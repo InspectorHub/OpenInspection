@@ -43,6 +43,10 @@ import {
   type ReportLoaderResult,
   type FilterKey,
 } from "~/components/portal/sections/ReportView";
+import {
+  ProgressView,
+  type ProgressSection,
+} from "~/components/portal/sections/ProgressView";
 
 export function meta() {
   return [{ title: "Inspection - OpenInspection" }];
@@ -72,7 +76,6 @@ function parseSection(v: string | null): HubSection {
 const NOT_YET_INLINED: HubSection[] = [
   "agreement",
   "payment",
-  "progress",
   "messages",
   "repair",
 ];
@@ -178,6 +181,54 @@ async function loadReportSection(
 }
 
 /* ------------------------------------------------------------------ */
+/* Progress section data — mirrors the standalone observe loader mapping,
+ * authenticated with the portal per-inspection token (ctx.token). */
+/* ------------------------------------------------------------------ */
+
+interface ProgressLoaderResult {
+  address: string;
+  date: string | null;
+  inspectorName: string;
+  status: string;
+  sections: ProgressSection[];
+  error: string | null;
+}
+
+async function loadProgressSection(
+  context: Route.LoaderArgs["context"],
+  inspectionId: string,
+  token: string,
+): Promise<ProgressLoaderResult> {
+  try {
+    const api = createApi(context);
+    const res = await api.publicReport.observe.inspections[":id"].$get({
+      param: { id: inspectionId },
+      query: { token: token || undefined },
+    });
+    const body = res.ok ? await res.json() : {};
+    const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
+    const has = Object.keys(d).length > 0;
+    return {
+      address: (d.address as string | undefined) ?? "",
+      date: (d.date as string | null | undefined) ?? null,
+      inspectorName: (d.inspectorName as string | undefined) ?? "",
+      status: (d.status as string | undefined) ?? "",
+      sections: (d.sections as ProgressSection[] | undefined) ?? [],
+      error: res.ok && has ? null : "Inspection not found",
+    };
+  } catch {
+    return {
+      address: "",
+      date: null,
+      inspectorName: "",
+      status: "",
+      sections: [],
+      error: "Service unavailable",
+    };
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Loader */
 /* ------------------------------------------------------------------ */
 
@@ -268,6 +319,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   // Step 4 — lazily fetch ONLY the active section's data (decision C).
   let documents: DocumentItem[] | null = null;
   let report: ReportLoaderResult | null = null;
+  let progress: ProgressLoaderResult | null = null;
 
   if (section === "documents") {
     // Client documents (unified portal section ⑦) — fetch using the SAME cookie
@@ -289,11 +341,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     }
   } else if (section === "report") {
     report = await loadReportSection(context, request, tenant, inspectionId, ctxToken);
+  } else if (section === "progress") {
+    progress = await loadProgressSection(context, inspectionId, ctxToken);
   }
 
   // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, section, documents, report }),
+    JSON.stringify({ overview, ctx, section, documents, report, progress }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -308,12 +362,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function PortalInspection() {
-  const { overview, ctx, section, documents, report } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, documents, report, progress } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string };
     section: HubSection;
     documents: DocumentItem[] | null;
     report: ReportLoaderResult | null;
+    progress: ProgressLoaderResult | null;
   };
   const revalidator = useRevalidator();
   const { tenant, inspectionId, token } = ctx;
@@ -406,6 +461,17 @@ export default function PortalInspection() {
           inspectionId,
           token: token || undefined,
         })}
+      />
+    );
+  } else if (section === "progress" && progress) {
+    sectionSlot = (
+      <ProgressView
+        address={progress.address}
+        date={progress.date}
+        inspectorName={progress.inspectorName}
+        status={progress.status}
+        sections={progress.sections}
+        error={progress.error}
       />
     );
   } else if (NOT_YET_INLINED.includes(section)) {
