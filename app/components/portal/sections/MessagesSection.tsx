@@ -50,12 +50,17 @@ export function MessagesSection({ token }: { token: string }) {
       const res = await fetch(`/api/messages/public/${token}`);
       const json = (await res.json()) as Record<string, unknown>;
       if (json.success) {
-        const data = json.data as {
-          messages: Message[];
-          inspection?: InspectionInfo;
-        };
-        setMessages(data.messages ?? []);
-        if (data.inspection) setInspection(data.inspection);
+        // The public endpoint returns the messages array directly under `data`;
+        // tolerate the legacy `{ messages, inspection }` envelope too.
+        const data = json.data as
+          | Message[]
+          | { messages?: Message[]; inspection?: InspectionInfo };
+        if (Array.isArray(data)) {
+          setMessages(data);
+        } else {
+          setMessages(data.messages ?? []);
+          if (data.inspection) setInspection(data.inspection);
+        }
       }
     } catch {
       /* silent */
