@@ -1,5 +1,4 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { tenants, inspections, reportVersions } from '../lib/db/schema';
@@ -8,78 +7,18 @@ import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
-import { resolvePortalAccess, resolveObserverAccess } from '../lib/public-access';
+import { resolvePortalAccess, resolveObserverAccess, resolveOwnerPreview } from '../lib/public-access';
+// Re-export so existing callers that import resolveOwnerPreviewToken from this
+// module (e.g. tests) continue to work without changes.
+export { resolveOwnerPreviewToken } from '../lib/public-access';
 import { contentDisposition } from '../lib/content-disposition';
 import { loadVerifyData, loadReportVerifyData } from '../lib/verify-data';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
-import { verifyJwt, type JwtKeyring } from '../lib/jwt-keyring';
-import { classifyJwtPayload } from '../lib/auth/jwt-claims';
-import type { HonoConfig } from '../types/hono';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost, resolveTenantSlug } from '../lib/url';
 import { publicReportAccessAllowed } from '../lib/report-access';
 import { isReportPublished } from '../lib/status/report-status';
-
-/**
- * Testable core of the owner-session preview fallback. Given a raw session JWT
- * (Bearer value, already stripped of the "Bearer " prefix), the per-request
- * keyring, and an optional KV getter for password-change invalidation, returns
- * the authenticated user's tenantId — or null on ANY failure (missing token,
- * bad signature, expired, non-tenant class, or KV-invalidated). Fail-closed so
- * an invalid token can never widen public access.
- *
- * Ownership of a specific inspection is NOT asserted here; the caller hands the
- * returned tenantId to a tenant-scoped query (getReportData), which 404s on a
- * cross-tenant id.
- */
-export async function resolveOwnerPreviewToken(
-    token: string | undefined,
-    keyring: JwtKeyring | undefined,
-    kvGet?: (key: string) => Promise<string | null>,
-): Promise<string | null> {
-    if (!token || !keyring) return null;
-    try {
-        const payload = await verifyJwt(token, keyring);
-        const classification = classifyJwtPayload(payload);
-        if (classification?.kind !== 'tenant') return null;
-        // Honor KV session invalidation (password change/reset/delete) — mirror
-        // the global jwtAuthMiddleware so a revoked owner token can't preview.
-        const userId = payload.sub as string | undefined;
-        const tokenIat = payload.iat as number | undefined;
-        if (userId && kvGet) {
-            const invalidatedAt = await kvGet(`pwchanged:${userId}`);
-            if (invalidatedAt) {
-                const invalidatedTs = parseInt(invalidatedAt, 10);
-                if (!tokenIat || tokenIat < invalidatedTs) return null;
-            }
-        }
-        return classification.tenantId;
-    } catch {
-        return null;
-    }
-}
-
-/**
- * Owner-session preview fallback for the public report endpoints.
- *
- * The owner's "View report" link (dashboard / inspection hub) deep-links into
- * the public report tokenlessly so the inspector/admin can preview exactly what
- * a client sees. Those routes are otherwise gated by a per-recipient portal
- * token, which the owner does not hold. The global JWT middleware skips
- * `/api/public/*` (server/index.ts), so the owner's relayed session Bearer token
- * is never verified upstream — we verify it HERE instead.
- */
-async function resolveOwnerPreview(c: Context<HonoConfig>): Promise<string | null> {
-    const authHeader = c.req.header('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-    // Public client viewers carry no Bearer token — bail before touching the
-    // keyring or KV so the common (tokenless-public) path stays side-effect-free.
-    if (!token) return null;
-    const keyring = await c.var.keyringPromise?.catch(() => undefined);
-    const kv = c.env?.TENANT_CACHE;
-    return resolveOwnerPreviewToken(token, keyring, kv ? (k) => kv.get(k) : undefined);
-}
 
 /**
  * Render-token access path for headless PDF generation. The Cloudflare Browser
