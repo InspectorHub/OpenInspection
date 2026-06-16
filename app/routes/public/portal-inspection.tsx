@@ -13,7 +13,8 @@
  *   - browser cookie (or the freshly-issued one) → forwarded INTO the overview
  *     call, since the typed client does not auto-forward the browser cookie.
  */
-import { redirect, useLoaderData } from "react-router";
+import { redirect, useLoaderData, useRevalidator } from "react-router";
+import { useState } from "react";
 import type { Route } from "./+types/portal-inspection";
 import { createApi } from "~/lib/api-client.server";
 import InspectionHub, {
@@ -21,6 +22,11 @@ import InspectionHub, {
   type HubSection,
 } from "~/components/portal/InspectionHub";
 import type { StatusOverview } from "~/components/portal/InspectionStatusCards";
+import DocumentsSection, {
+  type DocumentItem,
+  type DocumentCategory,
+  type DocumentVisibility,
+} from "~/components/DocumentsSection";
 
 export function meta() {
   return [{ title: "Inspection - OpenInspection" }];
@@ -115,6 +121,25 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   const ctxToken = overviewToken || token || "";
   const ctx = { tenant, inspectionId, token: ctxToken };
 
+  // Client documents (unified portal section ⑦) — fetch using the SAME cookie
+  // value used for the overview call (freshly-minted exchange cookie or the
+  // incoming browser cookie). Best-effort: a non-OK response → empty list.
+  let documents: DocumentItem[] = [];
+  try {
+    const apiWorker = (context.cloudflare.env as unknown as { API_WORKER?: { fetch: typeof fetch } })
+      .API_WORKER;
+    const docsRes = await (apiWorker?.fetch ?? fetch)(
+      new Request(`https://internal/api/public/inspections/${inspectionId}/documents`, {
+        headers: { cookie: cookieForApi },
+      }),
+    );
+    if (docsRes.ok) {
+      documents = (((await docsRes.json()) as { data?: DocumentItem[] }).data ?? []) as DocumentItem[];
+    }
+  } catch {
+    // Best-effort: fail open to empty list
+  }
+
   // Step 3 — if ?to names a real deep-link section, jump straight there
   // (carrying the token), forwarding any freshly-issued session cookie.
   if (isDeepLinkSection(to)) {
@@ -125,7 +150,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 
   // Step 4 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx }),
+    JSON.stringify({ overview, ctx, documents }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -136,9 +161,94 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 }
 
 export default function PortalInspection() {
-  const { overview, ctx } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, documents } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string };
+    documents: DocumentItem[];
   };
-  return <InspectionHub overview={overview} ctx={ctx} activeSection="overview" />;
+  const revalidator = useRevalidator();
+  const { inspectionId, token } = ctx;
+
+  // Client-side upload/delete against the public document routes. The client is
+  // authenticated by the __Host-portal_session cookie (auto-sent same-origin);
+  // the token query is a harmless fallback included only when non-empty.
+  const [docUploading, setDocUploading] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
+  const tokenSuffix = token ? `?token=${encodeURIComponent(token)}` : "";
+
+  const onUpload = async (
+    file: File,
+    opts: { category: DocumentCategory; visibility: DocumentVisibility; label?: string },
+  ) => {
+    setDocError(null);
+    setDocUploading(true);
+    try {
+      // Client uploads are always client_visible server-side — no visibility param.
+      const qs = new URLSearchParams({
+        filename: file.name,
+        category: opts.category,
+        ...(opts.label ? { label: opts.label } : {}),
+        ...(token ? { token } : {}),
+      });
+      const res = await fetch(
+        `/api/public/inspections/${inspectionId}/documents?${qs}`,
+        {
+          method: "PUT",
+          headers: {
+            "content-type": file.type || "application/octet-stream",
+            "content-length": String(file.size),
+          },
+          body: file,
+        },
+      );
+      if (!res.ok) {
+        setDocError("Upload failed. Please try again.");
+        return;
+      }
+      revalidator.revalidate();
+    } catch {
+      setDocError("Upload failed. Please try again.");
+    } finally {
+      setDocUploading(false);
+    }
+  };
+
+  const onDelete = async (docId: string) => {
+    setDocError(null);
+    try {
+      const res = await fetch(
+        `/api/public/inspections/${inspectionId}/documents/${docId}${tokenSuffix}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) {
+        setDocError("Could not delete the document. Please try again.");
+        return;
+      }
+      revalidator.revalidate();
+    } catch {
+      setDocError("Could not delete the document. Please try again.");
+    }
+  };
+
+  return (
+    <InspectionHub
+      overview={overview}
+      ctx={ctx}
+      activeSection="overview"
+      documentsSlot={
+        <DocumentsSection
+          items={documents}
+          canUpload
+          showVisibilityToggle={false}
+          downloadHref={(docId) =>
+            `/api/public/inspections/${inspectionId}/documents/${docId}${tokenSuffix}`
+          }
+          onUpload={onUpload}
+          onDelete={onDelete}
+          uploading={docUploading}
+          error={docError}
+        />
+      }
+    />
+  );
 }

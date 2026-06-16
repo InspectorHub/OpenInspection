@@ -1,3 +1,4 @@
+import type React from "react";
 import InspectionStatusCards, { type StatusOverview } from "./InspectionStatusCards";
 
 /* ------------------------------------------------------------------ */
@@ -11,7 +12,8 @@ export type HubSection =
   | "payment"
   | "progress"
   | "messages"
-  | "repair";
+  | "repair"
+  | "documents";
 
 export interface HubLinkCtx {
   tenant: string;
@@ -50,6 +52,9 @@ export function hubSectionHref(section: HubSection, ctx: HubLinkCtx): string {
       return reportHref;
     case "repair":
       return `/repair-builder/${tenant}/${inspectionId}?token=${t}`;
+    case "documents":
+      // Inline section on THIS page — anchor-scroll, not a deep-link.
+      return "#documents";
   }
 }
 
@@ -65,16 +70,21 @@ const NAV: Array<{ section: HubSection; label: string }> = [
   { section: "progress", label: "Progress" },
   { section: "messages", label: "Messages" },
   { section: "repair", label: "Repair Request" },
+  { section: "documents", label: "Documents" },
 ];
 
 export default function InspectionHub({
   overview,
   ctx,
   activeSection = "overview",
+  documentsSlot,
 }: {
   overview: StatusOverview;
   ctx: HubLinkCtx;
   activeSection?: HubSection;
+  /** Inline Documents section supplied by the route (keeps this component
+   *  data-source-agnostic — see portal-inspection.tsx). */
+  documentsSlot?: React.ReactNode;
 }) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -111,6 +121,14 @@ export default function InspectionHub({
 
       {/* Overview body */}
       <InspectionStatusCards overview={overview} />
+
+      {/* Documents — inline section (anchor target for the nav). Supplied by the
+          route so this component stays presentational/data-source-agnostic. */}
+      {documentsSlot && (
+        <section id="documents" className="mt-8 scroll-mt-6">
+          {documentsSlot}
+        </section>
+      )}
     </div>
   );
 }
