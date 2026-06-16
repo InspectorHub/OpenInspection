@@ -663,6 +663,276 @@ describe('PATCH .../lists/:rrId — set intro', () => {
     });
 });
 
+// ---------------------------------------------------------------------------
+// Share view routes (Task 5)
+// ---------------------------------------------------------------------------
+//
+// These routes are PUBLIC — the shareToken is the credential.
+// All three (GET /share/:token, GET /share/:token/pdf, POST /share/:token/email)
+// run a publish gate: getByShareToken → inspect reportStatus → 403 if not published.
+//
+// Drizzle mock pattern for share routes:
+//   - The share gate calls getByShareToken on the service (not raw drizzle).
+//   - Then does ONE raw drizzle query on inspections (by inspectionId + tenantId)
+//     to check reportStatus + get propertyAddress.
+//   So the share drizzle mock only needs to handle one query.
+
+function makeShareDb(inspResult: unknown) {
+    const chain = {
+        select: () => chain,
+        from:   () => chain,
+        where:  () => ({
+            get: async () => inspResult,
+        }),
+    };
+    return chain;
+}
+
+function makeShareServices(overrides: {
+    getByShareToken?: ReturnType<typeof vi.fn>;
+    creditTotal?: ReturnType<typeof vi.fn>;
+    sendEmail?: ReturnType<typeof vi.fn>;
+} = {}) {
+    return {
+        portalAccess: { resolveToken: vi.fn().mockResolvedValue(null) },
+        inspection:   { resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
+        repairRequest: {
+            getByShareToken: overrides.getByShareToken ?? vi.fn().mockResolvedValue(null),
+            creditTotal:     overrides.creditTotal ?? vi.fn().mockResolvedValue(0),
+            // Keep stubs for existing CRUD routes so TS is happy
+            listMine:      vi.fn().mockResolvedValue([]),
+            create:        vi.fn().mockResolvedValue({ id: 'rr1', shareToken: 'tok-share' }),
+            get:           vi.fn().mockResolvedValue(null),
+            addItem:       vi.fn().mockResolvedValue({ id: 'item1' }),
+            updateItem:    vi.fn().mockResolvedValue(undefined),
+            removeItem:    vi.fn().mockResolvedValue(undefined),
+            setIntro:      vi.fn().mockResolvedValue(undefined),
+            assertCanEdit: vi.fn().mockResolvedValue(undefined),
+        },
+        email: {
+            sendEmail: overrides.sendEmail ?? vi.fn().mockResolvedValue({ delivered: true }),
+        },
+    };
+}
+
+const SHARE_RR = {
+    id:            'rr1',
+    tenantId:      't1',
+    inspectionId:  'insp1',
+    createdByKind: 'client',
+    createdByRef:  'buyer@example.com',
+    customIntro:   'Please review',
+    shareToken:    'share-tok-abc',
+    createdAt:     new Date('2026-01-01'),
+    updatedAt:     new Date('2026-01-01'),
+};
+const SHARE_ITEMS = [{ id: 'item1', requestedCreditCents: 5000, sortOrder: 0 }];
+const SHARE_INSP_PUBLISHED = { reportStatus: 'published', propertyAddress: '123 Main St' };
+const SHARE_INSP_UNPUBLISHED = { reportStatus: 'in_progress', propertyAddress: '123 Main St' };
+
+function buildShareApp(opts: {
+    rrResult?: { request: typeof SHARE_RR; items: typeof SHARE_ITEMS } | null;
+    inspResult?: typeof SHARE_INSP_PUBLISHED | typeof SHARE_INSP_UNPUBLISHED | null;
+    creditTotalResult?: number;
+    sendEmail?: ReturnType<typeof vi.fn>;
+    browserBinding?: unknown;
+}) {
+    const {
+        rrResult = { request: SHARE_RR, items: SHARE_ITEMS },
+        inspResult = SHARE_INSP_PUBLISHED,
+        creditTotalResult = 5000,
+        sendEmail,
+        browserBinding,
+    } = opts;
+
+    const getByShareToken = vi.fn().mockResolvedValue(rrResult);
+    const creditTotal = vi.fn().mockResolvedValue(creditTotalResult);
+    const svc = makeShareServices({ getByShareToken, creditTotal, sendEmail });
+
+    (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+        makeShareDb(inspResult),
+    );
+
+    const app = new OpenAPIHono<HonoConfig>();
+    app.use('*', async (c, next) => {
+        c.env = {
+            DB:           {},
+            APP_BASE_URL: 'https://app.example.com',
+            BROWSER:      browserBinding,
+        } as unknown as HonoConfig['Bindings'];
+        c.set('services', svc as unknown as HonoConfig['Variables']['services']);
+        await next();
+    });
+    app.route('/api/public', repairBuilderRoutes);
+    return { app, svc };
+}
+
+describe('GET /api/public/repair-request/share/:shareToken', () => {
+    it('200 with propertyAddress + customIntro + items + creditTotal for published report', async () => {
+        const { app, svc } = buildShareApp({});
+
+        const res = await app.request('/api/public/repair-request/share/share-tok-abc');
+        expect(res.status).toBe(200);
+
+        const body = await res.json() as {
+            success: boolean;
+            data: {
+                propertyAddress: string;
+                customIntro: string | null;
+                items: unknown[];
+                creditTotal: number;
+            };
+        };
+        expect(body.success).toBe(true);
+        expect(body.data.propertyAddress).toBe('123 Main St');
+        expect(body.data.customIntro).toBe('Please review');
+        expect(body.data.items).toHaveLength(1);
+        expect(body.data.creditTotal).toBe(5000);
+
+        expect(svc.repairRequest.getByShareToken).toHaveBeenCalledWith('share-tok-abc');
+        expect(svc.repairRequest.creditTotal).toHaveBeenCalledWith('t1', 'rr1');
+    });
+
+    it('404 when shareToken is unknown', async () => {
+        const { app } = buildShareApp({ rrResult: null });
+
+        const res = await app.request('/api/public/repair-request/share/no-such-token');
+        expect(res.status).toBe(404);
+        const body = await res.json() as { success: false; error: { code: string } };
+        expect(body.success).toBe(false);
+        expect(body.error.code).toBe('NOT_FOUND');
+    });
+
+    it('403 NOT_PUBLISHED when report is in_progress — does NOT leak items', async () => {
+        const { app } = buildShareApp({ inspResult: SHARE_INSP_UNPUBLISHED });
+
+        const res = await app.request('/api/public/repair-request/share/share-tok-abc');
+        expect(res.status).toBe(403);
+        const body = await res.json() as { success: false; error: { code: string } };
+        expect(body.success).toBe(false);
+        expect(body.error.code).toBe('NOT_PUBLISHED');
+        // Must not contain items
+        expect(JSON.stringify(body)).not.toContain('item1');
+    });
+
+    it('403 NOT_PUBLISHED when inspection row missing (safety)', async () => {
+        const { app } = buildShareApp({ inspResult: null });
+
+        const res = await app.request('/api/public/repair-request/share/share-tok-abc');
+        expect(res.status).toBe(403);
+        const body = await res.json() as { success: false; error: { code: string } };
+        expect(body.error.code).toBe('NOT_PUBLISHED');
+    });
+});
+
+describe('GET /api/public/repair-request/share/:shareToken/pdf', () => {
+    it('403 NOT_PUBLISHED when report is unpublished', async () => {
+        const { app } = buildShareApp({ inspResult: SHARE_INSP_UNPUBLISHED });
+
+        const res = await app.request('/api/public/repair-request/share/share-tok-abc/pdf');
+        expect(res.status).toBe(403);
+        const body = await res.json() as { success: false; error: { code: string } };
+        expect(body.error.code).toBe('NOT_PUBLISHED');
+    });
+
+    it('404 when shareToken is unknown', async () => {
+        const { app } = buildShareApp({ rrResult: null });
+
+        const res = await app.request('/api/public/repair-request/share/no-token/pdf');
+        expect(res.status).toBe(404);
+    });
+
+    it('200 with PDF bytes when BROWSER stub returns ok response', async () => {
+        const fakeBuffer = new ArrayBuffer(4);
+        const browserStub = {
+            quickAction: vi.fn().mockResolvedValue({
+                ok: true,
+                arrayBuffer: async () => fakeBuffer,
+            }),
+        };
+
+        const { app } = buildShareApp({ browserBinding: browserStub });
+
+        const res = await app.request('/api/public/repair-request/share/share-tok-abc/pdf');
+        expect(res.status).toBe(200);
+        expect(res.headers.get('Content-Type')).toBe('application/pdf');
+        expect(res.headers.get('Content-Disposition')).toContain('repair-request.pdf');
+        // Confirm the page URL passed to quickAction
+        expect(browserStub.quickAction).toHaveBeenCalledWith('pdf', expect.objectContaining({
+            url: expect.stringContaining('/repair-request/share-tok-abc'),
+        }));
+    });
+});
+
+describe('POST /api/public/repair-request/share/:shareToken/email', () => {
+    it('403 NOT_PUBLISHED when report is unpublished', async () => {
+        const { app } = buildShareApp({ inspResult: SHARE_INSP_UNPUBLISHED });
+
+        const res = await app.request('/api/public/repair-request/share/share-tok-abc/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: 'contractor@example.com' }),
+        });
+        expect(res.status).toBe(403);
+        const body = await res.json() as { success: false; error: { code: string } };
+        expect(body.error.code).toBe('NOT_PUBLISHED');
+    });
+
+    it('404 when shareToken is unknown', async () => {
+        const { app } = buildShareApp({ rrResult: null });
+
+        const res = await app.request('/api/public/repair-request/share/no-token/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: 'contractor@example.com' }),
+        });
+        expect(res.status).toBe(404);
+    });
+
+    it('400 when "to" is missing or not a valid email', async () => {
+        const { app } = buildShareApp({});
+
+        const res = await app.request('/api/public/repair-request/share/share-tok-abc/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: 'not-an-email' }),
+        });
+        expect(res.status).toBe(400);
+    });
+
+    it('200 on published report with valid email — calls sendEmail', async () => {
+        const sendEmail = vi.fn().mockResolvedValue({ delivered: true });
+        const { app, svc } = buildShareApp({ sendEmail });
+
+        const res = await app.request('/api/public/repair-request/share/share-tok-abc/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: 'contractor@example.com', message: 'Please review.' }),
+        });
+        expect(res.status).toBe(200);
+        const body = await res.json() as { success: boolean };
+        expect(body.success).toBe(true);
+
+        expect(svc.email.sendEmail).toHaveBeenCalledWith(
+            ['contractor@example.com'],
+            expect.stringContaining('123 Main St'),
+            expect.any(String),
+        );
+    });
+
+    it('200 on published report with no optional message', async () => {
+        const sendEmail = vi.fn().mockResolvedValue({ delivered: true });
+        const { app } = buildShareApp({ sendEmail });
+
+        const res = await app.request('/api/public/repair-request/share/share-tok-abc/email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ to: 'contractor@example.com' }),
+        });
+        expect(res.status).toBe(200);
+    });
+});
+
 describe('assertCanEdit: different creator cannot edit', () => {
     it('403 when a different client ref tries to POST an item to a list they do not own', async () => {
         const { AppError: AE } = await import('../../server/lib/errors');

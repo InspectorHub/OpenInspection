@@ -23,6 +23,8 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { resolvePortalAccess, resolveOwnerPreviewFull } from '../lib/public-access';
 import { isReportPublished } from '../lib/status/report-status';
 import { flattenReportDefects } from '../lib/repair-defects';
+import { generatePdfFromUrl } from '../lib/pdf';
+import { checkRateLimit } from '../lib/rate-limit';
 import type { Creator } from '../services/repair-request.service';
 import type { HonoConfig } from '../types/hono';
 
@@ -358,6 +360,135 @@ const setIntroRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 // ---------------------------------------------------------------------------
+// Share routes — public (shareToken IS the credential), publish-gated
+// ---------------------------------------------------------------------------
+
+/**
+ * Share gate: look up the repair request by shareToken, then check that its
+ * inspection is currently published. Returns a structured result on success,
+ * or a Response (403/404) on failure.
+ *
+ * Also fetches `propertyAddress` so callers don't need a second query.
+ */
+async function runShareGate(
+    c: Context<HonoConfig>,
+    shareToken: string,
+): Promise<
+    | {
+          request: { id: string; tenantId: string; inspectionId: string; customIntro: string | null };
+          items: unknown[];
+          tenantId: string;
+          propertyAddress: string | null;
+      }
+    | Response
+> {
+    const result = await c.var.services.repairRequest.getByShareToken(shareToken);
+    if (!result) {
+        return c.json(
+            { success: false as const, error: { code: 'NOT_FOUND', message: 'Repair request not found.' } },
+            404,
+        );
+    }
+
+    const { request, items } = result;
+    const insp = await drizzle(c.env.DB)
+        .select({ reportStatus: inspections.reportStatus, propertyAddress: inspections.propertyAddress })
+        .from(inspections)
+        .where(and(eq(inspections.id, request.inspectionId), eq(inspections.tenantId, request.tenantId)))
+        .get();
+
+    if (!insp || !isReportPublished(insp.reportStatus)) {
+        return c.json(
+            { success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } },
+            403,
+        );
+    }
+
+    return {
+        request,
+        items,
+        tenantId: request.tenantId,
+        propertyAddress: insp.propertyAddress ?? null,
+    };
+}
+
+/** Derive the absolute base URL — mirrors repair-requests.ts. */
+function getBaseUrl(c: Context<HonoConfig>): string {
+    return (c.env.APP_BASE_URL || '').replace(/\/$/, '')
+        || (c.req.header('host') ? `https://${c.req.header('host')}` : '');
+}
+
+// Share route schemas
+
+const ShareTokenParamsSchema = z.object({
+    shareToken: z.string().describe('Opaque share token for the repair request.'),
+});
+
+const ShareViewResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        propertyAddress: z.string().nullable(),
+        customIntro:     z.string().nullable(),
+        items:           z.array(z.any()),
+        creditTotal:     z.number(),
+    }),
+});
+
+const ShareEmailBodySchema = z.object({
+    to:      z.string().email('Invalid email address'),
+    message: z.string().optional(),
+});
+
+const shareViewRoute = createRoute(withMcpMetadata({
+    method:  'get',
+    path:    '/repair-request/share/{shareToken}',
+    tags:    ['inspections', 'public'],
+    summary: 'Public share view of a repair request (publish-gated)',
+    request: { params: ShareTokenParamsSchema },
+    responses: {
+        200: { content: { 'application/json': { schema: ShareViewResponseSchema } }, description: 'Repair request share view' },
+        403: { description: 'Report not published' },
+        404: { description: 'Unknown share token' },
+    },
+    operationId: 'getRepairRequestShareView',
+    description: 'Returns the property address, custom intro, items, and credit total for a shared repair request. No login required; shareToken is the credential. Report must be published.',
+}, { scopes: [], tier: 'extended' }));
+
+const sharePdfRoute = createRoute(withMcpMetadata({
+    method:  'get',
+    path:    '/repair-request/share/{shareToken}/pdf',
+    tags:    ['inspections', 'public'],
+    summary: 'Download a PDF of a shared repair request (publish-gated)',
+    request: { params: ShareTokenParamsSchema },
+    responses: {
+        200: { description: 'PDF binary' },
+        403: { description: 'Report not published' },
+        404: { description: 'Unknown share token' },
+    },
+    operationId: 'getRepairRequestSharePdf',
+    description: 'Renders a PDF of the repair request share page via Browser Rendering. Report must be published.',
+}, { scopes: [], tier: 'extended' }));
+
+const shareEmailRoute = createRoute(withMcpMetadata({
+    method:  'post',
+    path:    '/repair-request/share/{shareToken}/email',
+    tags:    ['inspections', 'public'],
+    summary: 'Email a shared repair request link (publish-gated)',
+    request: {
+        params: ShareTokenParamsSchema,
+        body:   { content: { 'application/json': { schema: ShareEmailBodySchema } }, required: true },
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Email sent' },
+        400: { description: 'Invalid request body' },
+        403: { description: 'Report not published' },
+        404: { description: 'Unknown share token' },
+    },
+    operationId: 'emailRepairRequestShare',
+    description: 'Sends the share URL to a contractor or other recipient. Rate-limited. Report must be published.',
+}, { scopes: [], tier: 'extended' }));
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -509,7 +640,107 @@ export const repairBuilderRoutes = createApiRouter()
 
         await c.var.services.repairRequest.setIntro(tenantId, rrId, customIntro ?? null);
         return c.json({ success: true as const }, 200);
+    })
+
+    // -------------------------------------------------------------------------
+    // Share routes (Task 5) — public, publish-gated
+    // -------------------------------------------------------------------------
+
+    // GET /repair-request/share/:shareToken — share view data
+    .openapi(shareViewRoute, async (c) => {
+        const { shareToken } = c.req.valid('param');
+
+        const gateResult = await runShareGate(c, shareToken);
+        if (gateResult instanceof Response) return gateResult;
+
+        const { request, items, tenantId, propertyAddress } = gateResult;
+        const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, request.id);
+
+        return c.json({
+            success: true as const,
+            data: {
+                propertyAddress,
+                customIntro: request.customIntro,
+                items,
+                creditTotal,
+            },
+        }, 200);
+    })
+
+    // GET /repair-request/share/:shareToken/pdf — render PDF
+    .openapi(sharePdfRoute, async (c) => {
+        const { shareToken } = c.req.valid('param');
+
+        const gateResult = await runShareGate(c, shareToken);
+        if (gateResult instanceof Response) return gateResult;
+
+        const baseUrl = getBaseUrl(c);
+        const pageUrl = `${baseUrl}/repair-request/${shareToken}`;
+        const pdfBuffer = await generatePdfFromUrl(c.env.BROWSER, pageUrl);
+
+        return new Response(pdfBuffer, {
+            status: 200,
+            headers: {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': 'attachment; filename="repair-request.pdf"',
+            },
+        });
+    })
+
+    // POST /repair-request/share/:shareToken/email — send share link
+    .openapi(shareEmailRoute, async (c) => {
+        const { shareToken } = c.req.valid('param');
+        const body = c.req.valid('json');
+
+        const gateResult = await runShareGate(c, shareToken);
+        if (gateResult instanceof Response) return gateResult;
+
+        const { propertyAddress } = gateResult;
+
+        await checkRateLimit(c, 'book');
+
+        const baseUrl = getBaseUrl(c);
+        const shareUrl = `${baseUrl}/repair-request/${shareToken}`;
+        const safeAddress = escapeHtmlShare(propertyAddress || 'your property');
+        const safeMessage = body.message
+            ? escapeHtmlShare(body.message).replace(/\n/g, '<br/>')
+            : '';
+
+        const html = `
+            <div style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #0f172a;">
+                <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #64748b; margin: 0 0 4px;">Repair Request</p>
+                <h1 style="font-size: 22px; line-height: 1.25; font-weight: 600; margin: 0 0 16px;">${safeAddress}</h1>
+                <p style="font-size: 14px; line-height: 1.5; color: #475569;">
+                    A repair request list has been shared with you. Click the link below to review the items.
+                </p>
+                ${safeMessage ? `
+                <div style="margin-top: 20px; padding: 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px;">
+                    <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #64748b; margin: 0 0 8px;">Message</p>
+                    <p style="font-size: 14px; line-height: 1.6; margin: 0; white-space: pre-wrap;">${safeMessage}</p>
+                </div>` : ''}
+                <p style="margin-top: 24px;">
+                    <a href="${shareUrl}" style="display: inline-block; padding: 10px 16px; background: #0f172a; color: white; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 700;">View repair request</a>
+                </p>
+            </div>
+        `;
+
+        await c.var.services.email.sendEmail(
+            [body.to],
+            `Repair request — ${propertyAddress || 'your property'}`,
+            html,
+        );
+
+        return c.json({ success: true as const }, 200);
     });
+
+function escapeHtmlShare(s: string): string {
+    return s
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
 
 export type RepairBuilderApi = typeof repairBuilderRoutes;
 
