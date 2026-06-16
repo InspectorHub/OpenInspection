@@ -42,6 +42,7 @@ import type {
     PublicSlugApi,
     RatingSystemsApi,
     RecommendationsApi,
+    RepairBuilderApi,
     RepairRequestsApi,
     SecretsApi,
     ServicesApi,
@@ -145,6 +146,7 @@ export interface Api {
     publicSlug:         ReturnType<typeof hc<PublicSlugApi>>;
     ratingSystems:      ReturnType<typeof hc<RatingSystemsApi>>;
     recommendations:    ReturnType<typeof hc<RecommendationsApi>>;
+    repairBuilder:      ReturnType<typeof hc<RepairBuilderApi>>;
     repairRequests:     ReturnType<typeof hc<RepairRequestsApi>>;
     secrets:            ReturnType<typeof hc<SecretsApi>>;
     services:           ReturnType<typeof hc<ServicesApi>>;
@@ -208,6 +210,7 @@ const MOUNT: Record<keyof Api, string> = {
     publicSlug:         "/api/public",
     ratingSystems:      "/api/rating-systems",
     recommendations:    "/api/recommendations",
+    repairBuilder:      "/api/public",
     repairRequests:     "/api/public",
     secrets:            "/api/admin",
     services:           "/api/services",
@@ -289,6 +292,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         publicSlug:         mk<PublicSlugApi>(MOUNT.publicSlug),
         ratingSystems:      mk<RatingSystemsApi>(MOUNT.ratingSystems),
         recommendations:    mk<RecommendationsApi>(MOUNT.recommendations),
+        repairBuilder:      mk<RepairBuilderApi>(MOUNT.repairBuilder),
         repairRequests:     mk<RepairRequestsApi>(MOUNT.repairRequests),
         secrets:            mk<SecretsApi>(MOUNT.secrets),
         services:           mk<ServicesApi>(MOUNT.services),
