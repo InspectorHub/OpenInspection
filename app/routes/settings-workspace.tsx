@@ -33,7 +33,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const api = createApi(context, { token });
   const res = await api.adminBranding.branding.$get({});
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
-  return { branding: (body.data ?? {}) as Branding };
+  // The branding GET responds { success, data: { branding: {...fields} } }, so the
+  // fields live at body.data.branding — NOT body.data (that wrapper was making every
+  // field read back undefined, e.g. the Report Features toggles always appeared off).
+  const data = (body.data ?? {}) as Record<string, unknown>;
+  return { branding: ((data.branding ?? data) ?? {}) as Branding };
 }
 
 /* ------------------------------------------------------------------ */
