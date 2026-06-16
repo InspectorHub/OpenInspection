@@ -13,6 +13,7 @@ import { Form, useLoaderData, useActionData, useNavigation } from "react-router"
 import type { Route } from "./+types/portal";
 import { createApi } from "~/lib/api-client.server";
 import InspectionList, { type InspectionRow } from "~/components/portal/InspectionList";
+import { signOut } from "~/components/portal/sign-out";
 
 export function meta() {
   return [{ title: "Client Portal - OpenInspection" }];
@@ -76,14 +77,24 @@ export default function PortalLanding() {
   const submitting = navigation.state === "submitting";
 
   if (data.authed) {
+    const tenant = data.tenant;
     return (
       <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-        <div>
-          <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
-            Client Portal
-          </p>
-          <h1 className="text-2xl font-bold text-ih-fg-1">My Inspections</h1>
-          <p className="text-[13px] text-ih-fg-3 mt-1">Signed in as {data.email}</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
+              Client Portal
+            </p>
+            <h1 className="text-2xl font-bold text-ih-fg-1">My Inspections</h1>
+            <p className="text-[13px] text-ih-fg-3 mt-1">Signed in as {data.email}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void signOut(tenant)}
+            className="shrink-0 h-9 px-3 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
+          >
+            Sign out
+          </button>
         </div>
         <InspectionList
           rows={data.inspections}

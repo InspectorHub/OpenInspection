@@ -31,6 +31,7 @@ import InspectionHub, {
   hubSectionNavHref,
   type HubSection,
 } from "~/components/portal/InspectionHub";
+import { signOut } from "~/components/portal/sign-out";
 import type { StatusOverview } from "~/components/portal/InspectionStatusCards";
 import DocumentsSection, {
   type DocumentItem,
@@ -674,6 +675,7 @@ export default function PortalInspection() {
       ctx={ctx}
       activeSection={section}
       sectionSlot={sectionSlot}
+      onSignOut={() => void signOut(tenant)}
     />
   );
 }

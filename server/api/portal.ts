@@ -20,7 +20,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
-import { getCookie, setCookie } from 'hono/cookie';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { signMagicLink, verifyMagicLink, verifyPortalSession, signPortalSession } from '../lib/portal-session';
@@ -179,6 +179,28 @@ const exchangeRoute = createRoute(withMcpMetadata({
         'by the public report links) for a __Host-portal_session cookie, so a client arriving ' +
         'from an email CTA lands in the portal already authenticated. Asserts the resolved ' +
         'grant tenant matches the path tenant AND the role is client/co_client (agent → 403).',
+}, { scopes: [], tier: 'extended' }));
+
+const logoutRoute = createRoute(withMcpMetadata({
+    method:  'post',
+    path:    '/{tenant}/logout',
+    tags:    ['public'],
+    summary: 'Sign out of the client portal',
+    request: {
+        params: TenantParam,
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ data: z.object({ ok: z.boolean().describe('Always true — the session cookie was cleared (idempotent).') }) }) } },
+            description: 'Session cookie cleared.',
+        },
+    },
+    operationId: 'portalLogout',
+    description:
+        'Signs the recipient out of the unified client portal by clearing the ' +
+        '__Host-portal_session cookie. Idempotent and tenant-agnostic — clearing the cookie ' +
+        'works regardless of whether a session exists or the slug resolves, so it is NOT ' +
+        'behind the session middleware and always returns 200 { ok: true }.',
 }, { scopes: [], tier: 'extended' }));
 
 const meRoute = createRoute(withMcpMetadata({
@@ -341,6 +363,14 @@ export const portalRoutes = portalRouter
         const sess = await signPortalSession(c.env.JWT_SECRET, grant.recipientEmail);
         setCookie(c, PORTAL_SESSION_COOKIE, sess, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
         return c.json({ data: { email: grant.recipientEmail } }, 200);
+    })
+    .openapi(logoutRoute, async (c) => {
+        // Tenant-agnostic + idempotent: clearing the cookie works regardless of
+        // whether a session or a resolvable slug exists, so we do NOT gate on
+        // resolveTenantId here. CLAUDE.md: deleteCookie on a `__Host-` cookie MUST
+        // pass { path: '/', secure: true } or it throws at runtime.
+        deleteCookie(c, PORTAL_SESSION_COOKIE, { path: '/', secure: true });
+        return c.json({ data: { ok: true } }, 200);
     })
     .openapi(meRoute, async (c) => {
         const tenantId = resolveTenantId(c);

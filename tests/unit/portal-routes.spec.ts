@@ -438,6 +438,39 @@ describe('portal API', () => {
         }, reqEnv());
         expect(res.status).toBe(403);
     });
+
+    it('POST /logout → 200 {data:{ok:true}} and clears the session cookie (with a session present)', async () => {
+        const app = buildApp();
+        const cookie = await signPortalSession(SECRET, 'a@x.com');
+        const res = await app.request('/api/portal/acme/logout', {
+            method: 'POST',
+            headers: { cookie: '__Host-portal_session=' + cookie },
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        expect((await res.json()).data.ok).toBe(true);
+        // deleteCookie emits a clearing Set-Cookie (Max-Age=0 / past expiry).
+        const setCookieHdr = res.headers.get('set-cookie') ?? '';
+        expect(setCookieHdr).toContain('__Host-portal_session=');
+        expect(setCookieHdr).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+    });
+
+    it('POST /logout → 200 idempotent even with NO session cookie present', async () => {
+        const app = buildApp();
+        const res = await app.request('/api/portal/acme/logout', {
+            method: 'POST',
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        expect((await res.json()).data.ok).toBe(true);
+    });
+
+    it('POST /logout → 200 even when the tenant slug is unresolved (clearing is tenant-agnostic)', async () => {
+        const app = buildApp(null);
+        const res = await app.request('/api/portal/nope/logout', {
+            method: 'POST',
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        expect((await res.json()).data.ok).toBe(true);
+    });
 });
 
 import { buildPortalUrl } from '../../server/lib/portal-urls';

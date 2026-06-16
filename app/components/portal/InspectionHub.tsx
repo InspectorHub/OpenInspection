@@ -61,6 +61,7 @@ export default function InspectionHub({
   ctx,
   activeSection = "overview",
   sectionSlot,
+  onSignOut,
 }: {
   overview: StatusOverview;
   ctx: HubLinkCtx;
@@ -69,15 +70,30 @@ export default function InspectionHub({
    *  so this component stays presentational/data-source-agnostic. Ignored on
    *  the "overview" tab (which always renders the status cards). */
   sectionSlot?: React.ReactNode;
+  /** Optional sign-out callback (clears the portal session + redirects). Owned by
+   *  the route so this component stays presentational/SSR-safe. When omitted, no
+   *  Sign out control is rendered. */
+  onSignOut?: () => void;
 }) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       {/* Header — always rendered for every section. */}
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-ih-fg-1">
-          {overview.address || "Inspection"}
-        </h1>
-        {overview.date && <p className="mt-1 text-sm text-ih-fg-3">{overview.date}</p>}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-ih-fg-1">
+            {overview.address || "Inspection"}
+          </h1>
+          {overview.date && <p className="mt-1 text-sm text-ih-fg-3">{overview.date}</p>}
+        </div>
+        {onSignOut && (
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="shrink-0 h-9 px-3 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
+          >
+            Sign out
+          </button>
+        )}
       </div>
 
       {/* Top nav — client-side <Link>s switching the ?section= query. */}
