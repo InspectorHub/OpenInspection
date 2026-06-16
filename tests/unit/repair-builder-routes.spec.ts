@@ -93,6 +93,7 @@ function makeServices(overrides: {
     resolveAgentViewToken?: ReturnType<typeof vi.fn>;
     getRepairList?: ReturnType<typeof vi.fn>;
     listMine?: ReturnType<typeof vi.fn>;
+    listMineWithItems?: ReturnType<typeof vi.fn>;
     // CRUD overrides
     create?: ReturnType<typeof vi.fn>;
     get?: ReturnType<typeof vi.fn>;
@@ -121,15 +122,17 @@ function makeServices(overrides: {
             accessToInspection: overrides.accessToInspection ?? vi.fn().mockResolvedValue(null),
         },
         repairRequest: {
-            listMine:      overrides.listMine ?? defaultListMine,
-            create:        overrides.create ?? vi.fn().mockResolvedValue({ id: 'rr1', shareToken: 'tok-share' }),
-            get:           overrides.get ?? vi.fn().mockResolvedValue(null),
-            addItem:       overrides.addItem ?? vi.fn().mockResolvedValue({ id: 'item1' }),
-            updateItem:    overrides.updateItem ?? vi.fn().mockResolvedValue(undefined),
-            removeItem:    overrides.removeItem ?? vi.fn().mockResolvedValue(undefined),
-            setIntro:      overrides.setIntro ?? vi.fn().mockResolvedValue(undefined),
-            creditTotal:   overrides.creditTotal ?? vi.fn().mockResolvedValue(0),
-            assertCanEdit: overrides.assertCanEdit ?? vi.fn().mockResolvedValue(undefined),
+            listMine:          overrides.listMine ?? defaultListMine,
+            // B1: source route now calls listMineWithItems; default to same value as listMine
+            listMineWithItems: overrides.listMineWithItems ?? overrides.listMine ?? defaultListMine,
+            create:            overrides.create ?? vi.fn().mockResolvedValue({ id: 'rr1', shareToken: 'tok-share' }),
+            get:               overrides.get ?? vi.fn().mockResolvedValue(null),
+            addItem:           overrides.addItem ?? vi.fn().mockResolvedValue({ id: 'item1' }),
+            updateItem:        overrides.updateItem ?? vi.fn().mockResolvedValue(undefined),
+            removeItem:        overrides.removeItem ?? vi.fn().mockResolvedValue(undefined),
+            setIntro:          overrides.setIntro ?? vi.fn().mockResolvedValue(undefined),
+            creditTotal:       overrides.creditTotal ?? vi.fn().mockResolvedValue(0),
+            assertCanEdit:     overrides.assertCanEdit ?? vi.fn().mockResolvedValue(undefined),
         },
     };
 }
@@ -460,8 +463,9 @@ describe('GET /api/public/repair-builder/:tenant/:id/lists/:rrId — get list', 
         expect(body.success).toBe(true);
         expect(body.data.items).toHaveLength(1);
         expect(body.data.creditTotal).toBe(5000);
-        expect(get).toHaveBeenCalledWith('t1', 'rr1');
-        expect(creditTotal).toHaveBeenCalledWith('t1', 'rr1');
+        // I1: get() and creditTotal() now receive inspectionId as 2nd arg.
+        expect(get).toHaveBeenCalledWith('t1', 'insp1', 'rr1');
+        expect(creditTotal).toHaveBeenCalledWith('t1', 'insp1', 'rr1');
     });
 
     it('404 when rr does not exist', async () => {
@@ -506,7 +510,8 @@ describe('POST .../lists/:rrId/items — add item', () => {
         const body = await res.json() as { success: boolean; data: Record<string, unknown> };
         expect(body.success).toBe(true);
         expect(body.data.id).toBe('item-new');
-        expect(assertCanEdit).toHaveBeenCalledWith('t1', 'rr1', { kind: 'client', ref: 'buyer@example.com' });
+        // I1: assertCanEdit now receives inspectionId as 2nd arg.
+        expect(assertCanEdit).toHaveBeenCalledWith('t1', 'insp1', 'rr1', { kind: 'client', ref: 'buyer@example.com' });
         // Route normalizes undefined optional fields to null per ItemInput.
         expect(addItem).toHaveBeenCalledWith('t1', 'rr1', { ...ITEM_BODY, commentSnapshot: null });
     });
@@ -579,8 +584,9 @@ describe('PATCH .../lists/:rrId/items/:itemId — update item', () => {
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean };
         expect(body.success).toBe(true);
-        expect(assertCanEdit).toHaveBeenCalledWith('t1', 'rr1', { kind: 'client', ref: 'buyer@example.com' });
-        expect(updateItem).toHaveBeenCalledWith('t1', 'rr1', 'item1', { requestedCreditCents: 10000, note: 'Updated note' });
+        // I1: assertCanEdit and updateItem now receive inspectionId as 2nd arg.
+        expect(assertCanEdit).toHaveBeenCalledWith('t1', 'insp1', 'rr1', { kind: 'client', ref: 'buyer@example.com' });
+        expect(updateItem).toHaveBeenCalledWith('t1', 'insp1', 'rr1', 'item1', { requestedCreditCents: 10000, note: 'Updated note' });
     });
 
     it('200 on valid patch (sortOrder only)', async () => {
@@ -598,7 +604,7 @@ describe('PATCH .../lists/:rrId/items/:itemId — update item', () => {
             body: JSON.stringify({ sortOrder: 3 }),
         });
         expect(res.status).toBe(200);
-        expect(updateItem).toHaveBeenCalledWith('t1', 'rr1', 'item1', { sortOrder: 3 });
+        expect(updateItem).toHaveBeenCalledWith('t1', 'insp1', 'rr1', 'item1', { sortOrder: 3 });
     });
 
     it('403 FORBIDDEN from assertCanEdit on patch', async () => {
@@ -636,8 +642,9 @@ describe('DELETE .../lists/:rrId/items/:itemId — remove item', () => {
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean };
         expect(body.success).toBe(true);
-        expect(assertCanEdit).toHaveBeenCalledWith('t1', 'rr1', { kind: 'client', ref: 'buyer@example.com' });
-        expect(removeItem).toHaveBeenCalledWith('t1', 'rr1', 'item1');
+        // I1: assertCanEdit and removeItem now receive inspectionId as 2nd arg.
+        expect(assertCanEdit).toHaveBeenCalledWith('t1', 'insp1', 'rr1', { kind: 'client', ref: 'buyer@example.com' });
+        expect(removeItem).toHaveBeenCalledWith('t1', 'insp1', 'rr1', 'item1');
     });
 
     it('403 FORBIDDEN from assertCanEdit on delete', async () => {
@@ -675,8 +682,9 @@ describe('PATCH .../lists/:rrId — set intro', () => {
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean };
         expect(body.success).toBe(true);
-        expect(assertCanEdit).toHaveBeenCalledWith('t1', 'rr1', { kind: 'client', ref: 'buyer@example.com' });
-        expect(setIntro).toHaveBeenCalledWith('t1', 'rr1', 'Please fix these items.');
+        // I1: assertCanEdit and setIntro now receive inspectionId as 2nd arg.
+        expect(assertCanEdit).toHaveBeenCalledWith('t1', 'insp1', 'rr1', { kind: 'client', ref: 'buyer@example.com' });
+        expect(setIntro).toHaveBeenCalledWith('t1', 'insp1', 'rr1', 'Please fix these items.');
     });
 
     it('200 when customIntro is null (clearing)', async () => {
@@ -694,7 +702,7 @@ describe('PATCH .../lists/:rrId — set intro', () => {
             body: JSON.stringify({ customIntro: null }),
         });
         expect(res.status).toBe(200);
-        expect(setIntro).toHaveBeenCalledWith('t1', 'rr1', null);
+        expect(setIntro).toHaveBeenCalledWith('t1', 'insp1', 'rr1', null);
     });
 
     it('403 FORBIDDEN from assertCanEdit on setIntro', async () => {
@@ -1010,5 +1018,82 @@ describe('assertCanEdit: different creator cannot edit', () => {
         expect(res.status).toBe(403);
         const body = await res.json() as { success: false; error: { code: string } };
         expect(body.error.code).toBe('FORBIDDEN');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// B1: source route hydration — mine[].items must be populated
+// ---------------------------------------------------------------------------
+
+describe('B1: GET .../source → mine[0].items is populated from persisted list', () => {
+    it('mine[0].items contains the item hydrated from get()', async () => {
+        // Simulate: listMine returns one RR row (as listMineWithItems does now),
+        // which already includes its items array.
+        const persistedItem = {
+            id: 'item-server-1',
+            findingKey: 'canned:s1:item1:roof',
+            sectionTitle: 'Roof',
+            itemLabel: 'Missing shingles',
+            commentSnapshot: 'worn',
+            requestedCreditCents: 25000,
+            note: null,
+            sortOrder: 0,
+        };
+        const rrWithItems = {
+            id: 'rr1',
+            inspectionId: 'insp1',
+            tenantId: 't1',
+            customIntro: null,
+            shareToken: 'share-tok',
+            items: [persistedItem],
+        };
+        const listMine = vi.fn().mockResolvedValue([rrWithItems]);
+        const resolveToken = vi.fn().mockResolvedValue(VALID_TOKEN_ROW);
+
+        const { app } = buildApp({
+            services: makeServices({ portalAccessResolveToken: resolveToken, listMine }),
+            dbFactory: makeGatePassDb,
+        });
+
+        const res = await app.request('/api/public/repair-builder/t1/insp1/source?token=tok1');
+        expect(res.status).toBe(200);
+
+        const body = await res.json() as {
+            success: boolean;
+            data: { defects: unknown[]; mine: Array<{ id: string; items: unknown[] }> };
+        };
+        expect(body.success).toBe(true);
+        expect(body.data.mine).toHaveLength(1);
+        // The mine entry must carry the items array so the builder page can rehydrate
+        expect(body.data.mine[0].items).toHaveLength(1);
+        expect((body.data.mine[0].items[0] as Record<string, unknown>).findingKey).toBe('canned:s1:item1:roof');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// I1: cross-inspection read via authed route — must return 404
+// ---------------------------------------------------------------------------
+
+describe('I1: GET /lists/:rrId — list belonging to inspection B is NOT returned for inspection A', () => {
+    it('404 when rrId belongs to inspectionId B but URL uses inspectionId A', async () => {
+        // The service's get() now takes (tenantId, inspectionId, rrId).
+        // When rrId belongs to 'insp-B' but the URL says 'insp-A', get() returns null → 404.
+        const get = vi.fn().mockResolvedValue(null); // inspectionId mismatch → null
+        const resolveToken = vi.fn().mockResolvedValue(VALID_TOKEN_ROW); // grants access to insp1 (A)
+
+        const { app } = buildApp({
+            portalTokenRow: VALID_TOKEN_ROW,
+            services: makeServices({ portalAccessResolveToken: resolveToken, get }),
+            dbFactory: makeGatePassDb,
+        });
+
+        // rrId-of-B is on inspection B; URL says inspection insp1 (A)
+        const res = await app.request('/api/public/repair-builder/t1/insp1/lists/rrId-of-B?token=tok1');
+        expect(res.status).toBe(404);
+        const body = await res.json() as { success: false; error: { code: string } };
+        expect(body.error.code).toBe('NOT_FOUND');
+
+        // Verify the route DID pass inspectionId to get()
+        expect(get).toHaveBeenCalledWith('t1', 'insp1', 'rrId-of-B');
     });
 });

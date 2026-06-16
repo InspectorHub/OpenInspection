@@ -1,5 +1,5 @@
 /**
- * Interactive Repair Request Builder — source endpoint.
+ * Interactive Repair Request Builder — routes.
  *
  * GET /api/public/repair-builder/:tenant/:id/source
  *
@@ -9,8 +9,8 @@
  *   2. Publish — inspections.reportStatus must be 'published'
  *   3. Tenant  — tenant_configs.enable_customer_repair_export must be true
  *
- * NOT mounted in index.ts yet (Task 4). Export the router as default so Task 4
- * can mount it with a one-liner.
+ * Mounted in index.ts. All CRUD routes are scoped to (tenantId, inspectionId)
+ * to prevent cross-inspection reads within the same tenant.
  */
 
 import { createRoute, z } from '@hono/zod-openapi';
@@ -146,11 +146,12 @@ async function runBuilderGate(
 async function runAssertCanEdit(
     c: Context<HonoConfig>,
     tenantId: string,
+    inspectionId: string,
     rrId: string,
     creator: import('../services/repair-request.service').Creator,
 ): Promise<Response | null> {
     try {
-        await c.var.services.repairRequest.assertCanEdit(tenantId, rrId, creator);
+        await c.var.services.repairRequest.assertCanEdit(tenantId, inspectionId, rrId, creator);
         return null;
     } catch (err: unknown) {
         // AppError carries a `code` string. Map Forbidden/NotFound to explicit JSON.
@@ -427,7 +428,7 @@ async function runShareGate(
     };
 }
 
-/** Derive the absolute base URL — mirrors repair-requests.ts. */
+/** Derive the absolute base URL from env or the incoming Host header. */
 function getBaseUrl(c: Context<HonoConfig>): string {
     return (c.env.APP_BASE_URL || '').replace(/\/$/, '')
         || (c.req.header('host') ? `https://${c.req.header('host')}` : '');
@@ -526,9 +527,12 @@ export const repairBuilderRoutes = createApiRouter()
         if (gateResult) return gateResult;
 
         // --- Data fetch ---
+        // B1: use listMineWithItems so mine[].items is populated and the builder
+        // page can rehydrate initialSelected/initialDrafts/initialItemIds on reload
+        // without re-adding items (which would inflate creditTotal).
         const [defects, mine] = await Promise.all([
             flattenReportDefects(c.var.services.inspection, id, tenantId),
-            c.var.services.repairRequest.listMine(tenantId, id, creator),
+            c.var.services.repairRequest.listMineWithItems(tenantId, id, creator),
         ]);
 
         return c.json({ success: true as const, data: { defects, mine } }, 200);
@@ -560,11 +564,13 @@ export const repairBuilderRoutes = createApiRouter()
         const gateResult = await runBuilderGate(c, id, tenantId);
         if (gateResult) return gateResult;
 
-        const result = await c.var.services.repairRequest.get(tenantId, rrId);
+        // I1: scope get() to (tenantId, inspectionId) so a rrId from a different
+        // inspection within the same tenant is rejected with 404.
+        const result = await c.var.services.repairRequest.get(tenantId, id, rrId);
         if (!result) {
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Repair request not found.' } }, 404);
         }
-        const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, rrId);
+        const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, id, rrId);
         return c.json({ success: true as const, data: { request: result.request, items: result.items, creditTotal } }, 200);
     })
 
@@ -580,7 +586,8 @@ export const repairBuilderRoutes = createApiRouter()
         const gateResult = await runBuilderGate(c, id, tenantId);
         if (gateResult) return gateResult;
 
-        const guardResult = await runAssertCanEdit(c, tenantId, rrId, creator);
+        // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
+        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator);
         if (guardResult) return guardResult;
 
         // Map Zod-output (undefined optional) to service ItemInput (null optional)
@@ -608,15 +615,17 @@ export const repairBuilderRoutes = createApiRouter()
         const gateResult = await runBuilderGate(c, id, tenantId);
         if (gateResult) return gateResult;
 
-        const guardResult = await runAssertCanEdit(c, tenantId, rrId, creator);
+        // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
+        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator);
         if (guardResult) return guardResult;
 
         // Map Zod-output optional fields to service patch type (null not undefined).
-        const patch: Parameters<typeof c.var.services.repairRequest.updateItem>[3] = {};
+        const patch: Parameters<typeof c.var.services.repairRequest.updateItem>[4] = {};
         if (body.requestedCreditCents !== undefined) patch.requestedCreditCents = body.requestedCreditCents ?? null;
         if (body.note !== undefined) patch.note = body.note ?? null;
         if (body.sortOrder !== undefined) patch.sortOrder = body.sortOrder;
-        await c.var.services.repairRequest.updateItem(tenantId, rrId, itemId, patch);
+        // I1: pass inspectionId so the service guards against cross-inspection writes.
+        await c.var.services.repairRequest.updateItem(tenantId, id, rrId, itemId, patch);
         return c.json({ success: true as const }, 200);
     })
 
@@ -631,10 +640,12 @@ export const repairBuilderRoutes = createApiRouter()
         const gateResult = await runBuilderGate(c, id, tenantId);
         if (gateResult) return gateResult;
 
-        const guardResult = await runAssertCanEdit(c, tenantId, rrId, creator);
+        // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
+        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator);
         if (guardResult) return guardResult;
 
-        await c.var.services.repairRequest.removeItem(tenantId, rrId, itemId);
+        // I1: pass inspectionId so the service guards against cross-inspection deletes.
+        await c.var.services.repairRequest.removeItem(tenantId, id, rrId, itemId);
         return c.json({ success: true as const }, 200);
     })
 
@@ -650,10 +661,12 @@ export const repairBuilderRoutes = createApiRouter()
         const gateResult = await runBuilderGate(c, id, tenantId);
         if (gateResult) return gateResult;
 
-        const guardResult = await runAssertCanEdit(c, tenantId, rrId, creator);
+        // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
+        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator);
         if (guardResult) return guardResult;
 
-        await c.var.services.repairRequest.setIntro(tenantId, rrId, customIntro ?? null);
+        // I1: pass inspectionId so the service guards against cross-inspection writes.
+        await c.var.services.repairRequest.setIntro(tenantId, id, rrId, customIntro ?? null);
         return c.json({ success: true as const }, 200);
     })
 
@@ -669,7 +682,8 @@ export const repairBuilderRoutes = createApiRouter()
         if (gateResult instanceof Response) return gateResult;
 
         const { request, items, tenantId, propertyAddress } = gateResult;
-        const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, request.id);
+        // Share routes use the RR's own inspectionId (already validated by runShareGate).
+        const creditTotal = await c.var.services.repairRequest.creditTotal(tenantId, request.inspectionId, request.id);
 
         return c.json({
             success: true as const,
