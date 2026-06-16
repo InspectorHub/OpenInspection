@@ -18,7 +18,16 @@ import { describe, it, expect, vi } from 'vitest';
 import { OpenAPIHono } from '@hono/zod-openapi';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+vi.mock('../../server/lib/public-access', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('../../server/lib/public-access')>();
+    return {
+        ...actual,
+        resolveOwnerPreviewFull: vi.fn().mockResolvedValue(null),
+    };
+});
+
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { resolveOwnerPreviewFull } from '../../server/lib/public-access';
 
 // Import AFTER mock registration
 // eslint-disable-next-line import/order
@@ -141,12 +150,14 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
         const getRepairList = vi.fn().mockResolvedValue({
             defects: [
                 {
-                    sectionId:    's1',
-                    sectionTitle: 'Roof',
-                    itemId:       'item1',
-                    itemLabel:    'Shingles',
-                    comment:      'Missing shingles',
-                    category:     'safety' as const,
+                    sectionId:        's1',
+                    sectionTitle:     'Roof',
+                    itemId:           'item1',
+                    itemLabel:        'Shingles',
+                    comment:          'Missing shingles',
+                    category:         'safety' as const,
+                    source:           'canned' as const,
+                    recommendationId: 'missing-shingles',
                 },
             ],
         });
@@ -168,7 +179,7 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
         };
         expect(body.success).toBe(true);
         expect(body.data.defects).toHaveLength(1);
-        expect((body.data.defects[0] as Record<string, unknown>).findingKey).toBe('_default:s1:item1');
+        expect((body.data.defects[0] as Record<string, unknown>).findingKey).toBe('canned:s1:item1:missing-shingles');
         expect((body.data.defects[0] as Record<string, unknown>).category).toBe('safety');
         expect(body.data.mine).toHaveLength(1);
 
@@ -254,5 +265,31 @@ describe('GET /api/public/repair-builder/:tenant/:id/source', () => {
         expect(res.status).toBe(200);
         // Creator should be {kind:'agent', ref: token string}
         expect(listMine).toHaveBeenCalledWith('t2', 'insp1', { kind: 'agent', ref: 'kvtok' });
+    });
+
+    it('403 NOT_PUBLISHED for owner-preview on an unpublished (in_progress) report', async () => {
+        // Simulate owner-preview: portal + agent tokens both null, but
+        // resolveOwnerPreviewFull (mocked at module level) resolves a valid session.
+        vi.mocked(resolveOwnerPreviewFull).mockResolvedValueOnce({
+            tenantId: 't1',
+            userId:   'user-owner',
+        });
+
+        const { app } = buildApp({
+            // No portal token — both path-1 and path-2 will resolve null.
+            reportStatus: 'in_progress',
+            enableCustomerRepairExport: true,
+        });
+
+        // Owner-preview uses Bearer JWT in Authorization header, not ?token=
+        const res = await app.request(
+            '/api/public/repair-builder/t1/insp1/source',
+            { headers: { Authorization: 'Bearer owner-jwt' } },
+        );
+
+        expect(res.status).toBe(403);
+        const body = await res.json() as { success: false; error: { code: string } };
+        expect(body.success).toBe(false);
+        expect(body.error.code).toBe('NOT_PUBLISHED');
     });
 });
