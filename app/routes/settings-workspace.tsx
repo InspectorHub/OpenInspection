@@ -233,10 +233,10 @@ export default function SettingsWorkspacePage() {
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Report Features</h3>
 
           <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input type="hidden" name={fields.enableRepairList.name} value="false" />
+            <input type="hidden" name="enableRepairList" value="false" />
             <input
               type="checkbox"
-              name={fields.enableRepairList.name}
+              name="enableRepairList"
               value="true"
               defaultChecked={branding.enableRepairList ?? false}
               className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
@@ -250,10 +250,10 @@ export default function SettingsWorkspacePage() {
           </label>
 
           <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input type="hidden" name={fields.enableCustomerRepairExport.name} value="false" />
+            <input type="hidden" name="enableCustomerRepairExport" value="false" />
             <input
               type="checkbox"
-              name={fields.enableCustomerRepairExport.name}
+              name="enableCustomerRepairExport"
               value="true"
               defaultChecked={branding.enableCustomerRepairExport ?? false}
               className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
