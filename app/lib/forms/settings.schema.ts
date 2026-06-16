@@ -122,6 +122,12 @@ export const workspaceSchema = z.object({
     .optional(),
   reportTheme: z.enum(THEMES).optional(),
   customReferralSources: z.string().optional(),
+  // Track E1 — gate the "Repair List" tab on published reports.
+  // The action reads these via fd.getAll() and appends to body directly;
+  // the schema entries ensure they are present in the field map for conform.
+  enableRepairList: z.boolean().optional(),
+  // Gate the client-driven "Build repair request" export on published reports.
+  enableCustomerRepairExport: z.boolean().optional(),
 });
 
 export type WorkspaceInput = z.infer<typeof workspaceSchema>;

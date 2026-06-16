@@ -18,6 +18,8 @@ interface Branding {
   logoUrl?: string | null;
   reportTheme?: string | null;
   customReferralSources?: string[];
+  enableRepairList?: boolean | null;
+  enableCustomerRepairExport?: boolean | null;
 }
 
 const THEMES = ["modern", "classic", "minimal"] as const;
@@ -72,6 +74,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       .map((s) => s.trim())
       .filter(Boolean);
   }
+
+  // Boolean feature flags — read via getAll() so the hidden "false" sibling
+  // and the checkbox "true" value are both visible; last entry wins.
+  const repairListVals = fd.getAll("enableRepairList");
+  body.enableRepairList = repairListVals[repairListVals.length - 1] === "true";
+  const repairExportVals = fd.getAll("enableCustomerRepairExport");
+  body.enableCustomerRepairExport = repairExportVals[repairExportVals.length - 1] === "true";
 
   const api = createApi(context, { token });
   // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
@@ -217,6 +226,45 @@ export default function SettingsWorkspacePage() {
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
             <p className="text-[11px] text-ih-fg-3">One label per line. Maximum 32 entries; duplicates are ignored.</p>
           </div>
+        </section>
+
+        {/* Report features */}
+        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Report Features</h3>
+
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input type="hidden" name={fields.enableRepairList.name} value="false" />
+            <input
+              type="checkbox"
+              name={fields.enableRepairList.name}
+              value="true"
+              defaultChecked={branding.enableRepairList ?? false}
+              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
+            />
+            <span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">Show repair list tab</span>
+              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
+                Displays a summarised Repair List tab on the published client report.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input type="hidden" name={fields.enableCustomerRepairExport.name} value="false" />
+            <input
+              type="checkbox"
+              name={fields.enableCustomerRepairExport.name}
+              value="true"
+              defaultChecked={branding.enableCustomerRepairExport ?? false}
+              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
+            />
+            <span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">Allow clients to build repair requests</span>
+              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
+                Lets clients, agents, and inspectors build a shareable repair-request addendum from a published report.
+              </span>
+            </span>
+          </label>
         </section>
 
         {form.errors && (
