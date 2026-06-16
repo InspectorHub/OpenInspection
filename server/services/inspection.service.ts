@@ -2218,16 +2218,25 @@ export class InspectionService {
         // report renders "Estimated cost: $X – $Y" badges on defect cards.
         let showEstimates = false;
         let reportTheme: 'modern' | 'classic' | 'minimal' = 'modern';
+        // Per-tenant report-feature flags surfaced to the published report so the
+        // client report can render the "View Repair List" and "Build repair request"
+        // entries. Read live here (not part of the cached report content).
+        let enableRepairList = false;
+        let enableCustomerRepairExport = false;
         try {
             const cfg = await db.select({
                 showEstimates: tenantConfigs.showEstimates,
                 reportTheme:   tenantConfigs.reportTheme,
+                enableRepairList: tenantConfigs.enableRepairList,
+                enableCustomerRepairExport: tenantConfigs.enableCustomerRepairExport,
             })
                 .from(tenantConfigs)
                 .where(eq(tenantConfigs.tenantId, tenantId))
                 .get();
             if (cfg) {
                 showEstimates = Boolean(cfg.showEstimates);
+                enableRepairList = Boolean(cfg.enableRepairList);
+                enableCustomerRepairExport = Boolean(cfg.enableCustomerRepairExport);
                 if (cfg.reportTheme === 'classic' || cfg.reportTheme === 'minimal') {
                     reportTheme = cfg.reportTheme;
                 }
@@ -2362,6 +2371,8 @@ export class InspectionService {
                 { id: 'Not Inspected', label: 'Not Inspected', abbreviation: 'NI', color: '#3b82f6', severity: 'minor', isDefect: false },
             ],
             showEstimates,
+            enableRepairList,
+            enableCustomerRepairExport,
             propertyFacts,
             // Layer-2 report signature + verification (see docs/superpowers/specs/report-signature).
             isPublished,
