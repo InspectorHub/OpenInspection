@@ -20,7 +20,7 @@
  *   - browser cookie (or the freshly-issued one) → forwarded INTO the overview
  *     call, since the typed client does not auto-forward the browser cookie.
  */
-import { redirect, useLoaderData, useRevalidator } from "react-router";
+import { redirect, useLoaderData, useRevalidator, useSearchParams } from "react-router";
 import type React from "react";
 import { useState } from "react";
 import type { Route } from "./+types/portal-inspection";
@@ -491,7 +491,14 @@ export default function PortalInspection() {
     invoice: InvoiceLoaderResult | null;
   };
   const revalidator = useRevalidator();
+  const [searchParams] = useSearchParams();
   const { tenant, inspectionId, token } = ctx;
+
+  // After Stripe's confirmPayment redirect the Hub reloads with
+  // ?redirect_status=succeeded. The webhook settles the invoice asynchronously,
+  // so show an optimistic "received" state (Pay button hidden) until the loader
+  // picks up the settled invoice on a later visit — mirrors invoice.tsx.
+  const justPaid = searchParams.get("redirect_status") === "succeeded";
 
   // Client-side upload/delete against the public document routes. The client is
   // authenticated by the __Host-portal_session cookie (auto-sent same-origin);
@@ -608,6 +615,7 @@ export default function PortalInspection() {
         brand={invoice.brand}
         inspectionId={inspectionId}
         error={invoice.error}
+        justPaid={justPaid}
       />
     );
   } else if (section === "messages") {
