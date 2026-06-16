@@ -211,6 +211,7 @@ export interface AppServices {
     contact: ContactService;
     invoice: InvoiceService;
     portalAccess: PortalAccessService;
+    portal: import('../services/portal.service').PortalService;
     service: ServiceService;
     automation: AutomationService;
     marketplace: MarketplaceService;
