@@ -1,13 +1,11 @@
 /**
  * Shared repair-defect flatten helper.
  *
- * Extracted so both the legacy public repair-request export
- * (`server/api/repair-requests.ts`) and the new Interactive Repair Request
- * Builder source endpoint (`server/api/repair-builder.ts`) can share the same
- * flatten without duplicating the loop.
+ * Used by the Interactive Repair Request Builder source endpoint
+ * (`server/api/repair-builder.ts`) to flatten the report defect list into
+ * a stable, keyed format.
  *
- * The RRB shape omits estimateLow/estimateHigh (RRB is pure-credit; estimates
- * are a display concern for the old static export, not for the builder). We add
+ * The RRB shape omits estimateLow/estimateHigh (RRB is pure-credit). We add
  * a stable `findingKey` so the builder can key its items against the report.
  */
 

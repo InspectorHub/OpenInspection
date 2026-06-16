@@ -79,7 +79,6 @@ import contractorTypesRoutes from './api/contractor-types';
 import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 import inspectionRequestsRoutes from './api/inspection-requests';
-import repairRequestRoutes from './api/repair-requests';
 import repairBuilderRoutes from './api/repair-builder';
 import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 import publicSlugRoutes from './api/public-slug';
@@ -461,11 +460,6 @@ const routes = app
   .route('/api/public', publicSlugRoutes)
   // Booking #7 Sprint A — authenticated profile endpoints (slug write).
   .route('/api/profile', profileRoutes)
-  // Sprint 3 Track B (S3-2) — Customer-driven Repair Request export.
-  // Public, token-gated like /report/:id; the email endpoint validates the
-  // per-tenant enable_customer_repair_export flag + payment + agreement gates
-  // before sending.
-  .route('/api/public', repairRequestRoutes)
   // RRB builder CRUD — interactive repair request list authoring (Task 4).
   .route('/api/public', repairBuilderRoutes)
   // UC-C-7 — public share-token mint (customer Forward report flow).
