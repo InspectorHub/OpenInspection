@@ -85,6 +85,7 @@ import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 import publicSlugRoutes from './api/public-slug';
 import publicShareRoutes from './api/public-share';
 import publicReportRoutes from './api/public-report';
+import clientDocumentsRoutes, { inspectorDocumentsRoutes } from './api/client-documents';
 import profileRoutes from './api/profile';
 import conciergeRoutes from './api/concierge';
 import sessionContextRoutes from './api/session-context';
@@ -447,6 +448,10 @@ const routes = app
   // so the URL carries inspection id + item id directly. Mounted before the
   // generic inspection routes finish registering so OpenAPI catches both.
   .route('/api/inspections', inspectionTagRoutes)
+  // Unified client portal ⑦ — authed INSPECTOR document routes. Shares the
+  // /api/inspections root (paths are /:id/documents). Behind the global JWT
+  // gate by default (/api/inspections/* is not in the isPublic allowlist).
+  .route('/api/inspections', inspectorDocumentsRoutes)
   .route('/api/tags', tagsRoutes)
   .route('/api/inspection-requests', inspectionRequestsRoutes)
   .route('/api/ai', aiRoutes)
@@ -465,6 +470,10 @@ const routes = app
   .route('/api/public', repairBuilderRoutes)
   // UC-C-7 — public share-token mint (customer Forward report flow).
   .route('/api/public', publicShareRoutes)
+  // Unified client portal ⑦ — client document streaming upload/list/download/delete
+  // (router defines /inspections/:id/documents). Session- OR token-gated; the
+  // global JWT middleware skips /api/public/* so auth is performed in-route.
+  .route('/api/public', clientDocumentsRoutes)
   // Track L (D6/D9) — public SMS opt-in resolve/confirm + inbound STOP/START webhook.
   .route('/api/public', smsPublicRoutes)
   // Unified client portal — magic-link request/redeem + session-gated data routes.

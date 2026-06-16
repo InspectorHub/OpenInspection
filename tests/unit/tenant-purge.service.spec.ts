@@ -20,8 +20,16 @@ function makeR2(objects: { key: string; size: number }[]) {
     const deleted: string[] = [];
     return {
         bucket: {
-            list: vi.fn(async () => ({ objects, truncated: false, cursor: undefined })),
-            delete: vi.fn(async (keys: string[]) => { deleted.push(...keys); }),
+            // Prefix-aware so the purge can sweep multiple prefixes (e.g. the
+            // `tenants/` photo tree AND the `uploads/` client-document tree).
+            list: vi.fn(async (opts?: { prefix?: string }) => ({
+                objects: opts?.prefix ? objects.filter(o => o.key.startsWith(opts.prefix!)) : objects,
+                truncated: false,
+                cursor: undefined,
+            })),
+            delete: vi.fn(async (keys: string[] | string) => {
+                deleted.push(...(Array.isArray(keys) ? keys : [keys]));
+            }),
         } as unknown as R2Bucket,
         deleted,
     };
@@ -150,6 +158,34 @@ describe('TenantPurgeService.purge', () => {
 
         const remaining = await testDb.select().from(schema.erasureLog).all();
         expect(remaining).toHaveLength(0);
+    });
+
+    it('purges client_uploads rows AND their R2 objects (uploads/ prefix)', async () => {
+        const { drizzle } = await import('drizzle-orm/d1');
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        const docKey = `uploads/${TENANT}/i-1/doc-1-prior-report.pdf`;
+        await testDb.insert(schema.clientUploads).values({
+            id: 'doc-1', tenantId: TENANT, inspectionId: 'i-1',
+            uploadedByKind: 'client', uploadedByRef: 'jane@test.com', uploadedByName: 'Jane',
+            category: 'prior_reports', visibility: 'client_visible',
+            r2Key: docKey, filename: 'prior-report.pdf', contentType: 'application/pdf',
+            sizeBytes: 1234, label: null, createdAt: new Date(),
+        });
+
+        // Both prefixes present: a tenant photo AND the client-document object.
+        const r2 = makeR2([
+            { key: `tenants/${TENANT}/p1.jpg`, size: 100 },
+            { key: docKey, size: 1234 },
+        ]);
+        const kv = makeKv();
+        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+        await svc.purge(TENANT);
+
+        // (a) rows gone
+        const remaining = await testDb.select().from(schema.clientUploads).all();
+        expect(remaining).toHaveLength(0);
+        // (b) R2 object for the client document was deleted
+        expect(r2.deleted).toContain(docKey);
     });
 
     it('destruction record is non-personal (no email/name/address columns)', async () => {

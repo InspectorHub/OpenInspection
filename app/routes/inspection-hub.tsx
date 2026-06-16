@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, Link, isRouteErrorResponse, useRouteError, useFetcher, useNavigate } from "react-router";
+import { useLoaderData, Link, isRouteErrorResponse, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
 import type { Route } from "./+types/inspection-hub";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -8,6 +8,11 @@ import { deriveBlockStates, formatCents, isReportShipped, type HubPayload } from
 import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import DocumentsSection, {
+  type DocumentItem,
+  type DocumentCategory,
+  type DocumentVisibility,
+} from "~/components/DocumentsSection";
 
 export function meta() {
   return [{ title: "Inspection - OpenInspection" }];
@@ -134,7 +139,27 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     // Best-effort: fail open on cap check (canPublishCap stays false)
   }
 
-  return { hub, smsConsent, reinspectCandidates, canPublishCap };
+  // Inspector documents (unified portal section ⑦). The inspector document
+  // routes are not in the typed client, so fetch the list directly via the
+  // in-process API binding, forwarding the request cookie for auth. Best-effort:
+  // a non-OK response degrades to an empty list.
+  let documents: DocumentItem[] = [];
+  try {
+    const apiWorker = (context.cloudflare.env as unknown as { API_WORKER?: { fetch: typeof fetch } })
+      .API_WORKER;
+    const docsRes = await (apiWorker?.fetch ?? fetch)(
+      new Request(`https://internal/api/inspections/${id}/documents`, {
+        headers: { cookie: request.headers.get("cookie") ?? "" },
+      }),
+    );
+    if (docsRes.ok) {
+      documents = (((await docsRes.json()) as { data?: DocumentItem[] }).data ?? []) as DocumentItem[];
+    }
+  } catch {
+    // Best-effort: fail open to empty list
+  }
+
+  return { hub, smsConsent, reinspectCandidates, canPublishCap, documents };
 }
 
 /* ------------------------------------------------------------------ */
@@ -354,10 +379,66 @@ export function reportActions(
 /* ------------------------------------------------------------------ */
 
 export default function InspectionHubPage() {
-  const { hub, smsConsent, reinspectCandidates, canPublishCap } = useLoaderData<typeof loader>();
+  const { hub, smsConsent, reinspectCandidates, canPublishCap, documents } = useLoaderData<typeof loader>();
   const { inspection, people, services, tenantSlug } = hub;
   const blocks = deriveBlockStates(hub);
   const navigate = useNavigate();
+  const revalidator = useRevalidator();
+
+  // Documents (unified portal section ⑦) — client-side upload/delete against the
+  // authed inspector document routes (same-origin → the JWT cookie auto-sends),
+  // then revalidate the loader to refresh the list.
+  const [docUploading, setDocUploading] = useState(false);
+  const [docError, setDocError] = useState<string | null>(null);
+
+  const onDocUpload = async (
+    file: File,
+    opts: { category: DocumentCategory; visibility: DocumentVisibility; label?: string },
+  ) => {
+    setDocError(null);
+    setDocUploading(true);
+    try {
+      const qs = new URLSearchParams({
+        filename: file.name,
+        category: opts.category,
+        visibility: opts.visibility,
+        ...(opts.label ? { label: opts.label } : {}),
+      });
+      const res = await fetch(`/api/inspections/${inspection.id}/documents?${qs}`, {
+        method: "PUT",
+        headers: {
+          "content-type": file.type || "application/octet-stream",
+          "content-length": String(file.size),
+        },
+        body: file,
+      });
+      if (!res.ok) {
+        setDocError("Upload failed. Please try again.");
+        return;
+      }
+      revalidator.revalidate();
+    } catch {
+      setDocError("Upload failed. Please try again.");
+    } finally {
+      setDocUploading(false);
+    }
+  };
+
+  const onDocDelete = async (docId: string) => {
+    setDocError(null);
+    try {
+      const res = await fetch(`/api/inspections/${inspection.id}/documents/${docId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        setDocError("Could not delete the document. Please try again.");
+        return;
+      }
+      revalidator.revalidate();
+    } catch {
+      setDocError("Could not delete the document. Please try again.");
+    }
+  };
 
   // Track L (E) — SMS consent attestation. Dedicated fetcher (never share).
   const attestSms = useFetcher<typeof action>();
@@ -821,6 +902,21 @@ export default function InspectionHubPage() {
           )}
         </Card>
       </div>
+
+      {/* Documents — shared section (unified portal ⑦). Renders regardless of
+          report status (uploads are pre/intra-inspection). Inspector can upload
+          with a visibility toggle and delete any document. */}
+      <DocumentsSection
+        items={documents}
+        canUpload
+        showVisibilityToggle
+        allowDeleteAny
+        downloadHref={(docId) => `/api/inspections/${inspection.id}/documents/${docId}`}
+        onUpload={onDocUpload}
+        onDelete={onDocDelete}
+        uploading={docUploading}
+        error={docError}
+      />
 
       {/* Send-agreement modal — custom (no window.confirm) */}
       {agreementModalOpen && (

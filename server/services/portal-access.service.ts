@@ -138,6 +138,28 @@ export class PortalAccessService {
         };
     }
 
+    /**
+     * Resolve the LIVE (non-revoked, non-expired) grant for a (recipientEmail,
+     * inspectionId) pair — used by the unified-portal SESSION-cookie path, where
+     * there is no URL `?token` to resolve. Returns the authoritative
+     * {tenantId, role, recipientEmail} from the row, or null if no live grant.
+     */
+    async resolveByEmailAndInspection(
+        email: string,
+        inspectionId: string,
+        now: number = Date.now(),
+    ): Promise<{ tenantId: string; role: 'client' | 'co_client' | 'agent'; recipientEmail: string } | null> {
+        const db = this.getDrizzle();
+        const row = await db.select().from(inspectionAccessTokens)
+            .where(and(
+                eq(inspectionAccessTokens.recipientEmail, email),
+                eq(inspectionAccessTokens.inspectionId, inspectionId),
+            )).get();
+        if (!row || row.revokedAt != null) return null;
+        if (row.expiresAt != null && row.expiresAt <= now) return null;
+        return { tenantId: row.tenantId, role: row.role as 'client' | 'co_client' | 'agent', recipientEmail: row.recipientEmail };
+    }
+
     /** Inspector "Reset access link" — revoke a recipient's current token. */
     async revokeForRecipient(inspectionId: string, recipientEmail: string): Promise<void> {
         const db = this.getDrizzle();

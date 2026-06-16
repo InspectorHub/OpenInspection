@@ -71,3 +71,5 @@ export { usageCounters } from './usage';
 // Repair Request Builder — buyer/agent/inspector negotiation lists per inspection.
 export { repairRequests, repairRequestItems } from './repair-request';
 export type { RepairRequest, RepairRequestItem } from './repair-request';
+// Client documents — bidirectional per-inspection uploads (clients + inspectors).
+export * from './client-upload';

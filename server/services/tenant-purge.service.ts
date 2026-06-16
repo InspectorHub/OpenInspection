@@ -8,6 +8,7 @@ import {
     availability, availabilityOverrides, inspectionAgreements,
     eventTypes, inspectionEvents, tenantDestructionRecords,
     inspectionInspectors, serviceInspectors, erasureLog, contractorTypes,
+    clientUploads,
 } from '../lib/db/schema';
 
 const TENANT_TABLES = [
@@ -17,6 +18,9 @@ const TENANT_TABLES = [
     inspectionAgreements, agreementSigners, agreementRequests, agreements, automationLogs,
     inspectionEvents, eventTypes, automations,
     inspectionServices, services, discountCodes, comments, contractorTypes, contacts,
+    // client_uploads (per-inspection documents) carry R2 objects under a SEPARATE
+    // `uploads/` prefix (swept below) — the rows must be purged with the tenant.
+    clientUploads,
     availabilityOverrides, availability, inspectionResults, inspections, templates,
     // erasureLog holds subject_email PII scoped by tenantId — must be purged on
     // whole-tenant teardown. Per-subject erasure retains it (Art. 5(2)/30 proof).
@@ -69,19 +73,24 @@ export class TenantPurgeService {
         }
 
         // 3. R2 list + batch delete (accumulate object count + byte totals for the
-        //    destruction record).
+        //    destruction record). Two prefixes hold this tenant's objects:
+        //      - `tenants/${tenantId}/`  — inspection photos / report assets
+        //      - `uploads/${tenantId}/`  — client_uploads documents (separate tree)
+        //    Both must be swept or the client documents orphan in R2.
         let r2Count = 0;
         let r2Bytes = 0;
-        let cursor: string | undefined;
-        do {
-            const list = await this.r2.list({ prefix: `tenants/${tenantId}/`, limit: 1000, ...(cursor ? { cursor } : {}) });
-            if (list.objects.length) {
-                await this.r2.delete(list.objects.map(o => o.key));
-                r2Count += list.objects.length;
-                r2Bytes += list.objects.reduce((sum, o) => sum + (o.size ?? 0), 0);
-            }
-            cursor = list.truncated ? list.cursor : undefined;
-        } while (cursor);
+        for (const prefix of [`tenants/${tenantId}/`, `uploads/${tenantId}/`]) {
+            let cursor: string | undefined;
+            do {
+                const list = await this.r2.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });
+                if (list.objects.length) {
+                    await this.r2.delete(list.objects.map(o => o.key));
+                    r2Count += list.objects.length;
+                    r2Bytes += list.objects.reduce((sum, o) => sum + (o.size ?? 0), 0);
+                }
+                cursor = list.truncated ? list.cursor : undefined;
+            } while (cursor);
+        }
 
         // 4. KV delete (best-effort)
         let kvCount = 0;
