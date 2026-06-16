@@ -8,9 +8,9 @@
  *   - ?section : which Hub section to render INLINE (phase ②+). Defaults to
  *     "overview". Client-side <Link> nav switches this without a full reload;
  *     the loader re-runs and lazily fetches only the active section's data.
- *   - ?to      : optional HubSection — jump straight to that section's interim
- *     deep-link (carrying the token), instead of rendering the hub. Transitional
- *     (removed in a later task).
+ *   - ?to      : optional HubSection — redirect to the Hub with that section
+ *     active inline (i.e. ?section=<to>, carrying the token + freshly-minted
+ *     session cookie). Email CTAs use ?to so clients land on a clean ?section URL.
  *
  * Per-section data (decision C): always fetch the cheap overview (header +
  * status cards), then LAZILY fetch ONLY the active section's payload.
@@ -28,7 +28,7 @@ import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { EMPTY_BRAND } from "~/lib/brand";
 import InspectionHub, {
-  hubSectionHref,
+  hubSectionNavHref,
   type HubSection,
 } from "~/components/portal/InspectionHub";
 import type { StatusOverview } from "~/components/portal/InspectionStatusCards";
@@ -87,23 +87,10 @@ function parseSection(v: string | null): HubSection {
   return v !== null && (HUB_SECTIONS as string[]).includes(v) ? (v as HubSection) : "overview";
 }
 
-// Sections that are NOT yet inlined — they fall through to a transitional
-// "Coming soon — open the full page" link (built from the interim deep-link).
-const NOT_YET_INLINED: HubSection[] = [];
-
-// HubSections that have an interim deep-link target. Used to validate the ?to
-// query (transitional; removed in a later task).
-const DEEP_LINK_SECTIONS: HubSection[] = [
-  "report",
-  "agreement",
-  "payment",
-  "progress",
-  "messages",
-  "repair",
-];
-
-function isDeepLinkSection(v: string | null): v is HubSection {
-  return v !== null && (DEEP_LINK_SECTIONS as string[]).includes(v);
+// Sections the ?to= email-CTA may jump to (every real Hub section except the
+// default "overview", which needs no redirect).
+function isJumpSection(v: string | null): v is HubSection {
+  return v !== null && v !== "overview" && (HUB_SECTIONS as string[]).includes(v);
 }
 
 /* ------------------------------------------------------------------ */
@@ -453,11 +440,12 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     (overview as StatusOverview & { signerToken?: string | null }).signerToken ?? null;
   const ctx = { tenant, inspectionId, token: ctxToken, messageToken, signerToken };
 
-  // Step 3 — if ?to names a real deep-link section, jump straight there
-  // (carrying the token), forwarding any freshly-issued session cookie.
-  // Transitional: removed in a later task.
-  if (isDeepLinkSection(to)) {
-    throw redirect(hubSectionHref(to, ctx), {
+  // Step 3 — if ?to names a real Hub section, jump straight to the Hub with that
+  // section active INLINE (carrying the token), forwarding any freshly-issued
+  // session cookie. Email CTAs use ?to so the URL the client lands on is a clean
+  // ?section= Hub URL rather than a ?to= one.
+  if (isJumpSection(to)) {
+    throw redirect(hubSectionNavHref(to, ctx), {
       headers: cookieToForward ? { "Set-Cookie": cookieToForward } : undefined,
     });
   }
@@ -676,19 +664,6 @@ export default function PortalInspection() {
         <p className="text-sm text-ih-fg-3">
           Messaging is not available for this inspection yet.
         </p>
-      </div>
-    );
-  } else if (NOT_YET_INLINED.includes(section)) {
-    // Transitional: until ③–⑥ inline these, offer a link to the full page.
-    sectionSlot = (
-      <div className="rounded-xl border border-ih-border bg-ih-bg-card p-6 text-center">
-        <p className="text-sm text-ih-fg-3">This section isn't available inline yet.</p>
-        <a
-          href={hubSectionHref(section, ctx)}
-          className="mt-3 inline-block text-sm font-semibold text-ih-primary hover:underline"
-        >
-          Open the full page
-        </a>
       </div>
     );
   }

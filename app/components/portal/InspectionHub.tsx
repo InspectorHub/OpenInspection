@@ -27,40 +27,7 @@ export interface HubLinkCtx {
 /* ------------------------------------------------------------------ */
 
 /**
- * Interim deep-links (phase ①) — these point at existing standalone pages.
- * Phases ②–⑥ will replace these with inline sections rendered inside the hub.
- *
- * Built with template strings (not URL) because the base is relative.
- */
-export function hubSectionHref(section: HubSection, ctx: HubLinkCtx): string {
-  const { tenant, inspectionId, token } = ctx;
-  const t = encodeURIComponent(token);
-  const reportHref = `/report/${tenant}/${inspectionId}?token=${t}`;
-  switch (section) {
-    case "overview":
-      return `/portal/${tenant}/i/${inspectionId}`;
-    case "report":
-      return reportHref;
-    case "agreement":
-      // The report page hosts the agreement gate; no signer token in hub ctx.
-      return reportHref;
-    case "payment":
-      return `/r/${inspectionId}/invoice`;
-    case "progress":
-      return `/observe/inspections/${inspectionId}?token=${t}`;
-    case "messages":
-      // No messageToken in hub ctx → fall back to the report page.
-      return reportHref;
-    case "repair":
-      return `/repair-builder/${tenant}/${inspectionId}?token=${t}`;
-    case "documents":
-      // Inline section on THIS page — anchor-scroll, not a deep-link.
-      return "#documents";
-  }
-}
-
-/**
- * Inline section nav target (phase ②+): a `?section=` query on THIS hub page.
+ * Inline section nav target: a `?section=` query on THIS hub page.
  * Client-side <Link> navigation re-runs the loader without a full reload, so the
  * header + nav stay rendered. The per-inspection ?token= is preserved when
  * present (email-CTA arrivals carry it; magic-link sessions don't need it).
