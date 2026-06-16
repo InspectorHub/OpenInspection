@@ -14,10 +14,11 @@ import type { HonoConfig } from '../../server/types/hono';
 import { ClientDocumentService } from '../../server/services/client-document.service';
 import { PortalAccessService } from '../../server/services/portal-access.service';
 import { signPortalSession } from '../../server/lib/portal-session';
-import clientDocumentsRoutes from '../../server/api/client-documents';
+import clientDocumentsRoutes, { inspectorDocumentsRoutes } from '../../server/api/client-documents';
 
 const TENANT = '00000000-0000-0000-0000-0000000000a1';
 const SECRET = 'test-jwt-secret';
+const INSPECTOR_USER = 'inspector-user-1';
 
 // Map-backed fake R2 bucket: supports put/get/delete. get() returns
 // `{ body }` where body is a Uint8Array (good enough for `new Response(body)`).
@@ -81,6 +82,16 @@ describe('client document routes (token-gated)', () => {
             await next();
         });
         app.route('/api/public', clientDocumentsRoutes);
+        // Authed inspector surface. Mirror the JWT middleware's context contract:
+        // it sets `tenantId` + a `user` object whose `.sub` is the user id. The
+        // global jwtAuthMiddleware would gate this in production; here a tiny
+        // middleware injects the identity so we exercise the router logic itself.
+        app.use('/api/inspections/*', async (c, next) => {
+            c.set('tenantId', TENANT);
+            c.set('user', { sub: INSPECTOR_USER, role: 'inspector', tenantId: TENANT } as never);
+            await next();
+        });
+        app.route('/api/inspections', inspectorDocumentsRoutes);
         return app;
     }
 
@@ -103,7 +114,12 @@ describe('client document routes (token-gated)', () => {
         });
         const docs = new ClientDocumentService({} as D1Database, makeFakeBucket());
         const app = buildApp(portalAccess, docs);
-        return { app, inspectionId, clientToken, otherClientToken, clientEmail, otherClientEmail };
+        // Issue requests as the seeded inspector. Identity is injected by the
+        // `/api/inspections/*` middleware in buildApp (tenantId + user.sub), so
+        // callers just hit the authed paths.
+        const authedInspectorRequest = (path: string, init?: RequestInit) =>
+            app.request(path, init, reqEnv());
+        return { app, inspectionId, clientToken, otherClientToken, clientEmail, otherClientEmail, authedInspectorRequest };
     }
 
     beforeEach(async () => {
@@ -194,5 +210,68 @@ describe('client document routes (token-gated)', () => {
         const list = await res.json();
         expect(list.data.length).toBe(1);
         expect(list.data[0].filename).toBe('mine.pdf');
+    });
+
+    describe('inspector document routes (authed)', () => {
+        it('inspector sees all incl client uploads and internal; can delete any; client cannot see internal', async () => {
+            const { app, inspectionId, clientToken, authedInspectorRequest } = await seedInspectionWithClientToken();
+            // Client uploads a client_visible doc via the public path.
+            await app.request(`/api/public/inspections/${inspectionId}/documents?filename=client.pdf&category=other&token=${clientToken}`,
+                { method: 'PUT', headers: { 'content-type': 'application/pdf', 'content-length': '1' }, body: new Uint8Array([1]) }, reqEnv());
+            // Inspector uploads an internal doc via the authed path.
+            const up = await authedInspectorRequest(`/api/inspections/${inspectionId}/documents?filename=internal.pdf&category=other&visibility=internal`,
+                { method: 'PUT', headers: { 'content-type': 'application/pdf', 'content-length': '1' }, body: new Uint8Array([1]) });
+            expect(up.status).toBe(200);
+            const upBody = await up.json();
+            expect(upBody.data.visibility).toBe('internal');
+
+            // Inspector list = ALL rows (no visibility filter).
+            const inspRes = await authedInspectorRequest(`/api/inspections/${inspectionId}/documents`);
+            const inspList = await inspRes.json();
+            expect(inspList.data.length).toBe(2);
+            // r2Key must never leak.
+            expect(inspList.data.every((d: Record<string, unknown>) => !('r2Key' in d))).toBe(true);
+            // Inspector sees refs.
+            expect(inspList.data.every((d: Record<string, unknown>) => 'uploadedByRef' in d)).toBe(true);
+
+            // Client list = client_visible only → just the client upload.
+            const cliList = await (await app.request(`/api/public/inspections/${inspectionId}/documents?token=${clientToken}`, {}, reqEnv())).json();
+            expect(cliList.data.length).toBe(1);
+            const clientDocId = cliList.data[0].id;
+
+            // Inspector can download a client-uploaded doc (no visibility gate).
+            const dl = await authedInspectorRequest(`/api/inspections/${inspectionId}/documents/${clientDocId}`);
+            expect(dl.status).toBe(200);
+            expect(dl.headers.get('content-disposition')).toMatch(/attachment/);
+            expect(dl.headers.get('x-content-type-options')).toBe('nosniff');
+
+            // Inspector can delete ANY row (here: the client's upload).
+            const del = await authedInspectorRequest(`/api/inspections/${inspectionId}/documents/${clientDocId}`, { method: 'DELETE' });
+            expect(del.status).toBe(200);
+            const after = await (await authedInspectorRequest(`/api/inspections/${inspectionId}/documents`)).json();
+            expect(after.data.length).toBe(1);
+        });
+
+        it('401 when tenantId/userId missing; bad visibility → 400; 404 on cross-inspection doc', async () => {
+            const { app, inspectionId, authedInspectorRequest } = await seedInspectionWithClientToken();
+            // No-identity app (does not inject tenantId/user).
+            const bare = new Hono<HonoConfig>();
+            bare.use('*', async (c, next) => {
+                c.set('services', { clientDocument: new ClientDocumentService({} as D1Database, makeFakeBucket()) } as never);
+                await next();
+            });
+            bare.route('/api/inspections', inspectorDocumentsRoutes);
+            const unauth = await bare.request(`/api/inspections/${inspectionId}/documents`, {}, reqEnv());
+            expect(unauth.status).toBe(401);
+
+            // Bad visibility enum.
+            const badVis = await authedInspectorRequest(`/api/inspections/${inspectionId}/documents?filename=x.pdf&category=other&visibility=nope`,
+                { method: 'PUT', headers: { 'content-type': 'application/pdf', 'content-length': '1' }, body: new Uint8Array([1]) });
+            expect(badVis.status).toBe(400);
+
+            // 404 when doc belongs to another inspection.
+            const notFound = await authedInspectorRequest(`/api/inspections/${inspectionId}/documents/nonexistent-doc`);
+            expect(notFound.status).toBe(404);
+        });
     });
 });
