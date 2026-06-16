@@ -54,6 +54,10 @@ export default [
     route("sms-optin/:token", "routes/public/sms-optin.tsx"),
     route("repair-request/:shareToken", "routes/public/repair-request.$shareToken.tsx"),
     route("repair-builder/:tenant/:id", "routes/public/repair-builder.$tenant.$id.tsx"),
+    // Unified client portal (phase ①) — magic-link login, My Inspections, per-inspection Hub.
+    route("portal/:tenant", "routes/public/portal.tsx"),
+    route("portal/:tenant/auth", "routes/public/portal-auth.tsx"),
+    route("portal/:tenant/i/:inspectionId", "routes/public/portal-inspection.tsx"),
     route(
       "agreements/print/:token",
       "routes/public/agreement-printable.tsx",

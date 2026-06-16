@@ -20,10 +20,11 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
-import { getCookie } from 'hono/cookie';
+import { getCookie, setCookie } from 'hono/cookie';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
-import { signMagicLink, verifyMagicLink, verifyPortalSession } from '../lib/portal-session';
+import { signMagicLink, verifyMagicLink, verifyPortalSession, signPortalSession } from '../lib/portal-session';
+import { resolvePortalAccess } from '../lib/public-access';
 import { getBaseUrl } from '../lib/url';
 import { logger } from '../lib/logger';
 import type { HonoConfig } from '../types/hono';
@@ -140,9 +141,38 @@ const redeemRoute = createRoute(withMcpMetadata({
     },
     operationId: 'portalRedeemLink',
     description:
-        'Validates a portal magic-link token (typ=ml) and returns the verified email. The ' +
-        'frontend route is responsible for exchanging this for a session cookie; this ' +
-        'endpoint only verifies the signed token and never sets a cookie.',
+        'Validates a portal magic-link token (typ=ml). On success it sets the ' +
+        '__Host-portal_session cookie (httpOnly/secure/SameSite=Lax) carrying the verified ' +
+        'email and returns that email so the frontend can render. Bad/expired token → 401.',
+}, { scopes: [], tier: 'extended' }));
+
+const exchangeRoute = createRoute(withMcpMetadata({
+    method:  'get',
+    path:    '/{tenant}/exchange',
+    tags:    ['public'],
+    summary: 'Upgrade a per-inspection access token into a portal session',
+    request: {
+        params: TenantParam,
+        query: z.object({
+            token:        z.string().describe('Per-inspection client/co_client access token from an email CTA link.'),
+            inspectionId: z.string().describe('Inspection identifier the access token is expected to grant.'),
+        }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ data: z.object({ email: z.string().describe('Recipient email carried by the access token; also written into the session cookie.') }) }) } },
+            description: 'Token valid for this tenant + inspection; session cookie set and email returned.',
+        },
+        401: { description: 'Access token missing, invalid, expired, revoked, or not for this inspection' },
+        403: { description: 'Token resolves to a different tenant, or to a non-client (e.g. agent) role' },
+        404: { description: 'Tenant slug not found' },
+    },
+    operationId: 'portalExchangeToken',
+    description:
+        'Exchanges a persistent per-(recipient, inspection) access token (the same family used ' +
+        'by the public report links) for a __Host-portal_session cookie, so a client arriving ' +
+        'from an email CTA lands in the portal already authenticated. Asserts the resolved ' +
+        'grant tenant matches the path tenant AND the role is client/co_client (agent → 403).',
 }, { scopes: [], tier: 'extended' }));
 
 const meRoute = createRoute(withMcpMetadata({
@@ -201,13 +231,17 @@ const overviewRoute = createRoute(withMcpMetadata({
 // Router
 // ---------------------------------------------------------------------------
 
-export const portalRoutes = createApiRouter();
+const portalRouter = createApiRouter();
 
-// Session gate covers only the data routes (NOT request-link / redeem).
-portalRoutes.use('/:tenant/me', portalSession);
-portalRoutes.use('/:tenant/inspections/*', portalSession);
+// Session gate covers only the data routes (NOT request-link / redeem / exchange).
+portalRouter.use('/:tenant/me', portalSession);
+portalRouter.use('/:tenant/inspections/*', portalSession);
 
-portalRoutes
+// IMPORTANT: capture the fluent `.openapi()` chain into the exported binding so
+// `typeof portalRoutes` carries every registered route into PortalApi. Assigning
+// the bare router (and applying `.openapi()` as discarded statements) would type
+// the client surface as `unknown` — mirror repair-builder.ts here.
+export const portalRoutes = portalRouter
     .openapi(requestLinkRoute, async (c) => {
         const tenantId = resolveTenantId(c);
         if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);
@@ -279,7 +313,28 @@ portalRoutes
         if (!verified) {
             return c.json({ error: 'Invalid or expired link' }, 401);
         }
+        const sess = await signPortalSession(c.env.JWT_SECRET, verified.email);
+        setCookie(c, PORTAL_SESSION_COOKIE, sess, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
         return c.json({ data: { email: verified.email } }, 200);
+    })
+    .openapi(exchangeRoute, async (c) => {
+        const tenantId = resolveTenantId(c);
+        if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);
+
+        const { token, inspectionId } = c.req.valid('query');
+        const grant = await resolvePortalAccess(c.var.services.portalAccess, token, inspectionId);
+        if (!grant) return c.json({ error: 'Invalid or expired token' }, 401);
+
+        // SECURITY: the token row is authoritative — it must point at THIS tenant
+        // and carry a client/co_client role. Reject agents (and any mismatch) so
+        // an agent's per-inspection token can never mint a client portal session.
+        if (grant.tenantId !== tenantId || (grant.role !== 'client' && grant.role !== 'co_client')) {
+            return c.json({ error: 'Forbidden' }, 403);
+        }
+
+        const sess = await signPortalSession(c.env.JWT_SECRET, grant.recipientEmail);
+        setCookie(c, PORTAL_SESSION_COOKIE, sess, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
+        return c.json({ data: { email: grant.recipientEmail } }, 200);
     })
     .openapi(meRoute, async (c) => {
         const tenantId = resolveTenantId(c);

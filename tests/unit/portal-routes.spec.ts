@@ -185,6 +185,27 @@ describe('portal API', () => {
         });
     }
 
+    // Minimal PortalAccessResolver stub: resolveToken reads the seeded access
+    // token rows directly from the test DB (mirrors PortalAccessService.resolveToken
+    // shape — returns inspectionId/tenantId/role/recipientEmail/revokedAt/expiresAt).
+    function makePortalAccessStub() {
+        return {
+            resolveToken: async (token: string) => {
+                const rows = await testDb.select().from(schema.inspectionAccessTokens);
+                const row = rows.find((r) => r.token === token);
+                if (!row) return null;
+                return {
+                    inspectionId: row.inspectionId,
+                    tenantId: row.tenantId,
+                    role: row.role as 'client' | 'co_client' | 'agent',
+                    recipientEmail: row.recipientEmail,
+                    revokedAt: row.revokedAt,
+                    expiresAt: row.expiresAt,
+                };
+            },
+        };
+    }
+
     function buildApp(tenantId: string | null = TENANT) {
         const portalSvc = new PortalService({} as D1Database, inspStub);
         sendEmail = vi.fn().mockResolvedValue({ delivered: true });
@@ -197,11 +218,30 @@ describe('portal API', () => {
             c.set('services', {
                 portal: portalSvc,
                 email: { sendEmail },
+                portalAccess: makePortalAccessStub(),
             } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
         app.route('/api/portal', portalRoutes);
         return app;
+    }
+
+    // Seed a token and return its raw token string (needed for the exchange tests,
+    // which must present the token by value).
+    async function seedTokenReturning(inspectionId: string, recipientEmail: string, role: 'client' | 'co_client' | 'agent' = 'client') {
+        const token = crypto.randomUUID();
+        await testDb.insert(schema.inspectionAccessTokens).values({
+            id: crypto.randomUUID(),
+            tenantId: TENANT,
+            inspectionId,
+            recipientEmail,
+            role,
+            token,
+            createdAt: Date.now(),
+            expiresAt: null,
+            revokedAt: null,
+        });
+        return token;
     }
 
     // JWT_SECRET is injected via the env arg to app.request().
@@ -269,9 +309,59 @@ describe('portal API', () => {
         const ok = await app.request(`/api/portal/acme/redeem?link=${encodeURIComponent(token)}`, {}, reqEnv());
         expect(ok.status).toBe(200);
         expect((await ok.json()).data.email).toBe('a@x.com');
+        // Redeem now establishes the session: __Host-portal_session must be set.
+        expect(ok.headers.get('set-cookie') ?? '').toContain('__Host-portal_session=');
 
         const bad = await app.request('/api/portal/acme/redeem?link=garbage', {}, reqEnv());
         expect(bad.status).toBe(401);
+    });
+
+    it('GET /exchange with a valid client token for the matching inspection → 200 + Set-Cookie', async () => {
+        await seedInspection('insp1');
+        const token = await seedTokenReturning('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+        const res = await app.request(
+            `/api/portal/acme/exchange?token=${encodeURIComponent(token)}&inspectionId=insp1`,
+            {}, reqEnv());
+        expect(res.status).toBe(200);
+        expect((await res.json()).data.email).toBe('a@x.com');
+        expect(res.headers.get('set-cookie') ?? '').toContain('__Host-portal_session=');
+    });
+
+    it('GET /exchange with a bad token → 401', async () => {
+        await seedInspection('insp1');
+        const app = buildApp();
+        const res = await app.request(
+            '/api/portal/acme/exchange?token=garbage&inspectionId=insp1', {}, reqEnv());
+        expect(res.status).toBe(401);
+    });
+
+    it('GET /exchange rejects a token whose inspection does not match → 401', async () => {
+        await seedInspection('insp1');
+        await seedInspection('insp2');
+        const token = await seedTokenReturning('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+        const res = await app.request(
+            `/api/portal/acme/exchange?token=${encodeURIComponent(token)}&inspectionId=insp2`,
+            {}, reqEnv());
+        expect(res.status).toBe(401);
+    });
+
+    it('GET /exchange rejects an agent-role token → 403', async () => {
+        await seedInspection('insp1');
+        const token = await seedTokenReturning('insp1', 'agent@x.com', 'agent');
+        const app = buildApp();
+        const res = await app.request(
+            `/api/portal/acme/exchange?token=${encodeURIComponent(token)}&inspectionId=insp1`,
+            {}, reqEnv());
+        expect(res.status).toBe(403);
+    });
+
+    it('GET /exchange returns 404 when the tenant slug is unresolved', async () => {
+        const app = buildApp(null);
+        const res = await app.request(
+            '/api/portal/nope/exchange?token=x&inspectionId=insp1', {}, reqEnv());
+        expect(res.status).toBe(404);
     });
 
     it('GET /me without a session cookie → 401', async () => {
