@@ -48,6 +48,7 @@ import { QBOService } from '../../services/qbo.service';
 import { IdentityService } from '../../services/identity.service';
 import { IntegrationsService } from '../../services/integrations.service';
 import { AnalyticsService } from '../../services/analytics.service';
+import { RepairRequestService } from '../../services/repair-request.service';
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
 
@@ -340,6 +341,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'analytics':
                     target.analytics = new AnalyticsService(c.env.DB);
+                    break;
+                case 'repairRequest':
+                    target.repairRequest = new RepairRequestService(c.env.DB);
                     break;
             }
             return target[prop];
