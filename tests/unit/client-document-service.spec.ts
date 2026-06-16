@@ -6,7 +6,7 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import {
-  ClientDocumentService, ALLOWED_EXTENSIONS, CAD_EXTENSIONS, MAX_BYTES, MAX_FILES,
+  ClientDocumentService, ALLOWED_EXTENSIONS, CAD_EXTENSIONS, MAX_BYTES, MAX_FILES, PayloadTooLargeError,
 } from '../../server/services/client-document.service';
 
 const TENANT = 't1';
@@ -16,7 +16,26 @@ function fakeBucket() {
   const store = new Map<string, Uint8Array>();
   return {
     store,
-    put: vi.fn(async (key: string, body: Uint8Array) => { store.set(key, body); }),
+    // Mirrors the real R2 put(key, value, options): for ReadableStream values
+    // it drains the stream (so the counting TransformStream runs and can error).
+    // If the stream errors mid-flight, nothing is persisted (atomic on error).
+    put: vi.fn(async (key: string, body: ReadableStream | Uint8Array | ArrayBuffer) => {
+      if (body instanceof Uint8Array) { store.set(key, body); return { key }; }
+      if (body instanceof ArrayBuffer) { store.set(key, new Uint8Array(body)); return { key }; }
+      const reader = (body as ReadableStream<Uint8Array>).getReader();
+      const chunks: Uint8Array[] = [];
+      for (;;) {
+        const { done, value } = await reader.read(); // throws if the stream errors
+        if (done) break;
+        if (value) chunks.push(value);
+      }
+      const total = chunks.reduce((n, c) => n + c.length, 0);
+      const bytes = new Uint8Array(total);
+      let off = 0;
+      for (const c of chunks) { bytes.set(c, off); off += c.length; }
+      store.set(key, bytes);
+      return { key };
+    }),
     get: vi.fn(async (key: string) => store.has(key) ? { body: store.get(key) } : null),
     delete: vi.fn(async (key: string) => { store.delete(key); }),
   };
@@ -63,6 +82,22 @@ describe('ClientDocumentService', () => {
     await svc.remove(TENANT, row.id);
     expect((await svc.list(TENANT, INSP)).length).toBe(0);
     expect(bucket.store.has(row.r2Key)).toBe(false);
+  });
+
+  it('create from a ReadableStream persists the MEASURED size, not a lied-about Content-Length', async () => {
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+        controller.close();
+      },
+    });
+    const row = await svc.create(TENANT, INSP,
+      { kind: 'client', ref: 'a@x.com', name: 'Ann' },
+      // meta.sizeBytes is a lie (999); the real stream is only 3 bytes.
+      { filename: 'lie.pdf', contentType: 'application/pdf', category: 'other', visibility: 'client_visible', label: null, sizeBytes: 999 },
+      stream);
+    expect(row.sizeBytes).toBe(3); // measured wins over declared
+    expect(bucket.store.get(row.r2Key)).toEqual(new Uint8Array([1, 2, 3]));
   });
 
   it('count is per uploader ref', async () => {

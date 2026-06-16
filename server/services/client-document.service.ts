@@ -24,6 +24,14 @@ export const ALLOWED_CONTENT_TYPES = new Set([
 
 const extOf = (name: string) => (name.split('.').pop() ?? '').toLowerCase();
 
+/** Thrown when an upload stream exceeds MAX_BYTES mid-stream (maps to HTTP 413). */
+export class PayloadTooLargeError extends Error {
+  constructor(message = 'File exceeds 100 MB.') {
+    super(message);
+    this.name = 'PayloadTooLargeError';
+  }
+}
+
 export interface UploadMeta {
   filename: string;
   contentType: string;
@@ -70,13 +78,49 @@ export class ClientDocumentService {
     this.assertValid({ filename: meta.filename, contentType: meta.contentType, sizeBytes: meta.sizeBytes, currentCount });
     const id = this.genId();
     const r2Key = `uploads/${tenantId}/${inspectionId}/${id}-${sanitizeFilename(meta.filename, 'file')}`;
-    await this.bucket.put(r2Key, body as ReadableStream, { httpMetadata: { contentType: meta.contentType } });
+
+    // Enforce MAX_BYTES against ACTUAL bytes (Content-Length is spoofable). For
+    // non-stream bodies (unit tests) measure byteLength directly; for streams,
+    // count bytes through a TransformStream and abort if the cap is exceeded.
+    let measuredSize: number;
+    if (body instanceof Uint8Array) {
+      measuredSize = body.byteLength;
+      await this.bucket.put(r2Key, body, { httpMetadata: { contentType: meta.contentType } });
+    } else if (body instanceof ArrayBuffer) {
+      measuredSize = body.byteLength;
+      await this.bucket.put(r2Key, body, { httpMetadata: { contentType: meta.contentType } });
+    } else {
+      let total = 0;
+      let overflowed = false;
+      const counter = new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          total += chunk.byteLength;
+          if (total > MAX_BYTES) {
+            overflowed = true;
+            controller.error(new PayloadTooLargeError());
+            return;
+          }
+          controller.enqueue(chunk);
+        },
+      });
+      try {
+        // R2 put is atomic on stream error: if the stream errors mid-flight the
+        // object is NOT persisted. We re-throw PayloadTooLargeError so the route
+        // can map it to 413.
+        await this.bucket.put(r2Key, body.pipeThrough(counter), { httpMetadata: { contentType: meta.contentType } });
+      } catch (err) {
+        if (overflowed || err instanceof PayloadTooLargeError) throw new PayloadTooLargeError();
+        throw err;
+      }
+      measuredSize = total;
+    }
+
     const row = {
       id, tenantId, inspectionId,
       uploadedByKind: by.kind, uploadedByRef: by.ref, uploadedByName: by.name,
       category: meta.category, visibility: meta.visibility,
       r2Key, filename: meta.filename, contentType: meta.contentType,
-      sizeBytes: meta.sizeBytes, label: meta.label,
+      sizeBytes: measuredSize, label: meta.label,
       createdAt: new Date(this.now()),
     };
     await this.db().insert(clientUploads).values(row);

@@ -26,7 +26,7 @@ import type { HonoConfig } from '../types/hono';
 import { resolvePortalAccess } from '../lib/public-access';
 import { verifyPortalSession } from '../lib/portal-session';
 import { contentDisposition } from '../lib/content-disposition';
-import { MAX_BYTES } from '../services/client-document.service';
+import { MAX_BYTES, PayloadTooLargeError } from '../services/client-document.service';
 import { DOCUMENT_CATEGORIES } from '../lib/db/schema';
 
 interface ClientActor {
@@ -97,7 +97,8 @@ clientDocumentsRoutes.put('/inspections/:id/documents', async (c) => {
             c.req.raw.body!,
         );
         return c.json({ data: { id: row.id, filename: row.filename, sizeBytes: row.sizeBytes, category: row.category } });
-    } catch {
+    } catch (err) {
+        if (err instanceof PayloadTooLargeError) return c.json({ error: 'File exceeds 100 MB.' }, 413);
         return c.json({ error: 'Upload rejected.' }, 400);
     }
 });
@@ -119,7 +120,7 @@ clientDocumentsRoutes.get('/inspections/:id/documents', async (c) => {
             createdAt: u.createdAt,
             uploadedByKind: u.uploadedByKind,
             uploadedByName: u.uploadedByName,
-            uploadedByRef: u.uploadedByRef,
+            isOwn: u.uploadedByRef === actor.ref,
             visibility: u.visibility,
             label: u.label,
         }));
