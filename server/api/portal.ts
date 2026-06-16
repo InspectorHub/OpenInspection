@@ -94,6 +94,7 @@ const HubOverviewSchema = z.object({
 const HubOverviewResponseSchema = HubOverviewSchema.extend({
     token: z.string().describe('Persistent per-inspection access token for building section deep-links.'),
     messageToken: z.string().nullable().describe('Per-inspection conversation token for the inline Messages section. Null when minting fails.'),
+    signerToken: z.string().nullable().describe("The recipient's OWN agreement signer token (email-matched) for the inline Agreement section. Null when the recipient is not a signer."),
 });
 
 // ---------------------------------------------------------------------------
@@ -383,9 +384,20 @@ export const portalRoutes = portalRouter
             logger.error('[portal] overview message token issue failed', {}, err instanceof Error ? err : undefined);
         }
 
+        // Resolve THIS recipient's OWN agreement signer token (email-matched) so
+        // the inline Agreement section can mount. SECURITY: getSignerLinkByEmail
+        // matches on the verified session email and NEVER returns a different
+        // signer's token. Best-effort (null on failure / non-signer recipient).
+        let signerToken: string | null = null;
+        try {
+            signerToken = await c.var.services.agreement.getSignerLinkByEmail(tenantId, inspectionId, email);
+        } catch (err) {
+            logger.error('[portal] overview signer token resolve failed', {}, err instanceof Error ? err : undefined);
+        }
+
         const overview = await c.var.services.portal.hubOverview(tenantId, inspectionId);
         if (!overview) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: { ...overview, token, messageToken } }, 200);
+        return c.json({ data: { ...overview, token, messageToken, signerToken } }, 200);
     });
 
 export type PortalApi = typeof portalRoutes;

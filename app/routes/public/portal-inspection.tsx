@@ -55,6 +55,10 @@ import {
 } from "~/components/portal/sections/RepairBuilderSection";
 import { MessagesSection } from "~/components/portal/sections/MessagesSection";
 import {
+  AgreementSection,
+  type AgreementData,
+} from "~/components/portal/sections/AgreementSection";
+import {
   PaymentSection,
   type InvoiceData,
 } from "~/components/portal/sections/PaymentSection";
@@ -85,9 +89,7 @@ function parseSection(v: string | null): HubSection {
 
 // Sections that are NOT yet inlined — they fall through to a transitional
 // "Coming soon — open the full page" link (built from the interim deep-link).
-const NOT_YET_INLINED: HubSection[] = [
-  "agreement",
-];
+const NOT_YET_INLINED: HubSection[] = [];
 
 // HubSections that have an interim deep-link target. Used to validate the ?to
 // query (transitional; removed in a later task).
@@ -338,6 +340,37 @@ async function loadInvoiceSection(
 }
 
 /* ------------------------------------------------------------------ */
+/* Agreement section data — mirrors the standalone agreement-sign loader.
+ * Fetched with the recipient's OWN email-matched signer token (NOT the
+ * per-inspection access token). The overview endpoint resolves that token
+ * server-side (email-matched, never cross-signer). A null signerToken means the
+ * recipient is not a signer → no agreement to render. */
+/* ------------------------------------------------------------------ */
+
+interface AgreementLoaderResult {
+  agreement: AgreementData | null;
+  error: string | null;
+}
+
+async function loadAgreementSection(
+  context: Route.LoaderArgs["context"],
+  signerToken: string | null,
+): Promise<AgreementLoaderResult> {
+  if (!signerToken) return { agreement: null, error: null };
+  try {
+    const api = createApi(context);
+    const res = (await api.bookings.agreements[":token"].$get({
+      param: { token: signerToken },
+    })) as unknown as Response;
+    const body = res.ok ? ((await res.json()) as { data?: AgreementData }) : {};
+    const d = (body as { data?: AgreementData }).data ?? null;
+    return { agreement: d, error: res.ok ? null : "Agreement not found" };
+  } catch {
+    return { agreement: null, error: "Service unavailable" };
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Loader */
 /* ------------------------------------------------------------------ */
 
@@ -400,7 +433,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       throw new Response("Not found", { status: 404 });
     }
     const body = (await res.json()) as {
-      data?: StatusOverview & { token?: string; messageToken?: string | null };
+      data?: StatusOverview & { token?: string; messageToken?: string | null; signerToken?: string | null };
     };
     if (!body.data) throw new Response("Not found", { status: 404 });
     overview = body.data;
@@ -416,7 +449,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   const ctxToken = overviewToken || token || "";
   const messageToken =
     (overview as StatusOverview & { messageToken?: string | null }).messageToken ?? null;
-  const ctx = { tenant, inspectionId, token: ctxToken, messageToken };
+  const signerToken =
+    (overview as StatusOverview & { signerToken?: string | null }).signerToken ?? null;
+  const ctx = { tenant, inspectionId, token: ctxToken, messageToken, signerToken };
 
   // Step 3 — if ?to names a real deep-link section, jump straight there
   // (carrying the token), forwarding any freshly-issued session cookie.
@@ -433,6 +468,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   let progress: ProgressLoaderResult | null = null;
   let repair: RepairLoaderResult | null = null;
   let invoice: InvoiceLoaderResult | null = null;
+  let agreement: AgreementLoaderResult | null = null;
 
   if (section === "documents") {
     // Client documents (unified portal section ⑦) — fetch using the SAME cookie
@@ -461,11 +497,14 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   } else if (section === "payment") {
     // Pay flow is keyed by inspection id (pay-intent + invoice) — no token.
     invoice = await loadInvoiceSection(context, inspectionId);
+  } else if (section === "agreement") {
+    // Uses the recipient's OWN email-matched signer token (from the overview).
+    agreement = await loadAgreementSection(context, signerToken);
   }
 
   // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, section, documents, report, progress, repair, invoice }),
+    JSON.stringify({ overview, ctx, section, documents, report, progress, repair, invoice, agreement }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -480,15 +519,16 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function PortalInspection() {
-  const { overview, ctx, section, documents, report, progress, repair, invoice } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, documents, report, progress, repair, invoice, agreement } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
-    ctx: { tenant: string; inspectionId: string; token: string; messageToken: string | null };
+    ctx: { tenant: string; inspectionId: string; token: string; messageToken: string | null; signerToken: string | null };
     section: HubSection;
     documents: DocumentItem[] | null;
     report: ReportLoaderResult | null;
     progress: ProgressLoaderResult | null;
     repair: RepairLoaderResult | null;
     invoice: InvoiceLoaderResult | null;
+    agreement: AgreementLoaderResult | null;
   };
   const revalidator = useRevalidator();
   const [searchParams] = useSearchParams();
@@ -616,6 +656,16 @@ export default function PortalInspection() {
         inspectionId={inspectionId}
         error={invoice.error}
         justPaid={justPaid}
+      />
+    );
+  } else if (section === "agreement") {
+    sectionSlot = (
+      <AgreementSection
+        agreement={agreement?.agreement ?? null}
+        error={agreement?.error ?? null}
+        tenant={tenant}
+        token={ctx.signerToken ?? ""}
+        actionPath={`/agreements/sign/${tenant}/${ctx.signerToken ?? ""}`}
       />
     );
   } else if (section === "messages") {
