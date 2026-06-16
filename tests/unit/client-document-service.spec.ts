@@ -16,9 +16,12 @@ function fakeBucket() {
   const store = new Map<string, Uint8Array>();
   return {
     store,
-    // Mirrors the real R2 put(key, value, options): for ReadableStream values
-    // it drains the stream (so the counting TransformStream runs and can error).
-    // If the stream errors mid-flight, nothing is persisted (atomic on error).
+    // Mirrors the real R2 put(key, value, options) for the NODE unit-test runner.
+    // NOTE: production streams via a workerd-only FixedLengthStream (records the
+    // DECLARED Content-Length and enforces it) — that path is NOT unit-testable
+    // and is covered by E2E. Under Node the service falls back to a byte-counting
+    // TransformStream, so this fake drains the stream (the counter runs and can
+    // error). If the stream errors mid-flight, nothing is persisted (atomic on error).
     put: vi.fn(async (key: string, body: ReadableStream | Uint8Array | ArrayBuffer) => {
       if (body instanceof Uint8Array) { store.set(key, body); return { key }; }
       if (body instanceof ArrayBuffer) { store.set(key, new Uint8Array(body)); return { key }; }
@@ -84,7 +87,12 @@ describe('ClientDocumentService', () => {
     expect(bucket.store.has(row.r2Key)).toBe(false);
   });
 
-  it('create from a ReadableStream persists the MEASURED size, not a lied-about Content-Length', async () => {
+  // Exercises the NODE FALLBACK stream branch (no FixedLengthStream global), which
+  // counts ACTUAL bytes. The PRODUCTION workerd path uses FixedLengthStream — it
+  // records the DECLARED Content-Length and aborts on a length mismatch, and is
+  // covered by E2E (not unit-testable here). This test asserts the fallback's
+  // cap-enforcing byte counting still works under Node.
+  it('create from a ReadableStream (Node fallback) counts ACTUAL bytes, not a lied-about Content-Length', async () => {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         controller.enqueue(new Uint8Array([1, 2, 3]));
@@ -96,7 +104,7 @@ describe('ClientDocumentService', () => {
       // meta.sizeBytes is a lie (999); the real stream is only 3 bytes.
       { filename: 'lie.pdf', contentType: 'application/pdf', category: 'other', visibility: 'client_visible', label: null, sizeBytes: 999 },
       stream);
-    expect(row.sizeBytes).toBe(3); // measured wins over declared
+    expect(row.sizeBytes).toBe(3); // fallback measures the actual stream
     expect(bucket.store.get(row.r2Key)).toEqual(new Uint8Array([1, 2, 3]));
   });
 

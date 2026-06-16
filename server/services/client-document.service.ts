@@ -79,9 +79,11 @@ export class ClientDocumentService {
     const id = this.genId();
     const r2Key = `uploads/${tenantId}/${inspectionId}/${id}-${sanitizeFilename(meta.filename, 'file')}`;
 
-    // Enforce MAX_BYTES against ACTUAL bytes (Content-Length is spoofable). For
-    // non-stream bodies (unit tests) measure byteLength directly; for streams,
-    // count bytes through a TransformStream and abort if the cap is exceeded.
+    // Enforce MAX_BYTES against ACTUAL bytes (Content-Length is spoofable). The
+    // non-stream branches (Uint8Array/ArrayBuffer) measure byteLength directly and
+    // are exercised by the unit tests. The ReadableStream branch is the real
+    // client/inspector path (`c.req.raw.body`) and is E2E-verified against workerd
+    // (FixedLengthStream is a workerd-only global, so it is NOT unit-testable).
     let measuredSize: number;
     if (body instanceof Uint8Array) {
       measuredSize = body.byteLength;
@@ -89,7 +91,30 @@ export class ClientDocumentService {
     } else if (body instanceof ArrayBuffer) {
       measuredSize = body.byteLength;
       await this.bucket.put(r2Key, body, { httpMetadata: { contentType: meta.contentType } });
+    } else if (typeof FixedLengthStream !== 'undefined') {
+      // PRODUCTION (workerd) path — E2E-verified; NOT reachable under the Node
+      // unit-test runner because FixedLengthStream is a workerd-only global.
+      // R2 put requires a known content length; FixedLengthStream supplies it AND
+      // enforces that the actual bytes equal the declared (Content-Length-derived)
+      // size — a client that under-declares to stream unbounded data gets aborted.
+      // meta.sizeBytes is already validated <= MAX_BYTES upstream (route 413 fast-path
+      // + assertValid), so this also bounds the stored object to the cap.
+      const fls = new FixedLengthStream(meta.sizeBytes);
+      // pump the request body into the fixed-length stream; R2 reads the readable end.
+      const pumped = body.pipeThrough(fls as unknown as ReadableWritablePair<Uint8Array, Uint8Array>);
+      try {
+        await this.bucket.put(r2Key, pumped, { httpMetadata: { contentType: meta.contentType } });
+      } catch {
+        // A length mismatch (client lied about Content-Length) surfaces here.
+        throw new PayloadTooLargeError();
+      }
+      measuredSize = meta.sizeBytes;
     } else {
+      // FALLBACK for the Node unit-test runner only (no FixedLengthStream global).
+      // Counts ACTUAL bytes through a TransformStream and aborts the put if the
+      // MAX_BYTES cap is exceeded — preserving the cap-enforcement property the
+      // workerd FixedLengthStream gives us. The production path above is the one
+      // that ships; this branch never executes in workerd.
       let total = 0;
       let overflowed = false;
       const counter = new TransformStream<Uint8Array, Uint8Array>({
@@ -104,9 +129,6 @@ export class ClientDocumentService {
         },
       });
       try {
-        // R2 put is atomic on stream error: if the stream errors mid-flight the
-        // object is NOT persisted. We re-throw PayloadTooLargeError so the route
-        // can map it to 413.
         await this.bucket.put(r2Key, body.pipeThrough(counter), { httpMetadata: { contentType: meta.contentType } });
       } catch (err) {
         if (overflowed || err instanceof PayloadTooLargeError) throw new PayloadTooLargeError();
