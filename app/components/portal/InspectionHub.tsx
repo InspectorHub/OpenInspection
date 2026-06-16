@@ -92,22 +92,6 @@ export default function InspectionHub({
           const active = n.section === activeSection;
           const base =
             "px-3 py-1.5 text-xs font-semibold rounded-full transition-colors";
-          if (n.section === "overview") {
-            return (
-              <a
-                key={n.section}
-                href={hubSectionHref(n.section, ctx)}
-                aria-current={active ? "page" : undefined}
-                className={`${base} ${
-                  active
-                    ? "bg-ih-primary text-ih-fg-inverse"
-                    : "text-ih-fg-3 hover:bg-ih-bg-muted"
-                }`}
-              >
-                {n.label}
-              </a>
-            );
-          }
           return (
             <a
               key={n.section}

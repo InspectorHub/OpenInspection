@@ -4,7 +4,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { auditFromContext } from '../lib/audit';
-import { getBookingHost, resolveTenantSlug } from '../lib/url';
+import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl, agreementSignUrl } from '../lib/public-urls';
 import { buildPortalUrl } from '../lib/portal-urls';
 import { safeISODate } from '../lib/date';
@@ -2664,7 +2664,7 @@ export const inspectionsRoutes = createApiRouter()
             const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: inspection.clientEmail, role: 'client' });
             // linkUrl now lands the no-login client on the unified portal hub
             // (overview) carrying the persistent portalAccess token.
-            const linkUrl = buildPortalUrl(getBookingHost(c), tenantSlug, id, reportToken);
+            const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
             // renderUrl: token-bearing URL for the headless browser PDF render.
             const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
             const clientEmail = inspection.clientEmail;
@@ -2737,7 +2737,7 @@ export const inspectionsRoutes = createApiRouter()
         const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: recipient, role: 'client' });
         // linkUrl now lands the no-login client on the unified portal hub
         // (overview) carrying the persistent portalAccess token.
-        const linkUrl = buildPortalUrl(getBookingHost(c), tenantSlug, id, reportToken);
+        const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
         // renderUrl: token-bearing URL for the headless browser PDF render.
         const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const address = inspection.propertyAddress as string;

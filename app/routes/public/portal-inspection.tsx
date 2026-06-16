@@ -67,10 +67,14 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       if (ex.status === 200) {
         const minted = ex.headers.get("set-cookie");
         if (minted) {
+          // Forward the FULL Set-Cookie value to the browser (it carries
+          // ; Path=/; HttpOnly; Secure; SameSite=Lax attributes).
           cookieToForward = minted;
-          // The Set-Cookie value's first `name=value;` pair is a valid Cookie
-          // header value for the same-request overview call.
-          cookieForApi = minted;
+          // A Cookie request header must be `name=value` only — slice off the
+          // attributes before reusing the minted cookie on the same-request
+          // overview call. Fall back to the incoming browser cookie.
+          const mintedCookiePair = minted.split(";")[0];
+          cookieForApi = mintedCookiePair || browserCookie;
         }
       }
     } catch {

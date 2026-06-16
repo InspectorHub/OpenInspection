@@ -424,4 +424,23 @@ describe('buildPortalUrl', () => {
     expect(buildPortalUrl('https://app.x.io/', 'acme', 'insp1', 'tok9'))
       .toBe('https://app.x.io/portal/acme/i/insp1?token=tok9');
   });
+
+  // Regression: the report-ready email must carry an ABSOLUTE link (scheme +
+  // host) so mail clients treat it as a URL, not a relative path. The prior
+  // bug was the *caller* wiring (inspections.ts passed getBookingHost(c), a
+  // bare host, where buildPortalUrl expects a full origin). buildPortalUrl
+  // does not invent a scheme, so its baseUrl MUST already include one — this
+  // test pins the contract that protects the fixed call sites.
+  it('keeps the link absolute (starts with http) when given a full origin', () => {
+    const url = buildPortalUrl('https://app.x.io', 'acme', 'insp1', 'tok9');
+    expect(url.startsWith('http')).toBe(true);
+    expect(new URL(url).protocol).toMatch(/^https?:$/);
+  });
+
+  it('produces a scheme-less (broken) link when given a BARE host — documents the prior caller bug', () => {
+    // This is the old buggy behavior: passing a bare host yields a relative-looking
+    // value with no scheme. The fix was at the call site (getBaseUrl, not getBookingHost).
+    const url = buildPortalUrl('inspectorhub.io', 'acme', 'insp1', 'tok9');
+    expect(url.startsWith('http')).toBe(false);
+  });
 });
