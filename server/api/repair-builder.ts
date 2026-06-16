@@ -241,22 +241,22 @@ const BuilderQuerySchema = z.object({
 });
 
 const ItemBodySchema = z.object({
-    findingKey:           z.string(),
-    sectionTitle:         z.string(),
-    itemLabel:            z.string(),
-    commentSnapshot:      z.string().nullable().optional(),
-    requestedCreditCents: z.number().int().min(0).nullable().optional(),
-    note:                 z.string().nullable().optional(),
+    findingKey:           z.string().describe('Stable per-defect key from the report source list.'),
+    sectionTitle:         z.string().describe('Report section title snapshot for this defect.'),
+    itemLabel:            z.string().describe('Report item label snapshot for this defect.'),
+    commentSnapshot:      z.string().nullable().optional().describe('Defect comment text snapshot at add time.'),
+    requestedCreditCents: z.number().int().min(0).nullable().optional().describe('Requested repair credit in integer cents.'),
+    note:                 z.string().nullable().optional().describe('Buyer note explaining the requested credit.'),
 });
 
 const ItemPatchSchema = z.object({
-    requestedCreditCents: z.number().int().min(0).optional(),
-    note:                 z.string().optional(),
-    sortOrder:            z.number().int().optional(),
+    requestedCreditCents: z.number().int().min(0).optional().describe('Requested repair credit in integer cents.'),
+    note:                 z.string().optional().describe('Buyer note explaining the requested credit.'),
+    sortOrder:            z.number().int().optional().describe('Display order of this item in the list.'),
 });
 
 const IntroPatchSchema = z.object({
-    customIntro: z.string().nullable().optional(),
+    customIntro: z.string().nullable().optional().describe('Document-level intro shown atop the repair request.'),
 });
 
 // Route definitions
@@ -450,8 +450,8 @@ const ShareViewResponseSchema = z.object({
 });
 
 const ShareEmailBodySchema = z.object({
-    to:      z.string().email('Invalid email address'),
-    message: z.string().optional(),
+    to:      z.string().email('Invalid email address').describe('Recipient email address for the share link.'),
+    message: z.string().optional().describe('Optional personal message included in the email.'),
 });
 
 const shareViewRoute = createRoute(withMcpMetadata({
