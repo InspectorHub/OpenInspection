@@ -38,19 +38,31 @@ export function messageRows<
 /*  Section (bare content — no page chrome)                            */
 /* ------------------------------------------------------------------ */
 
-export function MessagesSection({ token }: { token: string }) {
+export function MessagesSection({
+  inspectionId,
+  token,
+}: {
+  inspectionId: string;
+  token?: string;
+}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inspection, setInspection] = useState<InspectionInfo | null>(null);
   const [composeBody, setComposeBody] = useState("");
   const [sending, setSending] = useState(false);
 
+  // Same-origin: the __Host-portal_session cookie is sent automatically. The
+  // per-inspection portal ?token is a fallback (email-CTA arrival), appended
+  // only when present — mirrors DocumentsSection / portal-inspection.
+  const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : "";
+  const base = `/api/public/inspections/${encodeURIComponent(inspectionId)}/messages`;
+
   // Load messages
   const loadMessages = useCallback(async () => {
     try {
-      const res = await fetch(`/api/messages/public/${token}`);
+      const res = await fetch(`${base}${tokenQuery}`);
       const json = (await res.json()) as Record<string, unknown>;
       if (json.success) {
-        // The public endpoint returns the messages array directly under `data`;
+        // The endpoint returns the messages array directly under `data`;
         // tolerate the legacy `{ messages, inspection }` envelope too.
         const data = json.data as
           | Message[]
@@ -65,7 +77,7 @@ export function MessagesSection({ token }: { token: string }) {
     } catch {
       /* silent */
     }
-  }, [token]);
+  }, [base, tokenQuery]);
 
   useEffect(() => {
     loadMessages();
@@ -76,7 +88,7 @@ export function MessagesSection({ token }: { token: string }) {
     if (!composeBody.trim() || sending) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/messages/public/${token}`, {
+      const res = await fetch(`${base}${tokenQuery}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: composeBody }),
@@ -124,7 +136,7 @@ export function MessagesSection({ token }: { token: string }) {
                 {m.attachments.map((a) => (
                   <a
                     key={a.id}
-                    href={`/api/messages/public/${encodeURIComponent(token)}/attachments/${encodeURIComponent(a.id)}`}
+                    href={`${base}/attachments/${encodeURIComponent(a.id)}${tokenQuery}`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-xs bg-ih-bg-card border border-ih-border rounded-lg px-2 py-1 hover:bg-ih-bg-muted"

@@ -49,7 +49,6 @@ export default [
       "report-view/:tenant/:id",
       "routes/public/report-card-stack.tsx",
     ),
-    route("messages/:token", "routes/public/messages.tsx"),
     // Track L (D6, path B) — public SMS double-opt-in confirmation page.
     route("sms-optin/:token", "routes/public/sms-optin.tsx"),
     route("repair-request/:shareToken", "routes/public/repair-request.$shareToken.tsx"),

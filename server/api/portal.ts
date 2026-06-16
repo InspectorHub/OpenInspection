@@ -93,7 +93,6 @@ const HubOverviewSchema = z.object({
 
 const HubOverviewResponseSchema = HubOverviewSchema.extend({
     token: z.string().describe('Persistent per-inspection access token for building section deep-links.'),
-    messageToken: z.string().nullable().describe('Per-inspection conversation token for the inline Messages section. Null when minting fails.'),
     signerToken: z.string().nullable().describe("The recipient's OWN agreement signer token (email-matched) for the inline Agreement section. Null when the recipient is not a signer."),
 });
 
@@ -403,17 +402,6 @@ export const portalRoutes = portalRouter
             logger.error('[portal] overview token issue failed', {}, err instanceof Error ? err : undefined);
         }
 
-        // Get-or-create the per-inspection conversation token so the inline
-        // Messages section can use the existing public message endpoints. The
-        // membership check above already authorizes this recipient; best-effort
-        // (null on failure, mirroring the token issue above).
-        let messageToken: string | null = null;
-        try {
-            messageToken = await c.var.services.message.getOrCreateToken(inspectionId, tenantId);
-        } catch (err) {
-            logger.error('[portal] overview message token issue failed', {}, err instanceof Error ? err : undefined);
-        }
-
         // Resolve THIS recipient's OWN agreement signer token (email-matched) so
         // the inline Agreement section can mount. SECURITY: getSignerLinkByEmail
         // matches on the verified session email and NEVER returns a different
@@ -427,7 +415,7 @@ export const portalRoutes = portalRouter
 
         const overview = await c.var.services.portal.hubOverview(tenantId, inspectionId);
         if (!overview) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: { ...overview, token, messageToken, signerToken } }, 200);
+        return c.json({ data: { ...overview, token, signerToken } }, 200);
     });
 
 export type PortalApi = typeof portalRoutes;

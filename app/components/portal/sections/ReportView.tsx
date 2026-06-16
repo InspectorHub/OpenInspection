@@ -436,14 +436,6 @@ export function ReportView(props: ReportViewProps) {
             </span>
           </div>
           <div className="flex items-center gap-2 print:hidden">
-            {data.messageToken && (
-              <a
-                href={`/messages/${data.messageToken}`}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
-              >
-                Message Inspector
-              </a>
-            )}
             {data.enableRepairList && (
               <a
                 href={`/inspections/${data.inspectionId}/repair-list`}

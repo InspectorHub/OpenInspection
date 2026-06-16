@@ -430,7 +430,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       throw new Response("Not found", { status: 404 });
     }
     const body = (await res.json()) as {
-      data?: StatusOverview & { token?: string; messageToken?: string | null; signerToken?: string | null };
+      data?: StatusOverview & { token?: string; signerToken?: string | null };
     };
     if (!body.data) throw new Response("Not found", { status: 404 });
     overview = body.data;
@@ -444,11 +444,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   // ?token); fall back to the URL ?token (email-CTA arrival) then "".
   const overviewToken = (overview as StatusOverview & { token?: string }).token;
   const ctxToken = overviewToken || token || "";
-  const messageToken =
-    (overview as StatusOverview & { messageToken?: string | null }).messageToken ?? null;
   const signerToken =
     (overview as StatusOverview & { signerToken?: string | null }).signerToken ?? null;
-  const ctx = { tenant, inspectionId, token: ctxToken, messageToken, signerToken };
+  const ctx = { tenant, inspectionId, token: ctxToken, signerToken };
 
   // Step 3 — if ?to names a real Hub section, jump straight to the Hub with that
   // section active INLINE (carrying the token), forwarding any freshly-issued
@@ -519,7 +517,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 export default function PortalInspection() {
   const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
-    ctx: { tenant: string; inspectionId: string; token: string; messageToken: string | null; signerToken: string | null };
+    ctx: { tenant: string; inspectionId: string; token: string; signerToken: string | null };
     section: HubSection;
     brand: TenantBrand;
     documents: DocumentItem[] | null;
@@ -668,14 +666,8 @@ export default function PortalInspection() {
       />
     );
   } else if (section === "messages") {
-    sectionSlot = ctx.messageToken ? (
-      <MessagesSection token={ctx.messageToken} />
-    ) : (
-      <div className="rounded-xl border border-ih-border bg-ih-bg-card p-6 text-center">
-        <p className="text-sm text-ih-fg-3">
-          Messaging is not available for this inspection yet.
-        </p>
-      </div>
+    sectionSlot = (
+      <MessagesSection inspectionId={inspectionId} token={token || undefined} />
     );
   }
 
