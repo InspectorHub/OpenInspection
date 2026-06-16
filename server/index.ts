@@ -80,6 +80,7 @@ import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 import inspectionRequestsRoutes from './api/inspection-requests';
 import repairRequestRoutes from './api/repair-requests';
+import repairBuilderRoutes from './api/repair-builder';
 import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 import publicSlugRoutes from './api/public-slug';
 import publicShareRoutes from './api/public-share';
@@ -465,6 +466,8 @@ const routes = app
   // per-tenant enable_customer_repair_export flag + payment + agreement gates
   // before sending.
   .route('/api/public', repairRequestRoutes)
+  // RRB builder CRUD — interactive repair request list authoring (Task 4).
+  .route('/api/public', repairBuilderRoutes)
   // UC-C-7 — public share-token mint (customer Forward report flow).
   .route('/api/public', publicShareRoutes)
   // Track L (D6/D9) — public SMS opt-in resolve/confirm + inbound STOP/START webhook.
