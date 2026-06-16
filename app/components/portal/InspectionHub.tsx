@@ -1,4 +1,5 @@
 import type React from "react";
+import { Link } from "react-router";
 import InspectionStatusCards, { type StatusOverview } from "./InspectionStatusCards";
 
 /* ------------------------------------------------------------------ */
@@ -58,6 +59,21 @@ export function hubSectionHref(section: HubSection, ctx: HubLinkCtx): string {
   }
 }
 
+/**
+ * Inline section nav target (phase ②+): a `?section=` query on THIS hub page.
+ * Client-side <Link> navigation re-runs the loader without a full reload, so the
+ * header + nav stay rendered. The per-inspection ?token= is preserved when
+ * present (email-CTA arrivals carry it; magic-link sessions don't need it).
+ */
+export function hubSectionNavHref(section: HubSection, ctx: HubLinkCtx): string {
+  const { tenant, inspectionId, token } = ctx;
+  const params = new URLSearchParams();
+  if (section !== "overview") params.set("section", section);
+  if (token) params.set("token", token);
+  const qs = params.toString();
+  return `/portal/${tenant}/i/${inspectionId}${qs ? `?${qs}` : ""}`;
+}
+
 /* ------------------------------------------------------------------ */
 /* Component */
 /* ------------------------------------------------------------------ */
@@ -77,18 +93,19 @@ export default function InspectionHub({
   overview,
   ctx,
   activeSection = "overview",
-  documentsSlot,
+  sectionSlot,
 }: {
   overview: StatusOverview;
   ctx: HubLinkCtx;
   activeSection?: HubSection;
-  /** Inline Documents section supplied by the route (keeps this component
-   *  data-source-agnostic — see portal-inspection.tsx). */
-  documentsSlot?: React.ReactNode;
+  /** The active (non-overview) section's rendered body, supplied by the route
+   *  so this component stays presentational/data-source-agnostic. Ignored on
+   *  the "overview" tab (which always renders the status cards). */
+  sectionSlot?: React.ReactNode;
 }) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-      {/* Header */}
+      {/* Header — always rendered for every section. */}
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-ih-fg-1">
           {overview.address || "Inspection"}
@@ -96,16 +113,16 @@ export default function InspectionHub({
         {overview.date && <p className="mt-1 text-sm text-ih-fg-3">{overview.date}</p>}
       </div>
 
-      {/* Top nav */}
+      {/* Top nav — client-side <Link>s switching the ?section= query. */}
       <nav className="mb-6 flex flex-wrap gap-2 border-b border-ih-border pb-3">
         {NAV.map((n) => {
           const active = n.section === activeSection;
           const base =
             "px-3 py-1.5 text-xs font-semibold rounded-full transition-colors";
           return (
-            <a
+            <Link
               key={n.section}
-              href={hubSectionHref(n.section, ctx)}
+              to={hubSectionNavHref(n.section, ctx)}
               aria-current={active ? "page" : undefined}
               className={`${base} ${
                 active
@@ -114,20 +131,17 @@ export default function InspectionHub({
               }`}
             >
               {n.label}
-            </a>
+            </Link>
           );
         })}
       </nav>
 
-      {/* Overview body */}
-      <InspectionStatusCards overview={overview} />
-
-      {/* Documents — inline section (anchor target for the nav). Supplied by the
-          route so this component stays presentational/data-source-agnostic. */}
-      {documentsSlot && (
-        <section id="documents" className="mt-8 scroll-mt-6">
-          {documentsSlot}
-        </section>
+      {/* Body — overview shows the status cards; any other section renders the
+          route-supplied slot. */}
+      {activeSection === "overview" ? (
+        <InspectionStatusCards overview={overview} />
+      ) : (
+        <section className="mt-2">{sectionSlot}</section>
       )}
     </div>
   );

@@ -1,12 +1,19 @@
 /**
  * Unified client portal — per-inspection Hub.
  *
- * Route: /portal/:tenant/i/:inspectionId?token=&to=
- *   - ?token : a per-inspection access token (email CTA). If present we exchange
+ * Route: /portal/:tenant/:inspectionId?token=&section=&to=
+ *   - ?token   : a per-inspection access token (email CTA). If present we exchange
  *     it for a portal session cookie (forwarded to the browser) so a client
  *     arriving from email lands authenticated.
- *   - ?to    : optional HubSection — jump straight to that section's interim
- *     deep-link (carrying the token), instead of rendering the hub.
+ *   - ?section : which Hub section to render INLINE (phase ②+). Defaults to
+ *     "overview". Client-side <Link> nav switches this without a full reload;
+ *     the loader re-runs and lazily fetches only the active section's data.
+ *   - ?to      : optional HubSection — jump straight to that section's interim
+ *     deep-link (carrying the token), instead of rendering the hub. Transitional
+ *     (removed in a later task).
+ *
+ * Per-section data (decision C): always fetch the cheap overview (header +
+ * status cards), then LAZILY fetch ONLY the active section's payload.
  *
  * Cookie forwarding (both directions):
  *   - exchange/redeem RESPONSE Set-Cookie → forwarded to the browser.
@@ -14,9 +21,12 @@
  *     call, since the typed client does not auto-forward the browser cookie.
  */
 import { redirect, useLoaderData, useRevalidator } from "react-router";
+import type React from "react";
 import { useState } from "react";
 import type { Route } from "./+types/portal-inspection";
 import { createApi } from "~/lib/api-client.server";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { EMPTY_BRAND } from "~/lib/brand";
 import InspectionHub, {
   hubSectionHref,
   type HubSection,
@@ -27,13 +37,48 @@ import DocumentsSection, {
   type DocumentCategory,
   type DocumentVisibility,
 } from "~/components/DocumentsSection";
+import {
+  ReportView,
+  reportViewProps,
+  type ReportLoaderResult,
+  type FilterKey,
+} from "~/components/portal/sections/ReportView";
 
 export function meta() {
   return [{ title: "Inspection - OpenInspection" }];
 }
 
-// HubSections that have an interim deep-link target (everything except the hub
-// itself, which IS this page). Used to validate the ?to query.
+/* ------------------------------------------------------------------ */
+/* Section validation */
+/* ------------------------------------------------------------------ */
+
+const HUB_SECTIONS: HubSection[] = [
+  "overview",
+  "report",
+  "agreement",
+  "payment",
+  "progress",
+  "messages",
+  "repair",
+  "documents",
+];
+
+function parseSection(v: string | null): HubSection {
+  return v !== null && (HUB_SECTIONS as string[]).includes(v) ? (v as HubSection) : "overview";
+}
+
+// Sections that are NOT yet inlined — they fall through to a transitional
+// "Coming soon — open the full page" link (built from the interim deep-link).
+const NOT_YET_INLINED: HubSection[] = [
+  "agreement",
+  "payment",
+  "progress",
+  "messages",
+  "repair",
+];
+
+// HubSections that have an interim deep-link target. Used to validate the ?to
+// query (transitional; removed in a later task).
 const DEEP_LINK_SECTIONS: HubSection[] = [
   "report",
   "agreement",
@@ -47,12 +92,102 @@ function isDeepLinkSection(v: string | null): v is HubSection {
   return v !== null && (DEEP_LINK_SECTIONS as string[]).includes(v);
 }
 
+/* ------------------------------------------------------------------ */
+/* Report section data — mirrors the standalone report loader mapping,
+ * authenticated with the portal per-inspection token (ctx.token). */
+/* ------------------------------------------------------------------ */
+
+async function loadReportSection(
+  context: Route.LoaderArgs["context"],
+  request: Request,
+  tenant: string,
+  inspectionId: string,
+  token: string,
+): Promise<ReportLoaderResult> {
+  const parsedUrl = new URL(request.url);
+  const baseUrl = parsedUrl.origin;
+  const initialFilter: FilterKey = "all";
+  const printMode = false;
+  try {
+    const api = createApi(context);
+    const [res, brand] = await Promise.all([
+      api.publicReport.report[":tenant"][":id"].$get({
+        param: { tenant, id: inspectionId },
+        query: { token: token || undefined },
+      }),
+      resolveTenantBrand(context, tenant),
+    ]);
+    const body = res.ok ? await res.json() : {};
+    const d = ((body as Record<string, unknown>).data ?? {}) as unknown as ReportLoaderResult | undefined;
+    const meta = d as unknown as {
+      inspection?: { propertyAddress?: string | null; date?: string | null; inspectorName?: string | null };
+      theme?: string;
+    } | undefined;
+    const raw = d as unknown as Record<string, unknown> | undefined;
+    return {
+      inspectionId: d?.inspectionId ?? inspectionId,
+      address: d?.address ?? meta?.inspection?.propertyAddress ?? "",
+      date: d?.date ?? meta?.inspection?.date ?? "",
+      inspectorName: d?.inspectorName ?? meta?.inspection?.inspectorName ?? null,
+      coverPhotoUrl: d?.coverPhotoUrl ?? null,
+      stats: d?.stats ?? { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
+      sections: d?.sections ?? [],
+      showEstimates: d?.showEstimates ?? false,
+      enableRepairList: d?.enableRepairList ?? false,
+      enableCustomerRepairExport: d?.enableCustomerRepairExport ?? false,
+      messageToken: d?.messageToken ?? null,
+      isDelivered: d?.isDelivered ?? false,
+      brand,
+      error: res.ok ? null : "Report not found",
+      notPublished: (res.status as number) === 403,
+      reportTheme: (raw?.reportTheme as string | undefined) ?? meta?.theme,
+      initialFilter,
+      printMode,
+      isPublished: (raw?.isPublished as boolean | undefined) ?? false,
+      signature: (raw?.signature as ReportLoaderResult["signature"] | undefined) ?? null,
+      verification: (raw?.verification as ReportLoaderResult["verification"] | undefined) ?? null,
+      ownerPreview: false,
+      baseUrl,
+    } satisfies ReportLoaderResult;
+  } catch {
+    return {
+      inspectionId,
+      address: "",
+      date: "",
+      inspectorName: null,
+      coverPhotoUrl: null,
+      stats: { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
+      sections: [],
+      showEstimates: false,
+      enableRepairList: false,
+      enableCustomerRepairExport: false,
+      messageToken: null,
+      isDelivered: false,
+      brand: EMPTY_BRAND,
+      error: "Service unavailable",
+      notPublished: false,
+      initialFilter,
+      printMode,
+      isPublished: false,
+      signature: null,
+      verification: null,
+      ownerPreview: false,
+      baseUrl,
+    } satisfies ReportLoaderResult;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Loader */
+/* ------------------------------------------------------------------ */
+
 export async function loader({ params, request, context }: Route.LoaderArgs) {
   const tenant = params.tenant ?? "";
   const inspectionId = params.inspectionId ?? "";
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
   const to = url.searchParams.get("to");
+  const section = parseSection(url.searchParams.get("section"));
 
   const api = createApi(context);
   const browserCookie = request.headers.get("cookie") ?? "";
@@ -121,36 +256,44 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   const ctxToken = overviewToken || token || "";
   const ctx = { tenant, inspectionId, token: ctxToken };
 
-  // Client documents (unified portal section ⑦) — fetch using the SAME cookie
-  // value used for the overview call (freshly-minted exchange cookie or the
-  // incoming browser cookie). Best-effort: a non-OK response → empty list.
-  let documents: DocumentItem[] = [];
-  try {
-    const apiWorker = (context.cloudflare.env as unknown as { API_WORKER?: { fetch: typeof fetch } })
-      .API_WORKER;
-    const docsRes = await (apiWorker?.fetch ?? fetch)(
-      new Request(`https://internal/api/public/inspections/${inspectionId}/documents`, {
-        headers: { cookie: cookieForApi },
-      }),
-    );
-    if (docsRes.ok) {
-      documents = (((await docsRes.json()) as { data?: DocumentItem[] }).data ?? []) as DocumentItem[];
-    }
-  } catch {
-    // Best-effort: fail open to empty list
-  }
-
   // Step 3 — if ?to names a real deep-link section, jump straight there
   // (carrying the token), forwarding any freshly-issued session cookie.
+  // Transitional: removed in a later task.
   if (isDeepLinkSection(to)) {
     throw redirect(hubSectionHref(to, ctx), {
       headers: cookieToForward ? { "Set-Cookie": cookieToForward } : undefined,
     });
   }
 
-  // Step 4 — render the hub.
+  // Step 4 — lazily fetch ONLY the active section's data (decision C).
+  let documents: DocumentItem[] | null = null;
+  let report: ReportLoaderResult | null = null;
+
+  if (section === "documents") {
+    // Client documents (unified portal section ⑦) — fetch using the SAME cookie
+    // value used for the overview call. Best-effort: a non-OK response → empty.
+    documents = [];
+    try {
+      const apiWorker = (context.cloudflare.env as unknown as { API_WORKER?: { fetch: typeof fetch } })
+        .API_WORKER;
+      const docsRes = await (apiWorker?.fetch ?? fetch)(
+        new Request(`https://internal/api/public/inspections/${inspectionId}/documents`, {
+          headers: { cookie: cookieForApi },
+        }),
+      );
+      if (docsRes.ok) {
+        documents = (((await docsRes.json()) as { data?: DocumentItem[] }).data ?? []) as DocumentItem[];
+      }
+    } catch {
+      // Best-effort: fail open to empty list
+    }
+  } else if (section === "report") {
+    report = await loadReportSection(context, request, tenant, inspectionId, ctxToken);
+  }
+
+  // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, documents }),
+    JSON.stringify({ overview, ctx, section, documents, report }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -160,14 +303,20 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Component */
+/* ------------------------------------------------------------------ */
+
 export default function PortalInspection() {
-  const { overview, ctx, documents } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, documents, report } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string };
-    documents: DocumentItem[];
+    section: HubSection;
+    documents: DocumentItem[] | null;
+    report: ReportLoaderResult | null;
   };
   const revalidator = useRevalidator();
-  const { inspectionId, token } = ctx;
+  const { tenant, inspectionId, token } = ctx;
 
   // Client-side upload/delete against the public document routes. The client is
   // authenticated by the __Host-portal_session cookie (auto-sent same-origin);
@@ -230,25 +379,56 @@ export default function PortalInspection() {
     }
   };
 
+  // Build the active section's body (decision B/C). Overview renders the status
+  // cards inside the Hub itself; this slot is only used on non-overview tabs.
+  let sectionSlot: React.ReactNode = null;
+  if (section === "documents") {
+    sectionSlot = (
+      <DocumentsSection
+        items={documents ?? []}
+        canUpload
+        showVisibilityToggle={false}
+        downloadHref={(docId) =>
+          `/api/public/inspections/${inspectionId}/documents/${docId}${tokenSuffix}`
+        }
+        onUpload={onUpload}
+        onDelete={onDelete}
+        uploading={docUploading}
+        error={docError}
+      />
+    );
+  } else if (section === "report" && report) {
+    sectionSlot = (
+      <ReportView
+        {...reportViewProps({
+          ...report,
+          tenant,
+          inspectionId,
+          token: token || undefined,
+        })}
+      />
+    );
+  } else if (NOT_YET_INLINED.includes(section)) {
+    // Transitional: until ③–⑥ inline these, offer a link to the full page.
+    sectionSlot = (
+      <div className="rounded-xl border border-ih-border bg-ih-bg-card p-6 text-center">
+        <p className="text-sm text-ih-fg-3">This section isn't available inline yet.</p>
+        <a
+          href={hubSectionHref(section, ctx)}
+          className="mt-3 inline-block text-sm font-semibold text-ih-primary hover:underline"
+        >
+          Open the full page
+        </a>
+      </div>
+    );
+  }
+
   return (
     <InspectionHub
       overview={overview}
       ctx={ctx}
-      activeSection="overview"
-      documentsSlot={
-        <DocumentsSection
-          items={documents}
-          canUpload
-          showVisibilityToggle={false}
-          downloadHref={(docId) =>
-            `/api/public/inspections/${inspectionId}/documents/${docId}${tokenSuffix}`
-          }
-          onUpload={onUpload}
-          onDelete={onDelete}
-          uploading={docUploading}
-          error={docError}
-        />
-      }
+      activeSection={section}
+      sectionSlot={sectionSlot}
     />
   );
 }

@@ -22,13 +22,13 @@ import { describe, it, expect } from 'vitest';
 
 describe('report-card-stack buttons (Task 9)', () => {
   it('loads the module source', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
     expect(text.length).toBeGreaterThan(0);
   });
 
   it('top-bar toolbar button reads "Print" (not "PDF")', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     // The top-bar toolbar sits inside the `flex items-center gap-2 print:hidden`
@@ -39,7 +39,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('top-bar toolbar button no longer reads ">PDF<"', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     // The label "PDF" as a JSX text node (between tags) must be gone from the
@@ -50,14 +50,14 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('FAB button still reads "Download PDF" as the default label', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     expect(text).toContain('Download PDF');
   });
 
   it('FAB button shows "Generating…" label when generating is true', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     // The conditional label text must appear in source.
@@ -65,7 +65,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('generating state variable is declared', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     expect(text).toContain('generating');
@@ -73,7 +73,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('downloadPdf handler uses fetch (not window.print)', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     // The async downloadPdf function must call fetch.
@@ -82,7 +82,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('downloadPdf creates a blob and anchor download (not window.print)', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     expect(text).toContain('res.blob()');
@@ -91,7 +91,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('owner URL path: /api/inspections/:id/pdf', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     expect(text).toContain('/api/inspections/');
@@ -99,7 +99,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('client URL path: /api/public/report/:tenant/:id/pdf with token', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     expect(text).toContain('/api/public/report/');
@@ -107,7 +107,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('FAB onClick is downloadPdf (not window.print)', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     // The fixed bottom-6 right-6 FAB must reference downloadPdf in its onClick.
@@ -116,7 +116,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('no native alert/confirm/prompt in downloadPdf handler', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     // Extract the downloadPdf function body to check for native dialogs.
@@ -130,7 +130,7 @@ describe('report-card-stack buttons (Task 9)', () => {
   });
 
   it('top-bar print button still calls window.print()', async () => {
-    const src = await import('~/routes/public/report-card-stack?raw');
+    const src = await import('~/components/portal/sections/ReportView?raw');
     const text = (src as unknown as { default: string }).default;
 
     // window.print() must still appear (for the top-bar Print button and
