@@ -47,6 +47,12 @@ import {
   ProgressView,
   type ProgressSection,
 } from "~/components/portal/sections/ProgressView";
+import {
+  RepairBuilderSection,
+  type LoaderResult as RepairLoaderResult,
+  type Defect as RepairDefect,
+  type RepairRequest,
+} from "~/components/portal/sections/RepairBuilderSection";
 
 export function meta() {
   return [{ title: "Inspection - OpenInspection" }];
@@ -77,7 +83,6 @@ const NOT_YET_INLINED: HubSection[] = [
   "agreement",
   "payment",
   "messages",
-  "repair",
 ];
 
 // HubSections that have an interim deep-link target. Used to validate the ?to
@@ -229,6 +234,51 @@ async function loadProgressSection(
 }
 
 /* ------------------------------------------------------------------ */
+/* Repair section data — mirrors the standalone repair-builder loader mapping,
+ * authenticated with the portal per-inspection token (ctx.token). */
+/* ------------------------------------------------------------------ */
+
+async function loadRepairSection(
+  context: Route.LoaderArgs["context"],
+  tenant: string,
+  inspectionId: string,
+  token: string,
+): Promise<RepairLoaderResult> {
+  try {
+    const api = createApi(context);
+    const res = await api.repairBuilder["repair-builder"][":tenant"][":id"].source.$get({
+      param: { tenant, id: inspectionId },
+      query: { token: token || undefined },
+    });
+
+    if (res.status === 401) return { kind: "no_access" };
+    if (res.status === 403) {
+      const body = (await res.json()) as { error?: { code?: string } };
+      if (body?.error?.code === "NOT_PUBLISHED") return { kind: "not_published" };
+      return { kind: "forbidden" };
+    }
+    if (!res.ok) return { kind: "error" };
+
+    const body = (await res.json()) as {
+      data?: { defects: RepairDefect[]; mine: RepairRequest[] };
+    };
+    const data = body.data;
+    if (!data) return { kind: "error" };
+
+    return {
+      kind: "ok",
+      defects: data.defects,
+      mine: data.mine,
+      tenant,
+      id: inspectionId,
+      token: token || null,
+    };
+  } catch {
+    return { kind: "error" };
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Loader */
 /* ------------------------------------------------------------------ */
 
@@ -320,6 +370,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   let documents: DocumentItem[] | null = null;
   let report: ReportLoaderResult | null = null;
   let progress: ProgressLoaderResult | null = null;
+  let repair: RepairLoaderResult | null = null;
 
   if (section === "documents") {
     // Client documents (unified portal section ⑦) — fetch using the SAME cookie
@@ -343,11 +394,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     report = await loadReportSection(context, request, tenant, inspectionId, ctxToken);
   } else if (section === "progress") {
     progress = await loadProgressSection(context, inspectionId, ctxToken);
+  } else if (section === "repair") {
+    repair = await loadRepairSection(context, tenant, inspectionId, ctxToken);
   }
 
   // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, section, documents, report, progress }),
+    JSON.stringify({ overview, ctx, section, documents, report, progress, repair }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -362,13 +415,14 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function PortalInspection() {
-  const { overview, ctx, section, documents, report, progress } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, documents, report, progress, repair } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string };
     section: HubSection;
     documents: DocumentItem[] | null;
     report: ReportLoaderResult | null;
     progress: ProgressLoaderResult | null;
+    repair: RepairLoaderResult | null;
   };
   const revalidator = useRevalidator();
   const { tenant, inspectionId, token } = ctx;
@@ -472,6 +526,13 @@ export default function PortalInspection() {
         status={progress.status}
         sections={progress.sections}
         error={progress.error}
+      />
+    );
+  } else if (section === "repair" && repair) {
+    sectionSlot = (
+      <RepairBuilderSection
+        result={repair}
+        actionPath={`/repair-builder/${tenant}/${inspectionId}`}
       />
     );
   } else if (NOT_YET_INLINED.includes(section)) {
