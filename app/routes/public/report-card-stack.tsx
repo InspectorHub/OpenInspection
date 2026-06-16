@@ -152,6 +152,10 @@ export default function ReportCardStackPage() {
  tenant: params.tenant,
  inspectionId: params.id ?? data.inspectionId,
  token: searchParams.get("token") ?? undefined,
+ // Standalone page keeps the full page chrome (min-h-screen background +
+ // big property-address title). The inline Hub mount omits this flag so
+ // the report renders bare (no double background, address shown once).
+ showStandaloneChrome: true,
  })}
  />
  );

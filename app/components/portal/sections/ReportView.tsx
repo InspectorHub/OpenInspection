@@ -129,6 +129,17 @@ export interface ReportViewProps extends ReportLoaderResult {
   reportId: string;
   /** Public access token (?token=) used for token-scoped action links. */
   token?: string;
+  /**
+   * When true (the STANDALONE `/report-view/...` page) the component renders its
+   * own full-page chrome: a `min-h-screen` page background and the big property-
+   * ADDRESS title block. When false (default — rendered INLINE inside the Hub)
+   * that chrome is dropped: the Hub already supplies the page container, header
+   * and address, so the bare report content is rendered to avoid a double
+   * background and a duplicated address. The functional bits (filters, toolbar,
+   * Download-PDF FAB, signature/verification, lightbox) render in BOTH modes.
+   * Mirrors `PaymentSection`'s `showStandaloneChrome` convention.
+   */
+  showStandaloneChrome?: boolean;
 }
 
 /**
@@ -136,7 +147,12 @@ export interface ReportViewProps extends ReportLoaderResult {
  * (no React / router). Defensive defaults keep it safe against partial payloads.
  */
 export function reportViewProps(
-  data: ReportLoaderResult & { tenant?: string; inspectionId?: string; token?: string },
+  data: ReportLoaderResult & {
+    tenant?: string;
+    inspectionId?: string;
+    token?: string;
+    showStandaloneChrome?: boolean;
+  },
 ): ReportViewProps {
   const reportId = data.inspectionId ?? "";
   return {
@@ -166,6 +182,7 @@ export function reportViewProps(
     tenant: data.tenant ?? "",
     reportId,
     token: data.token,
+    showStandaloneChrome: data.showStandaloneChrome ?? false,
   };
 }
 
@@ -290,6 +307,10 @@ export function ReportView(props: ReportViewProps) {
   const tenant = props.tenant;
   const id = props.reportId || data.inspectionId;
   const urlToken = props.token;
+  // Standalone page = full chrome (page background + big address title block).
+  // Inline in the Hub (default) = bare: the Hub supplies the page container,
+  // header and address, so we drop the page shell + duplicate address title.
+  const standalone = props.showStandaloneChrome ?? false;
 
   const [filter, setFilter] = useState<FilterKey>(data.initialFilter ?? "all");
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
@@ -383,7 +404,7 @@ export function ReportView(props: ReportViewProps) {
       : data.sections;
 
   return (
-    <div className="min-h-screen bg-ih-bg-card" data-theme={data.reportTheme || undefined} style={brandTokens(data.brand.primaryColor)}>
+    <div className={standalone ? "min-h-screen bg-ih-bg-card" : undefined} data-theme={data.reportTheme || undefined} style={brandTokens(data.brand.primaryColor)}>
       {/* Download PDF FAB */}
       <button
         type="button"
@@ -455,9 +476,15 @@ export function ReportView(props: ReportViewProps) {
             </button>
           </div>
         </div>
-        <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-2 text-ih-fg-1">
-          {data.address}
-        </h1>
+        {/* Big property-ADDRESS title — standalone only. Inline in the Hub the
+            page header already shows the address + date, so rendering it again
+            here would duplicate the address. The inspector/date cert line below
+            stays in both modes (functional, not chrome). */}
+        {standalone && (
+          <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-2 text-ih-fg-1">
+            {data.address}
+          </h1>
+        )}
         <p className="text-sm text-ih-fg-3">
           {data.date} &middot; Inspector: {data.inspectorName || "N/A"}
         </p>
