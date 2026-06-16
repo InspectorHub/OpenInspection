@@ -128,3 +128,181 @@ describe('PortalService', () => {
         expect(await svc.hubOverview(TENANT, 'nope')).toBeNull();
     });
 });
+
+// ---------------------------------------------------------------------------
+// Task 3 — portal API routes + session middleware
+// ---------------------------------------------------------------------------
+import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HonoConfig } from '../../server/types/hono';
+import { signPortalSession, signMagicLink } from '../../server/lib/portal-session';
+// eslint-disable-next-line import/order
+import portalRoutes from '../../server/api/portal';
+
+const SECRET = 'test-jwt-secret';
+
+describe('portal API', () => {
+    let testDb: BetterSQLite3Database<typeof schema>;
+    let sendEmail: ReturnType<typeof vi.fn>;
+
+    async function seedInspection(id: string, overrides: Partial<typeof schema.inspections.$inferInsert> = {}) {
+        await testDb.insert(schema.inspections).values({
+            id,
+            tenantId: TENANT,
+            propertyAddress: `${id} Main St`,
+            date: '2026-06-01',
+            status: 'requested',
+            reportStatus: 'in_progress',
+            paymentStatus: 'unpaid',
+            createdAt: new Date(),
+            ...overrides,
+        });
+    }
+
+    async function seedToken(inspectionId: string, recipientEmail: string, role: 'client' | 'co_client' | 'agent' = 'client', revokedAt: number | null = null) {
+        await testDb.insert(schema.inspectionAccessTokens).values({
+            id: crypto.randomUUID(),
+            tenantId: TENANT,
+            inspectionId,
+            recipientEmail,
+            role,
+            token: crypto.randomUUID(),
+            createdAt: Date.now(),
+            expiresAt: null,
+            revokedAt,
+        });
+    }
+
+    function buildApp(tenantId: string | null = TENANT) {
+        const portalSvc = new PortalService({} as D1Database, inspStub);
+        sendEmail = vi.fn().mockResolvedValue({ delivered: true });
+        const app = new OpenAPIHono<HonoConfig>();
+        app.use('*', async (c, next) => {
+            if (tenantId) {
+                c.set('tenantId', tenantId);
+                c.set('requestedTenantSlug', 'acme');
+            }
+            c.set('services', {
+                portal: portalSvc,
+                email: { sendEmail },
+            } as unknown as HonoConfig['Variables']['services']);
+            await next();
+        });
+        app.route('/api/portal', portalRoutes);
+        return app;
+    }
+
+    // JWT_SECRET is injected via the env arg to app.request().
+    function reqEnv() {
+        return { JWT_SECRET: SECRET, APP_BASE_URL: 'https://example.test' } as unknown as HonoConfig['Bindings'];
+    }
+
+    beforeEach(async () => {
+        const fix = createTestDb();
+        testDb = fix.db;
+        await setupSchema(fix.sqlite);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (mockDrizzle as any).mockReturnValue(testDb);
+        await testDb.insert(schema.tenants).values({
+            id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        });
+    });
+
+    it('POST /request-link returns 200 for a known recipient and sends an email', async () => {
+        await seedInspection('insp1');
+        await seedToken('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+        const res = await app.request('/api/portal/acme/request-link', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email: 'a@x.com' }),
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        const json = await res.json();
+        expect(json.data.sent).toBe(true);
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+        const htmlArg = sendEmail.mock.calls[0][2] as string;
+        expect(htmlArg).toContain('/portal/acme/auth?link=');
+    });
+
+    it('POST /request-link returns 200 for an UNKNOWN email and does NOT send (no enumeration)', async () => {
+        await seedInspection('insp1');
+        await seedToken('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+        const res = await app.request('/api/portal/acme/request-link', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email: 'nobody@x.com' }),
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        const json = await res.json();
+        expect(json.data.sent).toBe(true);
+        expect(sendEmail).not.toHaveBeenCalled();
+    });
+
+    it('POST /request-link returns 404 when the tenant slug is unresolved', async () => {
+        const app = buildApp(null);
+        const res = await app.request('/api/portal/nope/request-link', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ email: 'a@x.com' }),
+        }, reqEnv());
+        expect(res.status).toBe(404);
+    });
+
+    it('GET /redeem validates the magic link → 200 with email; bad token → 401', async () => {
+        const app = buildApp();
+        const token = await signMagicLink(SECRET, 'a@x.com');
+        const ok = await app.request(`/api/portal/acme/redeem?link=${encodeURIComponent(token)}`, {}, reqEnv());
+        expect(ok.status).toBe(200);
+        expect((await ok.json()).data.email).toBe('a@x.com');
+
+        const bad = await app.request('/api/portal/acme/redeem?link=garbage', {}, reqEnv());
+        expect(bad.status).toBe(401);
+    });
+
+    it('GET /me without a session cookie → 401', async () => {
+        const app = buildApp();
+        const res = await app.request('/api/portal/acme/me', {}, reqEnv());
+        expect(res.status).toBe(401);
+    });
+
+    it('GET /me with a valid session cookie → data.inspections populated', async () => {
+        await seedInspection('insp1');
+        await seedToken('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+        const cookie = await signPortalSession(SECRET, 'a@x.com');
+        const res = await app.request('/api/portal/acme/me', {
+            headers: { cookie: '__Host-portal_session=' + cookie },
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        const json = await res.json();
+        expect(json.data.email).toBe('a@x.com');
+        expect(json.data.inspections.length).toBeGreaterThan(0);
+    });
+
+    it('GET /inspections/:id/overview → 200 for an owned inspection', async () => {
+        await seedInspection('insp1');
+        await seedToken('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+        const cookie = await signPortalSession(SECRET, 'a@x.com');
+        const res = await app.request('/api/portal/acme/inspections/insp1/overview', {
+            headers: { cookie: '__Host-portal_session=' + cookie },
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        expect((await res.json()).data.address).toContain('insp1');
+    });
+
+    it('GET /inspections/:id/overview → 403 for an inspection the email does NOT own', async () => {
+        await seedInspection('insp1');
+        await seedInspection('insp2');
+        await seedToken('insp1', 'a@x.com', 'client');
+        await seedToken('insp2', 'other@x.com', 'client');
+        const app = buildApp();
+        const cookie = await signPortalSession(SECRET, 'a@x.com');
+        const res = await app.request('/api/portal/acme/inspections/insp2/overview', {
+            headers: { cookie: '__Host-portal_session=' + cookie },
+        }, reqEnv());
+        expect(res.status).toBe(403);
+    });
+});
