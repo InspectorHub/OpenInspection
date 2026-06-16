@@ -203,6 +203,31 @@ describe('portal API', () => {
                     expiresAt: row.expiresAt,
                 };
             },
+            // Idempotent get-or-create stub: returns the seeded row's plaintext
+            // token for (inspection, recipient). The overview tests seed live rows
+            // with a real `token` value, so this hands back that stable string.
+            issueToken: async (input: { tenantId: string; inspectionId: string; recipientEmail: string }) => {
+                const rows = await testDb.select().from(schema.inspectionAccessTokens);
+                const row = rows.find(
+                    (r) => r.inspectionId === input.inspectionId
+                        && r.recipientEmail === input.recipientEmail
+                        && r.revokedAt == null,
+                );
+                if (row) return row.token;
+                const token = crypto.randomUUID();
+                await testDb.insert(schema.inspectionAccessTokens).values({
+                    id: crypto.randomUUID(),
+                    tenantId: input.tenantId,
+                    inspectionId: input.inspectionId,
+                    recipientEmail: input.recipientEmail,
+                    role: 'client',
+                    token,
+                    createdAt: Date.now(),
+                    expiresAt: null,
+                    revokedAt: null,
+                });
+                return token;
+            },
         };
     }
 
@@ -393,7 +418,12 @@ describe('portal API', () => {
             headers: { cookie: '__Host-portal_session=' + cookie },
         }, reqEnv());
         expect(res.status).toBe(200);
-        expect((await res.json()).data.address).toContain('insp1');
+        const body = await res.json();
+        expect(body.data.address).toContain('insp1');
+        // The Hub needs the recipient's persistent per-inspection token to build
+        // section deep-links (works for magic-link sessions with no URL ?token).
+        expect(typeof body.data.token).toBe('string');
+        expect(body.data.token.length).toBeGreaterThan(0);
     });
 
     it('GET /inspections/:id/overview → 403 for an inspection the email does NOT own', async () => {

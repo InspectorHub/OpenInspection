@@ -91,6 +91,10 @@ const HubOverviewSchema = z.object({
     unreadMessages:   z.number().describe('Count of unread inspector messages.'),
 });
 
+const HubOverviewResponseSchema = HubOverviewSchema.extend({
+    token: z.string().describe('Persistent per-inspection access token for building section deep-links.'),
+});
+
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
@@ -213,7 +217,7 @@ const overviewRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ data: HubOverviewSchema }) } },
+            content: { 'application/json': { schema: z.object({ data: HubOverviewResponseSchema }) } },
             description: 'Six-dimension status snapshot for the inspection.',
         },
         401: { description: 'No valid portal session cookie' },
@@ -356,9 +360,20 @@ export const portalRoutes = portalRouter
             return c.json({ error: 'Not accessible' }, 403);
         }
 
+        // Resolve the recipient's STABLE per-inspection token so the Hub can build
+        // section deep-links even for magic-link sessions (which carry no ?token).
+        // issueToken is idempotent get-or-create; the membership check above already
+        // guarantees a grant exists, so this returns that grant's token — no new row.
+        let token = '';
+        try {
+            token = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId, recipientEmail: email });
+        } catch (err) {
+            logger.error('[portal] overview token issue failed', {}, err instanceof Error ? err : undefined);
+        }
+
         const overview = await c.var.services.portal.hubOverview(tenantId, inspectionId);
         if (!overview) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: overview }, 200);
+        return c.json({ data: { ...overview, token } }, 200);
     });
 
 export type PortalApi = typeof portalRoutes;

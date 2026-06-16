@@ -98,7 +98,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     if (!res.ok) {
       throw new Response("Not found", { status: 404 });
     }
-    const body = (await res.json()) as { data?: StatusOverview };
+    const body = (await res.json()) as {
+      data?: StatusOverview & { token?: string };
+    };
     if (!body.data) throw new Response("Not found", { status: 404 });
     overview = body.data;
   } catch (err) {
@@ -106,7 +108,12 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     throw new Response("Not found", { status: 404 });
   }
 
-  const ctx = { tenant, inspectionId, token: token ?? "" };
+  // Prefer the server-issued persistent per-inspection token (always present for
+  // an accessible inspection, including magic-link sessions that carry no
+  // ?token); fall back to the URL ?token (email-CTA arrival) then "".
+  const overviewToken = (overview as StatusOverview & { token?: string }).token;
+  const ctxToken = overviewToken || token || "";
+  const ctx = { tenant, inspectionId, token: ctxToken };
 
   // Step 3 — if ?to names a real deep-link section, jump straight there
   // (carrying the token), forwarding any freshly-issued session cookie.
