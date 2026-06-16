@@ -79,12 +79,11 @@ export async function action({ request, context }: Route.ActionArgs) {
       .filter(Boolean);
   }
 
-  // Boolean feature flags — read via getAll() so the hidden "false" sibling
-  // and the checkbox "true" value are both visible; last entry wins.
-  const repairListVals = fd.getAll("enableRepairList");
-  body.enableRepairList = repairListVals[repairListVals.length - 1] === "true";
-  const repairExportVals = fd.getAll("enableCustomerRepairExport");
-  body.enableCustomerRepairExport = repairExportVals[repairExportVals.length - 1] === "true";
+  // Boolean feature flags — conform-native checkboxes coerce to boolean in
+  // submission.value (checked → true, absent → undefined). Always send an explicit
+  // boolean so unchecking persists false.
+  body.enableRepairList = v.enableRepairList ?? false;
+  body.enableCustomerRepairExport = v.enableCustomerRepairExport ?? false;
 
   const api = createApi(context, { token });
   // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
@@ -237,11 +236,10 @@ export default function SettingsWorkspacePage() {
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Report Features</h3>
 
           <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input type="hidden" name="enableRepairList" value="false" />
             <input
               type="checkbox"
               name="enableRepairList"
-              value="true"
+              value="on"
               defaultChecked={branding.enableRepairList ?? false}
               className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
             />
@@ -254,11 +252,10 @@ export default function SettingsWorkspacePage() {
           </label>
 
           <label className="flex items-start gap-3 cursor-pointer select-none">
-            <input type="hidden" name="enableCustomerRepairExport" value="false" />
             <input
               type="checkbox"
               name="enableCustomerRepairExport"
-              value="true"
+              value="on"
               defaultChecked={branding.enableCustomerRepairExport ?? false}
               className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
             />

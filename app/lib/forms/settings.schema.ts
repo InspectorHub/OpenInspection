@@ -122,13 +122,12 @@ export const workspaceSchema = z.object({
     .optional(),
   reportTheme: z.enum(THEMES).optional(),
   customReferralSources: z.string().optional(),
-  // NOTE: the report-feature flags (enableRepairList / enableCustomerRepairExport)
-  // are intentionally NOT declared here. They render as a hidden "false" + checkbox
-  // "true" pair (LITERAL name attrs) and are read via fd.getAll() in the action — a
-  // boolean flag has no validation rules. If declared as z.boolean() here, a CHECKED
-  // box submits two values ["false","true"]; conform feeds that array to z.boolean()
-  // → parse error → the whole form silently fails to submit (you can never turn it
-  // on). Keeping them out of the conform field map is the fix.
+  // Report-feature flags. Rendered as conform-native checkboxes (single input,
+  // value "on", NO hidden "false" sibling) so a checked box submits ONE value that
+  // conform coerces to a boolean — read from submission.value in the action. (An
+  // earlier hidden+checkbox pair submitted two values and broke z.boolean parsing.)
+  enableRepairList: z.boolean().optional(),
+  enableCustomerRepairExport: z.boolean().optional(),
 });
 
 export type WorkspaceInput = z.infer<typeof workspaceSchema>;

@@ -4,11 +4,14 @@ import { workspaceSchema } from '../../../app/lib/forms/settings.schema';
 
 /**
  * Regression: the "Report Features" checkboxes (enableRepairList /
- * enableCustomerRepairExport) render as a hidden "false" + checkbox "true" pair,
- * so a CHECKED box submits the field twice (["false","true"]). These flags must
- * NOT be in workspaceSchema — if they were declared z.boolean(), conform would
- * feed the array to z.boolean() and the whole form would fail to submit (the flag
- * could never be turned on). They're read via fd.getAll() in the action instead.
+ * enableCustomerRepairExport) are conform-native checkboxes — a SINGLE input with
+ * value "on" and NO hidden "false" sibling. A checked box submits one "on" value
+ * that conform coerces to a boolean in submission.value; an unchecked box submits
+ * nothing (→ undefined → treated as false in the action).
+ *
+ * History: an earlier hidden("false")+checkbox("true") pair submitted the field
+ * TWICE; with z.boolean() in the schema, conform fed that array to z.boolean() and
+ * the whole form silently failed to submit (the flag could never be turned on).
  */
 function fd(pairs: [string, string][]) {
   const f = new FormData();
@@ -16,28 +19,26 @@ function fd(pairs: [string, string][]) {
   return f;
 }
 
-describe('workspace settings — report-feature flags do not block submit', () => {
-  it('a checked flag (doubled value) still parses successfully', () => {
-    const f = fd([
-      ['siteName', 'Acme'],
-      ['reportTheme', 'modern'],
-      ['enableRepairList', 'false'],
-      ['enableCustomerRepairExport', 'false'],
-      ['enableCustomerRepairExport', 'true'], // checkbox adds the second value
-    ]);
-    const submission = parseWithZod(f, { schema: workspaceSchema });
+describe('workspace settings — report-feature checkboxes coerce to booleans', () => {
+  it('checked ("on") → success with the flag true', () => {
+    const submission = parseWithZod(
+      fd([['siteName', 'Acme'], ['reportTheme', 'modern'], ['enableCustomerRepairExport', 'on']]),
+      { schema: workspaceSchema },
+    );
     expect(submission.status).toBe('success');
+    if (submission.status === 'success') {
+      expect(submission.value.enableCustomerRepairExport).toBe(true);
+    }
   });
 
-  it('getAll last-value-wins yields the checkbox state', () => {
-    const f = fd([
-      ['enableCustomerRepairExport', 'false'],
-      ['enableCustomerRepairExport', 'true'],
-    ]);
-    const vals = f.getAll('enableCustomerRepairExport');
-    expect(vals[vals.length - 1] === 'true').toBe(true);
-    const unchecked = fd([['enableCustomerRepairExport', 'false']]);
-    const u = unchecked.getAll('enableCustomerRepairExport');
-    expect(u[u.length - 1] === 'true').toBe(false);
+  it('unchecked (absent) → success with the flag falsy', () => {
+    const submission = parseWithZod(
+      fd([['siteName', 'Acme'], ['reportTheme', 'modern']]),
+      { schema: workspaceSchema },
+    );
+    expect(submission.status).toBe('success');
+    if (submission.status === 'success') {
+      expect(submission.value.enableCustomerRepairExport ?? false).toBe(false);
+    }
   });
 });
