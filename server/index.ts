@@ -85,6 +85,7 @@ import tagsRoutes, { inspectionTagRoutes } from './api/tags';
 import publicSlugRoutes from './api/public-slug';
 import publicShareRoutes from './api/public-share';
 import publicReportRoutes from './api/public-report';
+import clientDocumentsRoutes from './api/client-documents';
 import profileRoutes from './api/profile';
 import conciergeRoutes from './api/concierge';
 import sessionContextRoutes from './api/session-context';
@@ -465,6 +466,10 @@ const routes = app
   .route('/api/public', repairBuilderRoutes)
   // UC-C-7 — public share-token mint (customer Forward report flow).
   .route('/api/public', publicShareRoutes)
+  // Unified client portal ⑦ — client document streaming upload/list/download/delete
+  // (router defines /inspections/:id/documents). Session- OR token-gated; the
+  // global JWT middleware skips /api/public/* so auth is performed in-route.
+  .route('/api/public', clientDocumentsRoutes)
   // Track L (D6/D9) — public SMS opt-in resolve/confirm + inbound STOP/START webhook.
   .route('/api/public', smsPublicRoutes)
   // Unified client portal — magic-link request/redeem + session-gated data routes.
