@@ -12,7 +12,7 @@
  * Multi-tenant: EVERY query filters by tenantId explicitly (see CLAUDE.md).
  */
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray, isNull, or, gt } from 'drizzle-orm';
 import { inspectionAccessTokens, inspections, agreementRequests, customerMessages } from '../lib/db/schema';
 import { isReportPublished } from '../lib/status/report-status';
 
@@ -54,11 +54,12 @@ export class PortalService {
     }
 
     /**
-     * Inspections this recipient can access via a live (non-revoked) client /
-     * co_client token. Deduplicated by inspection id.
+     * Inspections this recipient can access via a live (non-revoked,
+     * non-expired) client / co_client token. Deduplicated by inspection id.
      */
     async listRecipientInspections(tenantId: string, email: string): Promise<RecipientInspection[]> {
         const db = this.d();
+        const now = Date.now();
 
         const grants = await db
             .select({ inspectionId: inspectionAccessTokens.inspectionId })
@@ -69,6 +70,10 @@ export class PortalService {
                     eq(inspectionAccessTokens.recipientEmail, email),
                     inArray(inspectionAccessTokens.role, ['client', 'co_client']),
                     isNull(inspectionAccessTokens.revokedAt),
+                    // A grant is live only when not yet expired. `expiresAt` is
+                    // epoch ms (NULL = never expires), consistent with Date.now().
+                    // Mirrors resolvePortalAccess (server/lib/public-access.ts).
+                    or(isNull(inspectionAccessTokens.expiresAt), gt(inspectionAccessTokens.expiresAt, now)),
                 ),
             );
 

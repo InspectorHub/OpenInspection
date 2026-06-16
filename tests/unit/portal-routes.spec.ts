@@ -41,7 +41,7 @@ describe('PortalService', () => {
         });
     }
 
-    async function seedToken(inspectionId: string, recipientEmail: string, role: 'client' | 'co_client' | 'agent', revokedAt: number | null = null) {
+    async function seedToken(inspectionId: string, recipientEmail: string, role: 'client' | 'co_client' | 'agent', revokedAt: number | null = null, expiresAt: number | null = null) {
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: crypto.randomUUID(),
             tenantId: TENANT,
@@ -50,7 +50,7 @@ describe('PortalService', () => {
             role,
             token: crypto.randomUUID(),
             createdAt: Date.now(),
-            expiresAt: null,
+            expiresAt,
             revokedAt,
         });
     }
@@ -79,6 +79,19 @@ describe('PortalService', () => {
         const rows = await svc.listRecipientInspections(TENANT, 'a@x.com');
         const ids = rows.map((r) => r.inspectionId).sort();
         expect(ids).toEqual(['insp1', 'insp2']);
+    });
+
+    it('listRecipientInspections enforces expiresAt: excludes past-expiry, includes future-expiry and null-expiry', async () => {
+        for (const id of ['inspNull', 'inspFuture', 'inspPast']) await seedInspection(id);
+        const past = Date.now() - 60_000;   // expired one minute ago
+        const future = Date.now() + 60_000; // expires one minute from now
+        await seedToken('inspNull', 'a@x.com', 'client', null, null);     // never expires → included
+        await seedToken('inspFuture', 'a@x.com', 'client', null, future); // not yet expired → included
+        await seedToken('inspPast', 'a@x.com', 'client', null, past);     // expired → excluded
+
+        const rows = await svc.listRecipientInspections(TENANT, 'a@x.com');
+        const ids = rows.map((r) => r.inspectionId).sort();
+        expect(ids).toEqual(['inspFuture', 'inspNull']);
     });
 
     it('listRecipientInspections returns [] when the recipient has no live tokens', async () => {

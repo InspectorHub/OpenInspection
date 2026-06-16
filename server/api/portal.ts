@@ -107,7 +107,7 @@ const requestLinkRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ data: z.object({ sent: z.boolean().describe('Always true — response is identical whether or not the email is known.') }) }) } },
+            content: { 'application/json': { schema: z.object({ data: z.object({ sent: z.boolean().describe('Always true — response is identical (payload AND timing) whether or not the email is known; the magic-link send is deferred to waitUntil.') }) }) } },
             description: 'Magic-link request accepted (no email enumeration).',
         },
         404: { description: 'Tenant slug not found' },
@@ -226,13 +226,18 @@ portalRoutes
         }
 
         if (known) {
-            try {
-                const token = await signMagicLink(c.env.JWT_SECRET, email);
-                const baseUrl = getBaseUrl(c).replace(/\/$/, '');
-                const slug = c.get('requestedTenantSlug') || '';
-                const link = `${baseUrl}/portal/${slug}/auth?link=${encodeURIComponent(token)}`;
-                const safeLink = link.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-                const html = `
+            // Do NOT await the send inside the request: awaiting only on the
+            // known path makes known emails respond measurably slower than
+            // unknown ones, which is a timing enumeration oracle. Defer the work
+            // to `waitUntil` so the response returns immediately in all cases.
+            const sendPromise = (async () => {
+                try {
+                    const token = await signMagicLink(c.env.JWT_SECRET, email);
+                    const baseUrl = getBaseUrl(c).replace(/\/$/, '');
+                    const slug = c.get('requestedTenantSlug') || '';
+                    const link = `${baseUrl}/portal/${slug}/auth?link=${encodeURIComponent(token)}`;
+                    const safeLink = link.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                    const html = `
                     <div style="font-family: -apple-system, system-ui, Segoe UI, Roboto, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #0f172a;">
                         <p style="font-size: 11px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #64748b; margin: 0 0 4px;">Client Portal</p>
                         <h1 style="font-size: 22px; line-height: 1.25; font-weight: 600; margin: 0 0 16px;">Sign in to your portal</h1>
@@ -245,14 +250,27 @@ portalRoutes
                         <p style="font-size: 12px; color: #94a3b8; margin-top: 24px;">If you didn't request this, you can safely ignore this email.</p>
                     </div>
                 `;
-                await c.var.services.email.sendEmail([email], 'Sign in to your client portal', html);
-            } catch (err) {
-                // Swallow send failures — never leak whether the email was known.
-                logger.error('[portal] magic-link send failed', {}, err instanceof Error ? err : undefined);
+                    await c.var.services.email.sendEmail([email], 'Sign in to your client portal', html);
+                } catch (err) {
+                    // Swallow send failures — never leak whether the email was known.
+                    logger.error('[portal] magic-link send failed', {}, err instanceof Error ? err : undefined);
+                }
+            })();
+            // `c.executionCtx` is the Hono Worker execution context (see di.ts).
+            // Its getter THROWS when no execution context is present (e.g. unit
+            // tests), so probe it defensively rather than via a truthiness check.
+            let execCtx: ExecutionContext | undefined;
+            try {
+                execCtx = c.executionCtx;
+            } catch {
+                execCtx = undefined;
             }
+            if (execCtx) execCtx.waitUntil(sendPromise);
+            else await sendPromise;
         }
 
-        // Identical response in all cases (no enumeration).
+        // Identical response in all cases — timing-identical (send deferred to
+        // waitUntil) AND payload-identical, so there is no enumeration oracle.
         return c.json({ data: { sent: true } }, 200);
     })
     .openapi(redeemRoute, async (c) => {
