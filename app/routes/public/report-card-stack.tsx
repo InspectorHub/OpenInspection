@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLoaderData, useParams } from "react-router";
+import { useLoaderData, useParams, useSearchParams } from "react-router";
 import type { Route } from "./+types/report-card-stack";
 import { createApi } from "~/lib/api-client.server";
 import { getToken } from "~/lib/session.server";
@@ -326,6 +326,7 @@ function formatUnixSeconds(sec: number): string {
 export default function ReportCardStackPage() {
  const data = useLoaderData<typeof loader>() as LoaderResult;
  const params = useParams();
+ const [searchParams] = useSearchParams();
  const [filter, setFilter] = useState<FilterKey>(data.initialFilter ?? "all");
  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
  const [repairPanel, setRepairPanel] = useState(false);
@@ -473,10 +474,10 @@ export default function ReportCardStackPage() {
  )}
  {data.enableCustomerRepairExport && (
  <a
- href={`/r/${data.inspectionId}/repair-request`}
+ href={`/repair-builder/${tenant}/${id}${searchParams.get("token") ? `?token=${encodeURIComponent(searchParams.get("token")!)}` : ""}`}
  className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
  >
- Generate repair request
+ Build repair request
  </a>
  )}
  <button

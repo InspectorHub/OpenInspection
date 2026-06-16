@@ -24,6 +24,7 @@ export interface AgentReferralRow {
     clientName: string | null;
     date: string;
     status: string;
+    reportStatus: string | null;
     paymentStatus: string;
     inspectorName: string | null;
 }
@@ -459,6 +460,7 @@ export class AgentService {
                 clientName:      inspections.clientName,
                 date:            inspections.date,
                 status:          inspections.status,
+                reportStatus:    inspections.reportStatus,
                 paymentStatus:   inspections.paymentStatus,
                 referredById:    inspections.referredByAgentId,
                 contactEmail:    contacts.email,
@@ -514,9 +516,72 @@ export class AgentService {
             clientName:      r.clientName ?? null,
             date:            r.date,
             status:          r.status,
+            reportStatus:    r.reportStatus ?? null,
             paymentStatus:   r.paymentStatus,
             inspectorName:   r.inspectorName ?? null,
         }));
+    }
+
+    /**
+     * Access check for the repair-request builder (and any other per-inspection
+     * agent capability). Confirms the signed-in agent is actually associated with
+     * the given inspection and returns the inspection's AUTHORITATIVE tenantId
+     * (derived from the inspection row, NEVER from a URL segment) so the caller
+     * can scope every subsequent query. Returns null when the agent has no claim.
+     *
+     * Uses the same association predicate as listReferrals:
+     *   - active agent_tenant_links row for (agentUserId, inspection.tenantId), AND
+     *   - inspection.referredByAgentId matches either the link's inspectorContactId
+     *     OR a contacts row (type='agent') whose email equals the agent's email.
+     *
+     * Single inspection id → at most one tenant; the inner join + filter keeps
+     * this O(1) in practice.
+     */
+    async accessToInspection(
+        agentUserId: string,
+        inspectionId: string,
+    ): Promise<{ tenantId: string } | null> {
+        const db = this.getDrizzle();
+        const rows = await db
+            .select({
+                tenantId:      inspections.tenantId,
+                referredById:  inspections.referredByAgentId,
+                contactEmail:  contacts.email,
+                linkContactId: agentTenantLinks.inspectorContactId,
+            })
+            .from(inspections)
+            .innerJoin(
+                agentTenantLinks,
+                and(
+                    eq(agentTenantLinks.tenantId, inspections.tenantId),
+                    eq(agentTenantLinks.agentUserId, agentUserId),
+                    eq(agentTenantLinks.status, 'active'),
+                ),
+            )
+            .leftJoin(
+                contacts,
+                and(
+                    eq(contacts.id, inspections.referredByAgentId),
+                    eq(contacts.tenantId, inspections.tenantId),
+                ),
+            )
+            .where(eq(inspections.id, inspectionId))
+            .all();
+        if (rows.length === 0) return null;
+
+        const agent = await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, agentUserId))
+            .get();
+        const agentEmail = agent?.email ?? null;
+
+        const match = rows.find((r) => {
+            if (r.referredById && r.linkContactId && r.referredById === r.linkContactId) return true;
+            if (agentEmail && r.contactEmail && r.contactEmail.toLowerCase() === agentEmail.toLowerCase()) return true;
+            return false;
+        });
+        return match ? { tenantId: match.tenantId } : null;
     }
 
     /**

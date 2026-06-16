@@ -52,7 +52,8 @@ export default [
     route("messages/:token", "routes/public/messages.tsx"),
     // Track L (D6, path B) — public SMS double-opt-in confirmation page.
     route("sms-optin/:token", "routes/public/sms-optin.tsx"),
-    route("r/:id/repair-request", "routes/public/repair-request.tsx"),
+    route("repair-request/:shareToken", "routes/public/repair-request.$shareToken.tsx"),
+    route("repair-builder/:tenant/:id", "routes/public/repair-builder.$tenant.$id.tsx"),
     route(
       "agreements/print/:token",
       "routes/public/agreement-printable.tsx",

@@ -2398,7 +2398,7 @@ export class InspectionService {
     /**
      * C-10 ③-A.2 — the public report-gate payload ("your report is almost ready,
      * here's what's blocking it + the CTA"). Mirrors the report double-gate used
-     * by /report/:id and repair-requests: agreement-signed first (chronologically
+     * by /report/:id: agreement-signed first (chronologically
      * first gate), then invoice-paid. Returns null when the inspection does not
      * exist OR is not actually gated (nothing to show). The `tenantSlug` is only
      * used to build the agreement-sign URL — authority is always `tenantId`.
@@ -2863,29 +2863,6 @@ export class InspectionService {
             defects: entries,
             totals,
             showEstimates: report.showEstimates,
-        };
-    }
-
-    /**
-     * C-10 ③-D — flattened payload for the public customer repair-request page
-     * (`/r/:id/repair-request`). Reuses the repair-list aggregator and adds the
-     * client email (so the page can prefill the "email me a copy" field).
-     */
-    async getRepairRequestData(inspectionId: string, tenantId: string) {
-        const rl = await this.getRepairList(inspectionId, tenantId);
-        const insp = await this.getDrizzle()
-            .select({ clientEmail: inspections.clientEmail })
-            .from(inspections)
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-            .get();
-        return {
-            inspectionId:    rl.inspection.id,
-            propertyAddress: rl.inspection.propertyAddress,
-            inspectionDate:  rl.inspection.date,
-            inspectorName:   rl.inspection.inspectorName,
-            clientEmail:     insp?.clientEmail ?? null,
-            defects:         rl.defects,
-            showEstimates:   rl.showEstimates,
         };
     }
 

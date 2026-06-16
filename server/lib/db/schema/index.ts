@@ -68,3 +68,6 @@ export { inspectionAccessTokens } from './portal-access';
 export { erasureLog, smsDisclosureVersions, smsConsentLog } from './compliance';
 // Usage metering (Phase 1, SaaS-only).
 export { usageCounters } from './usage';
+// Repair Request Builder — buyer/agent/inspector negotiation lists per inspection.
+export { repairRequests, repairRequestItems } from './repair-request';
+export type { RepairRequest, RepairRequestItem } from './repair-request';

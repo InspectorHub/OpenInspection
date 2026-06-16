@@ -185,10 +185,12 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
 const AgentReferralRowSchema = z.object({
     id:              z.string().describe('Inspection id.'),
     tenantName:      z.string().describe('Inspecting company name.'),
+    tenantSlug:      z.string().describe('Tenant slug for building repair-builder links.'),
     propertyAddress: z.string().nullable().describe('Property address of the referred inspection.'),
     clientName:      z.string().nullable().describe('Client (buyer) name on the referral.'),
     date:            z.string().nullable().describe('Scheduled inspection date.'),
     status:          z.string().describe('Inspection lifecycle status.'),
+    reportStatus:    z.string().nullable().describe('Report lifecycle status (published = repair builder available).'),
     inspectorName:   z.string().nullable().describe('Assigned inspector name.'),
 });
 const referralsRoute = createRoute(withMcpMetadata({

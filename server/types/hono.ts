@@ -246,6 +246,7 @@ export interface AppServices {
     identity: import('../services/identity.service').IdentityService;
     integrations: import('../services/integrations.service').IntegrationsService;
     analytics: import('../services/analytics.service').AnalyticsService;
+    repairRequest: import('../services/repair-request.service').RepairRequestService;
 }
 
 /**
