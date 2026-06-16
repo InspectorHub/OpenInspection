@@ -851,7 +851,8 @@ describe('GET /api/public/repair-request/share/:shareToken', () => {
         expect(body.data.creditTotal).toBe(5000);
 
         expect(svc.repairRequest.getByShareToken).toHaveBeenCalledWith('share-tok-abc');
-        expect(svc.repairRequest.creditTotal).toHaveBeenCalledWith('t1', 'rr1');
+        // Share route uses the RR's own inspectionId; creditTotal now takes (tenant, inspId, rrId).
+        expect(svc.repairRequest.creditTotal).toHaveBeenCalledWith('t1', 'insp1', 'rr1');
     });
 
     it('404 when shareToken is unknown', async () => {
