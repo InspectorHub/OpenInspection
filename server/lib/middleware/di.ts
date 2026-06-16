@@ -50,6 +50,7 @@ import { IdentityService } from '../../services/identity.service';
 import { IntegrationsService } from '../../services/integrations.service';
 import { AnalyticsService } from '../../services/analytics.service';
 import { RepairRequestService } from '../../services/repair-request.service';
+import { ClientDocumentService } from '../../services/client-document.service';
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
 
@@ -353,6 +354,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'repairRequest':
                     target.repairRequest = new RepairRequestService(c.env.DB);
+                    break;
+                case 'clientDocument':
+                    target.clientDocument = new ClientDocumentService(c.env.DB, c.env.PHOTOS);
                     break;
             }
             return target[prop];
