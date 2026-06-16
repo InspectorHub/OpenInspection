@@ -122,13 +122,13 @@ export const workspaceSchema = z.object({
     .optional(),
   reportTheme: z.enum(THEMES).optional(),
   customReferralSources: z.string().optional(),
-  // Report-feature flags. Mirrors profileSchema.signatureEnabled: declared here as
-  // z.boolean().optional(), rendered with a hidden "false" + checkbox "true" using
-  // LITERAL name attributes (not fields.x.name), and read via fd.getAll() in the
-  // action. Using fields.x.name instead makes conform manage the field and reject
-  // the string values, silently aborting the save.
-  enableRepairList: z.boolean().optional(),
-  enableCustomerRepairExport: z.boolean().optional(),
+  // NOTE: the report-feature flags (enableRepairList / enableCustomerRepairExport)
+  // are intentionally NOT declared here. They render as a hidden "false" + checkbox
+  // "true" pair (LITERAL name attrs) and are read via fd.getAll() in the action — a
+  // boolean flag has no validation rules. If declared as z.boolean() here, a CHECKED
+  // box submits two values ["false","true"]; conform feeds that array to z.boolean()
+  // → parse error → the whole form silently fails to submit (you can never turn it
+  // on). Keeping them out of the conform field map is the fix.
 });
 
 export type WorkspaceInput = z.infer<typeof workspaceSchema>;
