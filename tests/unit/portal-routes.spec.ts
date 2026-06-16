@@ -409,3 +409,19 @@ describe('portal API', () => {
         expect(res.status).toBe(403);
     });
 });
+
+import { buildPortalUrl } from '../../server/lib/portal-urls';
+describe('buildPortalUrl', () => {
+  it('points at the tenant-scoped portal hub with token; omits to= for overview', () => {
+    expect(buildPortalUrl('https://app.x.io', 'acme', 'insp1', 'tok9'))
+      .toBe('https://app.x.io/portal/acme/i/insp1?token=tok9');
+  });
+  it('adds to=<section> for non-overview sections', () => {
+    expect(buildPortalUrl('https://app.x.io', 'acme', 'insp1', 'tok9', 'report'))
+      .toBe('https://app.x.io/portal/acme/i/insp1?token=tok9&to=report');
+  });
+  it('strips a trailing slash on baseUrl', () => {
+    expect(buildPortalUrl('https://app.x.io/', 'acme', 'insp1', 'tok9'))
+      .toBe('https://app.x.io/portal/acme/i/insp1?token=tok9');
+  });
+});
