@@ -54,6 +54,11 @@ import {
   type RepairRequest,
 } from "~/components/portal/sections/RepairBuilderSection";
 import { MessagesSection } from "~/components/portal/sections/MessagesSection";
+import {
+  PaymentSection,
+  type InvoiceData,
+} from "~/components/portal/sections/PaymentSection";
+import type { TenantBrand } from "~/lib/brand";
 
 export function meta() {
   return [{ title: "Inspection - OpenInspection" }];
@@ -82,7 +87,6 @@ function parseSection(v: string | null): HubSection {
 // "Coming soon — open the full page" link (built from the interim deep-link).
 const NOT_YET_INLINED: HubSection[] = [
   "agreement",
-  "payment",
 ];
 
 // HubSections that have an interim deep-link target. Used to validate the ?to
@@ -279,6 +283,61 @@ async function loadRepairSection(
 }
 
 /* ------------------------------------------------------------------ */
+/* Payment section data — mirrors the standalone invoice loader mapping.
+ * The pay flow is keyed by INSPECTION ID (pay-intent + invoice both by id),
+ * so no per-inspection token is required here. */
+/* ------------------------------------------------------------------ */
+
+interface InvoiceLoaderResult {
+  invoice: InvoiceData | null;
+  brand: TenantBrand;
+  error: string | null;
+}
+
+/** Wire shape of GET /api/public/r/:id/invoice (cents + ISO dates + brand). */
+interface RawInvoice {
+  id: string;
+  amountCents: number;
+  status: string;
+  createdAt?: string | null;
+  dueDate?: string | null;
+  clientName?: string | null;
+  lineItems?: { description: string; amountCents: number }[];
+  brand?: TenantBrand;
+}
+
+async function loadInvoiceSection(
+  context: Route.LoaderArgs["context"],
+  inspectionId: string,
+): Promise<InvoiceLoaderResult> {
+  try {
+    const api = createApi(context);
+    const res = await api.publicReport.r[":id"].invoice.$get({ param: { id: inspectionId } });
+    const body = res.ok ? await res.json() : {};
+    const d = ((body as Record<string, unknown>).data ?? null) as RawInvoice | null;
+    const invoice: InvoiceData | null = d
+      ? {
+          number: `INV-${d.id.slice(0, 8).toUpperCase()}`,
+          date: d.createdAt?.slice(0, 10) ?? "",
+          dueDate: d.dueDate ?? null,
+          status: (d.status as InvoiceData["status"]) ?? "draft",
+          clientName: d.clientName ?? "",
+          inspectorName: "",
+          lineItems: (d.lineItems ?? []).map((li) => ({ description: li.description, amount: li.amountCents / 100 })),
+          total: d.amountCents / 100,
+        }
+      : null;
+    return {
+      invoice,
+      brand: d?.brand ?? EMPTY_BRAND,
+      error: res.ok ? null : "Invoice not found",
+    };
+  } catch {
+    return { invoice: null, brand: EMPTY_BRAND, error: "Service unavailable" };
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /* Loader */
 /* ------------------------------------------------------------------ */
 
@@ -373,6 +432,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   let report: ReportLoaderResult | null = null;
   let progress: ProgressLoaderResult | null = null;
   let repair: RepairLoaderResult | null = null;
+  let invoice: InvoiceLoaderResult | null = null;
 
   if (section === "documents") {
     // Client documents (unified portal section ⑦) — fetch using the SAME cookie
@@ -398,11 +458,14 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     progress = await loadProgressSection(context, inspectionId, ctxToken);
   } else if (section === "repair") {
     repair = await loadRepairSection(context, tenant, inspectionId, ctxToken);
+  } else if (section === "payment") {
+    // Pay flow is keyed by inspection id (pay-intent + invoice) — no token.
+    invoice = await loadInvoiceSection(context, inspectionId);
   }
 
   // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, section, documents, report, progress, repair }),
+    JSON.stringify({ overview, ctx, section, documents, report, progress, repair, invoice }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -417,7 +480,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function PortalInspection() {
-  const { overview, ctx, section, documents, report, progress, repair } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, documents, report, progress, repair, invoice } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string; messageToken: string | null };
     section: HubSection;
@@ -425,6 +488,7 @@ export default function PortalInspection() {
     report: ReportLoaderResult | null;
     progress: ProgressLoaderResult | null;
     repair: RepairLoaderResult | null;
+    invoice: InvoiceLoaderResult | null;
   };
   const revalidator = useRevalidator();
   const { tenant, inspectionId, token } = ctx;
@@ -535,6 +599,15 @@ export default function PortalInspection() {
       <RepairBuilderSection
         result={repair}
         actionPath={`/repair-builder/${tenant}/${inspectionId}`}
+      />
+    );
+  } else if (section === "payment" && invoice) {
+    sectionSlot = (
+      <PaymentSection
+        invoice={invoice.invoice}
+        brand={invoice.brand}
+        inspectionId={inspectionId}
+        error={invoice.error}
       />
     );
   } else if (section === "messages") {
