@@ -47,7 +47,7 @@ export function MessagesSection({ token }: { token: string }) {
   // Load messages
   const loadMessages = useCallback(async () => {
     try {
-      const res = await fetch(`/api/public/messages/${token}`);
+      const res = await fetch(`/api/messages/public/${token}`);
       const json = (await res.json()) as Record<string, unknown>;
       if (json.success) {
         const data = json.data as {
@@ -71,7 +71,7 @@ export function MessagesSection({ token }: { token: string }) {
     if (!composeBody.trim() || sending) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/public/messages/${token}`, {
+      const res = await fetch(`/api/messages/public/${token}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ body: composeBody }),
