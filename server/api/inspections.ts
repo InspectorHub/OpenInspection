@@ -4,8 +4,9 @@ import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import { auditFromContext } from '../lib/audit';
-import { getBookingHost, resolveTenantSlug } from '../lib/url';
+import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl, agreementSignUrl } from '../lib/public-urls';
+import { buildPortalUrl } from '../lib/portal-urls';
 import { safeISODate } from '../lib/date';
 import { Errors } from '../lib/errors';
 import { contentDisposition } from '../lib/content-disposition';
@@ -2661,7 +2662,9 @@ export const inspectionsRoutes = createApiRouter()
             // can open it (a plain URL 404s "Report not found"). Idempotent per
             // (inspection, recipient) — re-sends keep the same stable link.
             const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: inspection.clientEmail, role: 'client' });
-            const linkUrl = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?token=${encodeURIComponent(reportToken)}`;
+            // linkUrl now lands the no-login client on the unified portal hub
+            // (overview) carrying the persistent portalAccess token.
+            const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
             // renderUrl: token-bearing URL for the headless browser PDF render.
             const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
             const clientEmail = inspection.clientEmail;
@@ -2732,7 +2735,9 @@ export const inspectionsRoutes = createApiRouter()
         // found" for a no-login recipient. issueToken is idempotent per
         // (inspection, recipient), so re-sends reuse the same stable link.
         const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: recipient, role: 'client' });
-        const linkUrl = `${buildReportUrl(getBookingHost(c), tenantSlug, id)}?token=${encodeURIComponent(reportToken)}`;
+        // linkUrl now lands the no-login client on the unified portal hub
+        // (overview) carrying the persistent portalAccess token.
+        const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
         // renderUrl: token-bearing URL for the headless browser PDF render.
         const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const address = inspection.propertyAddress as string;

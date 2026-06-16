@@ -211,6 +211,7 @@ export interface AppServices {
     contact: ContactService;
     invoice: InvoiceService;
     portalAccess: PortalAccessService;
+    portal: import('../services/portal.service').PortalService;
     service: ServiceService;
     automation: AutomationService;
     marketplace: MarketplaceService;
@@ -255,6 +256,11 @@ export interface AppServices {
 export type AppVariables = AuthVariables & {
     services: AppServices;
     profile: DeploymentProfile;
+    /** Unified client portal — verified email from the __Host-portal_session
+     *  cookie, set by the portal session middleware (server/api/portal.ts).
+     *  Tenant-independent (email ownership is global); cross-tenant isolation
+     *  comes from every portal query being scoped to the path's tenantId. */
+    portalEmail?: string;
 };
 
 /**

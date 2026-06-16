@@ -36,6 +36,7 @@ import type {
     MetricsApi,
     NotificationsApi,
     PlacesApi,
+    PortalApi,
     ProfileApi,
     PublicShareApi,
     PublicReportApi,
@@ -139,6 +140,7 @@ export interface Api {
     metrics:            ReturnType<typeof hc<MetricsApi>>;
     notifications:      ReturnType<typeof hc<NotificationsApi>>;
     places:             ReturnType<typeof hc<PlacesApi>>;
+    portal:             ReturnType<typeof hc<PortalApi>>;
     profile:            ReturnType<typeof hc<ProfileApi>>;
     publicShare:        ReturnType<typeof hc<PublicShareApi>>;
     publicReport:       ReturnType<typeof hc<PublicReportApi>>;
@@ -202,6 +204,7 @@ const MOUNT: Record<keyof Api, string> = {
     metrics:            "/api/metrics",
     notifications:      "/api/notifications",
     places:             "/api/places",
+    portal:             "/api/portal",
     profile:            "/api/profile",
     publicShare:        "/api/public",
     publicReport:       "/api/public",
@@ -283,6 +286,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         metrics:            mk<MetricsApi>(MOUNT.metrics),
         notifications:      mk<NotificationsApi>(MOUNT.notifications),
         places:             mk<PlacesApi>(MOUNT.places),
+        portal:             mk<PortalApi>(MOUNT.portal),
         profile:            mk<ProfileApi>(MOUNT.profile),
         publicShare:        mk<PublicShareApi>(MOUNT.publicShare),
         publicReport:       mk<PublicReportApi>(MOUNT.publicReport),

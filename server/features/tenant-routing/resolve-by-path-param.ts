@@ -27,6 +27,9 @@ const PUBLIC_PREFIXES = [
     '/checkout/',
     '/m2m/agreement-render/',
     '/api/integrations/stripe/webhook/',
+    // Unified client portal — API routes (this task) + page routes (later task).
+    '/api/portal/',
+    '/portal/',
 ];
 
 export async function resolveByPathParam(c: Context<HonoConfig>, path: string): Promise<boolean> {
