@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { shareViewModel } from '~/routes/public/repair-request.$shareToken';
+import { builderCreditTotal, sortDefects, toggleSelected } from '~/routes/public/repair-builder.$tenant.$id';
 
 describe('shareViewModel', () => {
   it('formats credit total and lists items', () => {
@@ -80,5 +81,39 @@ describe('shareViewModel', () => {
     expect(m.propertyAddress).toBe('4 D Ct');
     expect(m.customIntro).toBe('Fix these:');
     expect(m.creditTotalDisplay).toBe('$125.00');
+  });
+});
+
+describe('repair-builder helpers', () => {
+  it('builderCreditTotal sums requestedCreditCents, ignoring null/undefined', () => {
+    const items = [
+      { requestedCreditCents: 5000 },
+      { requestedCreditCents: null },
+      { requestedCreditCents: 3000 },
+      { requestedCreditCents: undefined },
+    ];
+    expect(builderCreditTotal(items)).toBe(8000);
+  });
+
+  it('sortDefects by section groups on sectionTitle alphabetically', () => {
+    const defects = [
+      { findingKey: 'k1', sectionId: 's1', sectionTitle: 'Roof', itemId: 'i1', itemLabel: 'Shingles', comment: 'worn', category: 'safety' as const },
+      { findingKey: 'k2', sectionId: 's2', sectionTitle: 'Attic', itemId: 'i2', itemLabel: 'Insulation', comment: 'missing', category: 'recommendation' as const },
+      { findingKey: 'k3', sectionId: 's3', sectionTitle: 'Electrical', itemId: 'i3', itemLabel: 'Panel', comment: 'dated', category: 'maintenance' as const },
+    ];
+    const sorted = sortDefects(defects, 'section');
+    expect(sorted[0].sectionTitle).toBe('Attic');
+    expect(sorted[1].sectionTitle).toBe('Electrical');
+    expect(sorted[2].sectionTitle).toBe('Roof');
+  });
+
+  it('toggleSelected adds key when absent, removes when present', () => {
+    const s0 = new Set<string>();
+    const s1 = toggleSelected(s0, 'k1');
+    expect(s1.has('k1')).toBe(true);
+    const s2 = toggleSelected(s1, 'k1');
+    expect(s2.has('k1')).toBe(false);
+    // Original set is not mutated
+    expect(s0.size).toBe(0);
   });
 });

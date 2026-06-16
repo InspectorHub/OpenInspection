@@ -24,6 +24,7 @@ export interface AgentReferralRow {
     clientName: string | null;
     date: string;
     status: string;
+    reportStatus: string | null;
     paymentStatus: string;
     inspectorName: string | null;
 }
@@ -459,6 +460,7 @@ export class AgentService {
                 clientName:      inspections.clientName,
                 date:            inspections.date,
                 status:          inspections.status,
+                reportStatus:    inspections.reportStatus,
                 paymentStatus:   inspections.paymentStatus,
                 referredById:    inspections.referredByAgentId,
                 contactEmail:    contacts.email,
@@ -514,6 +516,7 @@ export class AgentService {
             clientName:      r.clientName ?? null,
             date:            r.date,
             status:          r.status,
+            reportStatus:    r.reportStatus ?? null,
             paymentStatus:   r.paymentStatus,
             inspectorName:   r.inspectorName ?? null,
         }));

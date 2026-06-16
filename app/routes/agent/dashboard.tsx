@@ -10,10 +10,12 @@ export function meta() {
 interface Referral {
  id: string;
  tenantName: string;
+ tenantSlug: string;
  propertyAddress: string | null;
  clientName: string | null;
  date: string | null;
  status: string;
+ reportStatus: string | null;
  inspectorName: string | null;
 }
 
@@ -117,8 +119,8 @@ export default function AgentDashboardPage() {
  </div>
  <div className="divide-y divide-ih-border">
  {rows.map((r) => (
- <div key={r.id} className="flex items-center justify-between px-5 py-3 hover:bg-ih-bg-muted/30 transition-colors">
- <div className="min-w-0">
+ <div key={r.id} className="flex items-center justify-between px-5 py-3 hover:bg-ih-bg-muted/30 transition-colors gap-3">
+ <div className="min-w-0 flex-1">
  <p className="text-[13px] font-semibold text-ih-fg-1 truncate">
  {r.propertyAddress || "No address"}
  </p>
@@ -127,9 +129,19 @@ export default function AgentDashboardPage() {
  {r.inspectorName ? ` · w/ ${r.inspectorName}` : ""}
  </p>
  </div>
- <span className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold uppercase tracking-[0.04em] shrink-0 ml-4 ${statusColor(r.status)}`}>
+ <div className="flex items-center gap-2 shrink-0">
+ {r.reportStatus === "published" && r.tenantSlug && (
+ <Link
+ to={`/repair-builder/${r.tenantSlug}/${r.id}`}
+ className="inline-flex items-center h-6 px-2 rounded border border-ih-border text-[11px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
+ >
+ Build repair request
+ </Link>
+ )}
+ <span className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold uppercase tracking-[0.04em] ${statusColor(r.status)}`}>
  {statusLabel(r.status)}
  </span>
+ </div>
  </div>
  ))}
  </div>
