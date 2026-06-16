@@ -93,6 +93,7 @@ const HubOverviewSchema = z.object({
 
 const HubOverviewResponseSchema = HubOverviewSchema.extend({
     token: z.string().describe('Persistent per-inspection access token for building section deep-links.'),
+    messageToken: z.string().nullable().describe('Per-inspection conversation token for the inline Messages section. Null when minting fails.'),
 });
 
 // ---------------------------------------------------------------------------
@@ -371,9 +372,20 @@ export const portalRoutes = portalRouter
             logger.error('[portal] overview token issue failed', {}, err instanceof Error ? err : undefined);
         }
 
+        // Get-or-create the per-inspection conversation token so the inline
+        // Messages section can use the existing public message endpoints. The
+        // membership check above already authorizes this recipient; best-effort
+        // (null on failure, mirroring the token issue above).
+        let messageToken: string | null = null;
+        try {
+            messageToken = await c.var.services.message.getOrCreateToken(inspectionId, tenantId);
+        } catch (err) {
+            logger.error('[portal] overview message token issue failed', {}, err instanceof Error ? err : undefined);
+        }
+
         const overview = await c.var.services.portal.hubOverview(tenantId, inspectionId);
         if (!overview) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: { ...overview, token } }, 200);
+        return c.json({ data: { ...overview, token, messageToken } }, 200);
     });
 
 export type PortalApi = typeof portalRoutes;

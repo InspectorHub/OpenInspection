@@ -53,6 +53,7 @@ import {
   type Defect as RepairDefect,
   type RepairRequest,
 } from "~/components/portal/sections/RepairBuilderSection";
+import { MessagesSection } from "~/components/portal/sections/MessagesSection";
 
 export function meta() {
   return [{ title: "Inspection - OpenInspection" }];
@@ -82,7 +83,6 @@ function parseSection(v: string | null): HubSection {
 const NOT_YET_INLINED: HubSection[] = [
   "agreement",
   "payment",
-  "messages",
 ];
 
 // HubSections that have an interim deep-link target. Used to validate the ?to
@@ -341,7 +341,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       throw new Response("Not found", { status: 404 });
     }
     const body = (await res.json()) as {
-      data?: StatusOverview & { token?: string };
+      data?: StatusOverview & { token?: string; messageToken?: string | null };
     };
     if (!body.data) throw new Response("Not found", { status: 404 });
     overview = body.data;
@@ -355,7 +355,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   // ?token); fall back to the URL ?token (email-CTA arrival) then "".
   const overviewToken = (overview as StatusOverview & { token?: string }).token;
   const ctxToken = overviewToken || token || "";
-  const ctx = { tenant, inspectionId, token: ctxToken };
+  const messageToken =
+    (overview as StatusOverview & { messageToken?: string | null }).messageToken ?? null;
+  const ctx = { tenant, inspectionId, token: ctxToken, messageToken };
 
   // Step 3 — if ?to names a real deep-link section, jump straight there
   // (carrying the token), forwarding any freshly-issued session cookie.
@@ -417,7 +419,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 export default function PortalInspection() {
   const { overview, ctx, section, documents, report, progress, repair } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
-    ctx: { tenant: string; inspectionId: string; token: string };
+    ctx: { tenant: string; inspectionId: string; token: string; messageToken: string | null };
     section: HubSection;
     documents: DocumentItem[] | null;
     report: ReportLoaderResult | null;
@@ -534,6 +536,16 @@ export default function PortalInspection() {
         result={repair}
         actionPath={`/repair-builder/${tenant}/${inspectionId}`}
       />
+    );
+  } else if (section === "messages") {
+    sectionSlot = ctx.messageToken ? (
+      <MessagesSection token={ctx.messageToken} />
+    ) : (
+      <div className="rounded-xl border border-ih-border bg-ih-bg-card p-6 text-center">
+        <p className="text-sm text-ih-fg-3">
+          Messaging is not available for this inspection yet.
+        </p>
+      </div>
     );
   } else if (NOT_YET_INLINED.includes(section)) {
     // Transitional: until ③–⑥ inline these, offer a link to the full page.
