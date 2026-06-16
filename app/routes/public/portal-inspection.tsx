@@ -373,6 +373,15 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   const api = createApi(context);
   const browserCookie = request.headers.get("cookie") ?? "";
 
+  // Tenant brand for the Hub shell (logo / company name / accent). Best-effort:
+  // any failure degrades to the platform default (EMPTY_BRAND).
+  let brand: TenantBrand = EMPTY_BRAND;
+  try {
+    brand = await resolveTenantBrand(context, tenant);
+  } catch {
+    brand = EMPTY_BRAND;
+  }
+
   // Cookie to forward to the browser (only set if exchange minted a fresh one).
   let cookieToForward: string | null = null;
   // Cookie value to present to the overview call: prefer the freshly-issued one.
@@ -493,7 +502,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 
   // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, section, documents, report, progress, repair, invoice, agreement }),
+    JSON.stringify({ overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -508,10 +517,11 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function PortalInspection() {
-  const { overview, ctx, section, documents, report, progress, repair, invoice, agreement } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string; messageToken: string | null; signerToken: string | null };
     section: HubSection;
+    brand: TenantBrand;
     documents: DocumentItem[] | null;
     report: ReportLoaderResult | null;
     progress: ProgressLoaderResult | null;
@@ -673,6 +683,7 @@ export default function PortalInspection() {
     <InspectionHub
       overview={overview}
       ctx={ctx}
+      brand={brand}
       activeSection={section}
       sectionSlot={sectionSlot}
       onSignOut={() => void signOut(tenant)}

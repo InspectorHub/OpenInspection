@@ -12,6 +12,8 @@
 import { Form, useLoaderData, useActionData, useNavigation } from "react-router";
 import type { Route } from "./+types/portal";
 import { createApi } from "~/lib/api-client.server";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 import InspectionList, { type InspectionRow } from "~/components/portal/InspectionList";
 import { signOut } from "~/components/portal/sign-out";
 
@@ -20,8 +22,8 @@ export function meta() {
 }
 
 type LoaderResult =
-  | { authed: true; tenant: string; email: string; inspections: InspectionRow[] }
-  | { authed: false; tenant: string };
+  | { authed: true; tenant: string; email: string; inspections: InspectionRow[]; brand: TenantBrand }
+  | { authed: false; tenant: string; brand: TenantBrand };
 
 export async function loader({
   params,
@@ -31,6 +33,16 @@ export async function loader({
   const tenant = params.tenant ?? "";
   const api = createApi(context);
   const cookie = request.headers.get("cookie") ?? "";
+
+  // Resolve the tenant brand for BOTH authed + signed-out states so the portal
+  // shell reflects the company's logo / name / accent color. Degrades to
+  // EMPTY_BRAND (platform default) on any failure.
+  let brand: TenantBrand = EMPTY_BRAND;
+  try {
+    brand = await resolveTenantBrand(context, tenant);
+  } catch {
+    brand = EMPTY_BRAND;
+  }
 
   try {
     const res = await api.portal[":tenant"].me.$get(
@@ -43,13 +55,13 @@ export async function loader({
       };
       const data = body.data;
       if (data) {
-        return { authed: true, tenant, email: data.email, inspections: data.inspections };
+        return { authed: true, tenant, email: data.email, inspections: data.inspections, brand };
       }
     }
   } catch {
     // fall through to unauthenticated
   }
-  return { authed: false, tenant };
+  return { authed: false, tenant, brand };
 }
 
 export async function action({ params, request, context }: Route.ActionArgs) {
@@ -70,6 +82,29 @@ export async function action({ params, request, context }: Route.ActionArgs) {
   return { sent: true as const };
 }
 
+/**
+ * Brand line for the portal shell header: tenant logo (when set) + company name
+ * as the eyebrow. Falls back to the generic "Client Portal" eyebrow when the
+ * tenant has no name/logo, so the shell never looks broken.
+ */
+function BrandEyebrow({ brand }: { brand: TenantBrand }) {
+  if (brand.logoUrl) {
+    return (
+      <div className="flex items-center gap-2 mb-2">
+        <img src={brand.logoUrl} alt={brand.siteName ?? "Company"} className="h-8 w-auto" />
+        {brand.siteName && (
+          <span className="text-[13px] font-semibold text-ih-fg-2">{brand.siteName}</span>
+        )}
+      </div>
+    );
+  }
+  return (
+    <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
+      {brand.siteName ?? "Client Portal"}
+    </p>
+  );
+}
+
 export default function PortalLanding() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -79,12 +114,10 @@ export default function PortalLanding() {
   if (data.authed) {
     const tenant = data.tenant;
     return (
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+      <div style={brandTokens(data.brand.primaryColor)} className="max-w-3xl mx-auto px-4 py-8 space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
-              Client Portal
-            </p>
+            <BrandEyebrow brand={data.brand} />
             <h1 className="text-2xl font-bold text-ih-fg-1">My Inspections</h1>
             <p className="text-[13px] text-ih-fg-3 mt-1">Signed in as {data.email}</p>
           </div>
@@ -105,11 +138,9 @@ export default function PortalLanding() {
   }
 
   return (
-    <div className="max-w-md mx-auto px-4 py-12">
+    <div style={brandTokens(data.brand.primaryColor)} className="max-w-md mx-auto px-4 py-12">
       <div className="mb-6">
-        <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
-          Client Portal
-        </p>
+        <BrandEyebrow brand={data.brand} />
         <h1 className="text-2xl font-bold text-ih-fg-1">Sign in to your portal</h1>
         <p className="text-[14px] text-ih-fg-3 mt-1">
           Enter your email and we&rsquo;ll send you a secure sign-in link.

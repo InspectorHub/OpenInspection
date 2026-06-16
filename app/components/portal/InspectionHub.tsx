@@ -1,5 +1,6 @@
 import type React from "react";
 import { Link } from "react-router";
+import { brandTokens, type TenantBrand } from "~/lib/brand";
 import InspectionStatusCards, { type StatusOverview } from "./InspectionStatusCards";
 
 /* ------------------------------------------------------------------ */
@@ -59,12 +60,18 @@ const NAV: Array<{ section: HubSection; label: string }> = [
 export default function InspectionHub({
   overview,
   ctx,
+  brand,
   activeSection = "overview",
   sectionSlot,
   onSignOut,
 }: {
   overview: StatusOverview;
   ctx: HubLinkCtx;
+  /** Tenant brand (logo / company name / accent color). When set, the accent
+   *  re-points the DS primary tokens via brandTokens so active tabs + the Sign
+   *  out hover adopt it; the logo / company name show as a small brand line.
+   *  Degrades gracefully (generic shell) when omitted or fields are null. */
+  brand?: TenantBrand;
   activeSection?: HubSection;
   /** The active (non-overview) section's rendered body, supplied by the route
    *  so this component stays presentational/data-source-agnostic. Ignored on
@@ -76,10 +83,26 @@ export default function InspectionHub({
   onSignOut?: () => void;
 }) {
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+    <div style={brandTokens(brand?.primaryColor)} className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       {/* Header — always rendered for every section. */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
+          {/* Brand line — tenant logo and/or company name above the address.
+              Hidden entirely when the tenant has no logo/name. */}
+          {(brand?.logoUrl || brand?.siteName) && (
+            <div className="mb-2 flex items-center gap-2">
+              {brand.logoUrl && (
+                <img
+                  src={brand.logoUrl}
+                  alt={brand.siteName ?? "Company"}
+                  className="h-8 w-auto"
+                />
+              )}
+              {brand.siteName && (
+                <span className="text-[13px] font-semibold text-ih-fg-3">{brand.siteName}</span>
+              )}
+            </div>
+          )}
           <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-ih-fg-1">
             {overview.address || "Inspection"}
           </h1>
