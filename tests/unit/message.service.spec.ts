@@ -45,21 +45,6 @@ describe('MessageService', () => {
         expect(list[0].body).toBe('a');
     });
 
-    it('getOrCreateToken returns same token on second call', async () => {
-        const t1 = await svc.getOrCreateToken('i1', 't1');
-        const t2 = await svc.getOrCreateToken('i1', 't1');
-        expect(t1).toBe(t2);
-        expect(t1).toMatch(/^[0-9a-f]{32}$/);
-    });
-
-    it('resolveByToken returns inspection only when token matches', async () => {
-        const t = await svc.getOrCreateToken('i1', 't1');
-        const insp = await svc.resolveByToken(t);
-        expect(insp?.id).toBe('i1');
-        const none = await svc.resolveByToken('00000000000000000000000000000000');
-        expect(none).toBeNull();
-    });
-
     it('unreadCountForTenant counts unread client messages only', async () => {
         await svc.createMessage({ tenantId: 't1', inspectionId: 'i1', fromRole: 'client', body: 'hi', attachments: [] });
         await svc.createMessage({ tenantId: 't1', inspectionId: 'i1', fromRole: 'inspector', body: 'hi back', attachments: [] });

@@ -103,7 +103,6 @@ export interface ReportLoaderResult {
   showEstimates: boolean;
   enableRepairList: boolean;
   enableCustomerRepairExport: boolean;
-  messageToken: string | null;
   isDelivered: boolean;
   brand: TenantBrand;
   error: string | null;
@@ -166,7 +165,6 @@ export function reportViewProps(
     showEstimates: data.showEstimates ?? false,
     enableRepairList: data.enableRepairList ?? false,
     enableCustomerRepairExport: data.enableCustomerRepairExport ?? false,
-    messageToken: data.messageToken ?? null,
     isDelivered: data.isDelivered ?? false,
     brand: data.brand,
     error: data.error ?? null,
