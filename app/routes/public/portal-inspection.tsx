@@ -284,7 +284,7 @@ interface InvoiceLoaderResult {
   error: string | null;
 }
 
-/** Wire shape of GET /api/public/r/:id/invoice (cents + ISO dates + brand). */
+/** Wire shape of GET /api/public/inspections/:id/invoice (cents + ISO dates + brand). */
 interface RawInvoice {
   id: string;
   amountCents: number;
@@ -302,7 +302,7 @@ async function loadInvoiceSection(
 ): Promise<InvoiceLoaderResult> {
   try {
     const api = createApi(context);
-    const res = await api.publicReport.r[":id"].invoice.$get({ param: { id: inspectionId } });
+    const res = await api.publicReport.inspections[":id"].invoice.$get({ param: { id: inspectionId } });
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? null) as RawInvoice | null;
     const invoice: InvoiceData | null = d

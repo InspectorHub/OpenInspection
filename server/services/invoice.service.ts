@@ -35,7 +35,7 @@ export class InvoiceService {
     /**
      * iter-2 production bug #10 — given an inspection id, return its most
      * recent invoice (if any) within the given tenant. Used by the public
-     * `/r/:id/invoice` payment page that the report-gate "Pay invoice" CTA
+     * `/invoice/:id` payment page that the report-gate "Pay invoice" CTA
      * now points at, so an unauthenticated customer can see what they owe
      * and how to pay without being redirected to /login.
      *

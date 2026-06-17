@@ -6,12 +6,12 @@ import type { HonoConfig } from '../../types/hono';
 
 /**
  * Tenant resolution for the public client chain keyed by inspection id:
- * `/r/:id/...` (invoice page) and `/api/public/r/:id/...`
+ * `/invoice/:id` (invoice page) and `/api/public/inspections/:id/...`
  * (invoice data, pay-intent). The unguessable inspection UUID is
  * already the capability these endpoints trust; resolving tenancy from it is
  * equivalent to the portal-token → tenantId pattern.
  */
-const R_PREFIXES = ['/r/', '/api/public/r/'];
+const R_PREFIXES = ['/invoice/', '/api/public/inspections/'];
 
 export function extractInspectionIdFromPath(path: string): string | null {
     for (const prefix of R_PREFIXES) {

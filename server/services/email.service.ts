@@ -348,7 +348,7 @@ export class EmailService {
 
     /**
      * Task 8 (Issue #111) — emails the client a request to pay their invoice,
-     * linking the public `/r/:id/invoice` payment page. Mirrors
+     * linking the public `/invoice/:id` payment page. Mirrors
      * sendAgreementRequest: registry-driven render with a branded fallback and
      * the inspector's rebooking signature (B-4) when host + inspector are given.
      */

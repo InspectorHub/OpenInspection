@@ -5,8 +5,8 @@
  * "Payment").
  *
  * Data-source-agnostic: receives everything via props (no `useLoaderData`). The
- * pay flow is keyed by INSPECTION ID — it POSTs `/api/public/r/:id/pay-intent`
- * and reads `/api/public/r/:id/invoice` upstream; no signer token is required.
+ * pay flow is keyed by INSPECTION ID — it POSTs `/api/public/inspections/:id/pay-intent`
+ * and reads `/api/public/inspections/:id/invoice` upstream; no signer token is required.
  *
  * Bare-content convention — it renders the invoice card + pay form ONLY; the page
  * chrome (max-width container, padding, page background) is supplied by the host
@@ -292,7 +292,7 @@ function PayPanel({ id, balanceDue, inspectorName, brandColor }: { id: string; b
     setReturnUrl(typeof window !== "undefined" ? window.location.href : "");
     setPhase("loading");
     try {
-      const res = await fetch(`/api/public/r/${id}/pay-intent`, {
+      const res = await fetch(`/api/public/inspections/${id}/pay-intent`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",

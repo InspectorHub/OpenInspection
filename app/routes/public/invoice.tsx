@@ -9,7 +9,7 @@ export function meta() {
   return [{ title: "Invoice - OpenInspection" }];
 }
 
-/** Wire shape of GET /api/public/r/:id/invoice (cents + ISO dates + brand). */
+/** Wire shape of GET /api/public/inspections/:id/invoice (cents + ISO dates + brand). */
 interface RawInvoice {
   id: string;
   amountCents: number;
@@ -25,7 +25,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const privacyUrl = readLegalLinks(context)?.privacyUrl ?? null;
   try {
     const api = createApi(context);
-    const res = await api.publicReport.r[":id"].invoice.$get({ param: { id: params.id ?? "" } });
+    const res = await api.publicReport.inspections[":id"].invoice.$get({ param: { id: params.id ?? "" } });
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? null) as RawInvoice | null;
     const invoice: InvoiceData | null = d

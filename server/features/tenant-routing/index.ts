@@ -39,7 +39,7 @@ export const tenantRouter: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const pathParamResolved = await resolveByPathParam(c, path);
     if (pathParamResolved) return next();
 
-    // Inspection-id capability paths (/r/:id, /api/public/r/:id). Skip in
+    // Inspection-id capability paths (/invoice/:id, /api/public/inspections/:id). Skip in
     // standalone — the fixed tenant below resolves without a query.
     if (!c.var.profile.fixedTenantId) {
         const inspectionResolved = await resolveByInspectionId(c, path);

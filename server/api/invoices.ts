@@ -105,7 +105,7 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
  * The hub Invoice card "Request payment" button posts here. Resolves (or
  * creates) the inspection's invoice per the money authority chain (Σ service
  * snapshots → inspections.price), marks it sent, and emails the client a link
- * to the public `/r/:id/invoice` payment page. Reuses any existing draft/sent
+ * to the public `/invoice/:id` payment page. Reuses any existing draft/sent
  * invoice rather than duplicating; rejects an already-paid invoice (409) and a
  * recipient-less or zero-amount inspection (422).
  */
@@ -269,7 +269,7 @@ export const invoiceRoutes = createApiRouter()
         await c.var.services.invoice.markSent(invoiceId, tenantId);
 
         // Build the public pay URL exactly like the agreement send path's host
-        // resolution; `/r/:id/invoice` is keyed by inspection id (no slug).
+        // resolution; `/invoice/:id` is keyed by inspection id (no slug).
         const payUrl = paymentUrl(getBookingHost(c), inspectionId);
         const amountLabel = USD.format(amountCents / 100);
 

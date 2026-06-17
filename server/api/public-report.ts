@@ -218,7 +218,7 @@ const PublicInvoiceSchema = z.object({
 
 const invoiceRoute = createRoute(withMcpMetadata({
     method: 'get',
-    path: '/r/{id}/invoice',
+    path: '/inspections/{id}/invoice',
     tags: ['public'],
     summary: 'Public invoice for an inspection (pay-link landing)',
     request: { params: z.object({ id: z.string().describe('Inspection id the invoice belongs to.') }) },
@@ -242,7 +242,7 @@ const PayIntentSchema = z.object({
 
 const payIntentRoute = createRoute(withMcpMetadata({
     method: 'post',
-    path: '/r/{id}/pay-intent',
+    path: '/inspections/{id}/pay-intent',
     tags: ['public'],
     summary: 'Start a Stripe card payment for an inspection invoice',
     request: { params: z.object({ id: z.string().describe('Inspection id the invoice belongs to.') }) },
@@ -741,7 +741,7 @@ export const publicReportRoutes = createApiRouter()
         const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
         if (!inv) return c.json({ success: true as const, data: null }, 200);
         // A-10 — ship the tenant brand with the invoice so the public pay page
-        // renders the inspector's branding (no tenant slug in /r/:id URLs).
+        // renders the inspector's branding (no tenant slug in /invoice/:id URLs).
         const brand = await c.var.services.branding.getBrand(tenantId);
         return c.json({ success: true as const, data: { ...inv, brand } }, 200);
     })

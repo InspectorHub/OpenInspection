@@ -67,11 +67,11 @@ export async function buildRenderReportUrl(
 
 /**
  * Public invoice payment page (Task 8 / #111). Unlike report/sign links this
- * route is keyed only by inspection id (`/r/:id/invoice`) — the public payment
+ * route is keyed only by inspection id (`/invoice/:id`) — the public payment
  * page resolves the tenant itself — so no slug segment is required.
  */
 export function paymentUrl(host: string, inspectionId: string): string {
-    return joinUrl(host, `/r/${inspectionId}/invoice`);
+    return joinUrl(host, `/invoice/${inspectionId}`);
 }
 
 export function signUrl(host: string, tenantSlug: string, inspectionId: string): string {
