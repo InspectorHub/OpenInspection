@@ -20,7 +20,7 @@
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import type { Context } from 'hono';
-import { getCookie, setCookie } from 'hono/cookie';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { signMagicLink, verifyMagicLink, verifyPortalSession, signPortalSession } from '../lib/portal-session';
@@ -93,6 +93,19 @@ const HubOverviewSchema = z.object({
 
 const HubOverviewResponseSchema = HubOverviewSchema.extend({
     token: z.string().describe('Persistent per-inspection access token for building section deep-links.'),
+    signerToken: z.string().nullable().describe("The recipient's OWN agreement signer token (email-matched) for the inline Agreement section. Null when the recipient is not a signer."),
+});
+
+const ObserveSchema = z.object({
+    address:        z.string().describe('Property address for the inspection.'),
+    date:           z.string().nullable().describe('Inspection date (ISO date string), or null.'),
+    inspectorName:  z.string().describe('Name of the assigned inspector.'),
+    status:         z.string().describe('Lifecycle status of the inspection.'),
+    sections:       z.array(z.object({
+        name:           z.string().describe('Section title.'),
+        totalItems:     z.number().describe('Total number of items in the section.'),
+        completedItems: z.number().describe('Number of completed items in the section.'),
+    })).describe('Per-section observation progress.'),
 });
 
 // ---------------------------------------------------------------------------
@@ -179,6 +192,28 @@ const exchangeRoute = createRoute(withMcpMetadata({
         'grant tenant matches the path tenant AND the role is client/co_client (agent → 403).',
 }, { scopes: [], tier: 'extended' }));
 
+const logoutRoute = createRoute(withMcpMetadata({
+    method:  'post',
+    path:    '/{tenant}/logout',
+    tags:    ['public'],
+    summary: 'Sign out of the client portal',
+    request: {
+        params: TenantParam,
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ data: z.object({ ok: z.boolean().describe('Always true — the session cookie was cleared (idempotent).') }) }) } },
+            description: 'Session cookie cleared.',
+        },
+    },
+    operationId: 'portalLogout',
+    description:
+        'Signs the recipient out of the unified client portal by clearing the ' +
+        '__Host-portal_session cookie. Idempotent and tenant-agnostic — clearing the cookie ' +
+        'works regardless of whether a session exists or the slug resolves, so it is NOT ' +
+        'behind the session middleware and always returns 200 { ok: true }.',
+}, { scopes: [], tier: 'extended' }));
+
 const meRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/{tenant}/me',
@@ -229,6 +264,35 @@ const overviewRoute = createRoute(withMcpMetadata({
         'Returns a six-dimension status snapshot (status / agreement / payment / report / ' +
         'progress / unread messages) for one inspection. Asserts the inspection is in the ' +
         'recipient\'s accessible set for this tenant+email before returning data (403 otherwise).',
+}, { scopes: [], tier: 'extended' }));
+
+const observeRoute = createRoute(withMcpMetadata({
+    method:  'get',
+    path:    '/{tenant}/inspections/{inspectionId}/observe',
+    tags:    ['public'],
+    summary: 'Per-section observe progress for an accessible inspection',
+    request: {
+        params: TenantParam.extend({
+            inspectionId: z.string().describe('Inspection identifier to fetch observe progress for.'),
+        }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ data: ObserveSchema }) } },
+            description: 'Per-section progress for the inspection.',
+        },
+        401: { description: 'No valid portal session cookie' },
+        403: { description: 'Inspection is not accessible to this recipient' },
+        404: { description: 'Tenant slug or inspection not found' },
+    },
+    operationId: 'portalInspectionObserve',
+    description:
+        'Returns per-section observation progress (section name + total/completed items, plus ' +
+        'address / date / inspector / status) for one inspection. Authenticated by the portal ' +
+        'session — NOT the separate observer-link token. Asserts the inspection is in the ' +
+        "recipient's accessible set for this tenant+email before returning data (403 otherwise). " +
+        'Mirrors the overview endpoint so the Hub Progress section reads progress via the ' +
+        'membership-checked portal session.',
 }, { scopes: [], tier: 'extended' }));
 
 // ---------------------------------------------------------------------------
@@ -340,6 +404,14 @@ export const portalRoutes = portalRouter
         setCookie(c, PORTAL_SESSION_COOKIE, sess, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
         return c.json({ data: { email: grant.recipientEmail } }, 200);
     })
+    .openapi(logoutRoute, async (c) => {
+        // Tenant-agnostic + idempotent: clearing the cookie works regardless of
+        // whether a session or a resolvable slug exists, so we do NOT gate on
+        // resolveTenantId here. CLAUDE.md: deleteCookie on a `__Host-` cookie MUST
+        // pass { path: '/', secure: true } or it throws at runtime.
+        deleteCookie(c, PORTAL_SESSION_COOKIE, { path: '/', secure: true });
+        return c.json({ data: { ok: true } }, 200);
+    })
     .openapi(meRoute, async (c) => {
         const tenantId = resolveTenantId(c);
         if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);
@@ -371,9 +443,38 @@ export const portalRoutes = portalRouter
             logger.error('[portal] overview token issue failed', {}, err instanceof Error ? err : undefined);
         }
 
+        // Resolve THIS recipient's OWN agreement signer token (email-matched) so
+        // the inline Agreement section can mount. SECURITY: getSignerLinkByEmail
+        // matches on the verified session email and NEVER returns a different
+        // signer's token. Best-effort (null on failure / non-signer recipient).
+        let signerToken: string | null = null;
+        try {
+            signerToken = await c.var.services.agreement.getSignerLinkByEmail(tenantId, inspectionId, email);
+        } catch (err) {
+            logger.error('[portal] overview signer token resolve failed', {}, err instanceof Error ? err : undefined);
+        }
+
         const overview = await c.var.services.portal.hubOverview(tenantId, inspectionId);
         if (!overview) return c.json({ error: 'Inspection not found' }, 404);
-        return c.json({ data: { ...overview, token } }, 200);
+        return c.json({ data: { ...overview, token, signerToken } }, 200);
+    })
+    .openapi(observeRoute, async (c) => {
+        const tenantId = resolveTenantId(c);
+        if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);
+        const email = c.get('portalEmail') as string;
+        const { inspectionId } = c.req.valid('param');
+
+        // Membership check (EXACTLY as overview): the inspection must be in the
+        // recipient's accessible set before any observe data is returned.
+        const accessible = await c.var.services.portal.listRecipientInspections(tenantId, email);
+        if (!accessible.some((i) => i.inspectionId === inspectionId)) {
+            return c.json({ error: 'Not accessible' }, 403);
+        }
+
+        // Tenant + inspection scoped server-side; NO observer-link token needed.
+        const observe = await c.var.services.portal.observeProgress(tenantId, inspectionId);
+        if (!observe) return c.json({ error: 'Inspection not found' }, 404);
+        return c.json({ data: observe }, 200);
     });
 
 export type PortalApi = typeof portalRoutes;

@@ -12,13 +12,18 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = '00000000-0000-0000-0000-0000000000a1';
 
-// A stub InspectionService.getObserveProgress — the unit under test only sums
-// totalItems/completedItems across the returned sections.
+// A stub InspectionService.getObserveProgress — returns the FULL observe shape
+// (address/date/inspectorName/status + named sections). hubOverview sums
+// totalItems/completedItems; observeProgress returns the whole object.
 const inspStub = {
     getObserveProgress: async () => ({
+        address: 'Stub St',
+        date: '2026-06-01',
+        inspectorName: 'Stub Inspector',
+        status: 'in_progress',
         sections: [
-            { totalItems: 5, completedItems: 2 },
-            { totalItems: 3, completedItems: 3 },
+            { name: 'Roof', totalItems: 5, completedItems: 2 },
+            { name: 'Foundation', totalItems: 3, completedItems: 3 },
         ],
     }),
 };
@@ -437,6 +442,77 @@ describe('portal API', () => {
             headers: { cookie: '__Host-portal_session=' + cookie },
         }, reqEnv());
         expect(res.status).toBe(403);
+    });
+
+    it('GET /inspections/:id/observe → 401 without a session cookie', async () => {
+        await seedInspection('insp1');
+        await seedToken('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+        const res = await app.request('/api/portal/acme/inspections/insp1/observe', {}, reqEnv());
+        expect(res.status).toBe(401);
+    });
+
+    it('GET /inspections/:id/observe → 200 with named sections for an owned inspection', async () => {
+        await seedInspection('insp1');
+        await seedToken('insp1', 'a@x.com', 'client');
+        const app = buildApp();
+        const cookie = await signPortalSession(SECRET, 'a@x.com');
+        const res = await app.request('/api/portal/acme/inspections/insp1/observe', {
+            headers: { cookie: '__Host-portal_session=' + cookie },
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(Array.isArray(body.data.sections)).toBe(true);
+        expect(body.data.sections.length).toBeGreaterThan(0);
+        expect(typeof body.data.sections[0].name).toBe('string');
+        expect(typeof body.data.sections[0].totalItems).toBe('number');
+        expect(typeof body.data.sections[0].completedItems).toBe('number');
+    });
+
+    it('GET /inspections/:id/observe → 403 for an inspection the email does NOT own', async () => {
+        await seedInspection('insp1');
+        await seedInspection('insp2');
+        await seedToken('insp1', 'a@x.com', 'client');
+        await seedToken('insp2', 'other@x.com', 'client');
+        const app = buildApp();
+        const cookie = await signPortalSession(SECRET, 'a@x.com');
+        const res = await app.request('/api/portal/acme/inspections/insp2/observe', {
+            headers: { cookie: '__Host-portal_session=' + cookie },
+        }, reqEnv());
+        expect(res.status).toBe(403);
+    });
+
+    it('POST /logout → 200 {data:{ok:true}} and clears the session cookie (with a session present)', async () => {
+        const app = buildApp();
+        const cookie = await signPortalSession(SECRET, 'a@x.com');
+        const res = await app.request('/api/portal/acme/logout', {
+            method: 'POST',
+            headers: { cookie: '__Host-portal_session=' + cookie },
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        expect((await res.json()).data.ok).toBe(true);
+        // deleteCookie emits a clearing Set-Cookie (Max-Age=0 / past expiry).
+        const setCookieHdr = res.headers.get('set-cookie') ?? '';
+        expect(setCookieHdr).toContain('__Host-portal_session=');
+        expect(setCookieHdr).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/i);
+    });
+
+    it('POST /logout → 200 idempotent even with NO session cookie present', async () => {
+        const app = buildApp();
+        const res = await app.request('/api/portal/acme/logout', {
+            method: 'POST',
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        expect((await res.json()).data.ok).toBe(true);
+    });
+
+    it('POST /logout → 200 even when the tenant slug is unresolved (clearing is tenant-agnostic)', async () => {
+        const app = buildApp(null);
+        const res = await app.request('/api/portal/nope/logout', {
+            method: 'POST',
+        }, reqEnv());
+        expect(res.status).toBe(200);
+        expect((await res.json()).data.ok).toBe(true);
     });
 });
 

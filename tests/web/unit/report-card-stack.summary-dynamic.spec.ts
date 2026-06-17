@@ -6,7 +6,7 @@ import { describe, it, expect } from 'vitest';
 
 describe('report-card-stack dynamic rating summary', () => {
   it('tallies items by their rating level and renders per-level cards', async () => {
-    const src = ((await import('~/routes/public/report-card-stack?raw')) as { default: string }).default;
+    const src = ((await import('~/components/portal/sections/ReportView?raw')) as { default: string }).default;
     // Dynamic per-level tally using each item's own rating label/color.
     expect(src).toContain('ratingTally');
     expect(src).toContain('summaryCards');

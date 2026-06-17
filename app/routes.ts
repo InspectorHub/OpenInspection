@@ -26,7 +26,7 @@ export default [
       "routes/public/agreement-sign.tsx",
     ),
     route("checkout/:tenant/:token", "routes/public/checkout.tsx"),
-    route("r/:id/invoice", "routes/public/invoice.tsx"),
+    route("invoice/:id", "routes/public/invoice.tsx"),
     route("verify/:envelopeId", "routes/public/verify.tsx"),
     route("verify", "routes/public/verify-offline.tsx"),
     route("v/:token", "routes/public/v.$token.tsx"),
@@ -49,7 +49,6 @@ export default [
       "report-view/:tenant/:id",
       "routes/public/report-card-stack.tsx",
     ),
-    route("messages/:token", "routes/public/messages.tsx"),
     // Track L (D6, path B) — public SMS double-opt-in confirmation page.
     route("sms-optin/:token", "routes/public/sms-optin.tsx"),
     route("repair-request/:shareToken", "routes/public/repair-request.$shareToken.tsx"),

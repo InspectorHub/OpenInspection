@@ -129,4 +129,63 @@ describe('AgreementService', () => {
         const after = await testDb.select().from(schema.agreementRequests).all();
         expect(after[0].status).toBe('expired');
     });
+
+    describe('getSignerLinkByEmail (portal Hub — email-matched signer token)', () => {
+        // A two-signer envelope so we can prove the email match never returns the
+        // WRONG signer's token (the cross-signer security property).
+        async function seedTwoSigners() {
+            return svc.findOrCreate(TENANT_A, INSP_ID, {
+                completionPolicy: 'all',
+                signers: [
+                    { name: 'Jane Client', email: 'jane@test.com', role: 'client' },
+                    { name: 'Bob CoClient', email: 'BOB@test.com', role: 'co_client' },
+                ],
+            });
+        }
+
+        it('returns the token of the signer whose email matches', async () => {
+            await seedTwoSigners();
+            const token = await svc.getSignerLinkByEmail(TENANT_A, INSP_ID, 'jane@test.com');
+            expect(token).toBeTruthy();
+            // The returned token must resolve back to JANE's signer row, never Bob's.
+            const resolved = await svc.getSignerByPresentedToken(token!);
+            expect(resolved?.signer.email.toLowerCase()).toBe('jane@test.com');
+        });
+
+        it('matches case-insensitively and never leaks a different signer', async () => {
+            await seedTwoSigners();
+            // Bob's row was seeded as 'BOB@test.com'; the caller's verified email is
+            // lower-cased 'bob@test.com'. It must match BOB, not fall back to Jane.
+            const token = await svc.getSignerLinkByEmail(TENANT_A, INSP_ID, 'bob@test.com');
+            expect(token).toBeTruthy();
+            const resolved = await svc.getSignerByPresentedToken(token!);
+            expect(resolved?.signer.email.toLowerCase()).toBe('bob@test.com');
+        });
+
+        it('returns null when no signer email matches (never a fallback token)', async () => {
+            await seedTwoSigners();
+            const token = await svc.getSignerLinkByEmail(TENANT_A, INSP_ID, 'stranger@test.com');
+            expect(token).toBeNull();
+        });
+
+        it('returns null when no envelope exists for the inspection', async () => {
+            const token = await svc.getSignerLinkByEmail(TENANT_A, INSP_ID, 'jane@test.com');
+            expect(token).toBeNull();
+        });
+
+        it('returns null for a blank email', async () => {
+            await seedTwoSigners();
+            expect(await svc.getSignerLinkByEmail(TENANT_A, INSP_ID, '')).toBeNull();
+        });
+
+        it('returns a token even when the envelope is already signed (still viewable)', async () => {
+            const { token: janeToken } = await seedTwoSigners();
+            // Sign as Jane → envelope may stay 'viewed' (policy 'all', Bob outstanding),
+            // but Jane's signer row becomes 'signed'. Her token must still resolve.
+            await svc.markViewedBySigner(janeToken);
+            await svc.markSignedBySigner(janeToken, 'data:image/png;base64,XX', { signedAtMs: Date.now(), channel: 'remote' });
+            const link = await svc.getSignerLinkByEmail(TENANT_A, INSP_ID, 'jane@test.com');
+            expect(link).toBeTruthy();
+        });
+    });
 });

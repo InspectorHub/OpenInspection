@@ -506,7 +506,7 @@ function PayPanel({
     brandColor,
     companyName,
 }: {
-    /** Inspection id — the pay-intent endpoint is inspection-keyed (/r/:id/pay-intent), NOT invoice-keyed. */
+    /** Inspection id — the pay-intent endpoint is inspection-keyed (/api/public/inspections/:id/pay-intent), NOT invoice-keyed. */
     inspectionId: string;
     amountCents: number;
     brandColor: string | null;
@@ -519,7 +519,7 @@ function PayPanel({
     async function startPayment() {
         setPhase("loading");
         try {
-            const res = await fetch(`/api/public/r/${inspectionId}/pay-intent`, {
+            const res = await fetch(`/api/public/inspections/${inspectionId}/pay-intent`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: "{}",

@@ -789,7 +789,7 @@ export default function InspectionHubPage() {
               >
                 Resend request
               </Button>
-              <CopyLinkButton url={`/r/${inspection.id}/invoice`} />
+              <CopyLinkButton url={`/invoice/${inspection.id}`} />
             </div>
           ) : (
             <Button

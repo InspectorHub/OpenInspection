@@ -691,6 +691,49 @@ export class AgreementService {
     }
 
     /**
+     * Returns the plaintext public link token for the signer of the LATEST
+     * envelope of (tenantId, inspectionId) whose email matches `email`
+     * case-insensitively. Used by the unified client-portal Hub to inline the
+     * agreement section for the authenticated recipient.
+     *
+     * SECURITY: returns ONLY the token of the signer whose email matches the
+     * caller's verified email. It NEVER falls back to "the first signer" — handing
+     * back a non-matching signer's token would let a recipient sign AS someone
+     * else. Returns null when there is no envelope, no email-matched signer, or
+     * the token cannot be reconstructed. The matched envelope may be in ANY status
+     * (including signed/declined) so a completed agreement is still viewable.
+     */
+    async getSignerLinkByEmail(tenantId: string, inspectionId: string, email: string): Promise<string | null> {
+        const target = (email || '').trim().toLowerCase();
+        if (!target) return null;
+        const db = this.getDrizzle();
+        try {
+            const envelope = await db.select().from(agreementRequests)
+                .where(and(
+                    eq(agreementRequests.tenantId, tenantId),
+                    eq(agreementRequests.inspectionId, inspectionId),
+                ))
+                .orderBy(desc(agreementRequests.createdAt))
+                .limit(1)
+                .get();
+            if (!envelope) return null;
+
+            const signers = await db.select().from(agreementSigners)
+                .where(eq(agreementSigners.requestId, envelope.id))
+                .all();
+            const signer = signers.find((s) => (s.email || '').trim().toLowerCase() === target);
+            if (!signer) return null;
+
+            return await this.getSignerLink(envelope.id, signer.id);
+        } catch (e) {
+            logger.warn('AgreementService.getSignerLinkByEmail failed', {
+                tenantId, inspectionId, error: e instanceof Error ? e.message : String(e),
+            });
+            return null;
+        }
+    }
+
+    /**
      * Marks a signer (resolved by presented token) as viewed and recomputes the
      * envelope aggregate (never downgrades). Null on miss / expired signer.
      * Idempotent.

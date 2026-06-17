@@ -348,7 +348,7 @@ export class EmailService {
 
     /**
      * Task 8 (Issue #111) — emails the client a request to pay their invoice,
-     * linking the public `/r/:id/invoice` payment page. Mirrors
+     * linking the public `/invoice/:id` payment page. Mirrors
      * sendAgreementRequest: registry-driven render with a branded fallback and
      * the inspector's rebooking signature (B-4) when host + inspector are given.
      */
@@ -391,7 +391,7 @@ export class EmailService {
         recipient: 'client' | 'inspector',
         inspectionId: string,
         message: { body: string; fromName?: string | null },
-        deps: { db: D1Database; kv?: KVNamespace; baseUrl: string },
+        deps: { db: D1Database; kv?: KVNamespace; baseUrl: string; clientViewUrl?: string },
     ): Promise<void> {
         if (!this.apiKey) return;
         const throttleKey = `msg_notify:${inspectionId}:${recipient}`;
@@ -412,7 +412,12 @@ export class EmailService {
         let viewUrl = '';
         if (recipient === 'client') {
             to = insp.clientEmail ?? null;
-            viewUrl = `${deps.baseUrl}/messages/${insp.messageToken ?? ''}`;
+            // The client now reads messages in the unified portal Hub. The caller
+            // (inspector send route) mints a per-recipient portal token and builds
+            // the section deep-link, mirroring the report-ready email. If it is
+            // absent (best-effort failure upstream) we fall back to the portal Hub
+            // overview without a token rather than a now-dead /messages/:token URL.
+            viewUrl = deps.clientViewUrl || `${deps.baseUrl}/portal`;
         } else {
             if (insp.inspectorId) {
                 const [u] = await db.select().from(users)

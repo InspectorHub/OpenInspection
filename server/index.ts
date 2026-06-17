@@ -70,7 +70,7 @@ import templateMigrationRoutes from './api/template-migrations';
 import dataRoutes from './api/data';
 import icsRoutes from './api/ics';
 import userRoutes from './api/users';
-import messageRoutes from './api/messages';
+import messageRoutes, { inspectorMessageRoutes, clientMessageRoutes } from './api/messages';
 import widgetRoutes from './api/widget';
 import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
@@ -253,7 +253,7 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
         path === '/api/concierge/book-info' ||
         path === '/api/concierge/book' ||
         path === '/api/concierge/confirm-info';
-    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path.startsWith('/api/messages/public/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/r/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/messages/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
+    const isPublic = path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
 
     // Design System 0520 subsystem D P5 — observer surfaces are gated by
     // the dedicated observer-cookie middleware, not JWT.
@@ -452,6 +452,11 @@ const routes = app
   // /api/inspections root (paths are /:id/documents). Behind the global JWT
   // gate by default (/api/inspections/* is not in the isPublic allowlist).
   .route('/api/inspections', inspectorDocumentsRoutes)
+  // Customer messaging ⑥ — authed INSPECTOR message routes. Shares the
+  // /api/inspections root (paths are /:id/messages...). Behind the global JWT
+  // gate by default (mirrors inspectorDocumentsRoutes). The static "messages"
+  // segment after :id keeps it disjoint from the per-id document/tag routes.
+  .route('/api/inspections', inspectorMessageRoutes)
   .route('/api/tags', tagsRoutes)
   .route('/api/inspection-requests', inspectionRequestsRoutes)
   .route('/api/ai', aiRoutes)
@@ -474,6 +479,10 @@ const routes = app
   // (router defines /inspections/:id/documents). Session- OR token-gated; the
   // global JWT middleware skips /api/public/* so auth is performed in-route.
   .route('/api/public', clientDocumentsRoutes)
+  // Customer messaging ⑥ — client message routes (router defines
+  // /inspections/:id/messages...). Session- OR token-gated via resolveClientActor;
+  // the global JWT middleware skips /api/public/* so auth is performed in-route.
+  .route('/api/public', clientMessageRoutes)
   // Track L (D6/D9) — public SMS opt-in resolve/confirm + inbound STOP/START webhook.
   .route('/api/public', smsPublicRoutes)
   // Unified client portal — magic-link request/redeem + session-gated data routes.
@@ -523,6 +532,9 @@ const routes = app
   .route('/api/data', dataRoutes)
   .route('/api/ics', icsRoutes)
   .route('/api/users', userRoutes)
+  // Lone cross-cutting messages summary: GET /api/messages/unread-count (sidebar
+  // badge). Every per-inspection messages route lives under /api/inspections
+  // (inspector) or /api/public (client) now.
   .route('/api/messages', messageRoutes)
   .route('/api/notifications', notificationsRoutes)
   .route('/settings/integrations/qbo', qboRoutes)

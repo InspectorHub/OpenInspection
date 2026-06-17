@@ -89,44 +89,48 @@ export class MessageService {
         return Number(row?.c ?? 0);
     }
 
-    async getOrCreateToken(inspectionId: string, tenantId: string): Promise<string> {
-        const [insp] = await this.db().select().from(inspections)
+    /**
+     * Resolves the inspection's stored client display name (for attribution on
+     * client-authored messages). Null when the inspection is missing or has no
+     * recorded client name. Tenant-scoped.
+     */
+    async clientNameForInspection(inspectionId: string, tenantId: string): Promise<string | null> {
+        const [insp] = await this.db().select({ clientName: inspections.clientName }).from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .limit(1);
-        if (!insp) throw Errors.NotFound('Inspection not found');
-        if (insp.messageToken) return insp.messageToken;
-        const token = crypto.randomUUID().replace(/-/g, '');
-        await this.db().update(inspections).set({ messageToken: token })
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
-        return token;
-    }
-
-    async resolveByToken(token: string): Promise<typeof inspections.$inferSelect | null> {
-        if (!token || token.length < 16) return null;
-        const [insp] = await this.db().select().from(inspections).where(eq(inspections.messageToken, token)).limit(1);
-        return insp ?? null;
+        return insp?.clientName ?? null;
     }
 
     /**
-     * Resolves a single message attachment for a conversation, scoped by the
-     * conversation `token` and the attachment `id`. Returns the stored
-     * attachment metadata (R2 `key`, original `name`, MIME `type`) only when
-     * the attachment belongs to a message on the token's inspection — never
-     * exposing arbitrary R2 keys. Returns null when the token is unknown or no
-     * attachment with that id exists on the conversation.
+     * Resolves the inspection's stored client email (for building the portal
+     * message-notification deep-link). Null when missing. Tenant-scoped.
      */
-    async resolveAttachmentByToken(
-        token: string,
+    async clientEmailForInspection(inspectionId: string, tenantId: string): Promise<string | null> {
+        const [insp] = await this.db().select({ clientEmail: inspections.clientEmail }).from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .limit(1);
+        return insp?.clientEmail ?? null;
+    }
+
+    /**
+     * Resolves a single message attachment scoped by INSPECTION (tenant + id),
+     * keyed by the inspection id the caller is already authorized for (JWT
+     * inspector or resolveClientActor client). Returns the stored attachment
+     * metadata only when the attachment belongs to a message on this inspection
+     * — never exposing arbitrary R2 keys. Returns null when no such attachment
+     * exists.
+     */
+    async resolveAttachmentForInspection(
+        inspectionId: string,
+        tenantId: string,
         attachmentId: string,
-    ): Promise<{ key: string; name: string; type: string; tenantId: string } | null> {
+    ): Promise<{ key: string; name: string; type: string } | null> {
         if (!attachmentId) return null;
-        const insp = await this.resolveByToken(token);
-        if (!insp) return null;
-        const rows = await this.listForInspection(insp.id, insp.tenantId);
+        const rows = await this.listForInspection(inspectionId, tenantId);
         for (const row of rows) {
             for (const att of row.attachments ?? []) {
                 if (att.id === attachmentId) {
-                    return { key: att.key, name: att.name, type: att.type, tenantId: insp.tenantId };
+                    return { key: att.key, name: att.name, type: att.type };
                 }
             }
         }

@@ -19,47 +19,13 @@
  * allowlist), so authentication is performed entirely inside `resolveClientActor`.
  */
 import { Hono } from 'hono';
-import { getCookie } from 'hono/cookie';
 import { z } from 'zod';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
-import { resolvePortalAccess } from '../lib/public-access';
-import { verifyPortalSession } from '../lib/portal-session';
+import { resolveClientActor } from '../lib/portal-client-actor';
 import { contentDisposition } from '../lib/content-disposition';
 import { MAX_BYTES, PayloadTooLargeError } from '../services/client-document.service';
 import { DOCUMENT_CATEGORIES, DOCUMENT_VISIBILITIES } from '../lib/db/schema';
-
-interface ClientActor {
-    tenantId: string;
-    kind: 'client' | 'co_client';
-    ref: string;          // recipient email (uploader identity)
-    name: string | null;
-}
-
-/**
- * Resolve the acting CLIENT for this request. Token path first (URL ?token),
- * then session-cookie path. Only `client` / `co_client` roles are accepted
- * (agents are NOT document uploaders here). Returns null → caller 401.
- */
-async function resolveClientActor(
-    c: Context<HonoConfig>,
-    inspectionId: string,
-): Promise<ClientActor | null> {
-    const token = c.req.query('token');
-    const grant = await resolvePortalAccess(c.var.services.portalAccess, token, inspectionId);
-    if (grant && (grant.role === 'client' || grant.role === 'co_client')) {
-        return { tenantId: grant.tenantId, kind: grant.role, ref: grant.recipientEmail, name: null };
-    }
-    const cookie = getCookie(c, '__Host-portal_session');
-    const sess = cookie ? await verifyPortalSession(c.env.JWT_SECRET, cookie) : null;
-    if (sess) {
-        const row = await c.var.services.portalAccess.resolveByEmailAndInspection(sess.email, inspectionId);
-        if (row && (row.role === 'client' || row.role === 'co_client')) {
-            return { tenantId: row.tenantId, kind: row.role, ref: sess.email, name: null };
-        }
-    }
-    return null;
-}
 
 const uploadQuerySchema = z.object({
     filename: z.string().min(1),

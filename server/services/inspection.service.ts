@@ -2530,7 +2530,7 @@ export class InspectionService {
         const actionUrl = bothOutstanding && signerLink
             ? `/checkout/${tenantSlug}/${signerLink}`
             : reason === 'payment'
-                ? `/r/${inspectionId}/invoice`
+                ? `/invoice/${inspectionId}`
                 : (agreementLinkToken ? `/agreements/sign/${tenantSlug}/${agreementLinkToken}` : `/report-gate/${tenantSlug}/${inspectionId}`);
 
         const actionLabel = bothOutstanding && signerLink

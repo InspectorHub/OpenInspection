@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { statusCardModels } from '../../../app/components/portal/InspectionStatusCards';
-import { hubSectionHref } from '../../../app/components/portal/InspectionHub';
+import { hubSectionNavHref } from '../../../app/components/portal/InspectionHub';
 describe('portal hub models', () => {
   it('statusCardModels renders 6 cards with correct states', () => {
     const cards = statusCardModels({ inspectionStatus:'completed', agreementSigned:true, paymentStatus:'paid', reportPublished:true, progress:{completed:8,total:10}, unreadMessages:2, address:'1 A St', date:'2026-06-16' });
@@ -14,8 +14,16 @@ describe('portal hub models', () => {
     const cards = statusCardModels({ inspectionStatus:'completed', agreementSigned:false, paymentStatus:'unpaid', reportPublished:false, progress:{completed:0,total:0}, unreadMessages:0, address:'', date:'' });
     expect(cards.find(c=>c.key==='report')!.value).toMatch(/Not published/i);
   });
-  it('hubSectionHref builds interim deep-links to existing pages (phase ①)', () => {
-    expect(hubSectionHref('report', { tenant:'t', inspectionId:'i', token:'k' })).toContain('/report/');
-    expect(hubSectionHref('payment', { tenant:'t', inspectionId:'i', token:'k' })).toContain('/r/i/invoice');
+  it('hubSectionNavHref builds inline ?section= nav targets on the hub page', () => {
+    expect(hubSectionNavHref('report', { tenant:'t', inspectionId:'i', token:'k' }))
+      .toBe('/portal/t/i/i?section=report&token=k');
+    expect(hubSectionNavHref('payment', { tenant:'t', inspectionId:'i', token:'k' }))
+      .toBe('/portal/t/i/i?section=payment&token=k');
+    // "overview" is the default → no ?section param; token still preserved.
+    expect(hubSectionNavHref('overview', { tenant:'t', inspectionId:'i', token:'k' }))
+      .toBe('/portal/t/i/i?token=k');
+    // No token → clean URL with no query when overview.
+    expect(hubSectionNavHref('overview', { tenant:'t', inspectionId:'i', token:'' }))
+      .toBe('/portal/t/i/i');
   });
 });

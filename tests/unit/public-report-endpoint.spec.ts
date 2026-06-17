@@ -139,7 +139,7 @@ describe('GET /api/public/report-gate/:tenant/:id — ③-A.2', () => {
         tenantId: string | null,
         getReportGate = vi.fn().mockResolvedValue({
             reason: 'payment', companyName: 'Acme', primaryColor: '#123456',
-            actionUrl: '/r/insp1/invoice', actionLabel: 'Pay invoice',
+            actionUrl: '/invoice/insp1', actionLabel: 'Pay invoice',
             propertyAddress: '1 Main St', inspectorName: 'Pat', inspectorEmail: null,
             inspectorPhone: null, inspectorLicense: null, scheduledDate: '2026-06-01',
             amountCents: 45000, currency: 'USD',
@@ -180,7 +180,7 @@ describe('GET /api/public/report-gate/:tenant/:id — ③-A.2', () => {
  * When BOTH the agreement and payment gates are outstanding, the gate's CTA
  * points at the combined /checkout/{slug}/{signerToken} page ('Sign & pay'),
  * with `reason` staying 'agreement' for compat. Single-outstanding behaviors
- * stay byte-compatible (legacy /agreements/sign and /r/:id/invoice URLs).
+ * stay byte-compatible (/agreements/sign and /invoice/:id URLs).
  */
 describe('InspectionService.getReportGate — combined checkout routing (Task 7)', () => {
     const TENANT_ID = '00000000-0000-0000-0000-000000000001';
@@ -300,13 +300,13 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         expect(resolved?.signer.id).toBe(signers[0].id);
     });
 
-    it('ONLY payment outstanding -> legacy /r/:id/invoice URL unchanged', async () => {
+    it('ONLY payment outstanding -> /invoice/:id URL', async () => {
         await seed({ agreementRequired: false, paymentRequired: true, paymentStatus: 'unpaid' });
         const { inspection, agreement } = makeService();
 
         const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
         expect(gate!.reason).toBe('payment');
         expect(gate!.actionLabel).toBe('Pay invoice');
-        expect(gate!.actionUrl).toBe(`/r/${INSP_ID}/invoice`);
+        expect(gate!.actionUrl).toBe(`/invoice/${INSP_ID}`);
     });
 });

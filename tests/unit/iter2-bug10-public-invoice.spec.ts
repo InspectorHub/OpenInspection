@@ -29,7 +29,7 @@ async function seedBase(testDb: BetterSQLite3Database<typeof schema>) {
  * unauthenticated customer who clicked the gate CTA was 302'd to /login,
  * a dead end with no signup path.
  *
- * The fix introduces a public `/r/:id/invoice` payment page (token-gated
+ * The fix introduces a public `/invoice/:id` payment page (token-gated
  * like Sprint 3 S3-2's `/r/:id/repair-request`) that renders the invoice
  * details + payment instructions without requiring auth. This spec pins
  * the service-level `findByInspectionId` lookup that powers the page:

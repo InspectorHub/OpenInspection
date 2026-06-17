@@ -3,13 +3,13 @@ import { extractInspectionIdFromPath } from '../../server/features/tenant-routin
 
 describe('extractInspectionIdFromPath', () => {
     it('matches page and API forms', () => {
-        expect(extractInspectionIdFromPath('/r/abc-123/invoice')).toBe('abc-123');
-        expect(extractInspectionIdFromPath('/api/public/r/abc-123/pay-intent')).toBe('abc-123');
-        expect(extractInspectionIdFromPath('/api/public/r/abc-123/invoice')).toBe('abc-123');
+        expect(extractInspectionIdFromPath('/invoice/abc-123')).toBe('abc-123');
+        expect(extractInspectionIdFromPath('/api/public/inspections/abc-123/pay-intent')).toBe('abc-123');
+        expect(extractInspectionIdFromPath('/api/public/inspections/abc-123/invoice')).toBe('abc-123');
     });
     it('ignores everything else', () => {
         expect(extractInspectionIdFromPath('/report/t/x')).toBeNull();
-        expect(extractInspectionIdFromPath('/r/')).toBeNull();
+        expect(extractInspectionIdFromPath('/invoice/')).toBeNull();
         expect(extractInspectionIdFromPath('/api/public/verify/x')).toBeNull();
     });
 });

@@ -6,7 +6,7 @@ const EXAMPLES: Record<string, string> = {
   verifyUrl: 'https://app.example.com/verify/abc123', confirmUrl: 'https://app.example.com/confirm/abc123',
   reviewUrl: 'https://app.example.com/review/abc123', dashboardUrl: 'https://app.example.com/dashboard',
   viewUrl: 'https://app.example.com/messages/abc123', acceptUrl: 'https://app.example.com/accept/abc123',
-  payUrl: 'https://app.example.com/r/abc123/invoice',
+  payUrl: 'https://app.example.com/invoice/abc123',
   inviteLink: 'https://app.example.com/join/abc123', resetLink: 'https://app.example.com/reset/abc123',
   clientName: 'Jordan Smith', inspectorName: 'Alex Rivera', agentName: 'Pat Lee',
   tenantName: 'Acme Inspections', agreementName: 'Inspection Agreement',

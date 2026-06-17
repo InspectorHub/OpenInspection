@@ -18,7 +18,7 @@ import type { HonoConfig } from '../../server/types/hono';
  * The hub's Invoice card "Request payment" button posts here. The endpoint
  * resolves (or creates) the inspection's invoice per the money authority chain
  * (Σ service snapshots → inspections.price), marks it sent, and emails the
- * client a link to the public `/r/:id/invoice` payment page. These tests
+ * client a link to the public `/invoice/:id` payment page. These tests
  * exercise the REAL mounted route (RBAC + zod + handler) against an in-memory
  * SQLite DB, mirroring inspection-agreement-request.spec.ts. The invoice
  * service is the real one (so the row is actually written); the email service
@@ -118,11 +118,11 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
         expect(rows[0].sentAt).not.toBeNull();
         expect(rows[0].amountCents).toBe(50000);
 
-        // Email sent to the client with a /r/{id}/invoice pay URL.
+        // Email sent to the client with a /invoice/{id} pay URL.
         expect(sendInvoiceRequest).toHaveBeenCalledTimes(1);
         expect(sendInvoiceRequest.mock.calls[0][0]).toBe('jane@example.com');
-        const payUrl = sendInvoiceRequest.mock.calls.flat().find((a) => typeof a === 'string' && a.includes('/r/'));
-        expect(payUrl).toContain(`/r/${INSP_ID}/invoice`);
+        const payUrl = sendInvoiceRequest.mock.calls.flat().find((a) => typeof a === 'string' && a.includes('/invoice/'));
+        expect(payUrl).toContain(`/invoice/${INSP_ID}`);
     });
 
     it('services present — amount is the Σ of service snapshots (override ?? snapshot), not inspections.price', async () => {

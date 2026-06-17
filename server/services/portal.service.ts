@@ -20,7 +20,22 @@ interface ObserveProgressLike {
     getObserveProgress: (
         inspectionId: string,
         tenantId: string,
-    ) => Promise<{ sections: Array<{ totalItems: number; completedItems: number }> }>;
+    ) => Promise<{
+        address: string;
+        date: string | null;
+        inspectorName: string;
+        status: string;
+        sections: Array<{ name: string; totalItems: number; completedItems: number }>;
+    }>;
+}
+
+/** Full per-section observe progress, as returned by InspectionService.getObserveProgress. */
+export interface ObserveProgress {
+    address: string;
+    date: string | null;
+    inspectorName: string;
+    status: string;
+    sections: Array<{ name: string; totalItems: number; completedItems: number }>;
 }
 
 export interface RecipientInspection {
@@ -158,5 +173,21 @@ export class PortalService {
             progress,
             unreadMessages: unread.length,
         };
+    }
+
+    /**
+     * Full per-section observe progress for one inspection, computed server-side
+     * via InspectionService.getObserveProgress (tenant + inspection scoped — no
+     * token needed). Backs the portal-session-authed observe endpoint so the Hub
+     * Progress section reads it via the portal session rather than the separate
+     * observer-link token. Returns null on failure (mirrors hubOverview's
+     * progress fallback), which the caller maps to a 404 / error state.
+     */
+    async observeProgress(tenantId: string, inspectionId: string): Promise<ObserveProgress | null> {
+        try {
+            return await this.inspectionSvc.getObserveProgress(inspectionId, tenantId);
+        } catch {
+            return null;
+        }
     }
 }
