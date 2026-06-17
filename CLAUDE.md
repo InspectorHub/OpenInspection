@@ -45,7 +45,7 @@ One file per deploy target; the build bakes whichever config wins (vite `configP
 |---|---|---|
 | `wrangler.jsonc` | committed (PLACEHOLDER ids) | standalone + the **Deploy to Cloudflare** one-click default — CF auto-provisions D1/KV/R2 and injects real ids (no real ids in the repo). |
 | `wrangler.local.jsonc` | gitignored | your real standalone ids (written by `scripts/setup-cloudflare.js`). |
-| `wrangler.saas.jsonc` | gitignored | InspectorHub private SaaS (`APP_MODE=saas`, `SYNC_QUEUE` producer + sync-DLQ consumer, crons, `*-saas` resources). |
+| `wrangler.saas.jsonc` | gitignored | SaaS-mode deployment config (`APP_MODE=saas`, `SYNC_QUEUE` producer + sync-DLQ consumer, crons, `*-saas` resources). Used for multi-tenant deployments; absent in standalone. |
 
 `wrangler deploy` runs against the built `build/server/wrangler.json`. `scripts/wrangler.mjs`
 applies the same config resolution to direct wrangler commands (db:migrate).
@@ -90,7 +90,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - JWT-based authentication (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header support for safe rotation — see `server/lib/jwt-keyring.ts`.
 - Supports both Cookie (for dashboard) and Bearer Header (for API) token delivery.
 - PBKDF2-SHA256 password hashing (100k iterations, 16-byte salt). Legacy SHA-256 hashes auto-rehashed on login.
-- **SaaS login is portal-only.** When `APP_MODE=saas` (regardless of topology, after silo-deconvergence 2026-05-29), `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: SaaS deploys have a single core D1 holding users for many tenants and `users.email` is unique per-`(tenant_id, email)` (migration 0072), so a local form cannot disambiguate which tenant the user means. Entry into core in saas mode is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone deploys are unchanged — the local form still works because the single-tenant mapping is unambiguous.
+- **SaaS login is portal-only.** When `APP_MODE=saas` (regardless of topology, after silo-deconvergence 2026-05-29), `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: SaaS deploys have a single core D1 holding users for many tenants and `users.email` is unique per-`(tenant_id, email)` (composite unique index in `schema/tenant.ts`), so a local form cannot disambiguate which tenant the user means. Entry into core in saas mode is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone deploys are unchanged — the local form still works because the single-tenant mapping is unambiguous.
 - **Switch workspace UI.** `MainLayout` renders a "Switch workspace" entry in the sidebar (desktop bottom section + mobile drawer) whenever `branding.isSaas` is true and `PORTAL_API_URL` is set. The link points at `${PORTAL_API_URL}/workspace/switch`. Because the JWT carries a single `custom:tenantId`, this portal bounce is the only correct way to swap tenants without losing the session — portal will SSO us back here with the new tenant's cookie (which overwrites the old one).
 
 ### Standalone Engine (Single-Tenant)
@@ -111,8 +111,8 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - **Rendering**: Full SSR — React Router v7 server renders on the edge, hydrates on the client.
 - **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); there is no separate server-side CSS build.
 - **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. The React Router v7 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
-- **State management**: React hooks — `useInspection` (866 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
-- **Component library**: `packages/shared-ui/` provides 12 design-system components (Button, Pill, Card, etc.) consumed by the frontend.
+- **State management**: React hooks — `useInspection` (~900 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
+- **Component library**: `packages/shared-ui/` provides 13 design-system components (Button, Pill, Card, Input, Modal, Icon, EmptyState, Eyebrow, FileDropzone, PageHeader, Pagination, Skeleton, TabStrip) consumed by the frontend.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
 - **Offline**: Service Worker + `useOfflineQueue` hook for photo upload queue and field sync.
 
