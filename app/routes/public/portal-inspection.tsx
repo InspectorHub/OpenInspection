@@ -178,8 +178,10 @@ async function loadReportSection(
 }
 
 /* ------------------------------------------------------------------ */
-/* Progress section data — mirrors the standalone observe loader mapping,
- * authenticated with the portal per-inspection token (ctx.token). */
+/* Progress section data — served via the portal-session-authed observe
+ * endpoint (membership-checked), NOT the observer-link token. The portal
+ * client is already authenticated by the __Host-portal_session cookie, which
+ * is forwarded into the API call exactly like the overview call. */
 /* ------------------------------------------------------------------ */
 
 interface ProgressLoaderResult {
@@ -193,15 +195,16 @@ interface ProgressLoaderResult {
 
 async function loadProgressSection(
   context: Route.LoaderArgs["context"],
+  tenant: string,
   inspectionId: string,
-  token: string,
+  cookieForApi: string,
 ): Promise<ProgressLoaderResult> {
   try {
     const api = createApi(context);
-    const res = await api.publicReport.observe.inspections[":id"].$get({
-      param: { id: inspectionId },
-      query: { token: token || undefined },
-    });
+    const res = await api.portal[":tenant"].inspections[":inspectionId"].observe.$get(
+      { param: { tenant, inspectionId } },
+      { headers: { Cookie: cookieForApi } },
+    );
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
     const has = Object.keys(d).length > 0;
@@ -485,7 +488,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   } else if (section === "report") {
     report = await loadReportSection(context, request, tenant, inspectionId, ctxToken);
   } else if (section === "progress") {
-    progress = await loadProgressSection(context, inspectionId, ctxToken);
+    // Portal-session-authed (membership-checked) — forward the same cookie used
+    // for the overview call rather than the observer-link token.
+    progress = await loadProgressSection(context, tenant, inspectionId, cookieForApi);
   } else if (section === "repair") {
     repair = await loadRepairSection(context, tenant, inspectionId, ctxToken);
   } else if (section === "payment") {

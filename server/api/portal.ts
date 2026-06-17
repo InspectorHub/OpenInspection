@@ -96,6 +96,18 @@ const HubOverviewResponseSchema = HubOverviewSchema.extend({
     signerToken: z.string().nullable().describe("The recipient's OWN agreement signer token (email-matched) for the inline Agreement section. Null when the recipient is not a signer."),
 });
 
+const ObserveSchema = z.object({
+    address:        z.string().describe('Property address for the inspection.'),
+    date:           z.string().nullable().describe('Inspection date (ISO date string), or null.'),
+    inspectorName:  z.string().describe('Name of the assigned inspector.'),
+    status:         z.string().describe('Lifecycle status of the inspection.'),
+    sections:       z.array(z.object({
+        name:           z.string().describe('Section title.'),
+        totalItems:     z.number().describe('Total number of items in the section.'),
+        completedItems: z.number().describe('Number of completed items in the section.'),
+    })).describe('Per-section observation progress.'),
+});
+
 // ---------------------------------------------------------------------------
 // Routes
 // ---------------------------------------------------------------------------
@@ -252,6 +264,35 @@ const overviewRoute = createRoute(withMcpMetadata({
         'Returns a six-dimension status snapshot (status / agreement / payment / report / ' +
         'progress / unread messages) for one inspection. Asserts the inspection is in the ' +
         'recipient\'s accessible set for this tenant+email before returning data (403 otherwise).',
+}, { scopes: [], tier: 'extended' }));
+
+const observeRoute = createRoute(withMcpMetadata({
+    method:  'get',
+    path:    '/{tenant}/inspections/{inspectionId}/observe',
+    tags:    ['public'],
+    summary: 'Per-section observe progress for an accessible inspection',
+    request: {
+        params: TenantParam.extend({
+            inspectionId: z.string().describe('Inspection identifier to fetch observe progress for.'),
+        }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ data: ObserveSchema }) } },
+            description: 'Per-section progress for the inspection.',
+        },
+        401: { description: 'No valid portal session cookie' },
+        403: { description: 'Inspection is not accessible to this recipient' },
+        404: { description: 'Tenant slug or inspection not found' },
+    },
+    operationId: 'portalInspectionObserve',
+    description:
+        'Returns per-section observation progress (section name + total/completed items, plus ' +
+        'address / date / inspector / status) for one inspection. Authenticated by the portal ' +
+        'session — NOT the separate observer-link token. Asserts the inspection is in the ' +
+        "recipient's accessible set for this tenant+email before returning data (403 otherwise). " +
+        'Mirrors the overview endpoint so the Hub Progress section reads progress via the ' +
+        'membership-checked portal session.',
 }, { scopes: [], tier: 'extended' }));
 
 // ---------------------------------------------------------------------------
@@ -416,6 +457,24 @@ export const portalRoutes = portalRouter
         const overview = await c.var.services.portal.hubOverview(tenantId, inspectionId);
         if (!overview) return c.json({ error: 'Inspection not found' }, 404);
         return c.json({ data: { ...overview, token, signerToken } }, 200);
+    })
+    .openapi(observeRoute, async (c) => {
+        const tenantId = resolveTenantId(c);
+        if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);
+        const email = c.get('portalEmail') as string;
+        const { inspectionId } = c.req.valid('param');
+
+        // Membership check (EXACTLY as overview): the inspection must be in the
+        // recipient's accessible set before any observe data is returned.
+        const accessible = await c.var.services.portal.listRecipientInspections(tenantId, email);
+        if (!accessible.some((i) => i.inspectionId === inspectionId)) {
+            return c.json({ error: 'Not accessible' }, 403);
+        }
+
+        // Tenant + inspection scoped server-side; NO observer-link token needed.
+        const observe = await c.var.services.portal.observeProgress(tenantId, inspectionId);
+        if (!observe) return c.json({ error: 'Inspection not found' }, 404);
+        return c.json({ data: observe }, 200);
     });
 
 export type PortalApi = typeof portalRoutes;
