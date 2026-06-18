@@ -3009,6 +3009,7 @@ export const inspectionsRoutes = createApiRouter()
             // Content hash enables post-publish owner/client downloads to reuse this
             // render instead of triggering a second Browser Rendering call.
             const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+            const footer = await c.var.services.inspection.getReportPdfFooterContext(id, tenantId);
             const renderBoth = async () => {
                 try {
                     await Promise.all([
@@ -3016,8 +3017,8 @@ export const inspectionsRoutes = createApiRouter()
                         reportPdf.markQueued(id, tenantId, 'full', publishedVersion),
                     ]);
                     await Promise.allSettled([
-                        reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash }),
-                        reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash }),
+                        reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash, footer }),
+                        reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: publishedVersion, contentHash, footer }),
                     ]);
                 } catch (err) {
                     logger.error('[publish] PDF render enqueue failed', { inspectionId: id }, err instanceof Error ? err : undefined);
@@ -3119,6 +3120,7 @@ export const inspectionsRoutes = createApiRouter()
         // Store content_hash so post-refresh downloads reuse this render (force
         // re-render is still guaranteed — renderAndStore always calls the browser).
         const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+        const footer = await c.var.services.inspection.getReportPdfFooterContext(id, tenantId);
 
         await Promise.all([
             reportPdf.markQueued(id, tenantId, 'summary', summaryVersion),
@@ -3127,8 +3129,8 @@ export const inspectionsRoutes = createApiRouter()
         c.executionCtx.waitUntil((async () => {
             try {
                 await Promise.allSettled([
-                    reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: summaryVersion, contentHash }),
-                    reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: fullVersion,    contentHash }),
+                    reportPdf.renderAndStore(id, tenantId, 'summary', { reportUrl: renderUrl, sourceVersion, versionNumber: summaryVersion, contentHash, footer }),
+                    reportPdf.renderAndStore(id, tenantId, 'full',    { reportUrl: renderUrl, sourceVersion, versionNumber: fullVersion,    contentHash, footer }),
                 ]);
             } catch (err) {
                 logger.error('[pdf/refresh] background render failed', { inspectionId: id }, err instanceof Error ? err : undefined);
@@ -3173,10 +3175,12 @@ export const inspectionsRoutes = createApiRouter()
         const tenantSlug = await resolveTenantSlug(c, tenantId);
         const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
+        const footer = await c.var.services.inspection.getReportPdfFooterContext(id, tenantId);
         const record = await c.var.services.reportPdf.getOrRender(id, tenantId, type, {
             reportUrl,
             contentHash,
             versionNumber: null,
+            footer,
         });
         const obj = await c.var.services.reportPdf.streamPdf(record);
         if (!obj) return c.json({ success: false, error: { message: 'PDF object missing in storage' } }, 404);

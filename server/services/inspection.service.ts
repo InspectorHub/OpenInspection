@@ -28,6 +28,7 @@ import type { DefectCommentState } from '../types/inspection-item-state';
 import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
 import { sha256Hex } from './signing-key.service';
 import { RENDER_VERSION } from '../lib/pdf';
+import { resolvePdfSettings, type PdfSettings } from '../lib/pdf-settings';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../lib/status/report-status';
 
@@ -3741,6 +3742,59 @@ export class InspectionService {
         const data = await this.getReportData(id, tenantId, (key: string) => key);
         const payload = JSON.stringify({ v: RENDER_VERSION, data });
         return sha256Hex(payload);
+    }
+
+    /**
+     * Layer ③ report-print footer context. Tenant-scoped lookup of the three
+     * inputs the PDF running footer needs:
+     *  - settings: resolved tenant PDF settings (showFooter/showPageNumbers/
+     *    showLicense + companyAddress) from tenant_configs (default ON).
+     *  - address: the inspection's property address (footer fallback when the
+     *    tenant has no companyAddress configured).
+     *  - license: the assigned inspector's users.licenseNumber (or null when no
+     *    inspector is assigned / the user row carries no license).
+     *
+     * All reads are filtered by tenantId so a footer can never leak a foreign
+     * tenant's address/license.
+     */
+    async getReportPdfFooterContext(
+        id: string,
+        tenantId: string,
+    ): Promise<{ settings: PdfSettings; address: string; license: string | null }> {
+        const db = drizzle(this.db);
+
+        const insp = await db
+            .select({ propertyAddress: inspections.propertyAddress, inspectorId: inspections.inspectorId })
+            .from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+
+        const cfg = await db
+            .select({
+                companyAddress: tenantConfigs.companyAddress,
+                pdfShowFooter: tenantConfigs.pdfShowFooter,
+                pdfShowPageNumbers: tenantConfigs.pdfShowPageNumbers,
+                pdfShowLicense: tenantConfigs.pdfShowLicense,
+            })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+
+        let license: string | null = null;
+        if (insp?.inspectorId) {
+            const owner = await db
+                .select({ licenseNumber: users.licenseNumber })
+                .from(users)
+                .where(and(eq(users.id, insp.inspectorId), eq(users.tenantId, tenantId)))
+                .get();
+            license = owner?.licenseNumber ?? null;
+        }
+
+        return {
+            settings: resolvePdfSettings(cfg),
+            address: insp?.propertyAddress ?? '',
+            license,
+        };
     }
 }
 
