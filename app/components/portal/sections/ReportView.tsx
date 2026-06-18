@@ -529,7 +529,7 @@ export function ReportView(props: ReportViewProps) {
       </div>
 
       {/* Filter chips */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-8 print:hidden">
         <div className="flex gap-2">
           {(["all", "defects", "summary"] as FilterKey[]).map((f) => (
             <button
@@ -755,7 +755,7 @@ export function ReportView(props: ReportViewProps) {
 
                         {(item.severityBucket === "defect" ||
                           item.severityBucket === "monitor") && (
-                          <label className="flex items-center gap-2 mt-3 cursor-pointer text-sm text-ih-fg-3">
+                          <label className="print:hidden flex items-center gap-2 mt-3 cursor-pointer text-sm text-ih-fg-3">
                             <input
                               type="checkbox"
                               checked={!!repairItems[item.id]}
@@ -913,7 +913,7 @@ export function ReportView(props: ReportViewProps) {
 
       {/* Repair Request Panel */}
       {repairPanel && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-ih-bg-card border-t border-ih-border max-h-[60vh] overflow-y-auto rounded-t-xl">
+        <div className="print:hidden fixed bottom-0 left-0 right-0 z-50 bg-ih-bg-card border-t border-ih-border max-h-[60vh] overflow-y-auto rounded-t-xl">
           <div className="max-w-4xl mx-auto p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-ih-fg-1">
