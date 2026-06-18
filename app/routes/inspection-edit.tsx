@@ -1024,6 +1024,7 @@ export default function InspectionEditPage() {
  state.setSaveStatus("error");
  pushToast({
  message: "Save failed — your last change did NOT reach the server.",
+				variant: "error",
  durationMs: 8000,
  });
  } else {
@@ -1315,12 +1316,14 @@ export default function InspectionEditPage() {
  }
  pushToast({
  message: `${d.keys.length} photo${d.keys.length === 1 ? "" : "s"} added${d.targetType === "defect" ? " to defect" : ""}`,
+				variant: "success",
  durationMs: 2000,
  });
  }
  if (d.ok === false) {
  pushToast({
  message: "Photo upload failed — your photo did NOT reach the server.",
+				variant: "error",
  durationMs: 8000,
  });
  }
@@ -1633,7 +1636,7 @@ export default function InspectionEditPage() {
  undefined,
  (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined,
  ).then((ok) => {
- if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", durationMs: 6000 });
+ if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", variant: "error", durationMs: 6000 });
  });
  }}
  queuedPreviews={state.activeItemId ? (queuedPhotoPreviews[state.activeItemId] ?? []) : []}

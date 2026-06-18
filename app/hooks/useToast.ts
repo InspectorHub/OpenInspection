@@ -3,6 +3,9 @@ import { useCallback, useEffect, useState } from 'react';
 export interface ToastEntry {
     id:           string;
     message:      string;
+    /** Visual intent — neutral (default) / error / success. Adds a left accent
+     *  bar in the DS color; the base card styling stays the same. */
+    variant?:     'neutral' | 'error' | 'success';
     actionLabel?: string;
     onAction?:    () => void;
     durationMs:   number;
