@@ -66,7 +66,12 @@ describe('ReportPdfService', () => {
             reportUrl: 'https://example.com/report/insp-1',
             sourceVersion: 1,
         });
-        expect(generatePdfFromUrl).toHaveBeenCalledWith(mockBrowser, 'https://example.com/report/insp-1?summary=1');
+        // No footer passed in this path → third arg is undefined (footer is optional).
+        expect(generatePdfFromUrl).toHaveBeenCalledWith(
+            mockBrowser,
+            'https://example.com/report/insp-1?summary=1',
+            undefined,
+        );
     });
 
     it('renderAndStore is idempotent — re-render replaces existing row', async () => {

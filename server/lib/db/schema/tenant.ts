@@ -229,6 +229,14 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     primaryColor: text('primary_color'),
     logoUrl: text('logo_url'),
     supportEmail: text('support_email'),
+    // Report PDF settings (2026-06-18) — print-layout chrome the tenant can
+    // toggle. companyAddress is shown in the PDF footer/header block; the three
+    // booleans gate footer / page-number / inspector-license rendering. Defaults
+    // preserve the prior always-on behaviour.
+    companyAddress: text('company_address'),
+    pdfShowFooter: integer('pdf_show_footer', { mode: 'boolean' }).notNull().default(true),
+    pdfShowPageNumbers: integer('pdf_show_page_numbers', { mode: 'boolean' }).notNull().default(true),
+    pdfShowLicense: integer('pdf_show_license', { mode: 'boolean' }).notNull().default(true),
     // C-10 ③-D (B-4 / A-7) — tenant transactional-email identity. `senderEmail`
     // is the From: address; `replyTo` is the Reply-To: header. Both null until
     // the workspace configures them in Settings → Communication.

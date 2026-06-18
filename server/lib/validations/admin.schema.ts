@@ -34,6 +34,13 @@ export const UpdateBrandingSchema = z.object({
     customReferralSources: z.array(z.string().min(1).max(50)).max(32).optional().openapi({ example: ['Magazine ad', 'Trade show'] }).describe('TODO describe customReferralSources field for the OpenInspection MCP integration'),
     // Migration 0059 — Workers Paid PDF pipeline opt-in. Default OFF.
     enablePdfPipeline: z.boolean().optional().openapi({ example: false }).describe('TODO describe enablePdfPipeline field for the OpenInspection MCP integration'),
+    // Migration 0010 — report PDF print-layout settings. companyAddress is shown
+    // in the PDF footer/header; the three booleans gate footer / page-number /
+    // inspector-license rendering. All default ON when unset.
+    companyAddress: z.string().max(300, 'Company address is too long').or(z.literal('')).nullable().optional().openapi({ example: '123 Main St, Springfield, IL' }).describe('Company mailing address rendered in the report PDF footer/header block.'),
+    pdfShowFooter: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders the company footer block.'),
+    pdfShowPageNumbers: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders page numbers.'),
+    pdfShowLicense: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders the inspector license number.'),
     // Design System 0520 subsystem E P8 — InterNACHI inspector ID.
     // Surfaced in the TeamCredit footer block on the customer report.
     // Accepts the canonical NACHI format (NACHI##### or numeric IDs).

@@ -73,6 +73,26 @@ export interface ReportSection {
 
 export type FilterKey = "all" | "defects" | "summary";
 
+/* ------------------------------------------------------------------ */
+/* Print layout constants (exported for tests + re-exported via the    */
+/* standalone route). PRINT-ONLY — on-screen rendering is unchanged.   */
+/* ------------------------------------------------------------------ */
+
+/** Inspection-item / defect / stats cards: never split a card across pages. */
+export const PRINT_CARD_CLASS = "print:break-inside-avoid";
+/** Photo cells: never split a photo across a page boundary. */
+export const PRINT_FIGURE_CLASS = "print:break-inside-avoid";
+/** Section headings: keep a heading glued to the content that follows. */
+export const PRINT_SECTION_HEADING_CLASS = "print:break-after-avoid";
+/** Defect photo grid (screen 3/4-col) collapses to a dense 3-col in print. */
+export const DEFECT_PHOTO_GRID_CLASS =
+  "grid grid-cols-3 sm:grid-cols-4 print:grid-cols-3 gap-1.5";
+/** Item photo grid (screen 2/3-col) collapses to a dense 3-col in print. */
+export const ITEM_PHOTO_GRID_CLASS =
+  "grid grid-cols-2 sm:grid-cols-3 print:grid-cols-3 gap-2";
+/** CF Images thumbnail width: smaller in print to keep the PDF lean. */
+export const printThumbWidth = (isPrint: boolean): number => (isPrint ? 480 : 800);
+
 export interface ReportSignature {
   signatureBase64: string | null;
   signedAt: number | null; // epoch ms
@@ -498,7 +518,7 @@ export function ReportView(props: ReportViewProps) {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {summaryCards.map((s) => (
-            <div key={s.label} className="bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center">
+            <div key={s.label} className={`bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center ${PRINT_CARD_CLASS}`}>
               <div className={`text-2xl font-bold ${s.color ? "" : "text-ih-fg-1"}`} style={s.color ? { color: s.color } : undefined}>{s.value}</div>
               <div className="text-[11px] text-ih-fg-4 uppercase tracking-widest mt-1">
                 {s.label}
@@ -509,7 +529,7 @@ export function ReportView(props: ReportViewProps) {
       </div>
 
       {/* Filter chips */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-8 print:hidden">
         <div className="flex gap-2">
           {(["all", "defects", "summary"] as FilterKey[]).map((f) => (
             <button
@@ -534,7 +554,7 @@ export function ReportView(props: ReportViewProps) {
           if (filter === "defects" && section.items.length === 0) return null;
           return (
             <div key={section.id} className="mb-6 group/section relative">
-              <div className="flex items-center gap-3 mb-4">
+              <div className={`flex items-center gap-3 mb-4 ${PRINT_SECTION_HEADING_CLASS}`}>
                 <span className="text-2xl">{getSectionIcon(section.title)}</span>
                 <h2 className="text-2xl font-bold italic text-ih-fg-1">
                   <span className="font-mono not-italic mr-1 text-ih-fg-4">
@@ -554,7 +574,7 @@ export function ReportView(props: ReportViewProps) {
                   {section.items.map((item) => (
                     <div
                       key={item.id}
-                      className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden"
+                      className={`bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden ${PRINT_CARD_CLASS}`}
                       style={{ borderLeftWidth: 4, borderLeftColor: item.ratingColor }}
                     >
                       <div className="p-4">
@@ -616,7 +636,7 @@ export function ReportView(props: ReportViewProps) {
                               .map((d) => (
                                 <div
                                   key={d.id}
-                                  className="rounded-md border border-ih-border bg-ih-bg-app/60 px-3 py-2"
+                                  className={`rounded-md border border-ih-border bg-ih-bg-app/60 px-3 py-2 ${PRINT_CARD_CLASS}`}
                                 >
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="text-[13px] font-bold text-ih-fg-1">{d.title}</span>
@@ -648,16 +668,16 @@ export function ReportView(props: ReportViewProps) {
                                     </p>
                                   )}
                                   {(d.defectPhotos ?? []).length > 0 && (
-                                    <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                                    <div className={`mt-2 ${DEFECT_PHOTO_GRID_CLASS}`}>
                                       {(d.defectPhotos ?? []).map((photo) => {
                                         const name = photoDisplayName(photo.key);
                                         return (
                                           <img
                                             key={photo.key}
-                                            src={`${photo.url}&w=1000`}
+                                            src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
                                             alt={name}
                                             title={name}
-                                            className="w-full h-20 object-cover rounded cursor-pointer"
+                                            className={`w-full h-20 object-cover rounded cursor-pointer ${PRINT_FIGURE_CLASS}`}
                                             loading={data.printMode ? "eager" : "lazy"}
                                             onClick={() => setLightboxUrl(photo.url)}
                                           />
@@ -705,13 +725,13 @@ export function ReportView(props: ReportViewProps) {
                         )}
 
                         {item.photos.length > 0 && (
-                          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          <div className={`mt-3 ${ITEM_PHOTO_GRID_CLASS}`}>
                             {item.photos.map((photo) => {
                               const name = photoDisplayName(photo.key);
                               return (
-                                <div key={photo.key} className="group relative">
+                                <div key={photo.key} className={`group relative ${PRINT_FIGURE_CLASS}`}>
                                   <img
-                                    src={`${photo.url}&w=1000`}
+                                    src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
                                     alt={name}
                                     title={name}
                                     className="w-full h-32 object-cover rounded cursor-pointer"
@@ -735,7 +755,7 @@ export function ReportView(props: ReportViewProps) {
 
                         {(item.severityBucket === "defect" ||
                           item.severityBucket === "monitor") && (
-                          <label className="flex items-center gap-2 mt-3 cursor-pointer text-sm text-ih-fg-3">
+                          <label className="print:hidden flex items-center gap-2 mt-3 cursor-pointer text-sm text-ih-fg-3">
                             <input
                               type="checkbox"
                               checked={!!repairItems[item.id]}
@@ -893,7 +913,7 @@ export function ReportView(props: ReportViewProps) {
 
       {/* Repair Request Panel */}
       {repairPanel && (
-        <div className="fixed bottom-0 left-0 right-0 z-50 bg-ih-bg-card border-t border-ih-border max-h-[60vh] overflow-y-auto rounded-t-xl">
+        <div className="print:hidden fixed bottom-0 left-0 right-0 z-50 bg-ih-bg-card border-t border-ih-border max-h-[60vh] overflow-y-auto rounded-t-xl">
           <div className="max-w-4xl mx-auto p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-ih-fg-1">

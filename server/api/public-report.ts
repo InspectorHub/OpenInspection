@@ -499,11 +499,13 @@ export const publicReportRoutes = createApiRouter()
         // Use contentHash from the snapshot row if available; fall back to live hash
         // so even legacy rows (no contentHash) get a rendered PDF.
         const hash = contentHash ?? await c.var.services.inspection.getReportContentHash(inspectionId, tenantId);
+        const footer = await c.var.services.inspection.getReportPdfFooterContext(inspectionId, tenantId);
 
         const record = await c.var.services.reportPdf.getOrRender(inspectionId, tenantId, 'full', {
             reportUrl,
             contentHash: hash,
             versionNumber,
+            footer,
         });
         const obj = await c.var.services.reportPdf.streamPdf(record);
         if (!obj) return c.notFound();

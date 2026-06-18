@@ -29,6 +29,14 @@ export {
   verificationBlockModel,
   type SignatureBlockResult,
   type VerificationBlockResult,
+  // Print-layout constants (PRINT-only; on-screen rendering unchanged). The
+  // grids + cards live in <ReportView>; these document/test the intent.
+  PRINT_CARD_CLASS,
+  PRINT_FIGURE_CLASS,
+  PRINT_SECTION_HEADING_CLASS,
+  DEFECT_PHOTO_GRID_CLASS,
+  ITEM_PHOTO_GRID_CLASS,
+  printThumbWidth,
 } from "~/components/portal/sections/ReportView";
 
 // Loader-local alias for the shared payload type.

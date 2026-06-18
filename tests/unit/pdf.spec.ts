@@ -25,6 +25,63 @@ describe('generatePdfFromUrl', () => {
         );
     });
 
+    it('builds a settings-driven footer (address + license + page numbers) on Letter', async () => {
+        const browser = { quickAction: vi.fn().mockResolvedValue({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)) }) };
+        await generatePdfFromUrl(browser as unknown as BrowserRun, 'https://example.com/r', {
+            address: '123 Main St',
+            license: 'LIC-42',
+            settings: { showFooter: true, showPageNumbers: true, showLicense: true, companyAddress: null },
+        });
+        const [, opts] = browser.quickAction.mock.calls[0];
+        expect(opts.pdfOptions.format).toBe('letter');
+        expect(opts.pdfOptions.displayHeaderFooter).toBe(true);
+        expect(opts.pdfOptions.footerTemplate).toContain('123 Main St');
+        expect(opts.pdfOptions.footerTemplate).toContain('Lic. LIC-42');
+        expect(opts.pdfOptions.footerTemplate).toContain('pageNumber');
+    });
+
+    it('prefers companyAddress over property address and HTML-escapes it', async () => {
+        const browser = { quickAction: vi.fn().mockResolvedValue({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)) }) };
+        await generatePdfFromUrl(browser as unknown as BrowserRun, 'https://example.com/r', {
+            address: 'fallback addr',
+            settings: { showFooter: true, showPageNumbers: true, showLicense: true, companyAddress: 'Acme & Co <HQ>' },
+        });
+        const [, opts] = browser.quickAction.mock.calls[0];
+        expect(opts.pdfOptions.footerTemplate).toContain('Acme &amp; Co &lt;HQ&gt;');
+        expect(opts.pdfOptions.footerTemplate).not.toContain('fallback addr');
+    });
+
+    it('omits footer entirely when showFooter is false', async () => {
+        const browser = { quickAction: vi.fn().mockResolvedValue({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)) }) };
+        await generatePdfFromUrl(browser as unknown as BrowserRun, 'https://example.com/r', {
+            address: '123 Main St',
+            settings: { showFooter: false, showPageNumbers: true, showLicense: true, companyAddress: null },
+        });
+        const [, opts] = browser.quickAction.mock.calls[0];
+        expect(opts.pdfOptions.displayHeaderFooter).toBe(false);
+        expect(opts.pdfOptions.footerTemplate).toBe('<div></div>');
+    });
+
+    it('omits page numbers and license when those settings are off', async () => {
+        const browser = { quickAction: vi.fn().mockResolvedValue({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)) }) };
+        await generatePdfFromUrl(browser as unknown as BrowserRun, 'https://example.com/r', {
+            address: '123 Main St',
+            license: 'LIC-42',
+            settings: { showFooter: true, showPageNumbers: false, showLicense: false, companyAddress: null },
+        });
+        const [, opts] = browser.quickAction.mock.calls[0];
+        expect(opts.pdfOptions.footerTemplate).not.toContain('pageNumber');
+        expect(opts.pdfOptions.footerTemplate).not.toContain('Lic.');
+    });
+
+    it('defaults footer ON (Letter) when no settings/opts passed', async () => {
+        const browser = { quickAction: vi.fn().mockResolvedValue({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(4)) }) };
+        await generatePdfFromUrl(browser as unknown as BrowserRun, 'https://example.com/r');
+        const [, opts] = browser.quickAction.mock.calls[0];
+        expect(opts.pdfOptions.format).toBe('letter');
+        expect(opts.pdfOptions.displayHeaderFooter).toBe(true);
+    });
+
     it('throws when BROWSER binding is undefined', async () => {
         await expect(generatePdfFromUrl(undefined, 'https://example.com')).rejects.toThrow(/binding not configured/i);
     });

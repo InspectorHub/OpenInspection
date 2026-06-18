@@ -256,7 +256,24 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
  if (intent === "publish") {
  const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: {} });
- ok = res.ok;
+ // Publish has meaningful precondition failures (e.g. "Inspection must be
+ // completed before publishing the report.") that the inspector MUST see —
+ // returning a bare { ok:false } here routed the publish through the generic
+ // autosave "Save failed" toast and swallowed the real reason. Parse the
+ // AppError body ({ error: { code, message } }) and carry the message back
+ // so the publish modal can show it inline.
+ if (!res.ok) {
+ const bodyText = await res.text().catch(() => "");
+ let message = "Couldn't publish the report. Please try again.";
+ try {
+ const parsed = JSON.parse(bodyText) as { error?: { message?: string }; message?: string };
+ message = parsed?.error?.message ?? parsed?.message ?? message;
+ } catch {
+ /* non-JSON body — keep the default message */
+ }
+ return { ok: false as const, intent: "publish", error: message };
+ }
+ return { ok: true as const, intent: "publish" };
  }
 
  // B-22 follow-up (C-12 class): the settings sheet's "Save changes" used to
@@ -558,6 +575,12 @@ export default function InspectionEditPage() {
  // FE-2: photo uploads also get a dedicated fetcher — sharing the mutation
  // fetcher would let an autosave abort an in-flight upload (and vice versa).
  const uploadFetcher = useFetcher();
+ // Publish gets its own fetcher so a publish precondition failure (e.g. "not
+ // completed") is NOT swallowed by the generic autosave "Save failed" toast
+ // (which only watches fetcher/notesFetcher/uploadFetcher). The real server
+ // message is surfaced inline in the publish modal instead.
+ const publishFetcher = useFetcher<{ ok: boolean; intent?: string; error?: string }>();
+ const [publishError, setPublishError] = useState<string | null>(null);
  const navigate = useNavigate();
  const photoInputRef = useRef<HTMLInputElement>(null);
  const { scheme, setColorScheme } = useTheme();
@@ -869,6 +892,7 @@ export default function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
 
  const handlePublishClick = useCallback(async () => {
+  setPublishError(null);
   try {
    // Track H (C-12): fresh on-demand check via the BFF resource route
    // (token relay) — never a raw client fetch on /api.
@@ -1000,6 +1024,7 @@ export default function InspectionEditPage() {
  state.setSaveStatus("error");
  pushToast({
  message: "Save failed — your last change did NOT reach the server.",
+				variant: "error",
  durationMs: 8000,
  });
  } else {
@@ -1010,6 +1035,25 @@ export default function InspectionEditPage() {
  }
  }
  }, [fetcher.state, notesFetcher.state, uploadFetcher.state]);
+
+ /* ---------------------------------------------------------------- */
+ /* Publish result — surface the real server reason (e.g. "not       */
+ /* completed") inline in the modal instead of the generic toast.    */
+ /* ---------------------------------------------------------------- */
+ useEffect(() => {
+ if (publishFetcher.state !== "idle" || !publishFetcher.data) return;
+ const data = publishFetcher.data;
+ if (data.ok) {
+ // Successful publish: clear any prior error, close the modal, and refresh
+ // loader data so the editor reflects the now-published status.
+ setPublishError(null);
+ state.setShowPublishModal(false);
+ revalidator.revalidate();
+ } else {
+ // Failed precondition: keep the modal open and show the actual reason.
+ setPublishError(data.error ?? "Couldn't publish the report. Please try again.");
+ }
+ }, [publishFetcher.state, publishFetcher.data, state.setShowPublishModal, revalidator]);
 
  /* ---------------------------------------------------------------- */
  /* Rating handler with auto-advance */
@@ -1272,12 +1316,14 @@ export default function InspectionEditPage() {
  }
  pushToast({
  message: `${d.keys.length} photo${d.keys.length === 1 ? "" : "s"} added${d.targetType === "defect" ? " to defect" : ""}`,
+				variant: "success",
  durationMs: 2000,
  });
  }
  if (d.ok === false) {
  pushToast({
  message: "Photo upload failed — your photo did NOT reach the server.",
+				variant: "error",
  durationMs: 8000,
  });
  }
@@ -1393,7 +1439,7 @@ export default function InspectionEditPage() {
  photoInputRef.current?.click();
  },
  onSave: () => findings.saveNow(),
- onPublish: () => state.setShowPublishModal(true),
+ onPublish: () => { setPublishError(null); state.setShowPublishModal(true); },
  onCloneLast: () => handleCloneLast(inspectionPrefs.cloneDefault),
  onSaveAsSnippet: () => {
  if (!state.activeItemId) return;
@@ -1590,7 +1636,7 @@ export default function InspectionEditPage() {
  undefined,
  (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined,
  ).then((ok) => {
- if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", durationMs: 6000 });
+ if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", variant: "error", durationMs: 6000 });
  });
  }}
  queuedPreviews={state.activeItemId ? (queuedPhotoPreviews[state.activeItemId] ?? []) : []}
@@ -1903,7 +1949,7 @@ export default function InspectionEditPage() {
  {/* Publish confirmation modal */}
  {state.showPublishModal && (
  <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
- <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={() => state.setShowPublishModal(false)} />
+ <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={() => { setPublishError(null); state.setShowPublishModal(false); }} />
  <div className="relative bg-ih-bg-card rounded-xl shadow-ih-popover p-6 max-w-md w-full border border-ih-border">
  <h3 className="text-[16px] font-bold text-ih-fg-1">Publish Report</h3>
  <p className="text-[13px] text-ih-fg-3 mt-2">
@@ -1919,15 +1965,23 @@ export default function InspectionEditPage() {
  <div className="flex justify-between"><span className="text-ih-fg-3">Completion</span><span className="font-bold">{state.progress.pct}%</span></div>
  <div className="flex justify-between"><span className="text-ih-fg-3">Status</span><span className="font-bold uppercase">{state.inspection.status as string}</span></div>
  </div>
+ {publishError && (
+ <div role="alert" className="mt-4 p-3 rounded-lg bg-ih-bad/10 border border-ih-bad/30 text-[12px] text-ih-bad font-medium">
+ {publishError}
+ </div>
+ )}
  <div className="flex justify-end gap-2 mt-5">
- <button onClick={() => state.setShowPublishModal(false)} className="px-4 py-2 text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted rounded-md">Cancel</button>
+ <button onClick={() => { setPublishError(null); state.setShowPublishModal(false); }} className="px-4 py-2 text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted rounded-md">Cancel</button>
  <button
+ disabled={publishFetcher.state !== "idle"}
  onClick={() => {
- fetcher.submit({ intent: "publish" }, { method: "post" });
- state.setShowPublishModal(false);
+ // Keep the modal open: the publish-result effect closes it on success
+ // and shows the real server reason inline on failure.
+ setPublishError(null);
+ publishFetcher.submit({ intent: "publish" }, { method: "post" });
  }}
- className="px-4 py-2 text-[13px] font-bold text-white bg-ih-ok hover:bg-ih-ok/85 rounded-md"
- >Publish Now</button>
+ className="px-4 py-2 text-[13px] font-bold text-white bg-ih-ok hover:bg-ih-ok/85 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
+ >{publishFetcher.state !== "idle" ? "Publishing…" : "Publish Now"}</button>
  </div>
  </div>
  </div>
@@ -2217,6 +2271,7 @@ export default function InspectionEditPage() {
   onClose={() => setShowPublishGate(false)}
   onProceed={() => {
    // IA-7 warning mode — user acknowledged the soft gaps.
+   setPublishError(null);
    setShowPublishGate(false);
    state.setShowPublishModal(true);
   }}
@@ -2445,6 +2500,20 @@ export default function InspectionEditPage() {
  Preview
  </button>
  )}
+
+ {/* Preview PDF — opens the real server-rendered PDF deliverable (the exact
+     client deliverable) in a new tab. Owner on-demand render works pre-publish
+     on drafts via the owner/JWT-authed /api/inspections/:id/pdf endpoint. */}
+ <button
+ onClick={() => window.open(`/api/inspections/${state.inspection.id}/pdf?type=full`, "_blank", "noopener")}
+ className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+ title="Preview the real server-rendered PDF (the exact client deliverable) in a new tab"
+ >
+ <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+ </svg>
+ Preview PDF
+ </button>
 
  {/* Sign now button */}
  <button

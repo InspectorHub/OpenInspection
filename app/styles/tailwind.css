@@ -245,3 +245,12 @@ html[data-sidebar-collapsed="1"] .ih-sidebar { width: var(--width-sidebar-collap
   --animate-ih-dash-march: ih-dash-march 0.6s linear infinite;
   --animate-ih-ok-flash: ih-ok-flash 1s ease-out;
 }
+
+/* ── Print layout (report PDF / browser print) ──
+   Letter page with safe margins + exact color so rating chips/borders print.
+   The page-break protection + dense photo grid live as Tailwind `print:`
+   utilities on the report components (PRINT_*_CLASS in ReportView). */
+@media print {
+  @page { size: Letter; margin: 0.5in 0.5in 0.7in 0.5in; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

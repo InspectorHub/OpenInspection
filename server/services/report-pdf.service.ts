@@ -5,6 +5,18 @@ import type { ReportPdf } from '../lib/db/schema';
 import { generatePdfFromUrl } from '../lib/pdf';
 import { Errors } from '../lib/errors';
 import type { BrowserRun } from '../types/hono';
+import type { PdfSettings } from '../lib/pdf-settings';
+
+/**
+ * Layer ③ — running header/footer inputs threaded from the caller into the
+ * Browser Rendering /pdf quick action. All fields optional; when absent the
+ * footer falls back to defaults (footer on, no license, empty address).
+ */
+export interface ReportPdfFooterOpts {
+    settings?: PdfSettings;
+    address?: string;
+    license?: string | null;
+}
 
 export type ReportPdfType = 'summary' | 'full';
 export type ReportPdfStatus = 'queued' | 'rendering' | 'ready' | 'failed';
@@ -85,7 +97,7 @@ export class ReportPdfService {
         inspectionId: string,
         tenantId: string,
         type: ReportPdfType,
-        opts: { reportUrl: string; sourceVersion: number; versionNumber?: number | null; contentHash?: string },
+        opts: { reportUrl: string; sourceVersion: number; versionNumber?: number | null; contentHash?: string; footer?: ReportPdfFooterOpts },
     ): Promise<ReportPdf> {
         if (!this.browser) throw Errors.BadRequest('PDF rendering unavailable: BROWSER binding not configured');
         if (!this.r2) throw Errors.BadRequest('PDF storage unavailable: storage bucket binding not configured');
@@ -97,7 +109,9 @@ export class ReportPdfService {
             ? (opts.reportUrl.includes('?') ? `${opts.reportUrl}&summary=1` : `${opts.reportUrl}?summary=1`)
             : opts.reportUrl;
 
-        const pdfBuffer = await generatePdfFromUrl(this.browser, renderUrl);
+        // ReportPdfFooterOpts is structurally identical to the generatePdfFromUrl
+        // opts (settings/address/license, all optional) — forward it directly.
+        const pdfBuffer = await generatePdfFromUrl(this.browser, renderUrl, opts.footer);
 
         // Content-addressed key when a hash is available; legacy key for back-compat.
         const r2Key = opts.contentHash != null
@@ -228,7 +242,7 @@ export class ReportPdfService {
         inspectionId: string,
         tenantId: string,
         type: ReportPdfType,
-        opts: { reportUrl: string; contentHash: string; versionNumber: number | null },
+        opts: { reportUrl: string; contentHash: string; versionNumber: number | null; footer?: ReportPdfFooterOpts },
     ): Promise<ReportPdf> {
         const cached = await this.getPdfRecordByContentHash(inspectionId, tenantId, type, opts.contentHash);
         if (cached) return cached;   // identical content already rendered — reuse, no Browser Rendering
@@ -237,6 +251,7 @@ export class ReportPdfService {
             sourceVersion: Date.now(),
             versionNumber: opts.versionNumber,
             contentHash: opts.contentHash,
+            ...(opts.footer ? { footer: opts.footer } : {}),
         });
     }
 
