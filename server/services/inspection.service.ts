@@ -1823,6 +1823,17 @@ export class InspectionService {
             .get();
         if (!row) throw Errors.NotFound('Pool photo not found');
 
+        // P8 — block deletion when this pool photo is still wired as the
+        // report cover (either the uncropped source or the baked crop), which
+        // would orphan the cover. Force the user to clear the cover first.
+        const insp = await db.select({ coverPhotoId: inspections.coverPhotoId, coverImageKey: inspections.coverImageKey })
+            .from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (insp && (insp.coverPhotoId === row.r2Key || insp.coverImageKey === row.r2Key)) {
+            throw Errors.Conflict('This photo is set as the report cover — clear the cover first.');
+        }
+
         await db.delete(inspectionMediaPool)
             .where(and(
                 eq(inspectionMediaPool.id, poolId),
