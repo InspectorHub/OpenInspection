@@ -508,6 +508,7 @@ export const DashboardResponseSchema = z.object({
  */
 export const MediaCenterAttachedPhotoSchema = z.object({
     key:           z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
+    originalKey:   z.string().describe('Source R2 key (revert target); differs from key when the photo is annotated'),
     url:           z.string().describe('TODO describe url field for the OpenInspection MCP integration'),
     itemId:        z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
     itemLabel:     z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
@@ -515,6 +516,7 @@ export const MediaCenterAttachedPhotoSchema = z.object({
     sectionTitle:  z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
     photoIndex:    z.number().int().nonnegative().describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
     annotated:     z.boolean().describe('TODO describe annotated field for the OpenInspection MCP integration'),
+    defectId:      z.string().optional().describe('Defect id when the photo hangs off a canned/custom defect rather than the item'),
 }).openapi('MediaCenterAttachedPhoto');
 
 export const MediaCenterPoolPhotoSchema = z.object({

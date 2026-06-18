@@ -29,6 +29,7 @@ import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
 import { sha256Hex } from './signing-key.service';
 import { RENDER_VERSION } from '../lib/pdf';
 import { stripExifOnIngest, type ImagesBinding } from '../lib/media/strip-exif';
+import { collectAttachedPhotos } from '../lib/media/collect-attached';
 import { resolvePdfSettings, type PdfSettings } from '../lib/pdf-settings';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../lib/status/report-status';
@@ -1327,6 +1328,7 @@ export class InspectionService {
     ): Promise<{
         attached: Array<{
             key: string;
+            originalKey: string;
             url: string;
             itemId: string;
             itemLabel: string;
@@ -1334,6 +1336,7 @@ export class InspectionService {
             sectionTitle: string;
             photoIndex: number;
             annotated: boolean;
+            defectId?: string;
         }>;
         pool: Array<{
             id: string;
@@ -1380,51 +1383,23 @@ export class InspectionService {
             }
         }
 
-        // Pull results — photos live under data[itemId].photos[]. Mirrors
-        // the same shape used by getReportData().
-        interface PhotoEntry { key: string; annotatedKey?: string; annotationsJson?: string }
-        interface ResultEntry { photos?: PhotoEntry[] }
+        // Pull results — photos live under data[itemId].photos[] plus the
+        // canned/custom defect arrays. Mirrors the same shape used by
+        // getReportData(). The walk is delegated to the pure
+        // collectAttachedPhotos helper so it stays unit-testable.
         const resultsRow = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
             .get();
-        const resultData: Record<string, ResultEntry> = resultsRow?.data
-            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, ResultEntry>
+        const resultData: Record<string, never> = resultsRow?.data
+            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, never>
             : {};
 
-        const attached: Array<{
-            key: string;
-            url: string;
-            itemId: string;
-            itemLabel: string;
-            sectionId: string;
-            sectionTitle: string;
-            photoIndex: number;
-            annotated: boolean;
-        }> = [];
-        for (const [key, entry] of Object.entries(resultData)) {
-            const parsedKey = parseFindingKey(key);
-            const itemId = parsedKey.itemId;
-            const photos = Array.isArray(entry?.photos) ? entry.photos : [];
-            const meta = itemMeta.get(itemId) ?? {
-                itemLabel:    itemId,
-                sectionId:    parsedKey.sectionId || 'unknown',
-                sectionTitle: 'Unsectioned',
-            };
-            photos.forEach((p, idx) => {
-                if (!p || typeof p.key !== 'string') return;
-                const displayKey = p.annotatedKey || p.key;
-                attached.push({
-                    key:          displayKey,
-                    url:          `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(displayKey)}`,
-                    itemId,
-                    itemLabel:    meta.itemLabel,
-                    sectionId:    meta.sectionId,
-                    sectionTitle: meta.sectionTitle,
-                    photoIndex:   idx,
-                    annotated:    !!p.annotatedKey,
-                });
-            });
-        }
+        const attached = collectAttachedPhotos(
+            resultData,
+            itemMeta,
+            (key) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`,
+            (k) => { const pk = parseFindingKey(k); return { itemId: pk.itemId, sectionId: pk.sectionId }; },
+        );
 
         // Pool — loose uploads, ordered newest first.
         const poolRows = await db.select().from(inspectionMediaPool)
