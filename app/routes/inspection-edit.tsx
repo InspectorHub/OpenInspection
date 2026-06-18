@@ -2446,6 +2446,20 @@ export default function InspectionEditPage() {
  </button>
  )}
 
+ {/* Preview PDF — opens the real server-rendered PDF deliverable (the exact
+     client deliverable) in a new tab. Owner on-demand render works pre-publish
+     on drafts via the owner/JWT-authed /api/inspections/:id/pdf endpoint. */}
+ <button
+ onClick={() => window.open(`/api/inspections/${state.inspection.id}/pdf?type=full`, "_blank", "noopener")}
+ className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+ title="Preview the real server-rendered PDF (the exact client deliverable) in a new tab"
+ >
+ <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+ </svg>
+ Preview PDF
+ </button>
+
  {/* Sign now button */}
  <button
  onClick={() => setSignModalOpen(true)}
