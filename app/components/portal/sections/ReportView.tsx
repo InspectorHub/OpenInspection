@@ -707,22 +707,26 @@ export function ReportView(props: ReportViewProps) {
                                       {d.effectiveComment}
                                     </p>
                                   )}
-                                  {(d.defectPhotos ?? []).length > 0 && (
+                                  {(d.defectPhotos ?? []).filter((p) => !failedPhotos.has(p.key)).length > 0 && (
                                     <div className={`mt-2 ${DEFECT_PHOTO_GRID_CLASS}`}>
-                                      {(d.defectPhotos ?? []).map((photo) => {
-                                        const name = photoDisplayName(photo.key);
-                                        return (
-                                          <img
-                                            key={photo.key}
-                                            src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
-                                            alt={name}
-                                            title={name}
-                                            className={`w-full h-20 object-cover rounded cursor-pointer ${PRINT_FIGURE_CLASS}`}
-                                            loading={data.printMode ? "eager" : "lazy"}
-                                            onClick={() => setLightboxUrl(photo.url)}
-                                          />
-                                        );
-                                      })}
+                                      {(d.defectPhotos ?? [])
+                                        .filter((p) => !failedPhotos.has(p.key))
+                                        .map((photo, idx) => {
+                                          const name = photoDisplayName(photo.key);
+                                          return (
+                                            <div key={photo.key} className={`aspect-[4/3] overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+                                              <img
+                                                src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
+                                                alt={`${d.title} — photo ${idx + 1}`}
+                                                title={name}
+                                                className="w-full h-full object-cover cursor-pointer"
+                                                loading={data.printMode ? "eager" : "lazy"}
+                                                onClick={() => setLightboxUrl(photo.url)}
+                                                onError={() => markPhotoFailed(photo.key)}
+                                              />
+                                            </div>
+                                          );
+                                        })}
                                     </div>
                                   )}
                                 </div>
@@ -764,32 +768,35 @@ export function ReportView(props: ReportViewProps) {
                           </div>
                         )}
 
-                        {item.photos.length > 0 && (
+                        {item.photos.filter((p) => !failedPhotos.has(p.key)).length > 0 && (
                           <div className={`mt-3 ${ITEM_PHOTO_GRID_CLASS}`}>
-                            {item.photos.map((photo) => {
-                              const name = photoDisplayName(photo.key);
-                              return (
-                                <div key={photo.key} className={`group relative ${PRINT_FIGURE_CLASS}`}>
-                                  <img
-                                    src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
-                                    alt={name}
-                                    title={name}
-                                    className="w-full h-32 object-cover rounded cursor-pointer"
-                                    loading={data.printMode ? "eager" : "lazy"}
-                                    onClick={() => setLightboxUrl(photo.url)}
-                                  />
-                                  <a
-                                    href={withDownload(photo.url)}
-                                    download={name}
-                                    title={`Download ${name}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
-                                  >
-                                    ↓
-                                  </a>
-                                </div>
-                              );
-                            })}
+                            {item.photos
+                              .filter((p) => !failedPhotos.has(p.key))
+                              .map((photo, idx) => {
+                                const name = photoDisplayName(photo.key);
+                                return (
+                                  <div key={photo.key} className={`group relative aspect-[4/3] overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+                                    <img
+                                      src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
+                                      alt={`${item.label} — photo ${idx + 1}`}
+                                      title={name}
+                                      className="w-full h-full object-cover cursor-pointer"
+                                      loading={data.printMode ? "eager" : "lazy"}
+                                      onClick={() => setLightboxUrl(photo.url)}
+                                      onError={() => markPhotoFailed(photo.key)}
+                                    />
+                                    <a
+                                      href={withDownload(photo.url)}
+                                      download={name}
+                                      title={`Download ${name}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
+                                    >
+                                      ↓
+                                    </a>
+                                  </div>
+                                );
+                              })}
                           </div>
                         )}
 
