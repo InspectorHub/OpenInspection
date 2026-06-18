@@ -128,6 +128,13 @@ export const workspaceSchema = z.object({
   // earlier hidden+checkbox pair submitted two values and broke z.boolean parsing.)
   enableRepairList: z.boolean().optional(),
   enableCustomerRepairExport: z.boolean().optional(),
+  // Report PDF print-layout settings (mirror UpdateBrandingSchema). companyAddress
+  // is a free-text field (empty string clears it); the three toggles are
+  // conform-native checkboxes like the report-feature flags above.
+  companyAddress: z.string().max(300, "Company address is too long").optional(),
+  pdfShowFooter: z.boolean().optional(),
+  pdfShowPageNumbers: z.boolean().optional(),
+  pdfShowLicense: z.boolean().optional(),
 });
 
 export type WorkspaceInput = z.infer<typeof workspaceSchema>;

@@ -20,6 +20,10 @@ interface Branding {
   customReferralSources?: string[];
   enableRepairList?: boolean | null;
   enableCustomerRepairExport?: boolean | null;
+  companyAddress?: string | null;
+  pdfShowFooter?: boolean | null;
+  pdfShowPageNumbers?: boolean | null;
+  pdfShowLicense?: boolean | null;
 }
 
 const THEMES = ["modern", "classic", "minimal"] as const;
@@ -84,6 +88,14 @@ export async function action({ request, context }: Route.ActionArgs) {
   // boolean so unchecking persists false.
   body.enableRepairList = v.enableRepairList ?? false;
   body.enableCustomerRepairExport = v.enableCustomerRepairExport ?? false;
+
+  // Report PDF settings. companyAddress is free text (trim; empty string clears).
+  // The three toggles are conform-native checkboxes — absent (unchecked) must
+  // persist false, so coerce with `?? false` (the same pattern as the flags above).
+  if (typeof v.companyAddress === "string") body.companyAddress = v.companyAddress.trim();
+  body.pdfShowFooter = v.pdfShowFooter ?? false;
+  body.pdfShowPageNumbers = v.pdfShowPageNumbers ?? false;
+  body.pdfShowLicense = v.pdfShowLicense ?? false;
 
   const api = createApi(context, { token });
   // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
@@ -263,6 +275,73 @@ export default function SettingsWorkspacePage() {
               <span className="block text-[13px] font-bold text-ih-fg-1">Allow clients to build repair requests</span>
               <span className="block text-[12px] text-ih-fg-3 mt-0.5">
                 Lets clients, agents, and inspectors build a shareable repair-request addendum from a published report.
+              </span>
+            </span>
+          </label>
+        </section>
+
+        {/* Report PDF */}
+        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Report PDF</h3>
+          <p className="text-[12px] text-ih-fg-3">Print-layout options for downloadable report PDFs.</p>
+
+          <div className="space-y-2">
+            <label htmlFor={fields.companyAddress.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Company address</label>
+            <input type="text" id={fields.companyAddress.id} name={fields.companyAddress.name}
+              defaultValue={branding.companyAddress ?? ""}
+              placeholder="123 Main St, Springfield, IL 62704"
+              aria-invalid={fields.companyAddress.errors ? true : undefined}
+              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
+            <p className="text-[11px] text-ih-fg-3">Shown in the report PDF footer block.</p>
+            {fields.companyAddress.errors && (
+              <p className="mt-1 text-xs text-ih-bad-fg">{fields.companyAddress.errors[0]}</p>
+            )}
+          </div>
+
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="pdfShowFooter"
+              value="on"
+              defaultChecked={branding.pdfShowFooter ?? true}
+              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
+            />
+            <span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">Show footer</span>
+              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
+                Renders the company footer block at the bottom of each report PDF page.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="pdfShowPageNumbers"
+              value="on"
+              defaultChecked={branding.pdfShowPageNumbers ?? true}
+              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
+            />
+            <span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">Show page numbers</span>
+              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
+                Adds page numbers to the report PDF.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              name="pdfShowLicense"
+              value="on"
+              defaultChecked={branding.pdfShowLicense ?? true}
+              className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
+            />
+            <span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">Show inspector license</span>
+              <span className="block text-[12px] text-ih-fg-3 mt-0.5">
+                Includes the inspector license number on the report PDF.
               </span>
             </span>
           </label>
