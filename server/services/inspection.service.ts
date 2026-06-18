@@ -28,6 +28,7 @@ import type { DefectCommentState } from '../types/inspection-item-state';
 import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
 import { sha256Hex } from './signing-key.service';
 import { RENDER_VERSION } from '../lib/pdf';
+import { stripExifOnIngest, type ImagesBinding } from '../lib/media/strip-exif';
 import { resolvePdfSettings, type PdfSettings } from '../lib/pdf-settings';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../lib/status/report-status';
@@ -283,7 +284,7 @@ export interface PropertyFacts {
  * Service to handle all inspection-related business logic.
  */
 export class InspectionService {
-    constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB, private kv?: KVNamespace) {}
+    constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB, private kv?: KVNamespace, private images?: ImagesBinding) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -1292,8 +1293,13 @@ export class InspectionService {
         }
 
         const key = `${tenantId}/${id}/${itemId}_${crypto.randomUUID()}_${file.name}`;
-        await this.r2.put(key, await file.arrayBuffer(), {
-            httpMetadata: { contentType: file.type },
+        // N2 — strip GPS/EXIF on ingest (fallback for any path that skipped the
+        // client canvas bake: original-quality uploads, direct API callers,
+        // browsers without createImageBitmap). Fails open when env.IMAGES is
+        // absent (standalone) — the client bake remains the primary guarantee.
+        const { bytes, contentType } = await stripExifOnIngest(this.images, await file.arrayBuffer(), file.type || 'image/jpeg');
+        await this.r2.put(key, bytes, {
+            httpMetadata: { contentType },
             // A-9: preserve the original upload filename so the serve route can
             // set Content-Disposition without parsing it back out of the key.
             customMetadata: { originalName: file.name || 'photo' },
@@ -1468,8 +1474,11 @@ export class InspectionService {
         const id = crypto.randomUUID();
         const safeName = (file.name || 'photo').replace(/[^a-zA-Z0-9._-]/g, '_');
         const key = `${tenantId}/${inspectionId}/_pool_${id}_${safeName}`;
-        await this.r2.put(key, await file.arrayBuffer(), {
-            httpMetadata: { contentType: file.type || 'image/jpeg' },
+        // N2 — strip GPS/EXIF on ingest (fallback for paths that skipped the
+        // client canvas bake). Fails open when env.IMAGES is absent.
+        const { bytes, contentType } = await stripExifOnIngest(this.images, await file.arrayBuffer(), file.type || 'image/jpeg');
+        await this.r2.put(key, bytes, {
+            httpMetadata: { contentType },
             // A-9: keep the real original filename (the key only carries a
             // sanitized variant) for the download Content-Disposition.
             customMetadata: { originalName: file.name || 'photo' },

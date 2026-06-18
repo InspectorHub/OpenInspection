@@ -12,6 +12,7 @@ import { BookingService } from '../../services/booking.service';
 import { BrandingService } from '../../services/branding.service';
 import { assembleTenantEmailService, loadTenantEmailConfig, type LoadedEmailConfig } from '../email/build-email-service';
 import { InspectionService } from '../../services/inspection.service';
+import type { ImagesBinding } from '../media/strip-exif';
 import { PortalService } from '../../services/portal.service';
 import { TeamService } from '../../services/team.service';
 import { TemplateService } from '../../services/template.service';
@@ -166,13 +167,13 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.email = buildEmailService();
                     break;
                 case 'inspection':
-                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE);
+                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES);
                     break;
                 case 'portal':
                     // PortalService depends on InspectionService — resolve it via the
                     // proxy target the same way auditLog resolves signingKey.
                     if (!target.inspection) {
-                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE);
+                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES);
                     }
                     target.portal = new PortalService(c.env.DB, target.inspection);
                     break;
