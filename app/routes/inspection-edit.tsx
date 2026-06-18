@@ -44,6 +44,7 @@ import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 import { CoverCropper } from "~/components/image-studio/CoverCropper";
 import { fullResUrl } from "~/components/image-studio/cropImage";
+import { preprocessImage } from "~/components/image-studio/preprocessImage";
 import { SignaturePad } from "~/components/SignaturePad";
 import { PublishGateModal } from "~/components/editor/PublishGateModal";
 import { ToastPortal } from "~/components/Toast";
@@ -1246,18 +1247,27 @@ export default function InspectionEditPage() {
   return;
  }
 
+ // N2+N4 — bake on the ONLINE path before submit (auto-orient + downscale +
+ // EXIF/GPS strip), unless the user opted into original quality. Capture the
+ // defect target ref into a local BEFORE the await so a second picker open
+ // cannot clobber it. The offline branch above keeps the RAW File (Task 5
+ // bakes at replay).
+ const orig = originalQualityEnabled();
+ const target = pendingPhotoTargetRef.current;
+ pendingPhotoTargetRef.current = null;
+ void (async () => {
+ const baked = orig ? file : await preprocessImage(file);
  const formData = new FormData();
  formData.append("intent", "upload-photo");
  formData.append("itemId", itemId);
- formData.append("file", file);
- const target = pendingPhotoTargetRef.current;
- pendingPhotoTargetRef.current = null;
+ formData.append("file", baked);
  if (target) {
- formData.append("targetType", "defect");
- formData.append("customId", target.id);
- formData.append("defectKind", target.kind);
+  formData.append("targetType", "defect");
+  formData.append("customId", target.id);
+  formData.append("defectKind", target.kind);
  }
  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
+ })();
  // Reset input so picking the same file twice re-fires onChange
  if (photoInputRef.current) photoInputRef.current.value = "";
  },
@@ -1294,13 +1304,20 @@ export default function InspectionEditPage() {
   return;
  }
 
+ // N4 — bake each frame on the ONLINE path. Burst frames are already
+ // canvas-captured JPEGs (no EXIF), so this is purely the downscale; it
+ // no-ops on frames already below the cap. Honors the original-quality opt-out.
+ const orig = originalQualityEnabled();
+ void (async () => {
  const formData = new FormData();
  formData.append("intent", "upload-photo");
  formData.append("itemId", itemId);
- blobs.forEach((blob, i) => {
- formData.append("file", new File([blob], `burst-${i + 1}.jpg`, { type: "image/jpeg" }));
- });
+ for (let i = 0; i < blobs.length; i++) {
+  const f = new File([blobs[i]], `burst-${i + 1}.jpg`, { type: "image/jpeg" });
+  formData.append("file", orig ? f : await preprocessImage(f));
+ }
  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
+ })();
  },
  [state.burstCameraItemId, state.inspection.id, uploadFetcher],
  );
