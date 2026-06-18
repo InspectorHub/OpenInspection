@@ -38,8 +38,8 @@ export const users = sqliteTable('users', {
     // accessing multiple tenants via agent_tenant_links). Inspector / owner /
     // admin accounts still always carry a tenant_id.
     tenantId: text('tenant_id').references(() => tenants.id),
-    // After migration 0072, UNIQUE moved to (tenant_id, email) via the
-    // `users_tenant_email_unique` index. A portal identity that belongs
+    // UNIQUE is on (tenant_id, email) (the `users_tenant_email_unique`
+    // composite index), not global on email. A portal identity that belongs
     // to multiple workspaces now has one row per workspace, each scoped
     // to that workspace's tenant_id, sharing the same email. Per-tenant
     // uniqueness is still enforced; globally a duplicate email is fine.
@@ -136,7 +136,7 @@ export const users = sqliteTable('users', {
 ]);
 
 /**
- * Outbox for core → portal sync events (migration 0073). Append happens
+ * Outbox for core → portal sync events. Append happens
  * inside the same DB write that produced the user-side mutation so the
  * event row is atomic with the change; a scheduled worker drains pending
  * rows by posting them to portal's /api/integration/from-core endpoint.
