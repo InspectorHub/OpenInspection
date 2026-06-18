@@ -42,6 +42,8 @@ import {
     MediaPoolUploadResponseSchema,
     MediaAttachRequestSchema,
     MediaAttachResponseSchema,
+    ReorderPhotosSchema,
+    ItemPhotoMutationSchema,
     ResultsBatchSchema,
     ResultsBatchResponseSchema,
     ConflictListResponseSchema,
@@ -1090,6 +1092,83 @@ const mediaPoolDeleteRoute = createRoute(withMcpMetadata({
     },
     operationId: "deleteInspectionMediaPool",
     description: "Auto-generated placeholder for deleteInspectionMediaPool (DELETE /{id}/media/pool/{poolId}, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['write'], tier: 'extended' }));
+
+// Media Studio (Plan 3, P4) — reorder an item's photos[] (array order ==
+// report photo order). Pure permutation; the submitted key set must match.
+const itemPhotosReorderRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path:   '/{id}/items/{itemId}/photos/reorder',
+    tags: ["inspections"],
+    summary: 'Reorder an item\'s photos (array order = report order)',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({
+            id:     z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+            itemId: z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: ReorderPhotosSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            description: 'Photos reordered',
+        },
+    },
+    operationId: "reorderInspectionItemPhotos",
+    description: "Auto-generated placeholder for reorderInspectionItemPhotos (POST /{id}/items/{itemId}/photos/reorder, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['write'], tier: 'extended' }));
+
+// Media Studio (Plan 3, P4) — detach a photo from an item (drop the array
+// entry; the R2 object is preserved).
+const itemPhotoDetachRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path:   '/{id}/items/{itemId}/photos/{photoIndex}/detach',
+    tags: ["inspections"],
+    summary: 'Detach a photo from an inspection item (keeps the R2 object)',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({
+            id:         z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+            itemId:     z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+            photoIndex: z.coerce.number().int().nonnegative().describe('Index of the photo within the item\'s photos[] array'),
+        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: ItemPhotoMutationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            description: 'Photo detached',
+        },
+    },
+    operationId: "detachInspectionItemPhoto",
+    description: "Auto-generated placeholder for detachInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/detach, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['write'], tier: 'extended' }));
+
+// Media Studio (Plan 3) — revert a photo's edits to the original (drop the
+// annotated derivative; keep the source key). Non-destructive undo.
+const itemPhotoRevertRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path:   '/{id}/items/{itemId}/photos/{photoIndex}/revert',
+    tags: ["inspections"],
+    summary: 'Revert a photo\'s edits to the original (drops annotations)',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({
+            id:         z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+            itemId:     z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+            photoIndex: z.coerce.number().int().nonnegative().describe('Index of the photo within the item\'s photos[] array'),
+        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: ItemPhotoMutationSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            description: 'Photo reverted',
+        },
+    },
+    operationId: "revertInspectionItemPhoto",
+    description: "Auto-generated placeholder for revertInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/revert, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Design System 0520 M14 — PhotoStudio annotation save (subsystem A, phase 4).
@@ -2621,6 +2700,24 @@ export const inspectionsRoutes = createApiRouter()
     .openapi(mediaPoolDeleteRoute, async (c) => {
         const { id, poolId } = c.req.valid('param');
         await c.var.services.inspection.deletePoolPhoto(id, c.get('tenantId'), poolId);
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(itemPhotosReorderRoute, async (c) => {
+        const { id, itemId } = c.req.valid('param');
+        const { order, sectionId } = c.req.valid('json');
+        await c.var.services.inspection.reorderItemPhotos(id, c.get('tenantId'), itemId, order, sectionId);
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(itemPhotoDetachRoute, async (c) => {
+        const { id, itemId, photoIndex } = c.req.valid('param');
+        const { sectionId } = c.req.valid('json');
+        await c.var.services.inspection.detachItemPhoto(id, c.get('tenantId'), itemId, Number(photoIndex), sectionId);
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(itemPhotoRevertRoute, async (c) => {
+        const { id, itemId, photoIndex } = c.req.valid('param');
+        const { sectionId } = c.req.valid('json');
+        await c.var.services.inspection.revertPhotoEdits(id, c.get('tenantId'), itemId, Number(photoIndex), sectionId);
         return c.json({ success: true as const }, 200);
     })
     .openapi(updateMediaAnnotationsRoute, async (c) => {

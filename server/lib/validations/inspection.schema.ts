@@ -552,6 +552,21 @@ export const MediaAttachResponseSchema = z.object({
     photoIndex: z.number().int().nonnegative().describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
 }).openapi('MediaAttachResponse');
 
+// Media Studio (Plan 3) — reorder an item's photos[] by key. The reorder is
+// pure permutation: the submitted key multiset must equal the current one
+// (no add/drop). Array order == report photo order.
+export const ReorderPhotosSchema = z.object({
+    order: z.array(z.string().min(1)).min(1).describe('Full list of photo display keys in the desired order'),
+    sectionId: z.string().min(1).optional().describe('Section ID for composite finding key'),
+}).openapi('ReorderPhotosRequest');
+
+// Media Studio (Plan 3) — body for detach/revert (only the optional sectionId
+// needed to resolve the composite finding key; the photo is addressed by the
+// :photoIndex path param).
+export const ItemPhotoMutationSchema = z.object({
+    sectionId: z.string().min(1).optional().describe('Section ID for composite finding key'),
+}).openapi('ItemPhotoMutationRequest');
+
 // -----------------------------------------------------------------------------
 // Typed-Hono dead-routes cleanup Tasks 10–13 — results batch + conflicts.
 // -----------------------------------------------------------------------------

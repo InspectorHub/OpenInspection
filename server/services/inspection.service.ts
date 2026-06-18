@@ -30,6 +30,7 @@ import { sha256Hex } from './signing-key.service';
 import { RENDER_VERSION } from '../lib/pdf';
 import { stripExifOnIngest, type ImagesBinding } from '../lib/media/strip-exif';
 import { collectAttachedPhotos } from '../lib/media/collect-attached';
+import { applyReorder, applyDetach, applyRevert } from '../lib/media/photo-ops';
 import { resolvePdfSettings, type PdfSettings } from '../lib/pdf-settings';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../lib/status/report-status';
@@ -1547,6 +1548,100 @@ export class InspectionService {
             ));
 
         return { key: poolRow.r2Key, itemId, photoIndex };
+    }
+
+    /**
+     * Media Studio (Plan 3, P4) — reorder an item's photos[] so the array
+     * order matches the report photo order. Pure permutation: the submitted
+     * key set must equal the current one (no add/drop). Reuses the pure
+     * {@link applyReorder} op.
+     */
+    async reorderItemPhotos(
+        inspectionId: string,
+        tenantId: string,
+        itemId: string,
+        order: string[],
+        sectionId?: string,
+    ): Promise<void> {
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+        const row = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        if (!row) throw Errors.NotFound('Results not found');
+        const data: Record<string, { photos?: { key: string }[] }> = typeof row.data === 'string'
+            ? JSON.parse(row.data)
+            : (row.data as Record<string, { photos?: { key: string }[] }>);
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId];
+        if (!entry?.photos) throw Errors.BadRequest('no photos for item');
+        entry.photos = applyReorder(entry.photos, order);
+        data[key] = entry;
+        await db.update(inspectionResults)
+            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+    }
+
+    /**
+     * Media Studio (Plan 3, P4) — detach a photo from an item: drop the
+     * array entry, keep the R2 object (it may live in the pool / elsewhere).
+     * Reuses the pure {@link applyDetach} op.
+     */
+    async detachItemPhoto(
+        inspectionId: string,
+        tenantId: string,
+        itemId: string,
+        photoIndex: number,
+        sectionId?: string,
+    ): Promise<void> {
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+        const rowSel = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        if (!rowSel) throw Errors.NotFound('Results not found');
+        const data: Record<string, { photos?: { key: string }[] }> = typeof rowSel.data === 'string'
+            ? JSON.parse(rowSel.data)
+            : (rowSel.data as Record<string, { photos?: { key: string }[] }>);
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId];
+        if (!entry?.photos) throw Errors.BadRequest('no photos for item');
+        entry.photos = applyDetach(entry.photos, photoIndex);
+        data[key] = entry;
+        await db.update(inspectionResults)
+            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+    }
+
+    /**
+     * Media Studio (Plan 3) — revert a photo's edits to the original: drop
+     * the annotated derivative (annotatedKey/annotationsJson), keep the
+     * source key. Non-destructive editing's "undo". Reuses {@link applyRevert}.
+     */
+    async revertPhotoEdits(
+        inspectionId: string,
+        tenantId: string,
+        itemId: string,
+        photoIndex: number,
+        sectionId?: string,
+    ): Promise<void> {
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+        const rowSel = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        if (!rowSel) throw Errors.NotFound('Results not found');
+        const data: Record<string, { photos?: { key: string }[] }> = typeof rowSel.data === 'string'
+            ? JSON.parse(rowSel.data)
+            : (rowSel.data as Record<string, { photos?: { key: string }[] }>);
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId];
+        if (!entry?.photos) throw Errors.BadRequest('no photos for item');
+        entry.photos = applyRevert(entry.photos, photoIndex);
+        data[key] = entry;
+        await db.update(inspectionResults)
+            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
     }
 
     /**
