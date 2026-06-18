@@ -73,6 +73,26 @@ export interface ReportSection {
 
 export type FilterKey = "all" | "defects" | "summary";
 
+/* ------------------------------------------------------------------ */
+/* Print layout constants (exported for tests + re-exported via the    */
+/* standalone route). PRINT-ONLY — on-screen rendering is unchanged.   */
+/* ------------------------------------------------------------------ */
+
+/** Inspection-item / defect / stats cards: never split a card across pages. */
+export const PRINT_CARD_CLASS = "print:break-inside-avoid";
+/** Photo cells: never split a photo across a page boundary. */
+export const PRINT_FIGURE_CLASS = "print:break-inside-avoid";
+/** Section headings: keep a heading glued to the content that follows. */
+export const PRINT_SECTION_HEADING_CLASS = "print:break-after-avoid";
+/** Defect photo grid (screen 3/4-col) collapses to a dense 3-col in print. */
+export const DEFECT_PHOTO_GRID_CLASS =
+  "grid grid-cols-3 sm:grid-cols-4 print:grid-cols-3 gap-1.5";
+/** Item photo grid (screen 2/3-col) collapses to a dense 3-col in print. */
+export const ITEM_PHOTO_GRID_CLASS =
+  "grid grid-cols-2 sm:grid-cols-3 print:grid-cols-3 gap-2";
+/** CF Images thumbnail width: smaller in print to keep the PDF lean. */
+export const printThumbWidth = (isPrint: boolean): number => (isPrint ? 480 : 800);
+
 export interface ReportSignature {
   signatureBase64: string | null;
   signedAt: number | null; // epoch ms
@@ -498,7 +518,7 @@ export function ReportView(props: ReportViewProps) {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {summaryCards.map((s) => (
-            <div key={s.label} className="bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center">
+            <div key={s.label} className={`bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center ${PRINT_CARD_CLASS}`}>
               <div className={`text-2xl font-bold ${s.color ? "" : "text-ih-fg-1"}`} style={s.color ? { color: s.color } : undefined}>{s.value}</div>
               <div className="text-[11px] text-ih-fg-4 uppercase tracking-widest mt-1">
                 {s.label}
@@ -534,7 +554,7 @@ export function ReportView(props: ReportViewProps) {
           if (filter === "defects" && section.items.length === 0) return null;
           return (
             <div key={section.id} className="mb-6 group/section relative">
-              <div className="flex items-center gap-3 mb-4">
+              <div className={`flex items-center gap-3 mb-4 ${PRINT_SECTION_HEADING_CLASS}`}>
                 <span className="text-2xl">{getSectionIcon(section.title)}</span>
                 <h2 className="text-2xl font-bold italic text-ih-fg-1">
                   <span className="font-mono not-italic mr-1 text-ih-fg-4">
@@ -554,7 +574,7 @@ export function ReportView(props: ReportViewProps) {
                   {section.items.map((item) => (
                     <div
                       key={item.id}
-                      className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden"
+                      className={`bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden ${PRINT_CARD_CLASS}`}
                       style={{ borderLeftWidth: 4, borderLeftColor: item.ratingColor }}
                     >
                       <div className="p-4">
@@ -616,7 +636,7 @@ export function ReportView(props: ReportViewProps) {
                               .map((d) => (
                                 <div
                                   key={d.id}
-                                  className="rounded-md border border-ih-border bg-ih-bg-app/60 px-3 py-2"
+                                  className={`rounded-md border border-ih-border bg-ih-bg-app/60 px-3 py-2 ${PRINT_CARD_CLASS}`}
                                 >
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="text-[13px] font-bold text-ih-fg-1">{d.title}</span>
