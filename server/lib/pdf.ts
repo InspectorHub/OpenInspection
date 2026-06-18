@@ -18,8 +18,10 @@ import type { PdfSettings } from './pdf-settings';
  * re-render (e.g. eager images, photo resize, layout changes).
  * 'r3' — settings-driven running header/footer (page numbers + address +
  * license) via the CF /pdf quick action's pdfOptions; Letter format.
+ * 'r4' — hide interactive controls (filter chips, Add-to-repair, repair panel)
+ * from the print/PDF render.
  */
-export const RENDER_VERSION = 'r3';
+export const RENDER_VERSION = 'r4';
 
 export async function generatePdfFromUrl(
     browser: BrowserRun | undefined,
