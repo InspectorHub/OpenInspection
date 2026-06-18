@@ -7,7 +7,14 @@
 export interface PixelCrop { x: number; y: number; width: number; height: number }
 
 const MAX_LONG_EDGE = 2048;
-const JPEG_QUALITY = 0.82;
+export const JPEG_QUALITY = 0.82;
+
+/** Shared `canvas.toBlob` promise wrapper — JPEG encode, rejects on null blob. */
+export function canvasToJpegBlob(canvas: HTMLCanvasElement, quality = JPEG_QUALITY): Promise<Blob> {
+  return new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', quality),
+  );
+}
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -34,7 +41,5 @@ export async function bakeCrop(sourceUrl: string, crop: PixelCrop, maxLongEdge =
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas 2d context unavailable');
   ctx.drawImage(img, crop.x, crop.y, crop.width, crop.height, 0, 0, outW, outH);
-  return await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', JPEG_QUALITY),
-  );
+  return await canvasToJpegBlob(canvas, JPEG_QUALITY);
 }
