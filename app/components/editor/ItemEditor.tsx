@@ -160,6 +160,8 @@ interface ItemEditorProps {
  onOpenPhoto?: (itemId: string, index: number) => void;
  /** Task 8 — persist a new photo order. CONTRACT: `order` is the ORIGINAL key order. */
  onReorderPhotos?: (itemId: string, order: string[]) => void;
+ /** Task 9 — bulk-detach the given photoIndex set (strip emits indices high→low). */
+ onBulkDetachPhotos?: (itemId: string, indices: number[]) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -200,6 +202,7 @@ export function ItemEditor({
  coverKey,
  onOpenPhoto,
  onReorderPhotos,
+ onBulkDetachPhotos,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
  const [defectQuery, setDefectQuery] = useState("");
@@ -782,6 +785,8 @@ export function ItemEditor({
  onAddPhoto={() => onAddPhoto?.()}
  onOpen={(i) => onOpenPhoto?.(item.id, i)}
  onReorder={onReorderPhotos ? (order) => onReorderPhotos(item.id, order) : undefined}
+ selectable={!!onBulkDetachPhotos}
+ onBulkDetach={onBulkDetachPhotos ? (indices) => onBulkDetachPhotos(item.id, indices) : undefined}
  photoUploading={photoUploading}
  />
  {/* Task 4 — queued offline photo previews rendered below the strip */}

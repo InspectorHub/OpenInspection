@@ -1063,6 +1063,27 @@ export default function InspectionEditPage() {
   [patchItemPhotos, photoOpsFetcher, state.inspection.id, state.currentSection],
  );
 
+ /* Task 9 — bulk-detach photos by index. The strip emits indices DESC so each
+  * detach keeps the remaining (lower) indices valid; we POST highest-first too. */
+ const onBulkDetachPhotos = useCallback(
+  (itemId: string, indices: number[]) => {
+   patchItemPhotos(itemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
+   const sectionId = state.currentSection?.id;
+   (async () => {
+    for (const idx of indices) {
+     await fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/detach`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sectionId }),
+     });
+    }
+    revalidator.revalidate();
+   })();
+  },
+  [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+ );
+
  /* Task 8 — route a viewer per-photo action to the right mutation. */
  const onViewerAction = useCallback(
   (action: MediaAction, photo: GalleryPhoto) => {
@@ -1839,6 +1860,7 @@ export default function InspectionEditPage() {
  coverKey={coverKey}
  onOpenPhoto={onOpenPhoto}
  onReorderPhotos={onReorderPhotos}
+ onBulkDetachPhotos={onBulkDetachPhotos}
  />
  ) : (
  <div className="flex items-center justify-center h-full text-ih-fg-4">

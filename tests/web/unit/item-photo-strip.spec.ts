@@ -81,4 +81,30 @@ describe('ItemPhotoStrip', () => {
     click(byTestId('thumb-1'));
     expect(onOpen).toHaveBeenCalledWith(1);
   });
+
+  it('enters select mode and reports chosen indices to bulk detach', () => {
+    const onBulkDetach = vi.fn();
+    mount(
+      createElement(ItemPhotoStrip, {
+        selectable: true,
+        inspectionId: 'i',
+        itemId: 'it',
+        photos,
+        coverKey: null,
+        photoUrl: (k: string) => `/u/${k}`,
+        onAddPhoto: vi.fn(),
+        onOpen: vi.fn(),
+        onBulkDetach,
+      }),
+    );
+    // visible "Select" toggle enters select mode
+    const selectBtn = $$('button').find((b) => /select/i.test(b.textContent ?? ''));
+    click(selectBtn ?? null);
+    // tap the checkbox overlay on thumb-0
+    click(byTestId('check-0'));
+    // bulk bar "Delete 1"
+    const deleteBtn = $$('button').find((b) => /delete/i.test(b.textContent ?? ''));
+    click(deleteBtn ?? null);
+    expect(onBulkDetach).toHaveBeenCalledWith([0]);
+  });
 });

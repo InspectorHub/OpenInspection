@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Sortable from "sortablejs";
 
 export interface StripPhoto {
@@ -21,6 +21,13 @@ export interface ItemPhotoStripProps {
    */
   onReorder?: (order: string[]) => void;
   photoUploading?: boolean;
+  /** Task 9 — show the "Select" toggle + enable long-press multi-select. */
+  selectable?: boolean;
+  /**
+   * Task 9 — detach the selected photos. Indices are emitted DESC (high→low) so
+   * the caller can splice/POST them in order without invalidating earlier indices.
+   */
+  onBulkDetach?: (indices: number[]) => void;
 }
 
 /** The visible thumbnail = the edited derivative when present, else the original. */
@@ -36,8 +43,40 @@ export function ItemPhotoStrip({
   onOpen,
   onReorder,
   photoUploading,
+  selectable,
+  onBulkDetach,
 }: ItemPhotoStripProps) {
   const rowRef = useRef<HTMLDivElement>(null);
+  // Task 9 — Drive-style multi-select. `selecting` flips the strip into select
+  // mode (tap toggles instead of opening); `sel` holds the chosen indices.
+  const [selecting, setSelecting] = useState(false);
+  const [sel, setSel] = useState<Set<number>>(new Set());
+  // Long-press timer: 450ms — DELIBERATELY longer than SortableJS's 180ms drag
+  // delay so a held-and-moved press = drag, a held-and-still press = select.
+  const lp = useRef<ReturnType<typeof setTimeout>>();
+
+  const toggle = (i: number) =>
+    setSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+
+  const exitSelect = () => {
+    setSelecting(false);
+    setSel(new Set());
+  };
+
+  const startLongPress = (i: number) => {
+    if (!selectable) return;
+    clearTimeout(lp.current);
+    lp.current = setTimeout(() => {
+      setSelecting(true);
+      toggle(i);
+    }, 450);
+  };
+  const cancelLongPress = () => clearTimeout(lp.current);
   // Keep the latest photos/onReorder for the SortableJS onEnd closure without
   // re-creating the Sortable instance on every photos change (drag would break
   // mid-gesture). The instance reads these refs at drop time.
@@ -70,60 +109,122 @@ export function ItemPhotoStrip({
     // Sortable instance (which would break a drag mid-gesture).
   }, [onReorder]);
 
+  const showSelectToggle = selectable && !!onBulkDetach && photos.length > 0;
+
   return (
-    <div
-      ref={rowRef}
-      className="flex flex-wrap items-center gap-2 overflow-x-auto"
-      style={{ touchAction: "pan-x" }}
-    >
-      {photos.map((p, i) => {
-        const dk = displayKey(p);
-        const isCover = coverKey != null && coverKey === dk;
-        return (
-          <button
-            key={dk}
-            type="button"
-            data-testid={`thumb-${i}`}
-            onClick={() => onOpen(i)}
-            className={`strip-thumb relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${
-              isCover
-                ? "is-cover border-ih-primary"
-                : "border-ih-border hover:border-ih-primary/60"
-            }`}
-          >
-            <img
-              src={photoUrl(dk)}
-              alt=""
-              className="w-full h-full object-cover"
-              loading="lazy"
-              draggable={false}
-            />
-            {isCover && (
-              <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[8px] font-bold text-center py-0.5 uppercase tracking-wide">
-                Cover
-              </span>
-            )}
-          </button>
-        );
-      })}
-      <button
-        type="button"
-        onClick={onAddPhoto}
-        disabled={photoUploading}
-        aria-label="Add photo"
-        className="strip-add w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-ih-border flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary transition-colors disabled:opacity-50"
+    <div>
+      {showSelectToggle && (
+        <div className="flex items-center justify-between mb-2">
+          {selecting ? (
+            <>
+              <button
+                type="button"
+                onClick={exitSelect}
+                className="text-[12px] font-bold text-ih-fg-3 hover:text-ih-fg-1"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={sel.size === 0}
+                onClick={() => {
+                  onBulkDetach?.([...sel].sort((a, b) => b - a));
+                  exitSelect();
+                }}
+                className="text-[12px] font-bold text-ih-danger hover:text-ih-danger/80 disabled:opacity-40"
+              >
+                Delete {sel.size}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setSelecting(true)}
+              className="ml-auto text-[12px] font-bold text-ih-primary hover:text-ih-primary-600"
+            >
+              Select
+            </button>
+          )}
+        </div>
+      )}
+      <div
+        ref={rowRef}
+        className="flex flex-wrap items-center gap-2 overflow-x-auto"
+        style={{ touchAction: "pan-x" }}
       >
-        {photoUploading ? (
-          <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-          </svg>
-        ) : (
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        )}
-      </button>
+        {photos.map((p, i) => {
+          const dk = displayKey(p);
+          const isCover = coverKey != null && coverKey === dk;
+          const checked = sel.has(i);
+          return (
+            <button
+              key={dk}
+              type="button"
+              data-testid={`thumb-${i}`}
+              onClick={() => (selecting ? toggle(i) : onOpen(i))}
+              onPointerDown={() => startLongPress(i)}
+              onPointerUp={cancelLongPress}
+              onPointerLeave={cancelLongPress}
+              className={`strip-thumb relative w-16 h-16 shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${
+                isCover
+                  ? "is-cover border-ih-primary"
+                  : checked
+                    ? "border-ih-primary"
+                    : "border-ih-border hover:border-ih-primary/60"
+              }`}
+            >
+              <img
+                src={photoUrl(dk)}
+                alt=""
+                className="w-full h-full object-cover"
+                loading="lazy"
+                draggable={false}
+              />
+              {selecting && (
+                <span
+                  data-testid={`check-${i}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggle(i);
+                  }}
+                  className={`absolute top-1 left-1 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                    checked ? "bg-ih-primary border-ih-primary" : "bg-ih-bg-card/80 border-ih-border"
+                  }`}
+                >
+                  {checked && (
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </span>
+              )}
+              {isCover && !selecting && (
+                <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[8px] font-bold text-center py-0.5 uppercase tracking-wide">
+                  Cover
+                </span>
+              )}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={onAddPhoto}
+          disabled={photoUploading}
+          aria-label="Add photo"
+          className="strip-add w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-ih-border flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary transition-colors disabled:opacity-50"
+        >
+          {photoUploading ? (
+            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+          ) : (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+          )}
+        </button>
+      </div>
     </div>
   );
 }
