@@ -43,6 +43,9 @@ import { PhotoAnnotator } from "~/components/image-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 import { CoverCropper } from "~/components/image-studio/CoverCropper";
+import { MediaViewer, type MediaAction } from "~/components/image-studio/MediaViewer";
+import type { GalleryPhoto } from "~/lib/inspection-media";
+import { fKey } from "~/hooks/useInspection";
 import { fullResUrl } from "~/components/image-studio/cropImage";
 import { preprocessImage } from "~/components/image-studio/preprocessImage";
 import { SignaturePad } from "~/components/SignaturePad";
@@ -974,6 +977,139 @@ export default function InspectionEditPage() {
  // Image Studio — gallery "Set as cover" opens an editor-level CoverCropper.
  const [galleryCropSource, setGalleryCropSource] = useState<{ key: string; url: string } | null>(null);
 
+ /* Task 8 — unified MediaViewer for an item's photo strip. `viewer` holds the
+  * item being viewed + the open index. Photos are mapped item-result → GalleryPhoto[]
+  * on demand so the viewer reflects the live (optimistic) results map. A null
+  * index means "closed". A dedicated fetcher persists reorder/detach/revert
+  * (per-photo POSTs, separate from the shared save-all fetcher). */
+ const [viewer, setViewer] = useState<{ itemId: string; index: number | null }>({ itemId: "", index: null });
+ const photoOpsFetcher = useFetcher();
+
+ /* Task 8 — the report cover key (DB-16): a photo whose displayKey matches this
+  * rings as the cover in the strip + carries the "Set cover" toggle in the viewer. */
+ const coverKey = (state.inspection.coverPhotoId as string | null) ?? null;
+
+ /* Task 8 — read an item's stored photos[] (item-level bucket) from the live
+  * results map. Item photos are `{ key; annotatedKey?; annotationsJson? }`. */
+ type ItemPhoto = { key: string; annotatedKey?: string; annotationsJson?: string };
+ const getItemPhotos = useCallback(
+  (itemId: string): ItemPhoto[] => {
+   const r = findings.getResult(itemId, state.sectionIdForItem(itemId) ?? undefined);
+   return ((r.photos as ItemPhoto[] | undefined) ?? []);
+  },
+  [findings, state.sectionIdForItem],
+ );
+
+ /* Task 8 — map an item's photos[] → GalleryPhoto[] for the unified MediaViewer.
+  * displayKey (annotatedKey||key) drives the rendered image + URL; originalKey
+  * keeps the un-annotated source; photoIndex addresses detach/revert; annotated
+  * gates the Revert button. itemId is threaded so onAction knows the target. */
+ const itemGalleryPhotos = useCallback(
+  (itemId: string): GalleryPhoto[] =>
+   getItemPhotos(itemId).map((p, i) => {
+    const dk = p.annotatedKey || p.key;
+    return {
+     key: dk,
+     url: `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(dk)}`,
+     label: "",
+     itemId,
+     photoIndex: i,
+     annotated: !!p.annotatedKey,
+     originalKey: p.key,
+    };
+   }),
+  [getItemPhotos, state.inspection.id],
+ );
+
+ /* Task 8 — open the viewer for an item at index i. */
+ const onOpenPhoto = useCallback((itemId: string, index: number) => {
+  setViewer({ itemId, index });
+ }, []);
+
+ /* Task 8 — optimistically apply a photos[] transform to BOTH result keys
+  * (composite + bare itemId), mirroring useFindings' dual-write. */
+ const patchItemPhotos = useCallback(
+  (itemId: string, next: (photos: ItemPhoto[]) => ItemPhoto[]) => {
+   const sid = state.sectionIdForItem(itemId);
+   const ck = sid ? fKey(sid, itemId) : itemId;
+   state.setResults((prev) => {
+    const existing = ((prev[ck] as Record<string, unknown>) || (prev[itemId] as Record<string, unknown>) || {});
+    const photos = next(((existing.photos as ItemPhoto[]) ?? []));
+    const updated = { ...existing, photos };
+    return { ...prev, [ck]: updated, [itemId]: updated };
+   });
+   state.setDirty(true);
+  },
+  [state.sectionIdForItem, state.setResults, state.setDirty],
+ );
+
+ /* Task 8 — persist a reorder. CONTRACT: `order` is the ORIGINAL key order
+  * (the server reorderItemPhotos route matches photos[].key). Optimistically
+  * reorder local state by key, then POST. */
+ const onReorderPhotos = useCallback(
+  (itemId: string, order: string[]) => {
+   patchItemPhotos(itemId, (photos) => {
+    const byKey = new Map(photos.map((p) => [p.key, p] as const));
+    const reordered = order.map((k) => byKey.get(k)).filter((p): p is ItemPhoto => !!p);
+    return reordered.length === photos.length ? reordered : photos;
+   });
+   photoOpsFetcher.submit(null, {
+    method: "POST",
+    action: `/api/inspections/${state.inspection.id}/items/${itemId}/photos/reorder`,
+    encType: "application/json",
+    body: JSON.stringify({ order, sectionId: state.currentSection?.id }),
+   } as Parameters<typeof photoOpsFetcher.submit>[1]);
+  },
+  [patchItemPhotos, photoOpsFetcher, state.inspection.id, state.currentSection],
+ );
+
+ /* Task 8 — route a viewer per-photo action to the right mutation. */
+ const onViewerAction = useCallback(
+  (action: MediaAction, photo: GalleryPhoto) => {
+   const itemId = photo.itemId;
+   const idx = photo.photoIndex;
+   const sectionId = state.currentSection?.id;
+   if (!itemId || idx == null) return;
+   if (action === "cover") {
+    // Reuse the existing CoverCropper flow: crop-then-set on the displayed key.
+    setGalleryCropSource({ key: photo.key, url: photo.url });
+    return;
+   }
+   if (action === "annotate") {
+    // Reuse the existing PhotoStudio/annotate flow on the displayed key.
+    setPhotoStudioUrl(photo.url);
+    setPhotoStudioKey(photo.key);
+    setPhotoStudioIndex(0);
+    setPhotoStudioTotal(0);
+    setPhotoStudioOpen(true);
+    return;
+   }
+   if (action === "revert") {
+    patchItemPhotos(itemId, (photos) => photos.map((p, i) => (i === idx ? { key: p.key } : p)));
+    fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/revert`, {
+     method: "POST",
+     credentials: "include",
+     headers: { "Content-Type": "application/json" },
+     body: JSON.stringify({ sectionId }),
+    }).then(() => revalidator.revalidate());
+    return;
+   }
+   if (action === "delete") {
+    patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
+    fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/detach`, {
+     method: "POST",
+     credentials: "include",
+     headers: { "Content-Type": "application/json" },
+     body: JSON.stringify({ sectionId }),
+    }).then(() => revalidator.revalidate());
+    return;
+   }
+   // crop / rotate / caption — routed here but not yet implemented.
+   // TODO Plan 4 (crop/rotate/caption on item photos).
+  },
+  [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+ );
+
  /* Mobile shell state */
  const isMobile = useIsMobile();
  const [mobileDrawer, setMobileDrawer] = useState<MobileDrawerId | null>(null);
@@ -1699,6 +1835,10 @@ export default function InspectionEditPage() {
  }
  onAttachRepairItem={findings.attachRepairItem}
  onDetachRepairItem={findings.detachRepairItem}
+ inspectionId={String(state.inspection.id)}
+ coverKey={coverKey}
+ onOpenPhoto={onOpenPhoto}
+ onReorderPhotos={onReorderPhotos}
  />
  ) : (
  <div className="flex items-center justify-center h-full text-ih-fg-4">
@@ -1935,6 +2075,16 @@ export default function InspectionEditPage() {
   setPhotoStudioOpen(false);
  }}
  onClose={() => setPhotoStudioOpen(false)}
+ />
+
+ {/* Task 8 — unified MediaViewer for an item's photo strip (tap a thumbnail
+  * to open; the bottom toolbar routes cover/annotate/revert/delete to the
+  * per-photo endpoints; crop/rotate/caption are Plan-4 no-ops). */}
+ <MediaViewer
+ photos={viewer.index !== null ? itemGalleryPhotos(viewer.itemId) : []}
+ index={viewer.index}
+ onClose={() => setViewer((v) => ({ ...v, index: null }))}
+ onAction={onViewerAction}
  />
 
  {/* Inspection settings sheet */}
