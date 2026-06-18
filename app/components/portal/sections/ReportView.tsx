@@ -668,16 +668,16 @@ export function ReportView(props: ReportViewProps) {
                                     </p>
                                   )}
                                   {(d.defectPhotos ?? []).length > 0 && (
-                                    <div className="mt-2 grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+                                    <div className={`mt-2 ${DEFECT_PHOTO_GRID_CLASS}`}>
                                       {(d.defectPhotos ?? []).map((photo) => {
                                         const name = photoDisplayName(photo.key);
                                         return (
                                           <img
                                             key={photo.key}
-                                            src={`${photo.url}&w=1000`}
+                                            src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
                                             alt={name}
                                             title={name}
-                                            className="w-full h-20 object-cover rounded cursor-pointer"
+                                            className={`w-full h-20 object-cover rounded cursor-pointer ${PRINT_FIGURE_CLASS}`}
                                             loading={data.printMode ? "eager" : "lazy"}
                                             onClick={() => setLightboxUrl(photo.url)}
                                           />
@@ -725,13 +725,13 @@ export function ReportView(props: ReportViewProps) {
                         )}
 
                         {item.photos.length > 0 && (
-                          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          <div className={`mt-3 ${ITEM_PHOTO_GRID_CLASS}`}>
                             {item.photos.map((photo) => {
                               const name = photoDisplayName(photo.key);
                               return (
-                                <div key={photo.key} className="group relative">
+                                <div key={photo.key} className={`group relative ${PRINT_FIGURE_CLASS}`}>
                                   <img
-                                    src={`${photo.url}&w=1000`}
+                                    src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
                                     alt={name}
                                     title={name}
                                     className="w-full h-32 object-cover rounded cursor-pointer"
