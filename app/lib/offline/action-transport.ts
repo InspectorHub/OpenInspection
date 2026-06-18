@@ -42,6 +42,7 @@
 
 import type { QueuedWrite, QueuedPhoto } from './queue-storage';
 import type { ReplayTransport } from './offline-queue';
+import { preprocessImage } from '~/components/image-studio/preprocessImage';
 
 // ── Result shape returned by replay-write/replay-photo action branches ─────
 
@@ -95,12 +96,21 @@ async function submitPhoto(
     p: QueuedPhoto,
     fetchImpl: typeof fetch,
 ): Promise<{ ok: boolean; status: number }> {
+    // N2+N4 — bake at REPLAY (not at enqueue): the queue stores the RAW blob, so
+    // a failed-then-retried entry never double-bakes. This runs client-side
+    // before the replay form is submitted; the server replay-photo action stays
+    // unchanged (it just forwards whatever file it receives). preprocessImage
+    // fails open, so the offline path degrades to the raw blob if the canvas
+    // path is unavailable — the server env.IMAGES re-encode is the backstop.
+    const srcFile = p.blob instanceof File ? p.blob : new File([p.blob], p.name, { type: p.blob.type || 'image/jpeg' });
+    const baked = p.originalQuality ? srcFile : await preprocessImage(srcFile);
+
     const body = new FormData();
     body.set('intent', 'replay-photo');
     body.set('inspectionId', p.inspectionId);
     body.set('itemId', p.itemId);
     body.set('name', p.name);
-    body.set('file', new File([p.blob], p.name));
+    body.set('file', baked, p.name);
 
     const res = await fetchImpl(
         `/inspections/${p.inspectionId}/edit`,

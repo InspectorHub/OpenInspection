@@ -217,6 +217,7 @@ export class OfflineQueue {
                     enqueuedAt: entry.enqueuedAt,
                     attempts: newAttempts,
                     status: 'pending',
+                    originalQuality: entry.originalQuality,
                 });
             }
             this.emit();

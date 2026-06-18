@@ -32,6 +32,10 @@ export interface QueuedPhoto {
     enqueuedAt: number;
     attempts: number;
     status: 'pending' | 'failed';
+    /** N4 — skip preprocessing on replay when true (captured at enqueue time).
+     *  Optional: legacy in-flight entries default to preprocessing (the safe
+     *  privacy choice). */
+    originalQuality?: boolean;
 }
 
 export type QueueEntry = QueuedWrite | QueuedPhoto;

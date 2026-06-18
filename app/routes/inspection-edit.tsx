@@ -1240,6 +1240,9 @@ export default function InspectionEditPage() {
    name: file.name,
    blob: file,
    enqueuedAt: Date.now(),
+   // N4 — capture the opt-out at enqueue time; the RAW file is stored and baked
+   // at replay (so a failed-then-retried entry never double-bakes).
+   originalQuality: originalQualityEnabled(),
   });
   pushToast({ message: "Photo queued — will upload when back online", durationMs: 3000 });
   // Reset input so picking the same file twice re-fires onChange
@@ -1295,6 +1298,7 @@ export default function InspectionEditPage() {
    name,
    blob,
    enqueuedAt: Date.now(),
+   originalQuality: originalQualityEnabled(),
   });
   });
   pushToast({
