@@ -96,6 +96,27 @@ async function submitPhoto(
     p: QueuedPhoto,
     fetchImpl: typeof fetch,
 ): Promise<{ ok: boolean; status: number }> {
+    // Task 9c — a baked annotation PNG replays to the annotation endpoint, NOT
+    // the plain upload endpoint. The blob is ALREADY the flattened derivative,
+    // so it is forwarded verbatim (no preprocessImage re-bake — that is a
+    // raw-upload privacy step and would mangle the rendered annotation).
+    if (p.derivative?.kind === 'annotation') {
+        const body = new FormData();
+        body.set('intent', 'replay-annotation');
+        body.set('inspectionId', p.inspectionId);
+        body.set('itemId', p.itemId);
+        body.set('photoIndex', String(p.derivative.photoIndex));
+        body.set('nodes', p.derivative.nodes);
+        if (p.derivative.sectionId) body.set('sectionId', p.derivative.sectionId);
+        body.set('image', new File([p.blob], p.name, { type: 'image/png' }));
+
+        const res = await fetchImpl(
+            `/inspections/${p.inspectionId}/edit`,
+            { method: 'POST', body, credentials: 'include' },
+        );
+        return mapStatus(res);
+    }
+
     // N2+N4 — bake at REPLAY (not at enqueue): the queue stores the RAW blob, so
     // a failed-then-retried entry never double-bakes. This runs client-side
     // before the replay form is submitted; the server replay-photo action stays

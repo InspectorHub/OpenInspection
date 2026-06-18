@@ -22,6 +22,22 @@ export interface QueuedWrite {
     status: 'pending' | 'failed';
 }
 
+/**
+ * Task 9c — a queued photo blob that is a DERIVED image (a baked annotation
+ * PNG), not a raw camera upload. When present on a QueuedPhoto, the replay
+ * transport routes the blob to the annotation endpoint (`replay-annotation`)
+ * instead of the plain upload endpoint, carrying the annotate context below.
+ */
+export interface AnnotationDerivative {
+    kind: 'annotation';
+    /** index within the source item's photos[] array (the photo being annotated) */
+    photoIndex: number;
+    /** opaque annotation node JSON forwarded verbatim to the annotation endpoint */
+    nodes: string;
+    /** composite finding-key section, when the item lives under a section */
+    sectionId?: string;
+}
+
 export interface QueuedPhoto {
     seq: number;
     kind: 'photo';
@@ -36,6 +52,10 @@ export interface QueuedPhoto {
      *  Optional: legacy in-flight entries default to preprocessing (the safe
      *  privacy choice). */
     originalQuality?: boolean;
+    /** Task 9c — when present, this queued blob is a derived image (e.g. a baked
+     *  annotation PNG) that replays to a different endpoint than a raw upload.
+     *  Absent for ordinary photo uploads. */
+    derivative?: AnnotationDerivative;
 }
 
 export type QueueEntry = QueuedWrite | QueuedPhoto;

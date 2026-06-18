@@ -567,6 +567,25 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   return Response.json({ ok: apiOk && Boolean(key), apiStatus, key }, { status: apiStatus });
  }
 
+ // Task 9c — replay a baked annotation PNG queued offline. Mirrors replay-photo
+ // but forwards to the annotation endpoint exactly like the online "annotate"
+ // branch above (the queued blob is already the flattened derivative).
+ if (intent === "replay-annotation") {
+  const itemId = String(formData.get("itemId") ?? "");
+  const photoIndex = Number(formData.get("photoIndex") ?? "-1");
+  const nodes = String(formData.get("nodes") ?? "[]");
+  const sectionId = String(formData.get("sectionId") ?? "");
+  const image = formData.get("image");
+  if (!(image instanceof File) || !itemId || photoIndex < 0) {
+   return Response.json({ ok: false, apiStatus: 400 }, { status: 400 });
+  }
+  const apiRes = await api.inspections[":id"].items[":itemId"].photos[":photoIndex"].annotation.$post({
+   param: { id: params.id, itemId, photoIndex: String(photoIndex) },
+   form: sectionId ? { image, nodes, sectionId } : { image, nodes },
+  });
+  return Response.json({ ok: apiRes.ok, apiStatus: apiRes.status }, { status: apiRes.status });
+ }
+
  return { ok };
 }
 
@@ -2124,14 +2143,37 @@ export default function InspectionEditPage() {
  onSave={({ blob, nodesJson }) => {
   const itemId = state.activeItemId;
   if (itemId && photoStudioIndex != null) {
-   const fd = new FormData();
-   fd.append("intent", "annotate");
-   fd.append("itemId", itemId);
-   fd.append("photoIndex", String(photoStudioIndex));
-   fd.append("nodes", nodesJson);
-   if (state.currentSection?.id) fd.append("sectionId", state.currentSection.id);
-   fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
-   coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+   const sectionId = state.currentSection?.id;
+   // Task 9c — offline-capable annotate. When offline, enqueue the baked PNG
+   // through the SAME media queue photo uploads use; the annotation derivative
+   // replays to the annotation endpoint on reconnect. When online, submit
+   // directly (unchanged).
+   const nav = typeof navigator !== "undefined" ? navigator : undefined;
+   if (shouldQueue(nav)) {
+    void getOfflineQueue().enqueuePhoto({
+     inspectionId: String(state.inspection.id),
+     itemId,
+     name: "annotated.png",
+     blob: new File([blob], "annotated.png", { type: "image/png" }),
+     enqueuedAt: Date.now(),
+     derivative: {
+      kind: "annotation",
+      photoIndex: photoStudioIndex,
+      nodes: nodesJson,
+      ...(sectionId ? { sectionId } : {}),
+     },
+    });
+    pushToast({ message: "Annotation queued — will save when back online", durationMs: 3000 });
+   } else {
+    const fd = new FormData();
+    fd.append("intent", "annotate");
+    fd.append("itemId", itemId);
+    fd.append("photoIndex", String(photoStudioIndex));
+    fd.append("nodes", nodesJson);
+    if (sectionId) fd.append("sectionId", sectionId);
+    fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
+    coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+   }
   }
   setPhotoStudioOpen(false);
  }}
