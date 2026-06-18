@@ -1084,6 +1084,43 @@ export default function InspectionEditPage() {
   [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
  );
 
+ /* Task 9b — the OTHER items photos can be moved to: every item across the
+  * inspection except the one currently being edited, each carrying its own
+  * section id so the move resolves the right composite finding key on arrival. */
+ const moveTargets = useMemo(
+  () =>
+   state.sections.flatMap((sec) =>
+    (sec.items || []).map((it) => ({
+     itemId: it.id,
+     label: `${sec.title} › ${it.label || it.name || it.id}`,
+     sectionId: sec.id,
+    })),
+   ),
+  [state.sections],
+ );
+
+ /* Task 9b — bulk-move photos by index to a target item. Like bulk detach, the
+  * strip emits indices DESC so each move keeps the remaining (lower) indices
+  * valid; we POST highest-first too. The source section is the current one. */
+ const onBulkMovePhotos = useCallback(
+  (fromItemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => {
+   patchItemPhotos(fromItemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
+   const fromSectionId = state.currentSection?.id;
+   (async () => {
+    for (const idx of indices) {
+     await fetch(`/api/inspections/${state.inspection.id}/items/${fromItemId}/photos/${idx}/move`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toItemId: to.itemId, toSectionId: to.sectionId, fromSectionId }),
+     });
+    }
+    revalidator.revalidate();
+   })();
+  },
+  [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+ );
+
  /* Task 8 — route a viewer per-photo action to the right mutation. */
  const onViewerAction = useCallback(
   (action: MediaAction, photo: GalleryPhoto) => {
@@ -1861,6 +1898,8 @@ export default function InspectionEditPage() {
  onOpenPhoto={onOpenPhoto}
  onReorderPhotos={onReorderPhotos}
  onBulkDetachPhotos={onBulkDetachPhotos}
+ moveTargets={moveTargets}
+ onBulkMovePhotos={onBulkMovePhotos}
  />
  ) : (
  <div className="flex items-center justify-center h-full text-ih-fg-4">

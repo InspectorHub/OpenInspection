@@ -22,3 +22,17 @@ export function applyRevert(photos: PhotoEntry[], index: number): PhotoEntry[] {
   if (index < 0 || index >= photos.length) throw new Error('photo index out of range');
   return photos.map((p, i) => (i === index ? { key: p.key } : p));
 }
+
+/** Move one entry (with all its derivatives) from `from[index]` to the end of `to`. */
+export function moveEntry(
+  from: PhotoEntry[],
+  to: PhotoEntry[],
+  index: number,
+): { from: PhotoEntry[]; to: PhotoEntry[] } {
+  if (index < 0 || index >= from.length) throw new Error('photo index out of range');
+  const moved = from[index];
+  return {
+    from: from.filter((_, i) => i !== index),
+    to: [...to, moved],
+  };
+}

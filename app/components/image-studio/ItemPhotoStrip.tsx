@@ -28,6 +28,17 @@ export interface ItemPhotoStripProps {
    * the caller can splice/POST them in order without invalidating earlier indices.
    */
   onBulkDetach?: (indices: number[]) => void;
+  /**
+   * Task 9b — the OTHER items this strip's photos can be moved to. When present
+   * (and non-empty), the bulk bar shows a "Move to" picker next to Delete.
+   */
+  moveTargets?: Array<{ itemId: string; label: string; sectionId?: string }>;
+  /**
+   * Task 9b — move the selected photos to the chosen target item/section.
+   * Indices are emitted DESC (high→low), mirroring {@link onBulkDetach}, so the
+   * caller can POST them one per round trip without invalidating earlier indices.
+   */
+  onBulkMove?: (indices: number[], to: { itemId: string; sectionId?: string }) => void;
 }
 
 /** The visible thumbnail = the edited derivative when present, else the original. */
@@ -45,6 +56,8 @@ export function ItemPhotoStrip({
   photoUploading,
   selectable,
   onBulkDetach,
+  moveTargets,
+  onBulkMove,
 }: ItemPhotoStripProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   // Task 9 — Drive-style multi-select. `selecting` flips the strip into select
@@ -109,7 +122,7 @@ export function ItemPhotoStrip({
     // Sortable instance (which would break a drag mid-gesture).
   }, [onReorder]);
 
-  const showSelectToggle = selectable && !!onBulkDetach && photos.length > 0;
+  const showSelectToggle = selectable && (!!onBulkDetach || !!onBulkMove) && photos.length > 0;
 
   return (
     <div>
@@ -124,17 +137,47 @@ export function ItemPhotoStrip({
               >
                 Cancel
               </button>
-              <button
-                type="button"
-                disabled={sel.size === 0}
-                onClick={() => {
-                  onBulkDetach?.([...sel].sort((a, b) => b - a));
-                  exitSelect();
-                }}
-                className="text-[12px] font-bold text-ih-danger hover:text-ih-danger/80 disabled:opacity-40"
-              >
-                Delete {sel.size}
-              </button>
+              <div className="flex items-center gap-3">
+                {onBulkMove && moveTargets && moveTargets.length > 0 && (
+                  <label className="flex items-center gap-1 text-[12px] font-bold text-ih-fg-2">
+                    Move to
+                    <select
+                      className="h-8 rounded-lg border border-ih-border bg-ih-surface px-2 text-[12px] disabled:opacity-40"
+                      defaultValue=""
+                      disabled={sel.size === 0}
+                      onChange={(e) => {
+                        const t = moveTargets.find((m) => m.itemId === e.target.value);
+                        e.currentTarget.value = "";
+                        if (!t) return;
+                        onBulkMove([...sel].sort((a, b) => b - a), { itemId: t.itemId, sectionId: t.sectionId });
+                        exitSelect();
+                      }}
+                    >
+                      <option value="" disabled>
+                        Choose item…
+                      </option>
+                      {moveTargets.map((m) => (
+                        <option key={m.itemId} value={m.itemId}>
+                          {m.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {onBulkDetach && (
+                  <button
+                    type="button"
+                    disabled={sel.size === 0}
+                    onClick={() => {
+                      onBulkDetach([...sel].sort((a, b) => b - a));
+                      exitSelect();
+                    }}
+                    className="text-[12px] font-bold text-ih-danger hover:text-ih-danger/80 disabled:opacity-40"
+                  >
+                    Delete {sel.size}
+                  </button>
+                )}
+              </div>
             </>
           ) : (
             <button

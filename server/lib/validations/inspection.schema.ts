@@ -567,6 +567,16 @@ export const ItemPhotoMutationSchema = z.object({
     sectionId: z.string().min(1).optional().describe('Section ID for composite finding key'),
 }).openapi('ItemPhotoMutationRequest');
 
+// Media Studio (Plan 3, Task 9b) — body for moving a photo from one item to
+// another. The source photo is addressed by the :itemId + :photoIndex path
+// params; the body carries the target item (and the optional composite-key
+// section on either side).
+export const MovePhotoSchema = z.object({
+    toItemId: z.string().min(1).describe('Target item id the photo moves to'),
+    toSectionId: z.string().optional().describe('Target section id for composite finding key'),
+    fromSectionId: z.string().optional().describe('Source section id for composite finding key'),
+}).openapi('MovePhotoRequest');
+
 // -----------------------------------------------------------------------------
 // Typed-Hono dead-routes cleanup Tasks 10–13 — results batch + conflicts.
 // -----------------------------------------------------------------------------

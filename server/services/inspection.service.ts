@@ -30,7 +30,8 @@ import { sha256Hex } from './signing-key.service';
 import { RENDER_VERSION } from '../lib/pdf';
 import { stripExifOnIngest, type ImagesBinding } from '../lib/media/strip-exif';
 import { collectAttachedPhotos } from '../lib/media/collect-attached';
-import { applyReorder, applyDetach, applyRevert } from '../lib/media/photo-ops';
+import { applyReorder, applyDetach, applyRevert, moveEntry } from '../lib/media/photo-ops';
+import type { PhotoEntry } from '../lib/media/collect-attached';
 import { resolvePdfSettings, type PdfSettings } from '../lib/pdf-settings';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../lib/status/report-status';
@@ -1642,6 +1643,45 @@ export class InspectionService {
         await db.update(inspectionResults)
             .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+    }
+
+    /**
+     * Media Studio (Plan 3, Task 9b) — move a photo from one item to another:
+     * detach from the source item's photos[] and append (with all its
+     * derivatives) to the target item's photos[]. Both entries live in the same
+     * inspection_results.data map, so this is one read/write on the single row.
+     * Reuses the pure {@link moveEntry} op.
+     */
+    async moveItemPhoto(
+        inspectionId: string,
+        tenantId: string,
+        fromItemId: string,
+        photoIndex: number,
+        toItemId: string,
+        fromSectionId?: string,
+        toSectionId?: string,
+    ): Promise<{ toItemId: string; photoIndex: number }> {
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+        const rowSel = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        if (!rowSel) throw Errors.NotFound('Results not found');
+        const data: Record<string, { photos?: PhotoEntry[] }> = typeof rowSel.data === 'string'
+            ? JSON.parse(rowSel.data)
+            : (rowSel.data as Record<string, { photos?: PhotoEntry[] }>);
+        const fromKey = fromSectionId ? findingKey(DEFAULT_UNIT, fromSectionId, fromItemId) : fromItemId;
+        const toKey   = toSectionId   ? findingKey(DEFAULT_UNIT, toSectionId, toItemId)     : toItemId;
+        const fromEntry = data[fromKey] ?? data[fromItemId];
+        if (!fromEntry?.photos) throw Errors.BadRequest('no photos for source item');
+        const toEntry = data[toKey] ?? data[toItemId] ?? {};
+        const moved = moveEntry(fromEntry.photos, toEntry.photos ?? [], photoIndex);
+        data[fromKey] = { ...fromEntry, photos: moved.from };
+        data[toKey]   = { ...toEntry,   photos: moved.to };
+        await db.update(inspectionResults)
+            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+        return { toItemId, photoIndex: moved.to.length - 1 };
     }
 
     /**

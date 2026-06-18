@@ -44,6 +44,7 @@ import {
     MediaAttachResponseSchema,
     ReorderPhotosSchema,
     ItemPhotoMutationSchema,
+    MovePhotoSchema,
     ResultsBatchSchema,
     ResultsBatchResponseSchema,
     ConflictListResponseSchema,
@@ -1169,6 +1170,32 @@ const itemPhotoRevertRoute = createRoute(withMcpMetadata({
     },
     operationId: "revertInspectionItemPhoto",
     description: "Auto-generated placeholder for revertInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/revert, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['write'], tier: 'extended' }));
+
+// Media Studio (Plan 3, Task 9b) — move a photo from one item to another
+// (detach from source + append to target, derivatives ride along).
+const itemPhotoMoveRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path:   '/{id}/items/{itemId}/photos/{photoIndex}/move',
+    tags: ["inspections"],
+    summary: 'Move a photo from one inspection item to another',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({
+            id:         z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+            itemId:     z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration'),
+            photoIndex: z.coerce.number().int().nonnegative().describe('Index of the photo within the source item\'s photos[] array'),
+        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: MovePhotoSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            description: 'Photo moved',
+        },
+    },
+    operationId: "moveInspectionItemPhoto",
+    description: "Auto-generated placeholder for moveInspectionItemPhoto (POST /{id}/items/{itemId}/photos/{photoIndex}/move, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Design System 0520 M14 — PhotoStudio annotation save (subsystem A, phase 4).
@@ -2718,6 +2745,14 @@ export const inspectionsRoutes = createApiRouter()
         const { id, itemId, photoIndex } = c.req.valid('param');
         const { sectionId } = c.req.valid('json');
         await c.var.services.inspection.revertPhotoEdits(id, c.get('tenantId'), itemId, Number(photoIndex), sectionId);
+        return c.json({ success: true as const }, 200);
+    })
+    .openapi(itemPhotoMoveRoute, async (c) => {
+        const { id, itemId, photoIndex } = c.req.valid('param');
+        const { toItemId, toSectionId, fromSectionId } = c.req.valid('json');
+        await c.var.services.inspection.moveItemPhoto(
+            id, c.get('tenantId'), itemId, Number(photoIndex), toItemId, fromSectionId, toSectionId,
+        );
         return c.json({ success: true as const }, 200);
     })
     .openapi(updateMediaAnnotationsRoute, async (c) => {

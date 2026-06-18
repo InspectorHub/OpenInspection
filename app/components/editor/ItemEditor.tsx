@@ -162,6 +162,10 @@ interface ItemEditorProps {
  onReorderPhotos?: (itemId: string, order: string[]) => void;
  /** Task 9 — bulk-detach the given photoIndex set (strip emits indices high→low). */
  onBulkDetachPhotos?: (itemId: string, indices: number[]) => void;
+ /** Task 9b — the OTHER items this item's photos can be moved to. */
+ moveTargets?: Array<{ itemId: string; label: string; sectionId?: string }>;
+ /** Task 9b — bulk-move the given photoIndex set (high→low) to a target item. */
+ onBulkMovePhotos?: (itemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -203,6 +207,8 @@ export function ItemEditor({
  onOpenPhoto,
  onReorderPhotos,
  onBulkDetachPhotos,
+ moveTargets,
+ onBulkMovePhotos,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
  const [defectQuery, setDefectQuery] = useState("");
@@ -785,8 +791,10 @@ export function ItemEditor({
  onAddPhoto={() => onAddPhoto?.()}
  onOpen={(i) => onOpenPhoto?.(item.id, i)}
  onReorder={onReorderPhotos ? (order) => onReorderPhotos(item.id, order) : undefined}
- selectable={!!onBulkDetachPhotos}
+ selectable={!!onBulkDetachPhotos || !!onBulkMovePhotos}
  onBulkDetach={onBulkDetachPhotos ? (indices) => onBulkDetachPhotos(item.id, indices) : undefined}
+ moveTargets={moveTargets ? moveTargets.filter((m) => m.itemId !== item.id) : undefined}
+ onBulkMove={onBulkMovePhotos ? (indices, to) => onBulkMovePhotos(item.id, indices, to) : undefined}
  photoUploading={photoUploading}
  />
  {/* Task 4 — queued offline photo previews rendered below the strip */}

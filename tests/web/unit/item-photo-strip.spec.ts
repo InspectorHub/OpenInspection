@@ -107,4 +107,33 @@ describe('ItemPhotoStrip', () => {
     click(deleteBtn ?? null);
     expect(onBulkDetach).toHaveBeenCalledWith([0]);
   });
+
+  it('reports chosen indices + target to bulk move', () => {
+    const onBulkMove = vi.fn();
+    mount(
+      createElement(ItemPhotoStrip, {
+        selectable: true,
+        inspectionId: 'i',
+        itemId: 'it',
+        photos,
+        coverKey: null,
+        photoUrl: (k: string) => `/u/${k}`,
+        onAddPhoto: vi.fn(),
+        onOpen: vi.fn(),
+        onBulkMove,
+        moveTargets: [{ itemId: 'other', label: 'Garage' }],
+      }),
+    );
+    // enter select mode + check thumb-1
+    const selectBtn = $$('button').find((b) => /select/i.test(b.textContent ?? ''));
+    click(selectBtn ?? null);
+    click(byTestId('check-1'));
+    // change the "Move to" combobox → fires onBulkMove([1], { itemId, sectionId })
+    const combo = container!.querySelector('select') as HTMLSelectElement;
+    act(() => {
+      combo.value = 'other';
+      combo.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(onBulkMove).toHaveBeenCalledWith([1], { itemId: 'other', sectionId: undefined });
+  });
 });
