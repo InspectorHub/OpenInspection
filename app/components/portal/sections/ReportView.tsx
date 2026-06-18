@@ -317,6 +317,27 @@ function formatUnixSeconds(sec: number): string {
 }
 
 /* ------------------------------------------------------------------ */
+/* Image fallbacks (Plan 1 / N1)                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Restrained fallback shown in place of the report cover photo when the
+ * underlying image fails to load (e.g. the photo was removed after the
+ * report was published). We render a calm panel rather than hiding the
+ * cover section, so the report never looks half-broken to the client.
+ */
+function CoverPhotoPlaceholder() {
+  return (
+    <div className="w-full h-44 sm:h-56 rounded-xl border border-ih-border bg-ih-bg-muted flex flex-col items-center justify-center gap-2 text-ih-fg-4">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+      <span className="text-xs font-medium tracking-wide">Cover photo unavailable</span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Component */
 /* ------------------------------------------------------------------ */
 
@@ -335,6 +356,19 @@ export function ReportView(props: ReportViewProps) {
   const [repairPanel, setRepairPanel] = useState(false);
   const [repairItems, setRepairItems] = useState<Record<string, boolean>>({});
   const [generating, setGenerating] = useState(false);
+  const [coverFailed, setCoverFailed] = useState(false);
+
+  // Photo keys whose thumbnail failed to load. A failed thumbnail is collapsed
+  // (rendered as null) rather than showing the browser's broken-image glyph,
+  // keeping the client report clean even after upstream photos are removed.
+  const [failedPhotos, setFailedPhotos] = useState<Set<string>>(() => new Set());
+  const markPhotoFailed = (key: string) =>
+    setFailedPhotos((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
 
   // Dynamic rating summary — derived from THIS inspection's own rating system
   // (Spectora-style) instead of fixed Satisfactory/Monitor/Defects buckets.
@@ -500,17 +534,23 @@ export function ReportView(props: ReportViewProps) {
         </p>
       </div>
 
-      {/* Cover photo (DB-16) — the inspector-chosen report cover image. Hidden
-          gracefully if the underlying photo was removed (onError). */}
+      {/* Cover photo (DB-16) — the inspector-chosen report cover image. On load
+          failure (e.g. the photo was removed after publish) we swap in a restrained
+          placeholder rather than hiding the section, so the report never looks
+          broken to the client (Plan 1 / N1). */}
       {data.coverPhotoUrl && (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
-          <img
-            src={`${data.coverPhotoUrl}&w=1600`}
-            alt={`Cover photo — ${data.address}`}
-            className="w-full max-h-72 object-cover rounded-xl border border-ih-border"
-            loading={data.printMode ? "eager" : "lazy"}
-            onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
-          />
+          {coverFailed ? (
+            <CoverPhotoPlaceholder />
+          ) : (
+            <img
+              src={`${data.coverPhotoUrl}&w=1600`}
+              alt={`Cover photo — ${data.address}`}
+              className="w-full max-h-72 object-cover rounded-xl border border-ih-border"
+              loading={data.printMode ? "eager" : "lazy"}
+              onError={() => setCoverFailed(true)}
+            />
+          )}
         </div>
       )}
 
