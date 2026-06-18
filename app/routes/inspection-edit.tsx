@@ -690,6 +690,17 @@ export default function InspectionEditPage() {
  return map;
  }, [activeResult]);
 
+ // Whole-inspection photo count for the Photos tab badge (P3). Sums per-item
+ // result.photos across the results map.
+ const inspectionPhotoCount = useMemo(() => {
+ let n = 0;
+ for (const value of Object.values(state.results)) {
+ const photos = (value as Record<string, unknown> | null)?.photos;
+ if (Array.isArray(photos)) n += photos.length;
+ }
+ return n;
+ }, [state.results]);
+
  const locationSuggestions = useMemo(() => {
  const set = new Set<string>();
  for (const value of Object.values(state.results)) {
@@ -1710,6 +1721,7 @@ export default function InspectionEditPage() {
  getRatingColor={state.getRatingColor}
  getRatingLabel={state.getRatingLabel}
  inspectionId={String(state.inspection.id)}
+ photoCount={inspectionPhotoCount}
  onGallerySetCover={(p) => setGalleryCropSource(p)}
  onGalleryAnnotate={(p) => {
   setPhotoStudioUrl(p.url);
