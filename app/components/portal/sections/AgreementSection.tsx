@@ -25,7 +25,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
-import { SignaturePad, type SignaturePadHandle } from "~/components/image-studio/SignaturePad";
+import { SignaturePad, type SignaturePadHandle } from "~/components/media-studio/SignaturePad";
 import {
   OnBehalfFields,
   onBehalfPayload,

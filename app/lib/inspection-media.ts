@@ -1,5 +1,5 @@
 /**
- * Image Studio — flatten the Media Center API ({attached, pool}) into one
+ * Media Studio — flatten the Media Center API ({attached, pool}) into one
  * deduped, labeled photo list for the gallery + cover picker. Dedup by R2 key.
  */
 export interface GalleryPhoto {

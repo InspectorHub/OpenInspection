@@ -5,7 +5,7 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-workspace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { LogoUploader } from "~/components/image-studio/LogoUploader";
+import { LogoUploader } from "~/components/media-studio/LogoUploader";
 import { workspaceSchema } from "~/lib/forms/settings.schema";
 
 /* ------------------------------------------------------------------ */

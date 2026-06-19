@@ -4,7 +4,7 @@ import { CloneLastButton } from "./CloneLastButton";
 import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
 import { ItemAttributesPanel } from "./ItemAttributesPanel";
 import { RepairItemsPanel } from "./RepairItemsPanel";
-import { ItemPhotoStrip, type StripPhoto } from "../image-studio/ItemPhotoStrip";
+import { ItemPhotoStrip, type StripPhoto } from "../media-studio/ItemPhotoStrip";
 import type { AttachedRepairItem } from "../../hooks/useFindings";
 import type { ItemAttribute } from "../../lib/types";
 import { renderTemplate } from "../../lib/mustache";

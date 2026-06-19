@@ -2,7 +2,7 @@ import { useState } from "react";
 import { renderTemplate } from "../../lib/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../lib/defect-fields";
 import { photoDisplayName, withDownload } from "../../lib/photo-name";
-import { PhotoGallery } from "~/components/image-studio/PhotoGallery";
+import { PhotoGallery } from "~/components/media-studio/PhotoGallery";
 
 interface SideRailProps {
   activeItem?: { id: string; label: string; type?: string } | null;

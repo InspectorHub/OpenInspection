@@ -5,7 +5,7 @@ import {
   initialSignatureState,
   type SignatureState,
   type Stroke,
-} from '~/components/image-studio/signaturePad.logic';
+} from '~/components/media-studio/signaturePad.logic';
 
 const dot = (pen: boolean): Stroke => ({ pen, pts: [{ x: 1, y: 1, p: 0.5 }] });
 

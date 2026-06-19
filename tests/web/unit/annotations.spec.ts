@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { serializeAnnotations, deserializeAnnotations, type Annotation } from '~/components/image-studio/annotations';
+import { serializeAnnotations, deserializeAnnotations, type Annotation } from '~/components/media-studio/annotations';
 describe('annotations serialization', () => {
   const anns: Annotation[] = [
     { kind: 'circle', x: 100, y: 120, r: 40 },

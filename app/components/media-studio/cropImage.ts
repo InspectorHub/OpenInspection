@@ -1,5 +1,5 @@
 /**
- * Image Studio (cover crop) — draw the chosen crop region of a source image to
+ * Media Studio (cover crop) — draw the chosen crop region of a source image to
  * a canvas and export a JPEG blob whose LONG edge is at most `maxLongEdge` (no
  * upscale). Source URL must be same-origin (authed photo route) so the canvas
  * is not tainted.

@@ -4,7 +4,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { createElement, act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { MediaViewerToolbar } from '~/components/image-studio/MediaViewer';
+import { MediaViewerToolbar } from '~/components/media-studio/MediaViewer';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;

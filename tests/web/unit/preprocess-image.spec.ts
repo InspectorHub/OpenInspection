@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTargetDimensions, UPLOAD_MAX_LONG_EDGE } from '~/components/image-studio/preprocessImage';
+import { computeTargetDimensions, UPLOAD_MAX_LONG_EDGE } from '~/components/media-studio/preprocessImage';
 
 describe('computeTargetDimensions', () => {
   it('exposes a 2560 long-edge cap', () => {

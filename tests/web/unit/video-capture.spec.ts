@@ -6,7 +6,7 @@ import {
   MAX_VIDEO_BYTES,
   MAX_VIDEO_SEC,
   ALLOWED_VIDEO_TYPES,
-} from '~/components/image-studio/VideoCapture';
+} from '~/components/media-studio/VideoCapture';
 
 function fakeFile(type: string, size: number): File {
   const file = new File([new Uint8Array(0)], 'clip', { type });

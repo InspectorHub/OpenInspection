@@ -4,7 +4,7 @@ export interface LogoUploaderProps {
   uploading: boolean;
   onSelect: (file: File) => void;
 }
-/** Image Studio — company logo uploader. Logos keep their original format
+/** Media Studio — company logo uploader. Logos keep their original format
  *  (transparent PNG / SVG): NO crop, NO bake. Just upload + fit preview. */
 export function LogoUploader({ currentUrl, uploading, onSelect }: LogoUploaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);

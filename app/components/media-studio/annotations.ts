@@ -1,5 +1,5 @@
 /**
- * Image Studio — annotation model. Coords are NATURAL-IMAGE PIXELS (resolution-
+ * Media Studio — annotation model. Coords are NATURAL-IMAGE PIXELS (resolution-
  * stable). `annotationsJson` stored server-side is the JSON of this array.
  */
 export interface Point { x: number; y: number }

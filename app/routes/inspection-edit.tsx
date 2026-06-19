@@ -39,19 +39,19 @@ import { FooterBar } from "~/components/editor/FooterBar";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
-import { PhotoAnnotator } from "~/components/image-studio/PhotoAnnotator";
+import { PhotoAnnotator } from "~/components/media-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
-import { CoverCropper } from "~/components/image-studio/CoverCropper";
-import { PhotoCropper, type PhotoCrop } from "~/components/image-studio/PhotoCropper";
-import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "~/components/image-studio/photo-display-key";
-import { MediaViewer, type MediaAction } from "~/components/image-studio/MediaViewer";
-import { PosterPicker, streamThumbUrl } from "~/components/image-studio/PosterPicker";
-import { VideoCapture } from "~/components/image-studio/VideoCapture";
+import { CoverCropper } from "~/components/media-studio/CoverCropper";
+import { PhotoCropper, type PhotoCrop } from "~/components/media-studio/PhotoCropper";
+import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "~/components/media-studio/photo-display-key";
+import { MediaViewer, type MediaAction } from "~/components/media-studio/MediaViewer";
+import { PosterPicker, streamThumbUrl } from "~/components/media-studio/PosterPicker";
+import { VideoCapture } from "~/components/media-studio/VideoCapture";
 import type { GalleryPhoto } from "~/lib/inspection-media";
 import { fKey } from "~/hooks/useInspection";
-import { fullResUrl } from "~/components/image-studio/cropImage";
-import { preprocessImage } from "~/components/image-studio/preprocessImage";
+import { fullResUrl } from "~/components/media-studio/cropImage";
+import { preprocessImage } from "~/components/media-studio/preprocessImage";
 import { SignaturePad } from "~/components/SignaturePad";
 import { PublishGateModal } from "~/components/editor/PublishGateModal";
 import { ToastPortal } from "~/components/Toast";
@@ -1037,7 +1037,7 @@ export default function InspectionEditPage() {
  // DB-16 — dedicated fetcher for set/clear report cover (avoids the
  // shared-fetcher abort hazard; the loader revalidates the cover after).
  const coverFetcher = useFetcher();
- // Image Studio — gallery "Set as cover" opens an editor-level CoverCropper.
+ // Media Studio — gallery "Set as cover" opens an editor-level CoverCropper.
  const [galleryCropSource, setGalleryCropSource] = useState<{ key: string; url: string } | null>(null);
  // Plan 4 (Task 8) — per-photo crop. `photoCropTarget` opens the PhotoCropper for
  // an item/defect photo (cropping ALWAYS re-derives from the ORIGINAL key).
@@ -2492,7 +2492,7 @@ export default function InspectionEditPage() {
  onTemplateApplied={() => window.location.reload()}
  />
 
- {/* Image Studio — gallery "Set as cover" crop overlay */}
+ {/* Media Studio — gallery "Set as cover" crop overlay */}
  {galleryCropSource && (
  <CoverCropper
   sourceUrl={fullResUrl(galleryCropSource.url)}

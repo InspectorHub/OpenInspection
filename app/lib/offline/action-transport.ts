@@ -42,7 +42,7 @@
 
 import type { QueuedWrite, QueuedPhoto, QueuedCrop } from './queue-storage';
 import type { ReplayTransport } from './offline-queue';
-import { preprocessImage } from '~/components/image-studio/preprocessImage';
+import { preprocessImage } from '~/components/media-studio/preprocessImage';
 
 // ── Result shape returned by replay-write/replay-photo action branches ─────
 

@@ -1,5 +1,5 @@
 /**
- * Image Studio (Plan 4) — single source of truth for which R2 key the report,
+ * Media Studio (Plan 4) — single source of truth for which R2 key the report,
  * the Plan-3 photo strip, and the viewer render for a given photo entry.
  *
  * Precedence: annotatedKey || croppedKey || key.

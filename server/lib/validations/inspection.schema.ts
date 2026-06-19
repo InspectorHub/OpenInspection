@@ -636,7 +636,7 @@ export const ConflictResolveResponseSchema = z.object({
 }).openapi('ConflictResolveResponse');
 
 /**
- * Image Studio (cover crop) — re-editable crop transform applied to the
+ * Media Studio (cover crop) — re-editable crop transform applied to the
  * source cover image, in source-pixel coordinates.
  */
 export const CoverCropSchema = z.object({
@@ -650,7 +650,7 @@ export const CoverCropSchema = z.object({
 export type CoverCrop = z.infer<typeof CoverCropSchema>;
 
 /**
- * Image Studio (Plan 4) — re-editable crop transform for an inspection-item or
+ * Media Studio (Plan 4) — re-editable crop transform for an inspection-item or
  * per-defect photo. Unlike CoverCropSchema, the aspect may be 'free' (item/defect
  * photos are not constrained to cover ratios). Coords are source-pixel.
  */

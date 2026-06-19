@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolvePhotoDisplayKey, clearAnnotationOnRecrop, type PhotoEntry } from '~/components/image-studio/photo-display-key';
+import { resolvePhotoDisplayKey, clearAnnotationOnRecrop, type PhotoEntry } from '~/components/media-studio/photo-display-key';
 
 describe('resolvePhotoDisplayKey', () => {
   it('prefers annotatedKey when present (annotated already contains the crop — sequential layering)', () => {

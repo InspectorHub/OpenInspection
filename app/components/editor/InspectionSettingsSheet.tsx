@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { TemplateCombobox } from "~/components/TemplateCombobox";
-import { CoverCropper } from "~/components/image-studio/CoverCropper";
-import { fullResUrl } from "~/components/image-studio/cropImage";
+import { CoverCropper } from "~/components/media-studio/CoverCropper";
+import { fullResUrl } from "~/components/media-studio/cropImage";
 import { ORIGINAL_QUALITY_KEY } from "~/routes/inspection-edit";
 
 interface SettingsForm {

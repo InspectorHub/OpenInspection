@@ -38,7 +38,7 @@ import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../lib/status/report-status';
 
 /**
- * Image Studio (cover crop) — resolves the cover image URL, preferring the
+ * Media Studio (cover crop) — resolves the cover image URL, preferring the
  * baked cropped derivative (`coverImageKey`) over the uncropped source
  * (`coverPhotoId`). Returns null when neither is set.
  */
@@ -1991,7 +1991,7 @@ export class InspectionService {
     }
 
     /**
-     * Image Studio (cover crop) — bakes a cropped JPEG derivative of the cover
+     * Media Studio (cover crop) — bakes a cropped JPEG derivative of the cover
      * source image into R2 and records the re-editable crop transform. Mirrors
      * saveAnnotation: the original source key (cover_photo_id) is preserved so
      * the crop can be re-edited; the report reads cover_image_key first.

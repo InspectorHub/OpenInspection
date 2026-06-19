@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { boundedSourceUrl, scaleCropToDecoded } from '~/components/image-studio/cropImage';
+import { boundedSourceUrl, scaleCropToDecoded } from '~/components/media-studio/cropImage';
 
 describe('boundedSourceUrl', () => {
   it('appends ?w=4096 when the url has no query', () => {
