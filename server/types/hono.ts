@@ -180,6 +180,7 @@ import { WidgetService } from '../services/widget.service';
 import { RecommendationService } from '../services/recommendation.service';
 import { ContractorTypeService } from '../services/contractor-type.service';
 import { EventService } from '../services/event.service';
+import { InspectionTypeService } from '../services/inspection-type.service';
 import { TotpService } from '../services/totp.service';
 import { TemplateSeedService } from '../services/template-seed.service';
 import { ReportPdfService } from '../services/report-pdf.service';
@@ -229,6 +230,7 @@ export interface AppServices {
     recommendation: RecommendationService;
     contractorType: ContractorTypeService;
     event: EventService;
+    inspectionType: InspectionTypeService;
     totp: TotpService;
     templateSeed: TemplateSeedService;
     reportPdf: ReportPdfService;
