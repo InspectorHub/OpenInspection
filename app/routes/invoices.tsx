@@ -228,9 +228,7 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-[18px]">
       <PageHeader
-        eyebrow="Invoices"
-        eyebrowColor="emerald"
-        title="Invoices"
+        title={`${total} ${total === 1 ? "Invoice" : "Invoices"}`}
         meta={`${total} ${total === 1 ? "invoice" : "invoices"}`}
         actions={<Button variant="primary" onClick={() => setNewOpen(true)}>+ New Invoice</Button>}
       />

@@ -504,9 +504,7 @@ export default function ContactsPage() {
   return (
     <div className="space-y-[18px]">
       <PageHeader
-        eyebrow="Contacts"
-        eyebrowColor="indigo"
-        title="Contacts"
+        title={`${filtered.length} ${filtered.length === 1 ? "Contact" : "Contacts"}`}
         meta={`${filtered.length} contacts`}
         actions={
           <>
