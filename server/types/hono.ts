@@ -21,6 +21,14 @@ export interface AppEnv {
     DB: D1Database;
     TENANT_CACHE: KVNamespace;
     PHOTOS: R2Bucket;
+    /** Cloudflare Stream — video walk-through storage (Media Studio, Plan 7).
+     *  Account-scoped, name-only binding. `StreamBinding` is an ambient global
+     *  interface vendored in worker-configuration.d.ts. */
+    STREAM: StreamBinding;
+    /** Cloudflare Stream customer subdomain for iframe/thumbnail URLs
+     *  (e.g. "customer-xxxx"). No hardcoded fallback — features that build
+     *  Stream URLs must fail closed when this is absent. */
+    STREAM_CUSTOMER_SUBDOMAIN?: string;
     
     // Security & Auth
     /** Legacy HS256 signing secret. Still used as the KDF input for

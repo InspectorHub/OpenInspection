@@ -39,6 +39,11 @@
     { "binding": "PHOTOS", "bucket_name": "openinspection-photos" }
   ],
   "browser": { "binding": "BROWSER" },
+  // Cloudflare Stream — video walk-through storage (Media Studio, Plan 7).
+  // No resource id: Stream is account-scoped; the binding is name-only. A real
+  // deploy must mirror this into the gitignored wrangler.local.jsonc /
+  // wrangler.saas.jsonc and set STREAM_CUSTOMER_SUBDOMAIN (no hardcoded fallback).
+  "stream": { "binding": "STREAM" },
   "workflows": [
     {
       "binding": "SIGN_COMPLETION_WORKFLOW",
