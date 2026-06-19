@@ -285,6 +285,16 @@ export const inspectionMediaPool = sqliteTable('inspection_media_pool', {
     // consumed exclusively client-side. `caption` is user-supplied, ≤200 chars.
     annotations:   text('annotations'),
     caption:       text('caption'),
+    // Plan 7 — video walk-through. A pool row is a photo (default) or a video.
+    // Video rows keep r2Key/url = '' (Cloudflare Stream owns the bytes) and set
+    // streamUid; existing photo rows backfill to 'photo' via the column default.
+    mediaType:     text('media_type', { enum: ['photo', 'video'] }).notNull().default('photo'),
+    // Cloudflare Stream UID for video rows; NULL for photos.
+    streamUid:     text('stream_uid'),
+    // Poster timestamp as a fraction of duration (0..1); NULL for photos.
+    posterPct:     real('poster_pct'),
+    // Video duration in seconds (cached from Stream for the thumb badge); NULL for photos.
+    durationSec:   integer('duration_sec'),
 }, (t) => [
     index('idx_media_pool_tenant').on(t.tenantId),
     index('idx_media_pool_inspection').on(t.inspectionId),
