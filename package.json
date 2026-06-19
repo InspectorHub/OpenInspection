@@ -60,7 +60,7 @@
     "backup": "node scripts/backup.js",
     "restore": "node scripts/restore.js",
     "rotate:jwt": "node scripts/rotate-jwt-keys.js",
-    "prepare": "husky",
+    "prepare": "node -e \"try{require('child_process').execSync('git config core.hooksPath .githooks',{stdio:'ignore'})}catch(e){}\"",
     "check:bundle": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {
@@ -118,7 +118,6 @@
     "fake-indexeddb": "^6.0.0",
     "globals": "^17.4.0",
     "happy-dom": "^20.9.0",
-    "husky": "^9.1.7",
     "konva": "^10.2.5",
     "lint-staged": "^16.4.0",
     "miniflare": "^4.20260405.0",
