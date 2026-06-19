@@ -1,6 +1,12 @@
-export interface PhotoEntry { key: string; annotatedKey?: string; annotationsJson?: string }
+export interface PhotoEntry {
+  key: string;
+  croppedKey?: string;
+  crop?: { aspect: string; orientation: 'landscape' | 'portrait'; x: number; y: number; width: number; height: number };
+  annotatedKey?: string;
+  annotationsJson?: string;
+}
 export interface AttachedPhoto {
-  key: string;          // displayKey = annotatedKey || key (what the report/grid shows)
+  key: string;          // displayKey = annotatedKey || croppedKey || key (what the report/grid shows)
   originalKey: string;  // the source key (revert target)
   url: string;
   itemId: string;

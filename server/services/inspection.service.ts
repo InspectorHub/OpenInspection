@@ -6,7 +6,7 @@ import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../lib/report-utils';
 import { mapRatingSystemLevels } from '../lib/map-rating-levels';
 import { z } from 'zod';
-import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema, type CoverCrop } from '../lib/validations/inspection.schema';
+import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema, type CoverCrop, type PhotoCrop } from '../lib/validations/inspection.schema';
 
 import { ScopedDB } from '../lib/db/scoped';
 import { escapeLikePattern } from '../lib/db/like-escape';
@@ -2013,6 +2013,55 @@ export class InspectionService {
             .set({ coverPhotoId: sourceKey, coverImageKey, coverCrop: crop })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
         return { coverImageKey };
+    }
+
+    /**
+     * Plan 4 — bakes a cropped JPEG derivative of an inspection-item (or per-defect)
+     * photo into R2 and records `croppedKey` + `crop` onto the targeted entry.
+     * Mirrors saveAnnotation's data load + finding-key resolution + results upsert.
+     * Sequential layering rule: a (re-)crop CLEARS any existing annotatedKey/
+     * annotationsJson, whose coords were in the previous cropped-pixel space.
+     */
+    async saveCroppedItemPhoto(
+        inspectionId: string,
+        tenantId: string,
+        itemId: string,
+        photoIndex: number,
+        bakedBytes: ArrayBuffer,
+        crop: PhotoCrop,
+        sectionId?: string,
+    ): Promise<{ croppedKey: string }> {
+        if (!this.r2) throw Errors.BadRequest('Storage not available');
+        await this.getInspection(inspectionId, tenantId);
+
+        const croppedKey = `${tenantId}/${inspectionId}/${itemId}_${crypto.randomUUID()}_cropped.jpg`;
+        await this.r2.put(croppedKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
+
+        const db = this.getDrizzle();
+        const [row] = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .limit(1);
+
+        interface ResultEntry { rating?: string; notes?: string; photos?: PhotoEntry[] }
+        const data: Record<string, ResultEntry> = (typeof row?.data === 'string' ? JSON.parse(row.data) : row?.data) ?? {};
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId] ?? {};
+        const photos = entry.photos ?? [];
+        if (!photos[photoIndex]) throw Errors.NotFound('Photo not found at index');
+        // Sequential layering: drop annotation (its coords are in the OLD cropped
+        // space), set the new crop.
+        const { annotatedKey: _a, annotationsJson: _j, ...keep } = photos[photoIndex];
+        void _a; void _j;
+        photos[photoIndex] = { ...keep, croppedKey, crop };
+        data[key] = { ...entry, photos };
+        if (key !== itemId) delete data[itemId];
+
+        if (row) {
+            await db.update(inspectionResults).set({ data, lastSyncedAt: new Date() }).where(eq(inspectionResults.id, row.id));
+        } else {
+            await db.insert(inspectionResults).values({ id: crypto.randomUUID(), tenantId, inspectionId, data, lastSyncedAt: new Date() });
+        }
+        return { croppedKey };
     }
 
     /**
