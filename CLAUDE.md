@@ -215,6 +215,15 @@ DB design policies (2026-06-04 DBA review). These apply to ALL new tables/column
 - **Status fields**: any column that models a state machine MUST declare a drizzle `{ enum: [...] }` (type-layer only, no DDL cost).
 - **Column retirement**: D1 cannot drop columns on FK-referenced tables. Retired columns are FROZEN: stop all reads/writes, add a `-- DEAD (date, reason)` schema comment, never reuse the name.
 
+## Comment Rules
+
+Migration sequence numbers are an unstable, positional ordering token — squash/consolidation renumbers them, leaving comments dangling at files that no longer exist (the `0000_baseline.sql` consolidation made every `migration 00NN` comment in the codebase point to nothing). Annotate the durable artifact, not the transient migration.
+
+- **No migration sequence numbers in code comments** (`migration 0045`, `0052_inspector_slug.sql`, `pre-migration 0040`, …). The only allowed reference is `0000_baseline.sql` — it never renumbers. Enforced by `npm run lint:migrefs` (`scripts/check-migration-refs.mjs`); also runs in `npm run lint` and pre-commit.
+- **State the invariant, not the history.** Put *why a column/index exists* next to its definition in `server/lib/db/schema/` (it travels with the field and survives any renumber). "the `lot_size` column on `inspections`" beats "the `lot_size` column added in migration 0045". History lives in `git blame`.
+- **For traceability, cite a stable id** — PR# / issue# (`see #144`) or a feature name — never a migration number. These never renumber and link to full context.
+- **"Must stay in sync with X" coupling → make it executable, not prose.** A comment that says "must match the inline DDL / the backfill list" is a latent bug; people forget. Prefer a shared constant both sides import, or a test that asserts the equality. Example: `tests/unit/inline-ddl-schema-sync.spec.ts` asserts the workers specs' hand-maintained `tenant_configs` DDL covers every Drizzle schema column — replacing the old "remember to sync this DDL" comment that blocked #164.
+
 ## Product Terminology (canonical)
 
 User-facing copy and NEW code identifiers use these terms. (Existing surfaces are renamed in a dedicated terminology pass — don't mix renames into feature work.)

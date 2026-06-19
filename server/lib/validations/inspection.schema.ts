@@ -153,8 +153,8 @@ export const UpdateInspectionSchema = z.object({
  * time. `null` clears a field; omitted = leave existing value untouched.
  *
  * `yearBuilt`, `sqft`, `bedrooms`, `bathrooms` and `foundationType` map to
- * dedicated columns on `inspections`. `lotSize` maps to the new `lot_size`
- * column added in migration 0045.
+ * dedicated columns on `inspections`. `lotSize` maps to the `lot_size`
+ * column on `inspections`.
  */
 export const PropertyFactsSchema = z.object({
     yearBuilt:      z.number().int().min(1800).max(2100).nullable().optional().openapi({ example: 1990 }).describe('TODO describe yearBuilt field for the OpenInspection MCP integration'),

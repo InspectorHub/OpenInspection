@@ -3581,7 +3581,7 @@ export class InspectionService {
 
         // handoff-decisions §1 — pull the configurable report-unpublished
         // threshold. Falls back to 24h when the row is missing (legacy tenants
-        // pre-migration 0040). 72h is the new default applied at insert time.
+        // created before the threshold default existed). 72h is the new default applied at insert time.
         const cfg = await db.select({ thresholds: tenantConfigs.attentionThresholds })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))

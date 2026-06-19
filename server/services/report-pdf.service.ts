@@ -50,7 +50,7 @@ export class ReportPdfService {
     private getDrizzle() { return drizzle(this.db as any); }
 
     /**
-     * Migration 0059 — gate the Browser-Rendering pipeline behind a tenant
+     * Gate the Browser-Rendering pipeline behind a tenant
      * opt-in toggle so Workers Free hosters don't burn isolate seconds on
      * a binding that always 404s, and Paid tenants pay only when they
      * deliberately want pre-rendered PDFs (vs the always-free

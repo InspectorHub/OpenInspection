@@ -61,6 +61,15 @@ else
     fail "DS token check failed  →  npm run lint:ds"
 fi
 
+# 3b. Migration-reference hygiene — no dangling migration sequence numbers in
+#     comments (fast full-repo scan; also gated in CI via npm run lint).
+step "Migration-reference hygiene"
+if node scripts/check-migration-refs.mjs > /dev/null 2>&1; then
+    pass "Migration-reference hygiene passed"
+else
+    fail "Migration-reference check failed  →  npm run lint:migrefs"
+fi
+
 # 4. Worker bundle size (C-13b) — Workers FREE caps the script at 3 MiB
 #    gzipped, and OpenInspection promises one-click Free-plan deploys, so an
 #    oversized bundle breaks every self-hoster. Runs the REAL build pipeline

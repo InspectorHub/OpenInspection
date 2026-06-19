@@ -16,11 +16,11 @@ describe('users schema — A1', () => {
         expect(col.notNull).toBe(false);
     });
 
-    it('users.email is UNIQUE per (tenant_id, email) after migration 0072', () => {
-        // Migration 0072 (sync-multi-workspace) replaced the prior global
-        // UNIQUE(email) constraint with UNIQUE(tenant_id, email). A single
-        // human can now hold one users row per tenant in core's shared D1,
-        // matching the per-identity / per-membership model on the portal side.
+    it('users.email is UNIQUE per (tenant_id, email)', () => {
+        // Core enforces UNIQUE(tenant_id, email) rather than a global
+        // UNIQUE(email). A single human can hold one users row per tenant in
+        // core's shared D1, matching the per-identity / per-membership model on
+        // the portal side.
         const row1 = sqlite.prepare(
             `INSERT INTO tenants (id, name, slug, tier, status, max_users, deployment_mode, created_at)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -44,7 +44,7 @@ describe('users schema — A1', () => {
     });
 
     it('agent users (tenant_id NULL) are accepted by the rebuilt schema', () => {
-        // Insert a row with tenant_id NULL — this must succeed after migration 0055.
+        // Agent users carry tenant_id NULL — the rebuilt schema must accept it.
         const insertAgent = sqlite.prepare(
             `INSERT INTO users (id, tenant_id, email, password_hash, role, created_at)
              VALUES (?, NULL, ?, ?, 'agent', ?)`,

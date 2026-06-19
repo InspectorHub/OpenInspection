@@ -4,6 +4,7 @@
 import { env } from 'cloudflare:test';
 import { describe, it, expect, beforeAll, beforeEach, vi } from 'vitest';
 import { applyCmdEnvelope, handleCmdBatch } from '../../server/portal/cmd-consumer';
+import { TENANT_CONFIGS_TEST_DDL } from '../helpers/inline-ddl';
 
 // Batch 2: the seed command delegates to the starter-content service, whose
 // real implementation touches 8 content tables — out of scope for the consumer
@@ -58,10 +59,9 @@ async function seedSchema(): Promise<void> {
     // PortalProvider.handleTenantUpdate reads/initializes tenant_configs when a
     // command carries `name` (IA-27 siteName init). Test DDL keeps every column
     // SELECTed by drizzle present but unconstrained — the apply path only ever
-    // writes (tenant_id, site_name, updated_at) here.
-    await b.DB.exec(
-        'CREATE TABLE IF NOT EXISTS tenant_configs (tenant_id TEXT PRIMARY KEY, site_name TEXT, primary_color TEXT, logo_url TEXT, support_email TEXT, sender_email TEXT, reply_to TEXT, email_mode TEXT, sms_mode TEXT, sender_display_name TEXT, use_inspector_from_name INTEGER, point_of_contact TEXT, billing_url TEXT, review_url TEXT, company_phone TEXT, integration_config TEXT, secrets TEXT, encrypted_secrets TEXT, dek_enc TEXT, ics_token TEXT, widget_allowed_origins TEXT, report_theme TEXT, attention_thresholds TEXT, inspection_prefs TEXT, show_estimates INTEGER, enable_repair_list INTEGER, enable_customer_repair_export INTEGER, block_unpaid INTEGER, block_unsigned_agreement INTEGER, custom_referral_sources TEXT, dashboard_column_prefs TEXT, concierge_review_required INTEGER, allow_inspector_choice INTEGER, enable_pdf_pipeline INTEGER, auto_sign_on_publish_default INTEGER, team_mode_default TEXT, apprentice_review_required INTEGER, guest_invites_enabled INTEGER, require_defect_fields TEXT, agreement_retention_years INTEGER, reinspection_statuses TEXT, company_address TEXT, pdf_show_footer INTEGER, pdf_show_page_numbers INTEGER, pdf_show_license INTEGER, updated_at INTEGER);',
-    );
+    // writes (tenant_id, site_name, updated_at) here. Shared with cmd-fixtures
+    // and guarded against schema drift by inline-ddl-schema-sync.spec.ts.
+    await b.DB.exec(TENANT_CONFIGS_TEST_DDL);
     await b.DB.exec(
         'CREATE TABLE IF NOT EXISTS usage_counters (tenant_id TEXT NOT NULL, metric TEXT NOT NULL, period_key TEXT NOT NULL, value INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL, PRIMARY KEY (tenant_id, metric, period_key));',
     );

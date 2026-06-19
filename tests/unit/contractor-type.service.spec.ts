@@ -38,7 +38,7 @@ describe('ContractorTypeService', () => {
   });
 
   it('updates and deletes rows whose id is a bare-hex (migration-seeded) id, not a UUID', async () => {
-    // Migration 0030 back-fills existing tenants with ids from lower(hex(randomblob(16))):
+    // The baseline back-fills existing tenants with ids from lower(hex(randomblob(16))):
     // a 32-char bare-hex string with no dashes — NOT a valid UUID. The route param schema
     // must therefore accept min(1) strings, never z.string().uuid(), or PATCH/DELETE 400s.
     const bareHexId = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';

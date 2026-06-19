@@ -162,9 +162,9 @@ export const syncOutbox = sqliteTable('sync_outbox', {
     index('idx_sync_outbox_status_created').on(t.status, t.createdAt),
 ]);
 
-// Booking #7 Sprint A — reserved/banned slug list. Seeded via migration 0052
-// with the project's reserved route names (admin, api, book, login, etc.) so
-// customers cannot register slugs that would shadow real URL paths.
+// Booking #7 Sprint A — reserved/banned slug list. Seeded with the project's
+// reserved route names (admin, api, book, login, etc.) so customers cannot
+// register slugs that would shadow real URL paths.
 // FROZEN for the inspector namespace (2026-06-06, DB-12); still consulted for agent slugs.
 export const slugReservations = sqliteTable('slug_reservations', {
     slug: text('slug').primaryKey(),
@@ -267,7 +267,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Track L — company contact phone shown in client SMS ({{company_phone}}).
     companyPhone: text('company_phone'),
     integrationConfig: text('integration_config'), // plaintext JSON: {appBaseUrl, turnstileSiteKey, googleClientId}
-    // Secret UI化 (migration 0079) — AES-256-GCM encrypted JSON holding all
+    // Settings-managed secrets — AES-256-GCM encrypted JSON holding all
     // 14 integration API keys configurable via Settings UI. Supersedes the
     // `secrets` column which held a smaller subset. Worker env vars still
     // take precedence (backwards compat); DB secrets are the fallback.
@@ -326,7 +326,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // wizard shows an inspector dropdown ("Allow choice of inspectors",
     // Spectora-style). Default OFF = pure auto-assign (first available).
     allowInspectorChoice: integer('allow_inspector_choice', { mode: 'boolean' }).notNull().default(false),
-    // Migration 0059 — Workers Paid PDF pipeline opt-in.
+    // Workers Paid PDF pipeline opt-in.
     // Default 0 (OFF) — keeps the Free-plan path cost-free (window.print()
     // fallback in the viewer is unaffected). Tenants on Workers Paid flip
     // this in Settings -> Reports to enable Browser-Rendering background

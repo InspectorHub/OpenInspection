@@ -11,9 +11,9 @@ const { users, slugReservations } = schema;
  * a `/book/<slug>` or `/inspector/<slug>` handle (they would shadow real app
  * routes). This is the authoritative source of truth.
  *
- * It previously lived ONLY as an `INSERT INTO slug_reservations` seed in the
- * standalone `0052_inspector_slug.sql` migration. When migrations were squashed
- * into the drizzle schema-first `0000_baseline.sql`, `db:generate` captured the
+ * It previously lived ONLY as an `INSERT INTO slug_reservations` seed in a
+ * standalone migration. When migrations were squashed into the drizzle
+ * schema-first `0000_baseline.sql`, `db:generate` captured the
  * table DDL but dropped the seed rows — leaving the blacklist empty in every
  * fresh deploy, so a customer could register `admin`, `login`, `api`, etc.
  * Encoding the list in code keeps the guard authoritative regardless of whether
@@ -87,7 +87,7 @@ function parseServiceAreas(raw: string | null): InspectorProfile['serviceAreas']
  *
  * Owns slug-related queries that back the per-inspector `/book/<slug>` link.
  * Per-tenant uniqueness is enforced by the partial unique index
- * `idx_users_slug_per_tenant` (migration 0052_inspector_slug.sql); the service
+ * `idx_users_slug_per_tenant`; the service
  * additionally consults the `slug_reservations` blacklist before allowing a
  * write so customers can't claim names that shadow real route paths.
  */
