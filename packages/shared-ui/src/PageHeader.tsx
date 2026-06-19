@@ -2,7 +2,9 @@ import React from "react";
 import { Eyebrow, type EyebrowColor } from "./Eyebrow";
 
 interface PageHeaderProps {
+  /** @deprecated Use a breadcrumb (app/components/Breadcrumb) + a Pill in `meta` instead. Do not use on new pages. */
   eyebrow?: string;
+  /** @deprecated Same as `eyebrow`. */
   eyebrowColor?: EyebrowColor;
   title: string | React.ReactNode;
   meta?: React.ReactNode;
