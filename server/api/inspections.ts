@@ -17,7 +17,7 @@
 // Routing is order-independent here anyway: all 90 paths/methods are unique and
 // Hono's router gives static segments priority over `:id` params regardless of
 // registration order.
-import { createApiRouter } from './inspections/_shared';
+import { createApiRouter } from '../lib/openapi-router';
 import templatesRoutes from './inspections/templates';
 import hierarchyRoutes from './inspections/hierarchy';
 import bulkRoutes from './inspections/bulk';
