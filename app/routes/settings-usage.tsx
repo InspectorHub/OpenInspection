@@ -1,8 +1,9 @@
 import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/settings-usage";
-import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 export function meta() {
   return [{ title: "Usage - Settings - OpenInspection" }];
@@ -24,7 +25,8 @@ interface UsageSummary {
 /* ------------------------------------------------------------------ */
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
   const res = await api.usage.summary.$get();
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
@@ -48,8 +50,10 @@ function fmtBytes(n: number): string {
 /* ------------------------------------------------------------------ */
 
 export default function SettingsUsagePage() {
-  const { usage } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
   const session = useSessionContext();
+  if ("forbidden" in data) return <AccessDenied />;
+  const { usage } = data;
   const isSaas = session?.branding?.isSaas ?? false;
 
   return (

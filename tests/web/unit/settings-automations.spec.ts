@@ -33,6 +33,11 @@ vi.mock('~/lib/session.server', () => ({
     requireToken: vi.fn(async () => 'tok-123'),
 }));
 
+// RBAC guard — admins pass; the route's forbidden branch is exercised via E2E.
+vi.mock('~/lib/access.server', () => ({
+    requireAdminLoader: vi.fn(async () => ({ forbidden: false, token: 'tok-123' })),
+}));
+
 vi.mock('~/lib/api-client.server', () => ({
     createApi: vi.fn(() => ({
         automations: {

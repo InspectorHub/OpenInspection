@@ -7,6 +7,8 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
 import { workspaceSchema } from "~/lib/forms/settings.schema";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -33,7 +35,8 @@ const THEMES = ["modern", "classic", "minimal"] as const;
 /* ------------------------------------------------------------------ */
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
   const res = await api.adminBranding.branding.$get({});
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
@@ -115,7 +118,9 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function SettingsWorkspacePage() {
-  const { branding } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
+  if ("forbidden" in data) return <AccessDenied />;
+  const { branding } = data;
   const actionData = useActionData<typeof action>();
   const [color, setColor] = useState(branding.primaryColor ?? "#6366f1");
 

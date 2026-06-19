@@ -6,6 +6,8 @@ import type { Route } from "./+types/settings-services";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { createServiceSchema } from "~/lib/forms/settings.schema";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 export function meta() {
   return [{ title: "Services & Catalog - Settings - OpenInspection" }];
@@ -38,7 +40,8 @@ interface Member {
 const SCHEDULING_ROLES = new Set(["owner", "manager", "inspector"]);
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   try {
     const api = createApi(context, { token });
     const [svcRes, discountRes, membersRes] = await Promise.all([
@@ -312,7 +315,9 @@ function QualificationWidget({ service, initialUserIds, members }: Qualification
 }
 
 export default function SettingsServices() {
-  const { services, discounts, restrictionMap, members } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
+  if ("forbidden" in data) return <AccessDenied />;
+  const { services, discounts, restrictionMap, members } = data;
   const actionData = useActionData<typeof action>();
   const [showForm, setShowForm] = useState(false);
 

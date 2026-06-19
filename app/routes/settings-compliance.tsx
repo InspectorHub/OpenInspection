@@ -3,6 +3,8 @@ import { Link, useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/settings-compliance";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 const DEFAULT_RETENTION_YEARS = 6;
 const MIN_RETENTION_YEARS = 1;
@@ -31,7 +33,8 @@ export function meta() {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
 
   const [configRes, logRes] = await Promise.all([
@@ -99,6 +102,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 export default function SettingsCompliancePage() {
   const data = useLoaderData<typeof loader>();
+  if ("forbidden" in data) return <AccessDenied />;
 
   return (
     <div className="space-y-[18px]">

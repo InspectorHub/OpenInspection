@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useLoaderData } from "react-router";
+import type { Route } from "./+types/settings-inspection-types";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
+
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const { forbidden } = await requireAdminLoader(context, request);
+  return { forbidden };
+}
 
 interface PlatformSubtype {
   slug: string;
@@ -31,12 +39,15 @@ const PLATFORM_SUBTYPES: PlatformSubtype[] = [
 const EMPTY_FORM = { name: "", basedOn: "", description: "" };
 
 export default function SettingsInspectionTypes() {
+  const { forbidden } = useLoaderData<typeof loader>();
   const [platformSubtypes] = useState<PlatformSubtype[]>(PLATFORM_SUBTYPES);
   const [orgSubtypes, setOrgSubtypes] = useState<OrgSubtype[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  if (forbidden) return <AccessDenied />;
 
   function openAdd() {
     setEditingId(null);

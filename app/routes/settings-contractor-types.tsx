@@ -4,13 +4,16 @@ import type { Route } from "./+types/settings-contractor-types";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 interface ContractorType { id: string; name: string; sortOrder: number }
 
 export function meta() { return [{ title: "Contractor Types - OpenInspection" }]; }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   try {
     const api = createApi(context, { token });
     const res = await api.contractorTypes.index.$get();
@@ -83,7 +86,9 @@ function ContractorTypeRow({ t, idx, count, onMove, onRequestDelete }: { t: Cont
 }
 
 export default function SettingsContractorTypes() {
-  const { types } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
+  if ("forbidden" in data) return <AccessDenied />;
+  const { types } = data;
   const createFetcher = useFetcher<typeof action>();
   const reorderFetcher = useFetcher<typeof action>();
   const deleteFetcher = useFetcher<typeof action>();
