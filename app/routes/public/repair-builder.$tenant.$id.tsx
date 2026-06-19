@@ -14,6 +14,7 @@ import { useLoaderData, useParams } from "react-router";
 import type { Route } from "./+types/repair-builder.$tenant.$id";
 import { createApi } from "~/lib/api-client.server";
 import { getToken } from "~/lib/session.server";
+import { PublicNotice } from "~/components/PublicNotice";
 import {
   RepairBuilderSection,
   builderCreditTotal,
@@ -211,6 +212,40 @@ export default function RepairBuilderPage() {
   const params = useParams();
   const tenant = params.tenant ?? "";
   const id = params.id ?? "";
+
+  // Standalone full-page route: render gated/error states with the shared
+  // full-page chrome (PublicNotice) so they read consistently with the rest of
+  // the public surface. (The inline Hub mount keeps RepairBuilderSection's bare
+  // mini-cards, which is correct inside the Hub's own chrome.)
+  if (result.kind === "no_access") {
+    return (
+      <PublicNotice title="Access required">
+        You need a valid token or login to view this page.
+      </PublicNotice>
+    );
+  }
+  if (result.kind === "not_published") {
+    return (
+      <PublicNotice title="Report not published">
+        The report must be published before you can build a repair request.
+      </PublicNotice>
+    );
+  }
+  if (result.kind === "forbidden") {
+    return (
+      <PublicNotice title="Feature not available">
+        The repair request builder is not enabled for this inspection company.
+      </PublicNotice>
+    );
+  }
+  if (result.kind === "error") {
+    return (
+      <PublicNotice title="Something went wrong" tone="error">
+        Unable to load the repair builder. Please try again.
+      </PublicNotice>
+    );
+  }
+
   // The internal fetchers must always post to THIS route's action regardless of
   // mount point; the standalone route's path is /repair-builder/:tenant/:id.
   const actionPath = `/repair-builder/${tenant}/${id}`;
