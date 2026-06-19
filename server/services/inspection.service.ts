@@ -5,15 +5,13 @@ import { contacts } from '../lib/db/schema/contact';
 import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../lib/report-utils';
 import { mapRatingSystemLevels } from '../lib/map-rating-levels';
-import { z } from 'zod';
-import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema, type CoverCrop, type PhotoCrop } from '../lib/validations/inspection.schema';
+import { type CoverCrop, type PhotoCrop } from '../lib/validations/inspection.schema';
 
 import { ScopedDB } from '../lib/db/scoped';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate, safeTimestamp } from '../lib/date';
-import { AutomationService } from './automation.service';
 import { logger } from '../lib/logger';
-import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../lib/recommendation-categories';
+import { RECOMMENDATION_CATEGORIES } from '../lib/recommendation-categories';
 import { computePreflightFromData } from '../lib/preflight';
 import { decideFieldWrite, applyFieldWrite } from '../lib/field-version';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
@@ -21,12 +19,11 @@ import type { AgreementService } from './agreement.service';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../lib/finding-key';
 import { mapRepairItems } from '../lib/report-repair-items';
 import { parseReinspectionStatuses, isOpenStatus } from '../lib/reinspection-status';
-import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
-import { renderTemplate, listUnresolved } from '../lib/mustache';
+import { renderTemplate } from '../lib/mustache';
 import { selectReportMedia, type ReportMediaContext } from '../lib/report-video';
 import { InvoiceService } from './invoice.service';
 import type { DefectCommentState } from '../types/inspection-item-state';
-import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
+import type { TemplateSchemaV2 } from '../types/template-schema';
 import { sha256Hex } from './signing-key.service';
 import { RENDER_VERSION } from '../lib/pdf';
 import { stripExifOnIngest, type ImagesBinding } from '../lib/media/strip-exif';
@@ -37,258 +34,62 @@ import { resolvePdfSettings, type PdfSettings } from '../lib/pdf-settings';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../lib/status/report-status';
 
-/**
- * Media Studio (cover crop) — resolves the cover image URL, preferring the
- * baked cropped derivative (`coverImageKey`) over the uncropped source
- * (`coverPhotoId`). Returns null when neither is set.
- */
-export function resolveCoverUrl(
-  ins: { coverImageKey?: string | null; coverPhotoId?: string | null },
-  makePhotoUrl: (key: string) => string,
-): string | null {
-  const key = ins.coverImageKey ?? ins.coverPhotoId;
-  return key ? makePhotoUrl(key) : null;
-}
-
-/** Slug → label map for resolving aggregated recommendation badges in
- *  getReportData. Built once at module load. */
-const RECOMMENDATION_CATEGORY_LABELS = new Map<string, string>(
-    RECOMMENDATION_CATEGORIES.map(c => [c.id, c.label]),
-);
-
-/**
- * Sprint 2 S2-3 / S2-4 — sanitize the new per-defect fields on every
- * inspection-results write. Mutates the supplied `data` record in place.
- *
- *   - `recommendationId` must be one of {@link RECOMMENDATION_CATEGORY_IDS};
- *     unknown slugs are dropped (set to null) so an outdated client doesn't
- *     poison the JSON payload.
- *   - `estimateLow` / `estimateHigh` must be non-negative finite integers
- *     (cents). Anything else collapses to null.
- *
- * The sanitizer is intentionally lossy + per-row: a single malformed defect
- * does not reject the whole patch. Mirrors the canned-comment + photo merge
- * strategy used elsewhere in updateResults().
- */
-export function sanitizeDefectStates(data: Record<string, unknown>): void {
-    const validSlugs = new Set<string>(RECOMMENDATION_CATEGORY_IDS);
-    for (const key of Object.keys(data)) {
-        const entry = data[key] as { tabs?: { defects?: unknown } } | null | undefined;
-        if (!entry || typeof entry !== 'object') continue;
-        const defects = entry.tabs?.defects;
-        if (!Array.isArray(defects)) continue;
-        for (const d of defects as Array<Record<string, unknown>>) {
-            if (!d || typeof d !== 'object') continue;
-            // recommendationId — string slug or null
-            if ('recommendationId' in d) {
-                const v = d.recommendationId;
-                d.recommendationId = (typeof v === 'string' && validSlugs.has(v)) ? v : null;
-            }
-            // estimateLow / estimateHigh — non-negative integers (cents) or null
-            for (const side of ['estimateLow', 'estimateHigh'] as const) {
-                if (side in d) {
-                    const v = d[side];
-                    if (typeof v === 'number' && Number.isFinite(v) && v >= 0) {
-                        d[side] = Math.round(v);
-                    } else {
-                        d[side] = null;
-                    }
-                }
-            }
-            // trade / deadline / timeframe — enum or null (drop unknown values)
-            if ('trade' in d) {
-                d.trade = isDefectTrade(d.trade) ? d.trade : null;
-            }
-            if ('deadline' in d) {
-                d.deadline = isDefectDeadline(d.deadline) ? d.deadline : null;
-            }
-            if ('timeframe' in d) {
-                d.timeframe = isDefectTimeframe(d.timeframe) ? d.timeframe : null;
-            }
-        }
-    }
-}
-
-/**
- * Returns the trigger Promise so callers can keep the worker isolate alive
- * via `c.executionCtx.waitUntil(...)`. The previous fire-and-forget version
- * dangled the promise — CF Workers terminated the isolate after the
- * response was sent, so AutomationService.trigger never inserted the
- * automation_logs row, and report.published / inspection.confirmed /
- * inspection.cancelled / inspection.created automations never fired.
- */
-function fireAutomation(db: D1Database, tenantId: string, inspectionId: string, event: string): Promise<void> {
-    return new AutomationService(db)
-        .trigger({ tenantId, inspectionId, triggerEvent: event, companyName: '', reportBaseUrl: '' })
-        .catch(err => logger.error('automation trigger failed', { event }, err instanceof Error ? err : undefined));
-}
-
-// mapRatingSystemLevels moved to ../lib/map-rating-levels (B-18: pure +
-// unit-tested so the pausesAdvance passthrough can't silently regress).
-
-/**
- * Resolve a defect-state row into the variables consumed by the Mustache
- * renderer when substituting tokens like `{{location}}` / `{{trade}}` in
- * canned-comment prose. Falls back to the template's default `location`
- * when the inspector hasn't filled an inspection-specific override.
- */
-function stringifyAttributeValue(v: unknown): string | null {
-    if (v === null || v === undefined) return null;
-    if (typeof v === 'string') return v.length > 0 ? v : null;
-    if (typeof v === 'number' && Number.isFinite(v)) return String(v);
-    if (typeof v === 'boolean') return v ? 'yes' : 'no';
-    return null;
-}
-
-function resolveDefectMustacheVars(
-    st: DefectCommentState | undefined,
-    d: CannedDefect,
-    itemAttributes?: Record<string, unknown>,
-): Record<string, string | null> {
-    const location = (typeof st?.location === 'string' && st.location.length > 0)
-        ? st.location
-        : (d.location || null);
-    const vars: Record<string, string | null> = {
-        location,
-        trade:     st?.trade     ? DEFECT_TRADE_LABELS[st.trade]         : null,
-        deadline:  st?.deadline  ? DEFECT_DEADLINE_LABELS[st.deadline]   : null,
-        timeframe: st?.timeframe ? DEFECT_TIMEFRAME_LABELS[st.timeframe] : null,
-    };
-    if (itemAttributes) {
-        for (const [k, v] of Object.entries(itemAttributes)) {
-            if (k in vars) continue; // defect-level vars take precedence
-            vars[k] = stringifyAttributeValue(v);
-        }
-    }
-    return vars;
-}
-
-export interface PublishBlockingDefect {
-    sectionId:        string;
-    sectionTitle:     string;
-    itemId:           string;
-    itemLabel:        string;
-    cannedId:         string;
-    cannedTitle:      string;
-    missing:          Array<'location' | 'trade'>;
-    unresolvedTokens: string[];
-}
-
-/** Track H (IA-7 / P-6②) — which defect fields the publish gate REQUIRES.
- *  Resolved as inspection override ?? tenant default ?? 'none' (loose). */
-export type RequireDefectFields = 'none' | 'location' | 'trade' | 'both';
-
-/** Pure resolution of the two-level config — override (NULL = inherit)
- *  beats the tenant default; both unset → 'none' (loose). */
-export function resolveRequireDefectFields(
-    override: RequireDefectFields | null | undefined,
-    tenantDefault: RequireDefectFields | null | undefined,
-): RequireDefectFields {
-    return override ?? tenantDefault ?? 'none';
-}
-
-export interface PublishReadiness {
-    ready: boolean;
-    blockingDefects: PublishBlockingDefect[];
-    /** Track H (IA-7) — incomplete-but-not-required defects: surfaced as a
-     *  yellow warning on the publish gate, never a block. */
-    warningDefects: PublishBlockingDefect[];
-}
-
-/**
- * Task 12 — pure function: walks the template schema + inspection results
- * and returns the set of included defects that are missing fields
- * (location and/or trade) or have unresolved Mustache tokens.
- *
- * Track H (IA-7 / P-6②): which missing fields BLOCK is now configurable.
- *   - A field in `requirement` missing → the defect blocks publish.
- *   - A field missing but NOT required → the defect lands in warningDefects.
- *   - Unresolved tokens ALWAYS block: the canned prose references a variable
- *     ({{location}}, {{brand}}, …) that would render as a literal gap in the
- *     report — that's broken content, not a policy choice.
- * The parameter defaults to 'both' (the legacy behavior) so existing pure
- * callers are unaffected; the SERVICE resolves the tenant/inspection config.
- */
-export function computePublishReadinessFromState(
-    schema: TemplateSchemaV2,
-    results: Record<string, unknown>,
-    requirement: RequireDefectFields = 'both',
-): PublishReadiness {
-    const requireLocation = requirement === 'location' || requirement === 'both';
-    const requireTrade = requirement === 'trade' || requirement === 'both';
-    const blocking: PublishBlockingDefect[] = [];
-    const warnings: PublishBlockingDefect[] = [];
-    for (const section of schema.sections ?? []) {
-        for (const item of section.items ?? []) {
-            if (item.type !== 'rich') continue;
-            const defectsTpl = item.tabs?.defects ?? [];
-            const entry = results[item.id] as { tabs?: { defects?: DefectCommentState[] }; attributes?: Record<string, unknown> } | undefined;
-            const stateRows = entry?.tabs?.defects ?? [];
-            const stateById = new Map(stateRows.map(d => [d.cannedId, d]));
-            const itemAttrVars: Record<string, string | null> = {};
-            if (entry?.attributes) {
-                for (const [k, v] of Object.entries(entry.attributes)) {
-                    itemAttrVars[k] = stringifyAttributeValue(v);
-                }
-            }
-            for (const d of defectsTpl) {
-                const st = stateById.get(d.id);
-                const included = st ? !!st.included : !!d.default;
-                if (!included) continue;
-                const missing: Array<'location' | 'trade'> = [];
-                const hasLocation = (typeof st?.location === 'string' && st.location.length > 0)
-                    || (typeof d.location === 'string' && d.location.length > 0);
-                if (!hasLocation) missing.push('location');
-                if (!st?.trade) missing.push('trade');
-                const effectiveComment = (st?.comment && st.comment.length > 0) ? st.comment : d.comment;
-                const unresolved = listUnresolved(effectiveComment, {
-                    location:  hasLocation ? 'x' : null,
-                    trade:     st?.trade     ?? null,
-                    deadline:  st?.deadline  ?? null,
-                    timeframe: st?.timeframe ?? null,
-                    ...itemAttrVars,
-                });
-                if (missing.length === 0 && unresolved.length === 0) continue;
-                const requiredMissing = missing.filter(f =>
-                    (f === 'location' && requireLocation) || (f === 'trade' && requireTrade));
-                const target = (requiredMissing.length > 0 || unresolved.length > 0) ? blocking : warnings;
-                target.push({
-                    sectionId:        section.id,
-                    sectionTitle:     section.title,
-                    itemId:           item.id,
-                    itemLabel:        item.label,
-                    cannedId:         d.id,
-                    cannedTitle:      d.title,
-                    missing,
-                    unresolvedTokens: unresolved,
-                });
-            }
-        }
-    }
-    return { ready: blocking.length === 0, blockingDefects: blocking, warningDefects: warnings };
-}
-
-type Inspection = z.infer<typeof InspectionSchema>;
-type InspectionListParams = z.infer<typeof InspectionListQuerySchema>;
-type CreateInspectionData = z.infer<typeof CreateInspectionSchema>;
-
-/** Round-2 backlog G1 — Property Facts strip payload. Mirrors the canonical
- *  Zod shape declared in inspection.schema.ts (PropertyFactsSchema). */
-type PropertyFactFoundation = 'basement' | 'slab' | 'crawlspace' | 'other';
-export interface PropertyFacts {
-    yearBuilt:      number | null;
-    sqft:           number | null;
-    foundationType: PropertyFactFoundation | null;
-    lotSize:        string | null;
-    bedrooms:       number | null;
-    bathrooms:      number | null;
-}
+// Module-level types, constants, and pure helpers now live in
+// ./inspection/shared.ts (single source of truth shared by the facade + every
+// sub-service). Re-exported here so the public API surface of this module is
+// unchanged (callers + tests still import these from 'inspection.service').
+import {
+    resolveCoverUrl,
+    RECOMMENDATION_CATEGORY_LABELS,
+    sanitizeDefectStates,
+    fireAutomation,
+    resolveDefectMustacheVars,
+    resolveRequireDefectFields,
+    computePublishReadinessFromState,
+    rankCannedCommentsForItem,
+    type PublishBlockingDefect,
+    type RequireDefectFields,
+    type PublishReadiness,
+    type Inspection,
+    type InspectionListParams,
+    type CreateInspectionData,
+    type PropertyFacts,
+    type PropertyFactFoundation,
+    type CannedRatingBucket,
+    type CannedCommentLike,
+    type RankCommentsOpts,
+} from './inspection/shared';
+import { InspectionSharingService } from './inspection/inspection-sharing.service';
+export {
+    resolveCoverUrl,
+    sanitizeDefectStates,
+    resolveRequireDefectFields,
+    computePublishReadinessFromState,
+    rankCannedCommentsForItem,
+};
+export type {
+    PublishBlockingDefect,
+    RequireDefectFields,
+    PublishReadiness,
+    PropertyFacts,
+    CannedRatingBucket,
+    CannedCommentLike,
+    RankCommentsOpts,
+};
 
 /**
  * Service to handle all inspection-related business logic.
  */
 export class InspectionService {
-    constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB, private kv?: KVNamespace, private images?: ImagesBinding) {}
+    // Sub-services that own a focused slice of the former monolith. Each is
+    // constructed from the same injected deps (positional construction of the
+    // facade itself is unchanged). The facade delegates its public methods to
+    // these — see the delegation stubs below.
+    private readonly sharing: InspectionSharingService;
+
+    constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB, kv?: KVNamespace, private images?: ImagesBinding) {
+        this.sharing = new InspectionSharingService(db, r2, sdb, kv, images);
+    }
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -3819,30 +3620,14 @@ export class InspectionService {
      * The token grants read-only access to the report without requiring login.
      */
     async generateAgentViewToken(tenantId: string, inspectionId: string): Promise<string> {
-        const db = this.getDrizzle();
-        const rows = await db.select({ id: inspections.id })
-            .from(inspections)
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-            .limit(1);
-        if (!rows[0]) throw Errors.NotFound('Inspection not found');
-        if (!this.kv) throw Errors.Internal('KV not available');
-
-        const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
-        await this.kv.put(`agent_view_token:${token}`, `${inspectionId}:${tenantId}`, {
-            expirationTtl: 30 * 24 * 60 * 60,
-        });
-        return token;
+        return this.sharing.generateAgentViewToken(tenantId, inspectionId);
     }
 
     /**
      * Resolves an agent view token from KV.
      */
     async resolveAgentViewToken(token: string): Promise<{ inspectionId: string; tenantId: string } | null> {
-        if (!this.kv) return null;
-        const val = await this.kv.get(`agent_view_token:${token}`);
-        if (!val) return null;
-        const [inspectionId, tenantId] = val.split(':');
-        return { inspectionId, tenantId };
+        return this.sharing.resolveAgentViewToken(token);
     }
 
     /**
@@ -3982,74 +3767,4 @@ export class InspectionService {
             license,
         };
     }
-}
-
-// -----------------------------------------------------------------------
-// Sprint 1 Sub-spec A Task 5 — ITEM-aware Quick Comments ranking helper.
-//
-// Scores a list of canned comments against the active item label so that
-// the QUICK COMMENTS panel surfaces the most relevant entries first.
-// Pure function (no DB) — exported for unit-test isolation; the API caller
-// is expected to fetch the section's comments first, then rank in memory.
-// -----------------------------------------------------------------------
-
-export type CannedRatingBucket = 'satisfactory' | 'monitor' | 'defect' | null;
-
-export interface CannedCommentLike {
-    id:            string;
-    text:          string;
-    section?:      string | null;
-    category?:     string | null;
-    ratingBucket?: CannedRatingBucket;
-}
-
-export interface RankCommentsOpts {
-    section:    string;
-    itemLabel:  string;
-    rating?:    'satisfactory' | 'monitor' | 'defect';
-    limit?:     number;
-}
-
-function tokenize(input: string): string[] {
-    return (input || '')
-        .toLowerCase()
-        .split(/[^a-z0-9]+/i)
-        .filter(t => t.length >= 3);
-}
-
-function scoreCanned(c: CannedCommentLike, opts: RankCommentsOpts): number {
-    const lcItem = (opts.itemLabel || '').toLowerCase().trim();
-    const itemTokens = tokenize(opts.itemLabel);
-    const lcCategory = (c.category || '').toLowerCase();
-    const lcText = (c.text || '').toLowerCase();
-    const lcSection = (c.section || '').toLowerCase();
-
-    let s = 0;
-    // Strongest signal: category exactly matches the item label.
-    if (lcCategory && lcCategory === lcItem) s += 100;
-    // Substring overlap (either direction) — handles "Gutters" vs "Gutters & Downspouts".
-    else if (lcCategory && (lcCategory.includes(lcItem) || lcItem.includes(lcCategory))) s += 60;
-    // Comment text contains all item tokens (length >= 3 each).
-    if (itemTokens.length > 0) {
-        const hits = itemTokens.filter(t => lcText.includes(t) || lcCategory.includes(t)).length;
-        if (hits === itemTokens.length) s += 40;
-        else if (hits > 0) s += 20 * (hits / itemTokens.length);
-    }
-    // Section match.
-    if (lcSection && lcSection === opts.section.toLowerCase()) s += 10;
-    // Rating-bucket boost when caller knows the active item's rating.
-    if (opts.rating && c.ratingBucket === opts.rating) s += 5;
-    return s;
-}
-
-export function rankCannedCommentsForItem<T extends CannedCommentLike>(
-    comments: T[],
-    opts: RankCommentsOpts,
-): T[] {
-    if (!Array.isArray(comments) || comments.length === 0) return [];
-    const scored = comments.map((c, idx) => ({ c, s: scoreCanned(c, opts), idx }));
-    // Stable sort: higher score first, then preserve original order for ties.
-    scored.sort((a, b) => (b.s - a.s) || (a.idx - b.idx));
-    const out = scored.map(x => x.c);
-    return typeof opts.limit === 'number' ? out.slice(0, opts.limit) : out;
 }
