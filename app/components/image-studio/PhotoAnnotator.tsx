@@ -3,7 +3,8 @@ import { Stage, Layer, Image as KonvaImage, Circle, Arrow, Line, Label, Tag, Tex
 import type Konva from "konva";
 import {
   ANNOTATION_COLOR,
-  deserializeAnnotations,
+  deserializeMeasureDoc,
+  serializeMeasureDoc,
   type Annotation,
   type Point,
 } from "./annotations";
@@ -103,7 +104,16 @@ export function PhotoAnnotator({
   /* -------------------------------------------------------------- */
   useEffect(() => {
     if (!open) return;
-    setAnnotations(deserializeAnnotations(initialAnnotationsJson));
+    // P6 — seed annotations AND restore measure shapes + calibration so a
+    // measurement survives reopen. `measure` annotations rebuild the visual
+    // measure lines; the calibration restores px-per-unit.
+    const doc = deserializeMeasureDoc(initialAnnotationsJson);
+    setAnnotations(doc.annotations.filter((a) => a.kind !== "measure"));
+    setMeasures(
+      doc.annotations
+        .filter((a): a is Extract<Annotation, { kind: "measure" }> => a.kind === "measure")
+        .map((m) => ({ a: { x: m.x, y: m.y }, b: { x: m.x2, y: m.y2 } })),
+    );
     setCaption(sectionName || "");
     setZoom(1);
     setTool("circle");
@@ -114,10 +124,10 @@ export function PhotoAnnotator({
     setLabelInput(null);
     setLabelText("");
     setShowCalibration(false);
-    setPxPerUnit(null);
+    setPxPerUnit(doc.calibration?.pxPerUnit ?? null);
     setCalibLine(null);
     setCalibKnown("");
-    setMeasures([]);
+    setCalibUnit(doc.calibration?.calibUnit ?? "in");
   }, [open, sectionName, initialAnnotationsJson]);
 
   /* -------------------------------------------------------------- */
@@ -316,8 +326,14 @@ export function PhotoAnnotator({
       );
     }
     if (!blob) return;
-    onSave({ blob, nodesJson: JSON.stringify(annotations), caption });
-  }, [annotations, caption, scale, onSave]);
+    // P6 — derive `measure` annotations from the committed measure lines and
+    // serialize them together with the calibration so measurements persist.
+    const measureAnns: Annotation[] = measures.map((m) => ({
+      kind: "measure", x: m.a.x, y: m.a.y, x2: m.b.x, y2: m.b.y, unit: calibUnit,
+    }));
+    const calibration = pxPerUnit != null ? { pxPerUnit, calibUnit } : null;
+    onSave({ blob, nodesJson: serializeMeasureDoc([...annotations, ...measureAnns], calibration), caption });
+  }, [annotations, measures, calibUnit, pxPerUnit, caption, scale, onSave]);
 
   /* -------------------------------------------------------------- */
   /* Render                                                          */
