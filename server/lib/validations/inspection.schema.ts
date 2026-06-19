@@ -648,3 +648,18 @@ export const CoverCropSchema = z.object({
     height: z.number().positive(),
 });
 export type CoverCrop = z.infer<typeof CoverCropSchema>;
+
+/**
+ * Image Studio (Plan 4) — re-editable crop transform for an inspection-item or
+ * per-defect photo. Unlike CoverCropSchema, the aspect may be 'free' (item/defect
+ * photos are not constrained to cover ratios). Coords are source-pixel.
+ */
+export const PhotoCropSchema = z.object({
+    aspect: z.enum(['free', '3:2', '16:9', '1.91:1', '4:3']),
+    orientation: z.enum(['landscape', 'portrait']),
+    x: z.number().min(0),
+    y: z.number().min(0),
+    width: z.number().positive(),
+    height: z.number().positive(),
+});
+export type PhotoCrop = z.infer<typeof PhotoCropSchema>;

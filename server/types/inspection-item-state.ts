@@ -16,6 +16,19 @@
 import type { DefectCategory } from './template-schema';
 import type { DefectTrade, DefectDeadline, DefectTimeframe } from './defect-fields';
 
+/** Plan 4: per-photo entry. croppedKey/crop are additive — no migration (JSON column). */
+export interface PhotoEntry {
+    key: string;
+    /** Plan 4 — baked cropped JPEG derivative; report precedence annotatedKey||croppedKey||key. */
+    croppedKey?: string;
+    /** Plan 4 — re-editable crop transform in source-pixel coords (free aspect or a preset). */
+    crop?: { aspect: string; orientation: 'landscape' | 'portrait'; x: number; y: number; width: number; height: number };
+    /** Annotated composite PNG (baked ON TOP of croppedKey when present). */
+    annotatedKey?: string;
+    /** Konva node tree + measure calibration JSON. */
+    annotationsJson?: string;
+}
+
 /**
  * State for a non-defect canned comment (Information / Limitations).
  * `cannedId` references the corresponding entry in the template's
@@ -42,7 +55,7 @@ export interface DefectCommentState {
     trade?: DefectTrade | null;
     deadline?: DefectDeadline | null;
     timeframe?: DefectTimeframe | null;
-    photos?: Array<{ key: string; annotatedKey?: string; annotationsJson?: string }>;
+    photos?: Array<PhotoEntry>;
 }
 
 /**
@@ -54,7 +67,7 @@ export interface InspectionItemState {
     /** Free-text notes (legacy field — still supported alongside tabs). */
     notes?: string;
     /** Item-level photos (legacy bucket — still supported). */
-    photos?: Array<{ key: string; annotatedKey?: string; annotationsJson?: string }>;
+    photos?: Array<PhotoEntry>;
     /** New v2 tab state. Optional so legacy item-results render cleanly. */
     tabs?: {
         information?: CannedCommentState[];
