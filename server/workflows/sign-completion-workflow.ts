@@ -43,6 +43,28 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         const { requestId, tenantId, tenantSlug } = event.payload;
         const env = this.env;
 
+        // The render URL's :tenant segment MUST be non-empty or the Hono route
+        // /m2m/agreement-render/:tenant/:id won't match — an empty segment yields
+        // /agreement-render//<id>, which 404s at the router and Browser Rendering
+        // then rasterizes that "Not found" page into signed.pdf (the production
+        // incident). The public sign route (/api/public/agreements/:token/sign)
+        // carries NO :tenant segment, so the enqueuing context's
+        // requestedTenantSlug — hence payload.tenantSlug — can be ''. Resolve the
+        // canonical slug from tenantId here as the authoritative source. The
+        // render handler no longer gates on the slug value, but it still needs a
+        // non-empty segment to route; 'render' is a safe last-resort placeholder.
+        const renderSlug = await step.do('resolve-tenant-slug', async () => {
+            if (tenantSlug) return tenantSlug;
+            try {
+                const db = drizzle(env.DB, { schema });
+                const row = await db.select({ slug: schema.tenants.slug })
+                    .from(schema.tenants).where(eq(schema.tenants.id, tenantId)).get();
+                return row?.slug || 'render';
+            } catch {
+                return 'render';
+            }
+        });
+
         // Step 1 — render canonical signed PDF (best-effort; if BR is not
         // provisioned at the account level, returns null + chain still extends)
         const signedPdfMeta = await step.do('render-canonical-pdf', {
@@ -51,7 +73,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         }, async () => {
             try {
                 return await renderPdfToR2(env, {
-                    renderUrl: m2mAgreementRenderUrl(baseHost(env), tenantSlug, requestId),
+                    renderUrl: m2mAgreementRenderUrl(baseHost(env), renderSlug, requestId),
                     r2Key: `tenants/${tenantId}/agreements/${requestId}/signed.pdf`,
                 });
             } catch (e) {
@@ -149,7 +171,14 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         // Best-effort: skip cleanly if Resend not configured or any artifact is missing.
         await step.do('email-parties', async () => {
             try {
-                if (!evidenceZipMeta || !signedPdfMeta) return;
+                // Require ALL three artifacts before sending. Previously the cert
+                // was omitted from this guard, so a failed Certificate-of-
+                // Completion render still shipped the email with an incomplete
+                // evidence pack (a 0-byte certificate.pdf the client could not
+                // open). The workflow is re-runnable (id = requestId), so on a
+                // transient render failure the admin re-run delivers the complete
+                // pack rather than the client receiving a broken one.
+                if (!evidenceZipMeta || !signedPdfMeta || !certPdfMeta) return;
                 if (!env.RESEND_API_KEY) return;
                 if (!env.PHOTOS) return;
                 const db = drizzle(env.DB, { schema });
@@ -194,9 +223,22 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
  * gated by the token-in-URL secret (no Authorization header needed —
  * Browser Run does not reliably forward custom headers).
  */
-async function renderPdfToR2(env: AppEnv, opts: { renderUrl: string; r2Key: string }): Promise<{ r2Key: string; sha256: string; sizeBytes: number }> {
+export async function renderPdfToR2(env: AppEnv, opts: { renderUrl: string; r2Key: string }): Promise<{ r2Key: string; sha256: string; sizeBytes: number }> {
     if (!env.PHOTOS) throw new Error('storage R2 bucket not configured');
     if (!env.BROWSER) throw new Error('BROWSER binding not configured');
+
+    // Preflight the render target BEFORE handing it to Browser Rendering. BR
+    // rasterizes whatever page it can load — including HTTP error pages: a 404
+    // "Not found" renders to a perfectly valid (but wrong) PDF, and
+    // quickAction() reports only whether the BR *service* succeeded, never the
+    // target page's status. Without this probe a broken render URL silently
+    // produced a "Not found" signed.pdf that was emailed + zipped to the client
+    // (production incident). Refuse to render anything but a 200 — the caller's
+    // try/catch turns this into a null artifact, which the email/zip steps skip.
+    const probe = await fetch(opts.renderUrl);
+    if (!probe.ok) {
+        throw new Error(`render target returned HTTP ${probe.status}: ${opts.renderUrl}`);
+    }
 
     console.info('[sign-workflow] BR quickAction("pdf")', { renderUrl: opts.renderUrl });
     const res = await env.BROWSER.quickAction('pdf', { url: opts.renderUrl });

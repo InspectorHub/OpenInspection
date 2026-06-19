@@ -29,12 +29,17 @@ export async function buildEvidencePack(opts: BuildEvidencePackOpts): Promise<Ar
     const certBytes = certObj
         ? new Uint8Array(await new Response(certObj.body).arrayBuffer())
         : new Uint8Array();
-    const zipped = zipSync({
-        'signed.pdf': signedBytes,
-        'certificate.pdf': certBytes,
+    // OMIT any artifact that is missing/empty rather than writing a 0-byte entry.
+    // A 0-byte PDF "opens with an error" in every viewer — strictly worse than
+    // its absence (production incident: a failed cert render shipped a 0-byte
+    // certificate.pdf the client could not open).
+    const entries: Record<string, Uint8Array> = {
         'audit-trail.json': strToU8(auditTrailJson),
         'public-key.pem': strToU8(publicKeyPem),
-    });
+    };
+    if (signedBytes.length > 0) entries['signed.pdf'] = signedBytes;
+    if (certBytes.length > 0) entries['certificate.pdf'] = certBytes;
+    const zipped = zipSync(entries);
     // Copy into a plain ArrayBuffer (zipped.buffer may be ArrayBufferLike)
     return zipped.buffer.slice(0) as ArrayBuffer;
 }
