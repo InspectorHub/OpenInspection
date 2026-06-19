@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import Sortable from "sortablejs";
+import { resolvePhotoDisplayKey } from "./photo-display-key";
 
 export interface StripPhoto {
   key: string;
+  croppedKey?: string;
   annotatedKey?: string;
 }
 
@@ -41,8 +43,9 @@ export interface ItemPhotoStripProps {
   onBulkMove?: (indices: number[], to: { itemId: string; sectionId?: string }) => void;
 }
 
-/** The visible thumbnail = the edited derivative when present, else the original. */
-const displayKey = (p: StripPhoto) => p.annotatedKey || p.key;
+/** The visible thumbnail = the edited derivative when present, else the original.
+ *  Plan 4: delegates to the shared resolver (annotatedKey || croppedKey || key). */
+const displayKey = (p: StripPhoto) => resolvePhotoDisplayKey(p);
 
 export function ItemPhotoStrip({
   inspectionId: _inspectionId,
