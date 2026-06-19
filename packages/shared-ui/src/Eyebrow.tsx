@@ -1,3 +1,4 @@
+/** @deprecated See the 2026-06-18 eyebrow deprecation. Detail/hierarchy pages now use a breadcrumb + a status Pill in PageHeader `meta`. Component retained for backward compatibility; evaluate removal once all pages have migrated. */
 import React from "react";
 
 export type EyebrowColor = "slate" | "indigo" | "emerald" | "amber" | "rose";

@@ -5,8 +5,9 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { deriveBlockStates, formatCents, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
-import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished } from "~/lib/status";
+import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
+import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 import DocumentsSection, {
   type DocumentItem,
@@ -342,18 +343,6 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Status humanization                                               */
-/* ------------------------------------------------------------------ */
-
-/** snake_case status → Title Case for the eyebrow (e.g. "in_progress" → "In Progress"). */
-function humanizeStatus(status: string): string {
-  return status
-    .split("_")
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(" ");
-}
-
-/* ------------------------------------------------------------------ */
 /*  Report action matrix (pure — testable)                            */
 /* ------------------------------------------------------------------ */
 
@@ -569,18 +558,29 @@ export default function InspectionHubPage() {
 
   return (
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
-      {/* PageHeader — status eyebrow, address title, date + inspector meta */}
+      {/* Breadcrumb — Inspections > this inspection */}
+      <Breadcrumb
+        items={[
+          { label: "Inspections", href: "/inspections" },
+          { label: inspection.propertyAddress || "Untitled inspection" },
+        ]}
+      />
+
+      {/* PageHeader — status pill in meta, address title, date + inspector meta */}
       <PageHeader
-        eyebrow={humanizeStatus(inspection.status)}
-        eyebrowColor="indigo"
         title={inspection.propertyAddress || "Untitled inspection"}
         meta={
-          <>
-            {formatInspectionDateTime(inspection.date)}
+          <span className="flex items-center gap-2 flex-wrap">
+            <Pill tone={statusTone(inspection.status)}>
+              {humanizeStatus(inspection.status)}
+            </Pill>
+            <span className="text-ih-fg-3">
+              {formatInspectionDateTime(inspection.date)}
+            </span>
             {people.inspector?.name && (
-              <span> &middot; {people.inspector.name}</span>
+              <span className="text-ih-fg-3">&middot; {people.inspector.name}</span>
             )}
-          </>
+          </span>
         }
         actions={
           <>
