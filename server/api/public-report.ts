@@ -570,7 +570,19 @@ export const publicReportRoutes = createApiRouter()
             : ownerPreview
                 ? (key: string) => `/api/inspections/${id}/photo?key=${encodeURIComponent(key)}`
                 : (key: string) => `/api/public/report/${tenant}/${id}/photo?key=${encodeURIComponent(key)}&token=${encodeURIComponent(tk)}`;
-        const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl);
+        // Plan 7 — video media context. `renderMode` (the render-token/PDF path)
+        // forces video entries to a poster + QR (the headless PDF browser cannot
+        // embed a player). The Stream customer subdomain is read from env; absent
+        // ⇒ fail closed (selectReportMedia degrades video → image, never a
+        // fabricated subdomain). appBaseUrl is the request origin for the QR deep
+        // link.
+        const streamCustomerSubdomain = c.env.STREAM_CUSTOMER_SUBDOMAIN ?? '';
+        const appBaseUrl = new URL(c.req.url).origin;
+        const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl, {
+            isPdf: renderMode,
+            streamCustomerSubdomain,
+            appBaseUrl,
+        });
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(reportPhotoRoute, async (c) => {

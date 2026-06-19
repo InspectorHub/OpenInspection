@@ -23,6 +23,7 @@ import { mapRepairItems } from '../lib/report-repair-items';
 import { parseReinspectionStatuses, isOpenStatus } from '../lib/reinspection-status';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
 import { renderTemplate, listUnresolved } from '../lib/mustache';
+import { selectReportMedia, type ReportMediaContext } from '../lib/report-video';
 import { InvoiceService } from './invoice.service';
 import type { DefectCommentState } from '../types/inspection-item-state';
 import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
@@ -2077,6 +2078,11 @@ export class InspectionService {
         tenantId: string,
         makePhotoUrl: (key: string) => string =
             (key) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`,
+        // Plan 7 — video walk-through. When present, each media entry is enriched
+        // with its resolved kind (image / video-player / video-poster) so the web
+        // report + PDF render chain can branch. Absent (legacy callers) ⇒ photos
+        // resolve exactly as before (image only).
+        videoCtx?: ReportMediaContext,
     ) {
         const db = this.getDrizzle();
 
@@ -2104,7 +2110,7 @@ export class InspectionService {
         // legacy templates without these fields render unchanged.
         interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[]; disclaimerText?: string | null; alwaysPageBreak?: boolean }
         interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
-        interface PhotoEntry        { key: string; croppedKey?: string; annotatedKey?: string; annotationsJson?: string }
+        interface PhotoEntry        { key: string; croppedKey?: string; annotatedKey?: string; annotationsJson?: string; mediaType?: 'photo' | 'video'; streamUid?: string; posterPct?: number; durationSec?: number }
         // Sprint 2 S2-3 / S2-4 — per-defect recommendation slug + repair
         // estimate range (cents). All optional so legacy defects render.
         interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[]; recommendationId?: string | null; estimateLow?: number | null; estimateHigh?: number | null; trade?: string | null; deadline?: string | null; timeframe?: string | null }
@@ -2197,6 +2203,23 @@ export class InspectionService {
 
         const stats = computeReportStats(schemaData.sections, resultData, levels);
 
+        // Plan 7 — map a stored media entry → its report photo object. Photos keep
+        // the existing { key: displayKey, originalKey, url } shape; videos additionally
+        // carry the resolved media kind (player vs poster) when `videoCtx` is present.
+        // Without `videoCtx` (legacy callers) it degrades to the photo-only shape.
+        const mapReportPhoto = (p: PhotoEntry) => {
+            const isVideo = p.mediaType === 'video';
+            const displayKey = p.annotatedKey || p.croppedKey || p.key;
+            const url = isVideo ? '' : makePhotoUrl(displayKey);
+            const base = { key: displayKey, originalKey: p.key, url };
+            if (!videoCtx) return base;
+            const media = selectReportMedia(
+                { key: displayKey, url, mediaType: p.mediaType, streamUid: p.streamUid, posterPct: p.posterPct, durationSec: p.durationSec },
+                videoCtx,
+            );
+            return { ...base, media };
+        };
+
         // Spec 5B helper — for a given item, resolve the effective set of
         // included comments per tab. Honors per-inspection toggles + text
         // overrides, falling back to the template's `default: true` flag.
@@ -2238,14 +2261,8 @@ export class InspectionService {
                 const level = levels.find((l: RatingLevel) => l.id === ratingId);
 
                 // Phase T (T16): prefer annotated composite when present; expose original via originalKey.
-                const photos = (res.photos || []).map((p: PhotoEntry) => {
-                    const displayKey = p.annotatedKey || p.croppedKey || p.key;
-                    return {
-                        key: displayKey,
-                        originalKey: p.key,
-                        url: makePhotoUrl(displayKey),
-                    };
-                });
+                // Plan 7: mapReportPhoto enriches video entries with their media kind.
+                const photos = (res.photos || []).map(mapReportPhoto);
 
                 // Spec 5B — resolve the three canned-comment tabs.
                 const information = resolveTab(item.tabs?.information, res.tabs?.information);
@@ -2264,14 +2281,7 @@ export class InspectionService {
                         effectiveComment: renderTemplate(override ?? d.comment, resolveDefectMustacheVars(st as DefectCommentState | undefined, d as CannedDefect, res.attributes)),
                         effectiveCategory: st?.category ?? d.category,
                         effectiveLocation: (typeof st?.location === 'string' && st.location.length > 0) ? st.location : d.location,
-                        defectPhotos: (st?.photos ?? []).map(p => {
-                            const displayKey = p.annotatedKey || p.croppedKey || p.key;
-                            return {
-                                key: displayKey,
-                                originalKey: p.key,
-                                url: makePhotoUrl(displayKey),
-                            };
-                        }),
+                        defectPhotos: (st?.photos ?? []).map(mapReportPhoto),
                         // Sprint 2 S2-3 / S2-4 — per-defect contractor recommendation +
                         // repair estimate range. Null when the inspector left them blank.
                         recommendationId: st?.recommendationId ?? null,
@@ -2373,10 +2383,7 @@ export class InspectionService {
                         ? {
                             rating: res.original.rating ?? null,
                             notes:  res.original.notes ?? null,
-                            photos: (res.original.photos || []).map((p: PhotoEntry) => {
-                                const displayKey = p.annotatedKey || p.croppedKey || p.key;
-                                return { key: displayKey, originalKey: p.key, url: makePhotoUrl(displayKey) };
-                            }),
+                            photos: (res.original.photos || []).map(mapReportPhoto),
                         }
                         : null,
                     followupStatus: res.followupStatus ?? null,

@@ -54,28 +54,37 @@ describe('ReportView image robustness (Plan 1 / N1)', () => {
     // A shared failed-photo Set drives graceful collapse for grid thumbnails.
     expect(text).toContain('failedPhotos');
     expect(text).toContain('markPhotoFailed');
-    // Both grids must wire onError to markPhotoFailed.
-    const onErrorCount = (text.match(/onError=\{\(\)\s*=>\s*markPhotoFailed\(/g) ?? []).length;
-    expect(onErrorCount).toBeGreaterThanOrEqual(2);
+    // Plan 7 — both grids render through the shared renderMediaTile helper, whose
+    // image branch wires onError → markPhotoFailed. (Previously inlined per grid.)
+    expect(text).toMatch(/onError=\{\(\)\s*=>\s*markPhotoFailed\(/);
+    expect(text).toContain('renderMediaTile');
+    // The collapse filter (mediaVisible) is applied at BOTH grid call sites.
+    const visibleCount = (text.match(/\.filter\(mediaVisible\)/g) ?? []).length;
+    expect(visibleCount).toBeGreaterThanOrEqual(2);
   });
 
   it('photo thumbnails use an explicit aspect-ratio box to prevent CLS', async () => {
     const text = await source();
-    // Both grids wrap thumbnails in an aspect-[4/3] box so the lazy <img>
-    // reserves space before it loads (no layout shift).
-    const aspectCount = (text.match(/aspect-\[4\/3\]/g) ?? []).length;
-    expect(aspectCount).toBeGreaterThanOrEqual(2);
+    // The shared image tile (renderMediaTile) wraps the lazy <img> in an
+    // aspect-[4/3] box so it reserves space before it loads (no layout shift);
+    // the video tile uses aspect-video for the same reason.
+    expect(text).toContain('aspect-[4/3]');
+    expect(text).toContain('aspect-video');
   });
 
   it('defect thumbnails use a human-readable alt (defect title, not the key)', async () => {
     const text = await source();
-    // The FE-3 defect grid must derive alt from the defect title d.title.
-    expect(text).toMatch(/alt=\{`?[^`}]*\$\{d\.title\}/);
+    // Plan 7 — the defect grid passes a human-readable alt (defect title) into
+    // the shared renderMediaTile, which applies it via alt={alt} on every tile.
+    expect(text).toMatch(/renderMediaTile\(photo, `\$\{d\.title\}/);
+    expect(text).toContain('alt={alt}');
   });
 
   it('item thumbnails use a human-readable alt (item label, not the key)', async () => {
     const text = await source();
-    // The item-photo grid must derive alt from the item label item.label.
-    expect(text).toMatch(/alt=\{`?[^`}]*\$\{item\.label\}/);
+    // Plan 7 — the item grid passes a human-readable alt (item label) into the
+    // shared renderMediaTile, which applies it via alt={alt} on every tile.
+    expect(text).toMatch(/renderMediaTile\(photo, `\$\{item\.label\}/);
+    expect(text).toContain('alt={alt}');
   });
 });

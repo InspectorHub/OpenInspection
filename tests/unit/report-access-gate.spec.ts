@@ -131,7 +131,7 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
         const { app, getReportData } = buildApp();
         const res = await app.request(`/api/public/report/acme/${INSP_ID}?token=tok`);
         expect(res.status).toBe(200);
-        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function));
+        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object));
     });
 
     it('owner-preview bypasses the gate (200 even when report_status=in_progress)', async () => {
@@ -146,7 +146,7 @@ describe('GET /api/public/report/:tenant/:id — publish gate', () => {
             headers: { Authorization: `Bearer ${ownerJwt}` },
         });
         expect(res.status).toBe(200);
-        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function));
+        expect(getReportData).toHaveBeenCalledWith(INSP_ID, TENANT_ID, expect.any(Function), expect.any(Object));
     });
 });
 
