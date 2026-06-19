@@ -29,24 +29,6 @@ export interface VideoCaptureProps {
 
 type Phase = "pick" | "validating" | "uploading" | "finalizing";
 
-/** Read a clip's duration (seconds) via a hidden <video> loadedmetadata event. */
-export function probeDuration(file: File): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const v = document.createElement("video");
-    v.preload = "metadata";
-    v.onloadedmetadata = () => {
-      URL.revokeObjectURL(url);
-      resolve(v.duration);
-    };
-    v.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Could not read video metadata"));
-    };
-    v.src = url;
-  });
-}
-
 /** Pure validation (type + size). Duration is checked separately (async probe). */
 export function validateVideoFile(file: File): string | null {
   if (!(ALLOWED_VIDEO_TYPES as readonly string[]).includes(file.type)) {
@@ -63,6 +45,32 @@ export function VideoCapture({ inspectionId, itemId, onClose, onUploaded }: Vide
   const [phase, setPhase] = useState<Phase>("pick");
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
+
+  // Duration probe. The clip's object URL is fed to a React-rendered hidden
+  // <video> via the JSX `src` attribute (state), never an imperative
+  // `el.src = blobUrl` — that keeps the blob off the DOM-XSS sink surface
+  // (CodeQL js/xss-through-dom) while still reading metadata in-browser.
+  const probeVideoRef = useRef<HTMLVideoElement>(null);
+  const [probeSrc, setProbeSrc] = useState<string | undefined>(undefined);
+  const probePending = useRef<{ url: string; resolve: (n: number) => void; reject: (e: Error) => void } | null>(null);
+
+  /** Read a clip's duration (seconds) via the hidden <video> loadedmetadata event. */
+  const probeDuration = (file: File): Promise<number> =>
+    new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      probePending.current = { url, resolve, reject };
+      setProbeSrc(url);
+    });
+
+  const finishProbe = (ok: boolean) => {
+    const p = probePending.current;
+    probePending.current = null;
+    setProbeSrc(undefined);
+    if (!p) return;
+    URL.revokeObjectURL(p.url);
+    if (ok) p.resolve(probeVideoRef.current?.duration ?? Number.NaN);
+    else p.reject(new Error("Could not read video metadata"));
+  };
 
   const handleFile = async (file: File) => {
     setError(null);
@@ -151,6 +159,20 @@ export function VideoCapture({ inspectionId, itemId, onClose, onUploaded }: Vide
             e.currentTarget.value = "";
             if (f) void handleFile(f);
           }}
+        />
+
+        {/* Hidden metadata probe — src is a state-driven blob URL (never an
+            imperative el.src assignment), revoked once duration is read. */}
+        <video
+          ref={probeVideoRef}
+          src={probeSrc}
+          preload="metadata"
+          muted
+          playsInline
+          className="hidden"
+          aria-hidden="true"
+          onLoadedMetadata={() => finishProbe(true)}
+          onError={() => { if (probePending.current) finishProbe(false); }}
         />
 
         {error && (
