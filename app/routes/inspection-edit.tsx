@@ -43,6 +43,8 @@ import { PhotoAnnotator } from "~/components/image-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 import { CoverCropper } from "~/components/image-studio/CoverCropper";
+import { PhotoCropper, type PhotoCrop } from "~/components/image-studio/PhotoCropper";
+import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "~/components/image-studio/photo-display-key";
 import { MediaViewer, type MediaAction } from "~/components/image-studio/MediaViewer";
 import type { GalleryPhoto } from "~/lib/inspection-media";
 import { fKey } from "~/hooks/useInspection";
@@ -586,6 +588,33 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   return Response.json({ ok: apiRes.ok, apiStatus: apiRes.status }, { status: apiRes.status });
  }
 
+ // Plan 4 Q3 — replay a baked crop derivative queued offline. Mirrors
+ // replay-photo but forwards to the crop endpoint and reads the croppedKey back.
+ if (intent === "replay-crop") {
+  const itemId = String(formData.get("itemId") ?? "");
+  const file = formData.get("file");
+  const photoIndex = Number(formData.get("photoIndex"));
+  const crop = String(formData.get("crop") ?? "");
+  const sectionId = String(formData.get("sectionId") ?? "");
+  if (!file || !(file instanceof File) || !itemId || !Number.isInteger(photoIndex) || photoIndex < 0) {
+   return Response.json({ ok: false, apiStatus: 400 }, { status: 400 });
+  }
+  const apiRes = await api.inspections[":id"].items[":itemId"].photos[":photoIndex"].crop.$post({
+   param: { id: params.id, itemId, photoIndex: String(photoIndex) },
+   form: sectionId ? { image: file, crop, sectionId } : { image: file, crop },
+  });
+  const apiStatus = apiRes.status;
+  const apiOk = apiRes.ok;
+  let croppedKey: string | undefined;
+  if (apiOk) {
+   try {
+    const j = (await apiRes.json()) as { data?: { croppedKey?: string } };
+    croppedKey = j.data?.croppedKey;
+   } catch { /* ignore */ }
+  }
+  return Response.json({ ok: apiOk && Boolean(croppedKey), apiStatus, croppedKey }, { status: apiStatus });
+ }
+
  return { ok };
 }
 
@@ -995,6 +1024,14 @@ export default function InspectionEditPage() {
  const coverFetcher = useFetcher();
  // Image Studio — gallery "Set as cover" opens an editor-level CoverCropper.
  const [galleryCropSource, setGalleryCropSource] = useState<{ key: string; url: string } | null>(null);
+ // Plan 4 (Task 8) — per-photo crop. `photoCropTarget` opens the PhotoCropper for
+ // an item/defect photo (cropping ALWAYS re-derives from the ORIGINAL key).
+ const [photoCropTarget, setPhotoCropTarget] = useState<{
+   itemId: string; photoIndex: number; sourceUrl: string; hasAnnotation: boolean; sectionId?: string;
+ } | null>(null);
+ // Plan 4 — re-crop warning modal: a crop that would discard an existing
+ // annotation defers behind a confirm (no native window.confirm).
+ const [recropWarn, setRecropWarn] = useState<{ run: () => void } | null>(null);
 
  /* Task 8 — unified MediaViewer for an item's photo strip. `viewer` holds the
   * item being viewed + the open index. Photos are mapped item-result → GalleryPhoto[]
@@ -1009,8 +1046,9 @@ export default function InspectionEditPage() {
  const coverKey = (state.inspection.coverPhotoId as string | null) ?? null;
 
  /* Task 8 — read an item's stored photos[] (item-level bucket) from the live
-  * results map. Item photos are `{ key; annotatedKey?; annotationsJson? }`. */
- type ItemPhoto = { key: string; annotatedKey?: string; annotationsJson?: string };
+  * results map. Item photos are `{ key; croppedKey?; crop?; annotatedKey?; annotationsJson? }`. */
+ type ItemCrop = { aspect: string; orientation: "landscape" | "portrait"; x: number; y: number; width: number; height: number };
+ type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string };
  const getItemPhotos = useCallback(
   (itemId: string): ItemPhoto[] => {
    const r = findings.getResult(itemId, state.sectionIdForItem(itemId) ?? undefined);
@@ -1026,7 +1064,7 @@ export default function InspectionEditPage() {
  const itemGalleryPhotos = useCallback(
   (itemId: string): GalleryPhoto[] =>
    getItemPhotos(itemId).map((p, i) => {
-    const dk = p.annotatedKey || p.key;
+    const dk = resolvePhotoDisplayKey(p);
     return {
      key: dk,
      url: `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(dk)}`,
@@ -1035,6 +1073,7 @@ export default function InspectionEditPage() {
      photoIndex: i,
      annotated: !!p.annotatedKey,
      originalKey: p.key,
+     croppedKey: p.croppedKey,
     };
    }),
   [getItemPhotos, state.inspection.id],
@@ -1153,12 +1192,30 @@ export default function InspectionEditPage() {
     return;
    }
    if (action === "annotate") {
-    // Reuse the existing PhotoStudio/annotate flow on the displayed key.
-    setPhotoStudioUrl(photo.url);
+    // Plan 4 sequential layering: annotate ON TOP of the crop. The annotate
+    // base is croppedKey || originalKey — NEVER annotatedKey (that would
+    // double-bake the existing annotation).
+    const annotateBaseKey = photo.croppedKey || photo.originalKey || photo.key;
+    setPhotoStudioUrl(`/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(annotateBaseKey)}`);
     setPhotoStudioKey(photo.key);
-    setPhotoStudioIndex(0);
+    setPhotoStudioIndex(idx);
     setPhotoStudioTotal(0);
     setPhotoStudioOpen(true);
+    return;
+   }
+   if (action === "crop") {
+    // Plan 4: crop ALWAYS re-derives from the ORIGINAL photo (never the
+    // cropped/annotated derivative). Open the PhotoCropper; the bake POSTs to
+    // the new crop endpoint (or enqueues offline — Task 9). A re-crop that
+    // would discard an existing annotation warns first.
+    const originalKey = photo.originalKey || photo.key;
+    setPhotoCropTarget({
+     itemId,
+     photoIndex: idx,
+     sourceUrl: `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(originalKey)}`,
+     hasAnnotation: !!photo.annotated,
+     sectionId,
+    });
     return;
    }
    if (action === "revert") {
@@ -1181,10 +1238,60 @@ export default function InspectionEditPage() {
     }).then(() => revalidator.revalidate());
     return;
    }
-   // crop / rotate / caption — routed here but not yet implemented.
-   // TODO Plan 4 (crop/rotate/caption on item photos).
+   // rotate / caption — routed here but not yet implemented (not Plan 4).
+   // TODO rotate/caption on item photos.
   },
   [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+ );
+
+ /* Plan 4 (Task 8/9) — persist a baked crop for the targeted photo. When online,
+  * POST multipart to the new crop endpoint; when offline, enqueue for replay
+  * (Task 9). Either way, optimistically apply clearAnnotationOnRecrop locally so
+  * the strip immediately reflects the new crop with any annotation cleared. */
+ const performPhotoCropSave = useCallback(
+  (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, crop: PhotoCrop) => {
+   const { itemId, photoIndex, sectionId } = target;
+   const cropTransform = { aspect: crop.aspect, orientation: crop.orientation, ...crop.pixels };
+   // Optimistic local apply: drop annotation, set crop. The croppedKey is not
+   // yet known client-side; revalidate (online) / replay (offline) supplies it.
+   patchItemPhotos(itemId, (photos) =>
+    photos.map((p, i) =>
+     i === photoIndex
+      ? clearAnnotationOnRecrop(p, p.croppedKey ?? p.key, cropTransform)
+      : p,
+    ),
+   );
+
+   const nav = typeof navigator !== "undefined" ? navigator : undefined;
+   if (shouldQueue(nav)) {
+    // Plan 4 Q3 — offline: enqueue the baked crop; replay on reconnect.
+    void getOfflineQueue().enqueueCrop({
+     inspectionId: String(state.inspection.id),
+     itemId,
+     photoIndex,
+     blob,
+     crop: cropTransform,
+     sectionId,
+     enqueuedAt: Date.now(),
+    });
+    pushToast({ message: "Crop queued — will save when back online", durationMs: 3000 });
+    return;
+   }
+
+   // Online: POST the bake directly to the crop endpoint.
+   const fd = new FormData();
+   fd.append("image", new File([blob], "cropped.jpg", { type: "image/jpeg" }));
+   fd.append("crop", JSON.stringify(cropTransform));
+   if (sectionId) fd.append("sectionId", sectionId);
+   void (async () => {
+    await fetch(
+     `/api/inspections/${state.inspection.id}/items/${itemId}/photos/${photoIndex}/crop`,
+     { method: "POST", credentials: "include", body: fd },
+    );
+    revalidator.revalidate();
+   })();
+  },
+  [patchItemPhotos, state.inspection.id, revalidator],
  );
 
  /* Mobile shell state */
@@ -2182,13 +2289,50 @@ export default function InspectionEditPage() {
 
  {/* Task 8 — unified MediaViewer for an item's photo strip (tap a thumbnail
   * to open; the bottom toolbar routes cover/annotate/revert/delete to the
-  * per-photo endpoints; crop/rotate/caption are Plan-4 no-ops). */}
+  * per-photo endpoints; crop opens the PhotoCropper, rotate/caption are no-ops). */}
  <MediaViewer
  photos={viewer.index !== null ? itemGalleryPhotos(viewer.itemId) : []}
  index={viewer.index}
  onClose={() => setViewer((v) => ({ ...v, index: null }))}
  onAction={onViewerAction}
  />
+
+ {/* Plan 4 (Task 8) — per-photo crop overlay. Cropping ALWAYS re-derives from
+  * the ORIGINAL key. A re-crop that would discard an existing annotation warns
+  * first (no native window.confirm). */}
+ {photoCropTarget && (
+ <PhotoCropper
+  sourceUrl={fullResUrl(photoCropTarget.sourceUrl)}
+  allowFree
+  title="Crop photo"
+  saveLabel="Save crop"
+  onCancel={() => setPhotoCropTarget(null)}
+  onSave={(blob, crop) => {
+   const target = photoCropTarget;
+   setPhotoCropTarget(null);
+   const run = () => performPhotoCropSave(target, blob, crop);
+   if (target.hasAnnotation) setRecropWarn({ run });
+   else run();
+  }}
+ />
+ )}
+
+ {/* Plan 4 — re-crop warning modal (annotation will be discarded). */}
+ {recropWarn && (
+ <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+ <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={() => setRecropWarn(null)} />
+ <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover p-6 max-w-sm w-full border border-ih-border">
+ <h3 className="text-[15px] font-bold text-ih-fg-1">Re-crop this photo?</h3>
+ <p className="text-[13px] text-ih-fg-3 mt-2">
+ Re-cropping will remove the existing annotation on this photo (its marks are tied to the previous crop).
+ </p>
+ <div className="flex justify-end gap-2 mt-4">
+ <button onClick={() => setRecropWarn(null)} className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md">Cancel</button>
+ <button onClick={() => { const r = recropWarn.run; setRecropWarn(null); r(); }} className="px-4 py-2 text-[13px] font-bold text-white bg-ih-bad hover:bg-ih-bad/85 rounded-md">Crop &amp; clear</button>
+ </div>
+ </div>
+ </div>
+ )}
 
  {/* Inspection settings sheet */}
  <InspectionSettingsSheet

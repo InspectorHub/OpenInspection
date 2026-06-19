@@ -11,6 +11,8 @@ export interface GalleryPhoto {
   annotated?: boolean;
   originalKey?: string;
   defectId?: string;
+  /** Plan 4 — the baked cropped derivative key, when this photo has one. */
+  croppedKey?: string;
 }
 export interface MediaApiBody {
   data?: {
