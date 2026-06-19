@@ -59,8 +59,6 @@ export default function MetricsPage() {
   return (
     <div className="space-y-[18px]">
       <PageHeader
-        eyebrow="METRICS"
-        eyebrowColor="slate"
         title="Metrics"
         meta={data ? `${data.totalInspections} inspections` : "Loading..."}
         actions={
