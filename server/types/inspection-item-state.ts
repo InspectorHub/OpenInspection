@@ -16,9 +16,28 @@
 import type { DefectCategory } from './template-schema';
 import type { DefectTrade, DefectDeadline, DefectTimeframe } from './defect-fields';
 
-/** Plan 4: per-photo entry. croppedKey/crop are additive — no migration (JSON column). */
-export interface PhotoEntry {
+/**
+ * Plan 7 — unified media entry (photo OR video). A missing `mediaType`
+ * resolves to 'photo' so legacy photo entries (which only ever carried `key`
+ * + optional derivative keys) keep working with no data migration.
+ *
+ * Photos store their bytes in R2 under `key` (+ Plan 4 croppedKey / annotated
+ * derivatives). Videos store no R2 object — Cloudflare Stream owns the bytes —
+ * so `key` is '' and `streamUid` points at the Stream video. This is a
+ * superset of the former `PhotoEntry` shape; `PhotoEntry` is kept as an alias
+ * for the existing photo-only call sites and report cascade.
+ */
+export interface MediaEntry {
+    /** R2 key for photos; '' for videos (Cloudflare Stream owns the bytes). */
     key: string;
+    /** Discriminator. Absent on legacy entries → treated as 'photo'. */
+    mediaType?: 'photo' | 'video';
+    /** Cloudflare Stream UID. Present iff mediaType === 'video'. */
+    streamUid?: string;
+    /** Video poster timestamp as a fraction of duration (0..1). */
+    posterPct?: number;
+    /** Video duration in seconds (cached from Stream for the thumb badge). */
+    durationSec?: number;
     /** Plan 4 — baked cropped JPEG derivative; report precedence annotatedKey||croppedKey||key. */
     croppedKey?: string;
     /** Plan 4 — re-editable crop transform in source-pixel coords (free aspect or a preset). */
@@ -27,7 +46,16 @@ export interface PhotoEntry {
     annotatedKey?: string;
     /** Konva node tree + measure calibration JSON. */
     annotationsJson?: string;
+    /** User-supplied caption (≤200 chars), surfaces in the published report. */
+    caption?: string;
 }
+
+/**
+ * Legacy alias — photo-only call sites + the Plan 4 report cascade still refer
+ * to `PhotoEntry`. It is structurally identical to `MediaEntry` (superset), so
+ * the two are interchangeable; new code should prefer `MediaEntry`.
+ */
+export type PhotoEntry = MediaEntry;
 
 /**
  * State for a non-defect canned comment (Information / Limitations).
@@ -55,7 +83,7 @@ export interface DefectCommentState {
     trade?: DefectTrade | null;
     deadline?: DefectDeadline | null;
     timeframe?: DefectTimeframe | null;
-    photos?: Array<PhotoEntry>;
+    photos?: MediaEntry[];
 }
 
 /**
@@ -67,7 +95,7 @@ export interface InspectionItemState {
     /** Free-text notes (legacy field — still supported alongside tabs). */
     notes?: string;
     /** Item-level photos (legacy bucket — still supported). */
-    photos?: Array<PhotoEntry>;
+    photos?: MediaEntry[];
     /** New v2 tab state. Optional so legacy item-results render cleanly. */
     tabs?: {
         information?: CannedCommentState[];
