@@ -30,6 +30,7 @@ export type { IdentityApi }           from '../../server/api/identity';
 export type { InspectionPrefsApi }    from '../../server/api/inspection-prefs';
 export type { InspectionRequestsApi } from '../../server/api/inspection-requests';
 export type { InspectionsApi }        from '../../server/api/inspections';
+export type { InspectionTypesApi }    from '../../server/api/inspection-types';
 export type { InspectionSyncApi }     from '../../server/api/inspection-sync';
 export type { InspectionTagApi }      from '../../server/api/tags';
 export type { IntegrationsApi }       from '../../server/api/integrations';
