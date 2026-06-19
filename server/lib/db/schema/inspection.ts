@@ -651,6 +651,23 @@ export const eventTypes = sqliteTable('event_types', {
     uniqueIndex('event_types_tenant_slug_idx').on(t.tenantId, t.slug),
 ]);
 
+// Settings + Library IA — tenant-defined inspection subtypes layered on the
+// platform property subtypes (Office/Retail/...). `basedOn` is a plain-string
+// soft ref to a platform subtype slug (no DB FK per Schema Rules). New table:
+// app-layer tenant filtering only, no `.references()`.
+export const inspectionTypes = sqliteTable('inspection_types', {
+    id:          text('id').primaryKey(),
+    tenantId:    text('tenant_id').notNull(),
+    name:        text('name').notNull(),
+    basedOn:     text('based_on'),
+    description: text('description'),
+    enabled:     integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    sortOrder:   integer('sort_order').notNull().default(0),
+    createdAt:   integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    uniqueIndex('idx_inspection_types_tenant_name').on(t.tenantId, t.name),
+]);
+
 // Agent Accounts A3 — Concierge magic-link tokens. Single-use, 7-day TTL.
 // `confirmed_at` flips to a timestamp when the client redeems the link; the
 // row is retained for audit (we don't delete tokens). The expiry index lets
