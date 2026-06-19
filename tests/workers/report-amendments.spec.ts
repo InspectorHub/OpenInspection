@@ -8,8 +8,8 @@
 // code DIRECTLY against the `env.DB` D1 binding rather than driving the full
 // Hono app through auth + DI middleware. We follow that pattern:
 //   - schema is seeded by replaying the real migration .sql files against the
-//     isolated per-test D1 (the source of truth, so the #120 columns added by
-//     migration 0027 are present without hand-maintained DDL),
+//     isolated per-test D1 (the source of truth, so the #120 columns are
+//     present without hand-maintained DDL),
 //   - the publish snapshot is produced by calling ReportVersionService
 //     .snapshotOnPublish directly (the exact call the HTTP publish handler
 //     makes — see server/api/inspections.ts publishRoute). Driving the real

@@ -81,8 +81,8 @@ import { RATING_SYSTEMS } from './starter-content/fixtures/rating-systems';
 import { MARKETPLACE_LIBRARIES } from './starter-content/fixtures/marketplace';
 
 // Comments-repair fold (2026-06-12) — the standard contractor-type taxonomy.
-// MUST match migration 0030's backfill list exactly so a freshly-provisioned
-// tenant gets the same dropdown as tenants that existed at migration time.
+// MUST stay in sync with the contractor-type backfill in `0000_baseline.sql`
+// so a freshly-provisioned tenant gets the same dropdown as pre-existing tenants.
 const CONTRACTOR_TYPES: ReadonlyArray<{ name: string; sortOrder: number }> = [
     { name: 'Licensed Electrician',   sortOrder: 1 },
     { name: 'Plumber',                sortOrder: 2 },

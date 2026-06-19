@@ -10,7 +10,7 @@ import { z } from '@hono/zod-openapi';
  *  - no underscores, dots, or whitespace
  *
  * Per-tenant uniqueness is enforced by the partial unique index
- * `idx_users_slug_per_tenant` defined in migration 0052_inspector_slug.sql.
+ * `idx_users_slug_per_tenant`.
  */
 export const SlugSchema = z
     .string()

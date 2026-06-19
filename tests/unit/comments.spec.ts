@@ -8,10 +8,9 @@ import { comments, tenants } from '../../server/lib/db/schema';
 /**
  * Spec 2026-05-07 — Comments Library unification.
  *
- * Verifies that the new `rating_bucket` + `section` columns added in
- * migration 0039 round-trip cleanly through Drizzle and that filter-by-bucket
- * / filter-by-section / combined filters work the way the /api/admin/comments
- * route expects.
+ * Verifies that the `rating_bucket` + `section` columns round-trip cleanly
+ * through Drizzle and that filter-by-bucket / filter-by-section / combined
+ * filters work the way the /api/admin/comments route expects.
  *
  * Smoke-tests migration backward compatibility too: rows inserted with the
  * pre-migration shape (no bucket / no section) MUST survive and stay queryable.

@@ -48,7 +48,7 @@ describe('UserService — slug', () => {
     });
 
     it('checkSlug rejects reserved slugs', async () => {
-        // 'admin' is seeded by migration 0052_inspector_slug.sql.
+        // 'admin' is in the reserved-slug seed list.
         const result = await svc.checkSlug(TENANT, 'admin');
         expect(result.available).toBe(false);
         expect(result.reason).toBe('reserved');

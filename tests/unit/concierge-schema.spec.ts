@@ -34,7 +34,7 @@ describe('concierge schema — A3', () => {
         expect(t.createdAt?.name).toBe('created_at');
     });
 
-    it('migration 0058 applies cleanly and the columns/table are queryable', async () => {
+    it('concierge review columns apply cleanly and the columns/table are queryable', async () => {
         const fixture = createTestDb();
         await setupSchema(fixture.sqlite);
 

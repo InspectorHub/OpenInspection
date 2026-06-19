@@ -21,8 +21,8 @@ const SQL_UUID_V4 = `lower(
 )`;
 
 // Default Comment Library entries seeded into every new tenant. The same set
-// is also seeded into existing tenants by migration 0022_seed_default_comments.
-// Each row is idempotent on (tenant_id, text) — seeded only when missing.
+// is also backfilled into existing tenants by the default-comments seed
+// migration. Each row is idempotent on (tenant_id, text) — seeded only when missing.
 async function seedDefaultComments(db: D1Database, tenantId: string): Promise<void> {
     try {
         // Idempotent NOT EXISTS clause keeps this safe to re-run.
@@ -57,7 +57,7 @@ async function seedDefaultComments(db: D1Database, tenantId: string): Promise<vo
 // Default automation rules seeded for every new tenant. Without these, none of
 // the lifecycle emails (booking confirm, report ready, agreement nag, invoice,
 // payment receipt) actually fire. Schema constrains `trigger` to a fixed enum
-// (see migrations/0032_inspection_events.sql) and `recipient` to a single value
+// (see the `automationRules` table in schema) and `recipient` to a single value
 // per row, so multi-recipient intents fan out into one row per recipient.
 //
 // Idempotent: NOT EXISTS guard on (tenant_id, trigger, recipient, name).

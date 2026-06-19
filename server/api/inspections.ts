@@ -3371,7 +3371,7 @@ export const inspectionsRoutes = createApiRouter()
         // response. Persistent record in report_pdfs lets the client UI poll
         // (status: queued -> rendering -> ready) and offer Refresh PDFs.
         //
-        // Migration 0059 — gated by tenant_configs.enable_pdf_pipeline (default
+        // Gated by tenant_configs.enable_pdf_pipeline (default
         // OFF). Free-plan tenants and Paid tenants who don't want the spend
         // skip rendering entirely; the report viewer's window.print() button
         // remains the universal fallback.

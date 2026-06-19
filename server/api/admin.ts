@@ -1124,8 +1124,8 @@ const erasureLogRoute = createRoute(withMcpMetadata({
 /**
  * PATCH /api/admin/pdf-pipeline
  *
- * Toggle the per-tenant Browser-Run PDF pipeline flag (`tenant_configs.enable_pdf_pipeline`,
- * migration 0059). When false, all Spec 5A/5H render call-sites skip
+ * Toggle the per-tenant Browser-Run PDF pipeline flag
+ * (`tenant_configs.enable_pdf_pipeline`). When false, all Spec 5A/5H render call-sites skip
  * `env.BROWSER.fetch()` to avoid burning Worker CPU on a binding that may
  * be unprovisioned. Default for a fresh tenant is false.
  *

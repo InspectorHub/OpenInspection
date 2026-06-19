@@ -32,9 +32,9 @@ export const UpdateBrandingSchema = z.object({
     // seven values (Realtor / Past Client / …) is hardcoded; this array
     // appends to it. Trimmed entries; max 32 to keep the dropdown usable.
     customReferralSources: z.array(z.string().min(1).max(50)).max(32).optional().openapi({ example: ['Magazine ad', 'Trade show'] }).describe('TODO describe customReferralSources field for the OpenInspection MCP integration'),
-    // Migration 0059 — Workers Paid PDF pipeline opt-in. Default OFF.
+    // Workers Paid PDF pipeline opt-in. Default OFF.
     enablePdfPipeline: z.boolean().optional().openapi({ example: false }).describe('TODO describe enablePdfPipeline field for the OpenInspection MCP integration'),
-    // Migration 0010 — report PDF print-layout settings. companyAddress is shown
+    // Report PDF print-layout settings. companyAddress is shown
     // in the PDF footer/header; the three booleans gate footer / page-number /
     // inspector-license rendering. All default ON when unset.
     companyAddress: z.string().max(300, 'Company address is too long').or(z.literal('')).nullable().optional().openapi({ example: '123 Main St, Springfield, IL' }).describe('Company mailing address rendered in the report PDF footer/header block.'),
