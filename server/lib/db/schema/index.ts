@@ -22,6 +22,7 @@ export {
     inspectionEvents,
     inspectionRequests,
     inspectionMediaPool,
+    orphanedMedia,
     tags,
     inspectionItemTagLinks,
     conciergeConfirmTokens,

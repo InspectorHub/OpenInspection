@@ -290,6 +290,19 @@ export const inspectionMediaPool = sqliteTable('inspection_media_pool', {
     index('idx_media_pool_inspection').on(t.inspectionId),
 ]);
 
+// Bookkeeping for the background orphaned-media GC (Q8). Each row records the
+// first time an R2 object under an inspection prefix was observed unreferenced;
+// the sweep deletes it only once that age exceeds the grace window.
+export const orphanedMedia = sqliteTable('orphaned_media', {
+    id:           text('id').primaryKey(),
+    tenantId:     text('tenant_id').notNull(),
+    inspectionId: text('inspection_id').notNull(),
+    r2Key:        text('r2_key').notNull(),
+    firstSeenAt:  integer('first_seen_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    index('idx_orphaned_media_key').on(t.tenantId, t.r2Key),
+]);
+
 export const inspectionResults = sqliteTable('inspection_results', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
