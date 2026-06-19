@@ -8,7 +8,7 @@ describe('Sidebar', () => {
     expect(mod.MobileHeader).toBeDefined();
   });
 
-  it('WORKSPACE_ITEMS includes Team, not Reports or Marketplace', async () => {
+  it('WORKSPACE_ITEMS includes Team, not Reports; Library is a single hub entry', async () => {
     // Import the raw module source to verify the nav arrays.
     // We inspect the module text so we don't have to render the component.
     const src = await import('~/components/Sidebar?raw');
@@ -20,14 +20,13 @@ describe('Sidebar', () => {
     expect(text).not.toContain('"Reports"');
     expect(text).toContain('"/team"');
     expect(text).toContain('"Team"');
-    // Marketplace must not appear in LIBRARY_ITEMS (defensive de-listing).
-    // It may still be referenced elsewhere, so we check that the LIBRARY_ITEMS
-    // array block does not contain the marketplace entry.
-    const libraryBlock = text.slice(
-      text.indexOf('const LIBRARY_ITEMS'),
-      text.indexOf('function SidebarNavItem'),
-    );
-    expect(libraryBlock).not.toContain('"/marketplace"');
+    // The flat LIBRARY_ITEMS group has been collapsed into a single Library hub
+    // entry. The sidebar must point at /library, not the individual module pages.
+    expect(text).not.toContain('const LIBRARY_ITEMS');
+    expect(text).toContain('"/library"');
+    expect(text).not.toContain('"/marketplace"');
+    expect(text).not.toContain('"/comments"');
+    expect(text).not.toContain('"/repair-items"');
   });
 
   it('IA-25: User Menu trigger button is present in Sidebar source', async () => {
