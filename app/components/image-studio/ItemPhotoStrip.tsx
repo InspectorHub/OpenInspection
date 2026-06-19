@@ -6,6 +6,22 @@ export interface StripPhoto {
   key: string;
   croppedKey?: string;
   annotatedKey?: string;
+  /** Plan 7 — media discriminator. Absent ⇒ photo. */
+  mediaType?: "photo" | "video";
+  /** Plan 7 — Cloudflare Stream UID (video entries). */
+  streamUid?: string;
+  /** Plan 7 — poster timestamp (0..1) for the Stream poster thumbnail. */
+  posterPct?: number;
+  /** Plan 7 — duration in seconds, rendered as an m:ss badge. */
+  durationSec?: number;
+}
+
+/** Plan 7 — format a duration in seconds as m:ss (e.g. 75 → "1:15"). */
+export function formatDuration(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, "0")}`;
 }
 
 export interface ItemPhotoStripProps {
@@ -41,6 +57,12 @@ export interface ItemPhotoStripProps {
    * caller can POST them one per round trip without invalidating earlier indices.
    */
   onBulkMove?: (indices: number[], to: { itemId: string; sectionId?: string }) => void;
+  /**
+   * Plan 7 — resolve a Stream poster thumbnail URL for a video entry. Returns
+   * null when the Stream customer subdomain is unavailable (fail closed) — the
+   * strip then shows a neutral video placeholder instead of a broken image.
+   */
+  videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
 }
 
 /** The visible thumbnail = the edited derivative when present, else the original.
@@ -61,6 +83,7 @@ export function ItemPhotoStrip({
   onBulkDetach,
   moveTargets,
   onBulkMove,
+  videoPosterUrl,
 }: ItemPhotoStripProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   // Task 9 — Drive-style multi-select. `selecting` flips the strip into select
@@ -202,6 +225,10 @@ export function ItemPhotoStrip({
           const dk = displayKey(p);
           const isCover = coverKey != null && coverKey === dk;
           const checked = sel.has(i);
+          // Plan 7 — video entries render the Stream poster as the thumb + a
+          // play-glyph + an m:ss duration badge; the cover ring is preserved.
+          const isVideo = p.mediaType === "video" && !!p.streamUid;
+          const posterSrc = isVideo ? (videoPosterUrl?.(p.streamUid!, p.posterPct) ?? null) : null;
           return (
             <button
               key={dk}
@@ -219,13 +246,40 @@ export function ItemPhotoStrip({
                     : "border-ih-border hover:border-ih-primary/60"
               }`}
             >
-              <img
-                src={photoUrl(dk)}
-                alt=""
-                className="w-full h-full object-cover"
-                loading="lazy"
-                draggable={false}
-              />
+              {isVideo ? (
+                <>
+                  {posterSrc ? (
+                    <img src={posterSrc} alt="" className="w-full h-full object-cover" loading="lazy" draggable={false} />
+                  ) : (
+                    <span data-testid={`video-placeholder-${i}`} className="flex w-full h-full items-center justify-center bg-ih-bg-muted" />
+                  )}
+                  <span
+                    data-testid={`video-play-${i}`}
+                    className="absolute inset-0 flex items-center justify-center text-white"
+                    aria-hidden="true"
+                  >
+                    <svg className="w-5 h-5 drop-shadow" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                  {typeof p.durationSec === "number" && p.durationSec > 0 && (
+                    <span
+                      data-testid={`video-dur-${i}`}
+                      className="absolute bottom-0.5 right-0.5 rounded bg-[rgba(15,23,42,0.7)] px-1 text-[9px] font-bold tabular-nums text-white"
+                    >
+                      {formatDuration(p.durationSec)}
+                    </span>
+                  )}
+                </>
+              ) : (
+                <img
+                  src={photoUrl(dk)}
+                  alt=""
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                  draggable={false}
+                />
+              )}
               {selecting && (
                 <span
                   data-testid={`check-${i}`}

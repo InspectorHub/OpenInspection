@@ -13,6 +13,14 @@ export interface GalleryPhoto {
   defectId?: string;
   /** Plan 4 — the baked cropped derivative key, when this photo has one. */
   croppedKey?: string;
+  /** Plan 7 — media discriminator. Absent ⇒ treated as 'photo'. */
+  mediaType?: "photo" | "video";
+  /** Plan 7 — Cloudflare Stream UID (video entries only). */
+  streamUid?: string;
+  /** Plan 7 — poster timestamp as a fraction of duration (0..1). */
+  posterPct?: number;
+  /** Plan 7 — video duration in seconds (for the m:ss strip badge). */
+  durationSec?: number;
 }
 export interface MediaApiBody {
   data?: {

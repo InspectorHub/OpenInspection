@@ -166,6 +166,8 @@ interface ItemEditorProps {
  moveTargets?: Array<{ itemId: string; label: string; sectionId?: string }>;
  /** Task 9b — bulk-move the given photoIndex set (high→low) to a target item. */
  onBulkMovePhotos?: (itemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => void;
+ /** Plan 7 — resolve a Stream poster URL for a video strip thumbnail (fail-closed → null). */
+ videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -209,6 +211,7 @@ export function ItemEditor({
  onBulkDetachPhotos,
  moveTargets,
  onBulkMovePhotos,
+ videoPosterUrl,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
  const [defectQuery, setDefectQuery] = useState("");
@@ -796,6 +799,7 @@ export function ItemEditor({
  moveTargets={moveTargets ? moveTargets.filter((m) => m.itemId !== item.id) : undefined}
  onBulkMove={onBulkMovePhotos ? (indices, to) => onBulkMovePhotos(item.id, indices, to) : undefined}
  photoUploading={photoUploading}
+ videoPosterUrl={videoPosterUrl}
  />
  {/* Task 4 — queued offline photo previews rendered below the strip */}
  {(queuedPreviews ?? []).length > 0 && (

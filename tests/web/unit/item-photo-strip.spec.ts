@@ -136,4 +136,51 @@ describe('ItemPhotoStrip', () => {
     });
     expect(onBulkMove).toHaveBeenCalledWith([1], { itemId: 'other', sectionId: undefined });
   });
+
+  it('Plan 7 — video entries render a poster thumb + play-glyph + m:ss duration badge', () => {
+    const withVideo: StripPhoto[] = [
+      { key: 'a' },
+      { key: '', mediaType: 'video', streamUid: 'uid9', posterPct: 0.5, durationSec: 75 },
+    ];
+    mount(
+      createElement(ItemPhotoStrip, {
+        inspectionId: 'i',
+        itemId: 'it',
+        photos: withVideo,
+        coverKey: null,
+        photoUrl: (k: string) => `/u/${k}`,
+        onAddPhoto: vi.fn(),
+        onOpen: vi.fn(),
+        videoPosterUrl: (uid: string) => `https://sub.cloudflarestream.com/${uid}/thumbnails/thumbnail.jpg?time=0s`,
+      }),
+    );
+    // thumb-1 is the video: play-glyph + duration badge present
+    expect(byTestId('video-play-1')).not.toBeNull();
+    expect(byTestId('video-dur-1')!.textContent).toBe('1:15');
+    // poster img uses the resolved Stream thumbnail URL
+    const vidImg = byTestId('thumb-1')!.querySelector('img') as HTMLImageElement;
+    expect(vidImg.src).toContain('cloudflarestream.com/uid9/thumbnails');
+    // the photo entry (thumb-0) has NO play-glyph
+    expect(byTestId('video-play-0')).toBeNull();
+  });
+
+  it('Plan 7 — video entry falls closed to a neutral placeholder when no poster URL is resolvable', () => {
+    const withVideo: StripPhoto[] = [
+      { key: '', mediaType: 'video', streamUid: 'uid9', durationSec: 10 },
+    ];
+    mount(
+      createElement(ItemPhotoStrip, {
+        inspectionId: 'i',
+        itemId: 'it',
+        photos: withVideo,
+        coverKey: null,
+        photoUrl: (k: string) => `/u/${k}`,
+        onAddPhoto: vi.fn(),
+        onOpen: vi.fn(),
+        videoPosterUrl: () => null, // subdomain unavailable
+      }),
+    );
+    expect(byTestId('video-placeholder-0')).not.toBeNull();
+    expect(byTestId('video-play-0')).not.toBeNull();
+  });
 });

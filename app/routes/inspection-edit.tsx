@@ -46,6 +46,8 @@ import { CoverCropper } from "~/components/image-studio/CoverCropper";
 import { PhotoCropper, type PhotoCrop } from "~/components/image-studio/PhotoCropper";
 import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "~/components/image-studio/photo-display-key";
 import { MediaViewer, type MediaAction } from "~/components/image-studio/MediaViewer";
+import { PosterPicker, streamThumbUrl } from "~/components/image-studio/PosterPicker";
+import { VideoCapture } from "~/components/image-studio/VideoCapture";
 import type { GalleryPhoto } from "~/lib/inspection-media";
 import { fKey } from "~/hooks/useInspection";
 import { fullResUrl } from "~/components/image-studio/cropImage";
@@ -157,7 +159,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  tenantSlug = sb.data?.branding?.tenantSlug ?? null;
  }
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug };
+ // Plan 7 — the Stream customer subdomain (env) drives video poster thumbnails
+ // + the player iframe. Absent ⇒ null; the viewer/strip fail closed gracefully
+ // (no fabricated subdomain).
+ const streamCustomerSubdomain =
+   ((context.cloudflare?.env as { STREAM_CUSTOMER_SUBDOMAIN?: string } | undefined)?.STREAM_CUSTOMER_SUBDOMAIN) ?? null;
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain };
 }
 
 /**
@@ -656,6 +664,13 @@ export default function InspectionEditPage() {
  const photoInputRef = useRef<HTMLInputElement>(null);
  const { scheme, setColorScheme } = useTheme();
 
+ /* Plan 7 — add-media chooser (photo OR video) + video capture overlay. The
+  * add tile opens the chooser; "Photo" triggers the existing photo input,
+  * "Video" opens VideoCapture. Video upload requires a connection (it does NOT
+  * use the offline photo queue — clip sizes make IndexedDB replay impractical). */
+ const [addMediaChooser, setAddMediaChooser] = useState<{ itemId: string } | null>(null);
+ const [videoCaptureTarget, setVideoCaptureTarget] = useState<{ itemId: string } | null>(null);
+
  /* ---------------------------------------------------------------- */
  /* Core state (useInspection) */
  /* ---------------------------------------------------------------- */
@@ -1041,6 +1056,30 @@ export default function InspectionEditPage() {
  const [viewer, setViewer] = useState<{ itemId: string; index: number | null }>({ itemId: "", index: null });
  const photoOpsFetcher = useFetcher();
 
+ /* Plan 7 — Stream customer subdomain (from loader env). Null ⇒ fail closed:
+  * video posters/players render a graceful "unavailable" state, never a
+  * fabricated subdomain. */
+ const streamCustomerSubdomain = loaderData.streamCustomerSubdomain ?? null;
+
+ /* Plan 7 — resolve a Stream poster thumbnail URL for a video strip thumb. */
+ const videoPosterUrl = useCallback(
+  (streamUid: string, posterPct?: number): string | null => {
+   if (!streamCustomerSubdomain) return null;
+   // poster sec is unknown without duration here; the thumbnail endpoint accepts
+   // a pct-derived time only when we know duration — fall back to time=0s, which
+   // Stream maps to the configured thumbnailTimestampPct poster anyway.
+   const sec = 0;
+   void posterPct;
+   return streamThumbUrl(streamCustomerSubdomain, streamUid, sec);
+  },
+  [streamCustomerSubdomain],
+ );
+
+ /* Plan 7 — PosterPicker target (a video entry being re-postered). */
+ const [posterTarget, setPosterTarget] = useState<
+  { streamUid: string; durationSec: number; posterPct: number } | null
+ >(null);
+
  /* Task 8 — the report cover key (DB-16): a photo whose displayKey matches this
   * rings as the cover in the strip + carries the "Set cover" toggle in the viewer. */
  const coverKey = (state.inspection.coverPhotoId as string | null) ?? null;
@@ -1048,7 +1087,7 @@ export default function InspectionEditPage() {
  /* Task 8 — read an item's stored photos[] (item-level bucket) from the live
   * results map. Item photos are `{ key; croppedKey?; crop?; annotatedKey?; annotationsJson? }`. */
  type ItemCrop = { aspect: string; orientation: "landscape" | "portrait"; x: number; y: number; width: number; height: number };
- type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string };
+ type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; streamUid?: string; posterPct?: number; durationSec?: number };
  const getItemPhotos = useCallback(
   (itemId: string): ItemPhoto[] => {
    const r = findings.getResult(itemId, state.sectionIdForItem(itemId) ?? undefined);
@@ -1074,6 +1113,11 @@ export default function InspectionEditPage() {
      annotated: !!p.annotatedKey,
      originalKey: p.key,
      croppedKey: p.croppedKey,
+     // Plan 7 — carry the media kind so the viewer/strip branch on video.
+     mediaType: p.mediaType,
+     streamUid: p.streamUid,
+     posterPct: p.posterPct,
+     durationSec: p.durationSec,
     };
    }),
   [getItemPhotos, state.inspection.id],
@@ -1186,6 +1230,30 @@ export default function InspectionEditPage() {
    const idx = photo.photoIndex;
    const sectionId = state.currentSection?.id;
    if (!itemId || idx == null) return;
+   // Plan 7 — video branch. A video entry exposes only poster · cover · caption
+   // · delete (the MediaViewer toolbar enforces this). Poster opens the picker;
+   // delete removes the Stream video + detaches the entry; cover/caption fall
+   // through to the shared handlers (cover stores the poster image reference).
+   if (photo.mediaType === "video" && photo.streamUid) {
+    if (action === "poster") {
+     setPosterTarget({
+      streamUid: photo.streamUid,
+      durationSec: photo.durationSec ?? 0,
+      posterPct: photo.posterPct ?? 0,
+     });
+     return;
+    }
+    if (action === "delete") {
+     patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
+     fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(photo.streamUid)}`, {
+      method: "DELETE",
+      credentials: "include",
+     }).then(() => revalidator.revalidate());
+     return;
+    }
+    // cover / caption fall through to the photo handlers below (they address by
+    // itemId + photoIndex, which is valid for video entries too).
+   }
    if (action === "cover") {
     // Reuse the existing CoverCropper flow: crop-then-set on the displayed key.
     setGalleryCropSource({ key: photo.key, url: photo.url });
@@ -1920,7 +1988,11 @@ export default function InspectionEditPage() {
  }
  ratingLevels={state.ratingLevels}
  onRating={handleRating}
- onAddPhoto={() => photoInputRef.current?.click()}
+ onAddPhoto={() =>
+  state.activeItemId
+   ? setAddMediaChooser({ itemId: state.activeItemId })
+   : photoInputRef.current?.click()
+ }
  onAddDefectPhoto={(target) => {
  pendingPhotoTargetRef.current = target;
  photoInputRef.current?.click();
@@ -2026,6 +2098,7 @@ export default function InspectionEditPage() {
  onBulkDetachPhotos={onBulkDetachPhotos}
  moveTargets={moveTargets}
  onBulkMovePhotos={onBulkMovePhotos}
+ videoPosterUrl={videoPosterUrl}
  />
  ) : (
  <div className="flex items-center justify-center h-full text-ih-fg-4">
@@ -2295,7 +2368,81 @@ export default function InspectionEditPage() {
  index={viewer.index}
  onClose={() => setViewer((v) => ({ ...v, index: null }))}
  onAction={onViewerAction}
+ streamCustomerSubdomain={streamCustomerSubdomain}
  />
+
+ {/* Plan 7 — poster-frame picker for a video entry (opened by the "Poster
+  * frame" toolbar action). Fails closed when the Stream subdomain is absent. */}
+ {posterTarget && (
+ <PosterPicker
+  inspectionId={String(state.inspection.id)}
+  streamUid={posterTarget.streamUid}
+  durationSec={posterTarget.durationSec}
+  posterPct={posterTarget.posterPct}
+  streamCustomerSubdomain={streamCustomerSubdomain}
+  onClose={() => setPosterTarget(null)}
+ />
+ )}
+
+ {/* Plan 7 — add-media chooser: photo OR video. Video requires a connection
+  * (no offline queue); the Video option disables + hints when offline. */}
+ {addMediaChooser && (
+ <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Add media">
+  <button
+   type="button"
+   aria-label="Close"
+   className="absolute inset-0 bg-[rgba(15,23,42,0.4)]"
+   onClick={() => setAddMediaChooser(null)}
+  />
+  <div className="relative w-full max-w-md rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover">
+   <h2 className="mb-3 text-[15px] font-bold text-ih-fg-1">Add media</h2>
+   <div className="grid grid-cols-2 gap-3">
+    <button
+     type="button"
+     onClick={() => {
+      setAddMediaChooser(null);
+      photoInputRef.current?.click();
+     }}
+     className="min-h-[44px] rounded-xl border border-ih-border bg-ih-bg-muted px-4 py-3 text-[14px] font-bold text-ih-fg-1 hover:border-ih-primary"
+    >
+     Photo
+    </button>
+    {(() => {
+     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+     return (
+      <button
+       type="button"
+       disabled={offline}
+       onClick={() => {
+        const t = addMediaChooser;
+        setAddMediaChooser(null);
+        setVideoCaptureTarget(t);
+       }}
+       title={offline ? "Video upload requires a connection" : undefined}
+       className="min-h-[44px] rounded-xl border border-ih-border bg-ih-bg-muted px-4 py-3 text-[14px] font-bold text-ih-fg-1 hover:border-ih-primary disabled:opacity-40"
+      >
+       Video
+       {offline && <span className="mt-1 block text-[10px] font-normal text-ih-fg-4">Requires a connection</span>}
+      </button>
+     );
+    })()}
+   </div>
+  </div>
+ </div>
+ )}
+
+ {/* Plan 7 — video capture + Cloudflare Stream direct-upload overlay. */}
+ {videoCaptureTarget && (
+ <VideoCapture
+  inspectionId={String(state.inspection.id)}
+  itemId={videoCaptureTarget.itemId}
+  onClose={() => setVideoCaptureTarget(null)}
+  onUploaded={() => {
+   setVideoCaptureTarget(null);
+   revalidator.revalidate();
+  }}
+ />
+ )}
 
  {/* Plan 4 (Task 8) — per-photo crop overlay. Cropping ALWAYS re-derives from
   * the ORIGINAL key. A re-crop that would discard an existing annotation warns

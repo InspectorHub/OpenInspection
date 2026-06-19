@@ -1,10 +1,12 @@
 import { PhotoLightbox } from "./PhotoLightbox";
+import { VideoPlayer } from "./VideoPlayer";
 import { fullResUrl } from "./cropImage";
+import { resolveMediaType } from "../../../server/lib/media/media-type";
 import type { GalleryPhoto } from "~/lib/inspection-media";
 
-export type MediaAction = "crop" | "annotate" | "rotate" | "cover" | "caption" | "revert" | "delete";
+export type MediaAction = "crop" | "annotate" | "rotate" | "cover" | "caption" | "revert" | "delete" | "poster";
 
-/** Bottom toolbar — single place all per-photo actions live (field-tablet: bottom, 44px). */
+/** Bottom toolbar — single place all per-media actions live (field-tablet: bottom, 44px). */
 export function MediaViewerToolbar({
   kind,
   edited,
@@ -14,9 +16,6 @@ export function MediaViewerToolbar({
   edited: boolean;
   on: (a: MediaAction) => void;
 }) {
-  // video toolbar is N8; photo toolbar today. Branch on `kind` so the video
-  // variant can diverge later without changing this component's surface.
-  const isPhoto = kind === "photo";
   const btn = (a: MediaAction, label: string) => (
     <button
       key={a}
@@ -28,17 +27,27 @@ export function MediaViewerToolbar({
       {label}
     </button>
   );
-  const items: React.ReactNode[] = isPhoto
-    ? [
-        btn("crop", "Crop"),
-        btn("annotate", "Annotate"),
-        btn("rotate", "Rotate"),
-        btn("cover", "Set cover"),
-        btn("caption", "Caption"),
-      ]
-    : [];
-  if (isPhoto && edited) items.push(btn("revert", "Revert"));
-  if (isPhoto) items.push(btn("delete", "Delete"));
+  // Plan 7 — video gets a LOCKED minimal toolbar: poster · cover · caption ·
+  // delete. NO crop / annotate / rotate / revert (out of v1). Photo unchanged.
+  if (kind === "video") {
+    return (
+      <>
+        {btn("poster", "Poster frame")}
+        {btn("cover", "Set cover")}
+        {btn("caption", "Caption")}
+        {btn("delete", "Delete")}
+      </>
+    );
+  }
+  const items: React.ReactNode[] = [
+    btn("crop", "Crop"),
+    btn("annotate", "Annotate"),
+    btn("rotate", "Rotate"),
+    btn("cover", "Set cover"),
+    btn("caption", "Caption"),
+  ];
+  if (edited) items.push(btn("revert", "Revert"));
+  items.push(btn("delete", "Delete"));
   return <>{items}</>;
 }
 
@@ -47,14 +56,18 @@ export interface MediaViewerProps {
   index: number | null;
   onClose: () => void;
   onAction: (action: MediaAction, photo: GalleryPhoto) => void;
+  /** Plan 7 — Cloudflare Stream customer subdomain for the video player iframe. */
+  streamCustomerSubdomain?: string | null;
 }
-export function MediaViewer({ photos, index, onClose, onAction }: MediaViewerProps) {
+export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSubdomain }: MediaViewerProps) {
   const viewed = index !== null ? photos[index] : undefined;
+  const kind = viewed ? resolveMediaType(viewed) : "photo";
+
   const toolbar = viewed
     ? [
         <MediaViewerToolbar
           key="tb"
-          kind="photo"
+          kind={kind}
           edited={!!viewed.annotated}
           on={(a) => {
             onClose();
@@ -63,13 +76,30 @@ export function MediaViewer({ photos, index, onClose, onAction }: MediaViewerPro
         />,
       ]
     : undefined;
+
+  // Plan 7 — a video entry renders the Stream player as a single "slide" rather
+  // than a still image. The lightbox renders arbitrary React via `renderSlide`.
+  const slides = photos.map((p) =>
+    resolveMediaType(p) === "video"
+      ? ({ type: "video-stream" as const, streamUid: p.streamUid ?? "", alt: p.label })
+      : ({ src: fullResUrl(p.url), alt: p.label }),
+  );
+
   return (
     <PhotoLightbox
-      slides={photos.map((p) => ({ src: fullResUrl(p.url), alt: p.label }))}
+      slides={slides}
       index={index ?? 0}
       open={index !== null}
       onClose={onClose}
       toolbarButtons={toolbar}
+      renderSlide={(slide) =>
+        slide && (slide as { type?: string }).type === "video-stream" ? (
+          <VideoPlayer
+            streamUid={(slide as { streamUid: string }).streamUid}
+            streamCustomerSubdomain={streamCustomerSubdomain ?? null}
+          />
+        ) : undefined
+      }
     />
   );
 }
