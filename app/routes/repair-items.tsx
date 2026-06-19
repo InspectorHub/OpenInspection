@@ -4,6 +4,7 @@ import type { Route } from "./+types/repair-items";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { Breadcrumb } from "~/components/Breadcrumb";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 
 export function meta() {
@@ -114,8 +115,8 @@ export default function RepairItemsPage() {
 
   return (
     <div className="space-y-[18px]">
+      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Repair Items" }]} />
       <PageHeader
-        eyebrow="Library · Repair Items"
         title="Repair Items"
         meta={`${items.length} in library`}
         actions={<Button variant="primary" onClick={openCreate}>+ Add item</Button>}

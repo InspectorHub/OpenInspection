@@ -4,6 +4,7 @@ import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination } from "@core/shared-ui";
+import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
 
 export function meta() {
@@ -48,8 +49,8 @@ export default function MarketplacePage() {
 
   return (
     <div className="space-y-[18px]">
+      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Marketplace" }]} />
       <PageHeader
-        eyebrow="Library · Marketplace"
         title="Marketplace"
         meta={`${meta.total} available`}
       />

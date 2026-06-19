@@ -4,6 +4,7 @@ import type { Route } from "./+types/rating-systems";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
+import { Breadcrumb } from "~/components/Breadcrumb";
 import { RatingSystemEditor, type EditorSystem, type RatingBucket } from "~/components/RatingSystemEditor";
 
 export function meta() {
@@ -102,8 +103,8 @@ export default function RatingSystemsPage() {
 
   return (
     <div className="space-y-[18px]">
+      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Rating Systems" }]} />
       <PageHeader
-        eyebrow="Library · Rating Systems"
         title="Rating Systems"
         meta={`${systems.length} ${systems.length === 1 ? "system" : "systems"}`}
         actions={<Button variant="primary" onClick={openNew}>+ New rating system</Button>}
