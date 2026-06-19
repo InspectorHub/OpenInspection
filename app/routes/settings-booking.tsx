@@ -4,6 +4,8 @@ import type { Route } from "./+types/settings-booking";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { useCopyClipboard } from "~/hooks/useCopyClipboard";
+import { SCHEDULING_ROLES } from "~/lib/settings/constants";
 
 interface AvailabilitySlot {
   id: number;
@@ -179,7 +181,7 @@ export default function SettingsBookingPage() {
   // Show picker only to admins; restrict to the roles that can hold a
   // schedule.
   const pickerMembers = isAdmin
-    ? data.members.filter((m) => ['owner', 'manager', 'inspector'].includes(m.role))
+    ? data.members.filter((m) => (SCHEDULING_ROLES as readonly string[]).includes(m.role))
     : [];
 
   return (
@@ -256,7 +258,7 @@ function ManageOthersPicker({
 /* ------------------------------------------------------------------ */
 
 function StatusAndLinks({ tenant, slug }: { tenant: string | null | undefined; slug: string | null | undefined }) {
-  const [copiedField, setCopiedField] = useState<string | null>(null);
+  const { copied: copiedField, copy } = useCopyClipboard();
 
   // window.location.origin is "" during SSR and real on client.
   // The existing code used this same pattern — it's a pre-existing SSR/client
@@ -268,12 +270,6 @@ function StatusAndLinks({ tenant, slug }: { tenant: string | null | undefined; s
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const companyUrl = tenant ? `${origin}/book/${tenant}` : null;
   const deepLink = tenant && slug ? `${origin}/book/${tenant}/${slug}` : null;
-
-  function copy(value: string, field: string) {
-    void navigator.clipboard.writeText(value);
-    setCopiedField(field);
-    setTimeout(() => setCopiedField(null), 2000);
-  }
 
   if (!companyUrl) return null;
 
@@ -699,7 +695,7 @@ const STYLES = [
 
 function EmbedWidget({ tenant }: { tenant: string | null | undefined }) {
   const [style, setStyle] = useState<"light" | "dark" | "branded">("light");
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyClipboard();
 
   // Company-level embed: only requires tenant (slug not needed).
   // See Part 4c — we use company-only embed, no per-inspector variant in the snippet.
@@ -722,12 +718,6 @@ function EmbedWidget({ tenant }: { tenant: string | null | undefined }) {
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const embedUrl = `${origin}/embed/${tenant}?style=${style}`;
   const snippet = `<iframe src="${origin}/embed/${tenant}?style=${style}" style="width:100%;min-height:700px;border:none;" loading="lazy"></iframe>`;
-
-  function copySnippet() {
-    void navigator.clipboard.writeText(snippet);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
@@ -753,7 +743,7 @@ function EmbedWidget({ tenant }: { tenant: string | null | undefined }) {
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-bold text-ih-fg-2">Embed code</span>
           <button
-            onClick={copySnippet}
+            onClick={() => copy(snippet)}
             className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors"
           >
             {copied ? "Copied!" : "Copy snippet"}

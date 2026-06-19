@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Form, Link, useLoaderData, useActionData, useNavigation, useFetcher } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -6,6 +5,8 @@ import type { Route } from "./+types/settings-advanced";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
+import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { useFlash } from "~/hooks/useFlash";
 import { stripeConnectSchema } from "~/lib/forms/settings-config.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
@@ -192,14 +193,10 @@ export default function SettingsAdvancedPage() {
     nav.state !== "idle" && nav.formData?.get("intent") === "save-advanced-secrets";
 
   // Transient success flash — visible for 4s after a save round-trip.
-  const [flashVisible, setFlashVisible] = useState(false);
-  useEffect(() => {
-    if (actionData && "success" in actionData && actionData.success) {
-      setFlashVisible(true);
-      const t = setTimeout(() => setFlashVisible(false), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [actionData]);
+  const { flashVisible } = useFlash(
+    !!actionData && "success" in actionData && !!actionData.success,
+    actionData,
+  );
 
   if ("forbidden" in loaderResult) return <AccessDenied />;
   const { config, secrets } = loaderResult;
@@ -359,19 +356,14 @@ export default function SettingsAdvancedPage() {
         </Form>
 
         {/* Test connection — probes the STORED Gemini key, no re-entry needed */}
-        <geminiTestFetcher.Form method="post" className="flex flex-wrap items-center gap-3">
-          <input type="hidden" name="intent" value="test-gemini" />
-          <button type="submit" disabled={geminiTestFetcher.state !== "idle"}
-            className="h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
-            {geminiTestFetcher.state !== "idle" ? "Testing…" : "Test connection"}
-          </button>
+        <TestConnectionButton fetcher={geminiTestFetcher} intent="test-gemini">
           {geminiTest && "intent" in geminiTest && geminiTest.intent === "test-gemini" && geminiTest.test && (
             <span className="text-[12px] text-ih-fg-2">Connected — key is valid</span>
           )}
           {geminiTest && "intent" in geminiTest && geminiTest.intent === "test-gemini" && "success" in geminiTest && !geminiTest.success && (
             <span className="text-[12px] text-ih-bad-fg">{geminiTest.error}</span>
           )}
-        </geminiTestFetcher.Form>
+        </TestConnectionButton>
       </section>
 
       {/* Integration API keys */}

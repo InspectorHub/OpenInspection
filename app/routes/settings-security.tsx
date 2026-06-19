@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Form, Link, useLoaderData, useActionData, useNavigation } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -6,6 +6,7 @@ import type { Route } from "./+types/settings-security";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
+import { useFlash } from "~/hooks/useFlash";
 import { changePasswordSchema, deleteAccountSchema } from "~/lib/forms/settings.schema";
 
 /* ------------------------------------------------------------------ */
@@ -147,14 +148,10 @@ export default function SettingsSecurityPage() {
     nav.state !== "idle" && nav.formData?.get("intent") === "save-turnstile";
 
   // Transient success flash — visible for 4s after a save round-trip.
-  const [flashVisible, setFlashVisible] = useState(false);
-  useEffect(() => {
-    if (actionData && "success" in actionData && actionData.success) {
-      setFlashVisible(true);
-      const t = setTimeout(() => setFlashVisible(false), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [actionData]);
+  const { flashVisible } = useFlash(
+    !!actionData && "success" in actionData && !!actionData.success,
+    actionData,
+  );
 
   // Map the server `field` error onto the matching SecretField (Turnstile).
   const turnstileFieldError = (name: string): string | undefined => {
