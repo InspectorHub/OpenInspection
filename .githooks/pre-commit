@@ -1,4 +1,16 @@
 #!/usr/bin/env sh
+# .githooks/pre-commit — openinspection
+#
+# Quality gate for commits made inside this repo. Activated automatically by the
+# "prepare" npm script on `npm install`/`npm ci`:
+#     git config core.hooksPath .githooks
+# Bypass (discouraged): git commit --no-verify
+#
+# Mechanism is .githooks + core.hooksPath (no husky), aligned with the
+# superproject and the portal/cms submodules.
+
+# Never run in CI / non-interactive contexts (CI does not commit, but guard anyway).
+[ -n "$CI" ] && exit 0
 
 # Colors
 RED='\033[0;31m'

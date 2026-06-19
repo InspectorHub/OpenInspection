@@ -32,7 +32,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -63,3 +63,8 @@ jobs:
 
       - name: Build (bundle the Worker)
         run: npm run build
+
+      # Bundle-size gate (Workers Free 3 MiB gzipped). Reuses the build/ output
+      # from the previous step (--skip-build); also enforced in pre-commit.
+      - name: Bundle size gate
+        run: npm run check:bundle -- --skip-build
