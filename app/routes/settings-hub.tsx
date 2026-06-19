@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { HubCard, HUB_GRID_CLASS } from "~/components/HubCard";
 
 const GROUPS = [
   {
@@ -89,37 +89,9 @@ const GROUPS = [
 
 export default function SettingsHub() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+    <div className={HUB_GRID_CLASS}>
       {GROUPS.map((g) => (
-        <Link
-          key={g.to}
-          to={g.to}
-          className="group p-4 bg-ih-bg-card border border-ih-border rounded-lg hover:shadow-ih-popover hover:border-ih-border transition-all"
-        >
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-lg bg-ih-primary-tint text-ih-primary flex items-center justify-center flex-shrink-0">
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d={g.icon}
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="font-bold text-[14px] text-ih-fg-1 group-hover:text-ih-primary">
-                {g.title}
-              </h3>
-              <p className="text-[12px] text-ih-fg-3 mt-0.5">{g.desc}</p>
-            </div>
-          </div>
-        </Link>
+        <HubCard key={g.to} to={g.to} title={g.title} desc={g.desc} icon={g.icon} />
       ))}
     </div>
   );
