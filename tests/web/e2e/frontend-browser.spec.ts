@@ -131,9 +131,9 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
       (window as any).__spa_nav_marker = true;
     });
 
-    // Click a sidebar link (e.g. Templates or Calendar)
+    // Click a sidebar link (e.g. the Library hub or Calendar)
     const sidebarLink = page.locator(
-      'aside a[href="/templates"], nav a[href="/templates"], aside a[href="/calendar"], nav a[href="/calendar"]',
+      'aside a[href="/library"], nav a[href="/library"], aside a[href="/calendar"], nav a[href="/calendar"]',
     );
     if ((await sidebarLink.count()) > 0) {
       await sidebarLink.first().click();
@@ -156,17 +156,17 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
     await page.waitForLoadState('networkidle');
 
     const sidebarLink = page.locator(
-      'aside a[href="/templates"], nav a[href="/templates"]',
+      'aside a[href="/library"], nav a[href="/library"]',
     );
     if ((await sidebarLink.count()) > 0) {
       await sidebarLink.first().click();
-      await page.waitForURL('**/templates', { timeout: 10000 }).catch(() => {});
+      await page.waitForURL('**/library', { timeout: 10000 }).catch(() => {});
       // Fallback: SPA nav may not change URL if hydration hasn't completed
-      if (!page.url().includes('/templates')) {
+      if (!page.url().includes('/library')) {
         // Navigate directly as fallback
-        await page.goto(`${BASE_URL}/templates`, { timeout: NAV_TIMEOUT, waitUntil: 'domcontentloaded' });
+        await page.goto(`${BASE_URL}/library`, { timeout: NAV_TIMEOUT, waitUntil: 'domcontentloaded' });
       }
-      expect(page.url()).toContain('/templates');
+      expect(page.url()).toContain('/library');
 
       await page.goBack();
       await page.waitForURL('**/dashboard', { timeout: 10000 }).catch(() => {});
@@ -199,7 +199,7 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
   // -- Templates Page --------------------------------------------------------
 
   test('UI-06: Templates page loads', async ({ page }) => {
-    await gotoAuth(page, '/templates', adminSession);
+    await gotoAuth(page, '/library/templates', adminSession);
     await page.waitForLoadState('networkidle');
     // Page should have loaded without error
     const content = await page.content();
@@ -231,7 +231,7 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
   }) => {
     const pagesToCheck = [
       '/dashboard',
-      '/templates',
+      '/library/templates',
       '/team',
       '/settings',
     ];

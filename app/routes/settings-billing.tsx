@@ -1,7 +1,8 @@
 import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/settings-billing";
-import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -22,7 +23,8 @@ interface BillingSummary {
 /* ------------------------------------------------------------------ */
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
   const res = await api.billing.summary.$get();
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
@@ -46,7 +48,9 @@ function fmtMoney(n: number): string {
 /* ------------------------------------------------------------------ */
 
 export default function SettingsBillingPage() {
-  const { billing } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
+  if ("forbidden" in data) return <AccessDenied />;
+  const { billing } = data;
   const {
     hasBilling = false,
     hasSeatQuota = false,

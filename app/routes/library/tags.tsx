@@ -3,6 +3,7 @@ import type { Route } from "./+types/tags";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
+import { Breadcrumb } from "~/components/Breadcrumb";
 
 export function meta() {
   return [{ title: "Tags - OpenInspection" }];
@@ -25,8 +26,8 @@ export default function TagsPage() {
 
   return (
     <div className="space-y-[18px]">
+      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Tags" }]} />
       <PageHeader
-        eyebrow="Library · Tags"
         title="Tags"
         meta={`${tags.length} tags`}
         actions={

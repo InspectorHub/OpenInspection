@@ -225,7 +225,7 @@ function StepPill({ index, label, state }: { index: number; label: string; state
                     done
                         ? "bg-ih-ok-bg text-ih-ok-fg"
                         : active
-                          ? "bg-ih-primary text-white"
+                          ? "bg-ih-primary text-ih-primary-fg"
                           : "bg-ih-bg-muted text-ih-fg-4"
                 }`}
             >
@@ -433,7 +433,7 @@ function SignCard({
                             type="button"
                             onClick={submitSignature}
                             disabled={submitting}
-                            className="flex-[2] h-10 px-4 bg-ih-primary text-white rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-[2] h-10 px-4 bg-ih-primary text-ih-primary-fg rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {submitting ? "Signing..." : "Sign Agreement"}
                         </button>
@@ -558,7 +558,7 @@ function PayPanel({
                         type="button"
                         onClick={startPayment}
                         disabled={phase === "loading"}
-                        className="w-full h-11 rounded-lg bg-ih-primary text-white font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
+                        className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
                     >
                         {phase === "loading" ? "Starting secure checkout…" : `Pay ${money(amountCents)}`}
                     </button>
@@ -630,7 +630,7 @@ function CheckoutPayForm({ amountCents, returnUrl }: { amountCents: number; retu
             <button
                 type="submit"
                 disabled={!stripe || submitting}
-                className="w-full h-11 rounded-lg bg-ih-primary text-white font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
+                className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
             >
                 {submitting ? "Processing…" : `Pay ${money(amountCents)}`}
             </button>
@@ -666,7 +666,7 @@ function CompleteCard({ tenant, inspectionId }: { tenant: string; inspectionId: 
             {reportHref && (
                 <a
                     href={reportHref}
-                    className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-md bg-ih-primary text-white text-sm font-bold hover:bg-ih-primary-600 transition-all"
+                    className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-md bg-ih-primary text-ih-primary-fg text-sm font-bold hover:bg-ih-primary-600 transition-all"
                 >
                     View your report
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

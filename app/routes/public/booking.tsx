@@ -274,7 +274,7 @@ export default function BookingPage() {
               <div key={s} className="flex items-center gap-1 flex-1">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
                   i <= step
-                    ? "bg-ih-primary text-white"
+                    ? "bg-ih-primary text-ih-primary-fg"
                     : "bg-ih-bg-muted text-ih-fg-4"
                 }`}>{i + 1}</div>
                 <span className={`text-[11px] font-medium hidden sm:inline ${
@@ -561,7 +561,7 @@ export default function BookingPage() {
                 <button
                   onClick={() => setStep(step + 1)}
                   disabled={!canNext}
-                  className="h-9 px-5 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  className="h-9 px-5 rounded-md bg-ih-primary text-ih-primary-fg font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
                   Continue
                 </button>
@@ -574,7 +574,7 @@ export default function BookingPage() {
                   <button
                     onClick={handleSubmit}
                     disabled={submitting || (needsTurnstile && !turnstileToken)}
-                    className="h-9 px-5 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    className="h-9 px-5 rounded-md bg-ih-primary text-ih-primary-fg font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                   >
                     {submitting ? "Submitting..." : "Request Inspection"}
                   </button>

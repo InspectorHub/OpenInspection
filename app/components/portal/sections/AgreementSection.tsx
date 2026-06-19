@@ -232,7 +232,7 @@ export function AgreementSection({
             <button
               type="button"
               onClick={() => window.print()}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-ih-primary text-white text-sm font-bold hover:bg-ih-primary-600 transition-all"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-md bg-ih-primary text-ih-primary-fg text-sm font-bold hover:bg-ih-primary-600 transition-all"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -264,7 +264,7 @@ export function AgreementSection({
                 type="button"
                 onClick={submitSignature}
                 disabled={submitting || !hasMark}
-                className="w-full h-11 px-4 bg-ih-primary text-white rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-11 px-4 bg-ih-primary text-ih-primary-fg rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {signFetcher.state !== "idle" ? "Signing..." : "Sign Agreement"}
               </button>

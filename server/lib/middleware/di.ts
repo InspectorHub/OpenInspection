@@ -30,6 +30,7 @@ import { WidgetService } from '../../services/widget.service';
 import { RecommendationService } from '../../services/recommendation.service';
 import { ContractorTypeService } from '../../services/contractor-type.service';
 import { EventService } from '../../services/event.service';
+import { InspectionTypeService } from '../../services/inspection-type.service';
 import { TotpService } from '../../services/totp.service';
 import { TemplateSeedService } from '../../services/template-seed.service';
 import { ReportPdfService } from '../../services/report-pdf.service';
@@ -247,6 +248,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'event':
                     target.event = new EventService(c.env.DB);
+                    break;
+                case 'inspectionType':
+                    target.inspectionType = new InspectionTypeService(c.env.DB);
                     break;
                 case 'totp':
                     target.totp = new TotpService();

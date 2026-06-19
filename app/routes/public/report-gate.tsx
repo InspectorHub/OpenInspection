@@ -177,7 +177,7 @@ export default function ReportGatePage() {
         {/* CTA */}
         <a
           href={gate.actionUrl}
-          className="inline-flex items-center justify-center h-11 px-6 rounded-lg text-sm font-bold text-white bg-ih-primary hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card"
+          className="inline-flex items-center justify-center h-11 px-6 rounded-lg text-sm font-bold text-ih-primary-fg bg-ih-primary hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card"
         >
           {ctaLabel}
         </a>

@@ -1,10 +1,20 @@
-import { Link } from "react-router";
+import { Link, useLoaderData } from "react-router";
+import type { Route } from "./+types/settings-data";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 export function meta() {
   return [{ title: "Data - Settings - OpenInspection" }];
 }
 
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const { forbidden } = await requireAdminLoader(context, request);
+  return { forbidden };
+}
+
 export default function SettingsData() {
+  const { forbidden } = useLoaderData<typeof loader>();
+  if (forbidden) return <AccessDenied />;
   return (
     <div className="space-y-[18px]">
       {/* Breadcrumb */}

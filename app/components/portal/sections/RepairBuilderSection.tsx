@@ -499,7 +499,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
           onClick={() => setSortKey("section")}
           className={`h-7 px-3 rounded text-[12px] font-semibold transition-colors ${
             sortKey === "section"
-              ? "bg-ih-primary text-white"
+              ? "bg-ih-primary text-ih-primary-fg"
               : "border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"
           }`}
         >
@@ -510,7 +510,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
           onClick={() => setSortKey("severity")}
           className={`h-7 px-3 rounded text-[12px] font-semibold transition-colors ${
             sortKey === "severity"
-              ? "bg-ih-primary text-white"
+              ? "bg-ih-primary text-ih-primary-fg"
               : "border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"
           }`}
         >
@@ -715,7 +715,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
                 type="button"
                 disabled={!emailTo || emailFetcher.state === "submitting"}
                 onClick={sendEmail}
-                className="h-9 px-4 rounded-lg bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+                className="h-9 px-4 rounded-lg bg-ih-primary text-ih-primary-fg text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
               >
                 {emailFetcher.state === "submitting" ? "Sending…" : "Send email"}
               </button>

@@ -170,7 +170,7 @@ export function MessagesSection({
             type="button"
             onClick={handleSend}
             disabled={!composeBody.trim() || sending}
-            className="px-4 py-2 rounded-xl bg-ih-primary text-white text-sm font-semibold disabled:opacity-50 transition-opacity"
+            className="px-4 py-2 rounded-xl bg-ih-primary text-ih-primary-fg text-sm font-semibold disabled:opacity-50 transition-opacity"
           >
             {sending ? "Sending..." : "Send"}
           </button>

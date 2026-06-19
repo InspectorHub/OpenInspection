@@ -23,11 +23,11 @@ interface PaletteItem {
 const PAGES: PaletteItem[] = [
   { id: "p-dashboard", label: "Dashboard", group: "Pages", icon: "page", to: "/dashboard", hint: "G then I" },
   { id: "p-reports", label: "Reports", group: "Pages", icon: "page", to: "/dashboard?workflow=published", hint: "G then R" },
-  { id: "p-templates", label: "Templates", group: "Pages", icon: "page", to: "/templates", hint: "G then T" },
-  { id: "p-marketplace", label: "Marketplace", group: "Pages", icon: "page", to: "/marketplace" },
-  { id: "p-agreements", label: "Agreements", group: "Pages", icon: "page", to: "/agreements" },
-  { id: "p-comments", label: "Canned Comments", group: "Pages", icon: "page", to: "/comments" },
-  { id: "p-repair", label: "Repair Items", group: "Pages", icon: "page", to: "/repair-items" },
+  { id: "p-templates", label: "Templates", group: "Pages", icon: "page", to: "/library/templates", hint: "G then T" },
+  { id: "p-marketplace", label: "Marketplace", group: "Pages", icon: "page", to: "/library/marketplace" },
+  { id: "p-agreements", label: "Agreements", group: "Pages", icon: "page", to: "/library/agreements" },
+  { id: "p-comments", label: "Canned Comments", group: "Pages", icon: "page", to: "/library/comments" },
+  { id: "p-repair", label: "Repair Items", group: "Pages", icon: "page", to: "/library/repair-items" },
   { id: "p-contacts", label: "Contacts", group: "Pages", icon: "page", to: "/contacts", hint: "G then C" },
   { id: "p-calendar", label: "Calendar", group: "Pages", icon: "page", to: "/calendar" },
   { id: "p-invoices", label: "Invoices", group: "Pages", icon: "page", to: "/invoices" },
@@ -56,9 +56,9 @@ const SETTINGS: PaletteItem[] = [
 
 const QUICK_ACTIONS: PaletteItem[] = [
   { id: "qa-new-inspection", label: "New Inspection", group: "Quick Actions", icon: "plus", hint: "create" },
-  { id: "qa-new-template", label: "New Template", group: "Quick Actions", icon: "plus", hint: "create", to: "/templates?new=1" },
+  { id: "qa-new-template", label: "New Template", group: "Quick Actions", icon: "plus", hint: "create", to: "/library/templates?new=1" },
   { id: "qa-new-contact", label: "New Contact", group: "Quick Actions", icon: "plus", hint: "create", to: "/contacts?new=1" },
-  { id: "qa-import", label: "Import Spectora", group: "Quick Actions", icon: "plus", to: "/templates?import=1" },
+  { id: "qa-import", label: "Import Spectora", group: "Quick Actions", icon: "plus", to: "/library/templates?import=1" },
 ];
 
 /* ------------------------------------------------------------------ */

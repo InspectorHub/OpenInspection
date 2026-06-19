@@ -7,6 +7,8 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
 import { stripeConnectSchema } from "~/lib/forms/settings-config.schema";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -23,7 +25,8 @@ interface AdvancedConfig {
 /* ------------------------------------------------------------------ */
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
 
   // Fetch Stripe connect status + secrets in parallel.
@@ -164,7 +167,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function SettingsAdvancedPage() {
-  const { config, secrets } = useLoaderData<typeof loader>();
+  const loaderResult = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const geminiTestFetcher = useFetcher<typeof action>();
@@ -197,6 +200,9 @@ export default function SettingsAdvancedPage() {
       return () => clearTimeout(t);
     }
   }, [actionData]);
+
+  if ("forbidden" in loaderResult) return <AccessDenied />;
+  const { config, secrets } = loaderResult;
 
   // Map a server `field` error back onto the matching SecretField.
   const secretFieldError = (name: string): string | undefined => {

@@ -13,6 +13,8 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 export function meta() {
   return [{ title: "Integrations - Settings - OpenInspection" }];
@@ -21,7 +23,8 @@ export function meta() {
 type WebhookLogEntry = { ts: string; eventType: string; result: string };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
   const [secretsRes, logRes] = await Promise.all([
     api.secrets.secrets.$get().catch(() => null),
@@ -189,17 +192,12 @@ function WebhookResultBadge({ result }: { result: string }) {
 }
 
 export default function SettingsIntegrations() {
-  const { secrets, webhookBase, webhookLog } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const revalidator = useRevalidator();
   const testFetcher = useFetcher<typeof action>();
   const ctx = useSessionContext();
-
-  const tenantSlug = ctx?.branding?.tenantSlug ?? null;
-  const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
-
-  const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save-stripe-secrets";
 
   // Transient success flash — visible for 4s after a save round-trip.
   // Errors persist until the next attempt (no auto-dismiss).
@@ -216,6 +214,14 @@ export default function SettingsIntegrations() {
   // failed submit, re-validate on every change inside the form.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submittedOnce, setSubmittedOnce] = useState(false);
+
+  if ("forbidden" in data) return <AccessDenied />;
+  const { secrets, webhookBase, webhookLog } = data;
+
+  const tenantSlug = ctx?.branding?.tenantSlug ?? null;
+  const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
+
+  const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save-stripe-secrets";
 
   const serverField = actionData?.intent === "save-stripe-secrets" && !actionData.success
     ? actionData.field

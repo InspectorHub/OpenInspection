@@ -159,7 +159,7 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
     });
 
     test('M-07: Marketplace renders without horizontal overflow on mobile', async ({ page }) => {
-        await gotoMobile(page, '/marketplace', adminToken);
+        await gotoMobile(page, '/library/marketplace', adminToken);
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         expect(overflow, 'no horizontal overflow').toBeLessThanOrEqual(1);
         await expect(page.locator('h1:has-text("Marketplace")')).toBeVisible();

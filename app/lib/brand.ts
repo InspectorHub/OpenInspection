@@ -14,6 +14,25 @@ export interface TenantBrand {
 export const EMPTY_BRAND: TenantBrand = { siteName: null, primaryColor: null, logoUrl: null };
 
 /**
+ * Pick a readable text color for content sitting ON the brand primary color.
+ * Uses the YIQ perceived-brightness formula: bright backgrounds (≥150) get the
+ * dark token (#111827), everything else gets white. Accepts `#rgb`/`#rrggbb`
+ * (leading `#` optional); any unparseable input falls back to white so a
+ * misconfigured brand color never renders invisible text.
+ */
+export function contrastForeground(hex: string | null | undefined): string {
+  const m = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(hex?.trim() ?? "");
+  if (!m) return "#ffffff";
+  let h = m[1];
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq >= 150 ? "#111827" : "#ffffff";
+}
+
+/**
  * Re-points the Design System 0523 primary tokens at the tenant's accent on a
  * surface root. Every existing `bg-ih-primary` / `text-ih-primary` /
  * `shadow-ih-focus` consumer downstream picks the brand up automatically —
@@ -45,5 +64,10 @@ export function brandTokens(primaryColor: string | null | undefined): CSSPropert
     "--color-ih-primary-tint": tint,
     "--color-ih-primary-glow": glow,
     "--shadow-ih-focus": `0 0 0 3px ${glow}`,
+    // Readable foreground for text/icons sitting on the brand primary color.
+    // A bright accent (e.g. yellow/lime) needs dark text; a deep accent needs
+    // white. Buttons on `bg-ih-primary` read this via `var(--color-ih-primary-fg)`.
+    "--ih-primary-fg": contrastForeground(primaryColor),
+    "--color-ih-primary-fg": contrastForeground(primaryColor),
   } as CSSProperties;
 }

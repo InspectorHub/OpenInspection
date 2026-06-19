@@ -292,7 +292,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
       <button
         type="submit"
         disabled={submitting}
-        className="w-full px-4 py-3 bg-ih-primary text-white rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+        className="w-full px-4 py-3 bg-ih-primary text-ih-primary-fg rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
       >
         {submitting ? "Submitting..." : "Request booking"}
       </button>

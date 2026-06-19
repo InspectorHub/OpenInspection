@@ -446,7 +446,7 @@ export default function TemplateEditPage() {
       {/* Toolbar */}
       <header className="flex items-center justify-between h-12 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
         <div className="flex items-center gap-3">
-          <Link to="/templates" className="text-ih-fg-4 hover:text-ih-fg-2 text-[13px]">&larr; Templates</Link>
+          <Link to="/library/templates" className="text-ih-fg-4 hover:text-ih-fg-2 text-[13px]">&larr; Templates</Link>
           <input
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}
@@ -865,7 +865,7 @@ export function ErrorBoundary() {
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-[#f8fafc] dark:bg-[#0f172a] gap-3 px-6 text-center">
       <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
-      <Link to="/templates" className="h-8 px-4 inline-flex items-center rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600">
+      <Link to="/library/templates" className="h-8 px-4 inline-flex items-center rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600">
         Back to Templates
       </Link>
     </div>

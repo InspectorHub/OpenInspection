@@ -27,6 +27,7 @@ import type {
     InspectionPrefsApi,
     InspectionRequestsApi,
     InspectionsApi,
+    InspectionTypesApi,
     InspectionSyncApi,
     InspectionTagApi,
     IntegrationsApi,
@@ -125,6 +126,7 @@ export interface Api {
     contactsImport:     ReturnType<typeof hc<ContactsImportApi>>;
     data:               ReturnType<typeof hc<DataApi>>;
     events:             ReturnType<typeof hc<EventsApi>>;
+    inspectionTypes:    ReturnType<typeof hc<InspectionTypesApi>>;
     emailTemplates:     ReturnType<typeof hc<EmailTemplatesApi>>;
     evidence:           ReturnType<typeof hc<EvidenceApi>>;
     identity:           ReturnType<typeof hc<IdentityApi>>;
@@ -189,6 +191,7 @@ const MOUNT: Record<keyof Api, string> = {
     contactsImport:     "/api/contacts",
     data:               "/api/data",
     events:             "/api",
+    inspectionTypes:    "/api/admin",
     emailTemplates:     "/api/admin",
     evidence:           "/api/admin",
     identity:           "/api/identities",
@@ -271,6 +274,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         contactsImport:     mk<ContactsImportApi>(MOUNT.contactsImport),
         data:               mk<DataApi>(MOUNT.data),
         events:             mk<EventsApi>(MOUNT.events),
+        inspectionTypes:    mk<InspectionTypesApi>(MOUNT.inspectionTypes),
         emailTemplates:     mk<EmailTemplatesApi>(MOUNT.emailTemplates),
         evidence:           mk<EvidenceApi>(MOUNT.evidence),
         identity:           mk<IdentityApi>(MOUNT.identity),

@@ -9,6 +9,8 @@ import { SecretField } from "~/components/SecretField";
 import { communicationEmailSchema } from "~/lib/forms/settings-config.schema";
 import { TemplateList } from "~/components/email-template/TemplateList";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 export function meta() {
   return [{ title: "Communication - Settings - OpenInspection" }];
@@ -25,7 +27,8 @@ interface CommConfig {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
 
   // Fetch communication config + secrets + email templates + SMS config/tenant-config in parallel
@@ -231,12 +234,32 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function SettingsCommunication() {
-  const { config, emailTemplates, icsUrl, googleCalendarConnected, secrets, smsConfig, companyPhone } = useLoaderData<typeof loader>();
+  const loaderResult = useLoaderData<typeof loader>();
+  // Non-admins get a forbidden flag and no data; supply inert defaults so the
+  // hooks below stay unconditional, then render <AccessDenied/> before any UI.
+  const denied = "forbidden" in loaderResult;
+  const EMPTY_CONFIG: CommConfig = {
+    senderEmail: null, replyTo: null, resendConfigured: false, emailMode: "platform",
+    senderDisplayName: null, siteName: null, pointOfContact: "company",
+  };
+  const config = denied ? EMPTY_CONFIG : loaderResult.config;
+  const emailTemplates = denied ? [] : loaderResult.emailTemplates;
+  const icsUrl = denied ? null : loaderResult.icsUrl;
+  const googleCalendarConnected = denied ? false : loaderResult.googleCalendarConnected;
+  const secrets = denied
+    ? { RESEND_API_KEY: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "" }
+    : loaderResult.secrets;
+  const smsConfig = denied ? { mode: "platform" as const, effectiveSource: "none" as const } : loaderResult.smsConfig;
+  const companyPhone = denied ? "" : loaderResult.companyPhone;
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const resendTestFetcher = useFetcher<typeof action>();
   const smsTestFetcher = useFetcher<typeof action>();
   const session = useSessionContext();
+  // Self-host (standalone) deployments have no platform mailbox / SMS number —
+  // tenants MUST bring their own provider keys. Force `own` and hide the
+  // platform/own toggle entirely; SaaS is unchanged.
+  const isSaas = session?.branding?.isSaas ?? false;
 
   // Only the `save-email` intent returns a Conform SubmissionResult; the
   // secret-paste intents return `{ ok }`. Feed Conform its own result only.
@@ -251,8 +274,8 @@ export default function SettingsCommunication() {
     shouldRevalidate: "onInput",
   });
 
-  const [mode, setMode] = useState<"platform" | "own">(config.emailMode);
-  const [smsMode, setSmsMode] = useState<"platform" | "own">(smsConfig.mode);
+  const [mode, setMode] = useState<"platform" | "own">(isSaas ? config.emailMode : "own");
+  const [smsMode, setSmsMode] = useState<"platform" | "own">(isSaas ? smsConfig.mode : "own");
   // Override toggle: ON when senderDisplayName is set AND differs from siteName.
   const [overrideName, setOverrideName] = useState<boolean>(
     !!config.senderDisplayName && config.senderDisplayName !== config.siteName
@@ -326,6 +349,8 @@ export default function SettingsCommunication() {
 
   const resendTest = resendTestFetcher.data;
 
+  if (denied) return <AccessDenied />;
+
   return (
     <div className="space-y-[18px]">
       {/* Breadcrumb */}
@@ -383,25 +408,40 @@ export default function SettingsCommunication() {
             </div>
           ) : null}
 
-          {/* Mode switch */}
-          <div className="inline-flex rounded-md border border-ih-border overflow-hidden">
-            {(["platform", "own"] as const).map((m) => (
-              <label key={m} className={`px-3 h-8 flex items-center text-[12px] font-bold cursor-pointer ${mode === m ? "bg-ih-primary text-white" : "bg-ih-bg-card text-ih-fg-2"}`}>
-                <input
-                  type="radio" name={emailFields.emailMode.name} value={m}
-                  defaultChecked={config.emailMode === m}
-                  onChange={() => setMode(m)}
-                  className="sr-only"
-                />
-                {m === "platform" ? "Platform email" : "My own Resend"}
-              </label>
-            ))}
-          </div>
-          <p className="text-[11px] text-ih-fg-4">
-            {mode === "platform"
-              ? "Send from the platform mailbox. You can set the display name and reply-to; the address is fixed."
-              : "Send from your own Resend account. Add your Resend API key below and a verified sender address."}
-          </p>
+          {/* Mode switch — SaaS only. Self-host has no platform mailbox, so the
+              mode is forced to `own` (hidden input below) and the toggle hides. */}
+          {isSaas ? (
+            <>
+              <div className="inline-flex rounded-md border border-ih-border overflow-hidden">
+                {(["platform", "own"] as const).map((m) => (
+                  <label key={m} className={`px-3 h-8 flex items-center text-[12px] font-bold cursor-pointer ${mode === m ? "bg-ih-primary text-white" : "bg-ih-bg-card text-ih-fg-2"}`}>
+                    <input
+                      type="radio" name={emailFields.emailMode.name} value={m}
+                      defaultChecked={config.emailMode === m}
+                      onChange={() => setMode(m)}
+                      className="sr-only"
+                    />
+                    {m === "platform" ? "Platform email" : "My own Resend"}
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-ih-fg-4">
+                {mode === "platform"
+                  ? "Send from the platform mailbox. You can set the display name and reply-to; the address is fixed."
+                  : "Send from your own Resend account. Add your Resend API key below and a verified sender address."}
+              </p>
+            </>
+          ) : (
+            <>
+              {/* Force `own` so the save action never writes the schema's
+                  default `platform` back into self-host config. */}
+              <input type="hidden" name={emailFields.emailMode.name} value="own" />
+              <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
+                Self-hosted deployments send from your own Resend account. Add your Resend
+                API key and a verified sender address below to enable email.
+              </p>
+            </>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {mode === "own" && (
@@ -587,16 +627,27 @@ export default function SettingsCommunication() {
           <input type="hidden" name="intent" value="save-sms-config" />
           <input type="hidden" name="smsMode" value={smsMode} />
 
-          <div className="inline-flex rounded-md border border-ih-border overflow-hidden">
-            {(["platform", "own"] as const).map((m) => (
-              <button
-                type="button" key={m} onClick={() => setSmsMode(m)}
-                className={`px-3 h-8 flex items-center text-[12px] font-bold ${smsMode === m ? "bg-ih-primary text-white" : "bg-ih-bg-card text-ih-fg-2"}`}
-              >
-                {m === "platform" ? "Platform SMS" : "My own Twilio"}
-              </button>
-            ))}
-          </div>
+          {/* Mode switch — SaaS only. Self-host has no platform SMS sender, so
+              the mode is forced to `own` (the hidden smsMode input above) and
+              the toggle hides. */}
+          {isSaas && (
+            <div className="inline-flex rounded-md border border-ih-border overflow-hidden">
+              {(["platform", "own"] as const).map((m) => (
+                <button
+                  type="button" key={m} onClick={() => setSmsMode(m)}
+                  className={`px-3 h-8 flex items-center text-[12px] font-bold ${smsMode === m ? "bg-ih-primary text-white" : "bg-ih-bg-card text-ih-fg-2"}`}
+                >
+                  {m === "platform" ? "Platform SMS" : "My own Twilio"}
+                </button>
+              ))}
+            </div>
+          )}
+          {!isSaas && (
+            <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
+              Self-hosted deployments text from your own Twilio account. Add your Twilio
+              credentials below to enable SMS.
+            </p>
+          )}
           <p className="text-[11px] font-bold text-ih-ok-fg">
             {smsConfig.effectiveSource === "own"
               ? "Using your Twilio"

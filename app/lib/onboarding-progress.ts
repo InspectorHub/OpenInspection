@@ -41,7 +41,7 @@ export function computeOnboardingSteps(input: OnboardingInput): OnboardingStep[]
       id: 'template',
       label: 'Have an inspection template',
       done: input.templateCount > 0,
-      href: '/templates',
+      href: '/library/templates',
     },
     {
       id: 'services',

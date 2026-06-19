@@ -326,7 +326,7 @@ function PayPanel({ id, balanceDue, inspectorName, brandColor }: { id: string; b
             type="button"
             onClick={startPayment}
             disabled={phase === "loading"}
-            className="w-full h-11 rounded-lg bg-ih-primary text-white font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
+            className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
           >
             {phase === "loading" ? "Starting secure checkout…" : `Pay ${money(balanceDue)}`}
           </button>
@@ -403,7 +403,7 @@ function CheckoutForm({ balanceDue, returnUrl }: { balanceDue: number; returnUrl
       <button
         type="submit"
         disabled={!stripe || submitting}
-        className="w-full h-11 rounded-lg bg-ih-primary text-white font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
+        className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
       >
         {submitting ? "Processing…" : `Pay ${money(balanceDue)}`}
       </button>
