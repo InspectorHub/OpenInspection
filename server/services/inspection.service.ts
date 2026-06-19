@@ -61,6 +61,7 @@ import {
 import { InspectionSharingService } from './inspection/inspection-sharing.service';
 import { InspectionAnalyticsService } from './inspection/inspection-analytics.service';
 import { InspectionStatusService } from './inspection/inspection-status.service';
+import { InspectionAnnotationsService } from './inspection/inspection-annotations.service';
 export {
     resolveCoverUrl,
     sanitizeDefectStates,
@@ -89,11 +90,13 @@ export class InspectionService {
     private readonly sharing: InspectionSharingService;
     private readonly analytics: InspectionAnalyticsService;
     private readonly status: InspectionStatusService;
+    private readonly annotations: InspectionAnnotationsService;
 
     constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB, kv?: KVNamespace, private images?: ImagesBinding) {
         this.sharing = new InspectionSharingService(db, r2, sdb, kv, images);
         this.analytics = new InspectionAnalyticsService(db, r2, sdb, kv, images, this);
         this.status = new InspectionStatusService(db, r2, sdb, kv, images);
+        this.annotations = new InspectionAnnotationsService(db, r2, sdb, kv, images, this);
     }
 
     private getDrizzle() {
@@ -1491,16 +1494,6 @@ export class InspectionService {
         return { toItemId, photoIndex: moved.to.length - 1 };
     }
 
-    /**
-     * Design System 0520 M14 — PhotoStudio annotation save (subsystem A,
-     * phase 4). Server treats `annotations` as opaque text; only enforces
-     * the size bound via Zod at the route layer. Caption is user-supplied,
-     * displayed in published reports.
-     *
-     * Returns null when the media row does not belong to the caller's
-     * tenant (or the id is unknown) — the route surfaces this as 404 to
-     * avoid enumeration leaks.
-     */
     async updateMediaAnnotations(
         inspectionId: string,
         mediaId: string,
@@ -1511,31 +1504,7 @@ export class InspectionService {
         | { id: string; annotations: string | null; caption: string | null; updatedAt: number }
         | null
     > {
-        await this.getInspection(inspectionId, tenantId); // ownership check
-        const db = this.getDrizzle();
-
-        const row = await db.select().from(inspectionMediaPool)
-            .where(and(
-                eq(inspectionMediaPool.id, mediaId),
-                eq(inspectionMediaPool.inspectionId, inspectionId),
-                eq(inspectionMediaPool.tenantId, tenantId),
-            ))
-            .get();
-        if (!row) return null;
-
-        await db.update(inspectionMediaPool)
-            .set({ annotations, caption })
-            .where(and(
-                eq(inspectionMediaPool.id, mediaId),
-                eq(inspectionMediaPool.tenantId, tenantId),
-            ));
-
-        return {
-            id:          mediaId,
-            annotations,
-            caption,
-            updatedAt:   Date.now(),
-        };
+        return this.annotations.updateMediaAnnotations(inspectionId, mediaId, tenantId, annotations, caption);
     }
 
     /**
@@ -1737,11 +1706,6 @@ export class InspectionService {
         return false;
     }
 
-    /**
-     * Phase T (T11): Saves an annotated composite PNG and Konva node tree for re-editing.
-     * Updates inspection_results.data so that data[itemId].photos[photoIndex] gains
-     * `annotatedKey` and `annotationsJson` fields. The original photo key is preserved.
-     */
     async saveAnnotation(
         inspectionId: string,
         tenantId: string,
@@ -1751,57 +1715,9 @@ export class InspectionService {
         nodesJson: string,
         sectionId?: string,
     ): Promise<{ annotatedKey: string }> {
-        if (!this.r2) throw Errors.BadRequest('Storage not available');
-        await this.getInspection(inspectionId, tenantId);
-
-        const annotatedKey = `${tenantId}/${inspectionId}/${itemId}_${crypto.randomUUID()}_annotated.png`;
-        await this.r2.put(annotatedKey, compositeBytes, {
-            httpMetadata: { contentType: 'image/png' }
-        });
-
-        const db = this.getDrizzle();
-        const [row] = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
-            .limit(1);
-
-        interface ResultEntry {
-            rating?: string;
-            notes?: string;
-            photos?: Array<{ key: string; annotatedKey?: string; annotationsJson?: string }>;
-        }
-        const data: Record<string, ResultEntry> = (typeof row?.data === 'string'
-            ? JSON.parse(row.data)
-            : row?.data) ?? {};
-        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
-        const entry = data[key] ?? data[itemId] ?? {};
-        const photos = entry.photos ?? [];
-        if (!photos[photoIndex]) throw Errors.NotFound('Photo not found at index');
-        photos[photoIndex] = { ...photos[photoIndex], annotatedKey, annotationsJson: nodesJson };
-        data[key] = { ...entry, photos };
-        if (key !== itemId) delete data[itemId]; // migrate on write
-
-        if (row) {
-            await db.update(inspectionResults)
-                .set({ data, lastSyncedAt: new Date() })
-                .where(eq(inspectionResults.id, row.id));
-        } else {
-            await db.insert(inspectionResults).values({
-                id: crypto.randomUUID(),
-                tenantId,
-                inspectionId,
-                data,
-                lastSyncedAt: new Date(),
-            });
-        }
-        return { annotatedKey };
+        return this.annotations.saveAnnotation(inspectionId, tenantId, itemId, photoIndex, compositeBytes, nodesJson, sectionId);
     }
 
-    /**
-     * Media Studio (cover crop) — bakes a cropped JPEG derivative of the cover
-     * source image into R2 and records the re-editable crop transform. Mirrors
-     * saveAnnotation: the original source key (cover_photo_id) is preserved so
-     * the crop can be re-edited; the report reads cover_image_key first.
-     */
     async setCroppedCover(
         inspectionId: string,
         tenantId: string,
@@ -1809,26 +1725,9 @@ export class InspectionService {
         bakedBytes: ArrayBuffer,
         crop: CoverCrop,
     ): Promise<{ coverImageKey: string }> {
-        if (!this.r2) throw Errors.BadRequest('Storage not available');
-        await this.getInspection(inspectionId, tenantId);
-        const ok = await this.isInspectionPhotoKey(inspectionId, tenantId, sourceKey);
-        if (!ok) throw Errors.BadRequest('sourceKey does not reference a photo of this inspection');
-        const coverImageKey = `${tenantId}/${inspectionId}/cover_${crypto.randomUUID()}.jpg`;
-        await this.r2.put(coverImageKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
-        const db = this.getDrizzle();
-        await db.update(inspections)
-            .set({ coverPhotoId: sourceKey, coverImageKey, coverCrop: crop })
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
-        return { coverImageKey };
+        return this.annotations.setCroppedCover(inspectionId, tenantId, sourceKey, bakedBytes, crop);
     }
 
-    /**
-     * Plan 4 — bakes a cropped JPEG derivative of an inspection-item (or per-defect)
-     * photo into R2 and records `croppedKey` + `crop` onto the targeted entry.
-     * Mirrors saveAnnotation's data load + finding-key resolution + results upsert.
-     * Sequential layering rule: a (re-)crop CLEARS any existing annotatedKey/
-     * annotationsJson, whose coords were in the previous cropped-pixel space.
-     */
     async saveCroppedItemPhoto(
         inspectionId: string,
         tenantId: string,
@@ -1838,37 +1737,7 @@ export class InspectionService {
         crop: PhotoCrop,
         sectionId?: string,
     ): Promise<{ croppedKey: string }> {
-        if (!this.r2) throw Errors.BadRequest('Storage not available');
-        await this.getInspection(inspectionId, tenantId);
-
-        const croppedKey = `${tenantId}/${inspectionId}/${itemId}_${crypto.randomUUID()}_cropped.jpg`;
-        await this.r2.put(croppedKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
-
-        const db = this.getDrizzle();
-        const [row] = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
-            .limit(1);
-
-        interface ResultEntry { rating?: string; notes?: string; photos?: PhotoEntry[] }
-        const data: Record<string, ResultEntry> = (typeof row?.data === 'string' ? JSON.parse(row.data) : row?.data) ?? {};
-        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
-        const entry = data[key] ?? data[itemId] ?? {};
-        const photos = entry.photos ?? [];
-        if (!photos[photoIndex]) throw Errors.NotFound('Photo not found at index');
-        // Sequential layering: drop annotation (its coords are in the OLD cropped
-        // space), set the new crop.
-        const { annotatedKey: _a, annotationsJson: _j, ...keep } = photos[photoIndex];
-        void _a; void _j;
-        photos[photoIndex] = { ...keep, croppedKey, crop };
-        data[key] = { ...entry, photos };
-        if (key !== itemId) delete data[itemId];
-
-        if (row) {
-            await db.update(inspectionResults).set({ data, lastSyncedAt: new Date() }).where(eq(inspectionResults.id, row.id));
-        } else {
-            await db.insert(inspectionResults).values({ id: crypto.randomUUID(), tenantId, inspectionId, data, lastSyncedAt: new Date() });
-        }
-        return { croppedKey };
+        return this.annotations.saveCroppedItemPhoto(inspectionId, tenantId, itemId, photoIndex, bakedBytes, crop, sectionId);
     }
 
     /**
