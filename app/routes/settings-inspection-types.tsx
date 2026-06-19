@@ -252,12 +252,13 @@ export default function SettingsInspectionTypes() {
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-ih-fg-3 mt-1">
-                      Based on{" "}
-                      {platformSubtypes.find((pt) => pt.slug === ot.basedOn)?.name ??
-                        ot.basedOn ??
-                        "—"}
-                    </p>
+                    {ot.basedOn && (
+                      <p className="text-[11px] text-ih-fg-3 mt-1">
+                        Based on{" "}
+                        {platformSubtypes.find((pt) => pt.slug === ot.basedOn)?.name ??
+                          ot.basedOn}
+                      </p>
+                    )}
                     {ot.description && (
                       <p className="text-[11px] text-ih-fg-3 mt-1 line-clamp-2">
                         {ot.description}
