@@ -78,6 +78,7 @@ import recommendationsRoutes from './api/recommendations';
 import contractorTypesRoutes from './api/contractor-types';
 import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
+import inspectionTypesRoutes from './api/inspection-types';
 import inspectionRequestsRoutes from './api/inspection-requests';
 import repairBuilderRoutes from './api/repair-builder';
 import portalRoutes from './api/portal';
@@ -499,6 +500,8 @@ const routes = app
   .route('/api/admin', smsAdminRoutes)
   // Email-template CRUD + preview — GET/PUT/POST /api/admin/email-templates
   .route('/api/admin', emailTemplateRoutes)
+  // Settings + Library IA — GET/POST/PUT/DELETE /api/admin/inspection-types
+  .route('/api/admin', inspectionTypesRoutes)
   .route('/api/agent', agentRoutes)
   // Agent Accounts A1 — invite + accept endpoints
   .route('/api/agents', agentsRoutes)
