@@ -82,9 +82,17 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
             }
         });
 
+        // Cool-down between the two Browser Rendering captures. On the Workers
+        // free tier, two quickAction('pdf') calls fired back-to-back reliably
+        // fail the SECOND one (the cert) — verified in production: the cert
+        // render succeeds in isolation but returns null when it immediately
+        // follows the signed render. Spacing them past the rate window lets both
+        // succeed so the evidence pack is normally complete.
+        await step.sleep('cooldown-between-renders', '60 seconds');
+
         // Step 2 — render Certificate of Completion PDF (also best-effort)
         const certPdfMeta = await step.do('render-certificate-pdf', {
-            retries: { limit: 2, delay: '5 seconds', backoff: 'exponential' },
+            retries: { limit: 3, delay: '30 seconds', backoff: 'exponential' },
             timeout: '2 minutes',
         }, async () => {
             try {
@@ -171,14 +179,14 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
         // Best-effort: skip cleanly if Resend not configured or any artifact is missing.
         await step.do('email-parties', async () => {
             try {
-                // Require ALL three artifacts before sending. Previously the cert
-                // was omitted from this guard, so a failed Certificate-of-
-                // Completion render still shipped the email with an incomplete
-                // evidence pack (a 0-byte certificate.pdf the client could not
-                // open). The workflow is re-runnable (id = requestId), so on a
-                // transient render failure the admin re-run delivers the complete
-                // pack rather than the client receiving a broken one.
-                if (!evidenceZipMeta || !signedPdfMeta || !certPdfMeta) return;
+                // The signed agreement is the must-deliver artifact — never
+                // withhold it from the client. The Certificate of Completion is
+                // supplementary and renders on best-effort (Browser Rendering can
+                // be flaky on the free tier); when it is missing, buildEvidencePack
+                // simply OMITS it from the zip (never a 0-byte entry that "opens
+                // with an error"). So gate delivery only on the signed PDF + zip;
+                // the workflow is re-runnable (id = requestId) to backfill a cert.
+                if (!evidenceZipMeta || !signedPdfMeta) return;
                 if (!env.RESEND_API_KEY) return;
                 if (!env.PHOTOS) return;
                 const db = drizzle(env.DB, { schema });
