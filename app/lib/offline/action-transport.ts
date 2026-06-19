@@ -40,8 +40,9 @@
  *   file            = File([p.blob], p.name)
  */
 
-import type { QueuedWrite, QueuedPhoto } from './queue-storage';
+import type { QueuedWrite, QueuedPhoto, QueuedCrop } from './queue-storage';
 import type { ReplayTransport } from './offline-queue';
+import { preprocessImage } from '~/components/media-studio/preprocessImage';
 
 // ── Result shape returned by replay-write/replay-photo action branches ─────
 
@@ -64,6 +65,7 @@ export function createActionTransport(
     return {
         submitWrite: (w) => submitWrite(w, fetchImpl),
         submitPhoto: (p) => submitPhoto(p, fetchImpl),
+        submitCrop: (c) => submitCrop(c, fetchImpl),
     };
 }
 
@@ -95,18 +97,69 @@ async function submitPhoto(
     p: QueuedPhoto,
     fetchImpl: typeof fetch,
 ): Promise<{ ok: boolean; status: number }> {
+    // Task 9c — a baked annotation PNG replays to the annotation endpoint, NOT
+    // the plain upload endpoint. The blob is ALREADY the flattened derivative,
+    // so it is forwarded verbatim (no preprocessImage re-bake — that is a
+    // raw-upload privacy step and would mangle the rendered annotation).
+    if (p.derivative?.kind === 'annotation') {
+        const body = new FormData();
+        body.set('intent', 'replay-annotation');
+        body.set('inspectionId', p.inspectionId);
+        body.set('itemId', p.itemId);
+        body.set('photoIndex', String(p.derivative.photoIndex));
+        body.set('nodes', p.derivative.nodes);
+        if (p.derivative.sectionId) body.set('sectionId', p.derivative.sectionId);
+        body.set('image', new File([p.blob], p.name, { type: 'image/png' }));
+
+        const res = await fetchImpl(
+            `/inspections/${p.inspectionId}/edit`,
+            { method: 'POST', body, credentials: 'include' },
+        );
+        return mapStatus(res);
+    }
+
+    // N2+N4 — bake at REPLAY (not at enqueue): the queue stores the RAW blob, so
+    // a failed-then-retried entry never double-bakes. This runs client-side
+    // before the replay form is submitted; the server replay-photo action stays
+    // unchanged (it just forwards whatever file it receives). preprocessImage
+    // fails open, so the offline path degrades to the raw blob if the canvas
+    // path is unavailable — the server env.IMAGES re-encode is the backstop.
+    const srcFile = p.blob instanceof File ? p.blob : new File([p.blob], p.name, { type: p.blob.type || 'image/jpeg' });
+    const baked = p.originalQuality ? srcFile : await preprocessImage(srcFile);
+
     const body = new FormData();
     body.set('intent', 'replay-photo');
     body.set('inspectionId', p.inspectionId);
     body.set('itemId', p.itemId);
     body.set('name', p.name);
-    body.set('file', new File([p.blob], p.name));
+    body.set('file', baked, p.name);
 
     const res = await fetchImpl(
         `/inspections/${p.inspectionId}/edit`,
         { method: 'POST', body, credentials: 'include' },
     );
 
+    return mapStatus(res);
+}
+
+// ── Crop derivative (Plan 4, offline-capable crop) ────────────────────────
+async function submitCrop(
+    c: QueuedCrop,
+    fetchImpl: typeof fetch,
+): Promise<{ ok: boolean; status: number }> {
+    const body = new FormData();
+    body.set('intent', 'replay-crop');
+    body.set('inspectionId', c.inspectionId);
+    body.set('itemId', c.itemId);
+    body.set('photoIndex', String(c.photoIndex));
+    body.set('crop', JSON.stringify(c.crop));
+    if (c.sectionId) body.set('sectionId', c.sectionId);
+    body.set('file', new File([c.blob], `${c.itemId}_${c.photoIndex}_crop.jpg`, { type: 'image/jpeg' }));
+
+    const res = await fetchImpl(
+        `/inspections/${c.inspectionId}/edit`,
+        { method: 'POST', body, credentials: 'include' },
+    );
     return mapStatus(res);
 }
 

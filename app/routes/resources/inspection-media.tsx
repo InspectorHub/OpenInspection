@@ -1,5 +1,5 @@
 /**
- * Image Studio — BFF resource route for the unified photo gallery.
+ * Media Studio — BFF resource route for the unified photo gallery.
  *
  * loader: bundles GET /api/inspections/:id/media into a deduped, labeled photo
  *         list (flattenMedia) so the gallery component has no raw client-side

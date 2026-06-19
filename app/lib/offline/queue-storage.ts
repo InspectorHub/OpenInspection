@@ -22,6 +22,22 @@ export interface QueuedWrite {
     status: 'pending' | 'failed';
 }
 
+/**
+ * Task 9c — a queued photo blob that is a DERIVED image (a baked annotation
+ * PNG), not a raw camera upload. When present on a QueuedPhoto, the replay
+ * transport routes the blob to the annotation endpoint (`replay-annotation`)
+ * instead of the plain upload endpoint, carrying the annotate context below.
+ */
+export interface AnnotationDerivative {
+    kind: 'annotation';
+    /** index within the source item's photos[] array (the photo being annotated) */
+    photoIndex: number;
+    /** opaque annotation node JSON forwarded verbatim to the annotation endpoint */
+    nodes: string;
+    /** composite finding-key section, when the item lives under a section */
+    sectionId?: string;
+}
+
 export interface QueuedPhoto {
     seq: number;
     kind: 'photo';
@@ -32,9 +48,40 @@ export interface QueuedPhoto {
     enqueuedAt: number;
     attempts: number;
     status: 'pending' | 'failed';
+    /** N4 — skip preprocessing on replay when true (captured at enqueue time).
+     *  Optional: legacy in-flight entries default to preprocessing (the safe
+     *  privacy choice). */
+    originalQuality?: boolean;
+    /** Task 9c — when present, this queued blob is a derived image (e.g. a baked
+     *  annotation PNG) that replays to a different endpoint than a raw upload.
+     *  Absent for ordinary photo uploads. */
+    derivative?: AnnotationDerivative;
 }
 
-export type QueueEntry = QueuedWrite | QueuedPhoto;
+/**
+ * Plan 4 (Q3) — a queued crop derivative: a baked cropped JPEG that replays to
+ * the crop endpoint (`replay-crop`) carrying the item/defect target + the crop
+ * transform. Mirrors QueuedPhoto's lifecycle (the store is kind-agnostic).
+ */
+export interface QueuedCrop {
+    seq: number;
+    kind: 'crop';
+    inspectionId: string;
+    itemId: string;
+    /** Index into the item/defect photos array whose crop derivative this is. */
+    photoIndex: number;
+    /** Source id for the composite finding key (defect photos); undefined for item photos. */
+    sectionId?: string;
+    /** Baked cropped JPEG (2048px long edge), produced client-side by bakeCrop. */
+    blob: Blob;
+    /** Re-editable crop transform in source-pixel coords (PhotoCropSchema shape). */
+    crop: { aspect: string; orientation: 'landscape' | 'portrait'; x: number; y: number; width: number; height: number };
+    enqueuedAt: number;
+    attempts: number;
+    status: 'pending' | 'failed';
+}
+
+export type QueueEntry = QueuedWrite | QueuedPhoto | QueuedCrop;
 
 export interface QueueStorage {
     /** Append a new write entry; seq is assigned by the store. */
@@ -53,6 +100,9 @@ export interface QueueStorage {
 
     /** Append a new photo entry; seq is assigned by the store. */
     putPhoto(p: Omit<QueuedPhoto, 'seq' | 'kind'>): Promise<QueuedPhoto>;
+
+    /** Append a new crop-derivative entry; seq is assigned by the store. */
+    putCrop(p: Omit<QueuedCrop, 'seq' | 'kind'>): Promise<QueuedCrop>;
 
     /**
      * Return all PENDING entries in ascending seq order.

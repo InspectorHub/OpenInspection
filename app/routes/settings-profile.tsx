@@ -6,7 +6,7 @@ import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SignaturePad } from "~/components/SignaturePad";
-import { AvatarCropper } from "~/components/image-studio/AvatarCropper";
+import { AvatarCropper } from "~/components/media-studio/AvatarCropper";
 import { profileSchema } from "~/lib/forms/settings.schema";
 
 /* ------------------------------------------------------------------ */

@@ -508,6 +508,7 @@ export const DashboardResponseSchema = z.object({
  */
 export const MediaCenterAttachedPhotoSchema = z.object({
     key:           z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
+    originalKey:   z.string().describe('Source R2 key (revert target); differs from key when the photo is annotated'),
     url:           z.string().describe('TODO describe url field for the OpenInspection MCP integration'),
     itemId:        z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
     itemLabel:     z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
@@ -515,6 +516,7 @@ export const MediaCenterAttachedPhotoSchema = z.object({
     sectionTitle:  z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
     photoIndex:    z.number().int().nonnegative().describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
     annotated:     z.boolean().describe('TODO describe annotated field for the OpenInspection MCP integration'),
+    defectId:      z.string().optional().describe('Defect id when the photo hangs off a canned/custom defect rather than the item'),
 }).openapi('MediaCenterAttachedPhoto');
 
 export const MediaCenterPoolPhotoSchema = z.object({
@@ -549,6 +551,31 @@ export const MediaAttachResponseSchema = z.object({
     itemId:     z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
     photoIndex: z.number().int().nonnegative().describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
 }).openapi('MediaAttachResponse');
+
+// Media Studio (Plan 3) — reorder an item's photos[] by key. The reorder is
+// pure permutation: the submitted key multiset must equal the current one
+// (no add/drop). Array order == report photo order.
+export const ReorderPhotosSchema = z.object({
+    order: z.array(z.string().min(1)).min(1).describe('Full list of photo display keys in the desired order'),
+    sectionId: z.string().min(1).optional().describe('Section ID for composite finding key'),
+}).openapi('ReorderPhotosRequest');
+
+// Media Studio (Plan 3) — body for detach/revert (only the optional sectionId
+// needed to resolve the composite finding key; the photo is addressed by the
+// :photoIndex path param).
+export const ItemPhotoMutationSchema = z.object({
+    sectionId: z.string().min(1).optional().describe('Section ID for composite finding key'),
+}).openapi('ItemPhotoMutationRequest');
+
+// Media Studio (Plan 3, Task 9b) — body for moving a photo from one item to
+// another. The source photo is addressed by the :itemId + :photoIndex path
+// params; the body carries the target item (and the optional composite-key
+// section on either side).
+export const MovePhotoSchema = z.object({
+    toItemId: z.string().min(1).describe('Target item id the photo moves to'),
+    toSectionId: z.string().optional().describe('Target section id for composite finding key'),
+    fromSectionId: z.string().optional().describe('Source section id for composite finding key'),
+}).openapi('MovePhotoRequest');
 
 // -----------------------------------------------------------------------------
 // Typed-Hono dead-routes cleanup Tasks 10–13 — results batch + conflicts.
@@ -609,7 +636,7 @@ export const ConflictResolveResponseSchema = z.object({
 }).openapi('ConflictResolveResponse');
 
 /**
- * Image Studio (cover crop) — re-editable crop transform applied to the
+ * Media Studio (cover crop) — re-editable crop transform applied to the
  * source cover image, in source-pixel coordinates.
  */
 export const CoverCropSchema = z.object({
@@ -621,3 +648,18 @@ export const CoverCropSchema = z.object({
     height: z.number().positive(),
 });
 export type CoverCrop = z.infer<typeof CoverCropSchema>;
+
+/**
+ * Media Studio (Plan 4) — re-editable crop transform for an inspection-item or
+ * per-defect photo. Unlike CoverCropSchema, the aspect may be 'free' (item/defect
+ * photos are not constrained to cover ratios). Coords are source-pixel.
+ */
+export const PhotoCropSchema = z.object({
+    aspect: z.enum(['free', '3:2', '16:9', '1.91:1', '4:3']),
+    orientation: z.enum(['landscape', 'portrait']),
+    x: z.number().min(0),
+    y: z.number().min(0),
+    width: z.number().positive(),
+    height: z.number().positive(),
+});
+export type PhotoCrop = z.infer<typeof PhotoCropSchema>;

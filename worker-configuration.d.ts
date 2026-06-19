@@ -8,6 +8,13 @@ declare namespace Cloudflare {
 	interface Env {
 		TENANT_CACHE: KVNamespace;
 		PHOTOS: R2Bucket;
+		// Cloudflare Stream — video walk-through (Media Studio, Plan 7). Hand-added
+		// because `wrangler types` was not run against a Stream-provisioned account
+		// in this worktree; regenerate to confirm once the binding is live remotely.
+		STREAM: StreamBinding;
+		// Cloudflare Stream customer subdomain for iframe/thumbnail URLs (e.g.
+		// "customer-xxxx"). Plaintext var; no hardcoded fallback in code.
+		STREAM_CUSTOMER_SUBDOMAIN: string;
 		DB: D1Database;
 		ENVIRONMENT: "production";
 		APP_NAME: "OpenInspection";

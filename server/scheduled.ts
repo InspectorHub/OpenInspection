@@ -176,6 +176,17 @@ export async function scheduled(
         logger.error('[cron] _pending cleanup failed', {}, e instanceof Error ? e : undefined);
     }
 
+    // 5b. Background GC of orphaned inspection R2 blobs (Q8). Idempotent; grace-windowed.
+    try {
+        if (env.PHOTOS) {
+            const { sweepOrphanedMedia } = await import('./lib/media/sweep-orphans');
+            const reaped = await sweepOrphanedMedia(env.DB, env.PHOTOS, Date.now());
+            if (reaped > 0) logger.info('[cron] reaped orphaned R2 blobs', { reaped });
+        }
+    } catch (e) {
+        logger.error('[cron] orphan GC failed', {}, e instanceof Error ? e : undefined);
+    }
+
     // 6. Track I-a GDPR retention sweep (spec §7) — final destruction of
     //    past-window signed-agreement signatures (signature_base64 -> NULL +
     //    purged_at marker). Keeps the esign_audit_logs chain. Idempotent,

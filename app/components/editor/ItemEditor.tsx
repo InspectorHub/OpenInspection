@@ -4,6 +4,7 @@ import { CloneLastButton } from "./CloneLastButton";
 import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
 import { ItemAttributesPanel } from "./ItemAttributesPanel";
 import { RepairItemsPanel } from "./RepairItemsPanel";
+import { ItemPhotoStrip, type StripPhoto } from "../media-studio/ItemPhotoStrip";
 import type { AttachedRepairItem } from "../../hooks/useFindings";
 import type { ItemAttribute } from "../../lib/types";
 import { renderTemplate } from "../../lib/mustache";
@@ -151,6 +152,22 @@ interface ItemEditorProps {
  onAttachRepairItem?: (itemId: string, snap: AttachedRepairItem) => void;
  /** Task 6 — detach a repair item from this item by recommendationId. */
  onDetachRepairItem?: (itemId: string, recommendationId: string) => void;
+ /** Task 8 — the inspection id; used to build per-photo thumbnail URLs. */
+ inspectionId?: string;
+ /** Task 8 — the inspection's report-cover key, so the strip rings the cover thumb. */
+ coverKey?: string | null;
+ /** Task 8 — open the unified MediaViewer for this item at photo index `i`. */
+ onOpenPhoto?: (itemId: string, index: number) => void;
+ /** Task 8 — persist a new photo order. CONTRACT: `order` is the ORIGINAL key order. */
+ onReorderPhotos?: (itemId: string, order: string[]) => void;
+ /** Task 9 — bulk-detach the given photoIndex set (strip emits indices high→low). */
+ onBulkDetachPhotos?: (itemId: string, indices: number[]) => void;
+ /** Task 9b — the OTHER items this item's photos can be moved to. */
+ moveTargets?: Array<{ itemId: string; label: string; sectionId?: string }>;
+ /** Task 9b — bulk-move the given photoIndex set (high→low) to a target item. */
+ onBulkMovePhotos?: (itemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => void;
+ /** Plan 7 — resolve a Stream poster URL for a video strip thumbnail (fail-closed → null). */
+ videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -187,6 +204,14 @@ export function ItemEditor({
  attachedRepairItems,
  onAttachRepairItem,
  onDetachRepairItem,
+ inspectionId,
+ coverKey,
+ onOpenPhoto,
+ onReorderPhotos,
+ onBulkDetachPhotos,
+ moveTargets,
+ onBulkMovePhotos,
+ videoPosterUrl,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
  const [defectQuery, setDefectQuery] = useState("");
@@ -757,28 +782,28 @@ export function ItemEditor({
  </span>
  )}
  </div>
- <div className="flex flex-wrap items-center gap-2">
- {/* FE-2 — this button shipped with no onClick at all (dead in the
- field). It now opens the route's hidden file input. */}
- <button
- type="button"
- onClick={onAddPhoto}
- disabled={photoUploading || !onAddPhoto}
- aria-label="Add photo"
- className="w-16 h-16 rounded-lg border-2 border-dashed border-ih-border flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary transition-colors disabled:opacity-50"
- >
- {photoUploading ? (
- <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
- <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
- <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
- </svg>
- ) : (
- <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
- </svg>
- )}
- </button>
- {/* Task 4 — queued offline photo previews rendered after the add button */}
+ {/* Task 8 — visible thumbnail strip (edited derivative as the face) +
+ cover ring + add tile + tap-to-viewer + long-press reorder; Task 9 adds
+ Drive-style multi-select bulk detach. Replaces the old bare Add button. */}
+ <ItemPhotoStrip
+ inspectionId={inspectionId ?? ""}
+ itemId={item.id}
+ photos={((result.photos as StripPhoto[]) ?? [])}
+ coverKey={coverKey ?? null}
+ photoUrl={(k) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(k)}`}
+ onAddPhoto={() => onAddPhoto?.()}
+ onOpen={(i) => onOpenPhoto?.(item.id, i)}
+ onReorder={onReorderPhotos ? (order) => onReorderPhotos(item.id, order) : undefined}
+ selectable={!!onBulkDetachPhotos || !!onBulkMovePhotos}
+ onBulkDetach={onBulkDetachPhotos ? (indices) => onBulkDetachPhotos(item.id, indices) : undefined}
+ moveTargets={moveTargets ? moveTargets.filter((m) => m.itemId !== item.id) : undefined}
+ onBulkMove={onBulkMovePhotos ? (indices, to) => onBulkMovePhotos(item.id, indices, to) : undefined}
+ photoUploading={photoUploading}
+ videoPosterUrl={videoPosterUrl}
+ />
+ {/* Task 4 — queued offline photo previews rendered below the strip */}
+ {(queuedPreviews ?? []).length > 0 && (
+ <div className="flex flex-wrap items-center gap-2 mt-2">
  {(queuedPreviews ?? []).map((preview) => (
  <div key={preview.objectUrl} className="relative w-16 h-16 rounded-lg overflow-hidden border border-ih-border flex-shrink-0">
   <img
@@ -793,14 +818,15 @@ export function ItemEditor({
   </span>
  </div>
  ))}
- <span className="text-[12px] text-ih-fg-4">
+ </div>
+ )}
+ <span className="block mt-1 text-[12px] text-ih-fg-4">
  {photoUploading
  ? "Uploading…"
  : ((result.photos as unknown[]) || []).length === 0 && !(queuedPreviews?.length)
  ? "No photos yet"
  : `${((result.photos as unknown[]) || []).length} photo${((result.photos as unknown[]) || []).length === 1 ? "" : "s"}${(queuedPreviews?.length) ? ` · ${queuedPreviews.length} queued` : ""}`}
  </span>
- </div>
  </div>
  </div>
  );

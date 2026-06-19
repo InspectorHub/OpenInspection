@@ -17,6 +17,10 @@ import { photoDisplayName, withDownload } from "~/lib/photo-name";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
 import { ErrorState } from "~/components/ErrorState";
 import { qrToSvg } from "../../../../server/lib/qr";
+import type { ReportMedia } from "../../../../server/lib/report-video";
+
+/** Plan 7 — a report photo object may carry a resolved media kind (video). */
+type ReportPhoto = { key: string; url: string; media?: ReportMedia };
 
 /* ------------------------------------------------------------------ */
 /* Types (shared with the report loader) */
@@ -30,7 +34,7 @@ export interface ResolvedDefect {
   effectiveComment: string;
   effectiveCategory?: string;
   effectiveLocation?: string | null;
-  defectPhotos?: Array<{ key: string; url: string }>;
+  defectPhotos?: ReportPhoto[];
 }
 
 export interface ReportItem {
@@ -42,7 +46,7 @@ export interface ReportItem {
   ratingLabel: string | null;
   severityBucket: string;
   notes: string | null;
-  photos: Array<{ key: string; url: string }>;
+  photos: ReportPhoto[];
   recommendation?: string | null;
   estimateMin?: number | null;
   estimateMax?: number | null;
@@ -317,6 +321,27 @@ function formatUnixSeconds(sec: number): string {
 }
 
 /* ------------------------------------------------------------------ */
+/* Image fallbacks (Plan 1 / N1)                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Restrained fallback shown in place of the report cover photo when the
+ * underlying image fails to load (e.g. the photo was removed after the
+ * report was published). We render a calm panel rather than hiding the
+ * cover section, so the report never looks half-broken to the client.
+ */
+function CoverPhotoPlaceholder() {
+  return (
+    <div className="w-full h-44 sm:h-56 rounded-xl border border-ih-border bg-ih-bg-muted flex flex-col items-center justify-center gap-2 text-ih-fg-4">
+      <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+      </svg>
+      <span className="text-xs font-medium tracking-wide">Cover photo unavailable</span>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Component */
 /* ------------------------------------------------------------------ */
 
@@ -335,6 +360,93 @@ export function ReportView(props: ReportViewProps) {
   const [repairPanel, setRepairPanel] = useState(false);
   const [repairItems, setRepairItems] = useState<Record<string, boolean>>({});
   const [generating, setGenerating] = useState(false);
+  const [coverFailed, setCoverFailed] = useState(false);
+
+  // Photo keys whose thumbnail failed to load. A failed thumbnail is collapsed
+  // (rendered as null) rather than showing the browser's broken-image glyph,
+  // keeping the client report clean even after upstream photos are removed.
+  const [failedPhotos, setFailedPhotos] = useState<Set<string>>(() => new Set());
+  const markPhotoFailed = (key: string) =>
+    setFailedPhotos((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+
+  // Plan 7 — render one media tile (photo OR video). When the server resolved a
+  // video kind, branch: web report → lazy Stream <iframe> at a fixed 16/9 aspect
+  // (no CLS); PDF render path → poster <img> + QR + "Watch the walk-through"
+  // link. Photo / legacy / no-subdomain fall through to the existing <img> with
+  // its onError/failedPhotos/aspect-[4/3]/alt hardening intact.
+  const renderMediaTile = (photo: ReportPhoto, alt: string, idx: number) => {
+    const m = photo.media;
+    const name = photoDisplayName(photo.key);
+
+    if (m && m.kind === "video-player") {
+      return (
+        <div key={`v-${m.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+          <iframe
+            src={m.playerSrc}
+            title={alt}
+            loading="lazy"
+            allow="accelerated-2d-canvas; fullscreen; encrypted-media; picture-in-picture"
+            allowFullScreen
+            className="absolute inset-0 h-full w-full border-0"
+          />
+        </div>
+      );
+    }
+
+    if (m && m.kind === "video-poster") {
+      // PDF cannot embed a player → poster frame + QR + deep link.
+      const qr = qrToSvg(m.playerLinkUrl);
+      return (
+        <div key={`vp-${m.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+          <img src={m.posterUrl} alt={alt} title={name} className="h-full w-full object-cover" loading="eager" />
+          <span
+            className="absolute bottom-1 right-1 h-12 w-12 rounded bg-ih-bg-card p-0.5"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: server-generated SVG from qrToSvg — no user input
+            dangerouslySetInnerHTML={{ __html: qr }}
+            aria-hidden="true"
+          />
+          <a
+            href={m.playerLinkUrl}
+            className="absolute inset-x-0 bottom-0 bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white"
+          >
+            ▶ Watch the walk-through
+          </a>
+        </div>
+      );
+    }
+
+    // Image branch (photo / legacy / fail-closed video) — unchanged hardening.
+    return (
+      <div key={photo.key} className={`group relative aspect-[4/3] overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+        <img
+          src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
+          alt={alt}
+          title={name}
+          className="w-full h-full object-cover cursor-pointer"
+          loading={data.printMode ? "eager" : "lazy"}
+          onClick={() => setLightboxUrl(photo.url)}
+          onError={() => markPhotoFailed(photo.key)}
+        />
+        <a
+          href={withDownload(photo.url)}
+          download={name}
+          title={`Download ${name}`}
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
+        >
+          ↓
+        </a>
+      </div>
+    );
+  };
+
+  /** A media entry is "visible" when it is a video OR a photo whose thumb hasn't failed. */
+  const mediaVisible = (p: ReportPhoto) => p.media?.kind === "video-player" || p.media?.kind === "video-poster" || !failedPhotos.has(p.key);
 
   // Dynamic rating summary — derived from THIS inspection's own rating system
   // (Spectora-style) instead of fixed Satisfactory/Monitor/Defects buckets.
@@ -500,17 +612,23 @@ export function ReportView(props: ReportViewProps) {
         </p>
       </div>
 
-      {/* Cover photo (DB-16) — the inspector-chosen report cover image. Hidden
-          gracefully if the underlying photo was removed (onError). */}
+      {/* Cover photo (DB-16) — the inspector-chosen report cover image. On load
+          failure (e.g. the photo was removed after publish) we swap in a restrained
+          placeholder rather than hiding the section, so the report never looks
+          broken to the client (Plan 1 / N1). */}
       {data.coverPhotoUrl && (
         <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
-          <img
-            src={`${data.coverPhotoUrl}&w=1600`}
-            alt={`Cover photo — ${data.address}`}
-            className="w-full max-h-72 object-cover rounded-xl border border-ih-border"
-            loading={data.printMode ? "eager" : "lazy"}
-            onError={(e) => { (e.currentTarget.parentElement as HTMLElement).style.display = "none"; }}
-          />
+          {coverFailed ? (
+            <CoverPhotoPlaceholder />
+          ) : (
+            <img
+              src={`${data.coverPhotoUrl}&w=1600`}
+              alt={`Cover photo — ${data.address}`}
+              className="w-full max-h-72 object-cover rounded-xl border border-ih-border"
+              loading={data.printMode ? "eager" : "lazy"}
+              onError={() => setCoverFailed(true)}
+            />
+          )}
         </div>
       )}
 
@@ -667,22 +785,11 @@ export function ReportView(props: ReportViewProps) {
                                       {d.effectiveComment}
                                     </p>
                                   )}
-                                  {(d.defectPhotos ?? []).length > 0 && (
+                                  {(d.defectPhotos ?? []).filter(mediaVisible).length > 0 && (
                                     <div className={`mt-2 ${DEFECT_PHOTO_GRID_CLASS}`}>
-                                      {(d.defectPhotos ?? []).map((photo) => {
-                                        const name = photoDisplayName(photo.key);
-                                        return (
-                                          <img
-                                            key={photo.key}
-                                            src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
-                                            alt={name}
-                                            title={name}
-                                            className={`w-full h-20 object-cover rounded cursor-pointer ${PRINT_FIGURE_CLASS}`}
-                                            loading={data.printMode ? "eager" : "lazy"}
-                                            onClick={() => setLightboxUrl(photo.url)}
-                                          />
-                                        );
-                                      })}
+                                      {(d.defectPhotos ?? [])
+                                        .filter(mediaVisible)
+                                        .map((photo, idx) => renderMediaTile(photo, `${d.title} — photo ${idx + 1}`, idx))}
                                     </div>
                                   )}
                                 </div>
@@ -724,32 +831,11 @@ export function ReportView(props: ReportViewProps) {
                           </div>
                         )}
 
-                        {item.photos.length > 0 && (
+                        {item.photos.filter(mediaVisible).length > 0 && (
                           <div className={`mt-3 ${ITEM_PHOTO_GRID_CLASS}`}>
-                            {item.photos.map((photo) => {
-                              const name = photoDisplayName(photo.key);
-                              return (
-                                <div key={photo.key} className={`group relative ${PRINT_FIGURE_CLASS}`}>
-                                  <img
-                                    src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
-                                    alt={name}
-                                    title={name}
-                                    className="w-full h-32 object-cover rounded cursor-pointer"
-                                    loading={data.printMode ? "eager" : "lazy"}
-                                    onClick={() => setLightboxUrl(photo.url)}
-                                  />
-                                  <a
-                                    href={withDownload(photo.url)}
-                                    download={name}
-                                    title={`Download ${name}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
-                                  >
-                                    ↓
-                                  </a>
-                                </div>
-                              );
-                            })}
+                            {item.photos
+                              .filter(mediaVisible)
+                              .map((photo, idx) => renderMediaTile(photo, `${item.label} — photo ${idx + 1}`, idx))}
                           </div>
                         )}
 

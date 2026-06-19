@@ -12,6 +12,7 @@
 
 import type {
     QueueEntry,
+    QueuedCrop,
     QueuedPhoto,
     QueuedWrite,
     QueueStorage,
@@ -120,6 +121,14 @@ export function createIdbQueueStorage(): QueueStorage {
             const db = await getDb();
             const store = rwTx(db);
             const entry: Omit<QueuedPhoto, 'seq'> = { ...p, kind: 'photo' };
+            const seq = (await req(store.add(entry))) as number;
+            return { ...entry, seq };
+        },
+
+        async putCrop(p) {
+            const db = await getDb();
+            const store = rwTx(db);
+            const entry: Omit<QueuedCrop, 'seq'> = { ...p, kind: 'crop' };
             const seq = (await req(store.add(entry))) as number;
             return { ...entry, seq };
         },

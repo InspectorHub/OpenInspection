@@ -2,7 +2,7 @@ import { useState } from "react";
 import { renderTemplate } from "../../lib/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../lib/defect-fields";
 import { photoDisplayName, withDownload } from "../../lib/photo-name";
-import { PhotoGallery } from "~/components/image-studio/PhotoGallery";
+import { PhotoGallery } from "~/components/media-studio/PhotoGallery";
 
 interface SideRailProps {
   activeItem?: { id: string; label: string; type?: string } | null;
@@ -11,6 +11,7 @@ interface SideRailProps {
   getRatingColor?: (id: string) => string;
   getRatingLabel?: (id: string) => string;
   inspectionId?: string;
+  photoCount?: number;
   onGallerySetCover?: (photo: { key: string; url: string }) => void;
   onGalleryAnnotate?: (photo: { key: string; url: string }) => void;
 }
@@ -23,7 +24,7 @@ const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: "photos", label: "Photos", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" },
 ];
 
-export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, onGallerySetCover, onGalleryAnnotate }: SideRailProps) {
+export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate }: SideRailProps) {
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [open, setOpen] = useState(false);
 
@@ -173,6 +174,11 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
             }`}
             title={tab.label}
           >
+            {tab.id === "photos" && (photoCount ?? 0) > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-ih-primary text-white text-[9px] font-bold leading-none">
+                {photoCount}
+              </span>
+            )}
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <path d={tab.icon} />
             </svg>

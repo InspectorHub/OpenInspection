@@ -6,7 +6,7 @@ import { Errors } from '../lib/errors';
 import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../lib/report-utils';
 import { mapRatingSystemLevels } from '../lib/map-rating-levels';
 import { z } from 'zod';
-import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema, type CoverCrop } from '../lib/validations/inspection.schema';
+import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema, type CoverCrop, type PhotoCrop } from '../lib/validations/inspection.schema';
 
 import { ScopedDB } from '../lib/db/scoped';
 import { escapeLikePattern } from '../lib/db/like-escape';
@@ -23,17 +23,22 @@ import { mapRepairItems } from '../lib/report-repair-items';
 import { parseReinspectionStatuses, isOpenStatus } from '../lib/reinspection-status';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../types/defect-fields';
 import { renderTemplate, listUnresolved } from '../lib/mustache';
+import { selectReportMedia, type ReportMediaContext } from '../lib/report-video';
 import { InvoiceService } from './invoice.service';
 import type { DefectCommentState } from '../types/inspection-item-state';
 import type { CannedDefect, TemplateSchemaV2 } from '../types/template-schema';
 import { sha256Hex } from './signing-key.service';
 import { RENDER_VERSION } from '../lib/pdf';
+import { stripExifOnIngest, type ImagesBinding } from '../lib/media/strip-exif';
+import { collectAttachedPhotos } from '../lib/media/collect-attached';
+import { applyReorder, applyDetach, applyRevert, moveEntry } from '../lib/media/photo-ops';
+import type { PhotoEntry } from '../lib/media/collect-attached';
 import { resolvePdfSettings, type PdfSettings } from '../lib/pdf-settings';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../lib/status/report-status';
 
 /**
- * Image Studio (cover crop) — resolves the cover image URL, preferring the
+ * Media Studio (cover crop) — resolves the cover image URL, preferring the
  * baked cropped derivative (`coverImageKey`) over the uncropped source
  * (`coverPhotoId`). Returns null when neither is set.
  */
@@ -283,7 +288,7 @@ export interface PropertyFacts {
  * Service to handle all inspection-related business logic.
  */
 export class InspectionService {
-    constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB, private kv?: KVNamespace) {}
+    constructor(private db: D1Database, private r2?: R2Bucket, private sdb?: ScopedDB, private kv?: KVNamespace, private images?: ImagesBinding) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -1292,8 +1297,13 @@ export class InspectionService {
         }
 
         const key = `${tenantId}/${id}/${itemId}_${crypto.randomUUID()}_${file.name}`;
-        await this.r2.put(key, await file.arrayBuffer(), {
-            httpMetadata: { contentType: file.type },
+        // N2 — strip GPS/EXIF on ingest (fallback for any path that skipped the
+        // client canvas bake: original-quality uploads, direct API callers,
+        // browsers without createImageBitmap). Fails open when env.IMAGES is
+        // absent (standalone) — the client bake remains the primary guarantee.
+        const { bytes, contentType } = await stripExifOnIngest(this.images, await file.arrayBuffer(), file.type || 'image/jpeg');
+        await this.r2.put(key, bytes, {
+            httpMetadata: { contentType },
             // A-9: preserve the original upload filename so the serve route can
             // set Content-Disposition without parsing it back out of the key.
             customMetadata: { originalName: file.name || 'photo' },
@@ -1321,6 +1331,7 @@ export class InspectionService {
     ): Promise<{
         attached: Array<{
             key: string;
+            originalKey: string;
             url: string;
             itemId: string;
             itemLabel: string;
@@ -1328,6 +1339,7 @@ export class InspectionService {
             sectionTitle: string;
             photoIndex: number;
             annotated: boolean;
+            defectId?: string;
         }>;
         pool: Array<{
             id: string;
@@ -1374,51 +1386,23 @@ export class InspectionService {
             }
         }
 
-        // Pull results — photos live under data[itemId].photos[]. Mirrors
-        // the same shape used by getReportData().
-        interface PhotoEntry { key: string; annotatedKey?: string; annotationsJson?: string }
-        interface ResultEntry { photos?: PhotoEntry[] }
+        // Pull results — photos live under data[itemId].photos[] plus the
+        // canned/custom defect arrays. Mirrors the same shape used by
+        // getReportData(). The walk is delegated to the pure
+        // collectAttachedPhotos helper so it stays unit-testable.
         const resultsRow = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
             .get();
-        const resultData: Record<string, ResultEntry> = resultsRow?.data
-            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, ResultEntry>
+        const resultData: Record<string, never> = resultsRow?.data
+            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, never>
             : {};
 
-        const attached: Array<{
-            key: string;
-            url: string;
-            itemId: string;
-            itemLabel: string;
-            sectionId: string;
-            sectionTitle: string;
-            photoIndex: number;
-            annotated: boolean;
-        }> = [];
-        for (const [key, entry] of Object.entries(resultData)) {
-            const parsedKey = parseFindingKey(key);
-            const itemId = parsedKey.itemId;
-            const photos = Array.isArray(entry?.photos) ? entry.photos : [];
-            const meta = itemMeta.get(itemId) ?? {
-                itemLabel:    itemId,
-                sectionId:    parsedKey.sectionId || 'unknown',
-                sectionTitle: 'Unsectioned',
-            };
-            photos.forEach((p, idx) => {
-                if (!p || typeof p.key !== 'string') return;
-                const displayKey = p.annotatedKey || p.key;
-                attached.push({
-                    key:          displayKey,
-                    url:          `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(displayKey)}`,
-                    itemId,
-                    itemLabel:    meta.itemLabel,
-                    sectionId:    meta.sectionId,
-                    sectionTitle: meta.sectionTitle,
-                    photoIndex:   idx,
-                    annotated:    !!p.annotatedKey,
-                });
-            });
-        }
+        const attached = collectAttachedPhotos(
+            resultData,
+            itemMeta,
+            (key) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`,
+            (k) => { const pk = parseFindingKey(k); return { itemId: pk.itemId, sectionId: pk.sectionId }; },
+        );
 
         // Pool — loose uploads, ordered newest first.
         const poolRows = await db.select().from(inspectionMediaPool)
@@ -1468,8 +1452,11 @@ export class InspectionService {
         const id = crypto.randomUUID();
         const safeName = (file.name || 'photo').replace(/[^a-zA-Z0-9._-]/g, '_');
         const key = `${tenantId}/${inspectionId}/_pool_${id}_${safeName}`;
-        await this.r2.put(key, await file.arrayBuffer(), {
-            httpMetadata: { contentType: file.type || 'image/jpeg' },
+        // N2 — strip GPS/EXIF on ingest (fallback for paths that skipped the
+        // client canvas bake). Fails open when env.IMAGES is absent.
+        const { bytes, contentType } = await stripExifOnIngest(this.images, await file.arrayBuffer(), file.type || 'image/jpeg');
+        await this.r2.put(key, bytes, {
+            httpMetadata: { contentType },
             // A-9: keep the real original filename (the key only carries a
             // sanitized variant) for the download Content-Disposition.
             customMetadata: { originalName: file.name || 'photo' },
@@ -1563,6 +1550,139 @@ export class InspectionService {
             ));
 
         return { key: poolRow.r2Key, itemId, photoIndex };
+    }
+
+    /**
+     * Media Studio (Plan 3, P4) — reorder an item's photos[] so the array
+     * order matches the report photo order. Pure permutation: the submitted
+     * key set must equal the current one (no add/drop). Reuses the pure
+     * {@link applyReorder} op.
+     */
+    async reorderItemPhotos(
+        inspectionId: string,
+        tenantId: string,
+        itemId: string,
+        order: string[],
+        sectionId?: string,
+    ): Promise<void> {
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+        const row = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        if (!row) throw Errors.NotFound('Results not found');
+        const data: Record<string, { photos?: { key: string }[] }> = typeof row.data === 'string'
+            ? JSON.parse(row.data)
+            : (row.data as Record<string, { photos?: { key: string }[] }>);
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId];
+        if (!entry?.photos) throw Errors.BadRequest('no photos for item');
+        entry.photos = applyReorder(entry.photos, order);
+        data[key] = entry;
+        await db.update(inspectionResults)
+            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+    }
+
+    /**
+     * Media Studio (Plan 3, P4) — detach a photo from an item: drop the
+     * array entry, keep the R2 object (it may live in the pool / elsewhere).
+     * Reuses the pure {@link applyDetach} op.
+     */
+    async detachItemPhoto(
+        inspectionId: string,
+        tenantId: string,
+        itemId: string,
+        photoIndex: number,
+        sectionId?: string,
+    ): Promise<void> {
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+        const rowSel = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        if (!rowSel) throw Errors.NotFound('Results not found');
+        const data: Record<string, { photos?: { key: string }[] }> = typeof rowSel.data === 'string'
+            ? JSON.parse(rowSel.data)
+            : (rowSel.data as Record<string, { photos?: { key: string }[] }>);
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId];
+        if (!entry?.photos) throw Errors.BadRequest('no photos for item');
+        entry.photos = applyDetach(entry.photos, photoIndex);
+        data[key] = entry;
+        await db.update(inspectionResults)
+            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+    }
+
+    /**
+     * Media Studio (Plan 3) — revert a photo's edits to the original: drop
+     * the annotated derivative (annotatedKey/annotationsJson), keep the
+     * source key. Non-destructive editing's "undo". Reuses {@link applyRevert}.
+     */
+    async revertPhotoEdits(
+        inspectionId: string,
+        tenantId: string,
+        itemId: string,
+        photoIndex: number,
+        sectionId?: string,
+    ): Promise<void> {
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+        const rowSel = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        if (!rowSel) throw Errors.NotFound('Results not found');
+        const data: Record<string, { photos?: { key: string }[] }> = typeof rowSel.data === 'string'
+            ? JSON.parse(rowSel.data)
+            : (rowSel.data as Record<string, { photos?: { key: string }[] }>);
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId];
+        if (!entry?.photos) throw Errors.BadRequest('no photos for item');
+        entry.photos = applyRevert(entry.photos, photoIndex);
+        data[key] = entry;
+        await db.update(inspectionResults)
+            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+    }
+
+    /**
+     * Media Studio (Plan 3, Task 9b) — move a photo from one item to another:
+     * detach from the source item's photos[] and append (with all its
+     * derivatives) to the target item's photos[]. Both entries live in the same
+     * inspection_results.data map, so this is one read/write on the single row.
+     * Reuses the pure {@link moveEntry} op.
+     */
+    async moveItemPhoto(
+        inspectionId: string,
+        tenantId: string,
+        fromItemId: string,
+        photoIndex: number,
+        toItemId: string,
+        fromSectionId?: string,
+        toSectionId?: string,
+    ): Promise<{ toItemId: string; photoIndex: number }> {
+        await this.getInspection(inspectionId, tenantId); // ownership check
+        const db = this.getDrizzle();
+        const rowSel = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        if (!rowSel) throw Errors.NotFound('Results not found');
+        const data: Record<string, { photos?: PhotoEntry[] }> = typeof rowSel.data === 'string'
+            ? JSON.parse(rowSel.data)
+            : (rowSel.data as Record<string, { photos?: PhotoEntry[] }>);
+        const fromKey = fromSectionId ? findingKey(DEFAULT_UNIT, fromSectionId, fromItemId) : fromItemId;
+        const toKey   = toSectionId   ? findingKey(DEFAULT_UNIT, toSectionId, toItemId)     : toItemId;
+        const fromEntry = data[fromKey] ?? data[fromItemId];
+        if (!fromEntry?.photos) throw Errors.BadRequest('no photos for source item');
+        const toEntry = data[toKey] ?? data[toItemId] ?? {};
+        const moved = moveEntry(fromEntry.photos, toEntry.photos ?? [], photoIndex);
+        data[fromKey] = { ...fromEntry, photos: moved.from };
+        data[toKey]   = { ...toEntry,   photos: moved.to };
+        await db.update(inspectionResults)
+            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+        return { toItemId, photoIndex: moved.to.length - 1 };
     }
 
     /**
@@ -1744,6 +1864,17 @@ export class InspectionService {
             .get();
         if (!row) throw Errors.NotFound('Pool photo not found');
 
+        // P8 — block deletion when this pool photo is still wired as the
+        // report cover (either the uncropped source or the baked crop), which
+        // would orphan the cover. Force the user to clear the cover first.
+        const insp = await db.select({ coverPhotoId: inspections.coverPhotoId, coverImageKey: inspections.coverImageKey })
+            .from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (insp && (insp.coverPhotoId === row.r2Key || insp.coverImageKey === row.r2Key)) {
+            throw Errors.Conflict('This photo is set as the report cover — clear the cover first.');
+        }
+
         await db.delete(inspectionMediaPool)
             .where(and(
                 eq(inspectionMediaPool.id, poolId),
@@ -1860,7 +1991,7 @@ export class InspectionService {
     }
 
     /**
-     * Image Studio (cover crop) — bakes a cropped JPEG derivative of the cover
+     * Media Studio (cover crop) — bakes a cropped JPEG derivative of the cover
      * source image into R2 and records the re-editable crop transform. Mirrors
      * saveAnnotation: the original source key (cover_photo_id) is preserved so
      * the crop can be re-edited; the report reads cover_image_key first.
@@ -1886,6 +2017,55 @@ export class InspectionService {
     }
 
     /**
+     * Plan 4 — bakes a cropped JPEG derivative of an inspection-item (or per-defect)
+     * photo into R2 and records `croppedKey` + `crop` onto the targeted entry.
+     * Mirrors saveAnnotation's data load + finding-key resolution + results upsert.
+     * Sequential layering rule: a (re-)crop CLEARS any existing annotatedKey/
+     * annotationsJson, whose coords were in the previous cropped-pixel space.
+     */
+    async saveCroppedItemPhoto(
+        inspectionId: string,
+        tenantId: string,
+        itemId: string,
+        photoIndex: number,
+        bakedBytes: ArrayBuffer,
+        crop: PhotoCrop,
+        sectionId?: string,
+    ): Promise<{ croppedKey: string }> {
+        if (!this.r2) throw Errors.BadRequest('Storage not available');
+        await this.getInspection(inspectionId, tenantId);
+
+        const croppedKey = `${tenantId}/${inspectionId}/${itemId}_${crypto.randomUUID()}_cropped.jpg`;
+        await this.r2.put(croppedKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
+
+        const db = this.getDrizzle();
+        const [row] = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
+            .limit(1);
+
+        interface ResultEntry { rating?: string; notes?: string; photos?: PhotoEntry[] }
+        const data: Record<string, ResultEntry> = (typeof row?.data === 'string' ? JSON.parse(row.data) : row?.data) ?? {};
+        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
+        const entry = data[key] ?? data[itemId] ?? {};
+        const photos = entry.photos ?? [];
+        if (!photos[photoIndex]) throw Errors.NotFound('Photo not found at index');
+        // Sequential layering: drop annotation (its coords are in the OLD cropped
+        // space), set the new crop.
+        const { annotatedKey: _a, annotationsJson: _j, ...keep } = photos[photoIndex];
+        void _a; void _j;
+        photos[photoIndex] = { ...keep, croppedKey, crop };
+        data[key] = { ...entry, photos };
+        if (key !== itemId) delete data[itemId];
+
+        if (row) {
+            await db.update(inspectionResults).set({ data, lastSyncedAt: new Date() }).where(eq(inspectionResults.id, row.id));
+        } else {
+            await db.insert(inspectionResults).values({ id: crypto.randomUUID(), tenantId, inspectionId, data, lastSyncedAt: new Date() });
+        }
+        return { croppedKey };
+    }
+
+    /**
      * Builds structured report data for a given inspection.
      *
      * `makePhotoUrl` lets the caller control how each photo key is turned into
@@ -1898,6 +2078,11 @@ export class InspectionService {
         tenantId: string,
         makePhotoUrl: (key: string) => string =
             (key) => `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`,
+        // Plan 7 — video walk-through. When present, each media entry is enriched
+        // with its resolved kind (image / video-player / video-poster) so the web
+        // report + PDF render chain can branch. Absent (legacy callers) ⇒ photos
+        // resolve exactly as before (image only).
+        videoCtx?: ReportMediaContext,
     ) {
         const db = this.getDrizzle();
 
@@ -1925,7 +2110,7 @@ export class InspectionService {
         // legacy templates without these fields render unchanged.
         interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[]; disclaimerText?: string | null; alwaysPageBreak?: boolean }
         interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
-        interface PhotoEntry        { key: string; annotatedKey?: string; annotationsJson?: string }
+        interface PhotoEntry        { key: string; croppedKey?: string; annotatedKey?: string; annotationsJson?: string; mediaType?: 'photo' | 'video'; streamUid?: string; posterPct?: number; durationSec?: number }
         // Sprint 2 S2-3 / S2-4 — per-defect recommendation slug + repair
         // estimate range (cents). All optional so legacy defects render.
         interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[]; recommendationId?: string | null; estimateLow?: number | null; estimateHigh?: number | null; trade?: string | null; deadline?: string | null; timeframe?: string | null }
@@ -2018,6 +2203,23 @@ export class InspectionService {
 
         const stats = computeReportStats(schemaData.sections, resultData, levels);
 
+        // Plan 7 — map a stored media entry → its report photo object. Photos keep
+        // the existing { key: displayKey, originalKey, url } shape; videos additionally
+        // carry the resolved media kind (player vs poster) when `videoCtx` is present.
+        // Without `videoCtx` (legacy callers) it degrades to the photo-only shape.
+        const mapReportPhoto = (p: PhotoEntry) => {
+            const isVideo = p.mediaType === 'video';
+            const displayKey = p.annotatedKey || p.croppedKey || p.key;
+            const url = isVideo ? '' : makePhotoUrl(displayKey);
+            const base = { key: displayKey, originalKey: p.key, url };
+            if (!videoCtx) return base;
+            const media = selectReportMedia(
+                { key: displayKey, url, mediaType: p.mediaType, streamUid: p.streamUid, posterPct: p.posterPct, durationSec: p.durationSec },
+                videoCtx,
+            );
+            return { ...base, media };
+        };
+
         // Spec 5B helper — for a given item, resolve the effective set of
         // included comments per tab. Honors per-inspection toggles + text
         // overrides, falling back to the template's `default: true` flag.
@@ -2059,14 +2261,8 @@ export class InspectionService {
                 const level = levels.find((l: RatingLevel) => l.id === ratingId);
 
                 // Phase T (T16): prefer annotated composite when present; expose original via originalKey.
-                const photos = (res.photos || []).map((p: PhotoEntry) => {
-                    const displayKey = p.annotatedKey || p.key;
-                    return {
-                        key: displayKey,
-                        originalKey: p.key,
-                        url: makePhotoUrl(displayKey),
-                    };
-                });
+                // Plan 7: mapReportPhoto enriches video entries with their media kind.
+                const photos = (res.photos || []).map(mapReportPhoto);
 
                 // Spec 5B — resolve the three canned-comment tabs.
                 const information = resolveTab(item.tabs?.information, res.tabs?.information);
@@ -2085,14 +2281,7 @@ export class InspectionService {
                         effectiveComment: renderTemplate(override ?? d.comment, resolveDefectMustacheVars(st as DefectCommentState | undefined, d as CannedDefect, res.attributes)),
                         effectiveCategory: st?.category ?? d.category,
                         effectiveLocation: (typeof st?.location === 'string' && st.location.length > 0) ? st.location : d.location,
-                        defectPhotos: (st?.photos ?? []).map(p => {
-                            const displayKey = p.annotatedKey || p.key;
-                            return {
-                                key: displayKey,
-                                originalKey: p.key,
-                                url: makePhotoUrl(displayKey),
-                            };
-                        }),
+                        defectPhotos: (st?.photos ?? []).map(mapReportPhoto),
                         // Sprint 2 S2-3 / S2-4 — per-defect contractor recommendation +
                         // repair estimate range. Null when the inspector left them blank.
                         recommendationId: st?.recommendationId ?? null,
@@ -2194,10 +2383,7 @@ export class InspectionService {
                         ? {
                             rating: res.original.rating ?? null,
                             notes:  res.original.notes ?? null,
-                            photos: (res.original.photos || []).map((p: PhotoEntry) => {
-                                const displayKey = p.annotatedKey || p.key;
-                                return { key: displayKey, originalKey: p.key, url: makePhotoUrl(displayKey) };
-                            }),
+                            photos: (res.original.photos || []).map(mapReportPhoto),
                         }
                         : null,
                     followupStatus: res.followupStatus ?? null,

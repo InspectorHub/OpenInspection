@@ -109,14 +109,14 @@ export const inspections = sqliteTable('inspections', {
     // row used as the report cover image. NULL until the inspector picks
     // one; the Publish pre-flight surfaces this as a gate.
     coverPhotoId:        text('cover_photo_id'),
-    // Image Studio (cover crop) — re-editable crop transform applied to the
+    // Media Studio (cover crop) — re-editable crop transform applied to the
     // SOURCE image (cover_photo_id), in source-pixel coords. NULL = uncropped.
     coverCrop:           text('cover_crop', { mode: 'json' }).$type<{
         aspect: '3:2' | '16:9' | '1.91:1' | '4:3';
         orientation: 'landscape' | 'portrait';
         x: number; y: number; width: number; height: number;
     }>(),
-    // Image Studio (cover crop) — R2 key of the baked cropped derivative
+    // Media Studio (cover crop) — R2 key of the baked cropped derivative
     // (JPEG, 2048px long edge). Report/OG/PDF read THIS when set; falls back
     // to cover_photo_id (uncropped source) otherwise.
     coverImageKey:       text('cover_image_key'),
@@ -285,9 +285,32 @@ export const inspectionMediaPool = sqliteTable('inspection_media_pool', {
     // consumed exclusively client-side. `caption` is user-supplied, ≤200 chars.
     annotations:   text('annotations'),
     caption:       text('caption'),
+    // Plan 7 — video walk-through. A pool row is a photo (default) or a video.
+    // Video rows keep r2Key/url = '' (Cloudflare Stream owns the bytes) and set
+    // streamUid; existing photo rows backfill to 'photo' via the column default.
+    mediaType:     text('media_type', { enum: ['photo', 'video'] }).notNull().default('photo'),
+    // Cloudflare Stream UID for video rows; NULL for photos.
+    streamUid:     text('stream_uid'),
+    // Poster timestamp as a fraction of duration (0..1); NULL for photos.
+    posterPct:     real('poster_pct'),
+    // Video duration in seconds (cached from Stream for the thumb badge); NULL for photos.
+    durationSec:   integer('duration_sec'),
 }, (t) => [
     index('idx_media_pool_tenant').on(t.tenantId),
     index('idx_media_pool_inspection').on(t.inspectionId),
+]);
+
+// Bookkeeping for the background orphaned-media GC (Q8). Each row records the
+// first time an R2 object under an inspection prefix was observed unreferenced;
+// the sweep deletes it only once that age exceeds the grace window.
+export const orphanedMedia = sqliteTable('orphaned_media', {
+    id:           text('id').primaryKey(),
+    tenantId:     text('tenant_id').notNull(),
+    inspectionId: text('inspection_id').notNull(),
+    r2Key:        text('r2_key').notNull(),
+    firstSeenAt:  integer('first_seen_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    index('idx_orphaned_media_key').on(t.tenantId, t.r2Key),
 ]);
 
 export const inspectionResults = sqliteTable('inspection_results', {

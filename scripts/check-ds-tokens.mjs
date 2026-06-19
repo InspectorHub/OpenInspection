@@ -38,9 +38,9 @@ const FILE_ALLOWLIST = [
   // styled with white-alpha glass utilities throughout. Brand fills inside
   // it ARE tokenized; the neutral on-dark styling is intentional.
   join("app", "components", "editor", "PhotoStudio.tsx"),
-  // Image Studio react-konva annotator — same fixed-dark studio chrome as
+  // Media Studio react-konva annotator — same fixed-dark studio chrome as
   // PhotoStudio.tsx (its replacement); neutral on-dark styling is intentional.
-  join("app", "components", "image-studio", "PhotoAnnotator.tsx"),
+  join("app", "components", "media-studio", "PhotoAnnotator.tsx"),
 ];
 
 /** How many lines above a violation a `ds-allow` comment still excuses it. */

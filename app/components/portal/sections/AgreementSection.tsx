@@ -16,14 +16,16 @@
  * which route the component is mounted under (critical when mounted inside the Hub
  * route, whose own action would otherwise be hit).
  *
- * SSR safety — the signature canvas only touches `canvasRef`/`window`/`document`
- * inside event handlers and `useEffect`; nothing runs during render.
+ * SSR safety — the signature canvas (<SignaturePad>) only touches
+ * `window.devicePixelRatio`/the canvas inside event handlers and `useEffect`
+ * (its DPR-aware `fit()` runs client-only); nothing runs during render.
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
+import { SignaturePad, type SignaturePadHandle } from "~/components/media-studio/SignaturePad";
 import {
   OnBehalfFields,
   onBehalfPayload,
@@ -93,8 +95,7 @@ export function AgreementSection({
   /** Where sign/decline fetchers post (the agreement-sign route's action). */
   actionPath: string;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [drawing, setDrawing] = useState(false);
+  const padRef = useRef<SignaturePadHandle>(null);
   const [hasMark, setHasMark] = useState(false);
   const [signed, setSigned] = useState(false);
   const [declined, setDeclined] = useState(false);
@@ -121,61 +122,13 @@ export function AgreementSection({
     }
   }, [declineFetcher.state, declineFetcher.data]);
 
-  /* Canvas drawing helpers */
-  const getPos = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return { x: 0, y: 0 };
-    const r = canvas.getBoundingClientRect();
-    const src = "touches" in e ? e.touches[0] : e;
-    return {
-      x: (src.clientX - r.left) * (canvas.width / r.width),
-      y: (src.clientY - r.top) * (canvas.height / r.height),
-    };
-  }, []);
-
-  useEffect(() => {
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    ctx.strokeStyle = "#1e293b";
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-  }, [agreement]);
-
-  const handleStart = (e: React.MouseEvent | React.TouchEvent) => {
-    setDrawing(true);
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    const p = getPos(e);
-    ctx.beginPath();
-    ctx.moveTo(p.x, p.y);
-  };
-  const handleMove = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!drawing) return;
-    setHasMark(true);
-    const ctx = canvasRef.current?.getContext("2d");
-    if (!ctx) return;
-    const p = getPos(e);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-  };
-  const handleEnd = () => setDrawing(false);
-  const clearSig = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setHasMark(false);
-  };
-
   const submitSignature = () => {
-    if (!hasMark) {
+    const pad = padRef.current;
+    if (!pad || pad.isEmpty()) {
       setErrorMsg("Please draw your signature before submitting.");
       return;
     }
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const signatureBase64 = canvas.toDataURL("image/png");
+    const signatureBase64 = pad.toDataURL();
     const payload = onBehalfPayload(onBehalf);
     setErrorMsg(null);
     const fd = new FormData();
@@ -294,22 +247,8 @@ export function AgreementSection({
           <div className="px-6 py-6 sm:px-10 sm:py-8">
             <p className="text-sm font-bold text-ih-fg-3 mb-4">Draw your signature below:</p>
 
-            <div className="border-2 border-ih-border rounded-2xl overflow-hidden bg-ih-bg-app mb-2" style={{ touchAction: "none" }}>
-              <canvas
-                ref={canvasRef}
-                role="img"
-                aria-label="Signature pad — draw your signature here"
-                width={580}
-                height={180}
-                className="w-full cursor-crosshair block"
-                onMouseDown={handleStart}
-                onMouseMove={handleMove}
-                onMouseUp={handleEnd}
-                onMouseLeave={handleEnd}
-                onTouchStart={handleStart}
-                onTouchMove={handleMove}
-                onTouchEnd={handleEnd}
-              />
+            <div className="mb-2">
+              <SignaturePad ref={padRef} disabled={submitting} onMarkChange={setHasMark} />
             </div>
 
             <OnBehalfFields value={onBehalf} onChange={setOnBehalf} disabled={submitting} />
@@ -323,17 +262,9 @@ export function AgreementSection({
             <div className="flex gap-3 mt-4 mb-6">
               <button
                 type="button"
-                onClick={clearSig}
-                disabled={submitting}
-                className="flex-1 h-10 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-3 text-sm font-semibold hover:bg-ih-bg-muted transition-all disabled:opacity-50"
-              >
-                Clear
-              </button>
-              <button
-                type="button"
                 onClick={submitSignature}
-                disabled={submitting}
-                className="flex-[2] h-10 px-4 bg-ih-primary text-white rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={submitting || !hasMark}
+                className="w-full h-11 px-4 bg-ih-primary text-white rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {signFetcher.state !== "idle" ? "Signing..." : "Sign Agreement"}
               </button>

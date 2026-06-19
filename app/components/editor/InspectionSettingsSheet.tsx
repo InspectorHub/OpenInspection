@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { TemplateCombobox } from "~/components/TemplateCombobox";
-import { CoverCropper } from "~/components/image-studio/CoverCropper";
-import { fullResUrl } from "~/components/image-studio/cropImage";
+import { CoverCropper } from "~/components/media-studio/CoverCropper";
+import { fullResUrl } from "~/components/media-studio/cropImage";
+import { ORIGINAL_QUALITY_KEY } from "~/routes/inspection-edit";
 
 interface SettingsForm {
   date: string;
@@ -85,6 +86,27 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   const coverFetcher = useFetcher<{ ok: boolean; intent?: string; coverKey?: string | null; coverUrl?: string | null }>();
   const coverFileRef = useRef<HTMLInputElement>(null);
   const [cropSource, setCropSource] = useState<{ key: string; url: string } | null>(null);
+
+  // N2+N4 — device-local "original quality uploads" opt-out. Default OFF =
+  // preprocessing ON (downscale + EXIF/GPS strip). Persisted to localStorage so
+  // the choice is read by all three photo entry points in inspection-edit.
+  const [originalQuality, setOriginalQuality] = useState(false);
+  useEffect(() => {
+    try {
+      setOriginalQuality(localStorage.getItem(ORIGINAL_QUALITY_KEY) === "1");
+    } catch {
+      setOriginalQuality(false);
+    }
+  }, [open]);
+  function toggleOriginalQuality(next: boolean) {
+    setOriginalQuality(next);
+    try {
+      if (next) localStorage.setItem(ORIGINAL_QUALITY_KEY, "1");
+      else localStorage.removeItem(ORIGINAL_QUALITY_KEY);
+    } catch {
+      /* private mode / disabled storage — preference simply doesn't persist */
+    }
+  }
 
   // Trigger load when the sheet opens or inspectionId changes
   useEffect(() => {
@@ -372,6 +394,27 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                   </button>
                   <span className="text-[11px] text-ih-fg-4">Shown on the report cover page. Click the selected photo to clear it.</span>
                 </div>
+              </fieldset>
+
+              {/* N2+N4 — device-local upload quality preference. Persisted to
+                  localStorage (not the inspection row); applies to this browser. */}
+              <fieldset className="space-y-2">
+                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Photo uploads</legend>
+                <label className="inline-flex items-start gap-2 text-[13px] text-ih-fg-3">
+                  <input
+                    type="checkbox"
+                    checked={originalQuality}
+                    onChange={(e) => toggleOriginalQuality(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
+                    data-testid="original-quality-uploads"
+                  />
+                  <span>
+                    Original quality uploads
+                    <span className="block text-[11px] text-ih-fg-4">
+                      Skip on-device resizing and metadata stripping. Larger files; uploads keep camera location data.
+                    </span>
+                  </span>
+                </label>
               </fieldset>
 
               <div className="flex items-center justify-end gap-3 border-t border-ih-border pt-4">

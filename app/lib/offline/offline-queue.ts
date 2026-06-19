@@ -25,7 +25,7 @@
  *   mutating the entry in-place would require storage.update() which does not exist.
  */
 
-import type { QueueStorage, QueuedWrite, QueuedPhoto } from './queue-storage';
+import type { QueueStorage, QueuedWrite, QueuedPhoto, QueuedCrop } from './queue-storage';
 
 // ── Public parameter types (Omit resolved) ────────────────────────────────────
 
@@ -35,11 +35,15 @@ export type WriteParams = Omit<QueuedWrite, 'seq' | 'kind' | 'attempts' | 'statu
 /** Parameters for enqueuePhoto — caller does not supply seq / kind / attempts / status. */
 export type PhotoParams = Omit<QueuedPhoto, 'seq' | 'kind' | 'attempts' | 'status'>;
 
+/** Parameters for enqueueCrop — caller does not supply seq / kind / attempts / status. */
+export type CropParams = Omit<QueuedCrop, 'seq' | 'kind' | 'attempts' | 'status'>;
+
 // ── Transport ─────────────────────────────────────────────────────────────────
 
 export interface ReplayTransport {
     submitWrite(w: QueuedWrite): Promise<{ ok: boolean; status: number }>;
     submitPhoto(p: QueuedPhoto): Promise<{ ok: boolean; status: number }>;
+    submitCrop(c: QueuedCrop): Promise<{ ok: boolean; status: number }>;
 }
 
 // ── Result & listener ─────────────────────────────────────────────────────────
@@ -115,6 +119,18 @@ export class OfflineQueue {
         this.emit();
     }
 
+    /** Enqueue a baked crop derivative for later replay (Plan 4, offline-capable
+     *  crop). Crops, like photos, are never coalesced — each baked derivative is
+     *  distinct. */
+    async enqueueCrop(params: CropParams): Promise<void> {
+        await this.storage.putCrop({
+            ...params,
+            attempts: 0,
+            status: 'pending',
+        });
+        this.emit();
+    }
+
     // ── Counts ────────────────────────────────────────────────────────────────
 
     /** Return current pending / failed counts from storage. */
@@ -152,6 +168,8 @@ export class OfflineQueue {
             try {
                 if (entry.kind === 'write') {
                     response = await this.transport.submitWrite(entry);
+                } else if (entry.kind === 'crop') {
+                    response = await this.transport.submitCrop(entry);
                 } else {
                     response = await this.transport.submitPhoto(entry);
                 }
@@ -208,6 +226,18 @@ export class OfflineQueue {
                     attempts: newAttempts,
                     status: 'pending',
                 });
+            } else if (entry.kind === 'crop') {
+                await this.storage.putCrop({
+                    inspectionId: entry.inspectionId,
+                    itemId: entry.itemId,
+                    photoIndex: entry.photoIndex,
+                    sectionId: entry.sectionId,
+                    blob: entry.blob,
+                    crop: entry.crop,
+                    enqueuedAt: entry.enqueuedAt,
+                    attempts: newAttempts,
+                    status: 'pending',
+                });
             } else {
                 await this.storage.putPhoto({
                     inspectionId: entry.inspectionId,
@@ -217,6 +247,7 @@ export class OfflineQueue {
                     enqueuedAt: entry.enqueuedAt,
                     attempts: newAttempts,
                     status: 'pending',
+                    originalQuality: entry.originalQuality,
                 });
             }
             this.emit();

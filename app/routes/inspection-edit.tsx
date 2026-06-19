@@ -39,11 +39,19 @@ import { FooterBar } from "~/components/editor/FooterBar";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
-import { PhotoAnnotator } from "~/components/image-studio/PhotoAnnotator";
+import { PhotoAnnotator } from "~/components/media-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
-import { CoverCropper } from "~/components/image-studio/CoverCropper";
-import { fullResUrl } from "~/components/image-studio/cropImage";
+import { CoverCropper } from "~/components/media-studio/CoverCropper";
+import { PhotoCropper, type PhotoCrop } from "~/components/media-studio/PhotoCropper";
+import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "~/components/media-studio/photo-display-key";
+import { MediaViewer, type MediaAction } from "~/components/media-studio/MediaViewer";
+import { PosterPicker, streamThumbUrl } from "~/components/media-studio/PosterPicker";
+import { VideoCapture } from "~/components/media-studio/VideoCapture";
+import type { GalleryPhoto } from "~/lib/inspection-media";
+import { fKey } from "~/hooks/useInspection";
+import { fullResUrl } from "~/components/media-studio/cropImage";
+import { preprocessImage } from "~/components/media-studio/preprocessImage";
 import { SignaturePad } from "~/components/SignaturePad";
 import { PublishGateModal } from "~/components/editor/PublishGateModal";
 import { ToastPortal } from "~/components/Toast";
@@ -55,6 +63,25 @@ import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
 
 export function meta() {
  return [{ title: "Edit Inspection - OpenInspection" }];
+}
+
+/* ------------------------------------------------------------------ */
+/* Upload quality preference (N2+N4)                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Device-local opt-out for the upload preprocessing pass. Default OFF means
+ * preprocessing is ON (downscale + EXIF/GPS strip). Persisted to localStorage
+ * so the choice survives reloads and is read at all three photo entry points
+ * (item picker, burst commit, offline replay) from one source of truth.
+ */
+export const ORIGINAL_QUALITY_KEY = "oi.uploads.originalQuality";
+export function originalQualityEnabled(): boolean {
+ try {
+ return typeof localStorage !== "undefined" && localStorage.getItem(ORIGINAL_QUALITY_KEY) === "1";
+ } catch {
+ return false;
+ }
 }
 
 /* ------------------------------------------------------------------ */
@@ -132,7 +159,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  tenantSlug = sb.data?.branding?.tenantSlug ?? null;
  }
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug };
+ // Plan 7 — the Stream customer subdomain (env) drives video poster thumbnails
+ // + the player iframe. Absent ⇒ null; the viewer/strip fail closed gracefully
+ // (no fabricated subdomain).
+ const streamCustomerSubdomain =
+   ((context.cloudflare?.env as { STREAM_CUSTOMER_SUBDOMAIN?: string } | undefined)?.STREAM_CUSTOMER_SUBDOMAIN) ?? null;
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain };
 }
 
 /**
@@ -544,6 +577,52 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   return Response.json({ ok: apiOk && Boolean(key), apiStatus, key }, { status: apiStatus });
  }
 
+ // Task 9c — replay a baked annotation PNG queued offline. Mirrors replay-photo
+ // but forwards to the annotation endpoint exactly like the online "annotate"
+ // branch above (the queued blob is already the flattened derivative).
+ if (intent === "replay-annotation") {
+  const itemId = String(formData.get("itemId") ?? "");
+  const photoIndex = Number(formData.get("photoIndex") ?? "-1");
+  const nodes = String(formData.get("nodes") ?? "[]");
+  const sectionId = String(formData.get("sectionId") ?? "");
+  const image = formData.get("image");
+  if (!(image instanceof File) || !itemId || photoIndex < 0) {
+   return Response.json({ ok: false, apiStatus: 400 }, { status: 400 });
+  }
+  const apiRes = await api.inspections[":id"].items[":itemId"].photos[":photoIndex"].annotation.$post({
+   param: { id: params.id, itemId, photoIndex: String(photoIndex) },
+   form: sectionId ? { image, nodes, sectionId } : { image, nodes },
+  });
+  return Response.json({ ok: apiRes.ok, apiStatus: apiRes.status }, { status: apiRes.status });
+ }
+
+ // Plan 4 Q3 — replay a baked crop derivative queued offline. Mirrors
+ // replay-photo but forwards to the crop endpoint and reads the croppedKey back.
+ if (intent === "replay-crop") {
+  const itemId = String(formData.get("itemId") ?? "");
+  const file = formData.get("file");
+  const photoIndex = Number(formData.get("photoIndex"));
+  const crop = String(formData.get("crop") ?? "");
+  const sectionId = String(formData.get("sectionId") ?? "");
+  if (!file || !(file instanceof File) || !itemId || !Number.isInteger(photoIndex) || photoIndex < 0) {
+   return Response.json({ ok: false, apiStatus: 400 }, { status: 400 });
+  }
+  const apiRes = await api.inspections[":id"].items[":itemId"].photos[":photoIndex"].crop.$post({
+   param: { id: params.id, itemId, photoIndex: String(photoIndex) },
+   form: sectionId ? { image: file, crop, sectionId } : { image: file, crop },
+  });
+  const apiStatus = apiRes.status;
+  const apiOk = apiRes.ok;
+  let croppedKey: string | undefined;
+  if (apiOk) {
+   try {
+    const j = (await apiRes.json()) as { data?: { croppedKey?: string } };
+    croppedKey = j.data?.croppedKey;
+   } catch { /* ignore */ }
+  }
+  return Response.json({ ok: apiOk && Boolean(croppedKey), apiStatus, croppedKey }, { status: apiStatus });
+ }
+
  return { ok };
 }
 
@@ -584,6 +663,13 @@ export default function InspectionEditPage() {
  const navigate = useNavigate();
  const photoInputRef = useRef<HTMLInputElement>(null);
  const { scheme, setColorScheme } = useTheme();
+
+ /* Plan 7 — add-media chooser (photo OR video) + video capture overlay. The
+  * add tile opens the chooser; "Photo" triggers the existing photo input,
+  * "Video" opens VideoCapture. Video upload requires a connection (it does NOT
+  * use the offline photo queue — clip sizes make IndexedDB replay impractical). */
+ const [addMediaChooser, setAddMediaChooser] = useState<{ itemId: string } | null>(null);
+ const [videoCaptureTarget, setVideoCaptureTarget] = useState<{ itemId: string } | null>(null);
 
  /* ---------------------------------------------------------------- */
  /* Core state (useInspection) */
@@ -669,6 +755,17 @@ export default function InspectionEditPage() {
  }
  return map;
  }, [activeResult]);
+
+ // Whole-inspection photo count for the Photos tab badge (P3). Sums per-item
+ // result.photos across the results map.
+ const inspectionPhotoCount = useMemo(() => {
+ let n = 0;
+ for (const value of Object.values(state.results)) {
+ const photos = (value as Record<string, unknown> | null)?.photos;
+ if (Array.isArray(photos)) n += photos.length;
+ }
+ return n;
+ }, [state.results]);
 
  const locationSuggestions = useMemo(() => {
  const set = new Set<string>();
@@ -940,8 +1037,330 @@ export default function InspectionEditPage() {
  // DB-16 — dedicated fetcher for set/clear report cover (avoids the
  // shared-fetcher abort hazard; the loader revalidates the cover after).
  const coverFetcher = useFetcher();
- // Image Studio — gallery "Set as cover" opens an editor-level CoverCropper.
+ // Media Studio — gallery "Set as cover" opens an editor-level CoverCropper.
  const [galleryCropSource, setGalleryCropSource] = useState<{ key: string; url: string } | null>(null);
+ // Plan 4 (Task 8) — per-photo crop. `photoCropTarget` opens the PhotoCropper for
+ // an item/defect photo (cropping ALWAYS re-derives from the ORIGINAL key).
+ const [photoCropTarget, setPhotoCropTarget] = useState<{
+   itemId: string; photoIndex: number; sourceUrl: string; hasAnnotation: boolean; sectionId?: string;
+ } | null>(null);
+ // Plan 4 — re-crop warning modal: a crop that would discard an existing
+ // annotation defers behind a confirm (no native window.confirm).
+ const [recropWarn, setRecropWarn] = useState<{ run: () => void } | null>(null);
+
+ /* Task 8 — unified MediaViewer for an item's photo strip. `viewer` holds the
+  * item being viewed + the open index. Photos are mapped item-result → GalleryPhoto[]
+  * on demand so the viewer reflects the live (optimistic) results map. A null
+  * index means "closed". A dedicated fetcher persists reorder/detach/revert
+  * (per-photo POSTs, separate from the shared save-all fetcher). */
+ const [viewer, setViewer] = useState<{ itemId: string; index: number | null }>({ itemId: "", index: null });
+ const photoOpsFetcher = useFetcher();
+
+ /* Plan 7 — Stream customer subdomain (from loader env). Null ⇒ fail closed:
+  * video posters/players render a graceful "unavailable" state, never a
+  * fabricated subdomain. */
+ const streamCustomerSubdomain = loaderData.streamCustomerSubdomain ?? null;
+
+ /* Plan 7 — resolve a Stream poster thumbnail URL for a video strip thumb. */
+ const videoPosterUrl = useCallback(
+  (streamUid: string, posterPct?: number): string | null => {
+   if (!streamCustomerSubdomain) return null;
+   // poster sec is unknown without duration here; the thumbnail endpoint accepts
+   // a pct-derived time only when we know duration — fall back to time=0s, which
+   // Stream maps to the configured thumbnailTimestampPct poster anyway.
+   const sec = 0;
+   void posterPct;
+   return streamThumbUrl(streamCustomerSubdomain, streamUid, sec);
+  },
+  [streamCustomerSubdomain],
+ );
+
+ /* Plan 7 — PosterPicker target (a video entry being re-postered). */
+ const [posterTarget, setPosterTarget] = useState<
+  { streamUid: string; durationSec: number; posterPct: number } | null
+ >(null);
+
+ /* Task 8 — the report cover key (DB-16): a photo whose displayKey matches this
+  * rings as the cover in the strip + carries the "Set cover" toggle in the viewer. */
+ const coverKey = (state.inspection.coverPhotoId as string | null) ?? null;
+
+ /* Task 8 — read an item's stored photos[] (item-level bucket) from the live
+  * results map. Item photos are `{ key; croppedKey?; crop?; annotatedKey?; annotationsJson? }`. */
+ type ItemCrop = { aspect: string; orientation: "landscape" | "portrait"; x: number; y: number; width: number; height: number };
+ type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; streamUid?: string; posterPct?: number; durationSec?: number };
+ const getItemPhotos = useCallback(
+  (itemId: string): ItemPhoto[] => {
+   const r = findings.getResult(itemId, state.sectionIdForItem(itemId) ?? undefined);
+   return ((r.photos as ItemPhoto[] | undefined) ?? []);
+  },
+  [findings, state.sectionIdForItem],
+ );
+
+ /* Task 8 — map an item's photos[] → GalleryPhoto[] for the unified MediaViewer.
+  * displayKey (annotatedKey||key) drives the rendered image + URL; originalKey
+  * keeps the un-annotated source; photoIndex addresses detach/revert; annotated
+  * gates the Revert button. itemId is threaded so onAction knows the target. */
+ const itemGalleryPhotos = useCallback(
+  (itemId: string): GalleryPhoto[] =>
+   getItemPhotos(itemId).map((p, i) => {
+    const dk = resolvePhotoDisplayKey(p);
+    return {
+     key: dk,
+     url: `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(dk)}`,
+     label: "",
+     itemId,
+     photoIndex: i,
+     annotated: !!p.annotatedKey,
+     originalKey: p.key,
+     croppedKey: p.croppedKey,
+     // Plan 7 — carry the media kind so the viewer/strip branch on video.
+     mediaType: p.mediaType,
+     streamUid: p.streamUid,
+     posterPct: p.posterPct,
+     durationSec: p.durationSec,
+    };
+   }),
+  [getItemPhotos, state.inspection.id],
+ );
+
+ /* Task 8 — open the viewer for an item at index i. */
+ const onOpenPhoto = useCallback((itemId: string, index: number) => {
+  setViewer({ itemId, index });
+ }, []);
+
+ /* Task 8 — optimistically apply a photos[] transform to BOTH result keys
+  * (composite + bare itemId), mirroring useFindings' dual-write. */
+ const patchItemPhotos = useCallback(
+  (itemId: string, next: (photos: ItemPhoto[]) => ItemPhoto[]) => {
+   const sid = state.sectionIdForItem(itemId);
+   const ck = sid ? fKey(sid, itemId) : itemId;
+   state.setResults((prev) => {
+    const existing = ((prev[ck] as Record<string, unknown>) || (prev[itemId] as Record<string, unknown>) || {});
+    const photos = next(((existing.photos as ItemPhoto[]) ?? []));
+    const updated = { ...existing, photos };
+    return { ...prev, [ck]: updated, [itemId]: updated };
+   });
+   state.setDirty(true);
+  },
+  [state.sectionIdForItem, state.setResults, state.setDirty],
+ );
+
+ /* Task 8 — persist a reorder. CONTRACT: `order` is the ORIGINAL key order
+  * (the server reorderItemPhotos route matches photos[].key). Optimistically
+  * reorder local state by key, then POST. */
+ const onReorderPhotos = useCallback(
+  (itemId: string, order: string[]) => {
+   patchItemPhotos(itemId, (photos) => {
+    const byKey = new Map(photos.map((p) => [p.key, p] as const));
+    const reordered = order.map((k) => byKey.get(k)).filter((p): p is ItemPhoto => !!p);
+    return reordered.length === photos.length ? reordered : photos;
+   });
+   photoOpsFetcher.submit(null, {
+    method: "POST",
+    action: `/api/inspections/${state.inspection.id}/items/${itemId}/photos/reorder`,
+    encType: "application/json",
+    body: JSON.stringify({ order, sectionId: state.currentSection?.id }),
+   } as Parameters<typeof photoOpsFetcher.submit>[1]);
+  },
+  [patchItemPhotos, photoOpsFetcher, state.inspection.id, state.currentSection],
+ );
+
+ /* Task 9 — bulk-detach photos by index. The strip emits indices DESC so each
+  * detach keeps the remaining (lower) indices valid; we POST highest-first too. */
+ const onBulkDetachPhotos = useCallback(
+  (itemId: string, indices: number[]) => {
+   patchItemPhotos(itemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
+   const sectionId = state.currentSection?.id;
+   (async () => {
+    for (const idx of indices) {
+     await fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/detach`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sectionId }),
+     });
+    }
+    revalidator.revalidate();
+   })();
+  },
+  [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+ );
+
+ /* Task 9b — the OTHER items photos can be moved to: every item across the
+  * inspection except the one currently being edited, each carrying its own
+  * section id so the move resolves the right composite finding key on arrival. */
+ const moveTargets = useMemo(
+  () =>
+   state.sections.flatMap((sec) =>
+    (sec.items || []).map((it) => ({
+     itemId: it.id,
+     label: `${sec.title} › ${it.label || it.name || it.id}`,
+     sectionId: sec.id,
+    })),
+   ),
+  [state.sections],
+ );
+
+ /* Task 9b — bulk-move photos by index to a target item. Like bulk detach, the
+  * strip emits indices DESC so each move keeps the remaining (lower) indices
+  * valid; we POST highest-first too. The source section is the current one. */
+ const onBulkMovePhotos = useCallback(
+  (fromItemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => {
+   patchItemPhotos(fromItemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
+   const fromSectionId = state.currentSection?.id;
+   (async () => {
+    for (const idx of indices) {
+     await fetch(`/api/inspections/${state.inspection.id}/items/${fromItemId}/photos/${idx}/move`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toItemId: to.itemId, toSectionId: to.sectionId, fromSectionId }),
+     });
+    }
+    revalidator.revalidate();
+   })();
+  },
+  [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+ );
+
+ /* Task 8 — route a viewer per-photo action to the right mutation. */
+ const onViewerAction = useCallback(
+  (action: MediaAction, photo: GalleryPhoto) => {
+   const itemId = photo.itemId;
+   const idx = photo.photoIndex;
+   const sectionId = state.currentSection?.id;
+   if (!itemId || idx == null) return;
+   // Plan 7 — video branch. A video entry exposes only poster · cover · caption
+   // · delete (the MediaViewer toolbar enforces this). Poster opens the picker;
+   // delete removes the Stream video + detaches the entry; cover/caption fall
+   // through to the shared handlers (cover stores the poster image reference).
+   if (photo.mediaType === "video" && photo.streamUid) {
+    if (action === "poster") {
+     setPosterTarget({
+      streamUid: photo.streamUid,
+      durationSec: photo.durationSec ?? 0,
+      posterPct: photo.posterPct ?? 0,
+     });
+     return;
+    }
+    if (action === "delete") {
+     patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
+     fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(photo.streamUid)}`, {
+      method: "DELETE",
+      credentials: "include",
+     }).then(() => revalidator.revalidate());
+     return;
+    }
+    // cover / caption fall through to the photo handlers below (they address by
+    // itemId + photoIndex, which is valid for video entries too).
+   }
+   if (action === "cover") {
+    // Reuse the existing CoverCropper flow: crop-then-set on the displayed key.
+    setGalleryCropSource({ key: photo.key, url: photo.url });
+    return;
+   }
+   if (action === "annotate") {
+    // Plan 4 sequential layering: annotate ON TOP of the crop. The annotate
+    // base is croppedKey || originalKey — NEVER annotatedKey (that would
+    // double-bake the existing annotation).
+    const annotateBaseKey = photo.croppedKey || photo.originalKey || photo.key;
+    setPhotoStudioUrl(`/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(annotateBaseKey)}`);
+    setPhotoStudioKey(photo.key);
+    setPhotoStudioIndex(idx);
+    setPhotoStudioTotal(0);
+    setPhotoStudioOpen(true);
+    return;
+   }
+   if (action === "crop") {
+    // Plan 4: crop ALWAYS re-derives from the ORIGINAL photo (never the
+    // cropped/annotated derivative). Open the PhotoCropper; the bake POSTs to
+    // the new crop endpoint (or enqueues offline — Task 9). A re-crop that
+    // would discard an existing annotation warns first.
+    const originalKey = photo.originalKey || photo.key;
+    setPhotoCropTarget({
+     itemId,
+     photoIndex: idx,
+     sourceUrl: `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(originalKey)}`,
+     hasAnnotation: !!photo.annotated,
+     sectionId,
+    });
+    return;
+   }
+   if (action === "revert") {
+    patchItemPhotos(itemId, (photos) => photos.map((p, i) => (i === idx ? { key: p.key } : p)));
+    fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/revert`, {
+     method: "POST",
+     credentials: "include",
+     headers: { "Content-Type": "application/json" },
+     body: JSON.stringify({ sectionId }),
+    }).then(() => revalidator.revalidate());
+    return;
+   }
+   if (action === "delete") {
+    patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
+    fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/detach`, {
+     method: "POST",
+     credentials: "include",
+     headers: { "Content-Type": "application/json" },
+     body: JSON.stringify({ sectionId }),
+    }).then(() => revalidator.revalidate());
+    return;
+   }
+   // rotate / caption — routed here but not yet implemented (not Plan 4).
+   // TODO rotate/caption on item photos.
+  },
+  [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+ );
+
+ /* Plan 4 (Task 8/9) — persist a baked crop for the targeted photo. When online,
+  * POST multipart to the new crop endpoint; when offline, enqueue for replay
+  * (Task 9). Either way, optimistically apply clearAnnotationOnRecrop locally so
+  * the strip immediately reflects the new crop with any annotation cleared. */
+ const performPhotoCropSave = useCallback(
+  (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, crop: PhotoCrop) => {
+   const { itemId, photoIndex, sectionId } = target;
+   const cropTransform = { aspect: crop.aspect, orientation: crop.orientation, ...crop.pixels };
+   // Optimistic local apply: drop annotation, set crop. The croppedKey is not
+   // yet known client-side; revalidate (online) / replay (offline) supplies it.
+   patchItemPhotos(itemId, (photos) =>
+    photos.map((p, i) =>
+     i === photoIndex
+      ? clearAnnotationOnRecrop(p, p.croppedKey ?? p.key, cropTransform)
+      : p,
+    ),
+   );
+
+   const nav = typeof navigator !== "undefined" ? navigator : undefined;
+   if (shouldQueue(nav)) {
+    // Plan 4 Q3 — offline: enqueue the baked crop; replay on reconnect.
+    void getOfflineQueue().enqueueCrop({
+     inspectionId: String(state.inspection.id),
+     itemId,
+     photoIndex,
+     blob,
+     crop: cropTransform,
+     sectionId,
+     enqueuedAt: Date.now(),
+    });
+    pushToast({ message: "Crop queued — will save when back online", durationMs: 3000 });
+    return;
+   }
+
+   // Online: POST the bake directly to the crop endpoint.
+   const fd = new FormData();
+   fd.append("image", new File([blob], "cropped.jpg", { type: "image/jpeg" }));
+   fd.append("crop", JSON.stringify(cropTransform));
+   if (sectionId) fd.append("sectionId", sectionId);
+   void (async () => {
+    await fetch(
+     `/api/inspections/${state.inspection.id}/items/${itemId}/photos/${photoIndex}/crop`,
+     { method: "POST", credentials: "include", body: fd },
+    );
+    revalidator.revalidate();
+   })();
+  },
+  [patchItemPhotos, state.inspection.id, revalidator],
+ );
 
  /* Mobile shell state */
  const isMobile = useIsMobile();
@@ -1220,6 +1639,9 @@ export default function InspectionEditPage() {
    name: file.name,
    blob: file,
    enqueuedAt: Date.now(),
+   // N4 — capture the opt-out at enqueue time; the RAW file is stored and baked
+   // at replay (so a failed-then-retried entry never double-bakes).
+   originalQuality: originalQualityEnabled(),
   });
   pushToast({ message: "Photo queued — will upload when back online", durationMs: 3000 });
   // Reset input so picking the same file twice re-fires onChange
@@ -1227,18 +1649,27 @@ export default function InspectionEditPage() {
   return;
  }
 
+ // N2+N4 — bake on the ONLINE path before submit (auto-orient + downscale +
+ // EXIF/GPS strip), unless the user opted into original quality. Capture the
+ // defect target ref into a local BEFORE the await so a second picker open
+ // cannot clobber it. The offline branch above keeps the RAW File (Task 5
+ // bakes at replay).
+ const orig = originalQualityEnabled();
+ const target = pendingPhotoTargetRef.current;
+ pendingPhotoTargetRef.current = null;
+ void (async () => {
+ const baked = orig ? file : await preprocessImage(file);
  const formData = new FormData();
  formData.append("intent", "upload-photo");
  formData.append("itemId", itemId);
- formData.append("file", file);
- const target = pendingPhotoTargetRef.current;
- pendingPhotoTargetRef.current = null;
+ formData.append("file", baked);
  if (target) {
- formData.append("targetType", "defect");
- formData.append("customId", target.id);
- formData.append("defectKind", target.kind);
+  formData.append("targetType", "defect");
+  formData.append("customId", target.id);
+  formData.append("defectKind", target.kind);
  }
  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
+ })();
  // Reset input so picking the same file twice re-fires onChange
  if (photoInputRef.current) photoInputRef.current.value = "";
  },
@@ -1266,6 +1697,7 @@ export default function InspectionEditPage() {
    name,
    blob,
    enqueuedAt: Date.now(),
+   originalQuality: originalQualityEnabled(),
   });
   });
   pushToast({
@@ -1275,13 +1707,20 @@ export default function InspectionEditPage() {
   return;
  }
 
+ // N4 — bake each frame on the ONLINE path. Burst frames are already
+ // canvas-captured JPEGs (no EXIF), so this is purely the downscale; it
+ // no-ops on frames already below the cap. Honors the original-quality opt-out.
+ const orig = originalQualityEnabled();
+ void (async () => {
  const formData = new FormData();
  formData.append("intent", "upload-photo");
  formData.append("itemId", itemId);
- blobs.forEach((blob, i) => {
- formData.append("file", new File([blob], `burst-${i + 1}.jpg`, { type: "image/jpeg" }));
- });
+ for (let i = 0; i < blobs.length; i++) {
+  const f = new File([blobs[i]], `burst-${i + 1}.jpg`, { type: "image/jpeg" });
+  formData.append("file", orig ? f : await preprocessImage(f));
+ }
  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
+ })();
  },
  [state.burstCameraItemId, state.inspection.id, uploadFetcher],
  );
@@ -1549,7 +1988,11 @@ export default function InspectionEditPage() {
  }
  ratingLevels={state.ratingLevels}
  onRating={handleRating}
- onAddPhoto={() => photoInputRef.current?.click()}
+ onAddPhoto={() =>
+  state.activeItemId
+   ? setAddMediaChooser({ itemId: state.activeItemId })
+   : photoInputRef.current?.click()
+ }
  onAddDefectPhoto={(target) => {
  pendingPhotoTargetRef.current = target;
  photoInputRef.current?.click();
@@ -1648,6 +2091,14 @@ export default function InspectionEditPage() {
  }
  onAttachRepairItem={findings.attachRepairItem}
  onDetachRepairItem={findings.detachRepairItem}
+ inspectionId={String(state.inspection.id)}
+ coverKey={coverKey}
+ onOpenPhoto={onOpenPhoto}
+ onReorderPhotos={onReorderPhotos}
+ onBulkDetachPhotos={onBulkDetachPhotos}
+ moveTargets={moveTargets}
+ onBulkMovePhotos={onBulkMovePhotos}
+ videoPosterUrl={videoPosterUrl}
  />
  ) : (
  <div className="flex items-center justify-center h-full text-ih-fg-4">
@@ -1670,6 +2121,7 @@ export default function InspectionEditPage() {
  getRatingColor={state.getRatingColor}
  getRatingLabel={state.getRatingLabel}
  inspectionId={String(state.inspection.id)}
+ photoCount={inspectionPhotoCount}
  onGallerySetCover={(p) => setGalleryCropSource(p)}
  onGalleryAnnotate={(p) => {
   setPhotoStudioUrl(p.url);
@@ -1871,19 +2323,163 @@ export default function InspectionEditPage() {
  onSave={({ blob, nodesJson }) => {
   const itemId = state.activeItemId;
   if (itemId && photoStudioIndex != null) {
-   const fd = new FormData();
-   fd.append("intent", "annotate");
-   fd.append("itemId", itemId);
-   fd.append("photoIndex", String(photoStudioIndex));
-   fd.append("nodes", nodesJson);
-   if (state.currentSection?.id) fd.append("sectionId", state.currentSection.id);
-   fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
-   coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+   const sectionId = state.currentSection?.id;
+   // Task 9c — offline-capable annotate. When offline, enqueue the baked PNG
+   // through the SAME media queue photo uploads use; the annotation derivative
+   // replays to the annotation endpoint on reconnect. When online, submit
+   // directly (unchanged).
+   const nav = typeof navigator !== "undefined" ? navigator : undefined;
+   if (shouldQueue(nav)) {
+    void getOfflineQueue().enqueuePhoto({
+     inspectionId: String(state.inspection.id),
+     itemId,
+     name: "annotated.png",
+     blob: new File([blob], "annotated.png", { type: "image/png" }),
+     enqueuedAt: Date.now(),
+     derivative: {
+      kind: "annotation",
+      photoIndex: photoStudioIndex,
+      nodes: nodesJson,
+      ...(sectionId ? { sectionId } : {}),
+     },
+    });
+    pushToast({ message: "Annotation queued — will save when back online", durationMs: 3000 });
+   } else {
+    const fd = new FormData();
+    fd.append("intent", "annotate");
+    fd.append("itemId", itemId);
+    fd.append("photoIndex", String(photoStudioIndex));
+    fd.append("nodes", nodesJson);
+    if (sectionId) fd.append("sectionId", sectionId);
+    fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
+    coverFetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
+   }
   }
   setPhotoStudioOpen(false);
  }}
  onClose={() => setPhotoStudioOpen(false)}
  />
+
+ {/* Task 8 — unified MediaViewer for an item's photo strip (tap a thumbnail
+  * to open; the bottom toolbar routes cover/annotate/revert/delete to the
+  * per-photo endpoints; crop opens the PhotoCropper, rotate/caption are no-ops). */}
+ <MediaViewer
+ photos={viewer.index !== null ? itemGalleryPhotos(viewer.itemId) : []}
+ index={viewer.index}
+ onClose={() => setViewer((v) => ({ ...v, index: null }))}
+ onAction={onViewerAction}
+ streamCustomerSubdomain={streamCustomerSubdomain}
+ />
+
+ {/* Plan 7 — poster-frame picker for a video entry (opened by the "Poster
+  * frame" toolbar action). Fails closed when the Stream subdomain is absent. */}
+ {posterTarget && (
+ <PosterPicker
+  inspectionId={String(state.inspection.id)}
+  streamUid={posterTarget.streamUid}
+  durationSec={posterTarget.durationSec}
+  posterPct={posterTarget.posterPct}
+  streamCustomerSubdomain={streamCustomerSubdomain}
+  onClose={() => setPosterTarget(null)}
+ />
+ )}
+
+ {/* Plan 7 — add-media chooser: photo OR video. Video requires a connection
+  * (no offline queue); the Video option disables + hints when offline. */}
+ {addMediaChooser && (
+ <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Add media">
+  <button
+   type="button"
+   aria-label="Close"
+   className="absolute inset-0 bg-[rgba(15,23,42,0.4)]"
+   onClick={() => setAddMediaChooser(null)}
+  />
+  <div className="relative w-full max-w-md rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover">
+   <h2 className="mb-3 text-[15px] font-bold text-ih-fg-1">Add media</h2>
+   <div className="grid grid-cols-2 gap-3">
+    <button
+     type="button"
+     onClick={() => {
+      setAddMediaChooser(null);
+      photoInputRef.current?.click();
+     }}
+     className="min-h-[44px] rounded-xl border border-ih-border bg-ih-bg-muted px-4 py-3 text-[14px] font-bold text-ih-fg-1 hover:border-ih-primary"
+    >
+     Photo
+    </button>
+    {(() => {
+     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+     return (
+      <button
+       type="button"
+       disabled={offline}
+       onClick={() => {
+        const t = addMediaChooser;
+        setAddMediaChooser(null);
+        setVideoCaptureTarget(t);
+       }}
+       title={offline ? "Video upload requires a connection" : undefined}
+       className="min-h-[44px] rounded-xl border border-ih-border bg-ih-bg-muted px-4 py-3 text-[14px] font-bold text-ih-fg-1 hover:border-ih-primary disabled:opacity-40"
+      >
+       Video
+       {offline && <span className="mt-1 block text-[10px] font-normal text-ih-fg-4">Requires a connection</span>}
+      </button>
+     );
+    })()}
+   </div>
+  </div>
+ </div>
+ )}
+
+ {/* Plan 7 — video capture + Cloudflare Stream direct-upload overlay. */}
+ {videoCaptureTarget && (
+ <VideoCapture
+  inspectionId={String(state.inspection.id)}
+  itemId={videoCaptureTarget.itemId}
+  onClose={() => setVideoCaptureTarget(null)}
+  onUploaded={() => {
+   setVideoCaptureTarget(null);
+   revalidator.revalidate();
+  }}
+ />
+ )}
+
+ {/* Plan 4 (Task 8) — per-photo crop overlay. Cropping ALWAYS re-derives from
+  * the ORIGINAL key. A re-crop that would discard an existing annotation warns
+  * first (no native window.confirm). */}
+ {photoCropTarget && (
+ <PhotoCropper
+  sourceUrl={fullResUrl(photoCropTarget.sourceUrl)}
+  allowFree
+  title="Crop photo"
+  saveLabel="Save crop"
+  onCancel={() => setPhotoCropTarget(null)}
+  onSave={(blob, crop) => {
+   const target = photoCropTarget;
+   setPhotoCropTarget(null);
+   const run = () => performPhotoCropSave(target, blob, crop);
+   if (target.hasAnnotation) setRecropWarn({ run });
+   else run();
+  }}
+ />
+ )}
+
+ {/* Plan 4 — re-crop warning modal (annotation will be discarded). */}
+ {recropWarn && (
+ <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+ <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={() => setRecropWarn(null)} />
+ <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover p-6 max-w-sm w-full border border-ih-border">
+ <h3 className="text-[15px] font-bold text-ih-fg-1">Re-crop this photo?</h3>
+ <p className="text-[13px] text-ih-fg-3 mt-2">
+ Re-cropping will remove the existing annotation on this photo (its marks are tied to the previous crop).
+ </p>
+ <div className="flex justify-end gap-2 mt-4">
+ <button onClick={() => setRecropWarn(null)} className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md">Cancel</button>
+ <button onClick={() => { const r = recropWarn.run; setRecropWarn(null); r(); }} className="px-4 py-2 text-[13px] font-bold text-white bg-ih-bad hover:bg-ih-bad/85 rounded-md">Crop &amp; clear</button>
+ </div>
+ </div>
+ </div>
+ )}
 
  {/* Inspection settings sheet */}
  <InspectionSettingsSheet
@@ -1896,7 +2492,7 @@ export default function InspectionEditPage() {
  onTemplateApplied={() => window.location.reload()}
  />
 
- {/* Image Studio — gallery "Set as cover" crop overlay */}
+ {/* Media Studio — gallery "Set as cover" crop overlay */}
  {galleryCropSource && (
  <CoverCropper
   sourceUrl={fullResUrl(galleryCropSource.url)}
