@@ -3,9 +3,10 @@ import { useRef, useState } from "react";
 /**
  * Plan 7 — video walk-through capture + Cloudflare Stream direct-creator-upload.
  *
- * Flow: pick/capture a clip → validate BEFORE upload (type allowlist, ≤200 MB,
- * ≤30 s via a hidden <video> metadata probe) → POST create-upload to mint a
- * one-shot Stream uploadURL → XHR-POST the file straight to Cloudflare with an
+ * Flow: pick/capture a clip → validate type + size BEFORE upload (allowlist,
+ * ≤200 MB) → POST create-upload to mint a one-shot Stream uploadURL (with
+ * maxDurationSeconds = MAX_VIDEO_SEC, so Stream enforces the 30s cap at ingest)
+ * → XHR-POST the file straight to Cloudflare with an
  * onprogress bar (bytes bypass the worker → no GPS-leak path) → on 200, POST
  * finalize so the pool row appears in the strip.
  *
@@ -27,9 +28,9 @@ export interface VideoCaptureProps {
   onUploaded: (streamUid: string) => void;
 }
 
-type Phase = "pick" | "validating" | "uploading" | "finalizing";
+type Phase = "pick" | "uploading" | "finalizing";
 
-/** Pure validation (type + size). Duration is checked separately (async probe). */
+/** Pure validation (type + size). Duration is enforced server-side by Stream. */
 export function validateVideoFile(file: File): string | null {
   if (!(ALLOWED_VIDEO_TYPES as readonly string[]).includes(file.type)) {
     return "Unsupported format. Use MP4, MOV, or WebM.";
@@ -46,57 +47,21 @@ export function VideoCapture({ inspectionId, itemId, onClose, onUploaded }: Vide
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
 
-  // Duration probe. The clip's object URL is fed to a React-rendered hidden
-  // <video> via the JSX `src` attribute (state), never an imperative
-  // `el.src = blobUrl` — that keeps the blob off the DOM-XSS sink surface
-  // (CodeQL js/xss-through-dom) while still reading metadata in-browser.
-  const probeVideoRef = useRef<HTMLVideoElement>(null);
-  const [probeSrc, setProbeSrc] = useState<string | undefined>(undefined);
-  const probePending = useRef<{ url: string; resolve: (n: number) => void; reject: (e: Error) => void } | null>(null);
-
-  /** Read a clip's duration (seconds) via the hidden <video> loadedmetadata event. */
-  const probeDuration = (file: File): Promise<number> =>
-    new Promise((resolve, reject) => {
-      const url = URL.createObjectURL(file);
-      probePending.current = { url, resolve, reject };
-      setProbeSrc(url);
-    });
-
-  const finishProbe = (ok: boolean) => {
-    const p = probePending.current;
-    probePending.current = null;
-    setProbeSrc(undefined);
-    if (!p) return;
-    URL.revokeObjectURL(p.url);
-    if (ok) p.resolve(probeVideoRef.current?.duration ?? Number.NaN);
-    else p.reject(new Error("Could not read video metadata"));
-  };
-
   const handleFile = async (file: File) => {
     setError(null);
-    // 1. type + size (eager-after-error inline message)
+    // Validate type + size client-side (eager-after-error inline message).
+    // Duration is enforced server-side: create-upload mints the Stream upload
+    // with maxDurationSeconds = MAX_VIDEO_SEC, so Cloudflare rejects an over-long
+    // clip at ingest. We deliberately do NOT probe duration in-browser — that
+    // requires loading the blob into a <video> src, and the cap is already
+    // guaranteed by Stream, so a client probe would be redundant.
     const ve = validateVideoFile(file);
     if (ve) {
       setError(ve);
       return;
     }
-    // 2. duration probe
-    setPhase("validating");
-    let durationSec: number;
-    try {
-      durationSec = await probeDuration(file);
-    } catch {
-      setPhase("pick");
-      setError("Could not read this video. Try a different clip.");
-      return;
-    }
-    if (durationSec > MAX_VIDEO_SEC) {
-      setPhase("pick");
-      setError(`Clip is too long (${Math.round(durationSec)}s). Max ${MAX_VIDEO_SEC}s.`);
-      return;
-    }
 
-    // 3. create-upload → mint a one-shot Stream uploadURL
+    // create-upload → mint a one-shot Stream uploadURL
     try {
       const createRes = await fetch(`/api/inspections/${inspectionId}/media/video/create-upload`, {
         method: "POST",
@@ -161,20 +126,6 @@ export function VideoCapture({ inspectionId, itemId, onClose, onUploaded }: Vide
           }}
         />
 
-        {/* Hidden metadata probe — src is a state-driven blob URL (never an
-            imperative el.src assignment), revoked once duration is read. */}
-        <video
-          ref={probeVideoRef}
-          src={probeSrc}
-          preload="metadata"
-          muted
-          playsInline
-          className="hidden"
-          aria-hidden="true"
-          onLoadedMetadata={() => finishProbe(true)}
-          onError={() => { if (probePending.current) finishProbe(false); }}
-        />
-
         {error && (
           <p data-testid="video-error" role="alert" className="mb-3 rounded-lg bg-ih-bad-bg px-3 py-2 text-[12px] font-semibold text-ih-bad">
             {error}
@@ -199,10 +150,9 @@ export function VideoCapture({ inspectionId, itemId, onClose, onUploaded }: Vide
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            disabled={phase === "validating"}
             className="min-h-[44px] w-full rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-white hover:bg-ih-primary-600 disabled:opacity-50"
           >
-            {phase === "validating" ? "Checking clip…" : "Choose or record a clip"}
+            Choose or record a clip
           </button>
         )}
 
