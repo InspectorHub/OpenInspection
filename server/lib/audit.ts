@@ -90,7 +90,10 @@ export interface AuditParams {
     entityId?: string | undefined;
     metadata?: Record<string, unknown> | undefined;
     ipAddress?: string | undefined;
-    executionCtx?: ExecutionContext | undefined;
+    // Only `waitUntil` is used; typed structurally so Hono's `c.executionCtx`
+    // (whose ExecutionContext type lags @cloudflare/workers-types — newer
+    // versions add members like `tracing`) assigns without a version-skew error.
+    executionCtx?: Pick<ExecutionContext, 'waitUntil'> | undefined;
 }
 
 /**

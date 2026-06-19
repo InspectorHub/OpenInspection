@@ -361,7 +361,10 @@ export const portalRoutes = portalRouter
             // `c.executionCtx` is the Hono Worker execution context (see di.ts).
             // Its getter THROWS when no execution context is present (e.g. unit
             // tests), so probe it defensively rather than via a truthiness check.
-            let execCtx: ExecutionContext | undefined;
+            // Only `waitUntil` is used; typed structurally so Hono's
+            // `c.executionCtx` (whose ExecutionContext type lags
+            // @cloudflare/workers-types) assigns without a version-skew error.
+            let execCtx: Pick<ExecutionContext, 'waitUntil'> | undefined;
             try {
                 execCtx = c.executionCtx;
             } catch {
