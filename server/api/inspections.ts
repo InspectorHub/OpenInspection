@@ -1,5 +1,4 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { HonoConfig } from '../types/hono';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
@@ -63,50 +62,16 @@ import { PatchItemFieldSchema } from '../lib/validations/inspection-patch.schema
 import { CreateInspectionFromWizardSchema } from '../lib/validations/wizard.schema';
 import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../lib/validations/unit.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, agreements, agreementRequests, agreementSigners, users, contacts, inspectionInspectors, tenants, inspectionMediaPool } from '../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, agreements, agreementRequests, agreementSigners, contacts, inspectionInspectors, tenants, inspectionMediaPool } from '../lib/db/schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../lib/sign-effects';
 import { applyResultsBatch } from '../services/inspection-results.service';
 import { syncInspectionAssignments, syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
 import { listPendingConflicts, resolveConflicts } from '../services/conflicts.service';
 import { findScheduleConflicts } from '../lib/schedule-conflicts';
 import { eq, inArray, and, asc } from 'drizzle-orm';
-import type { Context } from 'hono';
-import type { SignatureUser } from '../lib/inspector-signature';
+import { resolveSignatureInspector } from '../lib/signature-helpers';
+import { getTenantId, getDrizzle } from '../lib/route-helpers';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
-
-/**
- * Sprint B-4a — resolves the inspector record for an inspection so outbound
- * report / agreement / share emails can append the inspector's rebooking
- * signature footer. Returns undefined when the inspection has no assigned
- * inspector or the lookup fails — callers should pass undefined through to
- * EmailService methods, which will skip the footer in that case.
- */
-async function resolveSignatureInspector(
-    c: Context<HonoConfig>,
-    inspectorId: string | null | undefined,
-    tenantId: string,
-): Promise<SignatureUser | undefined> {
-    if (!inspectorId) return undefined;
-    try {
-        const db = drizzle(c.env.DB);
-        const row = await db.select({
-            name:             users.name,
-            email:            users.email,
-            phone:            users.phone,
-            licenseNumber:    users.licenseNumber,
-            slug:             users.slug,
-            signatureEnabled: users.signatureEnabled,
-        }).from(users).where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId))).get();
-        if (!row) return undefined;
-        // saas-aware: requestedTenantSlug is empty in saas, so the "Book again"
-        // link would otherwise drop. Resolve via the shared helper (DB fallback).
-        const tenantSlug = (await resolveTenantSlug(c, tenantId)) || null;
-        return { ...row, tenantSlug };
-    } catch (err) {
-        logger.error('[email-signature] inspector lookup failed', { inspectorId }, err instanceof Error ? err : undefined);
-        return undefined;
-    }
-}
 
 // --- GET /api/inspections/dashboard — Spec 3A ---
 const dashboardRoute = createRoute(withMcpMetadata({
@@ -3018,7 +2983,7 @@ export const inspectionsRoutes = createApiRouter()
     })
     .openapi(completeInspectionRoute, async (c) => {
         const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
+        const tenantId = getTenantId(c);
         const service = c.var.services.inspection;
         const { inspection } = await service.getInspection(id, tenantId);
 
@@ -3094,7 +3059,7 @@ export const inspectionsRoutes = createApiRouter()
     })
     .openapi(sendReportPdfRoute, async (c) => {
         const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
+        const tenantId = getTenantId(c);
         const body = c.req.valid('json') ?? {};
         const service = c.var.services.inspection;
         const { inspection } = await service.getInspection(id, tenantId);
@@ -3311,7 +3276,7 @@ export const inspectionsRoutes = createApiRouter()
         }, 200);
     })
     .openapi(publishRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
+        const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
         const body = c.req.valid('json');
         const service = c.var.services.inspection;
@@ -3606,9 +3571,9 @@ export const inspectionsRoutes = createApiRouter()
         operationId: "createInspectionShareAgent",
         description: "Auto-generated placeholder for createInspectionShareAgent (POST /{id}/share-agent, inspections domain). TODO: replace with a real description sourced from the handler."
     }, { scopes: ['write'], tier: 'extended' })), async (c) => {
-        const tenantId = c.get('tenantId') as string;
+        const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         const inspectionRow = await db.select({
             id: inspectionTable.id,

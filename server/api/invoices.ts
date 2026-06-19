@@ -1,5 +1,4 @@
 import { createRoute, z } from '@hono/zod-openapi';
-import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
@@ -13,12 +12,12 @@ import {
 } from '../lib/validations/invoice.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { normalizePaymentMethod } from '../lib/payment-method';
-import { inspections, inspectionServices, users } from '../lib/db/schema';
+import { inspections, inspectionServices } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
-import { getBookingHost, resolveTenantSlug } from '../lib/url';
+import { getBookingHost } from '../lib/url';
 import { paymentUrl } from '../lib/public-urls';
-import { logger } from '../lib/logger';
-import type { SignatureUser } from '../lib/inspector-signature';
+import { resolveSignatureInspector } from '../lib/signature-helpers';
+import { getTenantId, getDrizzle } from '../lib/route-helpers';
 
 const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
@@ -201,9 +200,9 @@ export const invoiceRoutes = createApiRouter()
         return c.json({ success: true }, 200);
     })
     .openapi(requestPaymentRoute, async (c) => {
-        const tenantId = c.get('tenantId');
+        const tenantId = getTenantId(c);
         const { inspectionId } = c.req.valid('json');
-        const db = drizzle(c.env.DB);
+        const db = getDrizzle(c);
 
         // 404 if the inspection is missing or belongs to another tenant.
         const inspection = await db.select().from(inspections)
@@ -274,7 +273,7 @@ export const invoiceRoutes = createApiRouter()
         const amountLabel = USD.format(amountCents / 100);
 
         // Sign the email with the assigned inspector's rebooking footer (B-4).
-        const sigInspector = await resolveSignatureInspectorForEmail(c, inspection.inspectorId, tenantId);
+        const sigInspector = await resolveSignatureInspector(c, inspection.inspectorId, tenantId);
 
         // Bare await — let an email failure surface as a 502 so the row stays
         // truthful (Task 7's reviewer-endorsed choice). markSent already ran, so
@@ -292,38 +291,6 @@ export const invoiceRoutes = createApiRouter()
             sentAt:      sent?.sentAt ?? null,
         }, 200);
     });
-
-/**
- * Minimal inspector lookup for the B-4 rebooking signature on the payment
- * request email. Mirrors resolveSignatureInspector in server/api/inspections.ts
- * (kept local so the invoices module stays self-contained). Never throws — a
- * missing inspector just means no signature footer.
- */
-async function resolveSignatureInspectorForEmail(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    c: any,
-    inspectorId: string | null | undefined,
-    tenantId: string,
-): Promise<SignatureUser | undefined> {
-    if (!inspectorId) return undefined;
-    try {
-        const db = drizzle(c.env.DB);
-        const row = await db.select({
-            name:             users.name,
-            email:            users.email,
-            phone:            users.phone,
-            licenseNumber:    users.licenseNumber,
-            slug:             users.slug,
-            signatureEnabled: users.signatureEnabled,
-        }).from(users).where(and(eq(users.id, inspectorId), eq(users.tenantId, tenantId))).get();
-        if (!row) return undefined;
-        const tenantSlug = (await resolveTenantSlug(c, tenantId)) || null;
-        return { ...row, tenantSlug };
-    } catch (err) {
-        logger.error('[email-signature] inspector lookup failed', { inspectorId }, err instanceof Error ? err : undefined);
-        return undefined;
-    }
-}
 
 export type InvoicesApi = typeof invoiceRoutes;
 
