@@ -215,6 +215,14 @@ DB design policies (2026-06-04 DBA review). These apply to ALL new tables/column
 - **Status fields**: any column that models a state machine MUST declare a drizzle `{ enum: [...] }` (type-layer only, no DDL cost).
 - **Column retirement**: D1 cannot drop columns on FK-referenced tables. Retired columns are FROZEN: stop all reads/writes, add a `-- DEAD (date, reason)` schema comment, never reuse the name.
 
+## Quality gates
+
+Pre-commit and CI run the same logical checks; CI's `verify` job is the authoritative gate (wire it up as a required status check). The pre-commit hook is a fast local guard — bypass only with `--no-verify` (discouraged). Mechanism, steps, and Node version are aligned across the superproject and the portal/cms submodules.
+
+- **Hook mechanism**: `.githooks/pre-commit`, activated by the `prepare` npm script (`git config core.hooksPath .githooks`) on `npm install`/`npm ci` — native git hooks, **no husky**.
+- **Pre-commit** (`.githooks/pre-commit`): tiered type-check (scoped to staged files — skip / api-only / full) → `lint-staged` (eslint --fix) → DS-token conformance (`lint:ds`) → migration-ref hygiene (`lint:migrefs`) → Worker bundle-size (gated to bundle-affecting changes). Docs/tests-only commits skip the heavy steps.
+- **CI** (`.github/workflows/ci.yml`, Node 22): `npm ci` → `gen-version` → `type-check` → `npm run lint` (eslint + `lint:ds` + `lint:erasure` + `lint:migrefs`) → `db:check` (migration drift) → `test:unit` → `test:workers` → `test:web` → `build` → bundle-size gate. CodeQL runs separately (`codeql.yml`).
+
 ## Comment Rules
 
 Migration sequence numbers are an unstable, positional ordering token — squash/consolidation renumbers them, leaving comments dangling at files that no longer exist (the `0000_baseline.sql` consolidation made every `migration 00NN` comment in the codebase point to nothing). Annotate the durable artifact, not the transient migration.
