@@ -51,6 +51,7 @@ import {
     ConflictResolveSchema,
     ConflictResolveResponseSchema,
     CoverCropSchema,
+    PhotoCropSchema,
 } from '../lib/validations/inspection.schema';
 import { CreateTemplateSchema, UpdateTemplateSchema, TemplateSchemaV2Schema } from '../lib/validations/template.schema';
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
@@ -1830,6 +1831,41 @@ const setCoverCropRoute = createRoute(withMcpMetadata({
     description: "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain)."
 }, { scopes: ['write'], tier: 'extended' }));
 
+// ── Image Studio (Plan 4): crop an item/defect photo ─────────────────────────
+const cropItemPhotoRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/{id}/items/{itemId}/photos/{photoIndex}/crop',
+    tags: ["inspections"],
+    summary: 'Bake and store a cropped derivative for an inspection-item or defect photo',
+    request: {
+        params: z.object({
+            id: z.string().describe('Inspection id'),
+            itemId: z.string().describe('Inspection item id'),
+            photoIndex: z.coerce.number().int().min(0).describe('Index into the item/defect photos array'),
+        }).describe('Crop item-photo path params'),
+        body: {
+            content: {
+                'multipart/form-data': {
+                    schema: z.object({
+                        image: z.unknown().openapi({ type: 'string', format: 'binary' }).describe('Baked cropped JPEG (2048px long edge)'),
+                        crop: z.string().describe('JSON-encoded PhotoCrop transform (source-pixel coords)'),
+                        sectionId: z.string().optional().describe('Section id for composite finding key (defect photos)'),
+                    }).describe('Crop item-photo multipart body'),
+                },
+            },
+        },
+    },
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ croppedKey: z.string().describe('R2 key of the baked cropped derivative') })) } },
+            description: 'Cropped item photo saved',
+        },
+    },
+    operationId: "cropInspectionItemPhoto",
+    description: "Bake and store a cropped derivative for an inspection-item or per-defect photo and record its re-editable crop transform (POST /{id}/items/{itemId}/photos/{photoIndex}/crop, inspections domain).",
+}, { scopes: ['write'], tier: 'extended' }));
+
 
 // -----------------------------------------------------------------------------
 // Agent Accounts A3 — POST /api/inspections/:id/concierge/approve
@@ -3440,6 +3476,25 @@ export const inspectionsRoutes = createApiRouter()
         const sourceKey = String(formData['sourceKey'] ?? '');
         const bytes = await file.arrayBuffer();
         const result = await c.var.services.inspection.setCroppedCover(id, tenantId, sourceKey, bytes, parsed.data);
+        return c.json({ success: true, data: result }, 200);
+    })
+    .openapi(cropItemPhotoRoute, async (c) => {
+        const { id, itemId, photoIndex } = c.req.valid('param');
+        const tenantId = c.get('tenantId');
+        const formData = await c.req.parseBody();
+        const file = formData['image'] as File | undefined;
+        if (!file) throw Errors.BadRequest('image file required');
+        let rawCrop: unknown;
+        try { rawCrop = JSON.parse(String(formData['crop'] ?? '{}')); }
+        catch { throw Errors.BadRequest('invalid crop'); }
+        const parsed = PhotoCropSchema.safeParse(rawCrop);
+        if (!parsed.success) throw Errors.BadRequest('invalid crop');
+        const sectionId = typeof formData['sectionId'] === 'string' && formData['sectionId'].length > 0
+            ? formData['sectionId'] : undefined;
+        const bytes = await file.arrayBuffer();
+        const result = await c.var.services.inspection.saveCroppedItemPhoto(
+            id, tenantId, itemId, photoIndex, bytes, parsed.data, sectionId,
+        );
         return c.json({ success: true, data: result }, 200);
     })
     .openapi(approveConciergeRoute, async (c) => {
