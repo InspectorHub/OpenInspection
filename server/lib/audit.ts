@@ -23,6 +23,8 @@ export type AuditAction =
     | 'inspection.share_agent'
     | 'inspection.property_facts.update'
     | 'inspection.media.attach'
+    | 'inspection.media.video.finalize'
+    | 'inspection.media.video.delete'
     | 'inspection.inspector_signed'
     | 'persistence.granted'
     | 'persistence.denied'
