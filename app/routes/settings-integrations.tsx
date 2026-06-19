@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Link,
   useLoaderData,
@@ -12,6 +12,8 @@ import type { Route } from "./+types/settings-integrations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
+import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { useFlash } from "~/hooks/useFlash";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
@@ -201,14 +203,10 @@ export default function SettingsIntegrations() {
 
   // Transient success flash — visible for 4s after a save round-trip.
   // Errors persist until the next attempt (no auto-dismiss).
-  const [flashVisible, setFlashVisible] = useState(false);
-  useEffect(() => {
-    if (actionData?.intent === "save-stripe-secrets" && actionData.success) {
-      setFlashVisible(true);
-      const t = setTimeout(() => setFlashVisible(false), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [actionData]);
+  const { flashVisible } = useFlash(
+    actionData?.intent === "save-stripe-secrets" && !!actionData.success,
+    actionData,
+  );
 
   // Eager-after-error client validation: validate on submit; after the first
   // failed submit, re-validate on every change inside the form.
@@ -334,12 +332,7 @@ export default function SettingsIntegrations() {
         </Form>
 
         {/* Test connection — probes the STORED secret key, no re-entry needed */}
-        <testFetcher.Form method="post" className="flex flex-wrap items-center gap-3">
-          <input type="hidden" name="intent" value="test-stripe" />
-          <button type="submit" disabled={testFetcher.state !== "idle"}
-            className="h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
-            {testFetcher.state !== "idle" ? "Testing…" : "Test connection"}
-          </button>
+        <TestConnectionButton fetcher={testFetcher} intent="test-stripe">
           {testFetcher.data?.intent === "test-stripe" && testFetcher.data.test && (
             <span className="text-[12px] text-ih-fg-2">
               Connected: <span className="font-semibold">{testFetcher.data.test.accountName}</span>
@@ -355,7 +348,7 @@ export default function SettingsIntegrations() {
           {testFetcher.data?.intent === "test-stripe" && !testFetcher.data.success && (
             <span className="text-[12px] text-ih-bad-fg">{testFetcher.data.error}</span>
           )}
-        </testFetcher.Form>
+        </TestConnectionButton>
 
         {/* Webhook endpoint to register in the Stripe dashboard */}
         <div className="pt-1 space-y-1.5">

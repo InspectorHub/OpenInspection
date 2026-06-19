@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useLoaderData, useActionData, useNavigation, useFetcher, Form } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -6,6 +6,8 @@ import type { Route } from "./+types/settings-communication";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
+import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { useFlash } from "~/hooks/useFlash";
 import { communicationEmailSchema } from "~/lib/forms/settings-config.schema";
 import { TemplateList } from "~/components/email-template/TemplateList";
 import { useSessionContext } from "~/hooks/useSessionContext";
@@ -304,20 +306,14 @@ export default function SettingsCommunication() {
 
   // Transient success flash — visible for 4s after a secret save round-trip.
   // Errors persist until the next attempt (no auto-dismiss).
-  const [flashVisible, setFlashVisible] = useState(false);
-  useEffect(() => {
-    const i = actionData && "intent" in actionData ? actionData.intent : null;
-    if (
-      (i === "save-email-secrets" || i === "save-calendar-secrets") &&
-      actionData &&
+  const flashIntent = actionData && "intent" in actionData ? actionData.intent : null;
+  const { flashVisible } = useFlash(
+    (flashIntent === "save-email-secrets" || flashIntent === "save-calendar-secrets") &&
+      !!actionData &&
       "ok" in actionData &&
-      actionData.ok
-    ) {
-      setFlashVisible(true);
-      const t = setTimeout(() => setFlashVisible(false), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [actionData]);
+      actionData.ok,
+    actionData,
+  );
 
   // Map a server `field` error back onto the matching SecretField.
   const secretFieldError = (name: string): string | undefined => {
@@ -596,12 +592,7 @@ export default function SettingsCommunication() {
         </Form>
 
         {/* Test connection — probes the STORED Resend key, no re-entry needed */}
-        <resendTestFetcher.Form method="post" className="flex flex-wrap items-center gap-3">
-          <input type="hidden" name="intent" value="test-resend" />
-          <button type="submit" disabled={resendTestFetcher.state !== "idle"}
-            className="h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
-            {resendTestFetcher.state !== "idle" ? "Testing…" : "Test connection"}
-          </button>
+        <TestConnectionButton fetcher={resendTestFetcher} intent="test-resend">
           {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && resendTest.test && "domains" in resendTest.test && (
             <span className="text-[12px] text-ih-fg-2">
               Connected — {resendTest.test.domains} verified domain(s)
@@ -610,7 +601,7 @@ export default function SettingsCommunication() {
           {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && "ok" in resendTest && !resendTest.ok && (
             <span className="text-[12px] text-ih-bad-fg">{resendTest.error}</span>
           )}
-        </resendTestFetcher.Form>
+        </TestConnectionButton>
       </section>
 
       {/* SMS delivery (Track L) */}

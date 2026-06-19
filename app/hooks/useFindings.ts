@@ -3,8 +3,7 @@ import type { useFetcher } from "react-router";
 import type { ResultMap } from "./useInspection";
 import { fKey } from "./useInspection";
 import { attachPhotoToDefectState, attachPhotoToCustomDefect } from "~/lib/defect-photos";
-import { shouldQueue } from "~/lib/offline/should-queue";
-import { lastKnownVersion } from "~/lib/offline/field-version-key";
+import { useOfflineWrite } from "./useOfflineWrite";
 import type { OfflineQueue } from "~/lib/offline/offline-queue";
 
 const DEFAULT_UNIT = "_default";
@@ -112,55 +111,15 @@ export function useFindings(
   const notesFetcher = options.notesFetcher ?? fetcher;
   const offlineQueue = options.offlineQueue;
 
-  /**
-   * Helper: if offline and an offlineQueue is provided, enqueue the write and
-   * return true (caller should skip the fetcher path).  Otherwise return false.
-   *
-   * Optimistic-concurrency: for the versioned single-field intents we freeze
-   * the field's last-known `<field>_v` (from the in-memory ResultMap, which
-   * the /results loader serializes verbatim) into the payload as
-   * `expectedVersion`. Replay then sends a REAL version check (force:false)
-   * so a concurrent edit lands as a 409 conflict instead of being silently
-   * overwritten — offline is the widest conflict window, so this matters most
-   * here. Whole-blob intents (save-all) have no per-field counter →
-   * lastKnownVersion returns null and we enqueue the payload as-is.
-   */
-  const tryEnqueueOffline = useCallback(
-    (
-      intent: string,
-      itemId: string | undefined,
-      field: string | undefined,
-      payload: Record<string, unknown>,
-    ): boolean => {
-      if (!offlineQueue) return false;
-      const nav = typeof navigator !== "undefined" ? navigator : undefined;
-      if (!shouldQueue(nav)) return false;
-
-      let outPayload = payload;
-      if (itemId) {
-        // Same lookup as getResult(): prefer the composite key, fall back to
-        // the bare itemId for legacy entries.
-        const sid =
-          (payload.sectionId as string | undefined) || sectionIdForItem(itemId);
-        const entry = (sid && results[fKey(sid, itemId)]) || results[itemId];
-        const known = lastKnownVersion(entry, intent);
-        if (known !== null) {
-          outPayload = { ...payload, expectedVersion: known };
-        }
-      }
-
-      void offlineQueue.enqueueWrite({
-        inspectionId: options.inspectionId,
-        itemId,
-        field,
-        intent,
-        payload: outPayload,
-        enqueuedAt: Date.now(),
-      });
-      return true;
-    },
-    [offlineQueue, options.inspectionId, results, sectionIdForItem],
-  );
+  // Offline-queue write helper (version-freeze / shouldQueue / lastKnownVersion
+  // semantics live in useOfflineWrite). Returns true when the write was queued
+  // (caller skips the fetcher path), false otherwise.
+  const tryEnqueueOffline = useOfflineWrite({
+    results,
+    sectionIdForItem,
+    inspectionId: options.inspectionId,
+    offlineQueue,
+  });
 
   /* ---------------------------------------------------------------- */
   /*  Read helpers                                                     */

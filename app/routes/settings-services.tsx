@@ -8,6 +8,7 @@ import { createApi } from "~/lib/api-client.server";
 import { createServiceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
+import { SCHEDULING_ROLES_SET } from "~/lib/settings/constants";
 
 export function meta() {
   return [{ title: "Services & Catalog - Settings - OpenInspection" }];
@@ -35,9 +36,6 @@ interface Member {
   role: string;
   createdAt: string;
 }
-
-// Scheduling roles that may be restricted per-service.
-const SCHEDULING_ROLES = new Set(["owner", "manager", "inspector"]);
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const { forbidden, token } = await requireAdminLoader(context, request);
@@ -79,7 +77,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (membersRes?.ok) {
       const mb = (await membersRes.json()) as Record<string, unknown>;
       const raw = ((mb.data ?? []) as Member[]);
-      members = raw.filter((m) => SCHEDULING_ROLES.has(m.role));
+      members = raw.filter((m) => SCHEDULING_ROLES_SET.has(m.role));
     }
 
     return {

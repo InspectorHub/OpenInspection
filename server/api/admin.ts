@@ -11,6 +11,8 @@ import { getBaseUrl, getBookingHost, resolveTenantSlug } from '../lib/url';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { agreementSignUrl, checkoutUrl } from '../lib/public-urls';
 import { shouldUseCheckoutLink } from '../lib/agreement-link';
+import { lookupSenderSignature, buildSignUrl } from '../lib/signature-helpers';
+import { getTenantId } from '../lib/route-helpers';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import {
@@ -48,8 +50,6 @@ import { commentUsage } from '../lib/db/schema/inspection';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { syncInspectionAssignmentsBatch } from '../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
-import type { Context } from 'hono';
-import type { HonoConfig } from '../types/hono';
 
 /**
  * GET /api/admin/export
@@ -1333,48 +1333,6 @@ const patchCommunicationRoute = createRoute(withMcpMetadata({
     description: 'Persists the tenant From: (senderEmail) and Reply-To: (replyTo) addresses — fixes the B-4/A-7 "Reply-To unsaveable" bug. Either value may be null to clear it.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-// --- Track I-a Task 9 — agreement send helpers (module scope) -------------
-
-type SenderSignature = { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null; signatureEnabled: boolean | null };
-
-/**
- * Look up the current admin/inspector's signature block so the recipient can
- * rebook with them via the embedded booking link (Sprint B-4a). Tolerant —
- * any failure yields `undefined` (no signature appended).
- */
-async function lookupSenderSignature(c: Context<HonoConfig>, tenantId: string): Promise<SenderSignature | undefined> {
-    const senderId = c.get('user')?.sub;
-    if (!senderId) return undefined;
-    try {
-        const row = await drizzle(c.env.DB).select({
-            name:             schema.users.name,
-            email:            schema.users.email,
-            phone:            schema.users.phone,
-            licenseNumber:    schema.users.licenseNumber,
-            signatureEnabled: schema.users.signatureEnabled,
-        }).from(schema.users)
-            .where(and(eq(schema.users.id, senderId), eq(schema.users.tenantId, tenantId)))
-            .get();
-        return row ?? undefined;
-    } catch (err) {
-        logger.warn('agreement.signature.lookup.failed', { senderId, error: (err as Error).message });
-        return undefined;
-    }
-}
-
-/**
- * Per-recipient link rule (shared by send + remind + copy-link): combined
- * Sign & pay checkout when the inspection requires payment AND has an
- * outstanding invoice, otherwise the standalone sign page. `token` is the
- * recipient's persistent public token (per-signer in the envelope model).
- */
-async function buildSignUrl(c: Context<HonoConfig>, tenantId: string, inspectionId: string | null | undefined, tenantSlug: string, token: string): Promise<string> {
-    const host = getBookingHost(c);
-    return (await shouldUseCheckoutLink(c.env.DB, tenantId, inspectionId))
-        ? checkoutUrl(host, tenantSlug, token)
-        : agreementSignUrl(host, tenantSlug, token);
-}
-
 export const adminRoutes = createApiRouter()
     .openapi(exportDataRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -1603,7 +1561,7 @@ export const adminRoutes = createApiRouter()
         return c.json({ success: true }, 200);
     })
     .openapi(sendAgreementRoute, async (c) => {
-        const tenantId = c.get('tenantId');
+        const tenantId = getTenantId(c);
         const body = c.req.valid('json');
         const svc = c.var.services.agreement;
         const tenantSlug = await resolveTenantSlug(c, tenantId);
@@ -1948,7 +1906,7 @@ export const adminRoutes = createApiRouter()
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(getSignerLinkRoute, async (c) => {
-        const tenantId = c.get('tenantId');
+        const tenantId = getTenantId(c);
         const { requestId, signerId } = c.req.valid('param');
         const svc = c.var.services.agreement;
         const db = drizzle(c.env.DB, { schema });
@@ -1969,7 +1927,7 @@ export const adminRoutes = createApiRouter()
         return c.json({ success: true as const, data: { url } }, 200);
     })
     .openapi(remindSignerRoute, async (c) => {
-        const tenantId = c.get('tenantId');
+        const tenantId = getTenantId(c);
         const { requestId, signerId } = c.req.valid('param');
         const svc = c.var.services.agreement;
         const db = drizzle(c.env.DB, { schema });
