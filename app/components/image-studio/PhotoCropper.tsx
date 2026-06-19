@@ -61,11 +61,9 @@ export function PhotoCropper({
     if (!pixels) return;
     setBusy(true);
     try {
-      // Task 10 will extend bakeCrop with a 4th `sourceLongEdge` arg; until then
-      // the bounded-decode rescale is a no-op. Reference sourceLongEdge so the
-      // captured value is retained for the Task 10 wiring.
-      void sourceLongEdge;
-      const blob = await bakeCrop(sourceUrl, pixels);
+      // Plan 4 Q5 — thread the source long edge so bakeCrop rescales the crop
+      // rect when the CDN returns a bounded (<=4096) variant of a huge original.
+      const blob = await bakeCrop(sourceUrl, pixels, undefined, sourceLongEdge);
       onSave(blob, { aspect: aspectKey, orientation: portrait ? "portrait" : "landscape", pixels });
     } finally { setBusy(false); }
   }
