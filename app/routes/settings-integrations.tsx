@@ -199,14 +199,6 @@ export default function SettingsIntegrations() {
   const testFetcher = useFetcher<typeof action>();
   const ctx = useSessionContext();
 
-  if ("forbidden" in data) return <AccessDenied />;
-  const { secrets, webhookBase, webhookLog } = data;
-
-  const tenantSlug = ctx?.branding?.tenantSlug ?? null;
-  const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
-
-  const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save-stripe-secrets";
-
   // Transient success flash — visible for 4s after a save round-trip.
   // Errors persist until the next attempt (no auto-dismiss).
   const [flashVisible, setFlashVisible] = useState(false);
@@ -222,6 +214,14 @@ export default function SettingsIntegrations() {
   // failed submit, re-validate on every change inside the form.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submittedOnce, setSubmittedOnce] = useState(false);
+
+  if ("forbidden" in data) return <AccessDenied />;
+  const { secrets, webhookBase, webhookLog } = data;
+
+  const tenantSlug = ctx?.branding?.tenantSlug ?? null;
+  const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
+
+  const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save-stripe-secrets";
 
   const serverField = actionData?.intent === "save-stripe-secrets" && !actionData.success
     ? actionData.field

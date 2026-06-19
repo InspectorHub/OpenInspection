@@ -316,8 +316,6 @@ function QualificationWidget({ service, initialUserIds, members }: Qualification
 
 export default function SettingsServices() {
   const data = useLoaderData<typeof loader>();
-  if ("forbidden" in data) return <AccessDenied />;
-  const { services, discounts, restrictionMap, members } = data;
   const actionData = useActionData<typeof action>();
   const [showForm, setShowForm] = useState(false);
 
@@ -332,6 +330,9 @@ export default function SettingsServices() {
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
   });
+
+  if ("forbidden" in data) return <AccessDenied />;
+  const { services, discounts, restrictionMap, members } = data;
 
   return (
     <div className="space-y-[18px]">

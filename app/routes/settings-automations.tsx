@@ -134,10 +134,11 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 export default function SettingsAutomations() {
   const data = useLoaderData<typeof loader>();
-  if ("forbidden" in data) return <AccessDenied />;
-  const { rules, services, recentLogs, reviewUrl } = data;
   const nav = useNavigation();
   const [editing, setEditing] = useState<Rule | null | "new">(null);
+
+  if ("forbidden" in data) return <AccessDenied />;
+  const { rules, services, recentLogs, reviewUrl } = data;
 
   return (
     <div className="space-y-[18px]">

@@ -87,13 +87,13 @@ function ContractorTypeRow({ t, idx, count, onMove, onRequestDelete }: { t: Cont
 
 export default function SettingsContractorTypes() {
   const data = useLoaderData<typeof loader>();
-  if ("forbidden" in data) return <AccessDenied />;
-  const { types } = data;
   const createFetcher = useFetcher<typeof action>();
   const reorderFetcher = useFetcher<typeof action>();
   const deleteFetcher = useFetcher<typeof action>();
   const [pendingDelete, setPendingDelete] = useState<ContractorType | null>(null);
   const [newName, setNewName] = useState("");
+
+  const types: ContractorType[] = "forbidden" in data ? [] : data.types;
 
   function move(idx: number, dir: -1 | 1) {
     if (reorderFetcher.state !== "idle") return;
@@ -103,6 +103,8 @@ export default function SettingsContractorTypes() {
     [next[idx], next[j]] = [next[j], next[idx]];
     reorderFetcher.submit({ intent: "reorder", ids: JSON.stringify(next.map((t) => t.id)) }, { method: "POST" });
   }
+
+  if ("forbidden" in data) return <AccessDenied />;
 
   return (
     <div className="space-y-[18px]">

@@ -119,9 +119,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 export default function SettingsWorkspacePage() {
   const data = useLoaderData<typeof loader>();
-  if ("forbidden" in data) return <AccessDenied />;
-  const { branding } = data;
   const actionData = useActionData<typeof action>();
+  // Safe-default the branding shape so hook initializers tolerate the
+  // forbidden loader branch ({ forbidden: true }) without reading missing keys.
+  const branding: Branding = "forbidden" in data ? {} : data.branding;
   const [color, setColor] = useState(branding.primaryColor ?? "#6366f1");
 
   const logoFetcher = useFetcher<{ success: boolean; intent?: string; logoUrl?: string | null }>();
@@ -139,6 +140,8 @@ export default function SettingsWorkspacePage() {
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
   });
+
+  if ("forbidden" in data) return <AccessDenied />;
 
   return (
     <div className="space-y-[18px]">
