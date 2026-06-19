@@ -2104,7 +2104,7 @@ export class InspectionService {
         // legacy templates without these fields render unchanged.
         interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[]; disclaimerText?: string | null; alwaysPageBreak?: boolean }
         interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
-        interface PhotoEntry        { key: string; annotatedKey?: string; annotationsJson?: string }
+        interface PhotoEntry        { key: string; croppedKey?: string; annotatedKey?: string; annotationsJson?: string }
         // Sprint 2 S2-3 / S2-4 — per-defect recommendation slug + repair
         // estimate range (cents). All optional so legacy defects render.
         interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[]; recommendationId?: string | null; estimateLow?: number | null; estimateHigh?: number | null; trade?: string | null; deadline?: string | null; timeframe?: string | null }
@@ -2239,7 +2239,7 @@ export class InspectionService {
 
                 // Phase T (T16): prefer annotated composite when present; expose original via originalKey.
                 const photos = (res.photos || []).map((p: PhotoEntry) => {
-                    const displayKey = p.annotatedKey || p.key;
+                    const displayKey = p.annotatedKey || p.croppedKey || p.key;
                     return {
                         key: displayKey,
                         originalKey: p.key,
@@ -2265,7 +2265,7 @@ export class InspectionService {
                         effectiveCategory: st?.category ?? d.category,
                         effectiveLocation: (typeof st?.location === 'string' && st.location.length > 0) ? st.location : d.location,
                         defectPhotos: (st?.photos ?? []).map(p => {
-                            const displayKey = p.annotatedKey || p.key;
+                            const displayKey = p.annotatedKey || p.croppedKey || p.key;
                             return {
                                 key: displayKey,
                                 originalKey: p.key,
@@ -2374,7 +2374,7 @@ export class InspectionService {
                             rating: res.original.rating ?? null,
                             notes:  res.original.notes ?? null,
                             photos: (res.original.photos || []).map((p: PhotoEntry) => {
-                                const displayKey = p.annotatedKey || p.key;
+                                const displayKey = p.annotatedKey || p.croppedKey || p.key;
                                 return { key: displayKey, originalKey: p.key, url: makePhotoUrl(displayKey) };
                             }),
                         }

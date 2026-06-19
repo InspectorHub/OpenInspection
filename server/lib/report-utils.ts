@@ -37,7 +37,7 @@ interface CustomDefectInput {
   included?: boolean;
   category?: string;
   location?: string | null;
-  photos?: Array<{ key: string; annotatedKey?: string }>;
+  photos?: Array<{ key: string; croppedKey?: string; annotatedKey?: string }>;
 }
 
 export interface ResolvedCustomDefect {
@@ -71,7 +71,7 @@ export function mapCustomDefectsForReport(
     effectiveCategory: d.category ?? 'recommendation',
     effectiveLocation: typeof d.location === 'string' && d.location.length > 0 ? d.location : null,
     defectPhotos: (d.photos ?? []).map((p) => {
-      const displayKey = p.annotatedKey || p.key;
+      const displayKey = p.annotatedKey || p.croppedKey || p.key;
       return { key: displayKey, originalKey: p.key, url: makePhotoUrl(displayKey) };
     }),
   }));

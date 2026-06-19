@@ -38,7 +38,7 @@ export function collectAttachedPhotos(
   const push = (itemId: string, sectionFallback: string | undefined, p: PhotoEntry | null, idx: number, defectId?: string) => {
     if (!p || typeof p.key !== 'string') return;
     const meta = itemMeta.get(itemId) ?? { itemLabel: itemId, sectionId: sectionFallback || 'unknown', sectionTitle: 'Unsectioned' };
-    const displayKey = p.annotatedKey || p.key;
+    const displayKey = p.annotatedKey || p.croppedKey || p.key;
     const attached: AttachedPhoto = {
       key: displayKey, originalKey: p.key, url: makeUrl(displayKey),
       itemId, itemLabel: meta.itemLabel, sectionId: meta.sectionId, sectionTitle: meta.sectionTitle,
