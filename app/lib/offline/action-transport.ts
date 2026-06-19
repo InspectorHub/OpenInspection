@@ -40,7 +40,7 @@
  *   file            = File([p.blob], p.name)
  */
 
-import type { QueuedWrite, QueuedPhoto } from './queue-storage';
+import type { QueuedWrite, QueuedPhoto, QueuedCrop } from './queue-storage';
 import type { ReplayTransport } from './offline-queue';
 import { preprocessImage } from '~/components/image-studio/preprocessImage';
 
@@ -65,6 +65,7 @@ export function createActionTransport(
     return {
         submitWrite: (w) => submitWrite(w, fetchImpl),
         submitPhoto: (p) => submitPhoto(p, fetchImpl),
+        submitCrop: (c) => submitCrop(c, fetchImpl),
     };
 }
 
@@ -138,6 +139,27 @@ async function submitPhoto(
         { method: 'POST', body, credentials: 'include' },
     );
 
+    return mapStatus(res);
+}
+
+// ── Crop derivative (Plan 4, offline-capable crop) ────────────────────────
+async function submitCrop(
+    c: QueuedCrop,
+    fetchImpl: typeof fetch,
+): Promise<{ ok: boolean; status: number }> {
+    const body = new FormData();
+    body.set('intent', 'replay-crop');
+    body.set('inspectionId', c.inspectionId);
+    body.set('itemId', c.itemId);
+    body.set('photoIndex', String(c.photoIndex));
+    body.set('crop', JSON.stringify(c.crop));
+    if (c.sectionId) body.set('sectionId', c.sectionId);
+    body.set('file', new File([c.blob], `${c.itemId}_${c.photoIndex}_crop.jpg`, { type: 'image/jpeg' }));
+
+    const res = await fetchImpl(
+        `/inspections/${c.inspectionId}/edit`,
+        { method: 'POST', body, credentials: 'include' },
+    );
     return mapStatus(res);
 }
 

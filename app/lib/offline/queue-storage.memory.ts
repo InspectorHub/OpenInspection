@@ -8,6 +8,7 @@
 
 import type {
     QueueEntry,
+    QueuedCrop,
     QueuedPhoto,
     QueuedWrite,
     QueueStorage,
@@ -56,6 +57,12 @@ export function createMemoryQueueStorage(): QueueStorage {
 
         async putPhoto(p) {
             const entry: QueuedPhoto = { ...p, seq: nextSeq++, kind: 'photo' };
+            entries.set(entry.seq, entry);
+            return entry;
+        },
+
+        async putCrop(p) {
+            const entry: QueuedCrop = { ...p, seq: nextSeq++, kind: 'crop' };
             entries.set(entry.seq, entry);
             return entry;
         },
