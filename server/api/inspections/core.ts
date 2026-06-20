@@ -1,41 +1,214 @@
-// Core inspection CRUD, property facts, results, ratings, wizard, presence sub-router.
-// Behavior-preserving extraction from inspections.ts — handler bodies are
-// byte-identical to the original (only the dynamic-import path depth changed).
-import {
-    Errors,
-    OBSERVER_COOKIE_NAME,
-    aggregateAttachedRecommendations,
-    aggregateRecommendationsRoute,
-    and,
-    applyResultsBatch,
-    auditFromContext,
-    autofillPropertyFactsRoute,
-    cloneInspectionRoute,
-    createApiRouter,
-    createFromWizardRoute,
-    createInspectionRoute,
-    deleteInspectionRoute,
-    drizzle,
-    eq,
-    getCookie,
-    getInspectionRoute,
-    getPropertyFactsRoute,
-    getResultsRoute,
-    inspectionInspectors,
-    inspectionResults,
-    inspectionTable,
-    patchItemFieldRoute,
-    preflightRoute,
-    requireRole,
-    resultsBatchRoute,
-    switchRatingSystemRoute,
-    syncInspectionAssignments,
-    updateInspectionRoute,
-    updatePropertyFactsRoute,
-    updateResultsRoute,
-    updateTemplateSnapshotRoute,
-    verifyObserverCookie,
-} from './_shared';
+// Core inspection CRUD + create/clone/wizard + offline-full + presence sub-router.
+// Behavior-preserving extraction from inspections.ts — handler bodies + route
+// definitions are byte-identical to the original (only their location changed).
+//
+// The per-inspection results/editing routes (property facts, results, rating
+// system, recommendations, item-field patch, preflight) live alongside in
+// ./results.ts to keep both files under the size ceiling.
+import { createRoute, z } from '@hono/zod-openapi';
+import { createApiRouter } from '../../lib/openapi-router';
+import { requireRole } from '../../lib/middleware/rbac';
+import { auditFromContext } from '../../lib/audit';
+import { Errors } from '../../lib/errors';
+import { getCookie } from 'hono/cookie';
+import { verifyObserverCookie } from '../../lib/observer-cookie';
+import { OBSERVER_COOKIE_NAME } from '../../lib/middleware/observer-cookie';
+import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
+import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
+import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
+import { drizzle } from 'drizzle-orm/d1';
+import { inspections as inspectionTable, inspectionResults, inspectionInspectors } from '../../lib/db/schema';
+import { syncInspectionAssignments } from '../../lib/db/assignment-links';
+import { eq, and } from 'drizzle-orm';
+import { withMcpMetadata } from '../../lib/route-metadata-standards';
+
+/**
+ * GET /api/inspections/:id
+ */
+export const getInspectionRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/{id}',
+    tags: ["inspections"],
+    summary: "Get inspection for current tenant",
+    description: 'Retrieve detailed information about a single inspection.',
+    request: {
+        params: z.object({
+            id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+    },
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({
+                        inspection: InspectionSchema.describe('TODO describe inspection field for the OpenInspection MCP integration'),
+                        template: z.unknown().openapi({ description: 'The associated template schema' }),
+                    })),
+                },
+            },
+            description: 'Success',
+        },
+        404: {
+            description: 'Inspection not found',
+        },
+    },
+    operationId: "getInspection"
+}, { scopes: ['read'], tier: 'primary' }));
+
+/**
+ * DELETE /api/inspections/:id
+ */
+export const deleteInspectionRoute = createRoute(withMcpMetadata({
+    method: 'delete',
+    path: '/{id}',
+    tags: ["inspections"],
+    summary: "Delete inspection for current tenant",
+    description: "Permanently remove an inspection record. (DELETE /{id}, inspections domain).",
+    request: {
+        params: z.object({
+            id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+    },
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                },
+            },
+            description: 'Success',
+        },
+    },
+    operationId: "deleteInspection"
+}, { scopes: ['write'], tier: 'primary' }));
+
+/**
+ * PATCH /api/inspections/:id
+ */
+export const updateInspectionRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/{id}',
+    tags: ["inspections"],
+    summary: "Patch inspection for current tenant",
+    description: "Partially update an inspection record. (PATCH /{id}, inspections domain).",
+    request: {
+        params: z.object({
+            id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+        }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: {
+            content: {
+                'application/json': {
+                    schema: UpdateInspectionSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                },
+            },
+        },
+    },
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    responses: {
+        200: {
+            content: {
+                'application/json': {
+                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                },
+            },
+            description: 'Success',
+        },
+        400: { description: 'coverPhotoId does not reference a photo of this inspection (DB-16)' },
+    },
+    operationId: "patchInspection"
+}, { scopes: ['write'], tier: 'primary' }));
+
+/**
+ * POST /api/inspections
+ */
+export const createInspectionRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/',
+    tags: ["inspections"],
+    summary: "Create inspection for current tenant",
+    description: "Initialize a new inspection for a property. (POST /, inspections domain).",
+    request: {
+        body: {
+            content: {
+                'application/json': {
+                    schema: CreateInspectionSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
+                },
+            },
+        },
+    },
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    responses: {
+        201: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({
+                        inspection: InspectionSchema.describe('TODO describe inspection field for the OpenInspection MCP integration'),
+                    })),
+                },
+            },
+            description: 'Created',
+        },
+    },
+    operationId: "createInspection"
+}, { scopes: ['write'], tier: 'primary' }));
+
+/**
+ * POST /api/inspections/:id/clone
+ */
+export const cloneInspectionRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/{id}/clone',
+    tags: ["inspections"],
+    summary: "Clone inspection for current tenant",
+    request: {
+        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+    },
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    responses: {
+        201: {
+            content: {
+                'application/json': {
+                    schema: createApiResponseSchema(z.object({ inspection: InspectionSchema.describe('TODO describe inspection field for the OpenInspection MCP integration') })),
+                },
+            },
+            description: 'Created',
+        },
+    },
+    operationId: "cloneInspection",
+    description: "Auto-generated placeholder for cloneInspection (POST /{id}/clone, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['write'], tier: 'extended' }));
+
+// -----------------------------------------------------------------------------
+// Design System 0520 subsystem B phase 5 task 5.3 — NewInspectionWizard create.
+// -----------------------------------------------------------------------------
+// Sibling endpoint to POST /api/inspections (the legacy single-step create).
+// 4-step wizard payload validated by CreateInspectionFromWizardSchema.
+// Returns the new inspection id so the wizard factory redirects to
+// /inspections/:id/edit on success.
+export const createFromWizardRoute = createRoute(withMcpMetadata({
+    method:     'post',
+    path:       '/wizard',
+    tags: ["inspections"],
+    summary:    'Create an inspection from the 4-step NewInspectionWizard',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        body: { content: { 'application/json': { schema: CreateInspectionFromWizardSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+    },
+    responses: {
+        200: {
+            description: 'Created',
+            content: { 'application/json': { schema: z.object({
+                success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
+                data:    z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
+            }) } },
+        },
+        400: { description: 'Validation error' },
+    },
+    operationId: "createInspectionWizard",
+    description: "Auto-generated placeholder for createInspectionWizard (POST /wizard, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['write'], tier: 'extended' }));
+
 
 const coreRoutes = createApiRouter()
     .openapi(getInspectionRoute, async (c) => {
@@ -116,90 +289,6 @@ const coreRoutes = createApiRouter()
             });
         }
         return c.json({ success: true }, 200);
-    })
-    .openapi(getPropertyFactsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const facts = await c.var.services.inspection.getPropertyFacts(id, tenantId);
-        return c.json({ success: true, data: facts }, 200);
-    })
-    .openapi(updatePropertyFactsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const body = c.req.valid('json');
-        const facts = await c.var.services.inspection.updatePropertyFacts(id, tenantId, body);
-        auditFromContext(c, 'inspection.property_facts.update', 'inspection', {
-            entityId: id,
-            metadata: { fields: Object.keys(body) },
-        });
-        return c.json({ success: true, data: facts }, 200);
-    })
-    .openapi(autofillPropertyFactsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        const { addressString } = c.req.valid('json');
-
-        // Tenant ownership guard — refuses cross-tenant lookups.
-        await c.var.services.inspection.getInspection(id, tenantId);
-
-        const result = await c.var.services.propertyLookup.lookup(addressString);
-        auditFromContext(c, 'inspection.property_facts.autofill', 'inspection', {
-            entityId: id,
-            metadata: { source: result.source ?? 'manual_required', reason: result.reason },
-        });
-
-        return c.json({
-            success: true as const,
-            data: {
-                facts:  result.data,
-                source: result.source ?? ('manual_required' as const),
-                ...(result.reason ? { reason: result.reason } : {}),
-            },
-        }, 200);
-    })
-    .openapi(getResultsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const db = drizzle(c.env.DB);
-        await c.var.services.inspection.getInspection(id, c.get('tenantId'));
-        const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
-        return c.json({ success: true, data: { results: (results?.data || {}) } }, 200);
-    })
-    .openapi(updateResultsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { data } = c.req.valid('json');
-        const service = c.var.services.inspection;
-        await service.updateResults(id, c.get('tenantId'), data);
-        return c.json({ success: true }, 200);
-    })
-    .openapi(updateTemplateSnapshotRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { snapshot } = c.req.valid('json');
-        await c.var.services.inspection.updateTemplateSnapshot(id, c.get('tenantId'), snapshot);
-        auditFromContext(c, 'inspection.template_snapshot.update', 'inspection', {
-            entityId: id,
-            metadata: { sectionCount: snapshot.sections?.length ?? 0 },
-        });
-        return c.json({ success: true }, 200);
-    })
-    .openapi(switchRatingSystemRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { ratingSystemId, mode } = c.req.valid('json');
-        const stats = await c.var.services.inspection.switchRatingSystem(id, c.get('tenantId'), ratingSystemId, mode);
-        auditFromContext(c, 'inspection.rating_system.switch', 'inspection', {
-            entityId: id,
-            metadata: { ratingSystemId, mode, ...stats },
-        });
-        return c.json({ success: true, data: stats }, 200);
-    })
-    .openapi(aggregateRecommendationsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId') as string;
-
-        const db = drizzle(c.env.DB);
-        const row = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId))).get();
-        const { items, totals } = aggregateAttachedRecommendations(row?.data as Record<string, unknown> | undefined);
-        return c.json({ success: true as const, data: { items, totals } }, 200);
     })
     .openapi(createInspectionRoute, async (c) => {
         const body = c.req.valid('json');
@@ -288,56 +377,6 @@ const coreRoutes = createApiRouter()
 
         const out = await c.var.services.inspection.createFromWizard(tenantId, userId, input);
         return c.json({ success: true as const, data: out }, 200);
-    })
-    .openapi(patchItemFieldRoute, async (c) => {
-        const { id, itemId } = c.req.valid('param');
-        const { field, value, expectedVersion, force, sectionId } = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const user     = c.get('user') as { sub?: string } | undefined;
-        const userId   = user?.sub;
-        if (!userId) throw Errors.Unauthorized('Missing user identity');
-
-        const out = await c.var.services.inspection.patchItem(
-            id, tenantId, itemId, field, value, expectedVersion, userId, { force: force ?? false }, sectionId,
-        );
-
-        if (out.kind === 'not_found') {
-            throw Errors.NotFound('Inspection not found');
-        }
-        if (out.kind === 'conflict') {
-            return c.json({ success: false as const, error: { code: 'CONFLICT', current: out.current, yours: out.yours } }, 409);
-        }
-        return c.json({ success: true as const, data: { kind: 'ok', newVersion: out.newVersion, by: out.by, at: out.at } }, 200);
-    })
-    .openapi(preflightRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
-        const out = await c.var.services.inspection.computePreflight(id, tenantId);
-        return c.json({ success: true as const, data: out }, 200);
-    })
-    .openapi(resultsBatchRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { patches } = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const user     = c.get('user') as { sub?: string } | undefined;
-        const userId   = user?.sub;
-        if (!userId) throw Errors.Unauthorized('Missing user identity');
-
-        // Ownership guard mirrors the single-field PATCH — 404 on tenant
-        // mismatch keeps the existence-enumeration leak closed.
-        try {
-            await c.var.services.inspection.getInspection(id, tenantId);
-        } catch {
-            throw Errors.NotFound('Inspection not found');
-        }
-
-        const db = drizzle(c.env.DB);
-        const data = await applyResultsBatch(db, id, patches, { tenantId, userId });
-        auditFromContext(c, 'inspection.results_batch_patched', 'inspection', {
-            entityId: id, metadata: { applied: data.applied, by: userId },
-        });
-        return c.json({ success: true as const, data }, 200);
     })
     // Typed-Hono dead-routes cleanup Task 12 — list persisted sync conflicts.
     .get('/:id/full', requireRole('owner', 'manager', 'inspector'), async (c) => {

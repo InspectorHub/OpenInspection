@@ -2,9 +2,11 @@
 //
 // This module is intentionally thin: the ~90 inspection routes were split into
 // focused sub-routers under `server/api/inspections/` (behavior-preserving — the
-// handler bodies are byte-identical to the original single-file router). Shared
-// route definitions, inline schemas, and dependency re-exports live in
-// `./inspections/_shared.ts`.
+// handler bodies + route definitions are byte-identical to the original
+// single-file router). Each route's `createRoute({...})` definition is
+// co-located with its `.openapi()` handler in the owning sub-router, and each
+// sub-router imports the dependencies it needs directly — there is no shared
+// barrel module.
 //
 // The sub-routers are mounted at `/` so the external path surface is IDENTICAL
 // to the original chain (every route path is absolute, e.g. `/dashboard`,
@@ -22,15 +24,23 @@ import templatesRoutes from './inspections/templates';
 import hierarchyRoutes from './inspections/hierarchy';
 import bulkRoutes from './inspections/bulk';
 import mediaRoutes from './inspections/media';
+import mediaStudioRoutes from './inspections/media-studio';
 import publishRoutes from './inspections/publish';
+import reportDeliveryRoutes from './inspections/report-delivery';
+import agreementsRoutes from './inspections/agreements';
 import coreRoutes from './inspections/core';
+import resultsRoutes from './inspections/results';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
     .route('/', templatesRoutes)
     .route('/', coreRoutes)
+    .route('/', resultsRoutes)
     .route('/', mediaRoutes)
+    .route('/', mediaStudioRoutes)
     .route('/', publishRoutes)
+    .route('/', reportDeliveryRoutes)
+    .route('/', agreementsRoutes)
     .route('/', hierarchyRoutes);
 
 export type InspectionsApi = typeof inspectionsRoutes;
