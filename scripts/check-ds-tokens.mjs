@@ -41,6 +41,9 @@ const FILE_ALLOWLIST = [
   // Media Studio react-konva annotator — same fixed-dark studio chrome as
   // PhotoStudio.tsx (its replacement); neutral on-dark styling is intentional.
   join("app", "components", "media-studio", "PhotoAnnotator.tsx"),
+  // Extracted from PhotoAnnotator.tsx — same fixed-dark studio chrome.
+  join("app", "components", "media-studio", "AnnotationToolbar.tsx"),
+  join("app", "components", "media-studio", "MeasureCalibration.tsx"),
 ];
 
 /** How many lines above a violation a `ds-allow` comment still excuses it. */

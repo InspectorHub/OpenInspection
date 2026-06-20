@@ -14,6 +14,12 @@ import DocumentsSection, {
   type DocumentCategory,
   type DocumentVisibility,
 } from "~/components/DocumentsSection";
+import { SendAgreementModal } from "~/components/inspection-hub/SendAgreementModal";
+import { RequestPaymentModal } from "~/components/inspection-hub/RequestPaymentModal";
+import { PublishReportModal } from "~/components/inspection-hub/PublishReportModal";
+import { CreateReinspectionModal } from "~/components/inspection-hub/CreateReinspectionModal";
+import { toActionResult } from "~/lib/inspection-hub-actions";
+import type { ReinspectCandidate } from "~/lib/inspection-hub-helpers";
 
 export function meta() {
   return [{ title: "Inspection - OpenInspection" }];
@@ -65,17 +71,6 @@ interface PeopleAgent {
   email: string | null;
   phone: string | null;
   agency: string | null;
-}
-
-/**
- * #119 Task 6 — a baseline report item the inspector can carry forward into a
- * re-inspection. `open` pre-checks the still-open flagged set in the modal.
- */
-interface ReinspectCandidate {
-  itemId: string;
-  label: string;
-  originalNotes: string | null;
-  open: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -186,45 +181,21 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         ...(email ? { email } : {}),
       },
     });
-    if (!res.ok) {
-      // Surface the API rejection (B-4: never unconditional ok:true).
-      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return {
-        ok: false,
-        intent: "send-agreement" as const,
-        error: err?.error?.message ?? "Could not send the agreement. Please try again.",
-      };
-    }
-    return { ok: true, intent: "send-agreement" as const, error: undefined };
+    // Surface the API rejection (B-4: never unconditional ok:true).
+    return toActionResult(res, "send-agreement", "Could not send the agreement. Please try again.");
   }
 
   if (intent === "request-payment") {
     const res = await api.invoices["request-payment"].$post({
       json: { inspectionId: id },
     });
-    if (!res.ok) {
-      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return {
-        ok: false,
-        intent: "request-payment" as const,
-        error: err?.error?.message ?? "Could not request payment. Please try again.",
-      };
-    }
-    return { ok: true, intent: "request-payment" as const, error: undefined };
+    return toActionResult(res, "request-payment", "Could not request payment. Please try again.");
   }
 
   if (intent === "attest-sms") {
     // Track L (E) — inspector attestation that the client agreed to receive texts.
     const res = await api.smsAdmin.sms.attest.$post({ json: { inspectionId: id } });
-    if (!res.ok) {
-      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return {
-        ok: false,
-        intent: "attest-sms" as const,
-        error: err?.error?.message ?? "Could not record consent. Please try again.",
-      };
-    }
-    return { ok: true, intent: "attest-sms" as const, error: undefined };
+    return toActionResult(res, "attest-sms", "Could not record consent. Please try again.");
   }
 
   if (intent === "publish") {
@@ -242,15 +213,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         requirePayment: formData.get("requirePayment") === "on",
       },
     });
-    if (!res.ok) {
-      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return {
-        ok: false,
-        intent: "publish" as const,
-        error: err?.error?.message ?? "Could not publish the report. Please try again.",
-      };
-    }
-    return { ok: true, intent: "publish" as const, error: undefined };
+    return toActionResult(res, "publish", "Could not publish the report. Please try again.");
   }
 
   if (intent === "submit") {
@@ -258,15 +221,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       submit: { $post: (args: { param: { id: string } }) => Promise<Response> };
     };
     const res = await submitApi.submit.$post({ param: { id } });
-    if (!res.ok) {
-      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return {
-        ok: false,
-        intent: "submit" as const,
-        error: err?.error?.message ?? "Could not submit the report. Please try again.",
-      };
-    }
-    return { ok: true, intent: "submit" as const, error: undefined };
+    return toActionResult(res, "submit", "Could not submit the report. Please try again.");
   }
 
   if (intent === "return") {
@@ -274,15 +229,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       return: { $post: (args: { param: { id: string } }) => Promise<Response> };
     };
     const res = await returnApi.return.$post({ param: { id } });
-    if (!res.ok) {
-      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return {
-        ok: false,
-        intent: "return" as const,
-        error: err?.error?.message ?? "Could not return the report. Please try again.",
-      };
-    }
-    return { ok: true, intent: "return" as const, error: undefined };
+    return toActionResult(res, "return", "Could not return the report. Please try again.");
   }
 
   if (intent === "unpublish") {
@@ -290,15 +237,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       unpublish: { $post: (args: { param: { id: string } }) => Promise<Response> };
     };
     const res = await unpublishApi.unpublish.$post({ param: { id } });
-    if (!res.ok) {
-      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return {
-        ok: false,
-        intent: "unpublish" as const,
-        error: err?.error?.message ?? "Could not unpublish the report. Please try again.",
-      };
-    }
-    return { ok: true, intent: "unpublish" as const, error: undefined };
+    return toActionResult(res, "unpublish", "Could not unpublish the report. Please try again.");
   }
 
   if (intent === "create-reinspection") {
@@ -970,190 +909,6 @@ export default function InspectionHubPage() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Send-agreement modal                                              */
-/* ------------------------------------------------------------------ */
-
-function SendAgreementModal({
-  agreements,
-  defaultEmail,
-  fetcher,
-  submitting,
-  error,
-  onClose,
-}: {
-  agreements: Array<{ id: string; name: string }>;
-  defaultEmail: string;
-  fetcher: ReturnType<typeof useFetcher<typeof action>>;
-  submitting: boolean;
-  error: string | undefined;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
-      <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-md flex flex-col">
-        <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
-          <h2 className="text-[14px] font-bold">Send agreement</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
-            aria-label="Close"
-          >
-            &#x2715;
-          </button>
-        </div>
-
-        <fetcher.Form method="post" className="flex flex-col">
-          <input type="hidden" name="intent" value="send-agreement" />
-          <div className="px-5 py-4 space-y-4">
-            <div>
-              <label htmlFor="agreement-email" className="block text-[12px] font-bold text-ih-fg-2 mb-1">
-                Client email
-              </label>
-              <input
-                id="agreement-email"
-                name="email"
-                type="email"
-                required
-                defaultValue={defaultEmail}
-                placeholder="client@example.com"
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:outline-none focus:ring-2 focus:ring-ih-primary"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="agreement-template" className="block text-[12px] font-bold text-ih-fg-2 mb-1">
-                Agreement
-              </label>
-              <select
-                id="agreement-template"
-                name="agreementId"
-                defaultValue={agreements[0]?.id ?? ""}
-                disabled={agreements.length === 0}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:outline-none focus:ring-2 focus:ring-ih-primary disabled:opacity-60"
-              >
-                {agreements.length === 0 ? (
-                  <option value="">No agreement template available</option>
-                ) : (
-                  agreements.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            {error && (
-              <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>
-            )}
-          </div>
-
-          <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || agreements.length === 0}
-              className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
-            >
-              {submitting ? "Sending…" : "Send agreement"}
-            </button>
-          </div>
-        </fetcher.Form>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Request-payment modal                                             */
-/* ------------------------------------------------------------------ */
-
-function RequestPaymentModal({
-  recipientEmail,
-  amountLabel,
-  resend,
-  fetcher,
-  submitting,
-  error,
-  onClose,
-}: {
-  recipientEmail: string;
-  amountLabel: string;
-  resend: boolean;
-  fetcher: ReturnType<typeof useFetcher<typeof action>>;
-  submitting: boolean;
-  error: string | undefined;
-  onClose: () => void;
-}) {
-  const title = resend ? "Resend payment request" : "Request payment";
-  const submitLabel = resend ? "Resend request" : "Send request";
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
-      <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-md flex flex-col">
-        <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
-          <h2 className="text-[14px] font-bold">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
-            aria-label="Close"
-          >
-            &#x2715;
-          </button>
-        </div>
-
-        <fetcher.Form method="post" className="flex flex-col">
-          <input type="hidden" name="intent" value="request-payment" />
-          <div className="px-5 py-4 space-y-4">
-            <div>
-              <p className="text-[12px] font-bold text-ih-fg-2 mb-1">Recipient</p>
-              <p className="text-[13px] text-ih-fg-1">
-                {recipientEmail || (
-                  <span className="text-ih-fg-4">No client email on this inspection</span>
-                )}
-              </p>
-            </div>
-
-            <div>
-              <p className="text-[12px] font-bold text-ih-fg-2 mb-1">Amount</p>
-              <p className="text-[18px] font-bold text-ih-fg-1 tabular-nums">{amountLabel}</p>
-            </div>
-
-            {error && (
-              <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>
-            )}
-          </div>
-
-          <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || !recipientEmail}
-              className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
-            >
-              {submitting ? "Sending…" : submitLabel}
-            </button>
-          </div>
-        </fetcher.Form>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
 /*  Client SMS consent status + attestation (Track L)                 */
 /* ------------------------------------------------------------------ */
 
@@ -1197,212 +952,6 @@ function ClientSmsConsent({
         </fetcher.Form>
       )}
       {error && <span className="text-ih-bad-fg">{error}</span>}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Publish-report modal                                              */
-/* ------------------------------------------------------------------ */
-
-function PublishReportModal({
-  agreementRequired,
-  paymentRequired,
-  fetcher,
-  submitting,
-  error,
-  onClose,
-}: {
-  agreementRequired: boolean;
-  paymentRequired: boolean;
-  fetcher: ReturnType<typeof useFetcher<typeof action>>;
-  submitting: boolean;
-  error: string | undefined;
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
-      <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-md flex flex-col">
-        <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
-          <h2 className="text-[14px] font-bold">Publish report</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
-            aria-label="Close"
-          >
-            &#x2715;
-          </button>
-        </div>
-
-        <fetcher.Form method="post" className="flex flex-col">
-          <input type="hidden" name="intent" value="publish" />
-          {/* No theme picker — rides the editor's effective default (server
-              'modern'); the action sends theme:"modern" explicitly. */}
-          <div className="px-5 py-4 space-y-3">
-            <ToggleRow
-              name="notifyClient"
-              label="Notify client by email"
-              defaultChecked
-            />
-            <ToggleRow name="notifyAgent" label="Notify agent" defaultChecked={false} />
-            <ToggleRow
-              name="requireSignature"
-              label="Require signature before viewing"
-              defaultChecked={agreementRequired}
-            />
-            <ToggleRow
-              name="requirePayment"
-              label="Require payment before viewing"
-              defaultChecked={paymentRequired}
-            />
-
-            {error && (
-              <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>
-            )}
-          </div>
-
-          <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
-            >
-              {submitting ? "Publishing…" : "Publish report"}
-            </button>
-          </div>
-        </fetcher.Form>
-      </div>
-    </div>
-  );
-}
-
-/** A labeled checkbox row for the publish modal toggles (DS tokens). */
-function ToggleRow({
-  name,
-  label,
-  defaultChecked,
-}: {
-  name: string;
-  label: string;
-  defaultChecked: boolean;
-}) {
-  return (
-    <label className="flex items-center gap-2.5 text-[13px] text-ih-fg-1 cursor-pointer">
-      <input
-        type="checkbox"
-        name={name}
-        defaultChecked={defaultChecked}
-        className="rounded border-ih-border text-ih-primary focus:ring-ih-primary"
-      />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Create-re-inspection modal (#119)                                 */
-/* ------------------------------------------------------------------ */
-
-function CreateReinspectionModal({
-  candidates,
-  fetcher,
-  submitting,
-  error,
-  onClose,
-}: {
-  candidates: ReinspectCandidate[];
-  fetcher: ReturnType<typeof useFetcher<typeof action>>;
-  submitting: boolean;
-  error: string | undefined;
-  onClose: () => void;
-}) {
-  const hasCandidates = candidates.length > 0;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
-      <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-md flex flex-col max-h-[85vh]">
-        <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
-          <h2 className="text-[14px] font-bold">Create re-inspection</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
-            aria-label="Close"
-          >
-            &#x2715;
-          </button>
-        </div>
-
-        <fetcher.Form method="post" className="flex flex-col min-h-0">
-          <input type="hidden" name="intent" value="create-reinspection" />
-          <div className="px-5 py-4 space-y-3 overflow-y-auto">
-            {hasCandidates ? (
-              <>
-                <p className="text-[12px] text-ih-fg-3">
-                  Choose which items to carry forward. Still-open flagged items are
-                  pre-selected.
-                </p>
-                <div className="divide-y divide-ih-border">
-                  {candidates.map((c) => (
-                    <label
-                      key={c.itemId}
-                      className="flex items-start gap-2.5 py-2 text-[13px] text-ih-fg-1 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        name="selectedItemIds"
-                        value={c.itemId}
-                        defaultChecked={c.open}
-                        className="mt-0.5 rounded border-ih-border text-ih-primary focus:ring-ih-primary"
-                      />
-                      <span className="min-w-0">
-                        <span className="font-medium block">{c.label}</span>
-                        {c.originalNotes && (
-                          <span className="text-[12px] text-ih-fg-3 block truncate">
-                            {c.originalNotes}
-                          </span>
-                        )}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="text-[13px] text-ih-fg-4">
-                This report has no items available to carry forward.
-              </p>
-            )}
-
-            {error && (
-              <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>
-            )}
-          </div>
-
-          <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting || !hasCandidates}
-              className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
-            >
-              {submitting ? "Creating…" : "Create re-inspection"}
-            </button>
-          </div>
-        </fetcher.Form>
-      </div>
     </div>
   );
 }

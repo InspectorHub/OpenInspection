@@ -10,136 +10,60 @@
  * The agent report (?view=agent) reuses the SAME standalone route, so it is
  * covered automatically by the wrapper — there is no separate agent component.
  *
+ * The presentational sub-blocks (media tile / defect card / signature /
+ * verification / repair panel) live colocated in ./report/*; the pure helpers
+ * live in ~/lib/report-helpers. This file composes them and owns the report's
+ * interactive state (filter, lightbox, repair selection, failed-photo Set).
+ *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { useState } from "react";
-import { photoDisplayName, withDownload } from "~/lib/photo-name";
-import { brandTokens, type TenantBrand } from "~/lib/brand";
+import { brandTokens } from "~/lib/brand";
 import { ErrorState } from "~/components/ErrorState";
-import { qrToSvg } from "../../../../server/lib/qr";
-import type { ReportMedia } from "../../../../server/lib/report-video";
-
-/** Plan 7 — a report photo object may carry a resolved media kind (video). */
-type ReportPhoto = { key: string; url: string; media?: ReportMedia };
-
-/* ------------------------------------------------------------------ */
-/* Types (shared with the report loader) */
-/* ------------------------------------------------------------------ */
-
-export interface ResolvedDefect {
-  id: string;
-  title: string;
-  included: boolean;
-  isCustom?: boolean;
-  effectiveComment: string;
-  effectiveCategory?: string;
-  effectiveLocation?: string | null;
-  defectPhotos?: ReportPhoto[];
-}
-
-export interface ReportItem {
-  id: string;
-  label: string;
-  type?: string;
-  rating: string | null;
-  ratingColor: string;
-  ratingLabel: string | null;
-  severityBucket: string;
-  notes: string | null;
-  photos: ReportPhoto[];
-  recommendation?: string | null;
-  estimateMin?: number | null;
-  estimateMax?: number | null;
-  /** Task 8 — attached repair items snapshotted on this finding (dollars). */
-  repairItems?: {
-    summary: string;
-    estimateMin: number | null;
-    estimateMax: number | null;
-    contractorType: string | null;
-  }[];
-  value?: unknown;
-  unit?: string | null;
-  /** FE-3/B-20 — resolved canned + custom defects (server emits both). */
-  resolvedTabs?: {
-    defects?: ResolvedDefect[];
-  };
-}
-
-export interface ReportSection {
-  id: string;
-  title: string;
-  icon?: string | null;
-  defectCount: number;
-  items: ReportItem[];
-  disclaimerText?: string | null;
-  alwaysPageBreak?: boolean;
-}
-
-export type FilterKey = "all" | "defects" | "summary";
+import { getSectionIcon, isDefect } from "~/lib/report-helpers";
+import { ReportMediaTile } from "./report/ReportMediaTile";
+import { ReportDefectCard } from "./report/ReportDefectCard";
+import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
+import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
+import { ReportRepairPanel } from "./report/ReportRepairPanel";
+import {
+  PRINT_CARD_CLASS,
+  PRINT_SECTION_HEADING_CLASS,
+  ITEM_PHOTO_GRID_CLASS,
+  type ReportPhoto,
+  type FilterKey,
+  type ReportLoaderResult,
+} from "./report/types";
 
 /* ------------------------------------------------------------------ */
-/* Print layout constants (exported for tests + re-exported via the    */
-/* standalone route). PRINT-ONLY — on-screen rendering is unchanged.   */
+/* Re-exports — keep ReportView's public type/constant/helper surface  */
+/* identical after the structural split (route + tests import these).  */
 /* ------------------------------------------------------------------ */
 
-/** Inspection-item / defect / stats cards: never split a card across pages. */
-export const PRINT_CARD_CLASS = "print:break-inside-avoid";
-/** Photo cells: never split a photo across a page boundary. */
-export const PRINT_FIGURE_CLASS = "print:break-inside-avoid";
-/** Section headings: keep a heading glued to the content that follows. */
-export const PRINT_SECTION_HEADING_CLASS = "print:break-after-avoid";
-/** Defect photo grid (screen 3/4-col) collapses to a dense 3-col in print. */
-export const DEFECT_PHOTO_GRID_CLASS =
-  "grid grid-cols-3 sm:grid-cols-4 print:grid-cols-3 gap-1.5";
-/** Item photo grid (screen 2/3-col) collapses to a dense 3-col in print. */
-export const ITEM_PHOTO_GRID_CLASS =
-  "grid grid-cols-2 sm:grid-cols-3 print:grid-cols-3 gap-2";
-/** CF Images thumbnail width: smaller in print to keep the PDF lean. */
-export const printThumbWidth = (isPrint: boolean): number => (isPrint ? 480 : 800);
-
-export interface ReportSignature {
-  signatureBase64: string | null;
-  signedAt: number | null; // epoch ms
-  inspectorName: string;
-  inspectorLicense: string | null;
-}
-
-export interface ReportVerification {
-  versionNumber: number;
-  contentHash: string;
-  verifyToken: string;
-  publishedAt: number; // unix seconds
-}
-
-/**
- * The report loader payload shape. Kept here (exported) so both the standalone
- * route and the portal route can type their loaders against it and feed it to
- * `reportViewProps()`.
- */
-export interface ReportLoaderResult {
-  inspectionId: string;
-  address: string;
-  date: string;
-  inspectorName: string | null;
-  coverPhotoUrl: string | null;
-  stats: { total: number; satisfactory: number; monitor: number; defect: number };
-  sections: ReportSection[];
-  showEstimates: boolean;
-  enableRepairList: boolean;
-  enableCustomerRepairExport: boolean;
-  isDelivered: boolean;
-  brand: TenantBrand;
-  error: string | null;
-  notPublished: boolean;
-  reportTheme?: string;
-  initialFilter: FilterKey;
-  printMode: boolean;
-  isPublished: boolean;
-  signature: ReportSignature | null;
-  verification: ReportVerification | null;
-  ownerPreview: boolean;
-  baseUrl: string;
-}
+export type {
+  ReportPhoto,
+  ResolvedDefect,
+  ReportItem,
+  ReportSection,
+  FilterKey,
+  ReportSignature,
+  ReportVerification,
+  ReportLoaderResult,
+} from "./report/types";
+export {
+  PRINT_CARD_CLASS,
+  PRINT_FIGURE_CLASS,
+  PRINT_SECTION_HEADING_CLASS,
+  DEFECT_PHOTO_GRID_CLASS,
+  ITEM_PHOTO_GRID_CLASS,
+  printThumbWidth,
+} from "./report/types";
+export {
+  signatureBlockModel,
+  verificationBlockModel,
+  type SignatureBlockResult,
+  type VerificationBlockResult,
+} from "~/lib/report-helpers";
 
 /* ------------------------------------------------------------------ */
 /* Component props + pure adapter */
@@ -209,118 +133,6 @@ export function reportViewProps(
 }
 
 /* ------------------------------------------------------------------ */
-/* Section icon mapping */
-/* ------------------------------------------------------------------ */
-
-const SECTION_ICONS: Record<string, string> = {
-  roof: "🏠",
-  exterior: "🏗️",
-  electrical: "⚡",
-  plumbing: "🔧",
-  hvac: "❄️",
-  interior: "🛋️",
-  structural: "🏛️",
-  appliances: "🔌",
-};
-
-function getSectionIcon(title: string): string {
-  const key = title.toLowerCase().replace(/[^a-z]/g, "");
-  for (const [k, v] of Object.entries(SECTION_ICONS)) {
-    if (key.includes(k)) return v;
-  }
-  return "📋";
-}
-
-/* ------------------------------------------------------------------ */
-/* Filter helpers */
-/* ------------------------------------------------------------------ */
-
-function isDefect(bucket: string): boolean {
-  return /defect|safety|major/i.test(bucket);
-}
-
-/* ------------------------------------------------------------------ */
-/* Signature + verification pure helpers (exported for tests) */
-/* ------------------------------------------------------------------ */
-
-export interface SignatureBlockResult {
-  variant: "image" | "typed" | "draft";
-  inspectorName?: string;
-  license?: string | null;
-  signedAt?: number | null;
-  signatureBase64?: string | null;
-  showNudge: boolean;
-}
-
-export function signatureBlockModel(d: {
-  isPublished: boolean;
-  signature: {
-    signatureBase64: string | null;
-    signedAt?: number | null;
-    inspectorName: string;
-    inspectorLicense?: string | null;
-  } | null;
-  ownerPreview: boolean;
-}): SignatureBlockResult {
-  if (!d.isPublished || !d.signature) return { variant: "draft", showNudge: false };
-  const base = {
-    inspectorName: d.signature.inspectorName,
-    license: d.signature.inspectorLicense ?? null,
-    signedAt: d.signature.signedAt ?? null,
-  };
-  if (d.signature.signatureBase64) {
-    return { variant: "image", signatureBase64: d.signature.signatureBase64, showNudge: false, ...base };
-  }
-  return { variant: "typed", showNudge: d.ownerPreview, ...base };
-}
-
-export interface VerificationBlockResult {
-  show: boolean;
-  verifyUrl: string;
-  shortHash: string;
-  versionNumber: number;
-  publishedAt: number;
-}
-
-export function verificationBlockModel(
-  d: {
-    verification: {
-      versionNumber: number;
-      contentHash: string;
-      verifyToken: string;
-      publishedAt: number;
-    } | null;
-  },
-  baseUrl: string,
-): VerificationBlockResult {
-  if (!d.verification) return { show: false, verifyUrl: "", shortHash: "", versionNumber: 0, publishedAt: 0 };
-  return {
-    show: true,
-    verifyUrl: `${baseUrl}/v/${d.verification.verifyToken}`,
-    shortHash: d.verification.contentHash.slice(0, 8),
-    versionNumber: d.verification.versionNumber,
-    publishedAt: d.verification.publishedAt,
-  };
-}
-
-/* ------------------------------------------------------------------ */
-/* Date formatting helpers for signature/verification blocks */
-/* ------------------------------------------------------------------ */
-
-function formatEpochMs(ms: number | null | undefined): string {
-  if (ms == null) return "";
-  const d = new Date(ms);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-function formatUnixSeconds(sec: number): string {
-  const d = new Date(sec * 1000);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
-
-/* ------------------------------------------------------------------ */
 /* Image fallbacks (Plan 1 / N1)                                       */
 /* ------------------------------------------------------------------ */
 
@@ -374,76 +186,21 @@ export function ReportView(props: ReportViewProps) {
       return next;
     });
 
-  // Plan 7 — render one media tile (photo OR video). When the server resolved a
-  // video kind, branch: web report → lazy Stream <iframe> at a fixed 16/9 aspect
-  // (no CLS); PDF render path → poster <img> + QR + "Watch the walk-through"
-  // link. Photo / legacy / no-subdomain fall through to the existing <img> with
-  // its onError/failedPhotos/aspect-[4/3]/alt hardening intact.
-  const renderMediaTile = (photo: ReportPhoto, alt: string, idx: number) => {
-    const m = photo.media;
-    const name = photoDisplayName(photo.key);
-
-    if (m && m.kind === "video-player") {
-      return (
-        <div key={`v-${m.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
-          <iframe
-            src={m.playerSrc}
-            title={alt}
-            loading="lazy"
-            allow="accelerated-2d-canvas; fullscreen; encrypted-media; picture-in-picture"
-            allowFullScreen
-            className="absolute inset-0 h-full w-full border-0"
-          />
-        </div>
-      );
-    }
-
-    if (m && m.kind === "video-poster") {
-      // PDF cannot embed a player → poster frame + QR + deep link.
-      const qr = qrToSvg(m.playerLinkUrl);
-      return (
-        <div key={`vp-${m.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
-          <img src={m.posterUrl} alt={alt} title={name} className="h-full w-full object-cover" loading="eager" />
-          <span
-            className="absolute bottom-1 right-1 h-12 w-12 rounded bg-ih-bg-card p-0.5"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: server-generated SVG from qrToSvg — no user input
-            dangerouslySetInnerHTML={{ __html: qr }}
-            aria-hidden="true"
-          />
-          <a
-            href={m.playerLinkUrl}
-            className="absolute inset-x-0 bottom-0 bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white"
-          >
-            ▶ Watch the walk-through
-          </a>
-        </div>
-      );
-    }
-
-    // Image branch (photo / legacy / fail-closed video) — unchanged hardening.
-    return (
-      <div key={photo.key} className={`group relative aspect-[4/3] overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
-        <img
-          src={`${photo.url}&w=${printThumbWidth(data.printMode)}`}
-          alt={alt}
-          title={name}
-          className="w-full h-full object-cover cursor-pointer"
-          loading={data.printMode ? "eager" : "lazy"}
-          onClick={() => setLightboxUrl(photo.url)}
-          onError={() => markPhotoFailed(photo.key)}
-        />
-        <a
-          href={withDownload(photo.url)}
-          download={name}
-          title={`Download ${name}`}
-          onClick={(e) => e.stopPropagation()}
-          className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
-        >
-          ↓
-        </a>
-      </div>
-    );
-  };
+  // Plan 7 — render one media tile (photo OR video) through <ReportMediaTile>.
+  // The web report → lazy Stream <iframe>; PDF render path → poster <img> + QR;
+  // photo / legacy / no-subdomain fall through to the existing <img> with its
+  // onError/failedPhotos/aspect-[4/3]/alt hardening intact.
+  const renderMediaTile = (photo: ReportPhoto, alt: string, idx: number) => (
+    <ReportMediaTile
+      key={photo.media?.kind === "video-player" ? `v-${photo.media.streamUid}-${idx}` : photo.media?.kind === "video-poster" ? `vp-${photo.media.streamUid}-${idx}` : photo.key}
+      photo={photo}
+      alt={alt}
+      idx={idx}
+      printMode={data.printMode}
+      onOpenLightbox={setLightboxUrl}
+      onPhotoFailed={markPhotoFailed}
+    />
+  );
 
   /** A media entry is "visible" when it is a video OR a photo whose thumb hasn't failed. */
   const mediaVisible = (p: ReportPhoto) => p.media?.kind === "video-player" || p.media?.kind === "video-poster" || !failedPhotos.has(p.key);
@@ -747,55 +504,7 @@ export function ReportView(props: ReportViewProps) {
                         {/* FE-3/B-20 — findings: included canned + custom defects with their
                         own photos. Previously the viewer rendered neither (field-authored
                         defects never appeared in the published report at all). */}
-                        {(item.resolvedTabs?.defects ?? []).filter((d) => d.included).length > 0 && (
-                          <div className="mt-3 space-y-2">
-                            {(item.resolvedTabs?.defects ?? [])
-                              .filter((d) => d.included)
-                              .map((d) => (
-                                <div
-                                  key={d.id}
-                                  className={`rounded-md border border-ih-border bg-ih-bg-app/60 px-3 py-2 ${PRINT_CARD_CLASS}`}
-                                >
-                                  <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[13px] font-bold text-ih-fg-1">{d.title}</span>
-                                    {d.effectiveCategory && (
-                                      <span
-                                        className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
-                                          d.effectiveCategory === "safety"
-                                            ? "bg-ih-bad-bg text-ih-bad-fg"
-                                            : d.effectiveCategory === "recommendation"
-                                            ? "bg-ih-watch-bg text-ih-watch-fg"
-                                            : "bg-ih-bg-muted text-ih-fg-2"
-                                        }`}
-                                      >
-                                        {d.effectiveCategory}
-                                      </span>
-                                    )}
-                                    {d.isCustom && (
-                                      <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary">
-                                        inspector-added
-                                      </span>
-                                    )}
-                                    {d.effectiveLocation && (
-                                      <span className="text-[11px] text-ih-fg-4">@ {d.effectiveLocation}</span>
-                                    )}
-                                  </div>
-                                  {d.effectiveComment && (
-                                    <p className="text-[13px] text-ih-fg-3 mt-1 leading-relaxed">
-                                      {d.effectiveComment}
-                                    </p>
-                                  )}
-                                  {(d.defectPhotos ?? []).filter(mediaVisible).length > 0 && (
-                                    <div className={`mt-2 ${DEFECT_PHOTO_GRID_CLASS}`}>
-                                      {(d.defectPhotos ?? [])
-                                        .filter(mediaVisible)
-                                        .map((photo, idx) => renderMediaTile(photo, `${d.title} — photo ${idx + 1}`, idx))}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                          </div>
-                        )}
+                        <ReportDefectCard item={item} mediaVisible={mediaVisible} renderMediaTile={renderMediaTile} />
 
                         {item.recommendation && (
                           <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -893,181 +602,18 @@ export function ReportView(props: ReportViewProps) {
       </div>
 
       {/* ── Signature block ──────────────────────────────────────────── */}
-      {(() => {
-        const sig = signatureBlockModel({ isPublished: data.isPublished, signature: data.signature, ownerPreview: data.ownerPreview });
-        if (sig.variant === "draft") {
-          return (
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-8 mb-4">
-              <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-muted flex items-center gap-3">
-                <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md bg-ih-watch-bg text-ih-watch-fg">DRAFT</span>
-                <span className="text-sm text-ih-fg-3">This report is unsigned and has not been published.</span>
-              </div>
-            </div>
-          );
-        }
-        return (
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 mt-8 mb-4">
-            <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-card">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-4">
-                Inspected &amp; Signed By
-              </div>
-              <div className="flex flex-col sm:flex-row items-start sm:items-end gap-4">
-                {sig.variant === "image" && sig.signatureBase64 && (
-                  <img
-                    src={sig.signatureBase64}
-                    alt="Inspector signature"
-                    className="h-16 object-contain border border-ih-border rounded bg-ih-bg-card p-1"
-                  />
-                )}
-                {sig.variant === "typed" && (
-                  <div className="font-serif italic text-2xl text-ih-fg-1 border-b border-ih-border pb-1 min-w-[160px]">
-                    {sig.inspectorName}
-                  </div>
-                )}
-                <div className="text-sm text-ih-fg-2 space-y-0.5">
-                  <div className="font-semibold text-ih-fg-1">{sig.inspectorName}</div>
-                  {sig.license && (
-                    <div className="text-ih-fg-4 text-xs">License #{sig.license}</div>
-                  )}
-                  {sig.signedAt != null && (
-                    <div className="text-ih-fg-4 text-xs">Signed {formatEpochMs(sig.signedAt)}</div>
-                  )}
-                  {sig.variant === "typed" && (
-                    <div className="text-[10px] text-ih-fg-4">Electronically signed by {sig.inspectorName}</div>
-                  )}
-                </div>
-              </div>
-              {sig.showNudge && (
-                <div className="print:hidden mt-4 text-xs text-ih-fg-4 border-t border-ih-border pt-3">
-                  Upload your signature in <strong>Settings → Profile</strong> to show it on printed reports.
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })()}
+      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} />
 
       {/* ── Verification block ───────────────────────────────────────── */}
-      {(() => {
-        const vb = verificationBlockModel({ verification: data.verification }, data.baseUrl);
-        if (!vb.show) return null;
-        let qrSvg: string | null = null;
-        try {
-          qrSvg = qrToSvg(vb.verifyUrl, { margin: 1, width: 120 });
-        } catch {
-          qrSvg = null;
-        }
-        return (
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-8">
-            <div className="border border-ih-border rounded-xl p-6 bg-ih-bg-card">
-              <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-4">
-                Verified Document
-              </div>
-              <div className="flex flex-col sm:flex-row items-start gap-6">
-                {qrSvg && (
-                  <div
-                    className="shrink-0 border border-ih-border rounded-lg overflow-hidden"
-                    // biome-ignore lint/security/noDangerouslySetInnerHtml: server-generated SVG from qrToSvg — no user input
-                    dangerouslySetInnerHTML={{ __html: qrSvg }}
-                  />
-                )}
-                <div className="text-sm space-y-1.5">
-                  <div className="font-semibold text-ih-fg-1">
-                    Published &amp; signed — version v{vb.versionNumber}
-                    <span className="text-ih-fg-4 font-normal"> · {formatUnixSeconds(vb.publishedAt)}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mr-2">Verify at</span>
-                    <a
-                      href={vb.verifyUrl}
-                      className="text-ih-primary underline text-xs break-all"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {vb.verifyUrl}
-                    </a>
-                  </div>
-                  <div className="text-xs text-ih-fg-4 font-mono">
-                    Integrity hash: {vb.shortHash}&hellip;
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      <ReportVerificationBlock verification={data.verification} baseUrl={data.baseUrl} />
 
       {/* Repair Request Panel */}
       {repairPanel && (
-        <div className="print:hidden fixed bottom-0 left-0 right-0 z-50 bg-ih-bg-card border-t border-ih-border max-h-[60vh] overflow-y-auto rounded-t-xl">
-          <div className="max-w-4xl mx-auto p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-ih-fg-1">
-                Repair Request
-              </h3>
-              <button
-                type="button"
-                onClick={() => setRepairPanel(false)}
-                className="text-ih-fg-4 hover:text-ih-fg-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            {selectedRepairList.length === 0 ? (
-              <div className="text-center py-8 text-ih-fg-4">
-                No items selected. Check "Add to repair request" on defect cards above.
-              </div>
-            ) : (
-              <>
-                {selectedRepairList.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between py-2 border-b border-ih-border"
-                  >
-                    <div>
-                      <span className="font-medium text-sm text-ih-fg-1">
-                        {item.label}
-                      </span>
-                      {item.recommendation && (
-                        <span className="text-xs text-ih-fg-4 ml-2">
-                          -- {item.recommendation}
-                        </span>
-                      )}
-                    </div>
-                    {data.showEstimates &&
-                      (item.estimateMin || item.estimateMax) && (
-                        <span className="text-xs font-mono text-ih-fg-4">
-                          ${item.estimateMin || "?"} - ${item.estimateMax || "?"}
-                        </span>
-                      )}
-                  </div>
-                ))}
-                <div className="mt-4 flex items-center justify-between">
-                  <div className="text-sm font-semibold text-ih-fg-1">
-                    {selectedRepairList.length} items
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => window.print()}
-                      className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3"
-                    >
-                      Export PDF
-                    </button>
-                    <button
-                      type="button"
-                      className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg"
-                    >
-                      Send to Inspector
-                    </button>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+        <ReportRepairPanel
+          selectedRepairList={selectedRepairList}
+          showEstimates={data.showEstimates}
+          onClose={() => setRepairPanel(false)}
+        />
       )}
 
       {/* Lightbox */}

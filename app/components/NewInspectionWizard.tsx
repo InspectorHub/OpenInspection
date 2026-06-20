@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFetcher } from "react-router";
-import { buildWizardSteps, todayLocalISO, formatPriceCents, type WizardStepId } from "~/lib/wizard-steps";
-import { getEffectivePriceCents } from "~/lib/effective-price";
+import { buildWizardSteps, todayLocalISO, type WizardStepId } from "~/lib/wizard-steps";
+import { PropertyStep } from "./new-inspection/PropertyStep";
+import { PeopleStep } from "./new-inspection/PeopleStep";
+import { ServicesStep } from "./new-inspection/ServicesStep";
+import { ScheduleStep } from "./new-inspection/ScheduleStep";
+import { TeamStep } from "./new-inspection/TeamStep";
 
 const STEP_LABELS: Record<WizardStepId, string> = {
   property: "Property",
@@ -10,12 +14,6 @@ const STEP_LABELS: Record<WizardStepId, string> = {
   schedule: "Schedule",
   team: "Team",
 };
-
-const PROPERTY_TYPES = [
-  { value: "single_family", label: "Single Family" },
-  { value: "multi_unit", label: "Multi-Unit" },
-  { value: "commercial", label: "Commercial" },
-] as const;
 
 export interface WizardTemplate {
   id: string;
@@ -35,7 +33,7 @@ export interface WizardTeamMember {
 }
 
 /** Agent row returned by the search-agents action intent. */
-interface AgentResult {
+export interface AgentResult {
   id: string;
   name: string;
   email: string | null;
@@ -342,351 +340,77 @@ export function NewInspectionWizard({
         {/* Body */}
         <div className="px-6 py-5 min-h-[220px]">
           {step === "property" && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Property Type</label>
-                <div className="flex gap-2">
-                  {PROPERTY_TYPES.map((pt) => (
-                    <button key={pt.value} onClick={() => setPropertyType(pt.value)}
-                      className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${propertyType === pt.value ? "border-ih-primary bg-ih-primary-tint text-ih-primary" : "border-ih-border text-ih-fg-3"}`}
-                    >{pt.label}</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Address</label>
-                <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="123 Main St, City, State" className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
-              </div>
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Template</label>
-                {templates.length === 0 ? (
-                  <p className="text-[12px] text-ih-fg-4 px-1 py-2">
-                    No templates yet — create one under Templates first.
-                  </p>
-                ) : (
-                  <>
-                    {templates.length > 6 && (
-                      <input
-                        value={templateQuery}
-                        onChange={(e) => setTemplateQuery(e.target.value)}
-                        placeholder="Type to filter templates…"
-                        className="w-full h-9 px-3 mb-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
-                      />
-                    )}
-                    <select
-                      value={templateId}
-                      onChange={(e) => setTemplateId(e.target.value)}
-                      className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none"
-                    >
-                      <option value="">Select a template…</option>
-                      {filteredTemplates.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.name}
-                          {typeof t.itemCount === "number" ? ` (${t.itemCount} item${t.itemCount === 1 ? "" : "s"})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                    {templateQuery && filteredTemplates.length === 0 && (
-                      <p className="text-[12px] text-ih-fg-4 mt-1">No templates match “{templateQuery}”.</p>
-                    )}
-                    {selectedTemplate && (
-                      <p className="text-[12px] text-ih-fg-4 mt-1">
-                        Selected: {selectedTemplate.name}
-                      </p>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
+            <PropertyStep
+              propertyType={propertyType}
+              setPropertyType={setPropertyType}
+              address={address}
+              setAddress={setAddress}
+              templates={templates}
+              templateId={templateId}
+              setTemplateId={setTemplateId}
+              templateQuery={templateQuery}
+              setTemplateQuery={setTemplateQuery}
+              filteredTemplates={filteredTemplates}
+              selectedTemplate={selectedTemplate}
+            />
           )}
 
           {step === "people" && (
-            <div className="space-y-5">
-              {/* CLIENT section */}
-              <div className="space-y-3">
-                <p className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-wide">Client</p>
-                <div>
-                  <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Name</label>
-                  <input
-                    value={clientName}
-                    onChange={(e) => setClientName(e.target.value)}
-                    placeholder="Client full name"
-                    className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
-                  />
-                  {clientNameMissing && (
-                    <p className="text-[12px] text-ih-danger mt-1">Name is required when adding a client.</p>
-                  )}
-                  {!clientNameMissing && clientName.trim().length > 0 && clientEmail.trim().length === 0 && (
-                    <p className="text-[12px] text-ih-fg-4 mt-1">Without an email you can&apos;t send the agreement or report later.</p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Email</label>
-                  <input
-                    type="email"
-                    value={clientEmail}
-                    onChange={(e) => setClientEmail(e.target.value)}
-                    placeholder="client@example.com"
-                    className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Phone</label>
-                  <input
-                    type="tel"
-                    value={clientPhone}
-                    onChange={(e) => setClientPhone(e.target.value)}
-                    placeholder="(555) 123-4567"
-                    className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
-                  />
-                </div>
-              </div>
-
-              {/* AGENT section */}
-              <div className="space-y-3">
-                <p className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-wide">Agent</p>
-
-                {selectedAgent ? (
-                  /* Chip for the selected agent */
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-ih-primary bg-ih-primary-tint">
-                    <span className="flex-1 text-[13px] font-medium text-ih-primary">
-                      {selectedAgent.name}
-                      {selectedAgent.email ? <span className="ml-1 text-ih-fg-4 font-normal text-[12px]">({selectedAgent.email})</span> : null}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={clearAgent}
-                      className="text-ih-fg-4 hover:text-ih-fg-2 text-base leading-none"
-                      aria-label="Remove selected agent"
-                    >&times;</button>
-                  </div>
-                ) : newAgentMode ? (
-                  /* Inline new-agent form */
-                  <div className="space-y-3 p-3 rounded-md border border-ih-border bg-ih-bg-muted">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-[12px] font-bold text-ih-fg-3">New Agent</p>
-                      <button
-                        type="button"
-                        onClick={() => setNewAgentMode(false)}
-                        className="text-[12px] text-ih-fg-4 hover:text-ih-fg-2"
-                      >Cancel</button>
-                    </div>
-                    <div>
-                      <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Name</label>
-                      <input
-                        value={newAgentName}
-                        onChange={(e) => setNewAgentName(e.target.value)}
-                        placeholder="Agent full name"
-                        className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Email</label>
-                      <input
-                        type="email"
-                        value={newAgentEmail}
-                        onChange={(e) => setNewAgentEmail(e.target.value)}
-                        placeholder="agent@realty.com"
-                        className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
-                      />
-                    </div>
-                  </div>
-                ) : (
-                  /* Typeahead search */
-                  <div className="relative">
-                    <input
-                      value={agentSearch}
-                      onChange={(e) => handleAgentSearchChange(e.target.value)}
-                      onBlur={() => {
-                        // Small delay so click on dropdown item fires first.
-                        setTimeout(() => setAgentDropdownOpen(false), 150);
-                      }}
-                      placeholder="Search agents…"
-                      className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
-                    />
-                    {agentDropdownOpen && (
-                      <div className="absolute z-10 w-full mt-1 rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover overflow-hidden">
-                        {agentFetcher.state === "submitting" || agentFetcher.state === "loading" ? (
-                          <p className="px-3 py-2 text-[12px] text-ih-fg-4">Searching…</p>
-                        ) : agentFetcher.data?.agents && agentFetcher.data.agents.length > 0 ? (
-                          agentFetcher.data.agents.map((a) => (
-                            <button
-                              key={a.id}
-                              type="button"
-                              onMouseDown={() => selectAgent(a)}
-                              className="w-full text-left px-3 py-2 text-[13px] hover:bg-ih-bg-muted border-b border-ih-border last:border-b-0"
-                            >
-                              <span className="font-medium">{a.name}</span>
-                              {a.email ? <span className="ml-2 text-ih-fg-4 text-[12px]">{a.email}</span> : null}
-                            </button>
-                          ))
-                        ) : agentFetcher.data ? (
-                          <p className="px-3 py-2 text-[12px] text-ih-fg-4">No agents found.</p>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {!selectedAgent && !newAgentMode && (
-                  <button
-                    type="button"
-                    onClick={enableNewAgentMode}
-                    className="text-[12px] font-medium text-ih-primary hover:underline"
-                  >+ New agent</button>
-                )}
-              </div>
-            </div>
+            <PeopleStep
+              clientName={clientName}
+              setClientName={setClientName}
+              clientEmail={clientEmail}
+              setClientEmail={setClientEmail}
+              clientPhone={clientPhone}
+              setClientPhone={setClientPhone}
+              clientNameMissing={clientNameMissing}
+              selectedAgent={selectedAgent}
+              newAgentMode={newAgentMode}
+              setNewAgentMode={setNewAgentMode}
+              newAgentName={newAgentName}
+              setNewAgentName={setNewAgentName}
+              newAgentEmail={newAgentEmail}
+              setNewAgentEmail={setNewAgentEmail}
+              agentSearch={agentSearch}
+              agentDropdownOpen={agentDropdownOpen}
+              setAgentDropdownOpen={setAgentDropdownOpen}
+              agentFetcher={agentFetcher}
+              handleAgentSearchChange={handleAgentSearchChange}
+              selectAgent={selectAgent}
+              clearAgent={clearAgent}
+              enableNewAgentMode={enableNewAgentMode}
+            />
           )}
 
           {step === "services" && (
-            <div className="space-y-2">
-              <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Select Services</label>
-              <div className="space-y-1.5">
-                {serviceCatalog.map((s) => {
-                  const selected = services.has(s.id);
-                  const catalogCents = typeof s.price === "number" && s.price > 0 ? s.price : null;
-                  const overrideCents = priceOverrides.get(s.id);
-                  // Display value for the price input: override dollars, or catalog dollars, or empty.
-                  const priceInputDefault =
-                    overrideCents !== undefined
-                      ? (overrideCents / 100).toFixed(2)
-                      : catalogCents !== null
-                        ? (catalogCents / 100).toFixed(2)
-                        : "";
-                  return (
-                    <div
-                      key={s.id}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md border transition-colors ${selected ? "border-ih-primary bg-ih-primary-tint" : "border-ih-border"}`}
-                    >
-                      {/* Checkbox + service name — clicking the left area toggles selection */}
-                      <button
-                        type="button"
-                        onClick={() => toggleService(s.id)}
-                        className={`flex-1 text-left text-[12px] font-medium flex items-center gap-1.5 ${selected ? "text-ih-primary" : "text-ih-fg-3"}`}
-                      >
-                        <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 text-[10px] font-bold ${selected ? "border-ih-primary bg-ih-primary text-white" : "border-ih-border"}`}>
-                          {selected ? "✓" : ""}
-                        </span>
-                        {s.name}
-                      </button>
-                      {/* Price: editable input when selected, static text otherwise */}
-                      {selected ? (
-                        <div className="flex items-center gap-1">
-                          <span className="text-[12px] text-ih-fg-4">$</span>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            defaultValue={priceInputDefault}
-                            onBlur={(e) => handlePriceOverrideChange(s.id, e.target.value, catalogCents)}
-                            onChange={(e) => handlePriceOverrideChange(s.id, e.target.value, catalogCents)}
-                            className="w-20 h-7 px-1.5 rounded border border-ih-border bg-ih-bg-card text-[12px] text-right focus:shadow-ih-focus outline-none"
-                            aria-label={`Price for ${s.name}`}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        </div>
-                      ) : catalogCents !== null ? (
-                        // FE-7: price is stored in cents — "$400.00", not "$40000"
-                        <span className="text-[12px] text-ih-fg-4 flex-shrink-0">{formatPriceCents(catalogCents)}</span>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-              {/* P-4: Live total across selected services — delegates to the authority-chain
-                  helper. At wizard time there is no invoice yet, so only tier 2 applies.
-                  Catalog svc.price maps to priceSnapshot; per-row priceOverrides maps to
-                  priceOverride. Empty set falls through to zero (no cache row here). */}
-              {services.size > 0 && (
-                <div className="flex justify-end pt-1 border-t border-ih-border mt-2">
-                  <span className="text-[12px] font-bold text-ih-fg-2">
-                    Total:{" "}
-                    {formatPriceCents(
-                      getEffectivePriceCents({
-                        serviceLines: [...services].map((id) => {
-                          const svc = serviceCatalog.find((s) => s.id === id);
-                          return {
-                            priceSnapshot: typeof svc?.price === "number" ? svc.price : 0,
-                            priceOverride: priceOverrides.get(id) ?? null,
-                          };
-                        }),
-                      }),
-                    )}
-                  </span>
-                </div>
-              )}
-            </div>
+            <ServicesStep
+              serviceCatalog={serviceCatalog}
+              services={services}
+              priceOverrides={priceOverrides}
+              toggleService={toggleService}
+              handlePriceOverrideChange={handlePriceOverrideChange}
+            />
           )}
 
           {step === "schedule" && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Date</label>
-                <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
-              </div>
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Time</label>
-                <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
-              </div>
-              {/* IA-6 — advisory conflict warning; non-blocking. With no team
-                  step (solo tenants) the inspection goes to the creator, and
-                  the conflict check covers them by default. */}
-              {(conflictFetcher.data?.conflicts?.length ?? 0) > 0 && (
-                <div className="rounded-md border border-ih-watch/40 bg-ih-watch-bg px-3 py-2">
-                  <p className="text-[12px] font-bold text-ih-watch-fg">
-                    <strong>Schedule conflict:</strong>{" "}
-                    {conflictFetcher.data!.conflicts.length === 1
-                      ? `this inspector already has an inspection at ${conflictFetcher.data!.conflicts[0].propertyAddress}`
-                      : `this inspector already has ${conflictFetcher.data!.conflicts.length} inspections`}{" "}
-                    in this time slot. You can still schedule it.
-                  </p>
-                </div>
-              )}
-            </div>
+            <ScheduleStep
+              date={date}
+              setDate={setDate}
+              time={time}
+              setTime={setTime}
+              conflictFetcher={conflictFetcher}
+            />
           )}
 
           {step === "team" && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Team Mode</label>
-                <div className="flex gap-2">
-                  <button onClick={() => setSoloMode(true)} className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${soloMode ? "border-ih-primary bg-ih-primary-tint text-ih-primary" : "border-ih-border text-ih-fg-3"}`}>Solo</button>
-                  <button onClick={() => setSoloMode(false)} className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${!soloMode ? "border-ih-primary bg-ih-primary-tint text-ih-primary" : "border-ih-border text-ih-fg-3"}`}>Team</button>
-                </div>
-              </div>
-              {!soloMode && (
-                <div>
-                  <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Inspector</label>
-                  {teamMembers.length > 0 ? (
-                    <select
-                      value={inspectorId}
-                      onChange={(e) => setInspectorId(e.target.value)}
-                      className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none"
-                    >
-                      <option value="">Select an inspector…</option>
-                      {teamMembers.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input value={inspectorId} onChange={(e) => setInspectorId(e.target.value)} placeholder="Inspector ID or name" className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
-                  )}
-                  {/* IA-6 — advisory conflict warning; non-blocking */}
-                  {(conflictFetcher.data?.conflicts?.length ?? 0) > 0 && (
-                    <div className="mt-2 rounded-md border border-ih-watch/40 bg-ih-watch-bg px-3 py-2">
-                      <p className="text-[12px] font-bold text-ih-watch-fg">
-                        <strong>Schedule conflict:</strong>{" "}
-                        {conflictFetcher.data!.conflicts.length === 1
-                          ? `this inspector already has an inspection at ${conflictFetcher.data!.conflicts[0].propertyAddress}`
-                          : `this inspector already has ${conflictFetcher.data!.conflicts.length} inspections`}{" "}
-                        in this time slot. You can still schedule it.
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+            <TeamStep
+              soloMode={soloMode}
+              setSoloMode={setSoloMode}
+              inspectorId={inspectorId}
+              setInspectorId={setInspectorId}
+              teamMembers={teamMembers}
+              conflictFetcher={conflictFetcher}
+            />
           )}
         </div>
 

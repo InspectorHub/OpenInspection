@@ -19,9 +19,16 @@
 
 import { describe, it, expect } from 'vitest';
 
+// The report render was split into ReportView + colocated ./report/*
+// sub-components (structural refactor). The intent markers asserted below now
+// live across that fileset, so we concatenate the relevant module sources.
 async function source(): Promise<string> {
-  const src = await import('~/components/portal/sections/ReportView?raw');
-  return (src as unknown as { default: string }).default;
+  const mods = await Promise.all([
+    import('~/components/portal/sections/ReportView?raw'),
+    import('~/components/portal/sections/report/ReportMediaTile?raw'),
+    import('~/components/portal/sections/report/ReportDefectCard?raw'),
+  ]);
+  return mods.map((m) => (m as unknown as { default: string }).default).join('\n');
 }
 
 describe('ReportView image robustness (Plan 1 / N1)', () => {
@@ -55,8 +62,11 @@ describe('ReportView image robustness (Plan 1 / N1)', () => {
     expect(text).toContain('failedPhotos');
     expect(text).toContain('markPhotoFailed');
     // Plan 7 — both grids render through the shared renderMediaTile helper, whose
-    // image branch wires onError → markPhotoFailed. (Previously inlined per grid.)
-    expect(text).toMatch(/onError=\{\(\)\s*=>\s*markPhotoFailed\(/);
+    // image branch wires onError → the failed-photo marker. Post-split the marker
+    // is threaded as the onPhotoFailed prop into <ReportMediaTile> (which calls
+    // markPhotoFailed), so the wiring is verified across the two ends.
+    expect(text).toMatch(/onError=\{\(\)\s*=>\s*onPhotoFailed\(/);
+    expect(text).toContain('onPhotoFailed={markPhotoFailed}');
     expect(text).toContain('renderMediaTile');
     // The collapse filter (mediaVisible) is applied at BOTH grid call sites.
     const visibleCount = (text.match(/\.filter\(mediaVisible\)/g) ?? []).length;

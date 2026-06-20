@@ -21,6 +21,9 @@
  */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { RepairDefectRow } from "./repair/RepairDefectRow";
+import { RepairIntroPanel } from "./repair/RepairIntroPanel";
+import { RepairSharePanel } from "./repair/RepairSharePanel";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -119,16 +122,6 @@ export function repairBuilderSectionProps(data: {
 // ---------------------------------------------------------------------------
 // Component helpers
 // ---------------------------------------------------------------------------
-
-function categoryLabel(cat: Defect["category"]): string {
-  return cat === "safety" ? "Safety" : cat === "recommendation" ? "Recommendation" : "Maintenance";
-}
-
-function categoryClass(cat: Defect["category"]): string {
-  if (cat === "safety") return "bg-ih-bad-bg text-ih-bad-fg";
-  if (cat === "recommendation") return "bg-ih-info-bg text-ih-info-fg";
-  return "bg-ih-bg-muted text-ih-fg-3";
-}
 
 function formatCents(cents: number): string {
   return `$${(cents / 100).toFixed(2)}`;
@@ -549,85 +542,16 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
                 : "";
 
             return (
-              <div
+              <RepairDefectRow
                 key={defect.findingKey}
-                className={`bg-ih-bg-card border rounded-xl transition-colors ${
-                  isSelected ? "border-ih-primary/60" : "border-ih-border"
-                }`}
-              >
-                {/* Row header */}
-                <button
-                  type="button"
-                  className="w-full flex items-start gap-3 px-4 py-3 text-left"
-                  onClick={() => toggleDefect(defect)}
-                >
-                  <span
-                    className={`mt-0.5 w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                      isSelected
-                        ? "bg-ih-primary border-ih-primary"
-                        : "border-ih-border-strong bg-ih-bg-app"
-                    }`}
-                  >
-                    {isSelected && (
-                      <svg viewBox="0 0 12 10" className="w-3 h-2 fill-white">
-                        <path d="M1 5l3.5 3.5L11 1" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-semibold text-ih-fg-1">
-                      {defect.itemLabel}
-                    </span>
-                    <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                      {defect.sectionTitle}
-                    </span>
-                    {defect.comment && (
-                      <span className="block text-[12px] text-ih-fg-4 mt-0.5 line-clamp-2">
-                        {defect.comment}
-                      </span>
-                    )}
-                  </span>
-                  <span
-                    className={`inline-flex items-center h-5 px-2 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ml-2 ${categoryClass(defect.category)}`}
-                  >
-                    {categoryLabel(defect.category)}
-                  </span>
-                </button>
-
-                {/* Expanded credit + note */}
-                {isSelected && (
-                  <div className="px-4 pb-4 pt-1 border-t border-ih-border space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">
-                          Credit Request ($)
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          value={creditDollars}
-                          onChange={(e) => updateCredit(defect, e.target.value)}
-                          className="w-full h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:border-ih-primary"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">
-                        Note
-                      </label>
-                      <textarea
-                        placeholder="Optional — describe the repair or credit rationale"
-                        rows={2}
-                        value={draft?.note ?? ""}
-                        onChange={(e) => updateNote(defect, e.target.value)}
-                        className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-none focus:outline-none focus:border-ih-primary"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
+                defect={defect}
+                isSelected={isSelected}
+                draft={draft}
+                creditDollars={creditDollars}
+                onToggle={toggleDefect}
+                onUpdateCredit={updateCredit}
+                onUpdateNote={updateNote}
+              />
             );
           })}
         </div>
@@ -635,22 +559,12 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
 
       {/* Custom intro */}
       {rrId && (
-        <div className="bg-ih-bg-card border border-ih-border rounded-xl p-5 space-y-3">
-          <p className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">
-            Custom Introduction
-          </p>
-          <textarea
-            placeholder="Add a personal message to appear at the top of the shared repair request…"
-            rows={4}
-            value={customIntro}
-            onChange={(e) => setCustomIntro(e.target.value)}
-            onBlur={saveIntro}
-            className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-none focus:outline-none focus:border-ih-primary"
-          />
-          {introFetcher.state === "submitting" && (
-            <p className="text-[11px] text-ih-fg-4">Saving…</p>
-          )}
-        </div>
+        <RepairIntroPanel
+          customIntro={customIntro}
+          saving={introFetcher.state === "submitting"}
+          onChange={setCustomIntro}
+          onBlur={saveIntro}
+        />
       )}
 
       {/* Credit total */}
@@ -667,68 +581,20 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
 
       {/* Share & actions */}
       {rrId && (
-        <div className="bg-ih-bg-card border border-ih-border rounded-xl p-5 space-y-4">
-          <p className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">Share</p>
-          <div className="flex flex-wrap gap-3">
-            {shareUrl && (
-              <>
-                <button
-                  type="button"
-                  onClick={copyShareLink}
-                  className="h-9 px-4 rounded-lg border border-ih-border text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
-                >
-                  {copyLabel}
-                </button>
-                <a
-                  href={`/api/public/repair-request/share/${shareToken}/pdf`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center h-9 px-4 rounded-lg border border-ih-border text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
-                >
-                  View as PDF
-                </a>
-              </>
-            )}
-          </div>
-
-          {/* Email form */}
-          {shareToken && !emailSent && (
-            <div className="space-y-2 pt-2 border-t border-ih-border">
-              <p className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">
-                Email to contractor
-              </p>
-              <input
-                type="email"
-                placeholder="contractor@example.com"
-                value={emailTo}
-                onChange={(e) => setEmailTo(e.target.value)}
-                className="w-full h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:border-ih-primary"
-              />
-              <textarea
-                placeholder="Optional message…"
-                rows={2}
-                value={emailMsg}
-                onChange={(e) => setEmailMsg(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-none focus:outline-none focus:border-ih-primary"
-              />
-              <button
-                type="button"
-                disabled={!emailTo || emailFetcher.state === "submitting"}
-                onClick={sendEmail}
-                className="h-9 px-4 rounded-lg bg-ih-primary text-ih-primary-fg text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
-              >
-                {emailFetcher.state === "submitting" ? "Sending…" : "Send email"}
-              </button>
-              {emailFetcher.data?.error && (
-                <p className="text-[12px] text-ih-bad-fg">{emailFetcher.data.error}</p>
-              )}
-            </div>
-          )}
-
-          {emailSent && (
-            <p className="text-[13px] text-ih-ok-fg font-semibold">Email sent.</p>
-          )}
-        </div>
+        <RepairSharePanel
+          shareToken={shareToken}
+          shareUrl={shareUrl}
+          copyLabel={copyLabel}
+          emailTo={emailTo}
+          emailMsg={emailMsg}
+          emailSent={emailSent}
+          emailSubmitting={emailFetcher.state === "submitting"}
+          emailError={emailFetcher.data?.error}
+          onCopyShareLink={copyShareLink}
+          onEmailToChange={setEmailTo}
+          onEmailMsgChange={setEmailMsg}
+          onSendEmail={sendEmail}
+        />
       )}
 
       {/* Mutation error */}

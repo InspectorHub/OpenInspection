@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
-import { useLoaderData, Link, useFetcher, useSearchParams, redirect } from "react-router";
+import { useLoaderData, useFetcher, useSearchParams, redirect } from "react-router";
 import type { InspectionSearchItem } from "~/routes/resources/inspection-search";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
@@ -10,219 +10,34 @@ import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist"
 import { CommandPalette } from "~/components/CommandPalette";
 import { SeatBanner } from "~/components/SeatBanner";
 import { useSessionContext } from "~/hooks/useSessionContext";
-import { formatInspectionDateTime } from "~/lib/format-date";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
-import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, statusTone } from "~/lib/status";
+import { INSPECTION_STATUS, isReportPublished } from "~/lib/status";
 import { PageHeader, TabStrip, Pill, Card, EmptyState, Button, Icon } from "@core/shared-ui";
+import {
+  DEFAULT_COLUMNS,
+  ALWAYS_ON,
+  INSPECTION_FILTERS,
+  TABS,
+  BUCKET_META,
+  PAGE_SIZE,
+  type Inspection,
+  type Tag,
+  type TemplateOption,
+  type ServiceOption,
+  type DashboardData,
+  type FilterId,
+  type TabKey,
+} from "~/lib/dashboard-schema";
+import { matchesFilter, matchesWorkflow, tabMatches } from "~/lib/dashboard-filters";
+import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspectionRow";
+import { FiltersModal } from "~/components/dashboard/FiltersModal";
+import { ColumnsModal } from "~/components/dashboard/ColumnsModal";
+
+// Re-exported for unit tests (tests/web import these from ~/routes/dashboard).
+export { tabMatches, matchesWorkflow };
 
 export function meta() {
   return [{ title: "Dashboard - OpenInspection" }];
-}
-
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-interface Inspection {
-  id: string;
-  date: string | null;
-  address: string | null;
-  propertyAddress?: string | null;
-  clientName: string | null;
-  clientEmail?: string | null;
-  status: string;
-  reportStatus?: string;
-  confirmedAt?: string | null;
-  price?: number | null;
-  paymentStatus?: string | null;
-  agentName?: string | null;
-  agentId?: string | null;
-  tagIds?: string[];
-  defectStats?: { safety: number; recommendation: number; maintenance: number };
-}
-
-interface Tag {
-  id: string;
-  name: string;
-  color?: string;
-}
-
-/** Template option for the New Inspection wizard picker (B-6). */
-interface TemplateOption {
-  id: string;
-  name: string;
-  itemCount?: number;
-}
-
-/** Service option for the New Inspection wizard Services step (B-8). */
-interface ServiceOption {
-  id: string;
-  name: string;
-  price?: number | null;
-}
-
-interface DashboardData {
-  needsAttention: Inspection[];
-  today: Inspection[];
-  thisWeek: Inspection[];
-  later: Inspection[];
-  laterTotal?: number;
-  recentReports: Inspection[];
-  cancelled: Inspection[];
-  conciergePending?: number;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Column registry                                                    */
-/* ------------------------------------------------------------------ */
-
-interface ColumnDef {
-  id: string;
-  label: string;
-  defaultOn: boolean;
-  alwaysOn?: boolean;
-}
-
-const COLUMN_REGISTRY: ColumnDef[] = [
-  { id: "propertyAddress", label: "Property Address", defaultOn: true, alwaysOn: true },
-  { id: "clientName", label: "Client Name", defaultOn: true },
-  { id: "date", label: "Inspection Date", defaultOn: true },
-  { id: "inspector", label: "Inspector", defaultOn: false },
-  { id: "statusIcons", label: "Status Icons", defaultOn: true },
-  { id: "defectChips", label: "Defect Counts", defaultOn: true },
-  { id: "agent", label: "Agent", defaultOn: true },
-  { id: "price", label: "Price", defaultOn: true },
-  { id: "closingDate", label: "Closing Date", defaultOn: true },
-  { id: "orderId", label: "Order ID", defaultOn: false },
-  { id: "referralSource", label: "Referral Source", defaultOn: false },
-  { id: "propertyFacts", label: "Property Facts", defaultOn: false },
-];
-
-const DEFAULT_COLUMNS = COLUMN_REGISTRY.filter((c) => c.defaultOn).map((c) => c.id);
-const ALWAYS_ON = new Set(COLUMN_REGISTRY.filter((c) => c.alwaysOn).map((c) => c.id));
-
-/* ------------------------------------------------------------------ */
-/*  Time filter helpers                                                */
-/* ------------------------------------------------------------------ */
-
-const INSPECTION_FILTERS = [
-  { id: "all", label: "All" },
-  { id: "past", label: "Past" },
-  { id: "yesterday", label: "Yesterday" },
-  { id: "today", label: "Today" },
-  { id: "tomorrow", label: "Tomorrow" },
-  { id: "this_week", label: "This Week" },
-  { id: "future", label: "Future" },
-  { id: "unconfirmed", label: "Unconfirmed" },
-  { id: "in_progress", label: "In Progress" },
-] as const;
-
-type FilterId = (typeof INSPECTION_FILTERS)[number]["id"];
-
-function startOfDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function addDays(d: Date, days: number) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + days);
-  return x;
-}
-
-function startOfWeek(d: Date) {
-  const x = startOfDay(d);
-  x.setDate(x.getDate() - x.getDay());
-  return x;
-}
-
-function matchesFilter(insp: Inspection, filter: FilterId, now: Date): boolean {
-  if (filter === "all") return true;
-  const status = (insp.status || "").toLowerCase();
-  if (filter === "unconfirmed") return status === INSPECTION_STATUS.SCHEDULED || status === INSPECTION_STATUS.REQUESTED;
-  if (filter === "in_progress") return status === INSPECTION_STATUS.COMPLETED && !isReportPublished(insp.reportStatus);
-  if (!insp.date) return false;
-  const date = new Date(insp.date);
-  if (isNaN(date.getTime())) return false;
-  const today = startOfDay(now);
-  const yesterday = addDays(today, -1);
-  const tomorrow = addDays(today, 1);
-  const wkStart = startOfWeek(today);
-  const wkEnd = addDays(wkStart, 7);
-  const dayStart = startOfDay(date);
-  switch (filter) {
-    case "past": return dayStart.getTime() < today.getTime();
-    case "yesterday": return dayStart.getTime() === yesterday.getTime();
-    case "today": return dayStart.getTime() === today.getTime();
-    case "tomorrow": return dayStart.getTime() === tomorrow.getTime();
-    case "this_week": return dayStart.getTime() >= wkStart.getTime() && dayStart.getTime() < wkEnd.getTime();
-    case "future": return dayStart.getTime() >= wkEnd.getTime();
-  }
-  return false;
-}
-
-/* ------------------------------------------------------------------ */
-/*  Workflow tabs                                                       */
-/* ------------------------------------------------------------------ */
-
-const TABS = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Active" },
-  { key: "requested", label: "Requested" },
-  { key: "to_review", label: "To Review" },
-  { key: "awaiting_payment", label: "Awaiting payment" },
-  { key: "published", label: "Published" },
-  { key: "cancelled", label: "Cancelled" },
-] as const;
-
-type TabKey = (typeof TABS)[number]["key"];
-
-/**
- * Pure tab matching function for both inspection lifecycle and report axes.
- * Exported for unit testing.
- */
-export function tabMatches(
-  tab: string,
-  i: { status: string; reportStatus?: string; paymentStatus?: string | null },
-): boolean {
-  if (tab === "all") return true;
-  switch (tab) {
-    case "active": return (
-        i.status === INSPECTION_STATUS.REQUESTED ||
-        i.status === INSPECTION_STATUS.SCHEDULED ||
-        i.status === INSPECTION_STATUS.CONFIRMED
-      );
-    case "requested": return i.status === INSPECTION_STATUS.REQUESTED;
-    case "to_review": return i.reportStatus === REPORT_STATUS.SUBMITTED;
-    case "published": return isReportPublished(i.reportStatus);
-    case "awaiting_payment": return isReportPublished(i.reportStatus) && i.paymentStatus !== "paid";
-    case "cancelled": return i.status === INSPECTION_STATUS.CANCELLED;
-    default: return true;
-  }
-}
-
-/** @deprecated Use tabMatches instead. Kept for backward compat. */
-export function matchesWorkflow(i: Inspection, tab: TabKey): boolean {
-  return tabMatches(tab, i);
-}
-
-/* ------------------------------------------------------------------ */
-/*  Report-state badge (Published tab)                                 */
-/* ------------------------------------------------------------------ */
-
-// Report-state pill for the Published/to_review tabs (uses reportStatus axis).
-const REPORT_STATE_TONE: Record<string, "monitor" | "sat" | "warning"> = {
-  in_progress: "monitor",
-  submitted: "warning",
-  published: "sat",
-};
-
-function reportStateLabel(reportStatus: string): string {
-  if (reportStatus === "in_progress") return "In Progress";
-  if (reportStatus === "submitted") return "Submitted";
-  if (reportStatus === "published") return "Published";
-  return reportStatus;
 }
 
 /* ------------------------------------------------------------------ */
@@ -409,23 +224,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Bucket labels                                                      */
-/* ------------------------------------------------------------------ */
-
-const BUCKET_META: Record<string, { label: string; hint: string }> = {
-  needsAttention: { label: "Needs Attention", hint: "Inspections requiring action" },
-  today: { label: "Today", hint: "Scheduled for today" },
-  thisWeek: { label: "This Week", hint: "Upcoming this week" },
-  later: { label: "Later", hint: "Future inspections" },
-  recentReports: { label: "Recent Reports", hint: "Recently completed" },
-  cancelled: { label: "Cancelled", hint: "Cancelled inspections" },
-};
-
-/* ------------------------------------------------------------------ */
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
-
-const PAGE_SIZE = 25;
 
 export default function DashboardPage() {
   const { buckets, conciergePending, greeting: _ssrGreeting, tags, templates, services, teamMembers, checklistDismissed: loaderDismissed, templateCount, serviceCount } = useLoaderData<typeof loader>();
@@ -743,124 +543,6 @@ export default function DashboardPage() {
   // from the auth-layout session context the dashboard already consumes.
   const tenantSlug = sessionCtx?.branding?.tenantSlug ?? null;
 
-  /* ---- Render inspection row ---- */
-  // reportView=true on the Published tab: render a report-state badge and, for
-  // delivered/published rows, a "View report" deep-link into the public report.
-  function InspectionRow({ insp, reportView = false }: { insp: Inspection; reportView?: boolean }) {
-    const isSelected = selectedIds.has(insp.id);
-    const showReportLink =
-      reportView && tenantSlug && isReportPublished(insp.reportStatus);
-    return (
-      <div className="flex items-center gap-2 px-4 py-3 hover:bg-ih-bg-muted transition-colors group">
-        <input
-          type="checkbox"
-          checked={isSelected}
-          onChange={() => toggleSelect(insp.id)}
-          className="accent-ih-primary shrink-0"
-        />
-        <Link
-          to={`/inspections/${insp.id}`}
-          className="flex items-center justify-between flex-1 min-w-0"
-        >
-          <div className="min-w-0">
-            {isColumnVisible("propertyAddress") && (
-              <p className="text-[13px] font-medium text-ih-fg-1 truncate">
-                {insp.address || insp.propertyAddress || "No address"}
-              </p>
-            )}
-            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              {isColumnVisible("clientName") && (
-                <span className="text-[11px] text-ih-fg-3">
-                  {insp.clientName || "No client"}
-                </span>
-              )}
-              {isColumnVisible("date") && insp.date && (
-                <span className="text-[11px] text-ih-fg-3">
-                  &middot; {formatInspectionDateTime(insp.date)}
-                </span>
-              )}
-              {isColumnVisible("agent") && insp.agentName && (
-                <span className="text-[11px] text-ih-fg-3">
-                  &middot; {insp.agentName}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0 ml-4">
-            {isColumnVisible("statusIcons") && (
-              <Pill tone={statusTone(insp.status)}>
-                {insp.status.replace(/_/g, " ")}
-              </Pill>
-            )}
-            {/* report-state badge (Published/to_review tabs) */}
-            {reportView && insp.reportStatus && REPORT_STATE_TONE[insp.reportStatus] && (
-              <Pill tone={REPORT_STATE_TONE[insp.reportStatus]}>
-                {reportStateLabel(insp.reportStatus)}
-              </Pill>
-            )}
-            {isColumnVisible("defectChips") && insp.defectStats && (
-              <div className="flex gap-1">
-                {insp.defectStats.safety > 0 && (
-                  <Pill tone="defect">{insp.defectStats.safety}S</Pill>
-                )}
-                {insp.defectStats.recommendation > 0 && (
-                  <Pill tone="monitor">{insp.defectStats.recommendation}R</Pill>
-                )}
-                {insp.defectStats.maintenance > 0 && (
-                  <Pill tone="info">{insp.defectStats.maintenance}M</Pill>
-                )}
-              </div>
-            )}
-            {/* P-4: dashboard rows only carry inspections.price (cache tier 3).
-                Invoices and service-snapshot tiers are not loaded here — out of scope.
-                Use getEffectivePriceCents() when a full authority-chain read is needed. */}
-            {isColumnVisible("price") && insp.price != null && (
-              <span className="text-[11px] font-medium text-ih-fg-3">
-                ${insp.price}
-              </span>
-            )}
-          </div>
-        </Link>
-        {/* Hover actions: open editor + status transition (visible on hover) */}
-        <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 flex items-center gap-1.5">
-          <Link
-            to={`/inspections/${insp.id}/edit`}
-            aria-label="Open editor"
-            title="Open editor"
-            onClick={(e) => e.stopPropagation()}
-            className="inline-flex items-center justify-center h-6 w-6 rounded text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
-          >
-            <Icon name="edit" size={14} />
-          </Link>
-          {/* #111: deep-link into the public report (Published tab, delivered/published only) */}
-          {showReportLink && (
-            <Link
-              to={`/report-view/${tenantSlug}/${insp.id}`}
-              aria-label="View report"
-              title="View report"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center justify-center h-6 w-6 rounded text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
-            >
-              <Icon name="share" size={14} />
-            </Link>
-          )}
-          <select
-            value={insp.status}
-            onChange={(e) => transitionStatus(insp.id, e.target.value)}
-            onClick={(e) => e.stopPropagation()}
-            className="h-6 px-1 rounded text-[10px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none cursor-pointer"
-          >
-            <option value="requested">Requested</option>
-            <option value="scheduled">Scheduled</option>
-            <option value="confirmed">Confirmed</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
       {/* F3 — Seat quota banner */}
@@ -1052,7 +734,16 @@ export default function DashboardPage() {
                 {!collapsed && (
                   <div className="divide-y divide-ih-border">
                     {items.map((insp) => (
-                      <InspectionRow key={insp.id} insp={insp} reportView={activeTab === "published" || activeTab === "to_review"} />
+                      <DashboardInspectionRow
+                        key={insp.id}
+                        insp={insp}
+                        reportView={activeTab === "published" || activeTab === "to_review"}
+                        tenantSlug={tenantSlug}
+                        selectedIds={selectedIds}
+                        isColumnVisible={isColumnVisible}
+                        toggleSelect={toggleSelect}
+                        transitionStatus={transitionStatus}
+                      />
                     ))}
                   </div>
                 )}
@@ -1076,7 +767,16 @@ export default function DashboardPage() {
               </div>
               <div className="divide-y divide-ih-border">
                 {!isSearching && displayList.map((insp) => (
-                  <InspectionRow key={insp.id} insp={insp} reportView={activeTab === "published" || activeTab === "to_review"} />
+                  <DashboardInspectionRow
+                    key={insp.id}
+                    insp={insp}
+                    reportView={activeTab === "published" || activeTab === "to_review"}
+                    tenantSlug={tenantSlug}
+                    selectedIds={selectedIds}
+                    isColumnVisible={isColumnVisible}
+                    toggleSelect={toggleSelect}
+                    transitionStatus={transitionStatus}
+                  />
                 ))}
               </div>
               {isSearching && (
@@ -1114,73 +814,25 @@ export default function DashboardPage() {
 
       {/* Filters modal */}
       {filtersOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setFiltersOpen(false)}>
-          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-bold text-ih-fg-1">Filters</h2>
-              <button onClick={() => setFiltersOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Date from</label>
-                <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
-              </div>
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Date to</label>
-                <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
-              </div>
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Agent ID</label>
-                <input type="text" value={filterAgentId} onChange={(e) => setFilterAgentId(e.target.value)} placeholder="Agent ID" className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
-              </div>
-            </div>
-            <div className="flex items-center justify-between mt-6">
-              <Button variant="ghost" size="sm" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterAgentId(""); }}>
-                Reset
-              </Button>
-              <Button variant="primary" size="sm" onClick={() => setFiltersOpen(false)}>
-                Apply
-              </Button>
-            </div>
-          </div>
-        </div>
+        <FiltersModal
+          onClose={() => setFiltersOpen(false)}
+          filterDateFrom={filterDateFrom}
+          filterDateTo={filterDateTo}
+          filterAgentId={filterAgentId}
+          setFilterDateFrom={setFilterDateFrom}
+          setFilterDateTo={setFilterDateTo}
+          setFilterAgentId={setFilterAgentId}
+        />
       )}
 
       {/* Columns modal */}
       {columnsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setColumnsOpen(false)}>
-          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-bold text-ih-fg-1">Customize Columns</h2>
-              <button onClick={() => setColumnsOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
-            </div>
-            <div className="space-y-2">
-              {COLUMN_REGISTRY.map((col) => (
-                <label key={col.id} className="flex items-center gap-3 py-1.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isColumnVisible(col.id)}
-                    disabled={ALWAYS_ON.has(col.id)}
-                    onChange={() => toggleColumn(col.id)}
-                    className="accent-ih-primary"
-                  />
-                  <span className="text-[13px] text-ih-fg-2">
-                    {col.label}
-                    {ALWAYS_ON.has(col.id) && <span className="ml-1 text-[10px] text-ih-fg-4">(required)</span>}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div className="flex items-center justify-between mt-6">
-              <Button variant="ghost" size="sm" onClick={resetColumns}>
-                Reset to defaults
-              </Button>
-              <Button variant="primary" size="sm" onClick={() => setColumnsOpen(false)}>
-                Done
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ColumnsModal
+          onClose={() => setColumnsOpen(false)}
+          isColumnVisible={isColumnVisible}
+          toggleColumn={toggleColumn}
+          resetColumns={resetColumns}
+        />
       )}
     </div>
   );

@@ -1,0 +1,93 @@
+/**
+ * <ReportMediaTile> — renders one report media cell (photo OR video).
+ *
+ * Extracted from <ReportView>'s former inline `renderMediaTile` closure. The
+ * behavior is byte-identical; the three closure dependencies (printMode,
+ * lightbox opener, failed-photo marker) are now explicit props.
+ *
+ * Plan 7 — when the server resolved a video kind, branch: web report → lazy
+ * Stream <iframe> at a fixed 16/9 aspect (no CLS); PDF render path → poster
+ * <img> + QR + "Watch the walk-through" link. Photo / legacy / no-subdomain
+ * fall through to the existing <img> with its onError/aspect-[4/3]/alt
+ * hardening intact.
+ *
+ * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
+ */
+import { photoDisplayName, withDownload } from "~/lib/photo-name";
+import { qrToSvg } from "../../../../../server/lib/qr";
+import { PRINT_FIGURE_CLASS, printThumbWidth, type ReportPhoto } from "./types";
+
+export interface ReportMediaTileProps {
+  photo: ReportPhoto;
+  alt: string;
+  idx: number;
+  printMode: boolean;
+  onOpenLightbox: (url: string) => void;
+  onPhotoFailed: (key: string) => void;
+}
+
+export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, onPhotoFailed }: ReportMediaTileProps) {
+  const m = photo.media;
+  const name = photoDisplayName(photo.key);
+
+  if (m && m.kind === "video-player") {
+    return (
+      <div key={`v-${m.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+        <iframe
+          src={m.playerSrc}
+          title={alt}
+          loading="lazy"
+          allow="accelerated-2d-canvas; fullscreen; encrypted-media; picture-in-picture"
+          allowFullScreen
+          className="absolute inset-0 h-full w-full border-0"
+        />
+      </div>
+    );
+  }
+
+  if (m && m.kind === "video-poster") {
+    // PDF cannot embed a player → poster frame + QR + deep link.
+    const qr = qrToSvg(m.playerLinkUrl);
+    return (
+      <div key={`vp-${m.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+        <img src={m.posterUrl} alt={alt} title={name} className="h-full w-full object-cover" loading="eager" />
+        <span
+          className="absolute bottom-1 right-1 h-12 w-12 rounded bg-ih-bg-card p-0.5"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: server-generated SVG from qrToSvg — no user input
+          dangerouslySetInnerHTML={{ __html: qr }}
+          aria-hidden="true"
+        />
+        <a
+          href={m.playerLinkUrl}
+          className="absolute inset-x-0 bottom-0 bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white"
+        >
+          ▶ Watch the walk-through
+        </a>
+      </div>
+    );
+  }
+
+  // Image branch (photo / legacy / fail-closed video) — unchanged hardening.
+  return (
+    <div key={photo.key} className={`group relative aspect-[4/3] overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+      <img
+        src={`${photo.url}&w=${printThumbWidth(printMode)}`}
+        alt={alt}
+        title={name}
+        className="w-full h-full object-cover cursor-pointer"
+        loading={printMode ? "eager" : "lazy"}
+        onClick={() => onOpenLightbox(photo.url)}
+        onError={() => onPhotoFailed(photo.key)}
+      />
+      <a
+        href={withDownload(photo.url)}
+        download={name}
+        title={`Download ${name}`}
+        onClick={(e) => e.stopPropagation()}
+        className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
+      >
+        ↓
+      </a>
+    </div>
+  );
+}

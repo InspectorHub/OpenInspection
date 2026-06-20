@@ -5,9 +5,12 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-security";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { SecretField } from "~/components/SecretField";
 import { useFlash } from "~/hooks/useFlash";
 import { changePasswordSchema, deleteAccountSchema } from "~/lib/forms/settings.schema";
+import { ChangePasswordPanel } from "~/components/settings/security/ChangePasswordPanel";
+import { TwoFactorPanel } from "~/components/settings/security/TwoFactorPanel";
+import { TurnstilePanel } from "~/components/settings/security/TurnstilePanel";
+import { DataExportPanel } from "~/components/settings/security/DataExportPanel";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -236,128 +239,25 @@ export default function SettingsSecurityPage() {
       </section>
 
       {/* Change password */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Change password</h3>
-        <Form
-          method="post"
-          id={pwForm.id}
-          onSubmit={pwForm.onSubmit}
-          noValidate
-          className="space-y-4 max-w-md"
-        >
-          <input type="hidden" name="intent" value="change-password" />
-          <div className="space-y-2">
-            <label htmlFor={pwFields.currentPassword.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Current password</label>
-            <input type={showPassword ? "text" : "password"} id={pwFields.currentPassword.id} name={pwFields.currentPassword.name} autoComplete="current-password"
-              aria-invalid={pwFields.currentPassword.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1" />
-            {pwFields.currentPassword.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{pwFields.currentPassword.errors[0]}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <label htmlFor={pwFields.newPassword.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">New password</label>
-            <input type={showPassword ? "text" : "password"} id={pwFields.newPassword.id} name={pwFields.newPassword.name} autoComplete="new-password"
-              aria-invalid={pwFields.newPassword.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1" />
-            {pwFields.newPassword.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{pwFields.newPassword.errors[0]}</p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <label htmlFor={pwFields.confirmPassword.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Confirm new password</label>
-            <input type={showPassword ? "text" : "password"} id={pwFields.confirmPassword.id} name={pwFields.confirmPassword.name} autoComplete="new-password"
-              aria-invalid={pwFields.confirmPassword.errors ? true : undefined}
-              className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1" />
-            {pwFields.confirmPassword.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{pwFields.confirmPassword.errors[0]}</p>
-            )}
-          </div>
-          {pwForm.errors && (
-            <div className="px-3 py-2 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg">
-              {pwForm.errors[0]}
-            </div>
-          )}
-          <label className="flex items-center gap-2 text-[11px] text-ih-fg-3 cursor-pointer">
-            <input type="checkbox" checked={showPassword} onChange={(e) => setShowPassword(e.target.checked)}
-              className="rounded border-ih-border" />
-            Show passwords
-          </label>
-          <div className="flex justify-end pt-2 border-t border-ih-border">
-            <button type="submit"
-              className="px-4 py-2 bg-ih-primary text-white rounded-md font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-              Change Password
-            </button>
-          </div>
-        </Form>
-      </section>
+      <ChangePasswordPanel
+        pwForm={pwForm}
+        pwFields={pwFields}
+        showPassword={showPassword}
+        setShowPassword={setShowPassword}
+      />
 
       {/* 2FA status */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${user.totpEnabled ? "bg-ih-ok-bg text-ih-ok-fg" : "bg-ih-bg-muted text-ih-fg-3"}`}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z" />
-              </svg>
-            </div>
-            <div>
-              <p className="font-bold text-ih-fg-1 text-[13px]">Two-factor authentication</p>
-              <p className="text-[11px] text-ih-fg-3">
-                {user.totpEnabled ? "Enabled. Required at every log in." : "Not enabled."}
-              </p>
-              {user.totpEnabled && user.recoveryCodesRemaining != null && (
-                <p className="text-[11px] text-ih-fg-3 mt-1">{user.recoveryCodesRemaining} recovery codes remaining</p>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            {!user.totpEnabled ? (
-              <button className="px-4 py-2 bg-ih-primary text-white rounded-md font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-                Enable 2FA
-              </button>
-            ) : (
-              <>
-                <button className="px-4 py-2 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-2 text-[13px] font-semibold hover:bg-ih-bg-muted transition-all">
-                  Regenerate codes
-                </button>
-                <button className="px-4 py-2 rounded-md border border-ih-bad text-ih-bad-fg text-[13px] font-bold hover:bg-ih-bad-bg transition-all">
-                  Disable 2FA
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </section>
+      <TwoFactorPanel
+        totpEnabled={user.totpEnabled}
+        recoveryCodesRemaining={user.recoveryCodesRemaining}
+      />
 
       {/* Turnstile bot protection */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Bot protection</h3>
-        <p className="text-[13px] text-ih-fg-3">
-          Bot protection prevents automated form submissions on public-facing pages.
-          Get keys at{" "}
-          <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer"
-            className="text-ih-primary hover:underline">
-            Cloudflare dashboard
-          </a>.
-        </p>
-        <Form method="post" className="space-y-3 max-w-xl">
-          <input type="hidden" name="intent" value="save-turnstile" />
-          <SecretField
-            name="TURNSTILE_SECRET_KEY"
-            label="Turnstile Secret Key"
-            value={secrets.TURNSTILE_SECRET_KEY}
-            error={turnstileFieldError("TURNSTILE_SECRET_KEY")}
-            hint="Bot protection on booking and signup forms. Create at dash.cloudflare.com → Turnstile. Use test key 1x0000000000000000000000000000000AA for development"
-          />
-          <div className="flex justify-end pt-2 border-t border-ih-border">
-            <button type="submit" disabled={savingTurnstile}
-              className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
-              {savingTurnstile ? "Saving…" : "Save"}
-            </button>
-          </div>
-        </Form>
-      </section>
+      <TurnstilePanel
+        value={secrets.TURNSTILE_SECRET_KEY}
+        fieldError={turnstileFieldError}
+        saving={savingTurnstile}
+      />
 
       {/* Active sessions placeholder */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
@@ -377,19 +277,7 @@ export default function SettingsSecurityPage() {
       </section>
 
       {/* Data export */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
-        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Data export</h3>
-        <p className="text-[13px] text-ih-fg-3">
-          Download a copy of all your data including inspections, reports, templates, and client information.
-        </p>
-        <Form method="post">
-          <input type="hidden" name="intent" value="export-data" />
-          <button type="submit"
-            className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-2 text-[13px] font-semibold hover:bg-ih-bg-muted transition-colors">
-            Download my data
-          </button>
-        </Form>
-      </section>
+      <DataExportPanel />
 
       {/* Danger zone */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-bad p-6 space-y-4">
