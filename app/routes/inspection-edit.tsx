@@ -52,8 +52,15 @@ import type { GalleryPhoto } from "~/lib/inspection-media";
 import { fKey } from "~/hooks/useInspection";
 import { fullResUrl } from "~/components/media-studio/cropImage";
 import { preprocessImage } from "~/components/media-studio/preprocessImage";
-import { SignaturePad } from "~/components/SignaturePad";
 import { PublishGateModal } from "~/components/editor/PublishGateModal";
+import { AddMediaChooser } from "~/components/editor/AddMediaChooser";
+import { RecropWarningModal } from "~/components/editor/RecropWarningModal";
+import { UnsavedChangesBlocker } from "~/components/editor/UnsavedChangesBlocker";
+import { PublishModal } from "~/components/editor/PublishModal";
+import { SignModal } from "~/components/editor/SignModal";
+import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
+import { SectionPickerModal } from "~/components/editor/SectionPickerModal";
+import { TagPickerModal } from "~/components/editor/TagPickerModal";
 import { ToastPortal } from "~/components/Toast";
 import { useIsMobile } from "~/hooks/useBreakpoint";
 import { MobileAppBar } from "~/components/editor/MobileAppBar";
@@ -629,15 +636,6 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-function formatRelativeTime(epochSec: number): string {
- const diffDays = Math.floor((Date.now() / 1000 - epochSec) / 86400);
- if (diffDays <= 0) return 'today';
- if (diffDays === 1) return '1 day ago';
- if (diffDays < 7)   return `${diffDays} days ago`;
- if (diffDays < 30)  return `${Math.floor(diffDays / 7)} wk ago`;
- return `${Math.floor(diffDays / 30)} mo ago`;
-}
 
 /* ------------------------------------------------------------------ */
 /* Component */
@@ -2387,48 +2385,18 @@ export default function InspectionEditPage() {
  {/* Plan 7 — add-media chooser: photo OR video. Video requires a connection
   * (no offline queue); the Video option disables + hints when offline. */}
  {addMediaChooser && (
- <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Add media">
-  <button
-   type="button"
-   aria-label="Close"
-   className="absolute inset-0 bg-[rgba(15,23,42,0.4)]"
-   onClick={() => setAddMediaChooser(null)}
-  />
-  <div className="relative w-full max-w-md rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover">
-   <h2 className="mb-3 text-[15px] font-bold text-ih-fg-1">Add media</h2>
-   <div className="grid grid-cols-2 gap-3">
-    <button
-     type="button"
-     onClick={() => {
-      setAddMediaChooser(null);
-      photoInputRef.current?.click();
-     }}
-     className="min-h-[44px] rounded-xl border border-ih-border bg-ih-bg-muted px-4 py-3 text-[14px] font-bold text-ih-fg-1 hover:border-ih-primary"
-    >
-     Photo
-    </button>
-    {(() => {
-     const offline = typeof navigator !== "undefined" && navigator.onLine === false;
-     return (
-      <button
-       type="button"
-       disabled={offline}
-       onClick={() => {
-        const t = addMediaChooser;
-        setAddMediaChooser(null);
-        setVideoCaptureTarget(t);
-       }}
-       title={offline ? "Video upload requires a connection" : undefined}
-       className="min-h-[44px] rounded-xl border border-ih-border bg-ih-bg-muted px-4 py-3 text-[14px] font-bold text-ih-fg-1 hover:border-ih-primary disabled:opacity-40"
-      >
-       Video
-       {offline && <span className="mt-1 block text-[10px] font-normal text-ih-fg-4">Requires a connection</span>}
-      </button>
-     );
-    })()}
-   </div>
-  </div>
- </div>
+ <AddMediaChooser
+  onClose={() => setAddMediaChooser(null)}
+  onPickPhoto={() => {
+   setAddMediaChooser(null);
+   photoInputRef.current?.click();
+  }}
+  onPickVideo={() => {
+   const t = addMediaChooser;
+   setAddMediaChooser(null);
+   setVideoCaptureTarget(t);
+  }}
+ />
  )}
 
  {/* Plan 7 — video capture + Cloudflare Stream direct-upload overlay. */}
@@ -2466,19 +2434,10 @@ export default function InspectionEditPage() {
 
  {/* Plan 4 — re-crop warning modal (annotation will be discarded). */}
  {recropWarn && (
- <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
- <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={() => setRecropWarn(null)} />
- <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover p-6 max-w-sm w-full border border-ih-border">
- <h3 className="text-[15px] font-bold text-ih-fg-1">Re-crop this photo?</h3>
- <p className="text-[13px] text-ih-fg-3 mt-2">
- Re-cropping will remove the existing annotation on this photo (its marks are tied to the previous crop).
- </p>
- <div className="flex justify-end gap-2 mt-4">
- <button onClick={() => setRecropWarn(null)} className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md">Cancel</button>
- <button onClick={() => { const r = recropWarn.run; setRecropWarn(null); r(); }} className="px-4 py-2 text-[13px] font-bold text-white bg-ih-bad hover:bg-ih-bad/85 rounded-md">Crop &amp; clear</button>
- </div>
- </div>
- </div>
+ <RecropWarningModal
+ onCancel={() => setRecropWarn(null)}
+ onConfirm={() => { const r = recropWarn.run; setRecropWarn(null); r(); }}
+ />
  )}
 
  {/* Inspection settings sheet */}
@@ -2512,352 +2471,89 @@ export default function InspectionEditPage() {
 
  {/* Unsaved changes blocker dialog */}
  {blocker.state === "blocked" && (
- <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
- <div
- className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm"
- onClick={cancelLeave}
+ <UnsavedChangesBlocker
+ onStay={cancelLeave}
+ onLeave={confirmLeave}
  />
- <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover p-6 max-w-sm w-full">
- <h3 className="text-[15px] font-bold text-ih-fg-1">
- Unsaved changes
- </h3>
- <p className="text-[13px] text-ih-fg-3 mt-2">
- You have unsaved changes. Are you sure you want to leave?
- </p>
- <div className="flex justify-end gap-2 mt-4">
- <button
- onClick={cancelLeave}
- className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md"
- >
- Stay
- </button>
- <button
- onClick={confirmLeave}
- className="px-4 py-2 text-[13px] font-bold text-white bg-ih-bad hover:bg-ih-bad/85 rounded-md"
- >
- Leave
- </button>
- </div>
- </div>
- </div>
  )}
 
  {/* Publish confirmation modal */}
  {state.showPublishModal && (
- <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
- <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={() => { setPublishError(null); state.setShowPublishModal(false); }} />
- <div className="relative bg-ih-bg-card rounded-xl shadow-ih-popover p-6 max-w-md w-full border border-ih-border">
- <h3 className="text-[16px] font-bold text-ih-fg-1">Publish Report</h3>
- <p className="text-[13px] text-ih-fg-3 mt-2">
- Publishing will finalize this inspection and make the report available to clients.
- {state.progress.pct < 100 && (
- <span className="block mt-2 text-ih-watch font-medium">
- Warning: Only {state.progress.rated} of {state.progress.total} items have been rated ({state.progress.pct}% complete).
- </span>
- )}
- </p>
- <div className="mt-4 p-3 rounded-lg bg-ih-bg-muted text-[12px] space-y-1">
- <div className="flex justify-between"><span className="text-ih-fg-3">Items rated</span><span className="font-bold">{state.progress.rated}/{state.progress.total}</span></div>
- <div className="flex justify-between"><span className="text-ih-fg-3">Completion</span><span className="font-bold">{state.progress.pct}%</span></div>
- <div className="flex justify-between"><span className="text-ih-fg-3">Status</span><span className="font-bold uppercase">{state.inspection.status as string}</span></div>
- </div>
- {publishError && (
- <div role="alert" className="mt-4 p-3 rounded-lg bg-ih-bad/10 border border-ih-bad/30 text-[12px] text-ih-bad font-medium">
- {publishError}
- </div>
- )}
- <div className="flex justify-end gap-2 mt-5">
- <button onClick={() => { setPublishError(null); state.setShowPublishModal(false); }} className="px-4 py-2 text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted rounded-md">Cancel</button>
- <button
- disabled={publishFetcher.state !== "idle"}
- onClick={() => {
+ <PublishModal
+ progress={{ rated: state.progress.rated, total: state.progress.total, pct: state.progress.pct }}
+ status={state.inspection.status as string}
+ publishError={publishError}
+ isSubmitting={publishFetcher.state !== "idle"}
+ onClose={() => { setPublishError(null); state.setShowPublishModal(false); }}
+ onPublish={() => {
  // Keep the modal open: the publish-result effect closes it on success
  // and shows the real server reason inline on failure.
  setPublishError(null);
  publishFetcher.submit({ intent: "publish" }, { method: "post" });
  }}
- className="px-4 py-2 text-[13px] font-bold text-white bg-ih-ok hover:bg-ih-ok/85 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
- >{publishFetcher.state !== "idle" ? "Publishing…" : "Publish Now"}</button>
- </div>
- </div>
- </div>
+ />
  )}
 
  {/* Inspector sign modal */}
  {signModalOpen && (
- <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
- <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={() => setSignModalOpen(false)} />
- <div className="relative bg-ih-bg-card rounded-xl shadow-ih-popover p-6 max-w-md w-full border border-ih-border">
- <h3 className="text-[16px] font-bold text-ih-fg-1">Inspector Signature</h3>
- <p className="text-[13px] text-ih-fg-3 mt-2 mb-4">
- Sign this inspection. The signature will be saved and can be included in the published report.
- </p>
- <SignaturePad
+ <SignModal
  onSubmit={handleSignSubmit}
  onCancel={() => setSignModalOpen(false)}
- label="Save signature"
+ failed={Boolean(signFetcher.data && !(signFetcher.data as { ok: boolean }).ok)}
  />
- {signFetcher.data && !(signFetcher.data as { ok: boolean }).ok && (
- <p className="text-sm text-ih-bad-fg mt-2">Failed to save signature. Please try again.</p>
- )}
- </div>
- </div>
  )}
 
  {/* Comment library drawer */}
  {state.showCommentLibrary && (
- <div className="fixed inset-0 z-[80] flex">
- <div
- className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm"
- onClick={() => state.setShowCommentLibrary(false)}
+ <CommentLibraryDrawer
+ comments={{
+ filterMode: comments.filterMode,
+ setFilterMode: comments.setFilterMode,
+ sort: comments.sort,
+ setSort: comments.setSort,
+ touchSnippet: comments.touchSnippet,
+ }}
+ state={{
+ activeItem: state.activeItem,
+ currentSection: state.currentSection,
+ activeItemId: state.activeItemId,
+ getResult: state.getResult,
+ getRatingLabel: state.getRatingLabel,
+ commentLibraryFilter: state.commentLibraryFilter,
+ setCommentLibraryFilter: state.setCommentLibraryFilter,
+ setCommentLibrarySelectedIdx: state.setCommentLibrarySelectedIdx,
+ commentLibrarySearch: state.commentLibrarySearch,
+ setCommentLibrarySearch: state.setCommentLibrarySearch,
+ commentLibrarySelectedIdx: state.commentLibrarySelectedIdx,
+ setShowCommentLibrary: state.setShowCommentLibrary,
+ }}
+ serverComments={serverComments}
+ onInsert={(sectionId, itemId, text) => findings.insertComment(sectionId, itemId, text)}
+ onClose={() => state.setShowCommentLibrary(false)}
  />
- <div className="relative ml-auto w-full max-w-md bg-ih-bg-card border-l border-ih-border shadow-ih-popover flex flex-col h-full">
- <div className="flex items-center justify-between px-4 py-3 border-b border-ih-border">
- <h3 className="text-[14px] font-bold">Comment Library</h3>
- <button
- onClick={() => state.setShowCommentLibrary(false)}
- className="text-ih-fg-4 hover:text-ih-fg-2 text-lg"
- >
- &#x2715;
- </button>
- </div>
-
- {/* Sort + Filter mode header */}
- <div className="flex items-center gap-3 px-3 py-2 border-b border-ih-border">
- <div className="flex items-center gap-1.5">
- <span className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4">Filter</span>
- <select
- value={comments.filterMode}
- onChange={e => comments.setFilterMode(e.target.value as 'auto' | 'all')}
- className="px-2 py-1 rounded border border-ih-border bg-ih-bg-app text-[11px]"
- >
- <option value="auto">Auto</option>
- <option value="all">All</option>
- </select>
- </div>
- <div className="flex items-center gap-1.5 ml-auto">
- <span className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4">Sort</span>
- <select
- value={comments.sort}
- onChange={e => comments.setSort(e.target.value)}
- className="px-2 py-1 rounded border border-ih-border bg-ih-bg-app text-[11px]"
- >
- <option value="relevance">Relevance</option>
- <option value="recent">Recent use</option>
- <option value="created">Recently added</option>
- <option value="frequent">Most used</option>
- <option value="alpha">A–Z</option>
- </select>
- </div>
- </div>
-
- {/* Context strip (auto mode + active item) */}
- {comments.filterMode === 'auto' && state.activeItem && (
- <div className="flex items-center gap-2 px-3 py-1.5 text-[11px] bg-ih-bg-muted border-b border-ih-border">
- <span className="text-ih-fg-4">Context:</span>
- <span>
- {state.currentSection?.title} › {(state.activeItem.label || state.activeItem.name) as string}
- </span>
- {Boolean(state.activeItemId && state.getResult(state.activeItemId)?.rating) && (
- <>
- <span className="text-ih-fg-4">·</span>
- <span>
- {state.getRatingLabel?.(state.getResult(state.activeItemId as string)?.rating as string) ?? ''}
- </span>
- </>
- )}
- <button
- onClick={() => comments.setFilterMode('all')}
- className="ml-auto text-ih-fg-4 hover:text-ih-fg-2"
- aria-label="Clear filter"
- >×</button>
- </div>
- )}
-
- {/* Filter chips */}
- <div className="flex gap-1 px-4 py-2 border-b border-ih-border flex-wrap">
- {[
- { id: "all", label: "All" },
- { id: "satisfactory", label: "Satisfactory" },
- { id: "monitor", label: "Monitor" },
- { id: "defect", label: "Defect" },
- { id: "my-snippets", label: "My Snippets" },
- ].map((f) => (
- <button
- key={f.id}
- onClick={() => {
- state.setCommentLibraryFilter(f.id);
- state.setCommentLibrarySelectedIdx(0);
- }}
- className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
- state.commentLibraryFilter === f.id
- ? "bg-ih-primary-tint text-ih-primary"
- : "text-ih-fg-4 hover:text-ih-fg-2"
- }`}
- >
- {f.label}
- </button>
- ))}
- </div>
-
- {/* Search */}
- <div className="px-4 py-2">
- <input
- id="comment-library-search"
- type="text"
- placeholder="Search comments..."
- value={state.commentLibrarySearch}
- onChange={(e) => {
- state.setCommentLibrarySearch(e.target.value);
- state.setCommentLibrarySelectedIdx(0);
- }}
- className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
- autoFocus
- />
- <p className="text-[10px] text-ih-fg-4 mt-1">
- {serverComments.length} comments
- </p>
- </div>
-
- {/* Comment list (server-fetched, sort/filter aware) */}
- <div className="flex-1 overflow-y-auto pb-2">
- <ul className="divide-y divide-ih-border">
- {serverComments.map((c, idx) => (
- <li
- key={c.id}
- onClick={() => {
- if (!state.currentSection || !state.activeItemId) return;
- findings.insertComment(
- state.currentSection.id,
- state.activeItemId,
- c.text,
- );
- comments.touchSnippet(c.id);
- state.setShowCommentLibrary(false);
- }}
- className={`cursor-pointer ${
- idx === state.commentLibrarySelectedIdx
- ? "bg-ih-primary-tint ring-1 ring-inset ring-ih-primary/30"
- : ""
- }`}
- >
- <div className="flex items-start gap-2 p-2.5 hover:bg-ih-bg-muted">
- <p className="flex-1 text-[12px] text-ih-fg-2 leading-relaxed">
- {c.text}
- </p>
- <span className="text-[10px] text-ih-fg-4 tabular-nums whitespace-nowrap">
- {comments.sort === 'recent'   && c.lastUsedAt ? formatRelativeTime(c.lastUsedAt) : ''}
- {comments.sort === 'frequent' && c.useCount   ? `${c.useCount}×`               : ''}
- </span>
- </div>
- </li>
- ))}
- </ul>
- {serverComments.length === 0 && (
- <p className="text-[13px] text-ih-fg-3 text-center py-8">
- No comments match the current filter.
- </p>
- )}
- </div>
- </div>
- </div>
  )}
 
  {/* Section picker modal */}
  {state.sectionPickerOpen && (
- <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[20vh]">
- <div className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => state.closeSectionPicker()} />
- <div className="relative w-full max-w-md bg-ih-bg-card rounded-xl shadow-ih-popover border border-ih-border overflow-hidden">
- <div className="px-4 py-3 border-b border-ih-border">
- <input
- id="section-picker-input"
- type="text"
- placeholder="Jump to section..."
- value={state.sectionPickerQuery}
- onChange={(e) => state.setSectionPickerQuery(e.target.value)}
- className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px]"
- autoFocus
+ <SectionPickerModal
+ sectionPickerQuery={state.sectionPickerQuery}
+ setSectionPickerQuery={state.setSectionPickerQuery}
+ filteredSectionsForPicker={state.filteredSectionsForPicker}
+ sections={state.sections}
+ pickSection={state.pickSection}
+ closeSectionPicker={state.closeSectionPicker}
  />
- </div>
- <div className="max-h-60 overflow-y-auto">
- {state.filteredSectionsForPicker.map((sec) => (
- <button
- key={sec.idx}
- onClick={() => state.pickSection(sec.idx)}
- className="w-full text-left px-4 py-2.5 text-[13px] hover:bg-ih-bg-muted flex items-center justify-between"
- >
- <span className="font-medium text-ih-fg-1">{sec.title}</span>
- <span className="text-[11px] text-ih-fg-3">{state.sections[sec.idx]?.items?.length || 0} items</span>
- </button>
- ))}
- {state.filteredSectionsForPicker.length === 0 && (
- <p className="text-center text-[13px] text-ih-fg-3 py-6">No sections match</p>
- )}
- </div>
- </div>
- </div>
  )}
 
  {/* Tag picker modal */}
  {tagPickerOpen && state.activeItemId && (
- <div className="fixed inset-0 z-[95] flex items-start justify-center pt-[20vh]">
-  <div className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setTagPickerOpen(false)} />
-  <div className="relative w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover border border-ih-border overflow-hidden">
-  <div className="px-4 py-3 border-b border-ih-border flex items-center justify-between">
-   <h3 className="text-[14px] font-bold text-ih-fg-1">Tags</h3>
-   <button
-   onClick={() => setTagPickerOpen(false)}
-   className="text-ih-fg-4 hover:text-ih-fg-2 text-lg"
-   >
-   &#x2715;
-   </button>
-  </div>
-  <div className="p-3 space-y-1.5">
-   {PRESET_TAGS.map((tag) => {
-   const currentTags = state.tagsByItem[state.activeItemId!] || [];
-   const isActive = currentTags.some(t => t.id === tag.id);
-   return (
-    <button
-    key={tag.id}
-    onClick={() => toggleTag(tag)}
-    className={`w-full text-left px-3 py-2.5 rounded-lg text-[13px] font-medium flex items-center gap-3 transition-colors ${
-     isActive
-     ? "bg-ih-bg-muted ring-1 ring-inset"
-     : "hover:bg-ih-bg-muted"
-    }`}
-    style={isActive ? { "--tw-ring-color": tag.color } as React.CSSProperties : undefined}
-    >
-    <span
-     className="w-3 h-3 rounded-full flex-shrink-0"
-     style={{ backgroundColor: tag.color }}
-    />
-    <span className="flex-1 text-ih-fg-1">{tag.name}</span>
-    {isActive && (
-     <svg className="w-4 h-4 text-ih-ok" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-     </svg>
-    )}
-    </button>
-   );
-   })}
-  </div>
-  {(state.tagsByItem[state.activeItemId!] || []).length > 0 && (
-   <div className="px-4 py-2 border-t border-ih-border">
-   <div className="flex flex-wrap gap-1.5">
-    {(state.tagsByItem[state.activeItemId!] || []).map(tag => (
-    <span
-     key={tag.id}
-     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-white"
-     style={{ backgroundColor: tag.color || '#6b7280' }}
-    >
-     {tag.name}
-    </span>
-    ))}
-   </div>
-   </div>
-  )}
-  </div>
- </div>
+ <TagPickerModal
+  activeItemId={state.activeItemId}
+  tagsByItem={state.tagsByItem}
+  presetTags={PRESET_TAGS}
+  onToggle={toggleTag}
+  onClose={() => setTagPickerOpen(false)}
+ />
  )}
 
  {/* Publish gate modal */}
