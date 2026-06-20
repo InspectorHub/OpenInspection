@@ -85,9 +85,9 @@ describe('computeOnboardingSteps', () => {
     expect(steps.find((s) => s.id === 'company')!.href).toBe('/settings/workspace');
   });
 
-  it('template step links to /templates', () => {
+  it('template step links to /library/templates', () => {
     const steps = computeOnboardingSteps({ siteNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
-    expect(steps.find((s) => s.id === 'template')!.href).toBe('/templates');
+    expect(steps.find((s) => s.id === 'template')!.href).toBe('/library/templates');
   });
 
   it('services step links to /settings/services', () => {

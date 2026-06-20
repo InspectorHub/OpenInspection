@@ -1,5 +1,35 @@
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useLoaderData } from "react-router";
+import type { Route } from "./+types/settings-inspection-types";
+import { createApi } from "~/lib/api-client.server";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
+
+interface ApiInspectionType {
+  id: string;
+  name: string;
+  basedOn: string | null;
+  description: string | null;
+  enabled: boolean;
+  sortOrder: number | null;
+}
+
+export async function loader({ request, context }: Route.LoaderArgs) {
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const, orgTypes: [] as ApiInspectionType[] };
+  try {
+    const api = createApi(context, { token });
+    const res = await api.inspectionTypes["inspection-types"].$get();
+    if (!res.ok) return { forbidden: false as const, orgTypes: [] as ApiInspectionType[] };
+    const body = await res.json();
+    return {
+      forbidden: false as const,
+      orgTypes: ((body as Record<string, unknown>).data ?? []) as ApiInspectionType[],
+    };
+  } catch {
+    return { forbidden: false as const, orgTypes: [] as ApiInspectionType[] };
+  }
+}
 
 interface PlatformSubtype {
   slug: string;
@@ -15,8 +45,16 @@ interface OrgSubtype {
   basedOn: string;
   description: string;
   enabled: boolean;
-  templateCount: number;
-  inspectionCount: number;
+}
+
+function toOrgSubtype(t: ApiInspectionType): OrgSubtype {
+  return {
+    id: t.id,
+    name: t.name,
+    basedOn: t.basedOn ?? "",
+    description: t.description ?? "",
+    enabled: t.enabled,
+  };
 }
 
 const PLATFORM_SUBTYPES: PlatformSubtype[] = [
@@ -31,12 +69,17 @@ const PLATFORM_SUBTYPES: PlatformSubtype[] = [
 const EMPTY_FORM = { name: "", basedOn: "", description: "" };
 
 export default function SettingsInspectionTypes() {
+  const data = useLoaderData<typeof loader>();
   const [platformSubtypes] = useState<PlatformSubtype[]>(PLATFORM_SUBTYPES);
-  const [orgSubtypes, setOrgSubtypes] = useState<OrgSubtype[]>([]);
+  const [orgSubtypes, setOrgSubtypes] = useState<OrgSubtype[]>(
+    data.orgTypes.map(toOrgSubtype),
+  );
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  if (data.forbidden) return <AccessDenied />;
 
   function openAdd() {
     setEditingId(null);
@@ -51,34 +94,58 @@ export default function SettingsInspectionTypes() {
   }
 
   async function save() {
+    if (!form.name.trim() || saving) return;
     setSaving(true);
-    // API integration will be wired in a later phase
-    const newSubtype: OrgSubtype = {
-      id: editingId ?? crypto.randomUUID(),
+    const body = {
       name: form.name,
-      basedOn: form.basedOn,
-      description: form.description,
-      enabled: true,
-      templateCount: 0,
-      inspectionCount: 0,
+      basedOn: form.basedOn || undefined,
+      description: form.description || undefined,
     };
-    if (editingId) {
-      setOrgSubtypes((prev) =>
-        prev.map((o) => (o.id === editingId ? newSubtype : o)),
-      );
-    } else {
-      setOrgSubtypes((prev) => [...prev, newSubtype]);
+    const url = editingId
+      ? `/api/admin/inspection-types/${editingId}`
+      : "/api/admin/inspection-types";
+    const res = await fetch(url, {
+      method: editingId ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      if (editingId) {
+        const id = editingId;
+        setOrgSubtypes((prev) =>
+          prev.map((o) =>
+            o.id === id
+              ? { ...o, name: form.name, basedOn: form.basedOn, description: form.description }
+              : o,
+          ),
+        );
+      } else {
+        const json = (await res.json()) as { data?: ApiInspectionType };
+        if (json.data) {
+          const created = toOrgSubtype(json.data);
+          setOrgSubtypes((prev) => [...prev, created]);
+        }
+      }
+      setModalOpen(false);
     }
-    setModalOpen(false);
     setSaving(false);
   }
 
-  function toggleOrg(ot: OrgSubtype) {
-    setOrgSubtypes((prev) =>
-      prev.map((o) =>
-        o.id === ot.id ? { ...o, enabled: !o.enabled } : o,
-      ),
-    );
+  async function toggleOrg(ot: OrgSubtype) {
+    const next = !ot.enabled;
+    const res = await fetch(`/api/admin/inspection-types/${ot.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      body: JSON.stringify({ enabled: next }),
+    });
+    if (res.ok) {
+      const id = ot.id;
+      setOrgSubtypes((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, enabled: next } : o)),
+      );
+    }
   }
 
   return (
@@ -175,13 +242,28 @@ export default function SettingsInspectionTypes() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="font-bold text-[13px] text-ih-fg-1">
-                      {ot.name}
-                    </p>
-                    <p className="text-[11px] text-ih-fg-3 mt-1">
-                      {ot.templateCount} templates &middot;{" "}
-                      {ot.inspectionCount} inspections
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-[13px] text-ih-fg-1 truncate">
+                        {ot.name}
+                      </p>
+                      {!ot.enabled && (
+                        <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-3 flex-shrink-0">
+                          Disabled
+                        </span>
+                      )}
+                    </div>
+                    {ot.basedOn && (
+                      <p className="text-[11px] text-ih-fg-3 mt-1">
+                        Based on{" "}
+                        {platformSubtypes.find((pt) => pt.slug === ot.basedOn)?.name ??
+                          ot.basedOn}
+                      </p>
+                    )}
+                    {ot.description && (
+                      <p className="text-[11px] text-ih-fg-3 mt-1 line-clamp-2">
+                        {ot.description}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-col gap-1">
                     <button

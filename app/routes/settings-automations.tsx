@@ -3,6 +3,8 @@ import { Link, useLoaderData, Form, useNavigation, useFetcher } from "react-rout
 import type { Route } from "./+types/settings-automations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 export function meta() {
   return [{ title: "Automations - Settings - OpenInspection" }];
@@ -60,7 +62,8 @@ export function buildConditions(input: { requirePaid: boolean; requireSigned: bo
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
   const [rulesRes, svcRes, logsRes, cfgRes] = await Promise.all([
     api.automations.index.$get().catch(() => null),
@@ -130,9 +133,12 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function SettingsAutomations() {
-  const { rules, services, recentLogs, reviewUrl } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
   const nav = useNavigation();
   const [editing, setEditing] = useState<Rule | null | "new">(null);
+
+  if ("forbidden" in data) return <AccessDenied />;
+  const { rules, services, recentLogs, reviewUrl } = data;
 
   return (
     <div className="space-y-[18px]">

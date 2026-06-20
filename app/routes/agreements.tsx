@@ -4,6 +4,7 @@ import type { Route } from "./+types/agreements";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { Breadcrumb } from "~/components/Breadcrumb";
 import { SignaturePad } from "~/components/SignaturePad";
 import { SignerList, type SignerRow } from "~/components/agreements/SignerList";
 import { SendAgreementModal, type SendAgreementPayload } from "~/components/agreements/SendAgreementModal";
@@ -310,8 +311,8 @@ export default function AgreementsPage() {
 
   return (
     <div className="space-y-[18px]">
+      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Agreements" }]} />
       <PageHeader
-        eyebrow="Library · Agreements"
         title="Agreements"
         meta={`${templates.length} templates · ${requests.length} requests`}
         actions={<Button variant="primary">+ New agreement</Button>}

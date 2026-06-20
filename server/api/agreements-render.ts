@@ -137,11 +137,17 @@ export async function agreementRenderHandler(
   if (!reqRow || reqRow.status !== 'signed' || !reqRow.signatureBase64) {
     return new Response('Not Found', { status: 404 });
   }
-  const tenant = await db.select({ slug: schema.tenants.slug })
-    .from(schema.tenants).where(eq(schema.tenants.id, reqRow.tenantId)).get();
-  if (!tenant || tenant.slug !== tenantSlug) {
-    return new Response('Not Found', { status: 404 });
-  }
+  // The unguessable envelope `requestId` (UUIDv4) IS the access credential —
+  // identical posture to /m2m/cert-render/:id and the public /verify/:id surface
+  // (both resolve by id alone). The `tenantSlug` path segment is INFORMATIONAL
+  // only and MUST NOT gate the render. A slug gate here caused a production
+  // incident: the public sign route POSTs to /api/public/agreements/:token/sign
+  // (no :tenant segment) so requestedTenantSlug was '', the sign-completion
+  // workflow built /m2m/agreement-render//<id> (empty slug → router 404), and
+  // Browser Rendering rasterized that "Not found" page straight into the emailed
+  // signed.pdf. The public tenant slug adds no real entropy over the requestId,
+  // so gating on it bought nothing but this failure mode.
+  void tenantSlug;
   const agreement = await db.select().from(schema.agreements)
     .where(eq(schema.agreements.id, reqRow.agreementId)).get();
   if (!agreement) return new Response('Not Found', { status: 404 });

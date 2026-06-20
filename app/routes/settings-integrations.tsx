@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Link,
   useLoaderData,
@@ -12,7 +12,11 @@ import type { Route } from "./+types/settings-integrations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SecretField } from "~/components/SecretField";
+import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { useFlash } from "~/hooks/useFlash";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 export function meta() {
   return [{ title: "Integrations - Settings - OpenInspection" }];
@@ -21,7 +25,8 @@ export function meta() {
 type WebhookLogEntry = { ts: string; eventType: string; result: string };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
   const [secretsRes, logRes] = await Promise.all([
     api.secrets.secrets.$get().catch(() => null),
@@ -189,33 +194,32 @@ function WebhookResultBadge({ result }: { result: string }) {
 }
 
 export default function SettingsIntegrations() {
-  const { secrets, webhookBase, webhookLog } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const revalidator = useRevalidator();
   const testFetcher = useFetcher<typeof action>();
   const ctx = useSessionContext();
 
-  const tenantSlug = ctx?.branding?.tenantSlug ?? null;
-  const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
-
-  const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save-stripe-secrets";
-
   // Transient success flash — visible for 4s after a save round-trip.
   // Errors persist until the next attempt (no auto-dismiss).
-  const [flashVisible, setFlashVisible] = useState(false);
-  useEffect(() => {
-    if (actionData?.intent === "save-stripe-secrets" && actionData.success) {
-      setFlashVisible(true);
-      const t = setTimeout(() => setFlashVisible(false), 4000);
-      return () => clearTimeout(t);
-    }
-  }, [actionData]);
+  const { flashVisible } = useFlash(
+    actionData?.intent === "save-stripe-secrets" && !!actionData.success,
+    actionData,
+  );
 
   // Eager-after-error client validation: validate on submit; after the first
   // failed submit, re-validate on every change inside the form.
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submittedOnce, setSubmittedOnce] = useState(false);
+
+  if ("forbidden" in data) return <AccessDenied />;
+  const { secrets, webhookBase, webhookLog } = data;
+
+  const tenantSlug = ctx?.branding?.tenantSlug ?? null;
+  const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
+
+  const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save-stripe-secrets";
 
   const serverField = actionData?.intent === "save-stripe-secrets" && !actionData.success
     ? actionData.field
@@ -328,12 +332,7 @@ export default function SettingsIntegrations() {
         </Form>
 
         {/* Test connection — probes the STORED secret key, no re-entry needed */}
-        <testFetcher.Form method="post" className="flex flex-wrap items-center gap-3">
-          <input type="hidden" name="intent" value="test-stripe" />
-          <button type="submit" disabled={testFetcher.state !== "idle"}
-            className="h-8 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
-            {testFetcher.state !== "idle" ? "Testing…" : "Test connection"}
-          </button>
+        <TestConnectionButton fetcher={testFetcher} intent="test-stripe">
           {testFetcher.data?.intent === "test-stripe" && testFetcher.data.test && (
             <span className="text-[12px] text-ih-fg-2">
               Connected: <span className="font-semibold">{testFetcher.data.test.accountName}</span>
@@ -349,7 +348,7 @@ export default function SettingsIntegrations() {
           {testFetcher.data?.intent === "test-stripe" && !testFetcher.data.success && (
             <span className="text-[12px] text-ih-bad-fg">{testFetcher.data.error}</span>
           )}
-        </testFetcher.Form>
+        </TestConnectionButton>
 
         {/* Webhook endpoint to register in the Stripe dashboard */}
         <div className="pt-1 space-y-1.5">

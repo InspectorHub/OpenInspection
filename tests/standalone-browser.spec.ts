@@ -201,14 +201,14 @@ test.describe.serial('Standalone Browser Tests', () => {
     // ── Templates Page ────────────────────────────────────────────────────────
 
     test('UI-06: Templates page shows created template', async ({ page }) => {
-        await gotoAuth(page, '/templates', adminToken);
+        await gotoAuth(page, '/library/templates', adminToken);
         await page.waitForSelector('#templatesList tr:not(#loadingRow)', { timeout: 10000 });
         const row = page.locator('#templatesList tr', { hasText: 'Browser Test Template' });
         await expect(row.first()).toBeVisible();
     });
 
     test('UI-07: Templates page uses standard terminology', async ({ page }) => {
-        await gotoAuth(page, '/templates', adminToken);
+        await gotoAuth(page, '/library/templates', adminToken);
         const createBtn = page.locator('button:has-text("New Template"), button:has-text("Create Template")');
         await expect(createBtn.first()).toBeVisible();
 
@@ -269,7 +269,7 @@ test.describe.serial('Standalone Browser Tests', () => {
     // ── Agreements Page ───────────────────────────────────────────────────────
 
     test('UI-11: Agreements page loads and uses standard terms', async ({ page }) => {
-        await gotoAuth(page, '/agreements', adminToken);
+        await gotoAuth(page, '/library/agreements', adminToken);
         await expect(page.locator('#agreementsList')).toBeVisible({ timeout: 10000 });
         await expect(page.locator('button:has-text("New Agreement")')).toBeVisible();
 
@@ -328,7 +328,7 @@ test.describe.serial('Standalone Browser Tests', () => {
     // ── Full Jargon Scan ──────────────────────────────────────────────────────
 
     test('UI-16: No sci-fi jargon on any authenticated page', async ({ page }) => {
-        const pagesToCheck = ['/dashboard', '/templates', '/team', '/settings', '/agreements'];
+        const pagesToCheck = ['/dashboard', '/library/templates', '/team', '/settings', '/library/agreements'];
 
         for (const path of pagesToCheck) {
             await gotoAuth(page, path, adminToken);

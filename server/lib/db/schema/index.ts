@@ -19,6 +19,7 @@ export {
     automations,
     automationLogs,
     eventTypes,
+    inspectionTypes,
     inspectionEvents,
     inspectionRequests,
     inspectionMediaPool,

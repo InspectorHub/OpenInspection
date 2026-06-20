@@ -592,7 +592,7 @@ export function ReportView(props: ReportViewProps) {
             <button
               type="button"
               onClick={() => setRepairPanel(!repairPanel)}
-              className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-white flex items-center gap-2"
+              className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg flex items-center gap-2"
             >
               Repair Request
             </button>
@@ -656,7 +656,7 @@ export function ReportView(props: ReportViewProps) {
               onClick={() => setFilter(f)}
               className={`px-4 py-1.5 text-xs font-semibold rounded-full transition-all ${
                 filter === f
-                  ? "bg-ih-primary text-white"
+                  ? "bg-ih-primary text-ih-primary-fg"
                   : "border border-ih-border text-ih-fg-3"
               }`}
             >
@@ -1058,7 +1058,7 @@ export function ReportView(props: ReportViewProps) {
                     </button>
                     <button
                       type="button"
-                      className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-white"
+                      className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg"
                     >
                       Send to Inspector
                     </button>

@@ -71,9 +71,7 @@ export default function InspectionsPage() {
   return (
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
       <PageHeader
-        eyebrow="INSPECTIONS"
-        eyebrowColor="indigo"
-        title="All Inspections"
+        title={`${inspections.length} ${inspections.length === 1 ? "Inspection" : "Inspections"}`}
         meta={<>{inspections.length} total</>}
       />
 

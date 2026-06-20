@@ -1,6 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/repair-request.$shareToken";
 import { createApi } from "~/lib/api-client.server";
+import { PublicNotice } from "~/components/PublicNotice";
 
 export function meta() {
   return [{ title: "Repair Request - OpenInspection" }];
@@ -122,32 +123,25 @@ export default function RepairRequestSharePage() {
 
   if (result.kind === "not_found") {
     return (
-      <div className="max-w-xl mx-auto p-6 text-center">
-        <h1 className="text-2xl font-bold text-ih-fg-1">Not Found</h1>
-        <p className="text-ih-fg-3 mt-2 text-[14px]">
-          This repair request link is invalid or has expired.
-        </p>
-      </div>
+      <PublicNotice title="Not found">
+        This repair request link is invalid or has expired.
+      </PublicNotice>
     );
   }
 
   if (result.kind === "error") {
     return (
-      <div className="max-w-xl mx-auto p-6 text-center">
-        <h1 className="text-2xl font-bold text-ih-bad-fg">Error</h1>
-        <p className="text-ih-fg-3 mt-2 text-[14px]">{result.message}</p>
-      </div>
+      <PublicNotice title="Error" tone="error">
+        {result.message}
+      </PublicNotice>
     );
   }
 
   if (result.kind === "not_published") {
     return (
-      <div className="max-w-xl mx-auto p-6">
-        <div className="rounded-lg bg-ih-bad-bg text-ih-bad-fg p-4 text-center mb-6">
-          <p className="text-lg font-bold">Not published</p>
-          <p className="text-[13px] mt-1">This report is not published.</p>
-        </div>
-      </div>
+      <PublicNotice title="Report not published">
+        This report is not published.
+      </PublicNotice>
     );
   }
 

@@ -6,6 +6,9 @@ import type { Route } from "./+types/settings-services";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { createServiceSchema } from "~/lib/forms/settings.schema";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
+import { SCHEDULING_ROLES_SET } from "~/lib/settings/constants";
 
 export function meta() {
   return [{ title: "Services & Catalog - Settings - OpenInspection" }];
@@ -34,11 +37,9 @@ interface Member {
   createdAt: string;
 }
 
-// Scheduling roles that may be restricted per-service.
-const SCHEDULING_ROLES = new Set(["owner", "manager", "inspector"]);
-
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const };
   try {
     const api = createApi(context, { token });
     const [svcRes, discountRes, membersRes] = await Promise.all([
@@ -76,7 +77,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     if (membersRes?.ok) {
       const mb = (await membersRes.json()) as Record<string, unknown>;
       const raw = ((mb.data ?? []) as Member[]);
-      members = raw.filter((m) => SCHEDULING_ROLES.has(m.role));
+      members = raw.filter((m) => SCHEDULING_ROLES_SET.has(m.role));
     }
 
     return {
@@ -312,7 +313,7 @@ function QualificationWidget({ service, initialUserIds, members }: Qualification
 }
 
 export default function SettingsServices() {
-  const { services, discounts, restrictionMap, members } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [showForm, setShowForm] = useState(false);
 
@@ -327,6 +328,9 @@ export default function SettingsServices() {
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
   });
+
+  if ("forbidden" in data) return <AccessDenied />;
+  const { services, discounts, restrictionMap, members } = data;
 
   return (
     <div className="space-y-[18px]">

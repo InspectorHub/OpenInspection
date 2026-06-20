@@ -6,6 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { SeatBanner } from "~/components/SeatBanner";
 import { InviteSeatModal } from "~/components/modals/InviteSeatModal";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 
 export function meta() {
@@ -70,9 +71,14 @@ export default function TeamPage() {
         <SeatBanner usage={sessionCtx.seatUsage} billingUrl={sessionCtx.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined} />
       )}
 
+      <Breadcrumb
+        items={[
+          { label: "Settings", href: "/settings" },
+          { label: "Team" },
+        ]}
+      />
+
       <PageHeader
-        eyebrow="SETTINGS &middot; TEAM"
-        eyebrowColor="slate"
         title="Workspace Team"
         meta={`${members.length} ${members.length === 1 ? "member" : "members"}`}
         actions={

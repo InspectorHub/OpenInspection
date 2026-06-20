@@ -4,7 +4,9 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { formatCents } from "~/lib/hub-blocks";
-import { PageHeader, Card, EmptyState } from "@core/shared-ui";
+import { humanizeStatus, capitalize } from "~/lib/status";
+import { Breadcrumb } from "~/components/Breadcrumb";
+import { PageHeader, Card, Pill, EmptyState } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Contact - OpenInspection" }];
@@ -64,28 +66,6 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Status humanization                                               */
-/* ------------------------------------------------------------------ */
-
-/**
- * snake_case status → Title Case (e.g. "in_progress" → "In Progress"). A small
- * copy of the same helper in inspection-hub.tsx — that one is a non-exported
- * module-local function; copying it here keeps each route self-contained rather
- * than promoting a one-liner to a shared module.
- */
-function humanizeStatus(status: string): string {
-  return status
-    .split("_")
-    .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
-    .join(" ");
-}
-
-/** Capitalize the contact type for the eyebrow ("client" → "Client"). */
-function capitalize(s: string): string {
-  return s ? s[0].toUpperCase() + s.slice(1) : s;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -96,12 +76,28 @@ export default function ContactDetailPage() {
 
   return (
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
-      {/* PageHeader — type eyebrow, name title, agency/email meta */}
+      {/* Breadcrumb — Contacts > this contact */}
+      <Breadcrumb
+        items={[
+          { label: "Contacts", href: "/contacts" },
+          { label: contact.name },
+        ]}
+      />
+
+      {/* PageHeader — type pill in meta, name title, agency/email meta */}
       <PageHeader
-        eyebrow={`${capitalize(contact.type)}${archived ? " · Archived" : ""}`}
-        eyebrowColor="indigo"
         title={contact.name}
-        meta={contact.type === "agent" ? contact.agency || contact.email || "" : contact.email || ""}
+        meta={
+          <span className="flex items-center gap-2 flex-wrap">
+            <Pill tone="info">{capitalize(contact.type)}</Pill>
+            {archived && <Pill tone="neutral">Archived</Pill>}
+            <span className="text-ih-fg-3">
+              {contact.type === "agent"
+                ? contact.agency || contact.email || ""
+                : contact.email || ""}
+            </span>
+          </span>
+        }
         actions={
           <Link
             to="/contacts"

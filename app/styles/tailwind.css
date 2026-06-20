@@ -14,6 +14,10 @@
   --color-ih-primary-700: var(--ih-primary-700);
   --color-ih-primary-tint: var(--ih-primary-tint);
   --color-ih-primary-glow: var(--ih-primary-glow);
+  /* Readable foreground for content on `bg-ih-primary`. Defaults to white
+     (the stock primary is dark); brandTokens() re-points it per surface via
+     a YIQ contrast pick so a bright brand color flips to dark text. */
+  --color-ih-primary-fg: var(--ih-primary-fg, #ffffff);
 
   /* ── Foreground / text ── */
   --color-ih-fg-1: var(--ih-fg-1);

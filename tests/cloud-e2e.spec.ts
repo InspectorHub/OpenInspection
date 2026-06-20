@@ -80,7 +80,7 @@ test.describe.serial('Cloud E2E Tests (HTTPS)', () => {
         await page.waitForURL('**/dashboard', { timeout: NAV_TIMEOUT });
 
         // Navigate to multiple pages — should stay authenticated
-        const protectedPages = ['/templates', '/team', '/settings', '/agreements'];
+        const protectedPages = ['/library/templates', '/team', '/settings', '/library/agreements'];
         for (const path of protectedPages) {
             await page.goto(`${BASE_URL}${path}`, { timeout: NAV_TIMEOUT });
             expect(page.url(), `${path} must not redirect to login`).not.toContain('/login');
@@ -99,11 +99,11 @@ test.describe.serial('Cloud E2E Tests (HTTPS)', () => {
         await page.waitForURL('**/dashboard', { timeout: NAV_TIMEOUT });
 
         // Try to access admin-only page
-        await page.goto(`${BASE_URL}/templates`, { timeout: NAV_TIMEOUT });
+        await page.goto(`${BASE_URL}/library/templates`, { timeout: NAV_TIMEOUT });
         // With real cookies, the redirect chain works properly:
-        // /templates → 302 /dashboard?error=unauthorized_role → renders dashboard
-        expect(page.url(), 'Inspector must be redirected away from /templates').toContain('/dashboard');
-        expect(page.url()).not.toContain('/templates');
+        // /library/templates → 302 /dashboard?error=unauthorized_role → renders dashboard
+        expect(page.url(), 'Inspector must be redirected away from /library/templates').toContain('/dashboard');
+        expect(page.url()).not.toContain('/library/templates');
     });
 
     test('CLOUD-05: Inspector redirected from settings to /dashboard', async ({ page }) => {

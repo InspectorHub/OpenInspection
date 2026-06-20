@@ -65,7 +65,14 @@ describe('agreement-render handler', () => {
     expect(body).toContain('Agreement body');
   });
 
-  it('returns 404 when tenant slug does not match', async () => {
+  // The unguessable envelope requestId IS the credential (same posture as
+  // cert-render and the public /verify/:id surface). The tenant slug segment is
+  // informational only — it MUST NOT gate the render. Gating on it caused a
+  // production incident: the public sign route POSTs to /api/public/agreements/
+  // :token/sign (no :tenant segment), so requestedTenantSlug was '', the workflow
+  // built /m2m/agreement-render//<id> (empty slug → router 404), and Browser
+  // Rendering rasterized that "Not found" page into the emailed signed.pdf.
+  it('renders regardless of the slug segment (resolves by requestId, wrong slug)', async () => {
     await db.insert(schema.agreementRequests).values({
       id: REQ_ID, tenantId: TENANT_A, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane',
@@ -73,7 +80,18 @@ describe('agreement-render handler', () => {
       signedAt: new Date(), createdAt: new Date(),
     });
     const res = await agreementRenderHandler({} as D1Database, 'wrongslug', REQ_ID);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+  });
+
+  it('renders even when the slug segment is empty (regression: empty requestedTenantSlug)', async () => {
+    await db.insert(schema.agreementRequests).values({
+      id: REQ_ID, tenantId: TENANT_A, agreementId: AGR_ID,
+      clientEmail: 'jane@x', clientName: 'Jane',
+      token: TOKEN_A, status: 'signed', signatureBase64: 'data:image/png;base64,xyz',
+      signedAt: new Date(), createdAt: new Date(),
+    });
+    const res = await agreementRenderHandler({} as D1Database, '', REQ_ID);
+    expect(res.status).toBe(200);
   });
 
   it('renders inspector block when inspector pre-signed', async () => {

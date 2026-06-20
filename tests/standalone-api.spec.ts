@@ -259,8 +259,8 @@ test.describe.serial('Standalone API Tests', () => {
         expect(res.headers()['location']).toContain('/login');
     });
 
-    test('API-16: Inspector GET /templates gets redirected (RBAC)', async ({ request }) => {
-        const res = await fetchPage(request, '/templates', inspectorToken);
+    test('API-16: Inspector GET /library/templates gets redirected (RBAC)', async ({ request }) => {
+        const res = await fetchPage(request, '/library/templates', inspectorToken);
         // Inspector is not in allowedRoles ['owner','admin'] → redirect to /dashboard
         expect(res.status(), 'Inspector must be redirected from admin-only page').toBe(302);
         expect(res.headers()['location']).toContain('/dashboard');

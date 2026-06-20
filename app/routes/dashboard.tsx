@@ -12,7 +12,7 @@ import { SeatBanner } from "~/components/SeatBanner";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
-import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished } from "~/lib/status";
+import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, statusTone } from "~/lib/status";
 import { PageHeader, TabStrip, Pill, Card, EmptyState, Button, Icon } from "@core/shared-ui";
 
 export function meta() {
@@ -739,15 +739,6 @@ export default function DashboardPage() {
     ? Object.values(filteredBuckets).flat().length
     : filteredInspections.length;
 
-  /* ---- Status → Pill tone mapping (inspection lifecycle axis) ---- */
-  const statusTone: Record<string, "ni" | "info" | "monitor" | "sat" | "gen"> = {
-    requested: "ni",
-    scheduled: "info",
-    confirmed: "info",
-    completed: "sat",
-    cancelled: "gen",
-  };
-
   // #111: tenant slug for the public report deep-link (Published tab). Available
   // from the auth-layout session context the dashboard already consumes.
   const tenantSlug = sessionCtx?.branding?.tenantSlug ?? null;
@@ -797,7 +788,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-4">
             {isColumnVisible("statusIcons") && (
-              <Pill tone={statusTone[insp.status] ?? "gen"}>
+              <Pill tone={statusTone(insp.status)}>
                 {insp.status.replace(/_/g, " ")}
               </Pill>
             )}
@@ -879,8 +870,6 @@ export default function DashboardPage() {
 
       {/* PageHeader */}
       <PageHeader
-        eyebrow="DASHBOARD"
-        eyebrowColor="indigo"
         title={greeting}
         meta={
           <>

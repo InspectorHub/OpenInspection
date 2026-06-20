@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/settings-event-types";
-import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { requireAdminLoader } from "~/lib/access.server";
+import { AccessDenied } from "~/components/AccessDenied";
 
 interface EventType {
   id: string;
@@ -20,7 +21,8 @@ export function meta() {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const token = await requireToken(context, request);
+  const { forbidden, token } = await requireAdminLoader(context, request);
+  if (forbidden) return { forbidden: true as const, types: [] as EventType[] };
   try {
     const api = createApi(context, { token });
     const res = await api.admin["event-types"].$get();
@@ -42,12 +44,14 @@ const EMPTY_FORM = {
 };
 
 export default function SettingsEventTypes() {
-  const { types: initial } = useLoaderData<typeof loader>();
-  const [types, setTypes] = useState<EventType[]>(initial as EventType[]);
+  const data = useLoaderData<typeof loader>();
+  const [types, setTypes] = useState<EventType[]>(data.types as EventType[]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+
+  if ("forbidden" in data) return <AccessDenied />;
 
   function openCreate() {
     setEditingId(null);
