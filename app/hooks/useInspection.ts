@@ -1,4 +1,10 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { backfillLevelDescriptions } from "./inspection/helpers";
+import type { InspectionContext } from "./inspection/helpers";
+import { useInspectionProgress } from "./inspection/useInspectionProgress";
+import { useInspectionNavigation } from "./inspection/useInspectionNavigation";
+import { useInspectionSearch } from "./inspection/useInspectionSearch";
+import { useInspectionBatch } from "./inspection/useInspectionBatch";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -87,44 +93,6 @@ export type ViewMode = "split" | "focus" | "preview";
 export type ItemFilter = "all" | "unrated" | "issues" | "flagged";
 
 /* ------------------------------------------------------------------ */
-/*  Fallback rating level descriptions                                 */
-/* ------------------------------------------------------------------ */
-
-const FALLBACK_DESCRIPTIONS: Record<string, string> = {
-  S: "Item is functioning as intended; no concerns observed.",
-  Sat: "Item is functioning as intended; no concerns observed.",
-  Satisfactory: "Item is functioning as intended; no concerns observed.",
-  M: "Item is functional but shows wear; recommend periodic re-inspection.",
-  Mon: "Item is functional but shows wear; recommend periodic re-inspection.",
-  Monitor: "Item is functional but shows wear; recommend periodic re-inspection.",
-  D: "Item is broken, deteriorated, or unsafe; recommend repair or replacement.",
-  Defect: "Item is broken, deteriorated, or unsafe; recommend repair or replacement.",
-  Defective: "Item is not functioning as intended; repair or replacement is recommended.",
-  NI: "Item could not be inspected (inaccessible, unsafe, or excluded).",
-  "Not Inspected": "Item could not be inspected (inaccessible, unsafe, or excluded).",
-  NP: "Item is not present at this property.",
-  "Not Present": "Item is not present at this property.",
-  I: "Item was inspected and meets the Standards of Practice.",
-  Inspected: "Item was inspected and meets the Standards of Practice.",
-  F: "Item visually inspected and observed to be in serviceable, functional condition.",
-  Functional: "Item visually inspected and observed to be in serviceable, functional condition.",
-  H: "Item presents an immediate safety hazard and should be addressed without delay.",
-  Hazardous: "Item presents an immediate safety hazard and should be addressed without delay.",
-};
-
-function backfillLevelDescriptions(levels: RatingLevel[]): RatingLevel[] {
-  return levels.map((lvl) => {
-    if (lvl.description) return lvl;
-    const fb =
-      FALLBACK_DESCRIPTIONS[lvl.id] ||
-      FALLBACK_DESCRIPTIONS[lvl.abbreviation ?? ""] ||
-      FALLBACK_DESCRIPTIONS[lvl.label] ||
-      "";
-    return fb ? { ...lvl, description: fb } : lvl;
-  });
-}
-
-/* ------------------------------------------------------------------ */
 /*  Composite finding key                                              */
 /* ------------------------------------------------------------------ */
 
@@ -143,6 +111,22 @@ export interface UseInspectionOptions {
   ratingLevels?: RatingLevel[];
 }
 
+/**
+ * The master inspection-editor state hook. Behavior-preserving decomposition
+ * (Phase 4): this function OWNS all of the core state (useState/useRef/useEffect),
+ * the derived nav values, and the result/rating helpers, then threads a single
+ * shared `ctx` object (plain object — NO React Context provider) into the
+ * composed Progress / Navigation / Search / Batch sub-hooks under
+ * ./inspection/*. Each slice returns its methods/values; this hook assembles them
+ * into the (unchanged) return object — same keys, order, and signatures as
+ * before.
+ *
+ * The derived nav state (`currentSection` / `currentSectionItems` /
+ * `currentSectionIdx`) is computed ONCE here and passed through `ctx`, so every
+ * slice that branches on the current section reads the SAME values (no
+ * recomputation, no divergence). Hook call order is fixed and unconditional;
+ * every memo/callback dependency array is identical to the pre-split hook.
+ */
 export function useInspectionState(opts: UseInspectionOptions) {
   const [inspection, setInspection] = useState<Inspection>(
     opts.inspection as Inspection,
@@ -368,396 +352,73 @@ export function useInspectionState(opts: UseInspectionOptions) {
   );
 
   /* ---------------------------------------------------------------- */
-  /*  Progress                                                         */
+  /*  Shared context for the composed slices                           */
   /* ---------------------------------------------------------------- */
 
-  const progress = useMemo(() => {
-    let total = 0;
-    let rated = 0;
-    for (const sec of sections) {
-      for (const item of sec.items || []) {
-        total++;
-        const r = getResult(item.id, sec.id);
-        if (r.rating) {
-          rated++;
-        } else {
-          const v = r.value;
-          if (
-            v !== undefined &&
-            v !== null &&
-            v !== "" &&
-            !(Array.isArray(v) && v.length === 0)
-          ) {
-            rated++;
-          }
-        }
-      }
-    }
-    return {
-      total,
-      rated,
-      pct: total > 0 ? Math.round((rated / total) * 100) : 0,
-    };
-  }, [sections, getResult]);
-
-  const sectionProgress = useCallback(
-    (sectionId: string) => {
-      const sec = sections.find((s) => s.id === sectionId);
-      if (!sec) return { rated: 0, total: 0, percent: 0, hasDefect: false };
-      const total = sec.items.length;
-      if (total === 0)
-        return { rated: 0, total: 0, percent: 0, hasDefect: false };
-      let rated = 0;
-      let hasDefect = false;
-      for (const item of sec.items) {
-        const r = getResult(item.id, sec.id);
-        if (r.rating != null) {
-          rated++;
-          const level = ratingLevels.find((l) => l.id === r.rating);
-          if (level?.isDefect) hasDefect = true;
-        }
-      }
-      return {
-        rated,
-        total,
-        percent: Math.round((rated / total) * 100),
-        hasDefect,
-      };
-    },
-    [sections, getResult, ratingLevels],
-  );
-
-  const sectionDefectCount = useCallback(
-    (sectionId: string): number => {
-      const sec = sections.find((s) => s.id === sectionId);
-      if (!sec) return 0;
-      let count = 0;
-      for (const item of sec.items || []) {
-        const rating = getResult(item.id, sectionId)?.rating as string | null;
-        if (!rating) continue;
-        const level = ratingLevels.find((l) => l.id === rating);
-        if (level?.isDefect || rating === "Defect") count++;
-      }
-      return count;
-    },
-    [sections, ratingLevels, getResult],
-  );
-
-  /** Live report stats */
-  const reportStats = useMemo(() => {
-    let total = 0;
-    let rated = 0;
-    let satisfactory = 0;
-    let monitor = 0;
-    let defect = 0;
-    for (const sec of sections) {
-      const items = sec.items || [];
-      total += items.length;
-      for (const item of items) {
-        const ratingId = getResult(item.id, sec.id)?.rating as string | null;
-        if (!ratingId) continue;
-        rated++;
-        const bucket = bucketForRatingId(ratingId);
-        if (bucket === "satisfactory") satisfactory++;
-        else if (bucket === "monitor") monitor++;
-        else if (bucket === "defect") defect++;
-      }
-    }
-    return { total, rated, satisfactory, monitor, defect };
-  }, [sections, getResult, bucketForRatingId]);
-
-  /** Overall stats incl. ETA — shape used by progress visualizations */
-  const overallStats = useCallback(() => {
-    let total = 0;
-    let rated = 0;
-    let satisfactory = 0;
-    let monitor = 0;
-    let defect = 0;
-    for (const sec of sections) {
-      const items = sec.items || [];
-      for (const item of items) {
-        total++;
-        const ratingId = getResult(item.id, sec.id)?.rating as string | null;
-        if (!ratingId) continue;
-        rated++;
-        const bucket = bucketForRatingId(ratingId);
-        if (bucket === "satisfactory") satisfactory++;
-        else if (bucket === "monitor") monitor++;
-        else if (bucket === "defect") defect++;
-      }
-    }
-    const etaMinutes = Math.ceil((total - rated) * 0.35);
-    return { total, rated, satisfactory, monitor, defect, etaMinutes };
-  }, [sections, getResult, bucketForRatingId]);
+  // Single shared context: every slice sees the SAME live state + setters +
+  // derived nav values + helpers. The nav values (`currentSection` /
+  // `currentSectionItems` / `currentSectionIdx`) are computed once above and
+  // passed through here so the slices never recompute or diverge.
+  const ctx: InspectionContext = {
+    inspection,
+    schema,
+    sections,
+    ratingLevels,
+    results,
+    currentSectionIdx,
+    setCurrentSectionIdx,
+    currentSection,
+    currentSectionItems,
+    activeItemId,
+    setActiveItemId,
+    setActiveView,
+    itemFilter,
+    searchQuery,
+    batchSelected,
+    setBatchSelected,
+    setBatchMode,
+    lastBatchClickedRef,
+    sectionPickerQuery,
+    setSectionPickerOpen,
+    setSectionPickerQuery,
+    setSectionPickerIdx,
+    tagsByItem,
+    getResult,
+    bucketForRatingId,
+  };
 
   /* ---------------------------------------------------------------- */
-  /*  Navigation                                                       */
+  /*  Composed slices                                                  */
   /* ---------------------------------------------------------------- */
 
-  const selectSection = useCallback(
-    (idx: number) => {
-      setActiveView("items");
-      setCurrentSectionIdx(idx);
-      setBatchMode(false);
-      setBatchSelected({});
-      const items = (sections[idx]?.items || []);
-      if (items.length > 0) {
-        setActiveItemId(items[0].id);
-      } else {
-        setActiveItemId(null);
-      }
-    },
-    [sections],
-  );
+  const {
+    progress,
+    sectionProgress,
+    sectionDefectCount,
+    reportStats,
+    overallStats,
+  } = useInspectionProgress(ctx);
 
-  const selectSectionById = useCallback(
-    (sectionId: string) => {
-      const idx = sections.findIndex((s) => s.id === sectionId);
-      if (idx >= 0) selectSection(idx);
-    },
-    [sections, selectSection],
-  );
+  const { selectSection, selectSectionById, navigateItem, advanceToNextUnrated } =
+    useInspectionNavigation(ctx);
 
-  const navigateItem = useCallback(
-    (dir: 1 | -1) => {
-      const items = currentSectionItems;
-      if (!items.length) return;
-      let curIdx = -1;
-      if (activeItemId) {
-        curIdx = items.findIndex((i) => i.id === activeItemId);
-      }
-      const nextIdx = curIdx === -1 ? (dir > 0 ? 0 : items.length - 1) : curIdx + dir;
+  const {
+    searchNeedle,
+    itemMatchesSearch,
+    sectionMatchesSearch,
+    itemPassesFilter,
+    filterCounts,
+  } = useInspectionSearch(ctx);
 
-      if (nextIdx >= items.length) {
-        // Wrap to next section
-        if (currentSectionIdx < sections.length - 1) {
-          const newIdx = currentSectionIdx + 1;
-          setCurrentSectionIdx(newIdx);
-          const nextItems = sections[newIdx]?.items || [];
-          if (nextItems.length) setActiveItemId(nextItems[0].id);
-        }
-      } else if (nextIdx < 0) {
-        // Wrap to prev section
-        if (currentSectionIdx > 0) {
-          const newIdx = currentSectionIdx - 1;
-          setCurrentSectionIdx(newIdx);
-          const prevItems = sections[newIdx]?.items || [];
-          if (prevItems.length) setActiveItemId(prevItems[prevItems.length - 1].id);
-        }
-      } else {
-        setActiveItemId(items[nextIdx].id);
-      }
-
-      // Scroll into view
-      requestAnimationFrame(() => {
-        if (activeItemId) {
-          const card = document.querySelector(`[data-item-id="${activeItemId}"]`);
-          card?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      });
-    },
-    [activeItemId, currentSectionItems, currentSectionIdx, sections],
-  );
-
-  const advanceToNextUnrated = useCallback((
-    onCrossedSection?: (newSectionTitle: string) => void,
-  ) => {
-    if (!activeItemId || !currentSection) return;
-    const sIdx = sections.findIndex((s) => s.id === currentSection.id);
-    if (sIdx < 0) return;
-    const fromIdx = currentSectionItems.findIndex((i) => i.id === activeItemId);
-    for (let i = fromIdx + 1; i < currentSectionItems.length; i++) {
-      const r = getResult(currentSectionItems[i].id, currentSection.id);
-      if (!r.rating) {
-        setActiveItemId(currentSectionItems[i].id);
-        return;
-      }
-    }
-    for (let s = sIdx + 1; s < sections.length; s++) {
-      const sec = sections[s];
-      const items = sec.items as Array<{ id: string }>;
-      for (const it of items) {
-        const r = getResult(it.id, sec.id);
-        if (!r.rating) {
-          selectSectionById(sec.id);
-          setActiveItemId(it.id);
-          onCrossedSection?.(sec.title);
-          return;
-        }
-      }
-    }
-    // Nothing unrated — stay put.
-  }, [activeItemId, currentSectionItems, currentSection, sections, getResult, selectSectionById]);
-
-  /* ---------------------------------------------------------------- */
-  /*  Search                                                           */
-  /* ---------------------------------------------------------------- */
-
-  const searchNeedle = useMemo(
-    () => (searchQuery || "").trim().toLowerCase(),
-    [searchQuery],
-  );
-
-  const itemMatchesSearch = useCallback(
-    (section: SchemaSection | null, item: SchemaItem): boolean => {
-      if (!searchNeedle) return true;
-      if (
-        section &&
-        (section.title || "").toLowerCase().includes(searchNeedle)
-      )
-        return true;
-      if ((item.label || "").toLowerCase().includes(searchNeedle)) return true;
-      const r = getResult(item.id);
-      if (
-        r.notes &&
-        String(r.notes).toLowerCase().includes(searchNeedle)
-      )
-        return true;
-      return false;
-    },
-    [searchNeedle, getResult],
-  );
-
-  const sectionMatchesSearch = useCallback(
-    (section: SchemaSection): boolean => {
-      if (!searchNeedle) return true;
-      if ((section.title || "").toLowerCase().includes(searchNeedle))
-        return true;
-      return (section.items || []).some((it) =>
-        itemMatchesSearch(section, it),
-      );
-    },
-    [searchNeedle, itemMatchesSearch],
-  );
-
-  /* ---------------------------------------------------------------- */
-  /*  Item filter                                                      */
-  /* ---------------------------------------------------------------- */
-
-  const itemPassesFilter = useCallback(
-    (item: SchemaItem, sectionId?: string): boolean => {
-      if (itemFilter === "all") return true;
-      const r = getResult(item.id, sectionId);
-      if (itemFilter === "unrated") return !r || r.rating == null;
-      if (itemFilter === "issues") {
-        if (!r || !r.rating) return false;
-        const level = ratingLevels.find((l) => l.id === r.rating);
-        return (
-          !!level?.isDefect ||
-          level?.severity === "significant" ||
-          level?.severity === "marginal"
-        );
-      }
-      if (itemFilter === "flagged") {
-        const tags = tagsByItem[item.id];
-        return Array.isArray(tags) && tags.length > 0;
-      }
-      return true;
-    },
-    [itemFilter, getResult, ratingLevels, tagsByItem],
-  );
-
-  const filterCounts = useMemo(() => {
-    const items = currentSectionItems;
-    const counts = { all: items.length, unrated: 0, issues: 0, flagged: 0 };
-    for (const item of items) {
-      const r = getResult(item.id, currentSection?.id);
-      if (!r || r.rating == null) counts.unrated++;
-      if (r?.rating) {
-        const level = ratingLevels.find((l) => l.id === r.rating);
-        if (
-          level?.isDefect ||
-          level?.severity === "significant" ||
-          level?.severity === "marginal"
-        )
-          counts.issues++;
-      }
-      if (tagsByItem[item.id]?.length) counts.flagged++;
-    }
-    return counts;
-  }, [currentSectionItems, currentSection, getResult, ratingLevels, tagsByItem]);
-
-  /* ---------------------------------------------------------------- */
-  /*  Batch                                                            */
-  /* ---------------------------------------------------------------- */
-
-  const toggleBatchSelect = useCallback(
-    (itemId: string, shiftKey?: boolean) => {
-      setBatchSelected((prev) => {
-        const next = { ...prev };
-        if (shiftKey && lastBatchClickedRef.current) {
-          const items = currentSectionItems;
-          const startIdx = items.findIndex(
-            (i) => i.id === lastBatchClickedRef.current,
-          );
-          const endIdx = items.findIndex((i) => i.id === itemId);
-          if (startIdx >= 0 && endIdx >= 0) {
-            const lo = Math.min(startIdx, endIdx);
-            const hi = Math.max(startIdx, endIdx);
-            for (let i = lo; i <= hi; i++) {
-              next[items[i].id] = true;
-            }
-          }
-        } else {
-          next[itemId] = !prev[itemId];
-        }
-        lastBatchClickedRef.current = itemId;
-        return next;
-      });
-    },
-    [currentSectionItems],
-  );
-
-  const batchSelectAll = useCallback(() => {
-    const next: Record<string, boolean> = {};
-    for (const item of currentSectionItems) {
-      next[item.id] = true;
-    }
-    setBatchSelected(next);
-  }, [currentSectionItems]);
-
-  const selectedBatchCount = useMemo(
-    () => Object.values(batchSelected).filter(Boolean).length,
-    [batchSelected],
-  );
-
-  /* ---------------------------------------------------------------- */
-  /*  Section picker                                                   */
-  /* ---------------------------------------------------------------- */
-
-  const filteredSectionsForPicker = useMemo(() => {
-    const q = (sectionPickerQuery || "").toLowerCase().trim();
-    const src = sections.map((s, idx) => ({
-      idx,
-      title: s.title || s.name || `#${idx}`,
-    }));
-    if (!q) return src;
-    return src.filter((s) => s.title.toLowerCase().includes(q));
-  }, [sections, sectionPickerQuery]);
-
-  const openSectionPicker = useCallback(() => {
-    setSectionPickerOpen(true);
-    setSectionPickerQuery("");
-    setSectionPickerIdx(0);
-    requestAnimationFrame(() => {
-      const input = document.getElementById("section-picker-input");
-      input?.focus();
-    });
-  }, []);
-
-  const closeSectionPicker = useCallback(() => {
-    setSectionPickerOpen(false);
-    setSectionPickerQuery("");
-    setSectionPickerIdx(0);
-  }, []);
-
-  const pickSection = useCallback(
-    (idx: number) => {
-      selectSection(idx);
-      closeSectionPicker();
-    },
-    [selectSection, closeSectionPicker],
-  );
+  const {
+    toggleBatchSelect,
+    batchSelectAll,
+    selectedBatchCount,
+    filteredSectionsForPicker,
+    openSectionPicker,
+    closeSectionPicker,
+    pickSection,
+  } = useInspectionBatch(ctx, selectSection);
 
   /* ---------------------------------------------------------------- */
   /*  Formatted date                                                   */

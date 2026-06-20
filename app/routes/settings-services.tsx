@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { Link, useLoaderData, Form, useActionData, useFetcher } from "react-router";
+import { useState } from "react";
+import { Link, useLoaderData, Form, useActionData } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-services";
@@ -9,6 +9,8 @@ import { createServiceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { SCHEDULING_ROLES_SET } from "~/lib/settings/constants";
+import { ServicesCatalogPanel } from "~/components/settings/services/ServicesCatalogPanel";
+import { DiscountCodesPanel } from "~/components/settings/services/DiscountCodesPanel";
 
 export function meta() {
   return [{ title: "Services & Catalog - Settings - OpenInspection" }];
@@ -160,158 +162,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   return { ok: true };
 }
 
-// ----------------------------------------------------------------
-// Qualified Inspectors widget (per-service)
-// ----------------------------------------------------------------
-
-interface QualificationWidgetProps {
-  service: Service;
-  initialUserIds: string[];
-  members: Member[];
-}
-
-function QualificationWidget({ service, initialUserIds, members }: QualificationWidgetProps) {
-  const fetcher = useFetcher<typeof action>({ key: `qual-${service.id}` });
-  const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set(initialUserIds));
-  const [dirty, setDirty] = useState(false);
-
-  // Re-sync local selection when the loader delivers a fresh restrictionMap
-  // (e.g. after a full-page navigation or revalidation).
-  useEffect(() => {
-    setSelected(new Set(initialUserIds));
-    setDirty(false);
-  }, [initialUserIds]);
-
-  const saving = fetcher.state !== "idle";
-  const lastResult = fetcher.state === "idle" ? fetcher.data : undefined;
-  const saved =
-    !dirty &&
-    lastResult !== undefined &&
-    "intent" in lastResult &&
-    lastResult.intent === "qualification-save" &&
-    (lastResult as { ok: boolean }).ok === true &&
-    "serviceId" in lastResult &&
-    (lastResult as { serviceId: string }).serviceId === service.id;
-  const failed =
-    !dirty &&
-    lastResult !== undefined &&
-    "intent" in lastResult &&
-    lastResult.intent === "qualification-save" &&
-    (lastResult as { ok: boolean }).ok === false &&
-    "serviceId" in lastResult &&
-    (lastResult as { serviceId: string }).serviceId === service.id;
-
-  const displayLabel =
-    initialUserIds.length === 0
-      ? "All inspectors"
-      : `${initialUserIds.length} inspector${initialUserIds.length !== 1 ? "s" : ""}`;
-
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    setDirty(true);
-  }
-
-  function handleSave() {
-    setDirty(false);
-    fetcher.submit(
-      {
-        intent: "qualification-save",
-        serviceId: service.id,
-        userIds: JSON.stringify(Array.from(selected)),
-      },
-      { method: "post" },
-    );
-  }
-
-  function handleCancel() {
-    setSelected(new Set(initialUserIds));
-    setDirty(false);
-    setOpen(false);
-  }
-
-  // Read-only display when no scheduling members are available (non-admin).
-  if (members.length === 0) {
-    return (
-      <div className="text-[12px] text-ih-fg-3">
-        <span className="font-medium">Qualified:</span> {displayLabel}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-2">
-      {!open ? (
-        <div className="flex items-center gap-3">
-          <span className="text-[12px] text-ih-fg-3">
-            <span className="font-medium">Qualified:</span> {displayLabel}
-          </span>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="text-[12px] font-semibold text-ih-primary hover:underline"
-          >
-            Edit
-          </button>
-          {saved && <span className="text-[12px] text-ih-ok-fg font-bold">Saved.</span>}
-        </div>
-      ) : (
-        <div className="border border-ih-border rounded-md p-3 space-y-2 bg-ih-bg-muted">
-          <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 mb-2">
-            Qualified inspectors
-          </p>
-          <p className="text-[12px] text-ih-fg-3 mb-2">
-            Leave all unchecked to allow all staff.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-40 overflow-y-auto">
-            {members.map((m) => (
-              <label key={m.id} className="flex items-center gap-2 cursor-pointer select-none py-1">
-                <input
-                  type="checkbox"
-                  checked={selected.has(m.id)}
-                  onChange={() => toggle(m.id)}
-                  className="h-4 w-4 rounded border-ih-border text-ih-primary"
-                />
-                <span className="text-[12px] text-ih-fg-1 truncate">
-                  {m.email}
-                  <span className="ml-1 text-ih-fg-3 text-[11px]">({m.role})</span>
-                </span>
-              </label>
-            ))}
-          </div>
-          {failed && (
-            <p className="text-[12px] text-ih-bad-fg">
-              {(lastResult as { message?: string }).message ?? "Save failed. Please try again."}
-            </p>
-          )}
-          <div className="flex items-center gap-2 pt-1">
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className="h-7 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function SettingsServices() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -421,104 +271,10 @@ export default function SettingsServices() {
       )}
 
       {/* Services table */}
-      <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-ih-border">
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Name</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Duration</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Price</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Status</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {services.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-10 text-center text-[13px] text-ih-fg-3">
-                  No services yet. Click "Add service" to create your first.
-                </td>
-              </tr>
-            ) : (
-              services.map((svc) => (
-                <tr key={svc.id} className="border-b border-ih-border last:border-b-0 hover:bg-ih-bg-muted transition-colors">
-                  <td className="py-3 px-4">
-                    <p className="text-[13px] font-medium text-ih-fg-1">{svc.name}</p>
-                    {svc.description && (
-                      <p className="text-[11px] text-ih-fg-3 mt-0.5 line-clamp-1">{svc.description}</p>
-                    )}
-                    <QualificationWidget
-                      service={svc}
-                      initialUserIds={restrictionMap[svc.id] ?? []}
-                      members={members}
-                    />
-                  </td>
-                  <td className="py-3 px-4 text-[13px] text-ih-fg-3">&mdash;</td>
-                  <td className="py-3 px-4 text-[13px] font-bold text-ih-ok-fg">
-                    ${((svc.price || 0) / 100).toFixed(2)}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
- svc.active
- ? "bg-ih-ok-bg text-ih-ok-fg"
- : "bg-ih-bg-muted text-ih-fg-3"
- }`}>
-                      {svc.active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <Form method="post" className="inline">
-                      <input type="hidden" name="intent" value="toggle-service" />
-                      <input type="hidden" name="id" value={svc.id} />
-                      <input type="hidden" name="active" value={String(svc.active)} />
-                      <button type="submit" className="text-[12px] font-semibold text-ih-primary hover:underline">
-                        {svc.active ? "Deactivate" : "Activate"}
-                      </button>
-                    </Form>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      <ServicesCatalogPanel services={services} restrictionMap={restrictionMap} members={members} />
 
       {/* Discount codes */}
-      <div className="pt-2">
-        <h3 className="text-[15px] font-bold text-ih-fg-1 mb-2">Discount codes</h3>
-        <p className="text-[13px] text-ih-fg-3 mb-3">Promo codes clients can apply at booking.</p>
-
-        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
-          {discounts.length === 0 ? (
-            <div className="py-8 text-center text-[13px] text-ih-fg-3">
-              No discount codes yet.
-            </div>
-          ) : (
-            <div className="divide-y divide-ih-border">
-              {discounts.map((d) => (
-                <div key={d.id} className="flex items-center justify-between px-4 py-3">
-                  <div className="flex items-center gap-4">
-                    <code className="font-mono text-[13px] font-bold text-ih-fg-1">{d.code}</code>
-                    <span className="text-[12px] text-ih-fg-3">
-                      {d.type === "percent" ? `${d.value}% off` : `$${(d.value / 100).toFixed(2)} off`}
-                    </span>
-                    <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
- d.active
- ? "bg-ih-ok-bg text-ih-ok-fg"
- : "bg-ih-bg-muted text-ih-fg-3"
- }`}>
-                      {d.active ? "Active" : "Disabled"}
-                    </span>
-                  </div>
-                  <button className="text-[12px] font-semibold text-ih-primary hover:underline">
-                    Edit
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      <DiscountCodesPanel discounts={discounts} />
     </div>
   );
 }

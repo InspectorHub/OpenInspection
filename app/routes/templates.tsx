@@ -1,35 +1,20 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { useLoaderData, useFetcher, useNavigate, useSearchParams, Link } from "react-router";
+import { useLoaderData, useFetcher, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/templates";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { Pagination } from "@core/shared-ui";
 import { usePagination } from "~/hooks/usePagination";
+import { type SortKey, type Template } from "~/components/templates/types";
+import { TemplatesListView } from "~/components/templates/TemplatesListView";
+import { TemplatesCardView } from "~/components/templates/TemplatesCardView";
+import { CreateTemplateModal } from "~/components/templates/CreateTemplateModal";
+import { ImportSpectoraModal } from "~/components/templates/ImportSpectoraModal";
+import { DeleteTemplateModal } from "~/components/templates/DeleteTemplateModal";
+import { SpectoraMappingModal } from "~/components/templates/SpectoraMappingModal";
 
 export function meta() {
   return [{ title: "Templates - OpenInspection" }];
-}
-
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-interface Template {
-  id: string;
-  name: string;
-  version: number;
-  description?: string;
-  source?: string;
-  marketplaceTemplateId?: string;
-  upstreamUpdateAvailable?: boolean;
-  usageCount?: number;
-  itemCount?: number;
-  createdAt?: string;
-  updatedAt?: string;
-  schema?: {
-    schemaVersion?: number;
-    sections?: { id: string; title?: string; name?: string; items?: unknown[] }[];
-  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -161,19 +146,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   return { ok: false };
-}
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-type SortKey = "name" | "date" | "usage";
-
-function countItems(t: Template): number {
-  if (t.itemCount != null) return t.itemCount;
-  const sections = t.schema?.sections;
-  if (!Array.isArray(sections)) return 0;
-  return sections.reduce((acc, s) => acc + (Array.isArray(s.items) ? s.items.length : 0), 0);
 }
 
 /* ------------------------------------------------------------------ */
@@ -374,184 +346,26 @@ export default function TemplatesPage() {
 
       {/* List view */}
       {view === "list" && (
-        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-ih-border">
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Name</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Version</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Items</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={4}>
-                    {searchQuery ? (
-                      <p className="py-12 text-center text-[13px] text-ih-fg-3">No templates match your search.</p>
-                    ) : (
-                      <div className="py-14 flex flex-col items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-ih-primary-tint flex items-center justify-center text-ih-primary">
-                          <TemplateIcon size="lg" />
-                        </div>
-                        <div className="text-center">
-                          <p className="text-[15px] font-bold text-ih-fg-1">Start with a template</p>
-                          <p className="text-[13px] text-ih-fg-3 mt-1 max-w-xs">
-                            Your workspace ships with starter templates — but if you&apos;re migrating, bring your own.
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setImportOpen(true)}
-                            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
-                          >
-                            &darr; Import from Spectora
-                          </button>
-                          <button
-                            onClick={() => setCreateOpen(true)}
-                            className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
-                          >
-                            + New template
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((t) => {
-                  const items = countItems(t);
-                  return (
-                    <tr key={t.id} className="border-b border-ih-border hover:bg-ih-bg-muted group">
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 bg-ih-primary-tint rounded-lg flex items-center justify-center text-ih-primary group-hover:bg-ih-primary group-hover:text-white transition-all shrink-0">
-                            <TemplateIcon />
-                          </div>
-                          <div>
-                            <Link to={`/templates/${t.id}/edit`} className="text-[13px] font-bold text-ih-fg-1 hover:text-ih-primary transition-colors">
-                              {t.name}
-                            </Link>
-                            {t.source === "marketplace" && (
-                              <span className="ml-2 text-[9px] font-bold uppercase tracking-widest text-ih-info-fg bg-ih-info-bg px-1.5 py-0.5 rounded">Marketplace</span>
-                            )}
-                            {t.description && (
-                              <p className="text-[11px] text-ih-fg-4 mt-0.5 line-clamp-1">{t.description}</p>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="inline-flex items-center rounded border border-ih-primary/20 px-1.5 py-0.5 text-[10px] font-bold bg-ih-primary-tint text-ih-primary">
-                          v{t.version || 1}.0
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-[13px] text-ih-fg-3 font-bold">
-                        {items} items
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="inline-flex items-center gap-3">
-                          <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary hover:text-ih-primary">
-                            Edit
-                          </Link>
-                          <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary transition-colors">
-                            Duplicate
-                          </button>
-                          <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-4 hover:text-ih-bad-fg transition-colors">
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+        <TemplatesListView
+          filtered={filtered}
+          searchQuery={searchQuery}
+          setImportOpen={setImportOpen}
+          setCreateOpen={setCreateOpen}
+          handleDuplicate={handleDuplicate}
+          setDeleteConfirm={setDeleteConfirm}
+        />
       )}
 
       {/* Card view */}
       {view === "card" && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {filtered.length === 0 ? (
-            <div className="col-span-full py-16 bg-ih-bg-card rounded-lg border border-ih-border flex flex-col items-center gap-4">
-              {searchQuery ? (
-                <>
-                  <p className="font-semibold text-ih-fg-2">No matching templates</p>
-                  <p className="text-[13px] text-ih-fg-3">Try a different search term.</p>
-                </>
-              ) : (
-                <>
-                  <div className="w-12 h-12 rounded-xl bg-ih-primary-tint flex items-center justify-center text-ih-primary">
-                    <TemplateIcon size="lg" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-[15px] font-bold text-ih-fg-1">Start with a template</p>
-                    <p className="text-[13px] text-ih-fg-3 mt-1 max-w-xs">
-                      Your workspace ships with starter templates — but if you&apos;re migrating, bring your own.
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setImportOpen(true)}
-                      className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
-                    >
-                      &darr; Import from Spectora
-                    </button>
-                    <button
-                      onClick={() => setCreateOpen(true)}
-                      className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
-                    >
-                      + New template
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          ) : (
-            filtered.map((t) => {
-              const items = countItems(t);
-              return (
-                <div
-                  key={t.id}
-                  className="bg-ih-bg-card border border-ih-border rounded-lg p-3 flex flex-col gap-2 hover:border-ih-primary transition-colors"
-                >
-                  <div>
-                    <Link to={`/templates/${t.id}/edit`} className="text-[14px] font-bold text-ih-fg-1 hover:text-ih-primary transition-colors">
-                      {t.name}
-                    </Link>
-                    {t.description && (
-                      <p className="text-[11px] text-ih-fg-3 line-clamp-2 mt-1">{t.description}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-[10px] font-mono text-ih-fg-4">
-                    <span className="inline-flex items-center rounded border border-ih-primary/20 px-1.5 py-0.5 bg-ih-primary-tint text-ih-primary">
-                      v{t.version || 1}.0
-                    </span>
-                    <span>{items} items</span>
-                    <span>used {t.usageCount || 0}&times;</span>
-                    {t.source === "marketplace" && (
-                      <span className="text-[9px] font-bold uppercase tracking-widest text-ih-info-fg bg-ih-info-bg px-1 py-0.5 rounded">MP</span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 pt-1 border-t border-ih-border mt-auto">
-                    <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary hover:text-ih-primary transition-colors">
-                      Edit
-                    </Link>
-                    <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary transition-colors">
-                      Duplicate
-                    </button>
-                    <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-4 hover:text-ih-bad-fg transition-colors ml-auto">
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+        <TemplatesCardView
+          filtered={filtered}
+          searchQuery={searchQuery}
+          setImportOpen={setImportOpen}
+          setCreateOpen={setCreateOpen}
+          handleDuplicate={handleDuplicate}
+          setDeleteConfirm={setDeleteConfirm}
+        />
       )}
 
       <Pagination
@@ -565,189 +379,39 @@ export default function TemplatesPage() {
 
       {/* Create modal */}
       {createOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setCreateOpen(false)}>
-          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-bold text-ih-fg-1">New Template</h2>
-              <button onClick={() => setCreateOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
-            </div>
-            <div>
-              <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Template name</label>
-              <input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-                placeholder="e.g. Residential Full"
-                autoFocus
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none focus:shadow-ih-focus"
-              />
-            </div>
-            <div className="flex justify-end mt-5">
-              <button
-                onClick={handleCreate}
-                disabled={!newName.trim()}
-                className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Create Template
-              </button>
-            </div>
-            {typeof fetcherData?.error === "string" && (
-              <p className="mt-3 text-[12px] text-ih-bad-fg font-medium">{fetcherData.error}</p>
-            )}
-          </div>
-        </div>
+        <CreateTemplateModal
+          setCreateOpen={setCreateOpen}
+          newName={newName}
+          setNewName={setNewName}
+          handleCreate={handleCreate}
+          error={fetcherData?.error}
+        />
       )}
 
       {/* Import Spectora modal */}
       {importOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setImportOpen(false)}>
-          <div className="w-full max-w-lg bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-[16px] font-bold text-ih-fg-1">Import from Spectora</h2>
-              <button onClick={() => setImportOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Template name</label>
-                <input
-                  value={importName}
-                  onChange={(e) => setImportName(e.target.value)}
-                  placeholder="e.g. Spectora Residential"
-                  className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none focus:shadow-ih-focus"
-                />
-              </div>
-              <div>
-                <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Spectora export JSON</label>
-                <textarea
-                  value={importPayload}
-                  onChange={(e) => setImportPayload(e.target.value)}
-                  rows={8}
-                  placeholder='Paste your Spectora export JSON here...'
-                  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-mono outline-none focus:shadow-ih-focus"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end mt-5 gap-2">
-              <button onClick={() => setImportOpen(false)} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3">
-                Cancel
-              </button>
-              <button
-                onClick={handleImport}
-                disabled={!importName.trim() || !importPayload.trim()}
-                className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Import
-              </button>
-            </div>
-          </div>
-        </div>
+        <ImportSpectoraModal
+          setImportOpen={setImportOpen}
+          importName={importName}
+          setImportName={setImportName}
+          importPayload={importPayload}
+          setImportPayload={setImportPayload}
+          handleImport={handleImport}
+        />
       )}
 
       {/* Delete confirmation modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setDeleteConfirm(null)}>
-          <div className="w-full max-w-xs bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-[16px] font-bold text-ih-fg-1 mb-2">Delete Template</h2>
-            <p className="text-[13px] text-ih-fg-3 mb-5">
-              Are you sure you want to delete this template? This cannot be undone.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setDeleteConfirm(null)} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3">
-                Cancel
-              </button>
-              <button onClick={handleDelete} className="h-8 px-4 rounded-md bg-ih-bad-fg text-white font-bold text-[13px] hover:bg-ih-bad-fg">
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
+        <DeleteTemplateModal
+          setDeleteConfirm={setDeleteConfirm}
+          handleDelete={handleDelete}
+        />
       )}
 
       {/* Concept-mapping modal — shown once after first Spectora import */}
       {mappingModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm"
-          onClick={handleMappingDismiss}
-        >
-          <div
-            className="w-full max-w-md bg-ih-bg-card rounded-xl shadow-ih-popover p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-1">
-              <h2 className="text-[17px] font-bold text-ih-fg-1">Coming from Spectora?</h2>
-              <button onClick={handleMappingDismiss} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none">&times;</button>
-            </div>
-            <p className="text-[12px] text-ih-fg-3 mb-4">Here&apos;s how Spectora concepts map to OpenInspection.</p>
-
-            <div className="divide-y divide-ih-border rounded-lg border border-ih-border overflow-hidden">
-              {/* Row 1 */}
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[12px] font-bold text-ih-fg-3 line-through">Comments</span>
-                  <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
-                  <span className="text-[12px] font-bold text-ih-primary">Defects</span>
-                  <span className="text-ih-fg-4 text-[10px] font-bold">+</span>
-                  <span className="text-[12px] font-bold text-ih-primary">Notes</span>
-                </div>
-                <p className="text-[12px] text-ih-fg-3">Your comment library becomes canned defects; free text lives in Notes.</p>
-              </div>
-              {/* Row 2 */}
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[12px] font-bold text-ih-fg-3 line-through">Rating icons</span>
-                  <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
-                  <span className="text-[12px] font-bold text-ih-good-fg">Satisfactory</span>
-                  <span className="text-ih-fg-4 text-[10px]">&middot;</span>
-                  <span className="text-[12px] font-bold text-ih-warn-fg">Monitor</span>
-                  <span className="text-ih-fg-4 text-[10px]">&middot;</span>
-                  <span className="text-[12px] font-bold text-ih-bad-fg">Defect</span>
-                </div>
-                <p className="text-[12px] text-ih-fg-3">Ratings are full-word buttons with semantic colors.</p>
-              </div>
-              {/* Row 3 */}
-              <div className="px-4 py-3">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[12px] font-bold text-ih-fg-3 line-through">Orders</span>
-                  <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
-                  <span className="text-[12px] font-bold text-ih-primary">Inspections</span>
-                  <span className="text-ih-fg-4 text-[10px] font-bold">+</span>
-                  <span className="text-[12px] font-bold text-ih-primary">Invoices</span>
-                </div>
-                <p className="text-[12px] text-ih-fg-3">One order = an inspection plus its invoice and agreement.</p>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between mt-5">
-              <Link
-                to="/settings/inspection"
-                className="text-[12px] text-ih-fg-3 hover:text-ih-primary underline underline-offset-2"
-                onClick={handleMappingDismiss}
-              >
-                Review editor settings
-              </Link>
-              <button
-                onClick={handleMappingDismiss}
-                className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
+        <SpectoraMappingModal handleMappingDismiss={handleMappingDismiss} />
       )}
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Icons                                                              */
-/* ------------------------------------------------------------------ */
-
-function TemplateIcon({ size = "sm" }: { size?: "sm" | "lg" }) {
-  const cls = size === "lg" ? "w-6 h-6" : "w-4 h-4";
-  return (
-    <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-    </svg>
   );
 }

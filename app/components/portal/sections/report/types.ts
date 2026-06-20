@@ -1,0 +1,128 @@
+/**
+ * Shared report types + print-layout constants.
+ *
+ * Extracted from <ReportView> so the colocated report sub-components and the
+ * pure helpers can reference them without importing the component module
+ * (avoids a circular import). ReportView re-exports every symbol here, so its
+ * public type/constant surface is unchanged.
+ */
+import type { TenantBrand } from "~/lib/brand";
+import type { ReportMedia } from "../../../../../server/lib/report-video";
+
+/** Plan 7 — a report photo object may carry a resolved media kind (video). */
+export type ReportPhoto = { key: string; url: string; media?: ReportMedia };
+
+export interface ResolvedDefect {
+  id: string;
+  title: string;
+  included: boolean;
+  isCustom?: boolean;
+  effectiveComment: string;
+  effectiveCategory?: string;
+  effectiveLocation?: string | null;
+  defectPhotos?: ReportPhoto[];
+}
+
+export interface ReportItem {
+  id: string;
+  label: string;
+  type?: string;
+  rating: string | null;
+  ratingColor: string;
+  ratingLabel: string | null;
+  severityBucket: string;
+  notes: string | null;
+  photos: ReportPhoto[];
+  recommendation?: string | null;
+  estimateMin?: number | null;
+  estimateMax?: number | null;
+  /** Task 8 — attached repair items snapshotted on this finding (dollars). */
+  repairItems?: {
+    summary: string;
+    estimateMin: number | null;
+    estimateMax: number | null;
+    contractorType: string | null;
+  }[];
+  value?: unknown;
+  unit?: string | null;
+  /** FE-3/B-20 — resolved canned + custom defects (server emits both). */
+  resolvedTabs?: {
+    defects?: ResolvedDefect[];
+  };
+}
+
+export interface ReportSection {
+  id: string;
+  title: string;
+  icon?: string | null;
+  defectCount: number;
+  items: ReportItem[];
+  disclaimerText?: string | null;
+  alwaysPageBreak?: boolean;
+}
+
+export type FilterKey = "all" | "defects" | "summary";
+
+/* ------------------------------------------------------------------ */
+/* Print layout constants (exported for tests + re-exported via the    */
+/* standalone route). PRINT-ONLY — on-screen rendering is unchanged.   */
+/* ------------------------------------------------------------------ */
+
+/** Inspection-item / defect / stats cards: never split a card across pages. */
+export const PRINT_CARD_CLASS = "print:break-inside-avoid";
+/** Photo cells: never split a photo across a page boundary. */
+export const PRINT_FIGURE_CLASS = "print:break-inside-avoid";
+/** Section headings: keep a heading glued to the content that follows. */
+export const PRINT_SECTION_HEADING_CLASS = "print:break-after-avoid";
+/** Defect photo grid (screen 3/4-col) collapses to a dense 3-col in print. */
+export const DEFECT_PHOTO_GRID_CLASS =
+  "grid grid-cols-3 sm:grid-cols-4 print:grid-cols-3 gap-1.5";
+/** Item photo grid (screen 2/3-col) collapses to a dense 3-col in print. */
+export const ITEM_PHOTO_GRID_CLASS =
+  "grid grid-cols-2 sm:grid-cols-3 print:grid-cols-3 gap-2";
+/** CF Images thumbnail width: smaller in print to keep the PDF lean. */
+export const printThumbWidth = (isPrint: boolean): number => (isPrint ? 480 : 800);
+
+export interface ReportSignature {
+  signatureBase64: string | null;
+  signedAt: number | null; // epoch ms
+  inspectorName: string;
+  inspectorLicense: string | null;
+}
+
+export interface ReportVerification {
+  versionNumber: number;
+  contentHash: string;
+  verifyToken: string;
+  publishedAt: number; // unix seconds
+}
+
+/**
+ * The report loader payload shape. Kept here (exported) so both the standalone
+ * route and the portal route can type their loaders against it and feed it to
+ * `reportViewProps()`.
+ */
+export interface ReportLoaderResult {
+  inspectionId: string;
+  address: string;
+  date: string;
+  inspectorName: string | null;
+  coverPhotoUrl: string | null;
+  stats: { total: number; satisfactory: number; monitor: number; defect: number };
+  sections: ReportSection[];
+  showEstimates: boolean;
+  enableRepairList: boolean;
+  enableCustomerRepairExport: boolean;
+  isDelivered: boolean;
+  brand: TenantBrand;
+  error: string | null;
+  notPublished: boolean;
+  reportTheme?: string;
+  initialFilter: FilterKey;
+  printMode: boolean;
+  isPublished: boolean;
+  signature: ReportSignature | null;
+  verification: ReportVerification | null;
+  ownerPreview: boolean;
+  baseUrl: string;
+}

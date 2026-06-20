@@ -11,8 +11,13 @@ describe('Sidebar', () => {
   it('WORKSPACE_ITEMS includes Team, not Reports; Library is a single hub entry', async () => {
     // Import the raw module source to verify the nav arrays.
     // We inspect the module text so we don't have to render the component.
-    const src = await import('~/components/Sidebar?raw');
-    const text = (src as unknown as { default: string }).default;
+    // The nav arrays live in the co-located nav-items module; the Library hub
+    // entry is rendered directly in the Sidebar export.
+    const navSrc = await import('~/components/sidebar/nav-items?raw');
+    const navText = (navSrc as unknown as { default: string }).default;
+    const sidebarSrc = await import('~/components/Sidebar?raw');
+    const sidebarText = (sidebarSrc as unknown as { default: string }).default;
+    const text = navText + sidebarText;
     // #111: the standalone Reports page is retired — its nav item is removed and
     // /reports now 301-redirects to the dashboard Published tab. The sidebar must
     // no longer surface a Reports entry.
@@ -41,7 +46,7 @@ describe('Sidebar', () => {
   });
 
   it('IA-25: Log out is reachable from UserMenuPopover (data-testid present)', async () => {
-    const src = await import('~/components/Sidebar?raw');
+    const src = await import('~/components/sidebar/UserMenuPopover?raw');
     const text = (src as unknown as { default: string }).default;
     // Log out link must be inside the popover with its testid
     expect(text).toContain('data-testid="user-menu-logout"');
@@ -49,14 +54,17 @@ describe('Sidebar', () => {
   });
 
   it('IA-25: no standalone bottom theme toggle row in desktop Sidebar footer', async () => {
-    const src = await import('~/components/Sidebar?raw');
-    const text = (src as unknown as { default: string }).default;
+    const sidebarSrc = await import('~/components/Sidebar?raw');
+    const sidebarText = (sidebarSrc as unknown as { default: string }).default;
     // ThemeToggle (old standalone component) must not appear in the Sidebar export.
     // The old component was rendered as <ThemeToggle collapsed={collapsed} />
     // in the Footer section — it must now be gone (moved into the User Menu).
-    expect(text).not.toContain('<ThemeToggle');
-    // ThemeSegmentControl (in-menu) must be present instead
-    expect(text).toContain('ThemeSegmentControl');
+    expect(sidebarText).not.toContain('<ThemeToggle');
+    // ThemeSegmentControl (in-menu) must be present instead — it now lives in
+    // the co-located UserMenuPopover module.
+    const popoverSrc = await import('~/components/sidebar/UserMenuPopover?raw');
+    const popoverText = (popoverSrc as unknown as { default: string }).default;
+    expect(popoverText).toContain('ThemeSegmentControl');
   });
 
   it('IA-25: collapse button is an edge handle with correct aria-labels', async () => {
@@ -70,7 +78,7 @@ describe('Sidebar', () => {
   });
 
   it('IA-25: popover closes on Escape key (keydown handler present)', async () => {
-    const src = await import('~/components/Sidebar?raw');
+    const src = await import('~/components/sidebar/UserMenuPopover?raw');
     const text = (src as unknown as { default: string }).default;
     // The UserMenuPopover registers an Escape handler
     expect(text).toContain('"Escape"');
@@ -78,13 +86,9 @@ describe('Sidebar', () => {
   });
 
   it('IA-25: MobileDrawer renders menu items flat (no nested popover component)', async () => {
-    const src = await import('~/components/Sidebar?raw');
-    const text = (src as unknown as { default: string }).default;
+    const src = await import('~/components/sidebar/MobileDrawer?raw');
+    const drawerBlock = (src as unknown as { default: string }).default;
     // MobileDrawer should contain the flat Log out link
-    const drawerBlock = text.slice(
-      text.indexOf('function MobileDrawer'),
-      text.indexOf('export function MobileHeader'),
-    );
     expect(drawerBlock).toContain('/logout');
     // MobileDrawer must NOT instantiate UserMenuPopover (no popover on mobile)
     expect(drawerBlock).not.toContain('<UserMenuPopover');

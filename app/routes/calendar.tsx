@@ -3,72 +3,13 @@ import { useLoaderData, useFetcher, useNavigate, useNavigation } from "react-rou
 import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { startOfWeek, addDays, type CalendarEvent, type ViewMode } from "~/components/calendar/calendar-helpers";
+import { MonthView } from "~/components/calendar/MonthView";
+import { WeekView } from "~/components/calendar/WeekView";
+import { DayView } from "~/components/calendar/DayView";
 
 export function meta() {
   return [{ title: "Calendar - OpenInspection" }];
-}
-
-/* ------------------------------------------------------------------ */
-/*  Types                                                              */
-/* ------------------------------------------------------------------ */
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  start: string;
-  end?: string;
-  url?: string;
-  color?: string;
-  backgroundColor?: string;
-  status?: string;
-  isDraft?: boolean;
-  source?: string;
-  extendedProps?: Record<string, unknown>;
-}
-
-type ViewMode = "month" | "week" | "day";
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
-
-
-function startOfWeek(d: Date) {
-  const x = new Date(d);
-  x.setDate(x.getDate() - x.getDay());
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function addDays(d: Date, n: number) {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-}
-
-function isSameDay(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-function formatTime(d: Date) {
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-}
-
-const STATUS_COLORS: Record<string, string> = {
-  draft: "bg-ih-bg-muted",
-  scheduled: "bg-ih-primary-600",
-  confirmed: "bg-ih-primary",
-  in_progress: "bg-ih-watch",
-  delivered: "bg-ih-ok",
-  published: "bg-ih-ok",
-  cancelled: "bg-ih-bad",
-  // ds-allow: Google-source events keep Google Calendar's violet brand hue
-  google: "bg-violet-400",
-};
-
-function eventColor(ev: CalendarEvent): string {
-  if (ev.source === "google" || ev.extendedProps?.source === "google") return STATUS_COLORS.google;
-  return STATUS_COLORS[ev.status || ""] || ev.backgroundColor || "bg-ih-primary";
 }
 
 /* ------------------------------------------------------------------ */
@@ -281,166 +222,43 @@ export default function CalendarPage() {
 
       {/* Month grid */}
       {!isLoading && viewMode === "month" && (
-        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
-          <div className="grid grid-cols-7">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div key={d} className="py-2 px-3 text-center text-[11px] font-bold uppercase tracking-wide text-ih-fg-4 border-b border-ih-border">
-                {d}
-              </div>
-            ))}
-            {Array.from({ length: firstDay }).map((_, i) => (
-              <div key={`empty-${i}`} className="min-h-[90px] border-b border-r border-ih-border bg-ih-bg-muted" />
-            ))}
-            {Array.from({ length: daysInMonth }).map((_, i) => {
-              const day = i + 1;
-              const dateObj = new Date(year, month, day);
-              const dateStr = dateObj.toISOString().slice(0, 10);
-              const dayEvents = getEventsForDate(dateObj);
-              return (
-                <div
-                  key={day}
-                  className={`min-h-[90px] p-1.5 border-b border-r border-ih-border cursor-pointer hover:bg-ih-primary-tint transition-colors ${isToday(day) ? "bg-ih-primary-tint" : ""}`}
-                  onClick={() => handleDayClick(`${dateStr}T09:00`)}
-                  onDragOver={(e) => { e.preventDefault(); setDragTarget(dateStr); }}
-                  onDragLeave={() => setDragTarget(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    const evId = e.dataTransfer.getData("text/plain");
-                    if (evId) handleDrop(evId, `${dateStr}T09:00:00.000Z`);
-                    setDragTarget(null);
-                  }}
-                >
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[12px] font-medium ${isToday(day) ? "bg-ih-primary text-white" : "text-ih-fg-2"}`}>
-                    {day}
-                  </span>
-                  <div className="mt-0.5 space-y-0.5">
-                    {dayEvents.slice(0, 3).map((ev) => (
-                      <button
-                        key={ev.id}
-                        onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }}
-                        draggable={ev.source !== "google" && ev.extendedProps?.source !== "google"}
-                        onDragStart={(e) => e.dataTransfer.setData("text/plain", ev.id)}
-                        className={`w-full text-left px-1 py-0.5 rounded text-[10px] font-medium text-white truncate ${eventColor(ev)} ${ev.isDraft ? "border border-dashed border-white/40 opacity-80" : ""}`}
-                      >
-                        {ev.title}
-                      </button>
-                    ))}
-                    {dayEvents.length > 3 && (
-                      <span className="text-[10px] text-ih-fg-4 font-bold">+{dayEvents.length - 3} more</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <MonthView
+          firstDay={firstDay}
+          daysInMonth={daysInMonth}
+          year={year}
+          month={month}
+          getEventsForDate={getEventsForDate}
+          isToday={isToday}
+          handleDayClick={handleDayClick}
+          setDragTarget={setDragTarget}
+          handleDrop={handleDrop}
+          handleEventClick={handleEventClick}
+        />
       )}
 
       {/* Week view */}
       {!isLoading && viewMode === "week" && (
-        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
-          {/* Day headers */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border">
-            <div className="py-2 px-1" />
-            {weekDays.map((d) => (
-              <div key={d.toISOString()} className={`py-2 px-2 text-center border-l border-ih-border ${isSameDay(d, today) ? "bg-ih-primary-tint" : ""}`}>
-                <span className="text-[10px] font-bold uppercase text-ih-fg-4 block">
-                  {d.toLocaleDateString("en-US", { weekday: "short" })}
-                </span>
-                <span className={`text-[14px] font-bold ${isSameDay(d, today) ? "text-ih-primary" : "text-ih-fg-2"}`}>
-                  {d.getDate()}
-                </span>
-              </div>
-            ))}
-          </div>
-          {/* Time slots */}
-          <div className="max-h-[500px] overflow-y-auto">
-            {hours.map((h) => (
-              <div key={h} className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border min-h-[48px]">
-                <div className="text-[10px] font-bold text-ih-fg-4 text-right pr-2 pt-1">
-                  {h > 12 ? h - 12 : h}{h >= 12 ? "pm" : "am"}
-                </div>
-                {weekDays.map((d) => {
-                  const dayEvents = getEventsForDate(d).filter((ev) => {
-                    const evDate = new Date(ev.start);
-                    return evDate.getHours() === h;
-                  });
-                  const dateStr = d.toISOString().slice(0, 10);
-                  return (
-                    <div
-                      key={d.toISOString() + h}
-                      className="border-l border-ih-border p-0.5 cursor-pointer hover:bg-ih-primary-tint"
-                      onClick={() => handleDayClick(`${dateStr}T${String(h).padStart(2, "0")}:00`)}
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        const evId = e.dataTransfer.getData("text/plain");
-                        if (evId) handleDrop(evId, `${dateStr}T${String(h).padStart(2, "0")}:00:00.000Z`);
-                      }}
-                    >
-                      {dayEvents.map((ev) => (
-                        <button
-                          key={ev.id}
-                          onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }}
-                          draggable
-                          onDragStart={(e) => e.dataTransfer.setData("text/plain", ev.id)}
-                          className={`w-full text-left px-1 py-0.5 rounded text-[10px] font-medium text-white truncate mb-0.5 ${eventColor(ev)}`}
-                        >
-                          {ev.title}
-                        </button>
-                      ))}
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        </div>
+        <WeekView
+          weekDays={weekDays}
+          today={today}
+          hours={hours}
+          getEventsForDate={getEventsForDate}
+          handleDayClick={handleDayClick}
+          handleDrop={handleDrop}
+          handleEventClick={handleEventClick}
+        />
       )}
 
       {/* Day view */}
       {!isLoading && viewMode === "day" && (
-        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
-          <div className="max-h-[600px] overflow-y-auto">
-            {hours.map((h) => {
-              const dayEvents = getEventsForDate(currentDate).filter((ev) => {
-                const evDate = new Date(ev.start);
-                return evDate.getHours() === h;
-              });
-              const dateStr = currentDate.toISOString().slice(0, 10);
-              return (
-                <div key={h} className="flex border-b border-ih-border min-h-[56px]">
-                  <div className="w-16 text-[11px] font-bold text-ih-fg-4 text-right pr-3 pt-2 shrink-0">
-                    {h > 12 ? h - 12 : h}:00 {h >= 12 ? "PM" : "AM"}
-                  </div>
-                  <div
-                    className="flex-1 p-1 cursor-pointer hover:bg-ih-primary-tint border-l border-ih-border"
-                    onClick={() => handleDayClick(`${dateStr}T${String(h).padStart(2, "0")}:00`)}
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const evId = e.dataTransfer.getData("text/plain");
-                      if (evId) handleDrop(evId, `${dateStr}T${String(h).padStart(2, "0")}:00:00.000Z`);
-                    }}
-                  >
-                    {dayEvents.map((ev) => (
-                      <button
-                        key={ev.id}
-                        onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }}
-                        draggable
-                        onDragStart={(e) => e.dataTransfer.setData("text/plain", ev.id)}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-[12px] font-bold text-white mb-1 ${eventColor(ev)}`}
-                      >
-                        {ev.title}
-                        {ev.start && <span className="ml-2 opacity-80 text-[10px]">{formatTime(new Date(ev.start))}</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <DayView
+          hours={hours}
+          currentDate={currentDate}
+          getEventsForDate={getEventsForDate}
+          handleDayClick={handleDayClick}
+          handleDrop={handleDrop}
+          handleEventClick={handleEventClick}
+        />
       )}
 
       {/* Event detail modal */}

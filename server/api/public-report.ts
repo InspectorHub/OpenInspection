@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { tenants, inspections, reportVersions } from '../lib/db/schema';
+import { inspections } from '../lib/db/schema';
 import { verifyRenderToken } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
@@ -12,13 +12,13 @@ import { resolvePortalAccess, resolveObserverAccess, resolveOwnerPreview } from 
 // module (e.g. tests) continue to work without changes.
 export { resolveOwnerPreviewToken } from '../lib/public-access';
 import { contentDisposition } from '../lib/content-disposition';
-import { loadVerifyData, loadReportVerifyData } from '../lib/verify-data';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
-import { getBookingHost, resolveTenantSlug } from '../lib/url';
+import { getBookingHost } from '../lib/url';
 import { publicReportAccessAllowed } from '../lib/report-access';
-import { isReportPublished } from '../lib/status/report-status';
+import publicVerifyRoutes from './public/verify';
+import publicInspectorProfileRoutes, { PublicBrandSchema } from './public/inspector-profile';
 
 /**
  * Render-token access path for headless PDF generation. The Cloudflare Browser
@@ -124,83 +124,6 @@ const reportPdfDownloadRoute = createRoute(withMcpMetadata({
     },
     operationId: 'getPublicReportPdf',
     description: 'Public, no-login report PDF resolved via a persistent portal token. Renders on demand and caches by version (published reports = immutable archive). 404 when the token is missing/expired/revoked or does not match the inspection.',
-}, { scopes: [], tier: 'extended' }));
-
-// Public inspector marketing profile (by slug). Tenant resolves from the
-// slug (no token — public page); returns whitelisted public fields only.
-const PublicInspectorProfileSchema = z.object({
-    profile: z.object({
-        name: z.string().nullable(),
-        bio: z.string().nullable(),
-        photoUrl: z.string().nullable(),
-        slug: z.string().nullable(),
-        serviceAreas: z.array(z.object({ city: z.string(), state: z.string() })),
-    }).nullable(),
-    services: z.array(z.object({
-        id: z.string(),
-        name: z.string(),
-        description: z.string().nullable().optional(),
-        priceCents: z.number().nullable().optional(),
-        durationMinutes: z.number().nullable().optional(),
-    })),
-});
-
-const inspectorRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/inspector/{tenant}/{slug}',
-    tags: ['public'],
-    summary: 'Public inspector marketing profile',
-    request: { params: z.object({
-        tenant: z.string().describe('Tenant slug that scopes the inspector lookup.'),
-        slug: z.string().describe('Public inspector profile slug.'),
-    }) },
-    responses: {
-        200: { content: { 'application/json': { schema: createApiResponseSchema(PublicInspectorProfileSchema) } }, description: 'Public profile + bookable services' },
-        404: { description: 'Tenant or inspector not found' },
-    },
-    operationId: 'getPublicInspectorProfile',
-    description: 'Public, no-login inspector profile resolved by tenant slug + slug. Returns only public marketing fields (name/bio/photo/serviceAreas) + bookable services — never email/phone/license/ids.',
-}, { scopes: [], tier: 'extended' }));
-
-// A-10 — the canonical tenant brand every public surface paints with.
-// Fields are nullable verbatim from tenant_configs; null primaryColor means
-// "keep the platform design tokens" (no per-surface fallback drift).
-const PublicBrandSchema = z.object({
-    siteName: z.string().nullable(),
-    primaryColor: z.string().nullable(),
-    logoUrl: z.string().nullable(),
-});
-
-const brandRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/brand/{tenant}',
-    tags: ['public'],
-    summary: 'Public tenant brand (site name / accent color / logo)',
-    request: { params: z.object({ tenant: z.string().describe('Tenant slug that scopes the brand lookup.') }) },
-    responses: {
-        200: { content: { 'application/json': { schema: createApiResponseSchema(PublicBrandSchema) } }, description: 'Tenant brand (nullable fields when unset)' },
-        404: { description: 'Tenant not found' },
-    },
-    operationId: 'getPublicBrand',
-    description: 'Public, no-login tenant branding (siteName / primaryColor / logoUrl) resolved by tenant slug. Powers the consistent brand overlay on profile, booking, report, and invoice surfaces.',
-}, { scopes: [], tier: 'extended' }));
-
-// A-10 — public brand-asset serve (tenant logos). Logos are public marketing
-// assets embedded in emails and public pages; only the `branding/` R2 prefix
-// is reachable here. The key contains '/', so it travels as a query param
-// (mounted routers don't match multi-segment path params — see A-9).
-const brandAssetRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/brand-asset',
-    tags: ['public'],
-    summary: 'Public brand asset (tenant logo) bytes',
-    request: { query: z.object({ key: z.string().describe('R2 object key under the branding/ prefix.') }) },
-    responses: {
-        200: { content: { 'image/*': { schema: z.any() } }, description: 'Asset bytes' },
-        404: { description: 'Key outside branding/ or object missing' },
-    },
-    operationId: 'getPublicBrandAsset',
-    description: 'Streams a tenant brand asset (logo) from R2. Only keys under the public `branding/` prefix are servable; everything else in the bucket stays scoped to its own routes.',
 }, { scopes: [], tier: 'extended' }));
 
 // Public invoice for the report-gate "Pay invoice" CTA (by inspection id;
@@ -326,196 +249,8 @@ const reportGateRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login report-gate status resolved by tenant slug + inspection id. Returns the outstanding gate (agreement before payment) with branding, inspector contact, and amount due — or null when the report is not gated.',
 }, { scopes: [], tier: 'extended' }));
 
-// Public e-sign verifier (Spec 5H P2, court-friendly). Reuses the raw siblings'
-// loadVerifyData; this is the base JSON route the verify page consumes.
-const VerifySignerSchema = z.object({
-    name: z.string(),
-    role: z.string(),
-    status: z.string(),
-    signedAt: z.string().nullable(),
-    channel: z.string().nullable(),
-});
-
-const VerifyResponseSchema = z.object({
-    envelopeId: z.string(),
-    documentTitle: z.string().nullable(),
-    clientName: z.string().nullable(),
-    chainValid: z.boolean(),
-    chainReason: z.string().nullable(),
-    keyFingerprint: z.string().nullable(),
-    keyAlgorithm: z.string(),
-    eventCount: z.number(),
-    // Track I-a — the pinned content snapshot ("what was signed") + its hash, and
-    // the per-signer roster (no emails — privacy). Snapshot is null on
-    // pre-feature envelopes signed before snapshots were introduced.
-    contentSnapshot: z.string().nullable(),
-    contentHash: z.string().nullable(),
-    signers: z.array(VerifySignerSchema),
-});
-
-const verifyRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/verify/{envelopeId}',
-    tags: ['public'],
-    summary: 'Public e-signature verification (court-friendly)',
-    request: { params: z.object({ envelopeId: z.string().describe('Signature envelope identifier to verify') }) },
-    responses: {
-        200: { content: { 'application/json': { schema: createApiResponseSchema(VerifyResponseSchema) } }, description: 'Verification result' },
-        404: { description: 'Envelope not found' },
-    },
-    operationId: 'getPublicVerify',
-    description: 'Public, no-login signature-chain verification for a signed agreement envelope. Returns chain validity + key fingerprint for independent verification.',
-}, { scopes: [], tier: 'extended' }));
-
-// #120 — public report-version verifier (court-friendly). Recomputes the
-// content hash, verifies the Ed25519 signature, and checks the prev_hash chain.
-// Mirrors the e-sign verifier above; exposes no PII beyond a masked address.
-const reportVerifyRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/verify/report/{token}',
-    tags: ['public'],
-    summary: 'Public report-version verification (court-friendly)',
-    request: { params: z.object({ token: z.string().describe('report_versions verification token') }) },
-    responses: {
-        200: { content: { 'application/json': { schema: createApiResponseSchema(z.object({
-            versionNumber: z.number(), isAmendment: z.boolean(), publishedAt: z.number(),
-            contentHash: z.string().nullable(), keyFingerprint: z.string().nullable(),
-            keyAlgorithm: z.string(), legacy: z.boolean(),
-            hashValid: z.boolean(), signatureValid: z.boolean(), chainValid: z.boolean(),
-            propertyAddressMasked: z.string(),
-            notPublished: z.boolean(),
-        })) } }, description: 'Verification result' },
-        404: { description: 'Token not found' },
-    },
-    operationId: 'getPublicReportVerify',
-    description: 'Public, no-login verification of a published report version: recomputes the content hash, verifies the Ed25519 signature, and checks the prev_hash chain.',
-}, { scopes: [], tier: 'extended' }));
-
-// #layer2 — frozen per-version PDF download for the public verifier page.
-// Token resolves to a report_versions row → frozen archived PDF keyed by
-// (inspectionId, type='full', versionNumber). If the frozen PDF hasn't been
-// rendered yet (e.g. publish predated the pipeline), it renders once on-demand
-// and stores it with versionNumber so subsequent hits are instant.
-const reportVerifyPdfRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/verify/report/{token}/pdf',
-    tags: ['public'],
-    summary: 'Download the frozen archived PDF for a verified report version',
-    request: { params: z.object({ token: z.string().describe('report_versions verification token') }) },
-    responses: {
-        200: { content: { 'application/pdf': { schema: z.any().describe('Frozen archived PDF bytes') } }, description: 'Archived PDF' },
-        404: { description: 'Token invalid or PDF not available' },
-        503: { description: 'PDF rendering not configured on this deployment' },
-    },
-    operationId: 'getPublicReportVerifyPdf',
-    description: 'Public, no-login download of the immutable archived PDF for a specific published report version. Identified by the report_versions verification token (same token as the verifier page). Rendered once on-demand and cached forever by version number.',
-}, { scopes: [], tier: 'extended' }));
-
 export const publicReportRoutes = createApiRouter()
-    .openapi(verifyRoute, async (c) => {
-        const { envelopeId } = c.req.valid('param');
-        const data = await loadVerifyData(c, envelopeId);
-        if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Envelope not found' } }, 404);
-        return c.json({
-            success: true as const,
-            data: {
-                envelopeId,
-                documentTitle: data.agreement?.name ?? null,
-                clientName: data.reqRow.clientName,
-                // clientEmail deliberately NOT exposed — this is a public, no-auth
-                // endpoint; the signer roster below is email-free for the same reason.
-                chainValid: data.verify.valid,
-                chainReason: data.verify.valid ? null : (data.verify.reason as string),
-                keyFingerprint: data.pubKey?.fingerprint ?? null,
-                keyAlgorithm: 'Ed25519',
-                eventCount: data.auditRows.length,
-                contentSnapshot: data.reqRow.contentSnapshot ?? null,
-                contentHash: data.reqRow.contentHash ?? null,
-                signers: data.signers.map((s) => ({
-                    name: s.name,
-                    role: s.role,
-                    status: s.status,
-                    signedAt: s.signedAt ? new Date(s.signedAt).toISOString() : null,
-                    channel: s.channel ?? null,
-                })),
-            },
-        }, 200);
-    })
-    .openapi(reportVerifyRoute, async (c) => {
-        const { token } = c.req.valid('param');
-        const data = await loadReportVerifyData(c, token);
-        if (!data) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Token not found' } }, 404);
-        return c.json({ success: true as const, data: {
-            versionNumber: data.verify.versionNumber,
-            isAmendment:   data.verify.isAmendment,
-            publishedAt:   data.verify.publishedAt,
-            contentHash:   data.verify.contentHash,
-            keyFingerprint: data.verify.keyFingerprint,
-            keyAlgorithm:  'Ed25519',
-            legacy:        data.verify.legacy,
-            hashValid:     data.verify.hashValid,
-            signatureValid: data.verify.signatureValid,
-            chainValid:    data.verify.chainValid,
-            propertyAddressMasked: data.propertyAddressMasked,
-            notPublished: data.notPublished,
-        } }, 200);
-    })
-    .openapi(reportVerifyPdfRoute, async (c) => {
-        const { token } = c.req.valid('param');
-        // Resolve token → report_versions row to get tenantId + versionNumber.
-        // loadReportVerifyData only returns inspectionId from verifyByToken, so
-        // we query the row directly for the tenantId we need.
-        const db = drizzle(c.env.DB);
-        const versionRow = await db.select({
-            tenantId:      reportVersions.tenantId,
-            inspectionId:  reportVersions.inspectionId,
-            versionNumber: reportVersions.versionNumber,
-            contentHash:   reportVersions.contentHash,
-        }).from(reportVersions).where(eq(reportVersions.verificationToken, token)).get();
-        if (!versionRow) return c.notFound();
-
-        const { tenantId, inspectionId, versionNumber, contentHash } = versionRow;
-
-        // Publish gate: the frozen archived PDF is a public client artifact — refuse
-        // while the report is not currently published (re-publishing restores it).
-        const inspRow = await db.select({ reportStatus: inspections.reportStatus })
-          .from(inspections)
-          .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-          .get();
-        if (!isReportPublished(inspRow?.reportStatus)) {
-          return c.json({ success: false as const, error: { code: 'NOT_PUBLISHED', message: 'This report is not published.' } }, 403);
-        }
-
-        if (!c.env.BROWSER || !c.env.PHOTOS) {
-            return c.json({ success: false as const, error: { code: 'PDF_UNAVAILABLE', message: 'PDF rendering is not configured on this deployment.' } }, 503);
-        }
-
-        // Check if we already have a frozen PDF for this exact version.
-        // getOrRender will return cached row on content-hash hit; on miss it
-        // renders once and stores with versionNumber so subsequent hits are instant.
-        const tenantSlug = await resolveTenantSlug(c, tenantId);
-        const reportUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, inspectionId, c.env.JWT_SECRET);
-
-        // Use contentHash from the snapshot row if available; fall back to live hash
-        // so even legacy rows (no contentHash) get a rendered PDF.
-        const hash = contentHash ?? await c.var.services.inspection.getReportContentHash(inspectionId, tenantId);
-        const footer = await c.var.services.inspection.getReportPdfFooterContext(inspectionId, tenantId);
-
-        const record = await c.var.services.reportPdf.getOrRender(inspectionId, tenantId, 'full', {
-            reportUrl,
-            contentHash: hash,
-            versionNumber,
-            footer,
-        });
-        const obj = await c.var.services.reportPdf.streamPdf(record);
-        if (!obj) return c.notFound();
-
-        return new Response(obj.body, { status: 200, headers: {
-            'Content-Type': 'application/pdf',
-            'Content-Disposition': `attachment; filename="report-v${versionNumber}.pdf"`,
-            'Cache-Control': 'public, max-age=31536000, immutable',
-        } });
-    })
+    .route('/', publicVerifyRoutes)
     .openapi(reportRoute, async (c) => {
         const { tenant, id } = c.req.valid('param');
         const { token, render } = c.req.valid('query');
@@ -703,51 +438,7 @@ export const publicReportRoutes = createApiRouter()
             'Cache-Control': 'private, max-age=300',
         } });
     })
-    .openapi(inspectorRoute, async (c) => {
-        const { tenant, slug } = c.req.valid('param');
-        // A-10 — resolve by the URL slug directly (same pattern as
-        // GET /book/:tenant/:slug and /brand/:tenant): the slug IS the public
-        // tenant identifier, and context resolution doesn't run for in-process
-        // /api/public/* calls.
-        const db = drizzle(c.env.DB);
-        const row = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, tenant)).get();
-        const tenantId = row?.id ?? ((c.get('resolvedTenantId') || c.get('tenantId')) as string | null);
-        if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Inspector not found' } }, 404);
-        const profile = await c.var.services.user.getProfileBySlug(tenantId, slug);
-        const services = await c.var.services.service.listServices(tenantId);
-        return c.json({
-            success: true as const,
-            data: {
-                profile: profile ? {
-                    name: profile.name, bio: profile.bio, photoUrl: profile.photoUrl,
-                    slug: profile.slug, serviceAreas: profile.serviceAreas,
-                } : null,
-                services,
-            },
-        }, 200);
-    })
-    .openapi(brandRoute, async (c) => {
-        const { tenant } = c.req.valid('param');
-        // Resolve by slug directly (works in every deploy mode — the slug is
-        // the public tenant identifier; same pattern as GET /book/:tenant/:slug).
-        const db = drizzle(c.env.DB);
-        const row = await db.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, tenant)).get();
-        if (!row) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Tenant not found' } }, 404);
-        const brand = await c.var.services.branding.getBrand(row.id);
-        return c.json({ success: true as const, data: brand }, 200);
-    })
-    .openapi(brandAssetRoute, async (c) => {
-        const { key } = c.req.valid('query');
-        if (!c.env.PHOTOS) return c.notFound();
-        if (!key.startsWith('branding/')) return c.notFound();
-        const obj = await c.env.PHOTOS.get(key);
-        if (!obj) return c.notFound();
-        const headers = new Headers();
-        headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
-        headers.set('Cache-Control', 'public, max-age=3600');
-        if (obj.httpEtag) headers.set('etag', obj.httpEtag);
-        return new Response(obj.body, { status: 200, headers });
-    })
+    .route('/', publicInspectorProfileRoutes)
     .openapi(invoiceRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
