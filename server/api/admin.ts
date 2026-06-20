@@ -23,6 +23,7 @@ import adminAgreementsRoutes from './admin/admin-agreements';
 import adminEsignRoutes from './admin/admin-esign';
 import adminCommentsRoutes from './admin/admin-comments';
 import adminDataRoutes from './admin/admin-data';
+import adminDataImportRoutes from './admin/admin-data-import';
 import adminSettingsRoutes from './admin/admin-settings';
 import adminConfigRoutes from './admin/admin-config';
 
@@ -31,6 +32,7 @@ export const adminRoutes = createApiRouter()
     .route('/', adminEsignRoutes)
     .route('/', adminCommentsRoutes)
     .route('/', adminDataRoutes)
+    .route('/', adminDataImportRoutes)
     .route('/', adminSettingsRoutes)
     .route('/', adminConfigRoutes);
 
