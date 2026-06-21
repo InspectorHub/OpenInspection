@@ -82,6 +82,24 @@ else
     fail "Migration-reference check failed  →  npm run lint:migrefs"
 fi
 
+# 3c. Large-file ratchet — no new files over the size limit; grandfathered
+#     monoliths may not grow (fast full-repo scan; also gated in CI via npm run lint).
+step "Large-file ratchet"
+if node scripts/check-file-size.mjs > /dev/null 2>&1; then
+    pass "Large-file ratchet passed"
+else
+    fail "Large-file gate failed  →  npm run lint:filesize"
+fi
+
+# 3d. Duplicate-code ceiling — copy/paste duplication must stay under the jscpd
+#     threshold (also gated in CI via npm run lint).
+step "Duplicate-code ceiling"
+if npm run lint:dup > /dev/null 2>&1; then
+    pass "Duplicate-code ceiling passed"
+else
+    fail "Duplicate-code gate failed  →  npm run lint:dup"
+fi
+
 # 4. Worker bundle size (C-13b) — Workers FREE caps the script at 3 MiB
 #    gzipped, and OpenInspection promises one-click Free-plan deploys, so an
 #    oversized bundle breaks every self-hoster. Runs the REAL build pipeline
