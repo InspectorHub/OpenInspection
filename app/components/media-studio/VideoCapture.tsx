@@ -420,7 +420,17 @@ export function grabFirstFrame(file: File): Promise<Blob | null> {
       resolve(null);
     };
 
-    video.src = objectUrl;
-    video.load();
+    // Defense-in-depth scheme allowlist for the media `.src` sink (CWE-79):
+    // URL.createObjectURL always yields a same-origin `blob:` URL, so this guard
+    // is always satisfied here — but it pins the only acceptable scheme so any
+    // future refactor that routes an external/attacker-influenced URL into this
+    // element fails closed instead of loading it.
+    if (objectUrl.startsWith("blob:")) {
+      video.src = objectUrl;
+      video.load();
+    } else {
+      cleanup();
+      resolve(null);
+    }
   });
 }
