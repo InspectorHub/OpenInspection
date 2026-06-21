@@ -9,6 +9,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { getBaseUrl } from '../../lib/url';
 import { Errors } from '../../lib/errors';
+import { logger } from '../../lib/logger';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { CoverCropSchema, PhotoCropSchema } from '../../lib/validations/inspection.schema';
 import { UpdateMediaAnnotationsSchema, CreateVideoUploadSchema, FinalizeVideoSchema, SetPosterSchema } from '../../lib/validations/media.schema';
@@ -281,7 +282,24 @@ const mediaStudioRoutes = createApiRouter()
         // Ownership check (404 on cross-tenant); tenantId is from the JWT.
         await c.var.services.inspection.getInspection(id, tenantId);
         const svc = new MediaVideoService(c.env.STREAM, tenantId, getBaseUrl(c));
-        const out = await svc.createUpload(id);
+        let out;
+        try {
+            out = await svc.createUpload(id);
+        } catch (err) {
+            // Cloudflare Stream rejects the direct-upload mint when the account has
+            // no allocated minutes / Stream isn't provisioned (QuotaReachedError),
+            // or on a transient Stream API failure. Translate to a typed 503 so the
+            // editor can show WHY rather than a generic 500 the client blames on the
+            // inspector's connection. The real Stream error is logged for ops.
+            const detail = err instanceof Error ? err.message : String(err);
+            logger.error('Stream create-upload failed', { inspectionId: id }, err instanceof Error ? err : undefined);
+            const isQuota = /quota|capacity|allocated|minutes|storage/i.test(detail);
+            throw Errors.ServiceUnavailable(
+                isQuota
+                    ? 'Video uploads are unavailable — the video service (Cloudflare Stream) has no remaining storage quota. Ask your administrator to enable Stream or add minutes.'
+                    : 'Video uploads are temporarily unavailable. Please try again later, or contact your administrator if it persists.',
+            );
+        }
         return c.json({ success: true, data: out }, 200);
     })
     .openapi(videoFinalizeRoute, async (c) => {

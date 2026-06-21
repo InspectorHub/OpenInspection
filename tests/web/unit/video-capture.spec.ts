@@ -3,6 +3,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   validateVideoFile,
+  apiErrorReason,
   MAX_VIDEO_BYTES,
   MAX_VIDEO_SEC,
   ALLOWED_VIDEO_TYPES,
@@ -37,5 +38,27 @@ describe('validateVideoFile', () => {
 
   it('exposes a 30s duration cap', () => {
     expect(MAX_VIDEO_SEC).toBe(30);
+  });
+});
+
+describe('apiErrorReason', () => {
+  const jsonResponse = (status: number, body: unknown): Response =>
+    ({ status, json: async () => body }) as unknown as Response;
+
+  it('surfaces the server-provided reason from the { error: { message } } envelope', async () => {
+    const res = jsonResponse(503, {
+      success: false,
+      error: { message: 'Video uploads are unavailable — the video service has no remaining storage quota.', code: 'service_unavailable' },
+    });
+    await expect(apiErrorReason(res)).resolves.toMatch(/no remaining storage quota/i);
+  });
+
+  it('falls back to a status-coded message when the envelope has no usable reason', async () => {
+    await expect(apiErrorReason(jsonResponse(500, { success: false }))).resolves.toMatch(/\(500\)/);
+  });
+
+  it('falls back when the body is not JSON', async () => {
+    const res = { status: 502, json: async () => { throw new Error('not json'); } } as unknown as Response;
+    await expect(apiErrorReason(res)).resolves.toMatch(/\(502\)/);
   });
 });

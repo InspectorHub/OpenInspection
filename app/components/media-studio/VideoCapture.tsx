@@ -69,14 +69,33 @@ export function VideoCapture({ inspectionId, itemId, onClose, onUploaded }: Vide
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(itemId ? { itemId } : {}),
       });
-      if (!createRes.ok) throw new Error("create-upload failed");
+      // Surface the server's real reason (e.g. "video service has no remaining
+      // quota") instead of blaming the connection — the API replies with a typed
+      // { error: { message } } envelope on failure.
+      if (!createRes.ok) {
+        setPhase("pick");
+        setError(await apiErrorReason(createRes));
+        return;
+      }
       const { data } = (await createRes.json()) as { data?: { uploadURL: string; streamUid: string } };
-      if (!data?.uploadURL || !data?.streamUid) throw new Error("create-upload missing fields");
+      if (!data?.uploadURL || !data?.streamUid) {
+        setPhase("pick");
+        setError("The video service returned an unexpected response. Please try again.");
+        return;
+      }
 
-      // 4. XHR POST the file straight to Cloudflare with a progress bar.
+      // 4. XHR POST the file straight to Cloudflare with a progress bar. A failure
+      // here IS a transport issue (bytes go direct to Cloudflare, not the worker),
+      // so the connection hint is the accurate message for this leg only.
       setPhase("uploading");
       setProgress(0);
-      await uploadWithProgress(data.uploadURL, file, setProgress);
+      try {
+        await uploadWithProgress(data.uploadURL, file, setProgress);
+      } catch {
+        setPhase("pick");
+        setError("Upload failed. Check your connection and try again.");
+        return;
+      }
 
       // 5. finalize → pool row appears in the strip.
       setPhase("finalizing");
@@ -86,7 +105,11 @@ export function VideoCapture({ inspectionId, itemId, onClose, onUploaded }: Vide
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ streamUid: data.streamUid }),
       });
-      if (!finRes.ok) throw new Error("finalize failed");
+      if (!finRes.ok) {
+        setPhase("pick");
+        setError(await apiErrorReason(finRes));
+        return;
+      }
       onUploaded(data.streamUid);
       onClose();
     } catch {
@@ -160,6 +183,22 @@ export function VideoCapture({ inspectionId, itemId, onClose, onUploaded }: Vide
       </div>
     </div>
   );
+}
+
+/**
+ * Pull the human-readable reason out of the API's `{ error: { message } }`
+ * envelope so the editor can show WHY an upload failed (e.g. the video service
+ * is out of quota) instead of a blanket "check your connection". Falls back to
+ * a status-coded message when the body has no usable reason.
+ */
+export async function apiErrorReason(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: { message?: string } };
+    if (body?.error?.message) return body.error.message;
+  } catch {
+    // non-JSON / body already consumed — fall through to the generic message
+  }
+  return `Upload failed (${res.status}). Please try again.`;
 }
 
 /** POST a file with an upload progress callback (Stream direct-upload is a single multipart POST). */
