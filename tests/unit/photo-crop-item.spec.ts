@@ -98,7 +98,7 @@ describe('saveCroppedItemPhoto', () => {
     const { croppedKey } = await svc.saveCroppedItemPhoto(
       INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined,
     );
-    expect(croppedKey).toMatch(/_cropped\.jpg$/);
+    expect(croppedKey).toMatch(/\.cropped\.jpg$/);
     expect(r2.store.has(croppedKey)).toBe(true);
     const entry = await readEntry(0);
     expect(entry.croppedKey).toBe(croppedKey);

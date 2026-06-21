@@ -355,7 +355,7 @@ const mediaRoutes = createApiRouter()
         if (!c.env.PHOTOS) return c.notFound();
         // Ownership: keys are `${tenantId}/${inspectionId}/...`; reject anything
         // outside this caller's tenant + the inspection in the path.
-        if (!key.startsWith(`${tenantId}/${id}/`)) return c.notFound();
+        if (!key.startsWith(`${tenantId}/inspections/${id}/`)) return c.notFound();
         const obj = await c.env.PHOTOS.get(key);
         if (!obj) return c.notFound();
 

@@ -9,7 +9,7 @@
   "app/components/editor/PhotoStudio.tsx": 694,
   "app/components/media-studio/PhotoAnnotator.tsx": 693,
   "app/components/portal/sections/ReportView.tsx": 637,
-  "server/services/inspection/inspection-photo.service.ts": 635,
+  "server/services/inspection/inspection-photo.service.ts": 641,
   "server/services/inspection/inspection-analytics.service.ts": 613,
   "app/components/portal/sections/RepairBuilderSection.tsx": 609,
   "server/services/inspection/inspection-report.service.ts": 602,
