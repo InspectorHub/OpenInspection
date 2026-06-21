@@ -34,6 +34,7 @@ import { resolveClientActor } from '../lib/portal-client-actor';
 import { buildPortalUrl } from '../lib/portal-urls';
 import { getBaseUrl, resolveTenantSlug } from '../lib/url';
 import type { HonoConfig } from '../types/hono';
+import { r2Keys } from '../lib/r2-keys';
 
 const AttachmentSchema = z.object({
     id: z.string().describe('Stable attachment identifier within the message.'),
@@ -147,7 +148,7 @@ const unreadRoute = createRoute(withMcpMetadata({
 async function storeAttachment(
     photos: R2Bucket | undefined,
     file: File | undefined,
-    keyPrefix: string,
+    tenantId: string,
 ): Promise<{ id: string; key: string; name: string; size: number; type: string; uploadedAt: number }> {
     if (!file) throw Errors.BadRequest('file required');
     if (file.size > 10 * 1024 * 1024) throw Errors.BadRequest('file too large (max 10MB)');
@@ -156,7 +157,9 @@ async function storeAttachment(
     if (!detected && !file.name.toLowerCase().endsWith('.heic')) throw Errors.BadRequest('unsupported file type');
     const id = crypto.randomUUID();
     const ext = (file.name.split('.').pop() || 'bin').toLowerCase().slice(0, 8);
-    const key = `${keyPrefix}/${id}/${id}.${ext}`;
+    // Each upload gets a fresh UUID (id) that serves as both the message bucket
+    // and the attachment id — the attachment IS the addressable unit here.
+    const key = r2Keys.messageAttachment(tenantId, id, id, ext);
     if (!photos) throw Errors.BadRequest('Storage not available');
     await photos.put(key, buf, { httpMetadata: { contentType: detected ?? file.type } });
     return { id, key, name: file.name, size: file.size, type: detected ?? file.type, uploadedAt: Date.now() };
@@ -228,10 +231,9 @@ export const inspectorMessageRoutes = createApiRouter()
         return c.json({ success: true, data: row }, 201);
     })
     .openapi(uploadRoute, async (c) => {
-        const { inspectionId } = c.req.valid('param');
         const tenantId = c.get('tenantId');
         const fd = await c.req.parseBody();
-        const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, `${tenantId}/${inspectionId}/messages`);
+        const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, tenantId);
         return c.json({ success: true, data }, 200);
     })
     .openapi(attachmentRoute, async (c) => {
@@ -315,7 +317,7 @@ clientMessageRoutes.post('/inspections/:id/messages/upload', async (c) => {
     if (!actor) return c.json({ error: 'Unauthorized' }, 401);
     const fd = await c.req.parseBody();
     try {
-        const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, `${actor.tenantId}/${inspectionId}/messages`);
+        const data = await storeAttachment(c.env.PHOTOS, fd['file'] as File | undefined, actor.tenantId);
         return c.json({ success: true, data }, 200);
     } catch (err) {
         const status = (err as { status?: number })?.status;
