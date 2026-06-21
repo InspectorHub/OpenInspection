@@ -107,7 +107,7 @@ describe('StreamVideoBackend.createUpload', () => {
     it('passes maxDurationSeconds=30 and a tenant-scoped meta envelope', async () => {
         const { stream, createDirectUpload } = makeStreamMock();
         const { db } = makeDbMock();
-        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db, 'insp-1');
+        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db);
         const out = await backend.createUpload('insp-1');
 
         expect(createDirectUpload).toHaveBeenCalledTimes(1);
@@ -128,27 +128,81 @@ describe('StreamVideoBackend.createUpload', () => {
 });
 
 describe('StreamVideoBackend tenant guard', () => {
-    it('getDetails rejects when Stream meta.tenantId mismatches', async () => {
+    it('getDetails rejects with NotFound (404) when Stream meta.tenantId mismatches', async () => {
         const { stream } = makeStreamMock({ meta: { tenantId: 'other-tenant' } });
         const { db } = makeDbMock();
-        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db, 'insp-1');
-        await expect(backend.getDetails({ provider: 'stream', streamUid: 'vid-123' })).rejects.toThrow();
+        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db);
+        await expect(backend.getDetails({ provider: 'stream', streamUid: 'vid-123' }))
+            .rejects.toThrow(/not found/i);
     });
 
     it('getDetails returns normalized VideoDetails when tenant matches', async () => {
         const { stream } = makeStreamMock({ meta: { tenantId: 't-1' }, duration: 18, readyToStream: true });
         const { db } = makeDbMock();
-        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db, 'insp-1');
+        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db);
         const d = await backend.getDetails({ provider: 'stream', streamUid: 'vid-123' });
         expect(d.readyToStream).toBe(true);
         expect(d.durationSec).toBe(18);
     });
 
-    it('delete rejects on tenant mismatch and never calls Stream delete', async () => {
+    it('delete rejects with NotFound (404) on tenant mismatch and never calls Stream delete', async () => {
         const { stream, del } = makeStreamMock({ meta: { tenantId: 'other-tenant' } });
         const { db } = makeDbMock();
-        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db, 'insp-1');
-        await expect(backend.delete({ provider: 'stream', streamUid: 'vid-123' })).rejects.toThrow();
+        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db);
+        await expect(backend.delete({ provider: 'stream', streamUid: 'vid-123' }))
+            .rejects.toThrow(/not found/i);
         expect(del).not.toHaveBeenCalled();
+    });
+});
+
+describe('StreamVideoBackend.finalize', () => {
+    it('inserts a pool row with provider:stream, streamUid, mediaType:video, and inspectionId from Stream meta', async () => {
+        const { stream } = makeStreamMock({
+            meta: { tenantId: 't-1', inspectionId: 'insp-meta-1' },
+            duration: 20,
+        });
+        const { db, insertValuesMock } = makeDbMock(null);
+        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db);
+
+        const result = await backend.finalize({ provider: 'stream', streamUid: 'vid-123' });
+
+        expect(result.poolId).toBeTruthy();
+        expect(insertValuesMock).toHaveBeenCalledTimes(1);
+        const row = insertValuesMock.mock.calls[0][0];
+        expect(row.provider).toBe('stream');
+        expect(row.streamUid).toBe('vid-123');
+        expect(row.mediaType).toBe('video');
+        // inspectionId must come from Stream meta, not a constructor argument
+        expect(row.inspectionId).toBe('insp-meta-1');
+        expect(row.tenantId).toBe('t-1');
+        expect(row.durationSec).toBe(20);
+    });
+
+    it('is idempotent — a second finalize for the same streamUid updates durationSec and does not insert a duplicate row', async () => {
+        const { stream } = makeStreamMock({
+            meta: { tenantId: 't-1', inspectionId: 'insp-meta-1' },
+            duration: 20,
+        });
+        // Simulate existing row already present (idempotent path)
+        const { db, insertValuesMock, updateSetMock } = makeDbMock({ id: 'existing-pool-id' });
+        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db);
+
+        const result = await backend.finalize({ provider: 'stream', streamUid: 'vid-123' });
+
+        expect(result.poolId).toBe('existing-pool-id');
+        // No new row inserted
+        expect(insertValuesMock).not.toHaveBeenCalled();
+        // Duration updated on the existing row
+        expect(updateSetMock).toHaveBeenCalledWith({ durationSec: 20 });
+    });
+
+    it('throws NotFound when Stream meta.inspectionId is absent', async () => {
+        // meta has tenantId but no inspectionId
+        const { stream } = makeStreamMock({ meta: { tenantId: 't-1' } });
+        const { db } = makeDbMock(null);
+        const backend = new StreamVideoBackend(stream, 't-1', 'https://app.example', db);
+
+        await expect(backend.finalize({ provider: 'stream', streamUid: 'vid-123' }))
+            .rejects.toThrow(/not found/i);
     });
 });

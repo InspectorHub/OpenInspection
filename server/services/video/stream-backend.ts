@@ -26,14 +26,12 @@ export class StreamVideoBackend implements VideoBackend {
      * @param tenantId    caller's tenant (from JWT — never the request body)
      * @param appOrigin   app base URL used for Stream `allowedOrigins`
      * @param db          Drizzle D1 database instance (needed for finalize + delete pool row)
-     * @param inspectionId inspection this backend instance is scoped to (needed for finalize insert)
      */
     constructor(
         private readonly stream: StreamBinding,
         private readonly tenantId: string,
         private readonly appOrigin: string,
         private readonly db: DrizzleD1Database,
-        private readonly inspectionId: string,
     ) {}
 
     /**
@@ -68,6 +66,10 @@ export class StreamVideoBackend implements VideoBackend {
      * The `posterRef` parameter is accepted for interface conformance but is
      * not used by the Stream backend (Stream manages its own poster via
      * thumbnailTimestampPct; there is no R2 poster key for Stream videos).
+     *
+     * inspectionId is read from video.meta.inspectionId (set by createUpload) —
+     * the Stream meta is the authoritative source, not a constructor field, so
+     * finalize cannot be called with a mismatched or missing inspectionId.
      */
     async finalize(ref: VideoRef, _posterRef?: { posterKey: string }): Promise<{ poolId: string }> {
         if (ref.provider !== 'stream') {
@@ -76,10 +78,20 @@ export class StreamVideoBackend implements VideoBackend {
         const { streamUid } = ref;
 
         // Tenant-guarded read of the Stream meta envelope (fail closed).
+        // meta.inspectionId was stamped at createUpload time and is the
+        // authoritative inspectionId for the pool-row insert.
         const rawDetails = await this.getRawDetails(streamUid);
         const durationSec = Number.isFinite(rawDetails.duration) && rawDetails.duration > 0
             ? Math.round(rawDetails.duration)
             : null;
+
+        const inspectionId = rawDetails.meta.inspectionId;
+        if (!inspectionId) {
+            // Fail closed — a pool row with a missing inspectionId would be
+            // an orphan. This should never happen if createUpload was called
+            // correctly, but guard against corrupted or externally-created videos.
+            throw Errors.NotFound('Video not found: meta.inspectionId is absent');
+        }
 
         // Idempotent on streamUid: a retry must not create a duplicate pool row.
         const existing = await this.db
@@ -105,7 +117,7 @@ export class StreamVideoBackend implements VideoBackend {
             poolId = crypto.randomUUID();
             await this.db.insert(inspectionMediaPool).values({
                 id: poolId,
-                inspectionId: this.inspectionId,
+                inspectionId,
                 tenantId: this.tenantId,
                 provider: 'stream',
                 r2Key: '',     // video bytes live in Cloudflare Stream, not R2
@@ -120,7 +132,7 @@ export class StreamVideoBackend implements VideoBackend {
         logger.info('StreamVideoBackend: finalized video', {
             streamUid,
             poolId,
-            inspectionId: this.inspectionId,
+            inspectionId,
             tenantId: this.tenantId,
         });
 
