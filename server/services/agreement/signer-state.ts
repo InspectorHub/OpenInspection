@@ -230,7 +230,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
          * envelope aggregate (never downgrades). Null on miss / expired signer.
          * Idempotent.
          */
-        async markViewedBySigner(presented: string): Promise<{ tenantId: string; inspectionId: string | null; agreementId: string; signerId: string } | null> {
+        async markViewedBySigner(presented: string): Promise<{ tenantId: string; inspectionId: string; agreementId: string; signerId: string } | null> {
             const db = this.getDrizzle();
             const resolved = await this.getSignerByPresentedToken(presented);
             if (!resolved) return null;
@@ -253,7 +253,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
         async markSignedBySigner(presented: string, signatureBase64: string, opts: {
             signedAtMs: number; channel: 'remote' | 'in_person'; ipAddress?: string | null; userAgent?: string | null;
             onBehalfOf?: string | null; onBehalfDisclaimer?: string | null;
-        }): Promise<{ tenantId: string; inspectionId: string | null; requestId: string; signerId: string; envelopeCompletedNow: boolean; envelopeStatus: string }> {
+        }): Promise<{ tenantId: string; inspectionId: string; requestId: string; signerId: string; envelopeCompletedNow: boolean; envelopeStatus: string }> {
             const db = this.getDrizzle();
             const resolved = await this.getSignerByPresentedToken(presented);
             if (!resolved) throw Errors.NotFound('Agreement request not found');
@@ -337,7 +337,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
          * signer → Conflict; declined → idempotent. When the aggregate flips to
          * 'declined', the reason is stored on the envelope's lastError.
          */
-        async markDeclinedBySigner(presented: string, reason?: string): Promise<{ tenantId: string; inspectionId: string | null; requestId: string; signerId: string; envelopeStatus: string }> {
+        async markDeclinedBySigner(presented: string, reason?: string): Promise<{ tenantId: string; inspectionId: string; requestId: string; signerId: string; envelopeStatus: string }> {
             const db = this.getDrizzle();
             const resolved = await this.getSignerByPresentedToken(presented);
             if (!resolved) throw Errors.NotFound('Agreement request not found');

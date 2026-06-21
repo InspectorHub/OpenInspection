@@ -96,7 +96,7 @@ export function usePhotoOps(ctx: {
   /* Task 8 — read an item's stored photos[] (item-level bucket) from the live
    * results map. Item photos are `{ key; croppedKey?; crop?; annotatedKey?; annotationsJson? }`. */
   type ItemCrop = { aspect: string; orientation: "landscape" | "portrait"; x: number; y: number; width: number; height: number };
-  type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; streamUid?: string; posterPct?: number; durationSec?: number };
+  type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; provider?: "stream" | "r2"; streamUid?: string; mediaId?: string; posterPct?: number; durationSec?: number };
   const getItemPhotos = useCallback(
     (itemId: string): ItemPhoto[] => {
       const r = findings.getResult(itemId, state.sectionIdForItem(itemId) ?? undefined);
@@ -122,9 +122,11 @@ export function usePhotoOps(ctx: {
           annotated: !!p.annotatedKey,
           originalKey: p.key,
           croppedKey: p.croppedKey,
-          // Plan 7 — carry the media kind so the viewer/strip branch on video.
+          // Plan 7 — carry the media kind + provider so the viewer/strip can branch.
           mediaType: p.mediaType,
+          provider: p.provider,
           streamUid: p.streamUid,
+          mediaId: p.mediaId,
           posterPct: p.posterPct,
           durationSec: p.durationSec,
         };
@@ -243,8 +245,8 @@ export function usePhotoOps(ctx: {
       // · delete (the MediaViewer toolbar enforces this). Poster opens the picker;
       // delete removes the Stream video + detaches the entry; cover/caption fall
       // through to the shared handlers (cover stores the poster image reference).
-      if (photo.mediaType === "video" && photo.streamUid) {
-        if (action === "poster") {
+      if (photo.mediaType === "video") {
+        if (action === "poster" && photo.streamUid) {
           setPosterTarget({
             streamUid: photo.streamUid,
             durationSec: photo.durationSec ?? 0,
@@ -254,10 +256,15 @@ export function usePhotoOps(ctx: {
         }
         if (action === "delete") {
           patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
-          fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(photo.streamUid)}`, {
-            method: "DELETE",
-            credentials: "include",
-          }).then(() => revalidator.revalidate());
+          // Route delete by provider — DELETE /{id}/media/video/{ref} accepts a
+          // Stream UID or an R2 mediaId and resolves the backend per provider.
+          const videoRef = photo.provider === "r2" ? photo.mediaId : photo.streamUid;
+          if (videoRef) {
+            fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(videoRef)}`, {
+              method: "DELETE",
+              credentials: "include",
+            }).then(() => revalidator.revalidate());
+          }
           return;
         }
         // cover / caption fall through to the photo handlers below (they address by

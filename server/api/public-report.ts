@@ -313,10 +313,13 @@ export const publicReportRoutes = createApiRouter()
         // link.
         const streamCustomerSubdomain = c.env.STREAM_CUSTOMER_SUBDOMAIN ?? '';
         const appBaseUrl = new URL(c.req.url).origin;
+        // R2 video serve base: PDF consumes only the poster JPEG (render-token);
+        // web viewer fetches clips, tenant-guarded by the pool-row lookup.
         const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl, {
             isPdf: renderMode,
             streamCustomerSubdomain,
             appBaseUrl,
+            r2BaseUrl: `/api/inspections/${id}/media/video`,
         });
         return c.json({ success: true as const, data }, 200);
     })
@@ -353,9 +356,9 @@ export const publicReportRoutes = createApiRouter()
             return c.notFound();
         }
         if (!c.env.PHOTOS) return c.notFound();
-        // Ownership: keys are `${tenantId}/${inspectionId}/...` — reject anything
-        // outside the token's tenant + the requested inspection.
-        if (!key.startsWith(`${tenantId}/${id}/`)) return c.notFound();
+        // Ownership: keys are `${tenantId}/inspections/${inspectionId}/...` — reject
+        // anything outside the token's tenant + the requested inspection.
+        if (!key.startsWith(`${tenantId}/inspections/${id}/`)) return c.notFound();
         const obj = await c.env.PHOTOS.get(key);
         if (!obj) return c.notFound();
         const width = w ? Math.min(Math.max(parseInt(w, 10) || 0, 16), 2000) : 0;

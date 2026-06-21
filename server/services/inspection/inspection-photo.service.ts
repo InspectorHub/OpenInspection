@@ -12,6 +12,9 @@ import type { ScopedDB } from '../../lib/db/scoped';
 import { sanitizeDefectStates } from './shared';
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
+import { r2Keys } from '../../lib/r2-keys';
+
+const extFromName = (n: string) => (n.split('.').pop() || 'bin').toLowerCase();
 
 /**
  * Photo + media handling: R2 upload (EXIF strip), media center aggregation,
@@ -35,7 +38,7 @@ export class InspectionPhotoService extends InspectionSubService {
     /**
      * Multi-photo upload to R2.
      */
-    async uploadPhoto(id: string, tenantId: string, itemId: string, file: File) {
+    async uploadPhoto(id: string, tenantId: string, _itemId: string, file: File) {
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(id, tenantId); // Ownership check
 
@@ -44,7 +47,9 @@ export class InspectionPhotoService extends InspectionSubService {
             throw Errors.BadRequest(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${file.size})`);
         }
 
-        const key = `${tenantId}/${id}/${itemId}_${crypto.randomUUID()}_${file.name}`;
+        const mediaId = crypto.randomUUID();
+        const ext = extFromName(file.name);
+        const key = r2Keys.inspectionPhoto(tenantId, id, mediaId, ext);
         // N2 — strip GPS/EXIF on ingest (fallback for any path that skipped the
         // client canvas bake: original-quality uploads, direct API callers,
         // browsers without createImageBitmap). Fails open when env.IMAGES is
@@ -199,7 +204,8 @@ export class InspectionPhotoService extends InspectionSubService {
 
         const id = crypto.randomUUID();
         const safeName = (file.name || 'photo').replace(/[^a-zA-Z0-9._-]/g, '_');
-        const key = `${tenantId}/${inspectionId}/_pool_${id}_${safeName}`;
+        const mediaId = id; // the pool row id serves as the stable mediaId
+        const key = r2Keys.inspectionPhoto(tenantId, inspectionId, mediaId, extFromName(safeName));
         // N2 — strip GPS/EXIF on ingest (fallback for paths that skipped the
         // client canvas bake). Fails open when env.IMAGES is absent.
         const { bytes, contentType } = await stripExifOnIngest(this.images, await file.arrayBuffer(), file.type || 'image/jpeg');

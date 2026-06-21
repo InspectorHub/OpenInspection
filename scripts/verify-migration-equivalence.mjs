@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
- * One-off verification: prove the drizzle-generated baseline produces the SAME
- * structural schema as the existing hand-written migrations, before we replace
- * migrations/ with the generated baseline. Compares columns/types/constraints/
- * indexes/FKs (semantic, not DDL text).
+ * Live drift gate (`db:check`): prove the Drizzle schema and the committed
+ * migrations/ produce the SAME structural schema (columns / types / constraints
+ * / indexes / FKs — semantic, not DDL text). Regenerates a baseline from the
+ * schema into drizzle-tmp/ and diffs its PRAGMA introspection against
+ * migrations/. KNOWN_ACCEPTED (below) is the audited allowlist for divergences
+ * that cannot be reconciled on D1 — empty after the 2026-06-21 baseline rebuild.
  *
  *   node scripts/verify-migration-equivalence.mjs
  */
@@ -29,30 +31,15 @@ const root = process.cwd();
 // The gate still FAILS on any drift NOT in this list (including a schema table
 // with no migration). Adding to this list is a deliberate, reviewed decision.
 const KNOWN_ACCEPTED = {
-  // Tables present in migrations but removed from schema. Orphaned physical
-  // tables — subsystems deleted 2026-06-13, all schema + code gone, no FK
-  // references them (safe-but-frozen; kept out of schema intentionally).
-  lostTables: new Set(['apprentice_reviews', 'guest_invites']),
-  // Per-table column-signature diffs that are accepted. Keyed by table, each
-  // lists the exact normalized `cols` signatures that may differ. A diff is
-  // accepted only if BOTH the hand-only and generated-only entries for that
-  // column are listed here.
-  colDiffs: {
-    // status DB default frozen at 'draft' (migration 0007_status_split); schema
-    // intends 'requested'. D1 can't rebuild FK-referenced `inspections`. Every
-    // insert sets status explicitly, so the DDL default is unreachable.
-    inspections: {
-      handOnly: ["status:TEXT:nn=1:pk=0:dflt='draft'"],
-      generatedOnly: ["status:TEXT:nn=1:pk=0:dflt='requested'"],
-    },
-    // role DB default frozen at 'admin' (migration 0003_role_value_remap);
-    // schema intends 'manager' ('admin' is no longer a valid role). D1 can't
-    // rebuild FK-referenced `users`. Every insert sets role explicitly.
-    users: {
-      handOnly: ["role:TEXT:nn=1:pk=0:dflt='admin'"],
-      generatedOnly: ["role:TEXT:nn=1:pk=0:dflt='manager'"],
-    },
-  },
+  // Tables present in migrations but removed from schema. Kept EMPTY: the
+  // pre-launch baseline rebuild (2026-06-21) regenerated migrations/ from the
+  // schema, so no orphan tables remain. Re-add only with a cited, D1-unfixable
+  // reason — this list is the audited escape hatch, never a dumping ground.
+  lostTables: new Set([]),
+  // Per-table column-signature diffs accepted as D1-unfixable. Kept EMPTY for
+  // the same reason — frozen defaults were created correct in the fresh
+  // baseline, not ALTERed. Re-add only with a cited reason.
+  colDiffs: {},
 };
 
 // Regenerate the baseline from the CURRENT Drizzle schema so this doubles as a

@@ -58,8 +58,10 @@ export interface MediaViewerProps {
   onAction: (action: MediaAction, photo: GalleryPhoto) => void;
   /** Plan 7 — Cloudflare Stream customer subdomain for the video player iframe. */
   streamCustomerSubdomain?: string | null;
+  /** Plan 7 — inspection id, used to build r2-object URLs for R2 videos. */
+  inspectionId?: string;
 }
-export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSubdomain }: MediaViewerProps) {
+export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSubdomain, inspectionId }: MediaViewerProps) {
   const viewed = index !== null ? photos[index] : undefined;
   const kind = viewed ? resolveMediaType(viewed) : "photo";
 
@@ -77,11 +79,24 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
       ]
     : undefined;
 
-  // Plan 7 — a video entry renders the Stream player as a single "slide" rather
-  // than a still image. The lightbox renders arbitrary React via `renderSlide`.
+  // Plan 7 — a video entry renders the appropriate player as a single "slide"
+  // rather than a still image. The lightbox renders arbitrary React via `renderSlide`.
+  type VideoSlide = {
+    type: "video";
+    provider: "stream" | "r2";
+    streamUid?: string;
+    mediaId?: string;
+    alt: string;
+  };
   const slides = photos.map((p) =>
     resolveMediaType(p) === "video"
-      ? ({ type: "video-stream" as const, streamUid: p.streamUid ?? "", alt: p.label })
+      ? ({
+          type: "video" as const,
+          provider: p.provider ?? "stream",
+          streamUid: p.streamUid,
+          mediaId: p.mediaId,
+          alt: p.label,
+        } as VideoSlide)
       : ({ src: fullResUrl(p.url), alt: p.label }),
   );
 
@@ -92,14 +107,28 @@ export function MediaViewer({ photos, index, onClose, onAction, streamCustomerSu
       open={index !== null}
       onClose={onClose}
       toolbarButtons={toolbar}
-      renderSlide={(slide) =>
-        slide && (slide as { type?: string }).type === "video-stream" ? (
-          <VideoPlayer
-            streamUid={(slide as { streamUid: string }).streamUid}
-            streamCustomerSubdomain={streamCustomerSubdomain ?? null}
-          />
-        ) : undefined
-      }
+      renderSlide={(slide) => {
+        const vs = slide as VideoSlide | undefined;
+        if (vs?.type === "video") {
+          if (vs.provider === "r2") {
+            return (
+              <VideoPlayer
+                provider="r2"
+                inspectionId={inspectionId}
+                mediaId={vs.mediaId}
+              />
+            );
+          }
+          return (
+            <VideoPlayer
+              provider="stream"
+              streamUid={vs.streamUid ?? ""}
+              streamCustomerSubdomain={streamCustomerSubdomain ?? null}
+            />
+          );
+        }
+        return undefined;
+      }}
     />
   );
 }

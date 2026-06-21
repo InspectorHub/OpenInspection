@@ -45,7 +45,7 @@ function buildApp(role = 'manager') {
         c.set('user', { sub: USER_ID } as never);
         c.set('requestedTenantSlug', SLUG as never);
         c.set('services', {
-            agreement: new AgreementService({} as D1Database),
+            agreement: new AgreementService({} as D1Database, { jwtSecret: 'test-secret' }),
             email: { sendAgreementRequest } as never,
         } as never);
         await next();

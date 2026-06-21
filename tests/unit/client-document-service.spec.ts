@@ -78,7 +78,7 @@ describe('ClientDocumentService', () => {
       { kind: 'client', ref: 'a@x.com', name: 'Ann' },
       { filename: 'My Roof Report.pdf', contentType: 'application/pdf', category: 'prior_reports', visibility: 'client_visible', label: null, sizeBytes: 3 },
       new Uint8Array([1, 2, 3]));
-    expect(row.r2Key).toMatch(/^uploads\/t1\/insp1\/id-1-/);
+    expect(row.r2Key).toMatch(/^t1\/inspections\/insp1\/documents\/id-1-/);
     expect(row.filename).toBe('My Roof Report.pdf');
     expect(bucket.store.has(row.r2Key)).toBe(true);
     expect((await svc.list(TENANT, INSP)).map((u) => u.id)).toContain(row.id);

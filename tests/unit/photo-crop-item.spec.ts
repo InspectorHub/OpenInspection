@@ -98,7 +98,7 @@ describe('saveCroppedItemPhoto', () => {
     const { croppedKey } = await svc.saveCroppedItemPhoto(
       INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined,
     );
-    expect(croppedKey).toMatch(/_cropped\.jpg$/);
+    expect(croppedKey).toMatch(/\.cropped\.jpg$/);
     expect(r2.store.has(croppedKey)).toBe(true);
     const entry = await readEntry(0);
     expect(entry.croppedKey).toBe(croppedKey);
@@ -111,5 +111,26 @@ describe('saveCroppedItemPhoto', () => {
   it('throws NotFound when photoIndex is out of range', async () => {
     await expect(svc.saveCroppedItemPhoto(INSPECTION_ID, TENANT, ITEM_ID, 99, new ArrayBuffer(8), CROP, undefined))
       .rejects.toThrow(/Photo not found/);
+  });
+
+  it('co-locates croppedKey under the same mediaId as the new-convention source key', async () => {
+    // Seed a photo with a new-convention key so mediaIdFromKey can extract the mediaId.
+    const MEDIAID = 'a1b2c3d4-0000-0000-0000-000000000001';
+    const newShapeKey = `${TENANT}/inspections/${INSPECTION_ID}/photos/${MEDIAID}.jpg`;
+    await testDb.update(schema.inspectionResults)
+      .set({
+        data: {
+          [ITEM_ID]: { photos: [{ key: newShapeKey }] },
+        },
+      })
+      .where(eq(schema.inspectionResults.inspectionId, INSPECTION_ID));
+
+    const { croppedKey } = await svc.saveCroppedItemPhoto(
+      INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined,
+    );
+    expect(croppedKey).toBe(
+      `${TENANT}/inspections/${INSPECTION_ID}/photos/${MEDIAID}.cropped.jpg`,
+    );
+    expect(r2.store.has(croppedKey)).toBe(true);
   });
 });

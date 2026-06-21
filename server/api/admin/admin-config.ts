@@ -27,6 +27,7 @@ const IntegrationConfigSchema = z.object({
     appBaseUrl: z.string().optional().describe('TODO describe appBaseUrl field for the OpenInspection MCP integration'),
     turnstileSiteKey: z.string().optional().describe('TODO describe turnstileSiteKey field for the OpenInspection MCP integration'),
     googleClientId: z.string().optional().describe('TODO describe googleClientId field for the OpenInspection MCP integration'),
+    streamCustomerSubdomain: z.string().optional().describe('Cloudflare Stream customer subdomain for self-host Stream video backend (e.g. customer.cloudflarestream.com).'),
 }).openapi('IntegrationConfig');
 
 // C-15 (2026-06-06): SecretsInputSchema + the POST /config/secrets route were

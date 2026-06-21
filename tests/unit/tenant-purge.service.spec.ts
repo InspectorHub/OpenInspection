@@ -188,6 +188,28 @@ describe('TenantPurgeService.purge', () => {
         expect(r2.deleted).toContain(docKey);
     });
 
+    it('purges R2 objects stored under the unified {tenantId}/ root (new convention)', async () => {
+        const { drizzle } = await import('drizzle-orm/d1');
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        // Seed objects that follow the unified R2 key convention: bare tenantId root.
+        const photoKey = `${TENANT}/inspections/i-1/photos/m-1.jpg`;
+        const docKey   = `${TENANT}/inspections/i-1/documents/doc-1-file.pdf`;
+        const r2 = makeR2([
+            { key: photoKey, size: 512 },
+            { key: docKey,   size: 2048 },
+        ]);
+        const kv = makeKv();
+        const svc = new TenantPurgeService({} as D1Database, r2.bucket, kv.ns);
+
+        const result = await svc.purge(TENANT);
+
+        // Both new-convention objects must be deleted and counted.
+        expect(r2.deleted).toContain(photoKey);
+        expect(r2.deleted).toContain(docKey);
+        expect(result.r2).toBe(2);
+        expect(result.r2Bytes).toBe(2560);
+    });
+
     it('destruction record is non-personal (no email/name/address columns)', async () => {
         const { drizzle } = await import('drizzle-orm/d1');
         (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);

@@ -69,7 +69,7 @@ export class InspectionReportService extends InspectionSubService {
         // legacy templates without these fields render unchanged.
         interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[]; disclaimerText?: string | null; alwaysPageBreak?: boolean }
         interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
-        interface PhotoEntry        { key: string; croppedKey?: string; annotatedKey?: string; annotationsJson?: string; mediaType?: 'photo' | 'video'; streamUid?: string; posterPct?: number; durationSec?: number }
+        interface PhotoEntry        { key: string; croppedKey?: string; annotatedKey?: string; annotationsJson?: string; mediaType?: 'photo' | 'video'; provider?: 'stream' | 'r2'; streamUid?: string; mediaId?: string; posterKey?: string; posterPct?: number; durationSec?: number }
         // Sprint 2 S2-3 / S2-4 — per-defect recommendation slug + repair
         // estimate range (cents). All optional so legacy defects render.
         interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[]; recommendationId?: string | null; estimateLow?: number | null; estimateHigh?: number | null; trade?: string | null; deadline?: string | null; timeframe?: string | null }
@@ -173,7 +173,7 @@ export class InspectionReportService extends InspectionSubService {
             const base = { key: displayKey, originalKey: p.key, url };
             if (!videoCtx) return base;
             const media = selectReportMedia(
-                { key: displayKey, url, mediaType: p.mediaType, streamUid: p.streamUid, posterPct: p.posterPct, durationSec: p.durationSec },
+                { key: displayKey, url, mediaType: p.mediaType, provider: p.provider, streamUid: p.streamUid, mediaId: p.mediaId, posterKey: p.posterKey, posterPct: p.posterPct, durationSec: p.durationSec },
                 videoCtx,
             );
             return { ...base, media };

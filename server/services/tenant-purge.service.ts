@@ -73,13 +73,25 @@ export class TenantPurgeService {
         }
 
         // 3. R2 list + batch delete (accumulate object count + byte totals for the
-        //    destruction record). Two prefixes hold this tenant's objects:
-        //      - `tenants/${tenantId}/`  — inspection photos / report assets
-        //      - `uploads/${tenantId}/`  — client_uploads documents (separate tree)
-        //    Both must be swept or the client documents orphan in R2.
+        //    destruction record). The unified R2 key convention roots EVERY new asset
+        //    under the bare `{tenantId}/` prefix (inspections/, branding/, messages/,
+        //    inspector-photos/, etc.). Three legacy prefixes are also swept to cover
+        //    objects written before the unified convention; once the pre-launch DB/R2
+        //    rebuild removes all legacy objects these three entries become harmless
+        //    no-ops (list returns empty, nothing is deleted).
+        //
+        //    Safety: the trailing `/` on `${tenantId}/` prevents any UUID from
+        //    accidentally matching a different tenant whose UUID shares the same prefix
+        //    — R2 list is a strict string-prefix filter, so `abc123/` never matches
+        //    `abc1234/` or any other tenant's root.
         let r2Count = 0;
         let r2Bytes = 0;
-        for (const prefix of [`tenants/${tenantId}/`, `uploads/${tenantId}/`]) {
+        for (const prefix of [
+            `${tenantId}/`,           // unified convention root (all new-convention assets)
+            `tenants/${tenantId}/`,   // legacy: inspector photos / agreements (pre-migration)
+            `uploads/${tenantId}/`,   // legacy: client documents (pre-migration)
+            `branding/${tenantId}/`,  // legacy: company logos (pre-migration)
+        ]) {
             let cursor: string | undefined;
             do {
                 const list = await this.r2.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });

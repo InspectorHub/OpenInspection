@@ -16,6 +16,7 @@ describe('buildEvidencePack', () => {
       auditTrailJson: '{"events":[]}',
       publicKeyPem: '-----BEGIN PUBLIC KEY-----\nABC\n-----END PUBLIC KEY-----',
       tenantId: 'tA',
+      inspectionId: 'iA',
       envelopeId: 'eA',
     });
     const unzipped = unzipSync(new Uint8Array(zip));
@@ -46,7 +47,7 @@ describe('buildEvidencePack', () => {
       r2,
       auditTrailJson: '{}',
       publicKeyPem: 'PEM',
-      tenantId: 't', envelopeId: 'e',
+      tenantId: 't', inspectionId: 'i', envelopeId: 'e',
     });
     const unzipped = unzipSync(new Uint8Array(zip));
     expect(unzipped['certificate.pdf']).toBeUndefined();

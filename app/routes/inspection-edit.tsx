@@ -522,6 +522,9 @@ export default function InspectionEditPage() {
   * video posters/players render a graceful "unavailable" state, never a
   * fabricated subdomain. */
  const streamCustomerSubdomain = loaderData.streamCustomerSubdomain ?? null;
+ /* Plan 7 — resolved video backend provider for this tenant ('r2' by default).
+  * Drives VideoCapture checkbox gating and VideoPlayer branch selection. */
+ const videoProvider = loaderData.videoProvider ?? "r2";
 
  /* ---------------------------------------------------------------- */
  /* Photo / media operations (extracted hook) */
@@ -1567,6 +1570,7 @@ export default function InspectionEditPage() {
  onClose={() => setViewer((v) => ({ ...v, index: null }))}
  onAction={onViewerAction}
  streamCustomerSubdomain={streamCustomerSubdomain}
+ inspectionId={String(state.inspection.id)}
  />
 
  {/* Plan 7 — poster-frame picker for a video entry (opened by the "Poster
@@ -1599,10 +1603,11 @@ export default function InspectionEditPage() {
  />
  )}
 
- {/* Plan 7 — video capture + Cloudflare Stream direct-upload overlay. */}
+ {/* Plan 7 — video capture + pluggable backend upload overlay. */}
  {videoCaptureTarget && (
  <VideoCapture
   inspectionId={String(state.inspection.id)}
+  provider={videoProvider}
   itemId={videoCaptureTarget.itemId}
   onClose={() => setVideoCaptureTarget(null)}
   onUploaded={() => {

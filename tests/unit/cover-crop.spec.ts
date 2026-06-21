@@ -86,7 +86,7 @@ describe('InspectionService.setCroppedCover', () => {
     const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]).buffer; // JPEG SOI marker
     const { coverImageKey } = await svc.setCroppedCover(INSPECTION_ID, TENANT, POOL_KEY, bytes, CROP);
 
-    expect(coverImageKey).toMatch(new RegExp(`^${TENANT}/${INSPECTION_ID}/cover_.*\\.jpg$`));
+    expect(coverImageKey).toMatch(new RegExp(`^${TENANT}/inspections/${INSPECTION_ID}/cover/[^/]+\\.jpg$`));
     expect(r2.store.has(coverImageKey)).toBe(true);
     expect(r2.store.get(coverImageKey)).toBe(bytes);
 

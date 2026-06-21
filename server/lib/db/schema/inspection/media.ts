@@ -66,6 +66,11 @@ export const inspectionMediaPool = sqliteTable('inspection_media_pool', {
     posterPct:     real('poster_pct'),
     // Video duration in seconds (cached from Stream for the thumb badge); NULL for photos.
     durationSec:   integer('duration_sec'),
+    // Video backend discriminator. Legacy/Stream rows default to 'stream'; the
+    // R2 backend writes 'r2'. (No rows exist pre-launch.)
+    provider:      text('provider', { enum: ['stream', 'r2'] }).notNull().default('stream'),
+    // R2 poster object key (R2 path only; the clip key reuses the existing r2Key column).
+    posterKey:     text('poster_key'),
 }, (t) => [
     index('idx_media_pool_tenant').on(t.tenantId),
     index('idx_media_pool_inspection').on(t.inspectionId),

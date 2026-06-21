@@ -28,6 +28,11 @@ describe('runRetentionSweep', () => {
             { tenantId: 't1', agreementRetentionYears: 6, updatedAt: new Date(NOW) },
             { tenantId: 't2', agreementRetentionYears: 2, updatedAt: new Date(NOW) },
         ] as any);
+        // Shared inspection rows referenced by the envelopes (inspectionId NOT NULL).
+        await testDb.insert(schema.inspections).values([
+            { id: 'insp-t1', tenantId: 't1', propertyAddress: '1 Main', clientName: null, clientEmail: null, date: '2026-01-01', status: 'completed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(NOW) },
+            { id: 'insp-t2', tenantId: 't2', propertyAddress: '2 Main', clientName: null, clientEmail: null, date: '2026-01-01', status: 'completed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(NOW) },
+        ] as any);
         // Shared agreement template referenced by the envelopes.
         await testDb.insert(agreements).values({
             id: 'agr-tpl', tenantId: 't1', name: 'Tpl', content: 'b', createdAt: new Date(NOW),
@@ -51,7 +56,7 @@ describe('runRetentionSweep', () => {
      */
     async function seedSignedEnvelope(opts: {
         id: string; tenantId: string; agreementId: string; signedAtMs: number;
-        pii?: boolean;
+        pii?: boolean; inspectionId?: string;
     }) {
         const req = opts.pii
             ? { clientEmail: 'jane@example.com', clientName: 'Jane Client' }
@@ -70,6 +75,7 @@ describe('runRetentionSweep', () => {
         await testDb.insert(agreementRequests).values({
             id: opts.id,
             tenantId: opts.tenantId,
+            inspectionId: opts.inspectionId ?? `insp-${opts.tenantId}`,
             agreementId: opts.agreementId,
             clientEmail: req.clientEmail,
             clientName: req.clientName,
@@ -220,13 +226,16 @@ describe('runRetentionSweep', () => {
         // A third tenant with NO tenant_configs row -> years comes back null from
         // the leftJoin and the sweep must coalesce it to DEFAULT_RETENTION_YEARS (6).
         await testDb.insert(tenants).values({ id: 't3', name: 'T3', slug: 't3', createdAt: new Date(NOW) });
+        await testDb.insert(schema.inspections).values({
+            id: 'insp-t3', tenantId: 't3', propertyAddress: '3 Main', clientName: null, clientEmail: null, date: '2026-01-01', status: 'completed', paymentStatus: 'unpaid', price: 0, createdAt: new Date(NOW),
+        } as any);
         await testDb.insert(agreements).values({
             id: 'agr-tpl3', tenantId: 't3', name: 'Tpl', content: 'b', createdAt: new Date(NOW),
         } as any);
         // Older than 6y -> swept under the default window.
-        await seedSignedEnvelope({ id: 'e-noconf-old', tenantId: 't3', agreementId: 'agr-tpl3', signedAtMs: NOW - 7 * YEAR_MS });
+        await seedSignedEnvelope({ id: 'e-noconf-old', tenantId: 't3', agreementId: 'agr-tpl3', signedAtMs: NOW - 7 * YEAR_MS, inspectionId: 'insp-t3' });
         // Younger than 6y -> kept.
-        await seedSignedEnvelope({ id: 'e-noconf-young', tenantId: 't3', agreementId: 'agr-tpl3', signedAtMs: NOW - 5 * YEAR_MS });
+        await seedSignedEnvelope({ id: 'e-noconf-young', tenantId: 't3', agreementId: 'agr-tpl3', signedAtMs: NOW - 5 * YEAR_MS, inspectionId: 'insp-t3' });
 
         const summary = await runRetentionSweep(testDb as any, NOW);
         expect(summary.purgedEnvelopes).toBe(1);
@@ -242,7 +251,7 @@ describe('runRetentionSweep', () => {
 
     it('leaves never-signed (draft) rows untouched', async () => {
         await testDb.insert(agreementRequests).values({
-            id: 'e-draft', tenantId: 't1', agreementId: 'agr-tpl',
+            id: 'e-draft', tenantId: 't1', inspectionId: 'insp-t1', agreementId: 'agr-tpl',
             clientEmail: 'client@example.com', token: 'tok-draft',
             status: 'sent', signatureBase64: null, signedAt: null,
             createdAt: new Date(NOW - 7 * YEAR_MS),

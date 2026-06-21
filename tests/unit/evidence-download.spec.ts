@@ -8,6 +8,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { downloadAgreementPdf, downloadCertPdf, downloadEvidenceZip } from '../../server/api/evidence';
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
+const INSP_ID  = '00000000-0000-0000-0000-000000000010';
 const REQ_ID   = '00000000-0000-0000-0000-000000000100';
 const AGR_ID   = '00000000-0000-0000-0000-000000000020';
 
@@ -22,12 +23,17 @@ describe('downloadAgreementPdf', () => {
       id: TENANT_A, name: 'A', slug: 'acme', status: 'active',
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
+    await db.insert(schema.inspections).values({
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
+      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      price: 0, createdAt: new Date(),
+    } as any);
     await db.insert(schema.agreements).values({
       id: AGR_ID, tenantId: TENANT_A, name: 'A', content: 'x',
       version: 1, createdAt: new Date(),
     });
     await db.insert(schema.agreementRequests).values({
-      id: REQ_ID, tenantId: TENANT_A, agreementId: AGR_ID,
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', token: 'tk', status: 'signed',
       signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(), createdAt: new Date(),
@@ -62,7 +68,7 @@ describe('downloadAgreementPdf', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/pdf');
     expect(res.headers.get('content-disposition')).toContain('signed-agreement');
-    expect(r2.get).toHaveBeenCalledWith(`tenants/${TENANT_A}/agreements/${REQ_ID}/signed.pdf`);
+    expect(r2.get).toHaveBeenCalledWith(`${TENANT_A}/inspections/${INSP_ID}/agreements/${REQ_ID}/signed.pdf`);
   });
 
   it('returns 404 when R2 object is missing', async () => {
@@ -83,12 +89,17 @@ describe('downloadCertPdf', () => {
       id: TENANT_A, name: 'A', slug: 'acme', status: 'active',
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
+    await db.insert(schema.inspections).values({
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
+      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      price: 0, createdAt: new Date(),
+    } as any);
     await db.insert(schema.agreements).values({
       id: AGR_ID, tenantId: TENANT_A, name: 'A', content: 'x',
       version: 1, createdAt: new Date(),
     });
     await db.insert(schema.agreementRequests).values({
-      id: REQ_ID, tenantId: TENANT_A, agreementId: AGR_ID,
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', token: 'tk', status: 'signed',
       signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(), createdAt: new Date(),
@@ -108,7 +119,7 @@ describe('downloadCertPdf', () => {
     const res = await downloadCertPdf({} as D1Database, r2, REQ_ID, TENANT_A);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/pdf');
-    expect(r2.get).toHaveBeenCalledWith(`tenants/${TENANT_A}/agreements/${REQ_ID}/certificate.pdf`);
+    expect(r2.get).toHaveBeenCalledWith(`${TENANT_A}/inspections/${INSP_ID}/agreements/${REQ_ID}/certificate.pdf`);
   });
 
   it('returns 404 when cert R2 object missing', async () => {
@@ -129,12 +140,17 @@ describe('downloadEvidenceZip', () => {
       id: TENANT_A, name: 'A', slug: 'acme', status: 'active',
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
+    await db.insert(schema.inspections).values({
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
+      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      price: 0, createdAt: new Date(),
+    } as any);
     await db.insert(schema.agreements).values({
       id: AGR_ID, tenantId: TENANT_A, name: 'A', content: 'x',
       version: 1, createdAt: new Date(),
     });
     await db.insert(schema.agreementRequests).values({
-      id: REQ_ID, tenantId: TENANT_A, agreementId: AGR_ID,
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', token: 'tk', status: 'signed',
       signatureBase64: 'data:image/png;base64,abc',
       signedAt: new Date(), createdAt: new Date(),
@@ -155,7 +171,7 @@ describe('downloadEvidenceZip', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/zip');
     expect(res.headers.get('content-disposition')).toContain('evidence');
-    expect(r2.get).toHaveBeenCalledWith(`tenants/${TENANT_A}/agreements/${REQ_ID}/evidence.zip`);
+    expect(r2.get).toHaveBeenCalledWith(`${TENANT_A}/inspections/${INSP_ID}/agreements/${REQ_ID}/evidence.zip`);
   });
 
   it('returns 404 when evidence.zip is missing from R2', async () => {

@@ -127,6 +127,7 @@ const TenantConfigGetResponseSchema = z.object({
         reviewUrl: z.string().nullable().optional().describe('Track J (#122) — company review link, or null.'),
         smsMode: z.enum(['platform', 'own']).describe('Track L (D3) — SMS sender mode.'),
         companyPhone: z.string().nullable().optional().describe('Track L — call-back number rendered as {{company_phone}} in SMS copy.'),
+        videoMode: z.enum(['r2', 'stream']).describe('Self-host video backend (default r2). Ignored in SaaS.'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -161,6 +162,7 @@ const TenantConfigPatchSchema = z.object({
     reviewUrl: z.string().url().max(500).nullish().describe('Track J (#122) — company review link (Google/Yelp/Facebook). null/empty clears it.'),
     smsMode: z.enum(['platform', 'own']).optional().describe('Track L (D3) — SMS sender mode: platform env or tenant-own Twilio.'),
     companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),
+    videoMode: z.enum(['r2', 'stream']).optional().describe('Self-host video backend: r2 (default, free) or stream (requires STREAM binding + customer subdomain).'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -405,6 +407,7 @@ export const adminSettingsRoutes = createApiRouter()
                 reviewUrl: config?.reviewUrl ?? null,
                 smsMode: (config?.smsMode as 'platform' | 'own') ?? 'platform',
                 companyPhone: (config?.companyPhone as string | null) ?? null,
+                videoMode: (config?.videoMode as 'r2' | 'stream') ?? 'r2',
             },
         }, 200);
     })
@@ -433,6 +436,9 @@ export const adminSettingsRoutes = createApiRouter()
         }
         if (body.companyPhone !== undefined) {
             update.companyPhone = body.companyPhone || null;
+        }
+        if (body.videoMode !== undefined) {
+            update.videoMode = body.videoMode;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);

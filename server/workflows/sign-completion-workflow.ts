@@ -8,6 +8,7 @@ import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
+import { r2Keys } from '../lib/r2-keys';
 
 export interface SignCompletionParams {
     requestId: string;
@@ -65,6 +66,19 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
             }
         });
 
+        // Resolve inspectionId from the envelope row — agreement_requests.inspection_id
+        // is NOT NULL, so this always returns a non-empty string for any valid envelope.
+        // Needed to build the nested R2 key convention: {tenantId}/inspections/{inspectionId}/agreements/...
+        const inspectionId = await step.do('resolve-inspection-id', async () => {
+            const db = drizzle(env.DB, { schema });
+            const row = await db.select({ inspectionId: schema.agreementRequests.inspectionId })
+                .from(schema.agreementRequests)
+                .where(eq(schema.agreementRequests.id, requestId))
+                .get();
+            if (!row?.inspectionId) throw new Error(`agreement_requests row not found or inspectionId null for requestId=${requestId}`);
+            return row.inspectionId;
+        });
+
         // Step 1 — render canonical signed PDF (best-effort; if BR is not
         // provisioned at the account level, returns null + chain still extends)
         const signedPdfMeta = await step.do('render-canonical-pdf', {
@@ -74,7 +88,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
             try {
                 return await renderPdfToR2(env, {
                     renderUrl: m2mAgreementRenderUrl(baseHost(env), renderSlug, requestId),
-                    r2Key: `tenants/${tenantId}/agreements/${requestId}/signed.pdf`,
+                    r2Key: r2Keys.agreementFile(tenantId, inspectionId, requestId, 'signed.pdf'),
                 });
             } catch (e) {
                 console.warn('[sign-workflow] render-canonical-pdf failed (BR may not be provisioned)', { error: (e as Error).message });
@@ -98,7 +112,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
             try {
                 return await renderPdfToR2(env, {
                     renderUrl: `${baseUrl(env)}/m2m/cert-render/${requestId}`,
-                    r2Key: `tenants/${tenantId}/agreements/${requestId}/certificate.pdf`,
+                    r2Key: r2Keys.agreementFile(tenantId, inspectionId, requestId, 'certificate.pdf'),
                 });
             } catch (e) {
                 console.warn('[sign-workflow] render-certificate-pdf failed (BR may not be provisioned)', { error: (e as Error).message });
@@ -141,9 +155,10 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                     auditTrailJson: JSON.stringify(auditPayload, null, 2),
                     publicKeyPem: pubKey.pem,
                     tenantId,
+                    inspectionId,
                     envelopeId: requestId,
                 });
-                const r2Key = `tenants/${tenantId}/agreements/${requestId}/evidence.zip`;
+                const r2Key = r2Keys.agreementFile(tenantId, inspectionId, requestId, 'evidence.zip');
                 const bytes = new Uint8Array(zipBuf);
                 const hashBuf = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as unknown as ArrayBuffer));
                 const sha256 = Array.from(hashBuf).map((b) => b.toString(16).padStart(2, '0')).join('');

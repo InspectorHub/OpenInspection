@@ -29,21 +29,21 @@ export const SignerInputSchema = z.object({
 
 export const SendAgreementSchema = z.object({
     agreementId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe agreementId field for the OpenInspection MCP integration'),
-    // Track I-a Task 9 — `clientEmail` is only consumed on the legacy
-    // single-recipient path; the multi-signer path keys recipients off the
-    // `signers` array. Optional here, gated by the refine below so exactly one
-    // of the two paths is always satisfiable.
-    clientEmail: z.string().email().optional().openapi({ example: 'client@example.com' }).describe('Recipient email for the legacy single-signer send; omit when `signers` is provided'),
-    clientName: z.string().max(100).optional().openapi({ example: 'John Smith' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    inspectionId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
-    // Track I-a Task 9 — multi-signer envelope. When `signers` is provided the
-    // send routes through AgreementService.findOrCreate (signer rows + snapshot
-    // pinning + per-signer links). Omitted → legacy single-recipient behavior.
-    signers: z.array(SignerInputSchema).min(1).max(10).optional().describe('Optional multi-signer recipient list; when present routes through the envelope model'),
+    // Recipient email for a single-signer send; normalised to a one-signer envelope.
+    // Omit when `signers` is provided. Gated by the refine below so exactly one
+    // of the two recipient fields is always satisfiable.
+    clientEmail: z.string().email().optional().openapi({ example: 'client@example.com' }).describe('Recipient email for a single-signer send; normalised to a one-signer envelope'),
+    clientName: z.string().max(100).optional().openapi({ example: 'John Smith' }).describe('Display name for the single-signer recipient; ignored when signers is provided'),
+    // Required: every envelope must be bound to an inspection.
+    inspectionId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection this agreement envelope is bound to; required for every send'),
+    // Explicit multi-signer list; when absent, clientEmail is the sole signer.
+    // All sends go through the envelope model (findOrCreate) regardless of which
+    // recipient field is used.
+    signers: z.array(SignerInputSchema).min(1).max(10).optional().describe('Explicit multi-signer list; when absent, clientEmail is the sole signer'),
     completionPolicy: z.enum(['all', 'one']).optional().openapi({ example: 'all' }).describe('Whether all signers must sign or any one signature completes the envelope'),
 }).refine(
-    // Valid request = legacy path (clientEmail present) OR multi-signer path
-    // (signers non-empty). The handler routes on these same two conditions.
+    // Valid request = clientEmail (single-signer) OR non-empty signers list
+    // (multi-signer). The handler normalises both into the envelope model.
     (v) => Boolean(v.clientEmail) || (Array.isArray(v.signers) && v.signers.length > 0),
     { message: 'Provide clientEmail (single-signer) or a non-empty signers list (multi-signer).', path: ['clientEmail'] },
 ).openapi('SendAgreement');

@@ -3,11 +3,14 @@ import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import type { EmailIdentityConfig } from '../lib/email/sender-identity';
+import { r2Keys } from '../lib/r2-keys';
 
 export interface IntegrationConfig {
     appBaseUrl?: string;
     turnstileSiteKey?: string;
     googleClientId?: string;
+    /** Cloudflare Stream customer subdomain for the self-host Stream video backend. */
+    streamCustomerSubdomain?: string;
 }
 
 // C-15 (2026-06-06): the legacy `SecretsConfig` shape (camelCase keys in the
@@ -137,7 +140,7 @@ export class BrandingService {
         if (!this.r2) throw Errors.BadRequest('Logo upload not available');
 
         const extension = file.type.split('/')[1] === 'svg+xml' ? 'svg' : file.type.split('/')[1];
-        const key = `branding/${tenantId}/logo-${Date.now()}.${extension}`;
+        const key = r2Keys.brandingLogo(tenantId, crypto.randomUUID(), extension);
 
         await this.r2.put(key, await file.arrayBuffer(), {
             httpMetadata: { contentType: file.type },

@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { clientUploads, type DocumentCategory, type DocumentVisibility, type UploaderKind } from '../lib/db/schema';
 import { sanitizeFilename } from '../lib/content-disposition';
 import { Errors } from '../lib/errors';
+import { r2Keys } from '../lib/r2-keys';
 
 export const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
 export const MAX_FILES = 50;
@@ -77,7 +78,7 @@ export class ClientDocumentService {
     const currentCount = await this.countForUploader(tenantId, inspectionId, by.ref);
     this.assertValid({ filename: meta.filename, contentType: meta.contentType, sizeBytes: meta.sizeBytes, currentCount });
     const id = this.genId();
-    const r2Key = `uploads/${tenantId}/${inspectionId}/${id}-${sanitizeFilename(meta.filename, 'file')}`;
+    const r2Key = r2Keys.inspectionDocument(tenantId, inspectionId, id, sanitizeFilename(meta.filename, 'file'));
 
     // Enforce MAX_BYTES against ACTUAL bytes (Content-Length is spoofable). The
     // non-stream branches (Uint8Array/ArrayBuffer) measure byteLength directly and

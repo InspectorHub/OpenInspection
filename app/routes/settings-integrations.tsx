@@ -14,7 +14,9 @@ import { useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { StripePaymentsPanel } from "~/components/settings/integrations/StripePaymentsPanel";
+import { VideoIntegrationPanel } from "~/components/settings/integrations/VideoIntegrationPanel";
 import { IntegrationCardsGrid } from "~/components/settings/integrations/IntegrationCardsGrid";
+import { SaveVideoSchema } from "../../server/lib/validations/video.schema";
 
 export function meta() {
   return [{ title: "Integrations - Settings - OpenInspection" }];
@@ -26,15 +28,31 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const { forbidden, token } = await requireAdminLoader(context, request);
   if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
-  const [secretsRes, logRes] = await Promise.all([
+  const [secretsRes, logRes, configRes, tcRes] = await Promise.all([
     api.secrets.secrets.$get().catch(() => null),
     api.integrations.stripe["webhook-log"].$get().catch(() => null),
+    // Integration config — plaintext JSON: appBaseUrl, turnstileSiteKey,
+    // googleClientId, streamCustomerSubdomain.
+    api.admin.config.$get().catch(() => null),
+    // Tenant config flags — includes videoMode (default 'r2').
+    api.admin["tenant-config"].$get().catch(() => null),
   ]);
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
   const logBody = logRes?.ok ? ((await logRes.json()) as Record<string, unknown>) : {};
   const webhookLog = (logBody.data ?? []) as WebhookLogEntry[];
   const webhookBase = `${new URL(request.url).origin}/api/integrations/stripe/webhook`;
+
+  const configBody = configRes?.ok
+    ? ((await configRes.json()) as Record<string, unknown>)
+    : {};
+  const integrationConfig = (
+    (configBody.data as Record<string, unknown> | undefined)?.integrationConfig ?? {}
+  ) as Record<string, string>;
+
+  const tcBody = tcRes?.ok ? ((await tcRes.json()) as Record<string, unknown>) : {};
+  const tcData = (tcBody.data ?? {}) as Record<string, unknown>;
+
   return {
     webhookBase,
     webhookLog,
@@ -43,6 +61,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       STRIPE_SECRET_KEY: secrets.STRIPE_SECRET_KEY || "",
       STRIPE_WEBHOOK_SECRET: secrets.STRIPE_WEBHOOK_SECRET || "",
     },
+    videoMode: (tcData.videoMode as "r2" | "stream" | undefined) ?? "r2",
+    streamCustomerSubdomain: integrationConfig.streamCustomerSubdomain ?? "",
   };
 }
 
@@ -94,6 +114,102 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, success: true, error: null, field: null, test: body.data };
   }
 
+  if (intent === "save-video") {
+    // SaaS guard: video backend is plan-managed in hosted mode.
+    const bffEnv = (context as { cloudflare?: { env?: { APP_MODE?: string } } })?.cloudflare?.env;
+    if (bffEnv?.APP_MODE === "saas") {
+      return {
+        intent,
+        success: false,
+        error: "Video backend is plan-managed in hosted mode.",
+        field: null,
+        test: null,
+      };
+    }
+
+    // Validate inputs via SaveVideoSchema (replaces inline regex).
+    const videoModeRaw = fd.get("videoMode");
+    const subdomainRaw = ((fd.get("streamCustomerSubdomain") as string | null) ?? "").trim();
+    const parseResult = SaveVideoSchema.safeParse({
+      videoMode: videoModeRaw === "stream" ? "stream" : "r2",
+      streamCustomerSubdomain: subdomainRaw || undefined,
+    });
+    if (!parseResult.success) {
+      const issue = parseResult.error.issues[0];
+      return {
+        intent,
+        success: false,
+        error: issue?.message ?? "Invalid video settings.",
+        field: "streamCustomerSubdomain",
+        test: null,
+      };
+    }
+    const { videoMode } = parseResult.data;
+
+    const api = createApi(context, { token });
+
+    // 1. GET current integrationConfig FIRST — no writes until we can do a
+    //    safe read-modify-write. If the GET fails, abort with an honest error.
+    const cfgRes = await api.admin.config.$get().catch(() => null);
+    if (!cfgRes?.ok) {
+      return {
+        intent,
+        success: false,
+        error: "Failed to read current configuration. No changes were saved.",
+        field: null,
+        test: null,
+      };
+    }
+    const cfgBody = (await cfgRes.json()) as Record<string, unknown>;
+    const existing = (
+      (cfgBody.data as Record<string, unknown> | undefined)?.integrationConfig ?? {}
+    ) as Record<string, string | undefined>;
+
+    // 2. Compute merged integrationConfig.
+    const merged: Record<string, string | undefined> = { ...existing };
+    if (videoMode === "stream") {
+      // streamCustomerSubdomain is guaranteed non-empty by SaveVideoSchema
+      merged.streamCustomerSubdomain = subdomainRaw;
+    } else {
+      // Reverting to R2: clear the subdomain so it doesn't linger.
+      delete merged.streamCustomerSubdomain;
+    }
+
+    // Strip undefined values before posting (updateIntegrationConfig ignores
+    // null/empty, but let's be explicit).
+    const cleanMerged = Object.fromEntries(
+      Object.entries(merged).filter(([, v]) => v != null && v !== ""),
+    ) as Parameters<typeof api.admin.config.$post>[0]["json"];
+
+    // 3. Write BOTH: PATCH videoMode and POST integrationConfig atomically.
+    //    If either fails, surface an error — we cannot partially succeed.
+    const [tcRes, postRes] = await Promise.all([
+      api.admin["tenant-config"].$patch({ json: { videoMode } }),
+      api.admin.config.$post({ json: cleanMerged }),
+    ]);
+
+    if (!tcRes.ok) {
+      return {
+        intent,
+        success: false,
+        error: "Failed to save video mode.",
+        field: null,
+        test: null,
+      };
+    }
+    if (!postRes.ok) {
+      return {
+        intent,
+        success: false,
+        error: "Failed to save integration configuration.",
+        field: null,
+        test: null,
+      };
+    }
+
+    return { intent, success: true, error: null, field: null, test: null };
+  }
+
   return { intent: null, success: false, error: "Unknown action", field: null, test: null };
 }
 
@@ -105,22 +221,29 @@ export default function SettingsIntegrations() {
   const testFetcher = useFetcher<typeof action>();
   const ctx = useSessionContext();
 
-  // Transient success flash — visible for 4s after a save round-trip.
-  // Errors persist until the next attempt (no auto-dismiss).
   const { flashVisible } = useFlash(
     actionData?.intent === "save-stripe-secrets" && !!actionData.success,
     actionData,
   );
+  const { flashVisible: videoFlashVisible } = useFlash(
+    actionData?.intent === "save-video" && !!actionData.success,
+    actionData,
+  );
 
   if ("forbidden" in data) return <AccessDenied />;
-  const { secrets, webhookBase, webhookLog } = data;
+  const { secrets, webhookBase, webhookLog, videoMode, streamCustomerSubdomain } = data;
 
   const tenantSlug = ctx?.branding?.tenantSlug ?? null;
   const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
+  const isSaas = ctx?.branding?.isSaas ?? false;
 
   const saving = nav.state !== "idle" && nav.formData?.get("intent") === "save-stripe-secrets";
+  const savingVideo = nav.state !== "idle" && nav.formData?.get("intent") === "save-video";
 
   const serverField = actionData?.intent === "save-stripe-secrets" && !actionData.success
+    ? actionData.field
+    : null;
+  const videoServerField = actionData?.intent === "save-video" && !actionData.success
     ? actionData.field
     : null;
 
@@ -146,7 +269,7 @@ export default function SettingsIntegrations() {
         </p>
       </div>
 
-      {/* Flash */}
+      {/* Flash — Stripe save */}
       {flashVisible && actionData?.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
           Settings saved.
@@ -155,6 +278,13 @@ export default function SettingsIntegrations() {
       {actionData?.intent === "save-stripe-secrets" && actionData.error && (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
           {actionData.error}
+        </div>
+      )}
+
+      {/* Flash — Video save */}
+      {videoFlashVisible && actionData?.success && (
+        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
+          Video settings saved.
         </div>
       )}
 
@@ -169,6 +299,17 @@ export default function SettingsIntegrations() {
         testFetcher={testFetcher}
         revalidator={revalidator}
       />
+
+      {/* Video backend — self-host only; hidden in SaaS (backend is plan-gated) */}
+      {!isSaas && (
+        <VideoIntegrationPanel
+          videoMode={videoMode}
+          streamCustomerSubdomain={streamCustomerSubdomain}
+          saving={savingVideo}
+          serverError={actionData?.intent === "save-video" ? actionData.error : null}
+          serverField={videoServerField}
+        />
+      )}
 
       <IntegrationCardsGrid />
     </div>

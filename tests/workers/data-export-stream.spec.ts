@@ -54,9 +54,10 @@ describe('DataExportService.buildZipToR2 — real R2 multipart streaming (A-21 b
 
     beforeAll(async () => {
         fakeRows.rows = [{ id: 'i1', tenantId: TENANT }];
-        await b.PHOTOS.put(`tenants/${TENANT}/insp1/a.jpg`, small);
-        await b.PHOTOS.put(`tenants/${TENANT}/insp1/b.jpg`, big);
-        await b.PHOTOS.put('tenants/OTHER/x.jpg', patternBytes(10, 3)); // prefix isolation
+        // Keys use the new r2Keys convention: {tenantId}/{path} (no leading "tenants/" segment)
+        await b.PHOTOS.put(`${TENANT}/insp1/a.jpg`, small);
+        await b.PHOTOS.put(`${TENANT}/insp1/b.jpg`, big);
+        await b.PHOTOS.put('OTHER/x.jpg', patternBytes(10, 3)); // prefix isolation
     });
 
     it('streams every photo (no byte budget), completes the multipart upload, and the ZIP round-trips', async () => {
@@ -79,14 +80,14 @@ describe('DataExportService.buildZipToR2 — real R2 multipart streaming (A-21 b
             'agreements.json',
             'inspections.csv',
             'photos-manifest.json',
-            `photos/tenants/${TENANT}/insp1/a.jpg`,
-            `photos/tenants/${TENANT}/insp1/b.jpg`,
+            `photos/${TENANT}/insp1/a.jpg`,
+            `photos/${TENANT}/insp1/b.jpg`,
             'README.txt',
             'templates.json',
         ].sort());
         // Byte-exact round-trip for both photos (pass-through = no recompression loss).
-        expect(sameBytes(entries[`photos/tenants/${TENANT}/insp1/a.jpg`], small)).toBe(true);
-        expect(sameBytes(entries[`photos/tenants/${TENANT}/insp1/b.jpg`], big)).toBe(true);
+        expect(sameBytes(entries[`photos/${TENANT}/insp1/a.jpg`], small)).toBe(true);
+        expect(sameBytes(entries[`photos/${TENANT}/insp1/b.jpg`], big)).toBe(true);
         // The other tenant's object never leaks in.
         expect(names.some((n) => n.includes('OTHER'))).toBe(false);
         // Manifest JSON marks both included.

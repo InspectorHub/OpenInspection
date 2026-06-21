@@ -8,6 +8,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { applyInspectorPreSign } from '../../server/services/agreement.service';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
+const INSP_ID = '00000000-0000-0000-0000-000000000010';
 const REQ_ID = '00000000-0000-0000-0000-000000000200';
 const USER_ID = '00000000-0000-0000-0000-000000000300';
 const AGR_ID = '00000000-0000-0000-0000-000000000020';
@@ -28,11 +29,16 @@ describe('applyInspectorPreSign', () => {
       id: USER_ID, tenantId: TENANT, email: 'i@x', passwordHash: 'x',
       role: 'inspector', createdAt: new Date(),
     });
+    await db.insert(schema.inspections).values({
+      id: INSP_ID, tenantId: TENANT, propertyAddress: '1 Main St', clientName: 'Client',
+      clientEmail: 'c@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      price: 0, createdAt: new Date(),
+    } as any);
     await db.insert(schema.agreements).values({
       id: AGR_ID, tenantId: TENANT, name: 'A', content: 'x', version: 1, createdAt: new Date(),
     });
     await db.insert(schema.agreementRequests).values({
-      id: REQ_ID, tenantId: TENANT, agreementId: AGR_ID,
+      id: REQ_ID, tenantId: TENANT, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'c@x', token: 'tk', status: 'pending', createdAt: new Date(),
     });
     (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);

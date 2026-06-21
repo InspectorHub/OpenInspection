@@ -1,10 +1,13 @@
 import { zipSync, strToU8 } from 'fflate';
+import { r2Keys } from '../lib/r2-keys';
 
 export interface BuildEvidencePackOpts {
     r2: R2Bucket;
     auditTrailJson: string;
     publicKeyPem: string;
     tenantId: string;
+    /** Inspection the envelope belongs to — required to form the canonical R2 key. */
+    inspectionId: string;
     envelopeId: string;
 }
 
@@ -20,9 +23,9 @@ export interface BuildEvidencePackOpts {
  * embed in a Resend email attachment.
  */
 export async function buildEvidencePack(opts: BuildEvidencePackOpts): Promise<ArrayBuffer> {
-    const { r2, auditTrailJson, publicKeyPem, tenantId, envelopeId } = opts;
-    const signedObj = await r2.get(`tenants/${tenantId}/agreements/${envelopeId}/signed.pdf`);
-    const certObj = await r2.get(`tenants/${tenantId}/agreements/${envelopeId}/certificate.pdf`);
+    const { r2, auditTrailJson, publicKeyPem, tenantId, inspectionId, envelopeId } = opts;
+    const signedObj = await r2.get(r2Keys.agreementFile(tenantId, inspectionId, envelopeId, 'signed.pdf'));
+    const certObj = await r2.get(r2Keys.agreementFile(tenantId, inspectionId, envelopeId, 'certificate.pdf'));
     const signedBytes = signedObj
         ? new Uint8Array(await new Response(signedObj.body).arrayBuffer())
         : new Uint8Array();

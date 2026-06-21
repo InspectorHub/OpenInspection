@@ -32,12 +32,26 @@ export const inspectionAgreements = sqliteTable('inspection_agreements', {
 export const agreementRequests = sqliteTable('agreement_requests', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
-    inspectionId: text('inspection_id').references(() => inspections.id),
+    // Every agreement envelope is bound to an inspection (the send UI + every
+    // service path require it). NOT NULL since the 2026-06-21 consolidation.
+    inspectionId: text('inspection_id').notNull().references(() => inspections.id),
     agreementId: text('agreement_id').notNull().references(() => agreements.id),
     clientEmail: text('client_email').notNull(),
     clientName: text('client_name'),
+    // Internal envelope handle: a throwaway, NEVER-distributed UUID written by
+    // findOrCreate to satisfy NOT NULL + UNIQUE. Public links use per-signer
+    // tokenHash; the /sign/:id redirect resolves an envelope via this through
+    // getSignerByPresentedToken's synthesize fallback. Not a distributed secret.
     token: text('token').notNull().unique(),
     status: text('status', { enum: ['pending', 'sent', 'viewed', 'signed', 'declined', 'expired'] }).notNull().default('pending'),
+    // LEGACY envelope-level client signature — superseded for NEW writes by
+    // agreement_signers.signatureBase64 / .signedAt (findOrCreate no longer
+    // writes these). NOT frozen: still READ by live paths — the render fallback
+    // for pre-signer-model envelopes (agreements-render.ts), the GDPR retention
+    // sweep (retention-sweep.ts filters/destroys on signed_at), publish-readiness
+    // (inspection-publish.service.ts), and the tenant data export
+    // (admin.service.ts). Migrate those readers to signer-level data before
+    // freezing/retiring these columns.
     signatureBase64: text('signature_base64'),
     signedAt: integer('signed_at', { mode: 'timestamp' }),
     viewedAt: integer('viewed_at', { mode: 'timestamp' }),

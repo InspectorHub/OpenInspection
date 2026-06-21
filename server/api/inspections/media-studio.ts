@@ -1,4 +1,4 @@
-// Media Studio sub-router: Cloudflare Stream walk-through video lifecycle +
+// Media Studio sub-router: pluggable video backend (Stream or R2) lifecycle +
 // PhotoStudio annotation/crop derivative bakes (annotations, cover crop,
 // item/defect photo crop). Split out of media.ts to keep both files under the
 // size ceiling. Behavior-preserving extraction from inspections.ts — handler
@@ -9,46 +9,70 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { getBaseUrl } from '../../lib/url';
 import { Errors } from '../../lib/errors';
+import { logger } from '../../lib/logger';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { CoverCropSchema, PhotoCropSchema } from '../../lib/validations/inspection.schema';
-import { UpdateMediaAnnotationsSchema, CreateVideoUploadSchema, FinalizeVideoSchema, SetPosterSchema } from '../../lib/validations/media.schema';
+import {
+    UpdateMediaAnnotationsSchema,
+    CreateVideoUploadSchema,
+    FinalizeVideoSchema,
+    SetPosterSchema,
+    VideoRefSchema,
+} from '../../lib/validations/media.schema';
 import { MediaVideoService } from '../../services/media-video.service';
+import { resolveVideoBackend } from '../../services/video/resolve';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspectionMediaPool } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { registerR2VideoRoutes } from './media-video-r2';
 
-/* ── Plan 7 — video walk-through (Cloudflare Stream) ───────────────────────
+/* ── Plan 7 — video walk-through (pluggable backend) ───────────────────────
  *
- * Direct creator upload: the worker mints a one-shot uploadURL, the browser
- * POSTs the file straight to Cloudflare (bytes bypass the worker → no GPS
- * leak path; Stream re-transcodes and strips container metadata on ingest).
- *   POST   /{id}/media/video/create-upload  — mint uploadURL + streamUid
- *   POST   /{id}/media/video/finalize       — insert the pool row (idempotent)
- *   POST   /{id}/media/video/poster         — set poster frame (thumbnailTimestampPct)
- *   DELETE /{id}/media/video/{streamUid}    — delete from Stream + drop pool row
+ * The router now delegates to a VideoBackend resolved per request. Two
+ * concrete implementations exist: StreamVideoBackend (Cloudflare Stream, paid
+ * plans) and R2VideoBackend (PHOTOS bucket, free / self-host). Resolution is
+ * handled by resolveVideoBackend(c) which reads the deployment mode and tenant
+ * plan tier.
+ *
+ *   POST   /{id}/media/video/create-upload          — mint uploadURL + ref
+ *   POST   /{id}/media/video/finalize               — insert the pool row (idempotent)
+ *   POST   /{id}/media/video/poster                 — set poster (Stream-only: thumbnailTimestampPct)
+ *   DELETE /{id}/media/video/{streamUid}            — delete from backend + drop pool row
+ *   POST   /{id}/media/video/r2-upload              — token-gated file PUT to R2 (→ media-video-r2.ts)
+ *   POST   /{id}/media/video/r2-upload-poster       — token-gated poster JPEG PUT to R2 (→ media-video-r2.ts)
+ *   GET    /{id}/media/video/r2-object/:mediaId     — serve R2 video with Range support (→ media-video-r2.ts)
+ *   GET    /{id}/media/video/r2-object/:mediaId/poster — serve R2 poster JPEG (→ media-video-r2.ts)
  *
  * tenantId always comes from the JWT (c.get('tenantId')); the body never
- * carries it. Stream ownership is re-asserted from the meta envelope in the
- * service (fail closed) since videos are not D1 rows with a tenant filter.
+ * carries it.
  */
+
+// ── OpenAPI response schemas ─────────────────────────────────────────────────
+
 export const VideoCreateUploadResponseSchema = z.object({
-    uploadURL: z.string().describe('One-shot Cloudflare Stream direct-creator-upload URL'),
-    streamUid: z.string().describe('Cloudflare Stream UID for the pending video'),
+    uploadURL: z.string().describe('One-shot upload URL (Cloudflare Stream or worker r2-upload endpoint)'),
+    provider: z.enum(['stream', 'r2']).describe('Video backend provider selected for this tenant'),
+    ref: z.union([
+        z.object({ provider: z.literal('stream'), streamUid: z.string() }),
+        z.object({ provider: z.literal('r2'), mediaId: z.string(), r2Key: z.string() }),
+    ]).describe('Backend-specific video reference — echo this back to finalize'),
 }).openapi('VideoCreateUploadResponse');
 
 export const VideoFinalizeResponseSchema = z.object({
     poolId:      z.string().describe('inspection_media_pool row id'),
-    streamUid:   z.string().describe('Cloudflare Stream UID'),
+    streamUid:   z.string().nullable().describe('Cloudflare Stream UID (null for R2 videos)'),
     durationSec: z.number().nullable().describe('Video duration in seconds (null if not yet known)'),
-    readyToStream: z.boolean().describe('Whether Stream has finished transcoding'),
+    readyToStream: z.boolean().describe('Whether the video is ready for playback'),
 }).openapi('VideoFinalizeResponse');
+
+// ── OpenAPI route definitions ────────────────────────────────────────────────
 
 export const videoCreateUploadRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/media/video/create-upload',
     tags: ["inspections"],
-    summary: 'Mint a Cloudflare Stream direct-creator-upload URL for a walk-through video',
+    summary: 'Mint a video upload URL (Stream or R2 backend)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().uuid().describe('Inspection id') }).describe('Path params'),
@@ -61,14 +85,14 @@ export const videoCreateUploadRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "createInspectionVideoUpload",
-    description: "Mint a one-shot Cloudflare Stream direct-creator-upload URL (browser uploads bytes directly; worker never sees them)."
+    description: "Mint a one-shot video upload URL. For paid tenants (SaaS) or stream-mode self-host, returns a Cloudflare Stream direct-creator-upload URL; otherwise returns a worker-proxied R2 upload URL."
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const videoFinalizeRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/media/video/finalize',
     tags: ["inspections"],
-    summary: 'Finalize a video upload — insert the media-pool row (idempotent on streamUid)',
+    summary: 'Finalize a video upload — insert the media-pool row (idempotent)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().uuid().describe('Inspection id') }).describe('Path params'),
@@ -81,14 +105,14 @@ export const videoFinalizeRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "finalizeInspectionVideo",
-    description: "Insert an inspection_media_pool video row after the browser-direct upload completes. Idempotent on streamUid."
+    description: "Insert an inspection_media_pool video row after the upload completes. Idempotent. Body is a discriminated VideoRef (stream or r2)."
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const videoPosterRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/media/video/poster',
     tags: ["inspections"],
-    summary: 'Set a video poster frame (thumbnailTimestampPct as a 0..1 fraction)',
+    summary: 'Set a video poster frame (Stream-only: thumbnailTimestampPct as a 0..1 fraction)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().uuid().describe('Inspection id') }).describe('Path params'),
@@ -101,19 +125,19 @@ export const videoPosterRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "setInspectionVideoPoster",
-    description: "Set the Cloudflare Stream poster frame and persist posterPct on the pool row."
+    description: "Set the Cloudflare Stream poster frame and persist posterPct on the pool row. Stream-only — R2 videos use the r2-upload-poster route."
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const videoDeleteRoute = createRoute(withMcpMetadata({
     method: 'delete',
     path:   '/{id}/media/video/{streamUid}',
     tags: ["inspections"],
-    summary: 'Delete a walk-through video from Cloudflare Stream + drop the pool row',
+    summary: 'Delete a walk-through video from the backend + drop the pool row',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
             id:        z.string().uuid().describe('Inspection id'),
-            streamUid: z.string().min(1).describe('Cloudflare Stream UID'),
+            streamUid: z.string().min(1).describe('Stream UID (Stream) or mediaId (R2)'),
         }).describe('Path params'),
     },
     responses: {
@@ -123,7 +147,7 @@ export const videoDeleteRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "deleteInspectionVideo",
-    description: "Delete a video from Cloudflare Stream (tenant-guarded via meta envelope) and remove its media-pool row."
+    description: "Delete a video from the active backend (Cloudflare Stream or R2) and remove its media-pool row. Pass the Stream UID for Stream videos or the mediaId for R2 videos."
 }, { scopes: ['write'], tier: 'extended' }));
 
 // Design System 0520 M14 — PhotoStudio annotation save (subsystem A, phase 4).
@@ -274,65 +298,71 @@ export const cropItemPhotoRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 
+// ── Route handlers ────────────────────────────────────────────────────────────
+
 const mediaStudioRoutes = createApiRouter()
     .openapi(videoCreateUploadRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId');
         // Ownership check (404 on cross-tenant); tenantId is from the JWT.
         await c.var.services.inspection.getInspection(id, tenantId);
-        const svc = new MediaVideoService(c.env.STREAM, tenantId, getBaseUrl(c));
-        const out = await svc.createUpload(id);
-        return c.json({ success: true, data: out }, 200);
+
+        const { backend, provider } = await resolveVideoBackend(c);
+        let out: { uploadURL: string; ref: { provider: 'stream'; streamUid: string } | { provider: 'r2'; mediaId: string; r2Key: string } };
+        try {
+            out = await backend.createUpload(id);
+        } catch (err) {
+            // Cloudflare Stream rejects the direct-upload mint when the account has
+            // no allocated minutes / Stream isn't provisioned (QuotaReachedError),
+            // or on a transient Stream API failure. Translate to a typed 503 so the
+            // editor can show WHY rather than a generic 500 the client blames on the
+            // inspector's connection. The real Stream error is logged for ops.
+            const detail = err instanceof Error ? err.message : String(err);
+            logger.error('Video create-upload failed', { inspectionId: id, provider }, err instanceof Error ? err : undefined);
+            const isQuota = /quota|capacity|allocated|minutes|storage/i.test(detail);
+            throw Errors.ServiceUnavailable(
+                isQuota
+                    ? 'Video uploads are unavailable — the video service has no remaining storage quota. Ask your administrator to enable Stream or add minutes.'
+                    : 'Video uploads are temporarily unavailable. Please try again later, or contact your administrator if it persists.',
+            );
+        }
+
+        return c.json({
+            success: true,
+            data: {
+                uploadURL: out.uploadURL,
+                provider,
+                ref: out.ref,
+            },
+        }, 200);
     })
     .openapi(videoFinalizeRoute, async (c) => {
         const { id } = c.req.valid('param');
-        const { streamUid } = c.req.valid('json');
+        const ref = c.req.valid('json');
         const tenantId = c.get('tenantId');
         await c.var.services.inspection.getInspection(id, tenantId);
 
-        const svc = new MediaVideoService(c.env.STREAM, tenantId, getBaseUrl(c));
-        // Tenant-guarded read of the Stream meta envelope (fail closed).
-        const details = await svc.getDetails(streamUid);
-        const durationSec = Number.isFinite(details.duration) && details.duration > 0
-            ? Math.round(details.duration)
-            : null;
+        const { backend } = await resolveVideoBackend(c);
+        const posterRef = ref.provider === 'r2' && ref.posterKey
+            ? { posterKey: ref.posterKey }
+            : undefined;
 
-        const db = drizzle(c.env.DB);
-        // Idempotent on streamUid: a retry must not create a duplicate pool row.
-        const existing = await db.select({ id: inspectionMediaPool.id })
-            .from(inspectionMediaPool)
-            .where(and(eq(inspectionMediaPool.streamUid, streamUid), eq(inspectionMediaPool.tenantId, tenantId)))
-            .get();
-
-        let poolId: string;
-        if (existing) {
-            poolId = existing.id;
-            await db.update(inspectionMediaPool)
-                .set({ durationSec })
-                .where(and(eq(inspectionMediaPool.id, poolId), eq(inspectionMediaPool.tenantId, tenantId)));
-        } else {
-            poolId = crypto.randomUUID();
-            await db.insert(inspectionMediaPool).values({
-                id: poolId,
-                inspectionId: id,
-                tenantId,
-                r2Key: '',     // video bytes live in Cloudflare Stream, not R2
-                url: '',       // playback URL is derived from streamUid client-side
-                uploadedAt: Date.now(),
-                mediaType: 'video',
-                streamUid,
-                durationSec,
-            });
-        }
+        const { poolId } = await backend.finalize(ref, posterRef);
+        const details = await backend.getDetails(ref);
 
         auditFromContext(c, 'inspection.media.video.finalize', 'inspection', {
             entityId: id,
-            metadata: { streamUid, poolId },
+            metadata: { poolId },
         });
 
         return c.json({
             success: true,
-            data: { poolId, streamUid, durationSec, readyToStream: details.readyToStream },
+            data: {
+                poolId,
+                streamUid: ref.provider === 'stream' ? ref.streamUid : null,
+                durationSec: details.durationSec ?? null,
+                readyToStream: details.readyToStream,
+            },
         }, 200);
     })
     .openapi(videoPosterRoute, async (c) => {
@@ -341,6 +371,9 @@ const mediaStudioRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         await c.var.services.inspection.getInspection(id, tenantId);
 
+        // Poster frame is Stream-only — uses MediaVideoService directly since
+        // setPoster is not part of the VideoBackend interface (R2 videos use
+        // the r2-upload-poster route to store a JPEG poster image instead).
         const svc = new MediaVideoService(c.env.STREAM, tenantId, getBaseUrl(c));
         await svc.setPoster(streamUid, posterPct);
 
@@ -354,21 +387,34 @@ const mediaStudioRoutes = createApiRouter()
         return c.json({ success: true as const }, 200);
     })
     .openapi(videoDeleteRoute, async (c) => {
-        const { id, streamUid } = c.req.valid('param');
+        const { id, streamUid: videoRef } = c.req.valid('param');
         const tenantId = c.get('tenantId');
         await c.var.services.inspection.getInspection(id, tenantId);
 
-        const svc = new MediaVideoService(c.env.STREAM, tenantId, getBaseUrl(c));
-        // Tenant-guarded delete (fail closed on meta mismatch).
-        await svc.deleteVideo(streamUid);
-
+        const { backend, provider } = await resolveVideoBackend(c);
         const db = drizzle(c.env.DB);
-        await db.delete(inspectionMediaPool)
-            .where(and(eq(inspectionMediaPool.streamUid, streamUid), eq(inspectionMediaPool.tenantId, tenantId)));
+
+        if (provider === 'stream') {
+            await backend.delete({ provider: 'stream', streamUid: videoRef });
+        } else {
+            // R2: videoRef is the mediaId. Look up the pool row to get r2Key for
+            // the delete call (the backend needs the full ref to locate the object).
+            const row = await db
+                .select({ r2Key: inspectionMediaPool.r2Key })
+                .from(inspectionMediaPool)
+                .where(and(
+                    eq(inspectionMediaPool.id, videoRef),
+                    eq(inspectionMediaPool.tenantId, tenantId),
+                    eq(inspectionMediaPool.provider, 'r2'),
+                ))
+                .get();
+            if (!row) throw Errors.NotFound('Video not found');
+            await backend.delete({ provider: 'r2', mediaId: videoRef, r2Key: row.r2Key });
+        }
 
         auditFromContext(c, 'inspection.media.video.delete', 'inspection', {
             entityId: id,
-            metadata: { streamUid },
+            metadata: { videoRef },
         });
 
         return c.json({ success: true as const }, 200);
@@ -442,5 +488,13 @@ const mediaStudioRoutes = createApiRouter()
         );
         return c.json({ success: true, data: result }, 200);
     });
+
+// Register R2 binary routes (upload + Range serve) — split into media-video-r2.ts
+// to keep this file under the large-file ceiling.
+registerR2VideoRoutes(mediaStudioRoutes);
+
+// VideoRefSchema is re-exported here so callers can import it from the
+// stable media-studio entry point rather than reaching into validations/.
+export { VideoRefSchema };
 
 export default mediaStudioRoutes;

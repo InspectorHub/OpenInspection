@@ -36,6 +36,7 @@ export interface Stubs {
     automationTrigger?: ReturnType<typeof vi.fn>;
     notificationCreate?: ReturnType<typeof vi.fn>;
     emailConfirm?: ReturnType<typeof vi.fn>;
+    emailAgreementRequest?: ReturnType<typeof vi.fn>;
     workflowCreate?: ReturnType<typeof vi.fn>;
 }
 
@@ -44,6 +45,7 @@ export function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs 
     const automationTrigger = stubs.automationTrigger ?? vi.fn().mockResolvedValue(undefined);
     const notificationCreate = stubs.notificationCreate ?? vi.fn().mockResolvedValue(undefined);
     const emailConfirm = stubs.emailConfirm ?? vi.fn().mockResolvedValue(undefined);
+    const emailAgreementRequest = stubs.emailAgreementRequest ?? vi.fn().mockResolvedValue(undefined);
     const workflowCreate = stubs.workflowCreate ?? vi.fn().mockResolvedValue(undefined);
 
     const agreement = new AgreementService({} as D1Database, { jwtSecret: JWT_SECRET });
@@ -58,13 +60,17 @@ export function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs 
 
     app.use('*', async (c, next) => {
         c.set('tenantId', TENANT_ID);
+        c.set('userRole', 'owner' as any);
         c.set('services', {
             agreement,
             inspection: new InspectionService({} as D1Database, undefined, new ScopedDB(db as never, TENANT_ID)),
             auditLog: { append: auditAppend },
             automation: { trigger: automationTrigger },
             notification: { createForAllAdmins: notificationCreate },
-            email: { sendAgreementSignedConfirmation: emailConfirm },
+            email: {
+                sendAgreementSignedConfirmation: emailConfirm,
+                sendAgreementRequest: emailAgreementRequest,
+            },
         } as unknown as HonoConfig['Variables']['services']);
         (c.env as Record<string, unknown>).SIGN_COMPLETION_WORKFLOW = { create: workflowCreate };
         await next();
@@ -72,7 +78,7 @@ export function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs 
     app.route('/', inspectionsRoutes);
     (mockDrizzle as any).mockReturnValue(db);
 
-    return { app, auditAppend, automationTrigger, notificationCreate, emailConfirm, workflowCreate };
+    return { app, auditAppend, automationTrigger, notificationCreate, emailConfirm, emailAgreementRequest, workflowCreate };
 }
 
 export async function seedBase(db: BetterSQLite3Database<typeof schema>, opts: { withTemplate?: boolean } = {}) {
@@ -112,6 +118,13 @@ export async function createTwoSignerEnvelope(db: BetterSQLite3Database<typeof s
 export const SIG = 'data:image/png;base64,aGVsbG8=';
 
 export function postSign(body: Record<string, unknown>) {
+    return {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+    } as RequestInit;
+}
+
+export function postAgreementRequest(body: Record<string, unknown> = {}) {
     return {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),

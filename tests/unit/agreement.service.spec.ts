@@ -98,21 +98,18 @@ describe('AgreementService', () => {
         await expect(svc.markSignedBySigner(token, 'sig', { signedAtMs: Date.now(), channel: 'remote' })).rejects.toThrow();
     });
 
-    it('legacy envelope-token markViewed/markSigned/markDeclined still work', async () => {
-        // Build a legacy single-signer envelope directly (plaintext envelope token).
-        const reqId = crypto.randomUUID();
-        const envToken = 'legacy-env-token-xyz';
-        await testDb.insert(schema.agreementRequests).values({
-            id: reqId, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
-            clientEmail: 'jane@test.com', clientName: 'Jane', token: envToken,
-            status: 'sent', completionPolicy: 'all', createdAt: new Date(),
-        });
-        const v = await svc.markViewed(envToken);
+    it('per-signer markViewedBySigner/markSignedBySigner drive envelope state', async () => {
+        // Use findOrCreate to create the envelope + signer row, then drive state
+        // through the signer-level methods (envelope-level markViewed/markSigned
+        // have been removed; production uses the *BySigner variants exclusively).
+        const { token } = await svc.findOrCreate(TENANT_A, INSP_ID);
+        const v = await svc.markViewedBySigner(token);
         expect(v?.inspectionId).toBe(INSP_ID);
-        await svc.markSigned(envToken, 'siglegacy', Date.now());
-        const row = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, reqId)).get();
-        expect(row!.status).toBe('signed');
-        expect(row!.signatureBase64).toBe('siglegacy');
+        const res = await svc.markSignedBySigner(token, 'siglegacy', { signedAtMs: Date.now(), channel: 'remote' });
+        expect(res.envelopeStatus).toBe('signed');
+        const rows = await testDb.select().from(schema.agreementRequests).all();
+        expect(rows[0].status).toBe('signed');
+        expect(rows[0].signatureBase64).toBe('siglegacy');
     });
 
     it('expireOlderThan marks pending/sent/viewed rows older than N days as expired', async () => {
