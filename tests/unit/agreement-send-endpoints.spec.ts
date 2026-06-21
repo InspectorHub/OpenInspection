@@ -158,7 +158,23 @@ describe('POST /api/admin/agreements/send — multi-signer', () => {
         expect(res.status).toBe(400);
     });
 
-    it('signers provided WITHOUT inspectionId -> 400 with clear message', async () => {
+    it('send without inspectionId is rejected at the schema layer (HTTP 400) — schema-enforced since inspection_id NOT NULL', async () => {
+        // Task 4: inspectionId is now required in SendAgreementSchema (z.string().uuid(),
+        // not optional). The Zod validator rejects the request before the handler runs.
+        const res = await buildApp().request('/api/admin/agreements/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agreementId: AGR_ID,
+                clientEmail: 'jane@test.com',
+                // intentionally omit inspectionId — must be schema-rejected
+                signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }],
+            }),
+        }, ENV, EXEC);
+        expect(res.status).toBe(400);
+    });
+
+    it('send without inspectionId and without signers is also rejected (schema layer, HTTP 400)', async () => {
         const res = await buildApp().request('/api/admin/agreements/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -166,13 +182,9 @@ describe('POST /api/admin/agreements/send — multi-signer', () => {
                 agreementId: AGR_ID,
                 clientEmail: 'jane@test.com',
                 // no inspectionId
-                signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }],
             }),
         }, ENV, EXEC);
         expect(res.status).toBe(400);
-        const body = await res.json() as { error?: { message?: string }; message?: string };
-        const message = body.error?.message ?? body.message ?? '';
-        expect(message).toMatch(/inspectionId is required/i);
     });
 
     it('clientEmail-only send (no signers) routes through the envelope path and returns requestId', async () => {

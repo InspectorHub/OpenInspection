@@ -32,7 +32,9 @@ export const inspectionAgreements = sqliteTable('inspection_agreements', {
 export const agreementRequests = sqliteTable('agreement_requests', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
-    inspectionId: text('inspection_id').references(() => inspections.id),
+    // Every agreement envelope is bound to an inspection (the send UI + every
+    // service path require it). NOT NULL since the 2026-06-21 consolidation.
+    inspectionId: text('inspection_id').notNull().references(() => inspections.id),
     agreementId: text('agreement_id').notNull().references(() => agreements.id),
     clientEmail: text('client_email').notNull(),
     clientName: text('client_name'),
