@@ -105,6 +105,19 @@ const agreementsRoutes = createApiRouter()
 
         // findOrCreate already sets status: 'sent' — no manual update needed.
 
+        // Fetch the envelope row so we can return the real createdAt (not
+        // wall-clock). On the reuse path, alreadyExists: true but findOrCreate
+        // does not expose the original timestamp.
+        const envelopeRow = await db
+            .select({ createdAt: agreementRequests.createdAt })
+            .from(agreementRequests)
+            .where(and(eq(agreementRequests.id, env.requestId), eq(agreementRequests.tenantId, tenantId)))
+            .get();
+        if (!envelopeRow) {
+            logger.error('agreement.send.envelope-not-found', { requestId: env.requestId, tenantId });
+            throw Errors.NotFound('Agreement request not found after creation');
+        }
+
         auditFromContext(c, 'agreement.send', 'agreement_request', {
             entityId: env.requestId,
             metadata: { agreementId: agreement.id, clientEmail, inspectionId: id },
@@ -116,7 +129,7 @@ const agreementsRoutes = createApiRouter()
                 id:          env.requestId,
                 status:      'sent',
                 clientEmail,
-                createdAt:   safeISODate(new Date()),
+                createdAt:   safeISODate(envelopeRow.createdAt),
             },
         }, 200);
     })
