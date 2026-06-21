@@ -155,6 +155,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                     auditTrailJson: JSON.stringify(auditPayload, null, 2),
                     publicKeyPem: pubKey.pem,
                     tenantId,
+                    inspectionId,
                     envelopeId: requestId,
                 });
                 const r2Key = r2Keys.agreementFile(tenantId, inspectionId, requestId, 'evidence.zip');
