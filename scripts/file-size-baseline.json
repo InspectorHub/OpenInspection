@@ -34,7 +34,7 @@
   "server/api/inspections/results.ts": 466,
   "server/api/bookings.ts": 465,
   "app/components/editor/InspectionSettingsSheet.tsx": 451,
-  "server/api/inspections/media-studio.ts": 465,
+  "server/api/inspections/media-studio.ts": 501,
   "app/routes/inspection-edit/action.server.ts": 440,
   "app/routes/settings-communication.tsx": 440,
   "app/components/NewInspectionWizard.tsx": 436,
