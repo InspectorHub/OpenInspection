@@ -310,3 +310,110 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         expect(gate!.actionUrl).toBe(`/invoice/${INSP_ID}`);
     });
 });
+
+/**
+ * Photo-guard prefix migration — GET /api/public/report/:tenant/:id/photo
+ *
+ * The key guard (startsWith) must use the NEW `{tenantId}/inspections/{id}/`
+ * prefix (post r2-key-convention). This suite asserts that:
+ *   • a new-convention photo/cover key passes the guard (object is served)
+ *   • a key scoped to a foreign tenant is 404'd
+ *   • a key scoped to the right tenant but a different inspection is 404'd
+ *
+ * Auth is wired via a stub portalAccess.resolveToken that returns the fixed
+ * tenantId so the test focuses exclusively on the prefix guard, not auth.
+ */
+describe('GET /api/public/report/:tenant/:id/photo — prefix guard (r2-key-convention)', () => {
+    const TENANT = 't1';
+    const INSP = 'insp1';
+
+    /** A fake R2 object that satisfies the minimal interface the handler reads. */
+    function fakeR2Object() {
+        return {
+            body: new ReadableStream(),
+            httpMetadata: { contentType: 'image/jpeg' },
+            customMetadata: {},
+            httpEtag: 'etag',
+        };
+    }
+
+    function buildApp(key: string, mockPhotos: Record<string, ReturnType<typeof fakeR2Object> | null> = {}) {
+        // portalAccess.resolveToken returns a valid row for our fixed tenant/inspection.
+        const resolveToken = vi.fn().mockResolvedValue({
+            inspectionId: INSP, tenantId: TENANT, role: 'client',
+            recipientEmail: 'a@b.com', revokedAt: null, expiresAt: null,
+        });
+        // drizzle is mocked globally; the handler calls it twice:
+        // (1) legacy agent-view-token path — irrelevant here (resolveToken already hits)
+        // (2) photoGate: returns published so the report-status gate passes.
+        const publishedDb = {
+            select: () => ({ from: () => ({ where: () => ({ get: async () => ({ reportStatus: 'published' }) }) }) }),
+        };
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(publishedDb as any);
+
+        const app = new OpenAPIHono<HonoConfig>();
+        app.use('*', async (c, next) => {
+            (c as unknown as { env: Record<string, unknown> }).env = {
+                DB: {},
+                PHOTOS: {
+                    get: async (k: string) => mockPhotos[k] ?? null,
+                },
+            };
+            c.set('services', {
+                portalAccess: { resolveToken },
+                inspection: { resolveAgentViewToken: vi.fn().mockResolvedValue(null) },
+            } as unknown as HonoConfig['Variables']['services']);
+            await next();
+        });
+        app.route('/api/public', publicReportRoutes);
+        return app;
+    }
+
+    it('new-convention photo key passes the guard (served, not 404)', async () => {
+        const key = `${TENANT}/inspections/${INSP}/photos/media-uuid.jpg`;
+        const app = buildApp(key, { [key]: fakeR2Object() });
+        const res = await app.request(
+            `/api/public/report/acme/${INSP}/photo?key=${encodeURIComponent(key)}&token=tok`,
+        );
+        // 200 means the guard passed and the object was found + served.
+        expect(res.status).toBe(200);
+    });
+
+    it('new-convention cover key passes the guard (served, not 404)', async () => {
+        const key = `${TENANT}/inspections/${INSP}/cover/media-uuid.jpg`;
+        const app = buildApp(key, { [key]: fakeR2Object() });
+        const res = await app.request(
+            `/api/public/report/acme/${INSP}/photo?key=${encodeURIComponent(key)}&token=tok`,
+        );
+        expect(res.status).toBe(200);
+    });
+
+    it('key scoped to a foreign tenant is 404d by the prefix guard', async () => {
+        const key = `OTHER-TENANT/inspections/${INSP}/photos/media-uuid.jpg`;
+        const app = buildApp(key, { [key]: fakeR2Object() });
+        const res = await app.request(
+            `/api/public/report/acme/${INSP}/photo?key=${encodeURIComponent(key)}&token=tok`,
+        );
+        expect(res.status).toBe(404);
+    });
+
+    it('key scoped to the right tenant but a different inspection is 404d by the prefix guard', async () => {
+        const key = `${TENANT}/inspections/OTHER-INSP/photos/media-uuid.jpg`;
+        const app = buildApp(key, { [key]: fakeR2Object() });
+        const res = await app.request(
+            `/api/public/report/acme/${INSP}/photo?key=${encodeURIComponent(key)}&token=tok`,
+        );
+        expect(res.status).toBe(404);
+    });
+
+    it('OLD bare prefix key (tenantId/inspId/) is rejected by the updated guard', async () => {
+        // This is the regression case: the old guard `${tenantId}/${id}/` would
+        // have passed this key; the new guard must not.
+        const key = `${TENANT}/${INSP}/photos/media-uuid.jpg`;
+        const app = buildApp(key, { [key]: fakeR2Object() });
+        const res = await app.request(
+            `/api/public/report/acme/${INSP}/photo?key=${encodeURIComponent(key)}&token=tok`,
+        );
+        expect(res.status).toBe(404);
+    });
+});

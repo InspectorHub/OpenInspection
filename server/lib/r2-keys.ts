@@ -20,8 +20,8 @@ export const r2Keys = {
     `${t}/inspections/${i}/cover/${mediaId}.jpg`,
   inspectionDocument: (t: string, i: string, docId: string, filename: string) =>
     `${t}/inspections/${i}/documents/${docId}-${filename}`,
-  inspectionReport: (t: string, i: string, version: number | string) =>
-    `${t}/inspections/${i}/report/${version}.pdf`,
+  // Note: report PDFs are content-hash-addressed and built inline in
+  // server/services/report-pdf.service.ts — not via a key builder here.
   agreementFile: (t: string, i: string, envelopeId: string, name: string) =>
     `${t}/inspections/${i}/agreements/${envelopeId}/${name}`,
   brandingLogo: (t: string, mediaId: string, ext: string) =>

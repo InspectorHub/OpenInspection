@@ -11,7 +11,6 @@ describe('r2Keys', () => {
     expect(r2Keys.inspectionVideoPoster(t, i, m)).toBe('TEN/inspections/INSP/videos/MED.poster.jpg');
     expect(r2Keys.inspectionCover(t, i, m)).toBe('TEN/inspections/INSP/cover/MED.jpg');
     expect(r2Keys.inspectionDocument(t, i, 'D', 'a.pdf')).toBe('TEN/inspections/INSP/documents/D-a.pdf');
-    expect(r2Keys.inspectionReport(t, i, 3)).toBe('TEN/inspections/INSP/report/3.pdf');
     expect(r2Keys.agreementFile(t, i, 'ENV', 'signed.pdf')).toBe('TEN/inspections/INSP/agreements/ENV/signed.pdf');
   });
   it('tenant/user scoped keys', () => {
