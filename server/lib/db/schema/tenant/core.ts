@@ -57,6 +57,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // inspector's name overrides the display name and their email becomes the
     // default Reply-To.
     emailMode: text('email_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
+    // Self-host video backend selection (mirrors emailMode). Default 'r2' (free).
+    // 'stream' uses the worker's own STREAM binding + integrationConfig.streamCustomerSubdomain.
+    // Ignored in SaaS (backend is plan-gated off tenants.tier/status).
+    videoMode: text('video_mode', { enum: ['r2', 'stream'] }).notNull().default('r2'),
     // Track L (D3) — SMS sender mode, mirrors email_mode. 'platform' uses the
     // platform Twilio env; 'own' uses the tenant's three TWILIO_* secrets (only
     // when all three are present, else platform fallback — see resolve-twilio.ts).
