@@ -9,6 +9,8 @@ export interface IntegrationConfig {
     appBaseUrl?: string;
     turnstileSiteKey?: string;
     googleClientId?: string;
+    /** Cloudflare Stream customer subdomain for the self-host Stream video backend. */
+    streamCustomerSubdomain?: string;
 }
 
 // C-15 (2026-06-06): the legacy `SecretsConfig` shape (camelCase keys in the

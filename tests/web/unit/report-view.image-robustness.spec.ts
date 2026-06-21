@@ -97,4 +97,18 @@ describe('ReportView image robustness (Plan 1 / N1)', () => {
     expect(text).toMatch(/renderMediaTile\(photo, `\$\{item\.label\}/);
     expect(text).toContain('alt={alt}');
   });
+
+  it('R2 videos render (player + poster) and are never collapsed — they must not vanish from the report', async () => {
+    const text = await source();
+    // The default R2 backend's videos have streamUid=null; the selector resolves
+    // them to r2-video-* kinds. ReportMediaTile MUST branch on both, or R2 videos
+    // fall through to the broken-image branch and silently disappear (the
+    // regression the whole-branch review caught).
+    expect(text).toContain('r2-video-player');
+    expect(text).toContain('r2-video-poster');
+    // mediaVisible must treat the R2 video kinds as visible (like Stream kinds),
+    // so a failed-image filter never hides them.
+    expect(text).toMatch(/kind === "r2-video-player"/);
+    expect(text).toMatch(/kind === "r2-video-poster"/);
+  });
 });

@@ -192,7 +192,7 @@ export function ReportView(props: ReportViewProps) {
   // onError/failedPhotos/aspect-[4/3]/alt hardening intact.
   const renderMediaTile = (photo: ReportPhoto, alt: string, idx: number) => (
     <ReportMediaTile
-      key={photo.media?.kind === "video-player" ? `v-${photo.media.streamUid}-${idx}` : photo.media?.kind === "video-poster" ? `vp-${photo.media.streamUid}-${idx}` : photo.key}
+      key={photo.media?.kind === "video-player" ? `v-${photo.media.streamUid}-${idx}` : photo.media?.kind === "video-poster" ? `vp-${photo.media.streamUid}-${idx}` : photo.media?.kind === "r2-video-player" ? `r2v-${photo.media.mediaId}-${idx}` : photo.media?.kind === "r2-video-poster" ? `r2vp-${photo.media.mediaId}-${idx}` : photo.key}
       photo={photo}
       alt={alt}
       idx={idx}
@@ -203,7 +203,7 @@ export function ReportView(props: ReportViewProps) {
   );
 
   /** A media entry is "visible" when it is a video OR a photo whose thumb hasn't failed. */
-  const mediaVisible = (p: ReportPhoto) => p.media?.kind === "video-player" || p.media?.kind === "video-poster" || !failedPhotos.has(p.key);
+  const mediaVisible = (p: ReportPhoto) => p.media?.kind === "video-player" || p.media?.kind === "video-poster" || p.media?.kind === "r2-video-player" || p.media?.kind === "r2-video-poster" || !failedPhotos.has(p.key);
 
   // Dynamic rating summary — derived from THIS inspection's own rating system
   // (Spectora-style) instead of fixed Satisfactory/Monitor/Defects buckets.

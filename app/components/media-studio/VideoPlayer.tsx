@@ -1,24 +1,32 @@
 /**
- * Plan 7 — Cloudflare Stream player for the unified media viewer.
+ * Plan 7 — video walk-through player (pluggable backend: Stream or R2).
  *
- * Renders the Stream `<iframe>` at a fixed 16/9 aspect (no CLS), lazy-loaded.
- * Until the upload finishes transcoding (`readyToStream === false`) it shows a
- * "Processing…" state instead of the iframe.
+ * Provider branch:
+ *   'stream' — renders the Cloudflare Stream <iframe> (needs streamCustomerSubdomain).
+ *              Transcoding progress shown while readyToStream === false.
+ *   'r2'     — renders a native <video> element served by the worker's
+ *              r2-object route, with an optional poster frame.
  *
- * The iframe URL needs the account's Stream customer subdomain (from
- * `env.STREAM_CUSTOMER_SUBDOMAIN`, threaded through loader data). When the
- * subdomain is absent we fail closed — no fabricated subdomain — and render a
- * "Video unavailable" panel.
+ * Fail closed: for Stream, when the subdomain is absent we render a
+ * "Video unavailable" panel rather than a fabricated/broken subdomain.
  */
 
 export interface VideoPlayerProps {
-  streamUid: string;
+  provider: "stream" | "r2";
+  // ── Stream fields ──────────────────────────────────────────────────────────
+  /** Cloudflare Stream UID. Required when provider='stream'. */
+  streamUid?: string;
   /** Cloudflare Stream customer subdomain. Null/empty ⇒ unavailable (fail closed). */
-  streamCustomerSubdomain: string | null;
+  streamCustomerSubdomain?: string | null;
   /** False while Stream is still transcoding the upload. */
   readyToStream?: boolean;
   /** 0..100 transcode progress, when known. */
   pctComplete?: number;
+  // ── R2 fields ─────────────────────────────────────────────────────────────
+  /** Inspection id — used to build the r2-object URL. Required when provider='r2'. */
+  inspectionId?: string;
+  /** Pool row id (= mediaId). Required when provider='r2'. */
+  mediaId?: string;
 }
 
 export function streamIframeSrc(subdomain: string, streamUid: string): string {
@@ -26,12 +34,44 @@ export function streamIframeSrc(subdomain: string, streamUid: string): string {
 }
 
 export function VideoPlayer({
+  provider,
   streamUid,
   streamCustomerSubdomain,
   readyToStream = true,
   pctComplete,
+  inspectionId,
+  mediaId,
 }: VideoPlayerProps) {
-  if (!streamCustomerSubdomain) {
+  // ── R2 branch ──────────────────────────────────────────────────────────────
+  if (provider === "r2") {
+    if (!inspectionId || !mediaId) {
+      return (
+        <div
+          data-testid="video-unavailable"
+          className="flex aspect-video w-full items-center justify-center rounded-xl bg-ih-bg-muted text-[13px] text-ih-fg-3"
+        >
+          Video unavailable
+        </div>
+      );
+    }
+
+    const objectURL = `/api/inspections/${inspectionId}/media/video/r2-object/${mediaId}`;
+    const posterURL = `${objectURL}/poster`;
+
+    return (
+      <div data-testid="video-player-r2" className="relative aspect-video w-full overflow-hidden rounded-xl bg-ih-bg-muted">
+        <video
+          controls
+          poster={posterURL}
+          src={objectURL}
+          className="absolute inset-0 h-full w-full"
+        />
+      </div>
+    );
+  }
+
+  // ── Stream branch ──────────────────────────────────────────────────────────
+  if (!streamCustomerSubdomain || !streamUid) {
     return (
       <div
         data-testid="video-unavailable"

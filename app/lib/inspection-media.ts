@@ -15,8 +15,12 @@ export interface GalleryPhoto {
   croppedKey?: string;
   /** Plan 7 — media discriminator. Absent ⇒ treated as 'photo'. */
   mediaType?: "photo" | "video";
-  /** Plan 7 — Cloudflare Stream UID (video entries only). */
+  /** Plan 7 — video backend provider. 'stream' = Cloudflare Stream; 'r2' = R2 bucket. */
+  provider?: "stream" | "r2";
+  /** Plan 7 — Cloudflare Stream UID (Stream videos only). */
   streamUid?: string;
+  /** Plan 7 — pool row id / media id (R2 videos: used to build r2-object URLs). */
+  mediaId?: string;
   /** Plan 7 — poster timestamp as a fraction of duration (0..1). */
   posterPct?: number;
   /** Plan 7 — video duration in seconds (for the m:ss strip badge). */

@@ -67,6 +67,35 @@ export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, on
     );
   }
 
+  if (m && m.kind === "r2-video-player") {
+    // Web report → native <video> with the R2 poster + clip URL. The clip route
+    // is tenant-guarded by the pool-row lookup; preload="none" so the poster
+    // shows first and the clip only downloads on play (no CLS, no eager bytes).
+    return (
+      <div key={`r2v-${m.mediaId}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+        <video
+          src={m.playerSrc}
+          poster={m.posterUrl}
+          controls
+          preload="none"
+          title={alt}
+          className="absolute inset-0 h-full w-full bg-ih-bg-muted object-cover"
+        />
+      </div>
+    );
+  }
+
+  if (m && m.kind === "r2-video-poster") {
+    // PDF cannot embed a player → poster frame only. R2 clips have no public
+    // deep-link watch page (unlike Stream), so the poster JPEG is the static
+    // fallback with no QR/link.
+    return (
+      <div key={`r2vp-${m.mediaId}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+        <img src={m.posterUrl} alt={alt} title={name} className="h-full w-full object-cover" loading="eager" />
+      </div>
+    );
+  }
+
   // Image branch (photo / legacy / fail-closed video) — unchanged hardening.
   return (
     <div key={photo.key} className={`group relative aspect-[4/3] overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>

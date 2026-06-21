@@ -2,7 +2,7 @@ import {} from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
-import { users } from '../lib/db/schema';
+import { users, tenantConfigs, tenants } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
@@ -69,6 +69,53 @@ export const sessionContextRoutes = createApiRouter()
             }
         }
 
+        // Resolve the video backend provider for this tenant. Used by the
+        // inspection editor to render the correct VideoCapture/VideoPlayer branch.
+        let videoProvider: 'r2' | 'stream' = 'r2';
+        if (tenantId) {
+            try {
+                const db = drizzle(c.env.DB);
+                const isSaas = c.env.APP_MODE === 'saas';
+                if (isSaas) {
+                    const tenantRow = await db
+                        .select({ tier: tenants.tier, status: tenants.status })
+                        .from(tenants)
+                        .where(eq(tenants.id, tenantId))
+                        .get();
+                    const tier = tenantRow?.tier ?? 'free';
+                    const status = tenantRow?.status ?? 'pending';
+                    const paid = (tier === 'pro' || tier === 'enterprise') && status !== 'trial';
+                    videoProvider = paid ? 'stream' : 'r2';
+                } else {
+                    const cfgRow = await db
+                        .select({ videoMode: tenantConfigs.videoMode, integrationConfig: tenantConfigs.integrationConfig })
+                        .from(tenantConfigs)
+                        .where(eq(tenantConfigs.tenantId, tenantId))
+                        .get();
+                    const videoModeRaw = (cfgRow?.videoMode as 'r2' | 'stream' | null) ?? null;
+                    if (videoModeRaw === 'stream' && !!c.env.STREAM) {
+                        // Mirror resolveVideoBackend: also require a non-empty
+                        // streamCustomerSubdomain, otherwise create-upload throws 503.
+                        let streamSubdomain = '';
+                        const rawCfg = (cfgRow as unknown as { integrationConfig?: string | null } | null)?.integrationConfig ?? null;
+                        if (rawCfg) {
+                            try {
+                                const parsed = JSON.parse(rawCfg) as Record<string, unknown>;
+                                if (typeof parsed.streamCustomerSubdomain === 'string') {
+                                    streamSubdomain = parsed.streamCustomerSubdomain;
+                                }
+                            } catch { /* ignore parse error — treat as empty */ }
+                        }
+                        videoProvider = streamSubdomain ? 'stream' : 'r2';
+                    } else {
+                        videoProvider = 'r2';
+                    }
+                }
+            } catch (e) {
+                logger.warn('[session-context] videoProvider resolution failed', { error: (e as Error).message });
+            }
+        }
+
         const privacyUrl = (c.env as unknown as Record<string, string | undefined>).PRIVACY_URL?.trim() || null;
 
         return c.json({
@@ -99,6 +146,7 @@ export const sessionContextRoutes = createApiRouter()
                     hasSeatQuota: profile.hasSeatQuota || false,
                 },
                 seatUsage,
+                videoProvider,
             },
         });
     });

@@ -313,10 +313,13 @@ export const publicReportRoutes = createApiRouter()
         // link.
         const streamCustomerSubdomain = c.env.STREAM_CUSTOMER_SUBDOMAIN ?? '';
         const appBaseUrl = new URL(c.req.url).origin;
+        // R2 video serve base: PDF consumes only the poster JPEG (render-token);
+        // web viewer fetches clips, tenant-guarded by the pool-row lookup.
         const data = await c.var.services.inspection.getReportData(id, tenantId, makePhotoUrl, {
             isPdf: renderMode,
             streamCustomerSubdomain,
             appBaseUrl,
+            r2BaseUrl: `/api/inspections/${id}/media/video`,
         });
         return c.json({ success: true as const, data }, 200);
     })
