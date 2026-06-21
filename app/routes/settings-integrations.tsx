@@ -16,6 +16,7 @@ import { AccessDenied } from "~/components/AccessDenied";
 import { StripePaymentsPanel } from "~/components/settings/integrations/StripePaymentsPanel";
 import { VideoIntegrationPanel } from "~/components/settings/integrations/VideoIntegrationPanel";
 import { IntegrationCardsGrid } from "~/components/settings/integrations/IntegrationCardsGrid";
+import { SaveVideoSchema } from "../../server/lib/validations/video.schema";
 
 export function meta() {
   return [{ title: "Integrations - Settings - OpenInspection" }];
@@ -114,61 +115,61 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "save-video") {
-    const videoModeRaw = fd.get("videoMode");
-    const subdomainRaw = (fd.get("streamCustomerSubdomain") as string | null) ?? "";
-    const videoMode: "r2" | "stream" = videoModeRaw === "stream" ? "stream" : "r2";
-
-    // Validate subdomain when Stream is selected.
-    const hostnameRe =
-      /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-    if (videoMode === "stream") {
-      if (!subdomainRaw.trim()) {
-        return {
-          intent,
-          success: false,
-          error: "Stream customer subdomain is required when Stream mode is enabled.",
-          field: "streamCustomerSubdomain",
-          test: null,
-        };
-      }
-      if (!hostnameRe.test(subdomainRaw.trim())) {
-        return {
-          intent,
-          success: false,
-          error: "Must be a valid hostname (e.g. customer.cloudflarestream.com).",
-          field: "streamCustomerSubdomain",
-          test: null,
-        };
-      }
-    }
-
-    const api = createApi(context, { token });
-
-    // 1. Persist videoMode to tenant_configs.video_mode.
-    const tcRes = await api.admin["tenant-config"].$patch({ json: { videoMode } });
-    if (!tcRes.ok) {
+    // SaaS guard: video backend is plan-managed in hosted mode.
+    const bffEnv = (context as { cloudflare?: { env?: { APP_MODE?: string } } })?.cloudflare?.env;
+    if (bffEnv?.APP_MODE === "saas") {
       return {
         intent,
         success: false,
-        error: "Failed to save video mode.",
+        error: "Video backend is plan-managed in hosted mode.",
         field: null,
         test: null,
       };
     }
 
-    // 2. Read-modify-write streamCustomerSubdomain into the plaintext
-    //    integrationConfig JSON column, mirroring the appBaseUrl/turnstileSiteKey pattern.
+    // Validate inputs via SaveVideoSchema (replaces inline regex).
+    const videoModeRaw = fd.get("videoMode");
+    const subdomainRaw = ((fd.get("streamCustomerSubdomain") as string | null) ?? "").trim();
+    const parseResult = SaveVideoSchema.safeParse({
+      videoMode: videoModeRaw === "stream" ? "stream" : "r2",
+      streamCustomerSubdomain: subdomainRaw || undefined,
+    });
+    if (!parseResult.success) {
+      const issue = parseResult.error.issues[0];
+      return {
+        intent,
+        success: false,
+        error: issue?.message ?? "Invalid video settings.",
+        field: "streamCustomerSubdomain",
+        test: null,
+      };
+    }
+    const { videoMode } = parseResult.data;
+
+    const api = createApi(context, { token });
+
+    // 1. GET current integrationConfig FIRST — no writes until we can do a
+    //    safe read-modify-write. If the GET fails, abort with an honest error.
     const cfgRes = await api.admin.config.$get().catch(() => null);
-    const cfgBody = cfgRes?.ok
-      ? ((await cfgRes.json()) as Record<string, unknown>)
-      : {};
+    if (!cfgRes?.ok) {
+      return {
+        intent,
+        success: false,
+        error: "Failed to read current configuration. No changes were saved.",
+        field: null,
+        test: null,
+      };
+    }
+    const cfgBody = (await cfgRes.json()) as Record<string, unknown>;
     const existing = (
       (cfgBody.data as Record<string, unknown> | undefined)?.integrationConfig ?? {}
     ) as Record<string, string | undefined>;
 
+    // 2. Compute merged integrationConfig.
     const merged: Record<string, string | undefined> = { ...existing };
     if (videoMode === "stream") {
-      merged.streamCustomerSubdomain = subdomainRaw.trim();
+      // streamCustomerSubdomain is guaranteed non-empty by SaveVideoSchema
+      merged.streamCustomerSubdomain = subdomainRaw;
     } else {
       // Reverting to R2: clear the subdomain so it doesn't linger.
       delete merged.streamCustomerSubdomain;
@@ -180,7 +181,31 @@ export async function action({ request, context }: Route.ActionArgs) {
       Object.entries(merged).filter(([, v]) => v != null && v !== ""),
     ) as Parameters<typeof api.admin.config.$post>[0]["json"];
 
-    await api.admin.config.$post({ json: cleanMerged });
+    // 3. Write BOTH: PATCH videoMode and POST integrationConfig atomically.
+    //    If either fails, surface an error — we cannot partially succeed.
+    const [tcRes, postRes] = await Promise.all([
+      api.admin["tenant-config"].$patch({ json: { videoMode } }),
+      api.admin.config.$post({ json: cleanMerged }),
+    ]);
+
+    if (!tcRes.ok) {
+      return {
+        intent,
+        success: false,
+        error: "Failed to save video mode.",
+        field: null,
+        test: null,
+      };
+    }
+    if (!postRes.ok) {
+      return {
+        intent,
+        success: false,
+        error: "Failed to save integration configuration.",
+        field: null,
+        test: null,
+      };
+    }
 
     return { intent, success: true, error: null, field: null, test: null };
   }

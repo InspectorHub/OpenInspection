@@ -186,6 +186,52 @@ describe('settings-integrations action — save-video intent', () => {
         const res = await action(actionArgs({ intent: 'save-video', videoMode: 'r2' }));
         expect(res).toMatchObject({ intent: 'save-video', success: false });
     });
+
+    it('returns error and makes no writes when GET /admin/config fails', async () => {
+        // Simulate the config GET returning a non-ok response.
+        getAdminConfig.mockResolvedValue(jsonRes(null, false));
+        const res = await action(actionArgs({ intent: 'save-video', videoMode: 'r2' }));
+        // No writes should happen — atomic: GET must succeed before PATCH/POST.
+        expect(patchTenantConfig).not.toHaveBeenCalled();
+        expect(postAdminConfig).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ intent: 'save-video', success: false });
+        expect((res as { error: string }).error).toMatch(/Failed to read current configuration/);
+    });
+
+    it('returns error and makes no writes when GET /admin/config throws', async () => {
+        // Simulate a network-level failure (catch(() => null) path).
+        getAdminConfig.mockRejectedValue(new Error('network error'));
+        const res = await action(actionArgs({ intent: 'save-video', videoMode: 'r2' }));
+        expect(patchTenantConfig).not.toHaveBeenCalled();
+        expect(postAdminConfig).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ intent: 'save-video', success: false });
+    });
+
+    it('returns error when POST /admin/config fails', async () => {
+        postAdminConfig.mockResolvedValue(jsonRes(null, false));
+        const res = await action(actionArgs({ intent: 'save-video', videoMode: 'r2' }));
+        expect(res).toMatchObject({ intent: 'save-video', success: false });
+        expect((res as { error: string }).error).toMatch(/Failed to save integration configuration/);
+    });
+
+    it('rejects save-video in SaaS mode', async () => {
+        // Simulate APP_MODE=saas via context.cloudflare.env.
+        const sasArgs = {
+            request: new Request('http://app.example.com/settings/integrations', {
+                method: 'POST',
+                body: (() => { const fd = new FormData(); fd.set('intent', 'save-video'); fd.set('videoMode', 'r2'); return fd; })(),
+            }),
+            context: { cloudflare: { env: { APP_MODE: 'saas' } } } as never,
+            params: {},
+        } as unknown as Parameters<typeof action>[0];
+        const res = await action(sasArgs);
+        // SaaS guard fires before any API call.
+        expect(getAdminConfig).not.toHaveBeenCalled();
+        expect(patchTenantConfig).not.toHaveBeenCalled();
+        expect(postAdminConfig).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ intent: 'save-video', success: false });
+        expect((res as { error: string }).error).toMatch(/plan-managed/);
+    });
 });
 
 // ─── Action: unknown intent ───────────────────────────────────────────────────
