@@ -17,6 +17,7 @@ describe('r2Keys', () => {
   it('tenant/user scoped keys', () => {
     expect(r2Keys.brandingLogo(t, m, 'png')).toBe('TEN/branding/logo-MED.png');
     expect(r2Keys.inspectorPhoto(t, 'U', 'jpg')).toBe('TEN/inspector-photos/U.jpg');
+    expect(r2Keys.inspectorPhotoServe(t, 'U.jpg')).toBe('TEN/inspector-photos/U.jpg');
     expect(r2Keys.messageAttachment(t, 'MSG', 'ATT', 'png')).toBe('TEN/messages/MSG/ATT.png');
   });
 });

@@ -4,7 +4,7 @@
   "server/services/inspection/inspection-core.service.ts": 906,
   "app/routes/dashboard.tsx": 841,
   "server/services/booking.service.ts": 829,
-  "server/index.ts": 819,
+  "server/index.ts": 820,
   "server/services/inspection.service.ts": 744,
   "app/components/editor/PhotoStudio.tsx": 694,
   "app/components/media-studio/PhotoAnnotator.tsx": 693,

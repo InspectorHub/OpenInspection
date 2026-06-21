@@ -26,6 +26,7 @@ import { HonoConfig } from './types/hono';
 import { UserRole } from './types/auth';
 import { logger } from './lib/logger';
 import { BUILD } from './generated/version';
+import { r2Keys } from './lib/r2-keys';
 
 import { setupWizardRoutes } from './features/setup-wizard';
 
@@ -205,7 +206,7 @@ app.get('/photos/:tenantId/inspector-photos/:filename', async (c) => {
     const tenantId = c.req.param('tenantId');
     const filename = c.req.param('filename');
     if (!c.env.PHOTOS) return c.notFound();
-    const key = `${tenantId}/inspector-photos/${filename}`;
+    const key = r2Keys.inspectorPhotoServe(tenantId, filename);
     const obj = await c.env.PHOTOS.get(key);
     if (!obj) return c.notFound();
     const headers = new Headers();

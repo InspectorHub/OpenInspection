@@ -28,6 +28,9 @@ export const r2Keys = {
     `${t}/branding/logo-${mediaId}.${ext}`,
   inspectorPhoto: (t: string, userId: string, ext: string) =>
     `${t}/inspector-photos/${userId}.${ext}`,
+  /** Serve-side variant — accepts the full filename (userId.ext) from the URL param. */
+  inspectorPhotoServe: (t: string, filename: string) =>
+    `${t}/inspector-photos/${filename}`,
   messageAttachment: (t: string, messageId: string, attachmentId: string, ext: string) =>
     `${t}/messages/${messageId}/${attachmentId}.${ext}`,
 };
