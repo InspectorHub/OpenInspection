@@ -49,15 +49,6 @@ async function importHmacKey(secret: string): Promise<CryptoKey> {
     );
 }
 
-// ── Constant-time compare ─────────────────────────────────────────────────────
-
-function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
-    if (a.length !== b.length) return false;
-    let diff = 0;
-    for (let i = 0; i < a.length; i++) diff |= a[i] ^ b[i];
-    return diff === 0;
-}
-
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -100,15 +91,11 @@ export async function verifyUploadToken(
         const payloadStr = token.slice(0, dotIdx);
         const sigB64 = token.slice(dotIdx + 1);
 
-        // Re-derive expected signature.
+        // Verify signature using the runtime's constant-time HMAC verify (no length oracle).
         const key = await importHmacKey(secret);
-        const expectedSig = new Uint8Array(
-            await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payloadStr)),
-        );
-
-        // Constant-time compare.
-        const receivedSig = fromBase64Url(sigB64);
-        if (!constantTimeEqual(expectedSig, receivedSig)) return null;
+        const sigBytes = fromBase64Url(sigB64);
+        const ok = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(payloadStr));
+        if (!ok) return null;
 
         // Decode payload.
         const payload: TokenPayload = JSON.parse(
