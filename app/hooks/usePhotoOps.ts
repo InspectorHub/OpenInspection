@@ -245,8 +245,8 @@ export function usePhotoOps(ctx: {
       // · delete (the MediaViewer toolbar enforces this). Poster opens the picker;
       // delete removes the Stream video + detaches the entry; cover/caption fall
       // through to the shared handlers (cover stores the poster image reference).
-      if (photo.mediaType === "video" && photo.streamUid) {
-        if (action === "poster") {
+      if (photo.mediaType === "video") {
+        if (action === "poster" && photo.streamUid) {
           setPosterTarget({
             streamUid: photo.streamUid,
             durationSec: photo.durationSec ?? 0,
@@ -256,10 +256,15 @@ export function usePhotoOps(ctx: {
         }
         if (action === "delete") {
           patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
-          fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(photo.streamUid)}`, {
-            method: "DELETE",
-            credentials: "include",
-          }).then(() => revalidator.revalidate());
+          // Route delete by provider — DELETE /{id}/media/video/{ref} accepts a
+          // Stream UID or an R2 mediaId and resolves the backend per provider.
+          const videoRef = photo.provider === "r2" ? photo.mediaId : photo.streamUid;
+          if (videoRef) {
+            fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(videoRef)}`, {
+              method: "DELETE",
+              credentials: "include",
+            }).then(() => revalidator.revalidate());
+          }
           return;
         }
         // cover / caption fall through to the photo handlers below (they address by

@@ -50,14 +50,21 @@ async function seedTenant() {
     });
 }
 
-async function seedVideoMode(videoMode: 'r2' | 'stream') {
+async function seedVideoMode(videoMode: 'r2' | 'stream', streamCustomerSubdomain?: string) {
+    // 'stream' resolves only when a non-empty subdomain is also configured
+    // (mirrors resolveVideoBackend's fail-closed requirement); otherwise the
+    // client must fall back to 'r2'.
+    const integrationConfig = streamCustomerSubdomain
+        ? JSON.stringify({ streamCustomerSubdomain })
+        : null;
     await testDb.insert(schema.tenantConfigs).values({
         tenantId: TENANT_ID,
         videoMode,
+        integrationConfig,
         updatedAt: new Date(),
     }).onConflictDoUpdate({
         target: schema.tenantConfigs.tenantId,
-        set: { videoMode, updatedAt: new Date() },
+        set: { videoMode, integrationConfig, updatedAt: new Date() },
     });
 }
 
@@ -103,9 +110,9 @@ function buildApp(hasStream: boolean) {
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 describe('session-context videoProvider — self-host resolution', () => {
-    it('videoMode=stream + STREAM binding present → videoProvider=stream', async () => {
+    it('videoMode=stream + STREAM binding + subdomain → videoProvider=stream', async () => {
         await seedTenant();
-        await seedVideoMode('stream');
+        await seedVideoMode('stream', 'customer-abc');
 
         const res = await buildApp(true).request('/api/session/context');
         expect(res.status).toBe(200);
@@ -113,9 +120,19 @@ describe('session-context videoProvider — self-host resolution', () => {
         expect(body.data.videoProvider).toBe('stream');
     });
 
+    it('videoMode=stream + STREAM binding present but NO subdomain → videoProvider=r2 (fail-safe; resolver would 503)', async () => {
+        await seedTenant();
+        await seedVideoMode('stream'); // no subdomain configured
+
+        const res = await buildApp(true).request('/api/session/context');
+        expect(res.status).toBe(200);
+        const body = await res.json() as { data: { videoProvider: string } };
+        expect(body.data.videoProvider).toBe('r2');
+    });
+
     it('videoMode=stream + NO STREAM binding → videoProvider=r2 (fail-safe)', async () => {
         await seedTenant();
-        await seedVideoMode('stream');
+        await seedVideoMode('stream', 'customer-abc'); // subdomain set; binding is the sole missing piece
 
         const res = await buildApp(false).request('/api/session/context');
         expect(res.status).toBe(200);

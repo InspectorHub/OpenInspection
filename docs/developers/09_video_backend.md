@@ -16,8 +16,8 @@ Video clips are stored directly in the `PHOTOS` R2 bucket alongside field photos
 ### Key shape (R2)
 
 ```
-videos/{tenantId}/{inspectionId}/{mediaId}.{ext}          — clip
-videos/{tenantId}/{inspectionId}/{mediaId}.poster.jpg     — poster frame
+{tenantId}/inspections/{inspectionId}/videos/{mediaId}.{ext}          — clip
+{tenantId}/inspections/{inspectionId}/videos/{mediaId}.poster.jpg     — poster frame
 ```
 
 Defined in `server/lib/r2-keys.ts` (`r2Keys.inspectionVideo` / `r2Keys.inspectionVideoPoster`).

@@ -69,6 +69,53 @@ describe('selectReportMedia — video entries (pdf)', () => {
     });
 });
 
+describe('selectReportMedia — R2 video entries', () => {
+    const r2ctx = { ...ctx, r2BaseUrl: '/api/inspections/insp1/media/video' };
+
+    it('web: provider=r2 resolves to a native player (poster + clip URL), NOT dropped', () => {
+        const r = selectReportMedia(
+            { key: 'v', mediaType: 'video', provider: 'r2', mediaId: 'm1', posterKey: 'p/k', durationSec: 8, url: '' },
+            r2ctx,
+        );
+        expect(r).toEqual({
+            kind: 'r2-video-player',
+            mediaId: 'm1',
+            posterUrl: '/api/inspections/insp1/media/video/r2-object/m1/poster',
+            playerSrc: '/api/inspections/insp1/media/video/r2-object/m1',
+            durationSec: 8,
+        });
+    });
+
+    it('pdf: provider=r2 degrades to a poster image only (cannot embed video)', () => {
+        const r = selectReportMedia(
+            { key: 'v', mediaType: 'video', provider: 'r2', mediaId: 'm1', posterKey: 'p/k', durationSec: 8, url: '' },
+            { ...r2ctx, isPdf: true },
+        );
+        expect(r).toEqual({
+            kind: 'r2-video-poster',
+            mediaId: 'm1',
+            posterUrl: '/api/inspections/insp1/media/video/r2-object/m1/poster',
+            durationSec: 8,
+        });
+    });
+
+    it('a streamUid-less video with a mediaId is inferred as R2 (no explicit provider)', () => {
+        const r = selectReportMedia(
+            { key: 'v', mediaType: 'video', mediaId: 'm2', url: '' },
+            r2ctx,
+        );
+        expect(r.kind).toBe('r2-video-player');
+    });
+
+    it('provider=r2 with NO r2BaseUrl fails closed to an image (never throws, never fabricates)', () => {
+        const r = selectReportMedia(
+            { key: 'v', mediaType: 'video', provider: 'r2', mediaId: 'm1', url: '/fallback' },
+            ctx, // no r2BaseUrl
+        );
+        expect(r.kind).toBe('image');
+    });
+});
+
 describe('selectReportMedia — graceful fail-closed (no subdomain)', () => {
     it('a video with no subdomain falls back to an image branch and never throws', () => {
         const r = selectReportMedia(

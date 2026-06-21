@@ -1,17 +1,19 @@
 /**
- * Unit tests for the R2 video object serve routes added to media-studio.ts.
+ * Unit tests for the R2 video object serve routes.
  *
  * Routes under test:
  *   GET /:id/media/video/r2-object/:mediaId         — full + Range serve
  *   GET /:id/media/video/r2-object/:mediaId/poster  — poster serve
  *
- * Strategy: build a minimal Hono app that replicates the route handler logic
- * from media-studio.ts with an in-memory D1 stub and R2 bucket stub. We
- * close over the stubs directly (avoiding c.env assignment issues in test
- * environments) and inject tenantId via a test header.
+ * Strategy: mount the REAL registerR2VideoRoutes handler on a minimal
+ * OpenAPIHono app with stubbed c.env.DB + c.env.PHOTOS. This means
+ * the token-guard, MIME, Range, and tenant-isolation assertions
+ * exercise the shipped code, not a copy of it.
  */
 import { describe, it, expect } from 'vitest';
-import { Hono } from 'hono';
+import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HonoConfig } from '../../server/types/hono';
+import { registerR2VideoRoutes } from '../../server/api/inspections/media-video-r2';
 import { r2Keys } from '../../server/lib/r2-keys';
 
 // ── In-memory R2 stub ─────────────────────────────────────────────────────────
@@ -76,8 +78,8 @@ function makeR2Stub() {
 
 // ── In-memory D1 stub ─────────────────────────────────────────────────────────
 //
-// Stores pool rows in memory. The stub handles the prepare().bind().raw()
-// path that Drizzle uses for .get() queries.
+// Drizzle's D1 adapter uses prepare().bind().first() for .get() queries.
+// The stub returns column-name-keyed objects so Drizzle can map them.
 
 interface PoolRow {
     id: string;
@@ -91,33 +93,58 @@ interface PoolRow {
 function makeD1Stub(rows: PoolRow[]): D1Database {
     return {
         prepare: (sql: string) => {
-            const upper = sql.trim().toUpperCase();
             return {
                 bind: (...args: unknown[]) => ({
-                    first: async () => null,
-                    all: async () => ({ results: [], meta: {}, success: true }),
-                    raw: async () => {
-                        if (!upper.startsWith('SELECT')) return [];
+                    first: async () => {
+                        const upper = sql.trim().toUpperCase();
+                        if (!upper.startsWith('SELECT')) return null;
 
                         // Match rows where string args include the row's id AND tenantId.
                         const stringArgs = args.filter((a): a is string => typeof a === 'string');
+                        const matched = rows.find(row =>
+                            stringArgs.includes(row.id) && stringArgs.includes(row.tenantId),
+                        );
+                        if (!matched) return null;
 
+                        // Drizzle maps snake_case DB column names from D1's first() result.
+                        // Return an object with all possible columns so Drizzle's column
+                        // mapping works regardless of which columns are SELECTed.
+                        return {
+                            id: matched.id,
+                            tenant_id: matched.tenantId,
+                            r2_key: matched.r2Key,
+                            poster_key: matched.posterKey,
+                            provider: matched.provider,
+                            media_type: matched.mediaType,
+                        };
+                    },
+                    all: async () => ({ results: [], meta: {}, success: true }),
+                    raw: async () => {
+                        const upper = sql.trim().toUpperCase();
+                        if (!upper.startsWith('SELECT')) return [];
+                        const stringArgs = args.filter((a): a is string => typeof a === 'string');
                         const matched = rows.find(row =>
                             stringArgs.includes(row.id) && stringArgs.includes(row.tenantId),
                         );
                         if (!matched) return [];
-
-                        // Return appropriate columns based on what the SELECT asks for.
-                        if (sql.includes('poster_key') && sql.includes('r2_key')) {
-                            return [[matched.r2Key, matched.posterKey]];
-                        }
-                        if (sql.includes('poster_key')) {
-                            return [[matched.posterKey]];
-                        }
-                        if (sql.includes('r2_key')) {
-                            return [[matched.r2Key]];
-                        }
-                        return [[matched.id]];
+                        // Drizzle's .get() consumes .raw() POSITIONALLY, so the tuple
+                        // must follow the actual SELECT column order (the clip route
+                        // selects r2_key, the poster route selects poster_key) — a
+                        // fixed [r2_key, poster_key] tuple silently serves the wrong key.
+                        const colMap: Record<string, unknown> = {
+                            id: matched.id,
+                            tenant_id: matched.tenantId,
+                            r2_key: matched.r2Key,
+                            poster_key: matched.posterKey,
+                            provider: matched.provider,
+                            media_type: matched.mediaType,
+                        };
+                        const fromIdx = upper.indexOf(' FROM ');
+                        const selectClause = sql.slice(6, fromIdx >= 0 ? fromIdx : undefined);
+                        const cols = Object.keys(colMap)
+                            .filter(col => selectClause.includes(`"${col}"`))
+                            .sort((a, b) => selectClause.indexOf(`"${a}"`) - selectClause.indexOf(`"${b}"`));
+                        return [cols.map(col => colMap[col])];
                     },
                     run: async () => ({ meta: {}, success: true }),
                 }),
@@ -129,128 +156,29 @@ function makeD1Stub(rows: PoolRow[]): D1Database {
     } as unknown as D1Database;
 }
 
-// ── Route logic (replicates media-studio.ts handlers) ────────────────────────
-//
-// We inline the handler logic here so the test file does not depend on
-// importing media-studio.ts (which pulls in the full OpenAPIHono chain and the
-// service injection graph). The logic is verbatim-equivalent to the
-// production handlers.
+// ── App factory — mounts REAL registered routes ───────────────────────────────
 
 function buildServeApp(
     d1: D1Database,
     photos: ReturnType<typeof makeR2Stub>,
 ) {
-    const app = new Hono<{ Variables: { tenantId: string } }>();
+    const app = new OpenAPIHono<HonoConfig>();
 
-    // Inject tenantId from a test-only header (simulates JWT middleware).
+    // Inject tenantId + stubbed env before every request.
     app.use('*', async (c, next) => {
         const tenant = c.req.header('x-test-tenant') ?? 'unknown';
         c.set('tenantId', tenant);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (c as any).env = {
+            DB: d1,
+            PHOTOS: photos,
+            JWT_SECRET: 'test-secret',
+        };
         await next();
     });
 
-    // GET /:id/media/video/r2-object/:mediaId
-    app.get('/:id/media/video/r2-object/:mediaId', async (c) => {
-        const tenantId = c.get('tenantId');
-        const mediaId = c.req.param('mediaId');
-
-        const raw = await d1
-            .prepare(
-                `select r2_key from inspection_media_pool where id = ? and tenant_id = ? and provider = 'r2' and media_type = 'video'`,
-            )
-            .bind(mediaId, tenantId)
-            .raw<[string]>();
-
-        if (!raw || raw.length === 0) {
-            return c.json({ error: 'Video not found' }, 404);
-        }
-
-        const r2Key = raw[0][0];
-        const rangeHeader = c.req.header('Range');
-
-        if (rangeHeader) {
-            const rangeMatch = /^bytes=(\d+)-(\d*)$/.exec(rangeHeader.trim());
-            if (!rangeMatch) {
-                return new Response('Invalid Range', { status: 416 });
-            }
-            const start = parseInt(rangeMatch[1], 10);
-            const endStr = rangeMatch[2];
-
-            const obj = await photos.get(r2Key, {
-                range: endStr
-                    ? { offset: start, length: parseInt(endStr, 10) - start + 1 }
-                    : { offset: start },
-            });
-            if (!obj) {
-                return c.json({ error: 'Video not found in storage' }, 404);
-            }
-
-            const contentType = obj.httpMetadata?.contentType ?? 'video/mp4';
-            const end = endStr ? parseInt(endStr, 10) : obj.size - 1;
-            const contentLength = end - start + 1;
-
-            return new Response(obj.body, {
-                status: 206,
-                headers: {
-                    'Content-Type': contentType,
-                    'Content-Range': `bytes ${start}-${end}/${obj.size}`,
-                    'Content-Length': String(contentLength),
-                    'Accept-Ranges': 'bytes',
-                },
-            });
-        }
-
-        // Full-object request.
-        const obj = await photos.get(r2Key);
-        if (!obj) {
-            return c.json({ error: 'Video not found in storage' }, 404);
-        }
-
-        const contentType = obj.httpMetadata?.contentType ?? 'video/mp4';
-
-        return new Response(obj.body, {
-            status: 200,
-            headers: {
-                'Content-Type': contentType,
-                'Content-Length': String(obj.size),
-                'Accept-Ranges': 'bytes',
-            },
-        });
-    });
-
-    // GET /:id/media/video/r2-object/:mediaId/poster
-    app.get('/:id/media/video/r2-object/:mediaId/poster', async (c) => {
-        const tenantId = c.get('tenantId');
-        const mediaId = c.req.param('mediaId');
-
-        const raw = await d1
-            .prepare(
-                `select poster_key from inspection_media_pool where id = ? and tenant_id = ? and provider = 'r2'`,
-            )
-            .bind(mediaId, tenantId)
-            .raw<[string | null]>();
-
-        if (!raw || raw.length === 0 || !raw[0][0]) {
-            return c.json({ error: 'Poster not found' }, 404);
-        }
-
-        const pk = raw[0][0];
-        const obj = await photos.get(pk);
-        if (!obj) {
-            return c.json({ error: 'Poster not found in storage' }, 404);
-        }
-
-        const contentType = obj.httpMetadata?.contentType ?? 'image/jpeg';
-
-        return new Response(obj.body, {
-            status: 200,
-            headers: {
-                'Content-Type': contentType,
-                'Content-Length': String(obj.size),
-                'Cache-Control': 'public, max-age=86400',
-            },
-        });
-    });
+    // Register the REAL R2 route handlers.
+    registerR2VideoRoutes(app);
 
     return app;
 }

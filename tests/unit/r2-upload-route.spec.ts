@@ -5,16 +5,16 @@
  *   POST /:id/media/video/r2-upload         — video multipart upload
  *   POST /:id/media/video/r2-upload-poster  — poster JPEG upload
  *
- * Strategy: build a minimal Hono app that replicates the route handler logic
- * from media-video-r2.ts with an in-memory R2 stub, a real verifyUploadToken
- * call (same HMAC key), and tenantId injected via a test header (simulating JWT
- * middleware). Tests focus on the three token-guard failure modes and the
- * empty-MIME rejection introduced by the security fixes.
+ * Strategy: mount the REAL registerR2VideoRoutes handler on a minimal
+ * OpenAPIHono app with stubbed c.env.DB + c.env.PHOTOS. Token guard,
+ * MIME validation, and size checks all exercise the shipped code, not
+ * an inline copy of it.
  */
 import { describe, it, expect } from 'vitest';
-import { Hono } from 'hono';
-import { signUploadToken, verifyUploadToken } from '../../server/lib/video-upload-token';
-import { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, mimeToExt } from '../../server/api/inspections/media-video-r2';
+import { OpenAPIHono } from '@hono/zod-openapi';
+import type { HonoConfig } from '../../server/types/hono';
+import { signUploadToken } from '../../server/lib/video-upload-token';
+import { ALLOWED_VIDEO_MIMES, MAX_VIDEO_BYTES, mimeToExt, registerR2VideoRoutes } from '../../server/api/inspections/media-video-r2';
 import { r2Keys } from '../../server/lib/r2-keys';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -33,6 +33,12 @@ interface FakeR2Entry {
     contentType: string;
 }
 
+interface FakeR2Object {
+    body: ReadableStream;
+    size: number;
+    httpMetadata?: { contentType?: string };
+}
+
 function makeR2Stub() {
     const store = new Map<string, FakeR2Entry>();
 
@@ -46,100 +52,67 @@ function makeR2Stub() {
         return {};
     }
 
-    return { store, put } as {
+    async function get(
+        key: string,
+        _options?: { range?: { offset: number; length?: number } },
+    ): Promise<FakeR2Object | null> {
+        const entry = store.get(key);
+        if (!entry) return null;
+        const captured = entry.bytes;
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(captured);
+                controller.close();
+            },
+        });
+        return { body: stream, size: entry.bytes.length, httpMetadata: { contentType: entry.contentType } };
+    }
+
+    return { store, put, get } as {
         store: Map<string, FakeR2Entry>;
         put: typeof put;
+        get: typeof get;
     };
 }
 
-// ── Build the upload app ──────────────────────────────────────────────────────
-//
-// Replicates the handler logic from registerR2VideoRoutes() for both upload
-// routes. Closing over the R2 stub directly avoids needing a full HonoConfig
-// env. The JWT_SECRET is a closure value — same contract as the real route.
+// ── Minimal D1 stub (upload routes never query D1, but c.env.DB is typed) ─────
+
+function makeMinimalD1Stub(): D1Database {
+    return {
+        prepare: () => ({
+            bind: () => ({
+                first: async () => null,
+                all: async () => ({ results: [], meta: {}, success: true }),
+                raw: async () => [],
+                run: async () => ({ meta: {}, success: true }),
+            }),
+        }) as ReturnType<D1Database['prepare']>,
+        exec: async () => ({ count: 0, duration: 0 }),
+        batch: async () => [],
+        dump: async () => new ArrayBuffer(0),
+    } as unknown as D1Database;
+}
+
+// ── App factory — mounts REAL registered routes ───────────────────────────────
 
 function buildUploadApp(photos: ReturnType<typeof makeR2Stub>) {
-    const app = new Hono<{ Variables: { tenantId: string } }>();
+    const app = new OpenAPIHono<HonoConfig>();
 
-    // Inject tenantId from a test-only header (simulates JWT middleware).
+    // Inject tenantId from a test-only header and stub env (simulates JWT middleware).
     app.use('*', async (c, next) => {
         const tenant = c.req.header('x-test-tenant') ?? 'unknown';
         c.set('tenantId', tenant);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (c as any).env = {
+            DB: makeMinimalD1Stub(),
+            PHOTOS: photos,
+            JWT_SECRET,
+        };
         await next();
     });
 
-    // POST /:id/media/video/r2-upload
-    app.post('/:id/media/video/r2-upload', async (c) => {
-        const id = c.req.param('id');
-        const tenantId = c.get('tenantId');
-
-        const tokenStr = c.req.query('token') ?? '';
-        const claims = await verifyUploadToken(tokenStr, JWT_SECRET);
-        if (!claims || claims.inspectionId !== id || claims.tenantId !== tenantId) {
-            return c.json({ error: 'Invalid or expired upload token' }, 401);
-        }
-
-        const formData = await c.req.parseBody();
-        const file = formData['file'] as File | undefined;
-        if (!file) {
-            return c.json({ error: 'file field required' }, 400);
-        }
-
-        const mime = file.type;
-        if (!mime || !ALLOWED_VIDEO_MIMES.has(mime)) {
-            return c.json({ error: 'Missing or unsupported video type. Allowed: mp4, mov, webm.' }, 400);
-        }
-
-        if (file.size > MAX_VIDEO_BYTES) {
-            return c.json({ error: `File exceeds the 200 MB limit (got ${Math.round(file.size / 1024 / 1024)} MB).` }, 413);
-        }
-
-        const { mediaId } = claims;
-        const ext = mimeToExt(mime);
-        const r2Key = r2Keys.inspectionVideo(tenantId, claims.inspectionId, mediaId, ext);
-
-        const bytes = await file.arrayBuffer();
-        await photos.put(r2Key, bytes, {
-            httpMetadata: { contentType: mime },
-            customMetadata: { tenantId, inspectionId: claims.inspectionId, mediaId },
-        });
-
-        return c.json({ success: true, data: { mediaId, r2Key } }, 200);
-    });
-
-    // POST /:id/media/video/r2-upload-poster
-    app.post('/:id/media/video/r2-upload-poster', async (c) => {
-        const id = c.req.param('id');
-        const tenantId = c.get('tenantId');
-
-        const tokenStr = c.req.query('token') ?? '';
-        const claims = await verifyUploadToken(tokenStr, JWT_SECRET);
-        if (!claims || claims.inspectionId !== id || claims.tenantId !== tenantId) {
-            return c.json({ error: 'Invalid or expired upload token' }, 401);
-        }
-
-        const formData = await c.req.parseBody();
-        const file = formData['file'] as File | undefined;
-        if (!file) {
-            return c.json({ error: 'file field required' }, 400);
-        }
-
-        const mime = file.type;
-        if (!mime || !mime.startsWith('image/')) {
-            return c.json({ error: 'Missing or unsupported poster type. JPEG image required.' }, 400);
-        }
-
-        const { mediaId } = claims;
-        const posterKey = r2Keys.inspectionVideoPoster(tenantId, claims.inspectionId, mediaId);
-
-        const bytes = await file.arrayBuffer();
-        await photos.put(posterKey, bytes, {
-            httpMetadata: { contentType: mime },
-            customMetadata: { tenantId, inspectionId: claims.inspectionId, mediaId },
-        });
-
-        return c.json({ success: true, data: { posterKey } }, 200);
-    });
+    // Register the REAL R2 route handlers.
+    registerR2VideoRoutes(app);
 
     return app;
 }

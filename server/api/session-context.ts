@@ -88,11 +88,28 @@ export const sessionContextRoutes = createApiRouter()
                     videoProvider = paid ? 'stream' : 'r2';
                 } else {
                     const cfgRow = await db
-                        .select({ videoMode: tenantConfigs.videoMode })
+                        .select({ videoMode: tenantConfigs.videoMode, integrationConfig: tenantConfigs.integrationConfig })
                         .from(tenantConfigs)
                         .where(eq(tenantConfigs.tenantId, tenantId))
                         .get();
-                    videoProvider = (cfgRow?.videoMode as 'r2' | 'stream' | null) === 'stream' && !!c.env.STREAM ? 'stream' : 'r2';
+                    const videoModeRaw = (cfgRow?.videoMode as 'r2' | 'stream' | null) ?? null;
+                    if (videoModeRaw === 'stream' && !!c.env.STREAM) {
+                        // Mirror resolveVideoBackend: also require a non-empty
+                        // streamCustomerSubdomain, otherwise create-upload throws 503.
+                        let streamSubdomain = '';
+                        const rawCfg = (cfgRow as unknown as { integrationConfig?: string | null } | null)?.integrationConfig ?? null;
+                        if (rawCfg) {
+                            try {
+                                const parsed = JSON.parse(rawCfg) as Record<string, unknown>;
+                                if (typeof parsed.streamCustomerSubdomain === 'string') {
+                                    streamSubdomain = parsed.streamCustomerSubdomain;
+                                }
+                            } catch { /* ignore parse error — treat as empty */ }
+                        }
+                        videoProvider = streamSubdomain ? 'stream' : 'r2';
+                    } else {
+                        videoProvider = 'r2';
+                    }
                 }
             } catch (e) {
                 logger.warn('[session-context] videoProvider resolution failed', { error: (e as Error).message });
