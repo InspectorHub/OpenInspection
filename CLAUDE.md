@@ -144,6 +144,8 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook HMAC verification |
 | `GOOGLE_PLACES_API_KEY` | No | Google Places API key powering address autocomplete on the dashboard new-inspection wizard and the public `/book` page (proxied via `/api/places/*` and `/public/geocode`). When unset, both endpoints return `{ data: [], reason: 'NO_API_KEY' }` and the address inputs degrade gracefully to plain text — the customer can still type a free-form address and submit. |
 | `ESTATED_API_KEY` | No | Estated.io public-records key for the `POST /api/inspections/:id/property-facts/autofill` endpoint. Resolves year built / sqft / foundation / lot size / bedrooms / bathrooms by address. When unset, the endpoint returns `{ data: null, reason: 'NO_API_KEY' }` and the Property Facts card displays a polite "auto-fill not configured" hint while still accepting manual entry. Same graceful-degrade pattern as `GOOGLE_PLACES_API_KEY`. |
+| `STREAM` | No | Cloudflare Stream binding (binding name `STREAM`). Required only when the video backend is set to Stream (self-host: Settings → Integrations → Video; SaaS: paid tier). Absent in the default R2 configuration. |
+| `STREAM_CUSTOMER_SUBDOMAIN` | No | Your Cloudflare Stream customer subdomain (e.g. `customer-abc123`, the prefix before `.cloudflarestream.com`). Required in SaaS mode for paid tenants (plan-gated; free/trial tenants use R2). In self-host mode this is stored per-tenant in `integrationConfig` via Settings → Integrations → Video, not as an env var. |
 
 ---
 

@@ -72,7 +72,7 @@ export const videoCreateUploadRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/media/video/create-upload',
     tags: ["inspections"],
-    summary: 'Mint a video upload URL (Cloudflare Stream or R2 depending on tenant plan)',
+    summary: 'Mint a video upload URL (Stream or R2 backend)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({ id: z.string().uuid().describe('Inspection id') }).describe('Path params'),
