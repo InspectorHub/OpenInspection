@@ -93,7 +93,10 @@ export async function verifyUploadToken(
 
         // Verify signature using the runtime's constant-time HMAC verify (no length oracle).
         const key = await importHmacKey(secret);
-        const sigBytes = fromBase64Url(sigB64);
+        // Cast through ArrayBuffer to satisfy the strict Uint8Array<ArrayBuffer> type
+        // expected by crypto.subtle.verify (tsc strict mode narrows ArrayBufferLike
+        // which Uint8Array normally carries, but the runtime accepts any Uint8Array).
+        const sigBytes = fromBase64Url(sigB64).buffer as ArrayBuffer;
         const ok = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(payloadStr));
         if (!ok) return null;
 

@@ -2,7 +2,7 @@ import {} from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
-import { users } from '../lib/db/schema';
+import { users, tenantConfigs, tenants } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
@@ -69,6 +69,36 @@ export const sessionContextRoutes = createApiRouter()
             }
         }
 
+        // Resolve the video backend provider for this tenant. Used by the
+        // inspection editor to render the correct VideoCapture/VideoPlayer branch.
+        let videoProvider: 'r2' | 'stream' = 'r2';
+        if (tenantId) {
+            try {
+                const db = drizzle(c.env.DB);
+                const isSaas = c.env.APP_MODE === 'saas';
+                if (isSaas) {
+                    const tenantRow = await db
+                        .select({ tier: tenants.tier, status: tenants.status })
+                        .from(tenants)
+                        .where(eq(tenants.id, tenantId))
+                        .get();
+                    const tier = tenantRow?.tier ?? 'free';
+                    const status = tenantRow?.status ?? 'pending';
+                    const paid = (tier === 'pro' || tier === 'enterprise') && status !== 'trial';
+                    videoProvider = paid ? 'stream' : 'r2';
+                } else {
+                    const cfgRow = await db
+                        .select({ videoMode: tenantConfigs.videoMode })
+                        .from(tenantConfigs)
+                        .where(eq(tenantConfigs.tenantId, tenantId))
+                        .get();
+                    videoProvider = (cfgRow?.videoMode as 'r2' | 'stream' | null) === 'stream' ? 'stream' : 'r2';
+                }
+            } catch (e) {
+                logger.warn('[session-context] videoProvider resolution failed', { error: (e as Error).message });
+            }
+        }
+
         const privacyUrl = (c.env as unknown as Record<string, string | undefined>).PRIVACY_URL?.trim() || null;
 
         return c.json({
@@ -99,6 +129,7 @@ export const sessionContextRoutes = createApiRouter()
                     hasSeatQuota: profile.hasSeatQuota || false,
                 },
                 seatUsage,
+                videoProvider,
             },
         });
     });

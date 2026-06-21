@@ -96,7 +96,7 @@ export function usePhotoOps(ctx: {
   /* Task 8 — read an item's stored photos[] (item-level bucket) from the live
    * results map. Item photos are `{ key; croppedKey?; crop?; annotatedKey?; annotationsJson? }`. */
   type ItemCrop = { aspect: string; orientation: "landscape" | "portrait"; x: number; y: number; width: number; height: number };
-  type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; streamUid?: string; posterPct?: number; durationSec?: number };
+  type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; provider?: "stream" | "r2"; streamUid?: string; mediaId?: string; posterPct?: number; durationSec?: number };
   const getItemPhotos = useCallback(
     (itemId: string): ItemPhoto[] => {
       const r = findings.getResult(itemId, state.sectionIdForItem(itemId) ?? undefined);
@@ -122,9 +122,11 @@ export function usePhotoOps(ctx: {
           annotated: !!p.annotatedKey,
           originalKey: p.key,
           croppedKey: p.croppedKey,
-          // Plan 7 — carry the media kind so the viewer/strip branch on video.
+          // Plan 7 — carry the media kind + provider so the viewer/strip can branch.
           mediaType: p.mediaType,
+          provider: p.provider,
           streamUid: p.streamUid,
+          mediaId: p.mediaId,
           posterPct: p.posterPct,
           durationSec: p.durationSec,
         };
