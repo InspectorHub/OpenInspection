@@ -17,7 +17,9 @@ import { r2Keys } from '../../lib/r2-keys';
  */
 function mediaIdFromKey(key: string): string | null {
     // New convention: …/photos/{mediaId}.{ext}
-    const m = /\/photos\/([^/]+)\.[^/.]+$/.exec(key);
+    // Stem capture disallows dots so that derivative keys (e.g. MED.annotated.png)
+    // return null rather than a corrupted stem like "MED.annotated".
+    const m = /\/photos\/([^/.]+)\.[^/.]+$/.exec(key);
     if (m) return m[1];
     return null;
 }
