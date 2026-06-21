@@ -28,7 +28,7 @@ vi.mock('../../server/lib/rate-limit', () => ({
 
 import {
     TENANT_ID, INSP_ID, AGR_ID, JWT_SECRET, FAKE_ENV,
-    makeExecCtx, buildApp, seedBase, createTwoSignerEnvelope, SIG, postSign,
+    makeExecCtx, buildApp, seedBase, createTwoSignerEnvelope, SIG, postSign, postAgreementRequest,
 } from './helpers/inspection-sign-unification-setup';
 
 describe('in-app on-site signing rides the envelope (Track I-a Task 5)', () => {
@@ -294,5 +294,95 @@ describe('in-app on-site signing rides the envelope (Track I-a Task 5)', () => {
         expect(signerSignedCall).toBeTruthy();
         // Fourth argument is the payload object.
         expect(signerSignedCall![3]).toMatchObject({ channel: 'in_person' });
+    });
+});
+
+describe('POST /:id/agreement-requests routes through findOrCreate (Task 2)', () => {
+    let db: BetterSQLite3Database<typeof schema>;
+    let sqlite: any;
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db as BetterSQLite3Database<typeof schema>;
+        sqlite = setup.sqlite;
+        await setupSchema(sqlite);
+        (mockDrizzle as any).mockReturnValue(db);
+    });
+
+    afterEach(() => sqlite.close());
+
+    // T2-1 — happy path: creates a 1-signer envelope, status sent, emails client
+    it('creates a 1-signer envelope (findOrCreate), returns sent status, emails the client', async () => {
+        await seedBase(db);
+        const emailAgreementRequest = vi.fn().mockResolvedValue(undefined);
+        const { app } = buildApp(db, { emailAgreementRequest });
+        const { ctx } = makeExecCtx();
+
+        const res = await app.request(
+            `/${INSP_ID}/agreement-requests`,
+            postAgreementRequest(),
+            FAKE_ENV,
+            ctx,
+        );
+        expect(res.status).toBe(200);
+        const body = await res.json() as any;
+        expect(body.success).toBe(true);
+        expect(body.data.status).toBe('sent');
+        expect(body.data.clientEmail).toBe('jane@test.com');
+        expect(body.data.id).toBeTruthy();
+
+        // A 1-signer envelope row + 1 signer row must exist
+        const { agreementRequests, agreementSigners } = schema;
+        const { eq } = await import('drizzle-orm');
+        const reqs = await db.select().from(agreementRequests)
+            .where(eq(agreementRequests.inspectionId, INSP_ID)).all();
+        expect(reqs.length).toBe(1);
+        expect(reqs[0].status).toBe('sent');
+
+        const signers = await db.select().from(agreementSigners)
+            .where(eq(agreementSigners.requestId, reqs[0].id)).all();
+        expect(signers.length).toBe(1);
+        expect(signers[0].email).toBe('jane@test.com');
+        expect(signers[0].role).toBe('client');
+
+        // Client must receive the agreement email with a per-signer token URL
+        expect(emailAgreementRequest).toHaveBeenCalledTimes(1);
+        const [toEmail, , agreementName, signUrl] = emailAgreementRequest.mock.calls[0];
+        expect(toEmail).toBe('jane@test.com');
+        expect(agreementName).toBe('Standard Agreement');
+        expect(signUrl).toContain('/sign/');
+    });
+
+    // T2-2 — idempotent: second call reuses the same envelope, does NOT create a second request row
+    it('second POST reuses the existing envelope (idempotent findOrCreate)', async () => {
+        await seedBase(db);
+        const { app } = buildApp(db);
+        const ctx1 = makeExecCtx();
+        const ctx2 = makeExecCtx();
+
+        await app.request(`/${INSP_ID}/agreement-requests`, postAgreementRequest(), FAKE_ENV, ctx1.ctx);
+        const res2 = await app.request(`/${INSP_ID}/agreement-requests`, postAgreementRequest(), FAKE_ENV, ctx2.ctx);
+        expect(res2.status).toBe(200);
+
+        const { agreementRequests } = schema;
+        const { eq } = await import('drizzle-orm');
+        const reqs = await db.select().from(agreementRequests)
+            .where(eq(agreementRequests.inspectionId, INSP_ID)).all();
+        expect(reqs.length).toBe(1);
+    });
+
+    // T2-3 — 422 when no template exists
+    it('422 when no agreement template configured', async () => {
+        await seedBase(db, { withTemplate: false });
+        const { app } = buildApp(db);
+        const { ctx } = makeExecCtx();
+
+        const res = await app.request(
+            `/${INSP_ID}/agreement-requests`,
+            postAgreementRequest(),
+            FAKE_ENV,
+            ctx,
+        );
+        expect(res.status).toBe(422);
     });
 });

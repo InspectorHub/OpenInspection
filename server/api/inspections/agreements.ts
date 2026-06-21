@@ -81,44 +81,42 @@ const agreementsRoutes = createApiRouter()
         const clientEmail = body.email ?? inspection.clientEmail ?? null;
         if (!clientEmail) throw Errors.UnprocessableEntity('No client email on this inspection. Add a client email or enter one to send.');
 
-        // Create the signing request (tenant-scoped inside the service).
-        const request = await c.var.services.agreement.createSigningRequest(tenantId, {
-            agreementId: agreement.id,
-            clientEmail,
-            clientName: inspection.clientName ?? null,
-            inspectionId: id,
+        // One send model: create (or reuse) the inspection's envelope with the
+        // client as a single signer, then email that signer their persistent link.
+        const env = await c.var.services.agreement.findOrCreate(tenantId, id, {
+            signers: [{ name: inspection.clientName ?? clientEmail, email: clientEmail, role: 'client' }],
+            completionPolicy: 'one',
         });
 
-        // Build the public sign URL exactly like the admin send path.
-        // Use the saas-aware resolver (requestedTenantSlug is empty in saas → DB fallback).
+        const signers = await c.var.services.agreement.listSigners(tenantId, env.requestId);
+        const signer = signers[0];
+        const token = await c.var.services.agreement.getSignerLink(env.requestId, signer.id);
+
+        // Build the public sign URL. Use the saas-aware resolver
+        // (requestedTenantSlug is empty in saas → DB fallback).
         const slug = await resolveTenantSlug(c, tenantId);
-        const signUrl = agreementSignUrl(getBookingHost(c), slug, request.token);
+        const signUrl = agreementSignUrl(getBookingHost(c), slug, token);
 
         // Sign the email with the assigned inspector's rebooking footer (B-4a).
         const sigInspector = await resolveSignatureInspector(c, inspection.inspectorId, tenantId);
         await c.var.services.email.sendAgreementRequest(
-            clientEmail, inspection.clientName ?? null, request.agreementName, signUrl, sigInspector, getBookingHost(c),
+            clientEmail, inspection.clientName ?? null, agreement.name, signUrl, sigInspector, getBookingHost(c),
         );
 
-        // Flip the row to 'sent' (the admin path stamps a request.sent audit
-        // event; the hub surfaces row status directly, so we persist it).
-        const sentAt = new Date();
-        await db.update(agreementRequests)
-            .set({ status: 'sent', sentAt })
-            .where(and(eq(agreementRequests.id, request.id), eq(agreementRequests.tenantId, tenantId)));
+        // findOrCreate already sets status: 'sent' — no manual update needed.
 
         auditFromContext(c, 'agreement.send', 'agreement_request', {
-            entityId: request.id,
+            entityId: env.requestId,
             metadata: { agreementId: agreement.id, clientEmail, inspectionId: id },
         });
 
         return c.json({
             success: true as const,
             data: {
-                id:          request.id,
+                id:          env.requestId,
                 status:      'sent',
                 clientEmail,
-                createdAt:   safeISODate(request.createdAt),
+                createdAt:   safeISODate(new Date()),
             },
         }, 200);
     })
