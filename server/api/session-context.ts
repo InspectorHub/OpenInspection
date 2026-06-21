@@ -92,7 +92,7 @@ export const sessionContextRoutes = createApiRouter()
                         .from(tenantConfigs)
                         .where(eq(tenantConfigs.tenantId, tenantId))
                         .get();
-                    videoProvider = (cfgRow?.videoMode as 'r2' | 'stream' | null) === 'stream' ? 'stream' : 'r2';
+                    videoProvider = (cfgRow?.videoMode as 'r2' | 'stream' | null) === 'stream' && !!c.env.STREAM ? 'stream' : 'r2';
                 }
             } catch (e) {
                 logger.warn('[session-context] videoProvider resolution failed', { error: (e as Error).message });
