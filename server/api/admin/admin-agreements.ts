@@ -244,7 +244,7 @@ export const adminAgreementsRoutes = createApiRouter()
         const completionPolicy =
             body.completionPolicy ?? (signers.length === 1 ? 'one' : 'all');
 
-        const env = await svc.findOrCreate(tenantId, inspectionId, { signers, completionPolicy });
+        const env = await svc.findOrCreate(tenantId, inspectionId, { agreementId: body.agreementId, signers, completionPolicy });
 
         const sigInspector = await lookupSenderSignature(c, tenantId);
         const signerRows = await svc.listSigners(tenantId, env.requestId);

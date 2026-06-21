@@ -84,6 +84,7 @@ const agreementsRoutes = createApiRouter()
         // One send model: create (or reuse) the inspection's envelope with the
         // client as a single signer, then email that signer their persistent link.
         const env = await c.var.services.agreement.findOrCreate(tenantId, id, {
+            agreementId: agreement.id,
             signers: [{ name: inspection.clientName ?? clientEmail, email: clientEmail, role: 'client' }],
             completionPolicy: 'one',
         });

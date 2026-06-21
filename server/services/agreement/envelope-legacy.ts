@@ -80,7 +80,7 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
         async findOrCreate(
             tenantId: string,
             inspectionId: string,
-            opts?: { signers?: SignerInput[]; completionPolicy?: 'all' | 'one' },
+            opts?: { signers?: SignerInput[]; completionPolicy?: 'all' | 'one'; agreementId?: string },
         ): Promise<{ token: string; status: string; alreadyExists: boolean; requestId: string }> {
             const db = this.getDrizzle();
             // Look for an existing non-terminal request
@@ -118,10 +118,17 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).limit(1);
             if (inspRows.length === 0) throw Errors.NotFound('Inspection not found');
             const insp = inspRows[0];
-            // Pick the tenant's first agreement template (simplest MVP)
-            const agrRows = await db.select().from(agreements)
-                .where(eq(agreements.tenantId, tenantId)).limit(1);
-            if (agrRows.length === 0) throw Errors.NotFound('No agreement template configured');
+            // Pick the agreement template: explicit id (tenant-scoped) or the tenant's first template.
+            let agrRows;
+            if (opts?.agreementId) {
+                agrRows = await db.select().from(agreements)
+                    .where(and(eq(agreements.id, opts.agreementId), eq(agreements.tenantId, tenantId))).limit(1);
+                if (agrRows.length === 0) throw Errors.NotFound('No agreement template configured');
+            } else {
+                agrRows = await db.select().from(agreements)
+                    .where(eq(agreements.tenantId, tenantId)).limit(1);
+                if (agrRows.length === 0) throw Errors.NotFound('No agreement template configured');
+            }
             const agreement = agrRows[0];
 
             // Resolve the signer set (default = single client signer from the inspection)
@@ -136,6 +143,11 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 seen.add(key);
             }
 
+            // Use the first explicit signer's email as the envelope clientEmail when provided,
+            // so callers that pass opts.signers[0].email see it reflected in the envelope row.
+            const resolvedClientEmail = opts?.signers?.[0]?.email || insp.clientEmail || '';
+            const resolvedClientName = opts?.signers?.[0]?.name ?? insp.clientName;
+
             const completionPolicy = opts?.completionPolicy ?? 'all';
             const now = new Date();
             const requestId = crypto.randomUUID();
@@ -147,8 +159,8 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 tenantId,
                 inspectionId,
                 agreementId: agreement.id,
-                clientEmail: insp.clientEmail || '',
-                clientName: insp.clientName,
+                clientEmail: resolvedClientEmail,
+                clientName: resolvedClientName,
                 // Never distributed — satisfies NOT NULL + UNIQUE on the legacy column.
                 token: crypto.randomUUID(),
                 status: 'sent' as const,
