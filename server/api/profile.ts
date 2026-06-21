@@ -8,6 +8,7 @@ import { users } from '../lib/db/schema/tenant';
 import { logger } from '../lib/logger';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { inspectorSignature } from '../lib/inspector-signature';
+import { r2Keys } from '../lib/r2-keys';
 
 /**
  * Booking #7 Sprint A — authenticated profile endpoint mounted at
@@ -233,7 +234,7 @@ export const profileRoutes = createApiRouter()
         const ext = file.type === 'image/jpeg' ? 'jpg' : file.type === 'image/png' ? 'png' : 'webp';
         // Tenant-prefixed key keeps cross-tenant photos isolated even though the
         // serving route at /photos/:key is public — keys are unguessable + scoped.
-        const key = `tenants/${tenantId}/inspector-photos/${userId}.${ext}`;
+        const key = r2Keys.inspectorPhoto(tenantId, userId, ext);
         const buf = new Uint8Array(await file.arrayBuffer());
         await c.env.PHOTOS.put(key, buf, { httpMetadata: { contentType: file.type } });
 

@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
+import { r2Keys } from '../lib/r2-keys';
 
 /**
  * Pure download helpers exported for unit testing. The OpenAPIHono route
@@ -24,7 +25,7 @@ export async function downloadAgreementPdf(
     if (!row || row.tenantId !== tenantId || row.status !== 'signed') {
         return new Response('Not Found', { status: 404 });
     }
-    const key = `tenants/${tenantId}/agreements/${envelopeId}/signed.pdf`;
+    const key = r2Keys.agreementFile(tenantId, row.inspectionId, envelopeId, 'signed.pdf');
     const obj = await r2.get(key);
     if (!obj) return new Response('Not Found', { status: 404 });
     return new Response(obj.body, {
@@ -50,7 +51,7 @@ export async function downloadCertPdf(
     if (!row || row.tenantId !== tenantId) {
         return new Response('Not Found', { status: 404 });
     }
-    const key = `tenants/${tenantId}/agreements/${envelopeId}/certificate.pdf`;
+    const key = r2Keys.agreementFile(tenantId, row.inspectionId, envelopeId, 'certificate.pdf');
     const obj = await r2.get(key);
     if (!obj) return new Response('Not Found', { status: 404 });
     return new Response(obj.body, {
@@ -76,7 +77,7 @@ export async function downloadEvidenceZip(
     if (!row || row.tenantId !== tenantId) {
         return new Response('Not Found', { status: 404 });
     }
-    const key = `tenants/${tenantId}/agreements/${envelopeId}/evidence.zip`;
+    const key = r2Keys.agreementFile(tenantId, row.inspectionId, envelopeId, 'evidence.zip');
     const obj = await r2.get(key);
     if (!obj) return new Response('Not Found', { status: 404 });
     return new Response(obj.body, {

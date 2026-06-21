@@ -68,7 +68,7 @@ describe('downloadAgreementPdf', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/pdf');
     expect(res.headers.get('content-disposition')).toContain('signed-agreement');
-    expect(r2.get).toHaveBeenCalledWith(`tenants/${TENANT_A}/agreements/${REQ_ID}/signed.pdf`);
+    expect(r2.get).toHaveBeenCalledWith(`${TENANT_A}/inspections/${INSP_ID}/agreements/${REQ_ID}/signed.pdf`);
   });
 
   it('returns 404 when R2 object is missing', async () => {
@@ -119,7 +119,7 @@ describe('downloadCertPdf', () => {
     const res = await downloadCertPdf({} as D1Database, r2, REQ_ID, TENANT_A);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/pdf');
-    expect(r2.get).toHaveBeenCalledWith(`tenants/${TENANT_A}/agreements/${REQ_ID}/certificate.pdf`);
+    expect(r2.get).toHaveBeenCalledWith(`${TENANT_A}/inspections/${INSP_ID}/agreements/${REQ_ID}/certificate.pdf`);
   });
 
   it('returns 404 when cert R2 object missing', async () => {
@@ -171,7 +171,7 @@ describe('downloadEvidenceZip', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/zip');
     expect(res.headers.get('content-disposition')).toContain('evidence');
-    expect(r2.get).toHaveBeenCalledWith(`tenants/${TENANT_A}/agreements/${REQ_ID}/evidence.zip`);
+    expect(r2.get).toHaveBeenCalledWith(`${TENANT_A}/inspections/${INSP_ID}/agreements/${REQ_ID}/evidence.zip`);
   });
 
   it('returns 404 when evidence.zip is missing from R2', async () => {

@@ -47,7 +47,7 @@ export class DataExportService {
         const photos: PhotoEntry[] = [];
         let cursor: string | undefined;
         do {
-            const list = await this.r2.list({ prefix: `tenants/${tenantId}/`, limit: 1000, ...(cursor ? { cursor } : {}) });
+            const list = await this.r2.list({ prefix: `${tenantId}/`, limit: 1000, ...(cursor ? { cursor } : {}) });
             list.objects.forEach(o => photos.push({ key: o.key, size: o.size, included: false }));
             cursor = list.truncated ? list.cursor : undefined;
         } while (cursor);
@@ -124,7 +124,7 @@ export class DataExportService {
         const photos: PhotoEntry[] = [];
         let cursor: string | undefined;
         do {
-            const list = await this.r2.list({ prefix: `tenants/${tenantId}/`, limit: 1000, ...(cursor ? { cursor } : {}) });
+            const list = await this.r2.list({ prefix: `${tenantId}/`, limit: 1000, ...(cursor ? { cursor } : {}) });
             list.objects.forEach(o => photos.push({ key: o.key, size: o.size, included: false }));
             cursor = list.truncated ? list.cursor : undefined;
         } while (cursor);

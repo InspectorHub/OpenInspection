@@ -2,17 +2,17 @@ import { STOCK_PERIOD } from '../lib/usage/period';
 import { type MeteringService } from './metering.service';
 
 /**
- * Daily SaaS-only R2 measurement. Photo/report/message keys use `${tenantId}/...`;
- * agreements/profile/export keys use `tenants/${tenantId}/...`; branding uses
- * `branding/${tenantId}/...`. Sum all three prefixes per tenant (mutually
- * exclusive first path segments — no double counting).
+ * Daily SaaS-only R2 measurement. All tenant assets — inspection photos,
+ * client documents, branding, inspector profile photos, agreements, exports —
+ * live under the unified `${tenantId}/` prefix (R2 key convention §1).
+ * A single paginated list suffices; no multi-prefix fan-out required.
  */
 export class R2UsageService {
   constructor(private r2: R2Bucket, private metering: Pick<MeteringService, 'setGauge'>) {}
 
   async measureTenant(tenantId: string): Promise<number> {
     let bytes = 0;
-    for (const prefix of [`${tenantId}/`, `tenants/${tenantId}/`, `branding/${tenantId}/`]) {
+    for (const prefix of [`${tenantId}/`]) {
       let cursor: string | undefined;
       do {
         const list = await this.r2.list({ prefix, limit: 1000, ...(cursor ? { cursor } : {}) });

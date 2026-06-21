@@ -8,6 +8,21 @@ import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
+import { r2Keys } from '../../lib/r2-keys';
+
+/**
+ * Extract the mediaId from a new-convention R2 photo key
+ * (`{t}/inspections/{i}/photos/{mediaId}.{ext}`). Returns null when the key
+ * follows the old ad-hoc shape so callers can fall back gracefully.
+ */
+function mediaIdFromKey(key: string): string | null {
+    // New convention: …/photos/{mediaId}.{ext}
+    // Stem capture disallows dots so that derivative keys (e.g. MED.annotated.png)
+    // return null rather than a corrupted stem like "MED.annotated".
+    const m = /\/photos\/([^/.]+)\.[^/.]+$/.exec(key);
+    if (m) return m[1];
+    return null;
+}
 
 /**
  * Media annotation + crop derivative writes: PhotoStudio annotation save,
@@ -92,11 +107,6 @@ export class InspectionAnnotationsService extends InspectionSubService {
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(inspectionId, tenantId);
 
-        const annotatedKey = `${tenantId}/${inspectionId}/${itemId}_${crypto.randomUUID()}_annotated.png`;
-        await this.r2.put(annotatedKey, compositeBytes, {
-            httpMetadata: { contentType: 'image/png' }
-        });
-
         const db = this.getDrizzle();
         const [row] = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
@@ -114,6 +124,14 @@ export class InspectionAnnotationsService extends InspectionSubService {
         const entry = data[key] ?? data[itemId] ?? {};
         const photos = entry.photos ?? [];
         if (!photos[photoIndex]) throw Errors.NotFound('Photo not found at index');
+
+        // Co-locate the annotated derivative with its source photo by reusing
+        // the same mediaId. Fall back to a new UUID only for old-shape keys.
+        const sourceMediaId = mediaIdFromKey(photos[photoIndex].key) ?? crypto.randomUUID();
+        const annotatedKey = r2Keys.inspectionPhotoAnnotated(tenantId, inspectionId, sourceMediaId);
+        await this.r2.put(annotatedKey, compositeBytes, {
+            httpMetadata: { contentType: 'image/png' }
+        });
         photos[photoIndex] = { ...photos[photoIndex], annotatedKey, annotationsJson: nodesJson };
         data[key] = { ...entry, photos };
         if (key !== itemId) delete data[itemId]; // migrate on write
@@ -151,7 +169,7 @@ export class InspectionAnnotationsService extends InspectionSubService {
         await this.facade.getInspection(inspectionId, tenantId);
         const ok = await this.facade.isInspectionPhotoKey(inspectionId, tenantId, sourceKey);
         if (!ok) throw Errors.BadRequest('sourceKey does not reference a photo of this inspection');
-        const coverImageKey = `${tenantId}/${inspectionId}/cover_${crypto.randomUUID()}.jpg`;
+        const coverImageKey = r2Keys.inspectionCover(tenantId, inspectionId, crypto.randomUUID());
         await this.r2.put(coverImageKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
         const db = this.getDrizzle();
         await db.update(inspections)
@@ -179,9 +197,6 @@ export class InspectionAnnotationsService extends InspectionSubService {
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(inspectionId, tenantId);
 
-        const croppedKey = `${tenantId}/${inspectionId}/${itemId}_${crypto.randomUUID()}_cropped.jpg`;
-        await this.r2.put(croppedKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
-
         const db = this.getDrizzle();
         const [row] = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
@@ -193,6 +208,12 @@ export class InspectionAnnotationsService extends InspectionSubService {
         const entry = data[key] ?? data[itemId] ?? {};
         const photos = entry.photos ?? [];
         if (!photos[photoIndex]) throw Errors.NotFound('Photo not found at index');
+
+        // Co-locate the cropped derivative with its source photo by reusing
+        // the same mediaId. Fall back to a new UUID only for old-shape keys.
+        const sourceMediaId = mediaIdFromKey(photos[photoIndex].key) ?? crypto.randomUUID();
+        const croppedKey = r2Keys.inspectionPhotoCropped(tenantId, inspectionId, sourceMediaId);
+        await this.r2.put(croppedKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
         // Sequential layering: drop annotation (its coords are in the OLD cropped
         // space), set the new crop.
         const { annotatedKey: _a, annotationsJson: _j, ...keep } = photos[photoIndex];
