@@ -120,7 +120,12 @@ export const publicInspectorProfileRoutes = createApiRouter()
     .openapi(brandAssetRoute, async (c) => {
         const { key } = c.req.valid('query');
         if (!c.env.PHOTOS) return c.notFound();
-        if (!key.startsWith('branding/')) return c.notFound();
+        // Public brand-asset endpoint may ONLY serve branding logos (never arbitrary
+        // R2 objects). New layout: {tenantId}/branding/logo-{uuid}.{ext}; legacy:
+        // branding/{tenantId}/logo-{ts}.{ext}. Segments must be non-empty alphanumeric
+        // identifiers (no ".." path traversal).
+        const isBrandingLogo = /^[^/.][^/]*\/branding\/logo-[^/]+$/.test(key) || /^branding\/[^/.][^/]*\/logo-[^/]+$/.test(key);
+        if (!isBrandingLogo) return c.notFound();
         const obj = await c.env.PHOTOS.get(key);
         if (!obj) return c.notFound();
         const headers = new Headers();
