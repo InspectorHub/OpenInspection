@@ -22,6 +22,7 @@ import { eq, and } from 'drizzle-orm';
 import { verifyUploadToken } from '../../lib/video-upload-token';
 import { r2Keys } from '../../lib/r2-keys';
 import { logger } from '../../lib/logger';
+import { Errors } from '../../lib/errors';
 import type { HonoConfig } from '../../types/hono';
 
 // ── MIME / extension helpers ─────────────────────────────────────────────────
@@ -72,9 +73,9 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'file field required' }, 400);
         }
 
-        const mime = file.type || 'video/mp4';
-        if (!ALLOWED_VIDEO_MIMES.has(mime)) {
-            return c.json({ error: `Unsupported video type: ${mime}. Allowed: mp4, mov, webm.` }, 400);
+        const mime = file.type;
+        if (!mime || !ALLOWED_VIDEO_MIMES.has(mime)) {
+            return c.json({ error: 'Missing or unsupported video type. Allowed: mp4, mov, webm.' }, 400);
         }
 
         if (file.size > MAX_VIDEO_BYTES) {
@@ -87,10 +88,19 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
         const r2Key = r2Keys.inspectionVideo(tenantId, claims.inspectionId, mediaId, ext);
 
         const bytes = await file.arrayBuffer();
-        await c.env.PHOTOS.put(r2Key, bytes, {
-            httpMetadata: { contentType: mime },
-            customMetadata: { tenantId, inspectionId: claims.inspectionId, mediaId },
-        });
+        try {
+            await c.env.PHOTOS.put(r2Key, bytes, {
+                httpMetadata: { contentType: mime },
+                customMetadata: { tenantId, inspectionId: claims.inspectionId, mediaId },
+            });
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            logger.error('R2 video put failed', { tenantId, inspectionId: id, mediaId, r2Key }, err instanceof Error ? err : undefined);
+            if (/quota|storage|capacity|exceeded/i.test(detail)) {
+                throw Errors.ServiceUnavailable('Video storage is full — free up R2 space or enable Stream.');
+            }
+            throw err;
+        }
 
         logger.info('r2-upload: stored video', {
             tenantId, inspectionId: id, mediaId, r2Key, bytes: bytes.byteLength,
@@ -123,19 +133,28 @@ export function registerR2VideoRoutes(router: OpenAPIHono<HonoConfig>): void {
             return c.json({ error: 'file field required' }, 400);
         }
 
-        const mime = file.type || 'image/jpeg';
-        if (!mime.startsWith('image/')) {
-            return c.json({ error: 'Poster must be an image (JPEG expected).' }, 400);
+        const mime = file.type;
+        if (!mime || !mime.startsWith('image/')) {
+            return c.json({ error: 'Missing or unsupported poster type. JPEG image required.' }, 400);
         }
 
         const { mediaId } = claims;
         const posterKey = r2Keys.inspectionVideoPoster(tenantId, claims.inspectionId, mediaId);
 
         const bytes = await file.arrayBuffer();
-        await c.env.PHOTOS.put(posterKey, bytes, {
-            httpMetadata: { contentType: mime },
-            customMetadata: { tenantId, inspectionId: claims.inspectionId, mediaId },
-        });
+        try {
+            await c.env.PHOTOS.put(posterKey, bytes, {
+                httpMetadata: { contentType: mime },
+                customMetadata: { tenantId, inspectionId: claims.inspectionId, mediaId },
+            });
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            logger.error('R2 poster put failed', { tenantId, inspectionId: id, mediaId, posterKey }, err instanceof Error ? err : undefined);
+            if (/quota|storage|capacity|exceeded/i.test(detail)) {
+                throw Errors.ServiceUnavailable('Video storage is full — free up R2 space or enable Stream.');
+            }
+            throw err;
+        }
 
         logger.info('r2-upload-poster: stored poster', {
             tenantId, inspectionId: id, mediaId, posterKey,
