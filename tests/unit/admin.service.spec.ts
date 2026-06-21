@@ -86,11 +86,16 @@ describe('AdminService', () => {
     it('getExport includes agreement_requests + agreement_signers, projects token material OUT', async () => {
         const tenantId = 't1';
 
+        await testDb.insert(inspections).values({
+            id: 'insp-export', tenantId, propertyAddress: '1 Main', clientName: 'Client',
+            clientEmail: 'client@example.com', date: '2026-06-01', status: 'requested',
+            paymentStatus: 'unpaid', price: 0, createdAt: new Date(),
+        } as any);
         await testDb.insert(agreements).values({
             id: 'agr-tpl', tenantId, name: 'Tpl', content: 'body', createdAt: new Date(),
         } as any);
         await testDb.insert(agreementRequests).values({
-            id: 'req-1', tenantId, agreementId: 'agr-tpl',
+            id: 'req-1', tenantId, inspectionId: 'insp-export', agreementId: 'agr-tpl',
             clientEmail: 'client@example.com', clientName: 'Client',
             token: 'PLAINTEXT-TOKEN-XYZ', tokenHash: 'HASH-REQ-ABC',
             status: 'signed', signatureBase64: 'data:image/png;base64,SIG',

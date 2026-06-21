@@ -8,6 +8,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { loadVerifyData } from '../../server/lib/verify-data';
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
+const INSP_ID = '00000000-0000-0000-0000-000000000010';
 const REQ_ID = '00000000-0000-0000-0000-000000000100';
 const AGR_ID = '00000000-0000-0000-0000-000000000020';
 
@@ -39,6 +40,11 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
       id: TENANT_A, name: 'A', slug: 'acme', status: 'active',
       deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
+    await db.insert(schema.inspections).values({
+      id: INSP_ID, tenantId: TENANT_A, propertyAddress: '1 Main St', clientName: 'Jane',
+      clientEmail: 'jane@x', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
+      price: 0, createdAt: new Date(),
+    } as any);
     await db.insert(schema.agreements).values({
       id: AGR_ID, tenantId: TENANT_A, name: 'Standard', content: '<p>Body</p>',
       version: 1, createdAt: new Date(),
@@ -53,7 +59,7 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
 
   it('includes contentSnapshot/contentHash + signers (without emails)', async () => {
     await db.insert(schema.agreementRequests).values({
-      id: REQ_ID, tenantId: TENANT_A, agreementId: AGR_ID,
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
       token: 'tok-verify-1', status: 'signed',
       signatureBase64: 'data:image/png;base64,sig',
@@ -88,7 +94,7 @@ describe('loadVerifyData — Track I-a snapshot + signers', () => {
 
   it('exposes a NULL snapshot for pre-feature envelopes', async () => {
     await db.insert(schema.agreementRequests).values({
-      id: REQ_ID, tenantId: TENANT_A, agreementId: AGR_ID,
+      id: REQ_ID, tenantId: TENANT_A, inspectionId: INSP_ID, agreementId: AGR_ID,
       clientEmail: 'jane@x', clientName: 'Jane Doe',
       token: 'tok-verify-2', status: 'signed',
       signatureBase64: 'data:image/png;base64,sig',

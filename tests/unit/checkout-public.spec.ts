@@ -210,16 +210,5 @@ describe('GET /api/public/checkout/:token (Track I-a Task 7)', () => {
         expect(after?.status).toBe('viewed');
     });
 
-    it('envelope without an inspection -> 404 (checkout is always inspection-bound)', async () => {
-        await seedBase(db);
-        const { token, requestId } = await createEnvelope(db);
-        await db.update(schema.agreementRequests)
-            .set({ inspectionId: null })
-            .where(eq(schema.agreementRequests.id, requestId));
-
-        const { app } = buildApp(db);
-        const { ctx } = makeExecCtx();
-        const res = await app.request(`/checkout/${token}`, {}, FAKE_ENV, ctx);
-        expect(res.status).toBe(404);
-    });
 });
+

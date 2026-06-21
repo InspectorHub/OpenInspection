@@ -158,7 +158,23 @@ describe('POST /api/admin/agreements/send — multi-signer', () => {
         expect(res.status).toBe(400);
     });
 
-    it('signers provided WITHOUT inspectionId -> 400 with clear message', async () => {
+    it('send without inspectionId is rejected at the schema layer (HTTP 400) — schema-enforced since inspection_id NOT NULL', async () => {
+        // Task 4: inspectionId is now required in SendAgreementSchema (z.string().uuid(),
+        // not optional). The Zod validator rejects the request before the handler runs.
+        const res = await buildApp().request('/api/admin/agreements/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agreementId: AGR_ID,
+                clientEmail: 'jane@test.com',
+                // intentionally omit inspectionId — must be schema-rejected
+                signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }],
+            }),
+        }, ENV, EXEC);
+        expect(res.status).toBe(400);
+    });
+
+    it('send without inspectionId and without signers is also rejected (schema layer, HTTP 400)', async () => {
         const res = await buildApp().request('/api/admin/agreements/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -166,25 +182,51 @@ describe('POST /api/admin/agreements/send — multi-signer', () => {
                 agreementId: AGR_ID,
                 clientEmail: 'jane@test.com',
                 // no inspectionId
-                signers: [{ name: 'Jane', email: 'jane@test.com', role: 'client' }],
             }),
         }, ENV, EXEC);
         expect(res.status).toBe(400);
-        const body = await res.json() as { error?: { message?: string }; message?: string };
-        const message = body.error?.message ?? body.message ?? '';
-        expect(message).toMatch(/inspectionId is required when sending to multiple signers/i);
     });
 
-    it('legacy send (no signers) still succeeds', async () => {
+    it('clientEmail-only send (no signers) routes through the envelope path and returns requestId', async () => {
         const res = await buildApp().request('/api/admin/agreements/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ agreementId: AGR_ID, clientEmail: 'jane@test.com', inspectionId: INSP_ID }),
         }, ENV, EXEC);
         expect(res.status).toBe(200);
-        const body = await res.json() as { success: boolean };
+        const body = await res.json() as { success: boolean; data: { requestId: string; signers: unknown[] } };
         expect(body.success).toBe(true);
+        expect(body.data.requestId).toBeTruthy();
+        expect(body.data.signers).toHaveLength(1);
         expect(emailSend).toHaveBeenCalled();
+    });
+
+    it('single clientEmail send produces a one-signer envelope', async () => {
+        const res = await buildApp().request('/api/admin/agreements/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                agreementId: AGR_ID,
+                inspectionId: INSP_ID,
+                clientEmail: 'jane@example.com',
+                clientName: 'Jane Doe',
+            }),
+        }, ENV, EXEC);
+        expect(res.status).toBe(200);
+        const body = await res.json() as { data: { requestId: string; signers: Array<{ id: string; name: string; email: string; role: string; status: string }> } };
+        expect(body.data.requestId).toBeTruthy();
+        expect(body.data.signers).toHaveLength(1);
+        expect(body.data.signers[0].email).toBe('jane@example.com');
+
+        // signer row exists in DB
+        const signers = await db.select().from(schema.agreementSigners)
+            .where(eq(schema.agreementSigners.requestId, body.data.requestId)).all();
+        expect(signers).toHaveLength(1);
+
+        // completionPolicy on the envelope is 'one' for a single recipient
+        const envelopes = await db.select().from(schema.agreementRequests)
+            .where(eq(schema.agreementRequests.id, body.data.requestId)).all();
+        expect(envelopes[0].completionPolicy).toBe('one');
     });
 });
 
