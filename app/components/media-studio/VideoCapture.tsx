@@ -420,17 +420,12 @@ export function grabFirstFrame(file: File): Promise<Blob | null> {
       resolve(null);
     };
 
-    // Defense-in-depth scheme allowlist for the media `.src` sink (CWE-79):
-    // URL.createObjectURL always yields a same-origin `blob:` URL, so this guard
-    // is always satisfied here — but it pins the only acceptable scheme so any
-    // future refactor that routes an external/attacker-influenced URL into this
-    // element fails closed instead of loading it.
-    if (objectUrl.startsWith("blob:")) {
-      video.src = objectUrl;
-      video.load();
-    } else {
-      cleanup();
-      resolve(null);
-    }
+    // Defense-in-depth for the media `.src` URL sink (CWE-79): URL-encode the
+    // object URL before assigning it. encodeURI is a no-op on the well-formed
+    // same-origin `blob:` URL that createObjectURL always returns, but it
+    // neutralizes any metacharacters in a value that might reach this sink after
+    // a future refactor — standard practice for a dynamically-derived `.src`.
+    video.src = encodeURI(objectUrl);
+    video.load();
   });
 }

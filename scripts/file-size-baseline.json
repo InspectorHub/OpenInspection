@@ -1,6 +1,6 @@
 {
   "app/routes/inspection-edit.tsx": 1959,
-  "app/components/media-studio/VideoCapture.tsx": 437,
+  "app/components/media-studio/VideoCapture.tsx": 432,
   "app/hooks/usePhotoOps.ts": 406,
   "app/routes/inspection-hub.tsx": 1023,
   "server/services/inspection/inspection-core.service.ts": 906,
