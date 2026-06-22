@@ -81,9 +81,8 @@ export type TurnstileInput = z.infer<typeof turnstileSchema>;
 
 /**
  * Profile fields — mirrors the API's inline `PatchProfileSchema` in
- * `server/api/profile.ts` (name max 100, phone max 30, licenseNumber max 50,
- * bio max 600). All fields optional so a partial save leaves untouched fields
- * unchanged.
+ * `server/api/profile.ts` (name max 100, phone max 30, licenseNumber max 50).
+ * All fields optional so a partial save leaves untouched fields unchanged.
  *
  * DB-12 / IA-26 (2026-06-06) — slug removed. Inspector booking slugs are
  * frozen; the field was removed from the PATCH endpoint on the API side.
@@ -93,7 +92,6 @@ export const profileSchema = z.object({
   name: z.string().max(100, "Name is too long").optional(),
   phone: z.string().max(30, "Phone is too long").optional(),
   licenseNumber: z.string().max(50, "License number is too long").optional(),
-  bio: z.string().max(600, "Bio must be at most 600 characters").optional(),
   signatureEnabled: z.boolean().optional(),
 });
 

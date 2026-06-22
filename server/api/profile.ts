@@ -22,7 +22,7 @@ const getProfileRoute = createRoute(withMcpMetadata({
     operationId: 'getMyProfile',
     tags: ['profile'],
     summary: 'Get current user profile',
-    description: 'Returns the authenticated user\'s editable profile fields (name, phone, license, slug, bio, photo URL, service areas).',
+    description: 'Returns the authenticated user\'s editable profile fields (name, phone, license, slug, photo URL).',
     responses: {
         200: {
             content: {
@@ -33,9 +33,7 @@ const getProfileRoute = createRoute(withMcpMetadata({
                         phone: z.string().nullable(),
                         licenseNumber: z.string().nullable(),
                         slug: z.string().nullable(),
-                        bio: z.string().nullable(),
                         photoUrl: z.string().nullable(),
-                        serviceAreas: z.any().nullable(),
                         signatureEnabled: z.boolean(),
                         signaturePreviewHtml: z.string(),
                     })),
@@ -55,7 +53,6 @@ const PatchProfileSchema = z.object({
     name: z.string().max(100).optional().describe('Display name shown on reports and the booking page'),
     phone: z.string().max(30).optional().describe('Contact phone number for the inspector profile'),
     licenseNumber: z.string().max(50).optional().describe('Professional inspector license or certification number'),
-    bio: z.string().max(600).nullable().optional().describe('Short inspector biography shown on the public booking page'),
     signatureEnabled: z.boolean().optional().describe('Whether the inspector business-card footer is added to outbound emails'),
 });
 
@@ -65,7 +62,7 @@ const patchProfileRoute = createRoute(withMcpMetadata({
     operationId: 'patchMyProfile',
     tags: ['profile'],
     summary: 'Update current user profile',
-    description: 'Partially updates the authenticated user\'s profile (name, phone, licenseNumber, bio). DB-12: slug is frozen for inspectors — the field is silently stripped if sent. Agent slugs use POST /api/agent/profile.',
+    description: 'Partially updates the authenticated user\'s profile (name, phone, licenseNumber). DB-12: slug is frozen for inspectors — the field is silently stripped if sent. Agent slugs use POST /api/agent/profile.',
     request: {
         body: {
             content: {
@@ -85,7 +82,7 @@ const patchProfileRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'primary' }));
 
-// ── Sprint C-1 — profile photo upload + bio/service-areas details ──────────────
+// ── Sprint C-1 — profile photo upload ─────────────────────────────────────────
 
 const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 const MAX_PHOTO_BYTES = 2_000_000;
@@ -116,39 +113,6 @@ const photoUploadRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'extended' }));
 
-const ProfileDetailsSchema = z.object({
-    bio: z.string().max(600).nullable().optional().describe('Free-form inspector biography shown on the public booking page; null clears it.'),
-    serviceAreas: z.array(z.object({
-        city: z.string().min(1).max(80).describe('City name within the inspector\'s service coverage.'),
-        state: z.string().min(1).max(40).describe('State or province for the service area.'),
-        zip: z.string().min(1).max(20).describe('ZIP or postal code for the service area.'),
-    })).max(20).optional().describe('List of geographic service areas (up to 20) shown on the public profile page.'),
-});
-
-const detailsRoute = createRoute(withMcpMetadata({
-    method: 'post',
-    path: '/details',
-    operationId: 'updateMyProfileDetails',
-    tags: ['profile'],
-    summary: 'Update inspector bio and service areas',
-    description: 'Updates the inspector\'s public-facing bio and service-area list. Both fields are optional; missing keys leave existing values unchanged.',
-    request: {
-        body: {
-            content: { 'application/json': { schema: ProfileDetailsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
-        },
-    },
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: createApiResponseSchema(z.object({}).passthrough()),
-                },
-            },
-            description: 'Saved',
-        },
-    },
-}, { scopes: ['write'], tier: 'extended' }));
-
 export const profileRoutes = createApiRouter()
     .openapi(getProfileRoute, async (c) => {
         const userId = c.get('user')?.sub;
@@ -161,9 +125,7 @@ export const profileRoutes = createApiRouter()
             phone: users.phone,
             licenseNumber: users.licenseNumber,
             slug: users.slug,
-            bio: users.bio,
             photoUrl: users.photoUrl,
-            serviceAreas: users.serviceAreas,
             signatureEnabled: users.signatureEnabled,
         }).from(users)
           .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
@@ -180,14 +142,9 @@ export const profileRoutes = createApiRouter()
             }, host).html
           : '';
 
-        let parsedAreas = null;
-        if (row.serviceAreas) {
-            try { parsedAreas = JSON.parse(row.serviceAreas); } catch { /* malformed JSON — fall through to null */ }
-        }
-
         return c.json({
             success: true as const,
-            data: { ...row, serviceAreas: parsedAreas, signatureEnabled: row.signatureEnabled, signaturePreviewHtml },
+            data: { ...row, signatureEnabled: row.signatureEnabled, signaturePreviewHtml },
         }, 200);
     })
     .openapi(patchProfileRoute, async (c) => {
@@ -201,7 +158,6 @@ export const profileRoutes = createApiRouter()
         if (body.name !== undefined) updates.name = body.name;
         if (body.phone !== undefined) updates.phone = body.phone;
         if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber;
-        if (body.bio !== undefined) updates.bio = body.bio;
         if (body.signatureEnabled !== undefined) updates.signatureEnabled = body.signatureEnabled;
         // DB-12 / IA-26 — slug write removed; inspector booking slugs are frozen.
         // Agent slug writes go through POST /api/agent/profile (separate endpoint).
@@ -247,31 +203,6 @@ export const profileRoutes = createApiRouter()
 
         logger.info('profile.photo.upload', { userId, tenantId, size: file.size, type: file.type });
         return c.json({ success: true as const, data: { photoUrl } }, 200);
-    })
-    .openapi(detailsRoute, async (c) => {
-        const userId = c.get('user')?.sub;
-        const tenantId = c.get('tenantId');
-        if (!userId || !tenantId) throw Errors.Unauthorized();
-
-        const body = c.req.valid('json');
-        const updates: { bio?: string | null; serviceAreas?: string } = {};
-        if (body.bio !== undefined) updates.bio = body.bio;
-        if (body.serviceAreas !== undefined) {
-            updates.serviceAreas = JSON.stringify(body.serviceAreas);
-        }
-        if (Object.keys(updates).length === 0) {
-            return c.json({ success: true as const, data: {} }, 200);
-        }
-        await drizzle(c.env.DB).update(users)
-            .set(updates)
-            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
-
-        logger.info('profile.details.update', {
-            userId,
-            tenantId,
-            fields: Object.keys(updates).join(','),
-        });
-        return c.json({ success: true as const, data: {} }, 200);
     });
 
 export type ProfileApi = typeof profileRoutes;

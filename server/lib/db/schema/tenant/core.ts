@@ -45,10 +45,8 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     replyTo: text('reply_to'),
     // Phase 1 (B-4/A-7) — sender identity. `email_mode` switches between the
     // platform Resend account ('platform', default) and the tenant's own
-    // ('own'). `sender_display_name` is the From: display name; when
-    // `use_inspector_from_name` is on and a send carries an inspector, that
-    // inspector's name overrides the display name and their email becomes the
-    // default Reply-To.
+    // ('own'). `sender_display_name` is the From: display name. Who client-facing
+    // mail comes from (inspector vs company) is driven by `point_of_contact`.
     emailMode: text('email_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
     // Self-host video backend selection (mirrors emailMode). Default 'r2' (free).
     // 'stream' uses the worker's own STREAM binding + integrationConfig.streamCustomerSubdomain.
@@ -59,11 +57,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // when all three are present, else platform fallback — see resolve-twilio.ts).
     smsMode: text('sms_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
     senderDisplayName: text('sender_display_name'),
-    useInspectorFromName: integer('use_inspector_from_name', { mode: 'boolean' }).notNull().default(false),
     // 2026-06-14 — Point of Contact (Spectora parity). Single tenant-level
     // switch for who client-facing emails come from. Drives From display name
-    // + reply-to (NOT the From address — that is emailMode). Replaces the
-    // useInspectorFromName boolean (kept as a dead column; no longer read).
+    // + reply-to (NOT the From address — that is emailMode).
     pointOfContact: text('point_of_contact', { enum: ['inspector', 'company'] }).notNull().default('company'),
     billingUrl: text('billing_url'),
     // Track J (#122) — per-company Google/Yelp/Facebook review link. The

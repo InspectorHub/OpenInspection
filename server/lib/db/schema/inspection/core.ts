@@ -90,10 +90,6 @@ export const inspections = sqliteTable('inspections', {
     county:              text('county'),
     sellingAgentId:      text('selling_agent_id').references(() => contacts.id),
     disableAutomations:  integer('disable_automations', { mode: 'boolean' }).notNull().default(false),
-    // DEAD (2026-06-17, retired with messages URL convergence — client access
-    // moved to resolveClientActor; no reads/writes). Column FROZEN (D1 cannot
-    // drop columns); kept only to preserve the table shape.
-    messageToken:        text('message_token').unique('idx_inspections_msg_token'),
     templateSnapshot:    text('template_snapshot', { mode: 'json' }),
     templateSnapshotVersion: integer('template_snapshot_version').default(1),
     reportThemeOverride: text('report_theme_override', { enum: ['modern', 'classic', 'minimal'] }),

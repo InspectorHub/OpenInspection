@@ -19,7 +19,6 @@ interface Profile {
   phone?: string | null;
   licenseNumber?: string | null;
   // DB-12 / IA-26 — slug omitted; inspector booking slugs are frozen.
-  bio?: string | null;
   photoUrl?: string | null;
   signatureEnabled?: boolean;
   signaturePreviewHtml?: string;
@@ -89,7 +88,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const v = submission.value;
   const body: Record<string, unknown> = {};
   // DB-12 / IA-26 — "slug" intentionally removed; inspector booking slugs frozen.
-  for (const key of ["name", "phone", "licenseNumber", "bio"] as const) {
+  for (const key of ["name", "phone", "licenseNumber"] as const) {
     if (v[key] !== undefined) body[key] = v[key];
   }
   // Email signature toggle: hidden "false" + optional checkbox "true" — last value wins.
@@ -112,7 +111,6 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function SettingsProfilePage() {
   const { profile } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
-  const [bioLen, setBioLen] = useState((profile.bio ?? "").length);
   const [avatarSource, setAvatarSource] = useState<string | null>(null);
   // DB-12 / IA-26 — useSessionContext / tenantSlug removed; slug section gone.
 
@@ -226,8 +224,8 @@ export default function SettingsProfilePage() {
         {/* Photo placeholder */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
           <header className="space-y-1">
-            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Public profile</h3>
-            <p className="text-[12px] text-ih-fg-3">Photo, bio, and service areas shown on your public inspector page.</p>
+            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Profile photo</h3>
+            <p className="text-[12px] text-ih-fg-3">Your avatar on the public company booking page.</p>
           </header>
 
           {/* Photo */}
@@ -255,24 +253,6 @@ export default function SettingsProfilePage() {
                 <p className="text-[11px] text-ih-fg-3">JPG, PNG, or WebP. Max 2 MB. Square crop renders best.</p>
               </div>
             </div>
-          </div>
-
-          {/* Bio */}
-          <div className="space-y-2">
-            <label htmlFor={fields.bio.id} className="block text-[13px] font-semibold text-ih-fg-1">Bio</label>
-            <textarea
-              id={fields.bio.id} name={fields.bio.name} rows={4} maxLength={600}
-              defaultValue={profile.bio ?? ""}
-              onChange={(e) => setBioLen(e.target.value.length)}
-              aria-invalid={fields.bio.errors ? true : undefined}
-              placeholder="Tell customers a bit about your background, certifications, and inspection style."
-              className="block w-full rounded-md border border-ih-border bg-ih-bg-card px-3 py-2 text-[13px] focus:border-ih-primary focus:shadow-ih-focus outline-none transition-colors text-ih-fg-1 placeholder:text-ih-fg-4"
-            />
-            {fields.bio.errors ? (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.bio.errors[0]}</p>
-            ) : (
-              <p className="text-[11px] text-ih-fg-3">{bioLen} / 600</p>
-            )}
           </div>
 
         </section>

@@ -19,18 +19,13 @@ export const users = sqliteTable('users', {
     name: text('name'),
     phone: text('phone'),
     licenseNumber: text('license_number'),
-    // Booking #7 Sprint C-1 — public inspector profile fields, all nullable so
-    // the editorial profile page can render gracefully when an inspector hasn't
-    // completed their profile yet. `serviceAreas` stores a JSON array of
-    // {city, state, zip} objects; parsed/validated in UserService.getProfileBySlug.
+    // Inspector avatar shown on the public company booking page (/book/:tenant).
     photoUrl: text('photo_url'),
     // Spec 5H D2 — saved signature used for auto-sign on publish + Settings prefill.
     defaultSignatureBase64: text('default_signature_base64'),
     // 2026-06-14 — per-inspector opt-in for the business-card email footer
     // (independent of Point of Contact). Default true preserves prior behaviour.
     signatureEnabled: integer('signature_enabled', { mode: 'boolean' }).notNull().default(true),
-    bio: text('bio'),
-    serviceAreas: text('service_areas'),
     // FROZEN for inspectors (2026-06-06, DB-12/IA-26): the per-inspector
     // booking slug is retired — /book/:tenant is the canonical public entry
     // and no inspector-facing route writes this column anymore. Live READERS

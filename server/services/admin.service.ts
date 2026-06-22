@@ -8,7 +8,6 @@ import {
     inspections,
     inspectionResults,
     templates,
-    inspectionAgreements,
     agreementRequests,
     agreementSigners,
     tenants,
@@ -145,9 +144,6 @@ export class AdminService {
             // Live multi-signer agreement evidence (token material projected out).
             agreementRequests: tenantAgreementRequests,
             agreementSigners: tenantAgreementSigners,
-            // Back-compat: dead `inspection_agreements` table key retained for export
-            // shape stability; always [] (superseded by agreement_requests/signers).
-            inspectionAgreements: [] as Record<string, unknown>[],
         };
     }
 
@@ -175,14 +171,6 @@ export class AdminService {
             .from(inspections)
             .where(dbAnd(eq(inspections.tenantId, tenantId), eq(inspections.clientEmail, clientEmail)));
         const matchedIds = matched.map((r) => r.id);
-
-        // Dead `inspection_agreements` table — harmless legacy cleanup retained
-        // for back-compat (the live agreement evidence lives in
-        // agreement_requests / agreement_signers, handled by the orchestrator).
-        if (matchedIds.length > 0) {
-            await db.delete(inspectionAgreements)
-                .where(dbAnd(inArray(inspectionAgreements.inspectionId, matchedIds), eq(inspectionAgreements.tenantId, tenantId)));
-        }
 
         // Per-tenant retention window (default 6) from tenant_configs.
         const cfg = await db.select({ years: tenantConfigs.agreementRetentionYears })

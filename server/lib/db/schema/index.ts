@@ -5,7 +5,6 @@ export {
     inspections,
     inspectionResults,
     agreements,
-    inspectionAgreements,
     availability,
     availabilityOverrides,
     inspectionInspectors,

@@ -105,11 +105,6 @@ describe('in-app on-site signing rides the envelope (Track I-a Task 5)', () => {
         expect(signers[0].status).toBe('signed');
         expect(signers[0].channel).toBe('in_person');
 
-        // NO legacy inspection_agreements row written
-        const legacy = await db.select().from(schema.inspectionAgreements)
-            .where(eq(schema.inspectionAgreements.inspectionId, INSP_ID)).all();
-        expect(legacy.length).toBe(0);
-
         // sign-status reflects the envelope
         const statusRes = await app.request(`/${INSP_ID}/sign-status`, {}, FAKE_ENV, makeExecCtx().ctx);
         const statusBody = await statusRes.json() as any;

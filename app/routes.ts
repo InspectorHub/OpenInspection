@@ -37,11 +37,6 @@ export default [
     // confirm and follows the server-chosen redirect (agreement / report).
     route("confirm/:token", "routes/public/concierge-confirm-token.tsx"),
     route(
-      "inspector/:tenant/:slug",
-      "routes/public/inspector-profile.tsx",
-    ),
-    route("inspector-not-found", "routes/public/inspector-not-found.tsx"),
-    route(
       "report-gate/:tenant/:id",
       "routes/public/report-gate.tsx",
     ),

@@ -13,22 +13,6 @@ export const agreements = sqliteTable('agreements', {
     index('idx_agreements_tenant').on(t.tenantId),
 ]);
 
-// -- DEAD (2026-06-07, Track I-a): superseded by agreement_signers under the
-// agreement_requests envelope. No reads or writes remain except tenant-purge /
-// erase-client-data deletes. Do not extend.
-export const inspectionAgreements = sqliteTable('inspection_agreements', {
-    id: text('id').primaryKey(),
-    tenantId: text('tenant_id').notNull().references(() => tenants.id),
-    inspectionId: text('inspection_id').notNull().references(() => inspections.id),
-    signatureBase64: text('signature_base64').notNull(),
-    signedAt: integer('signed_at', { mode: 'timestamp' }).notNull(),
-    ipAddress: text('ip_address'),
-    userAgent: text('user_agent'),
-}, (t) => [
-    index('idx_insp_agreements_tenant').on(t.tenantId),
-    index('idx_insp_agreements_insp').on(t.inspectionId),
-]);
-
 export const agreementRequests = sqliteTable('agreement_requests', {
     id: text('id').primaryKey(),
     tenantId: text('tenant_id').notNull().references(() => tenants.id),

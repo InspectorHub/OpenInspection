@@ -306,20 +306,6 @@ CREATE UNIQUE INDEX `idx_iat_token` ON `inspection_access_tokens` (`token`);--> 
 CREATE INDEX `idx_iat_inspection` ON `inspection_access_tokens` (`tenant_id`,`inspection_id`);--> statement-breakpoint
 CREATE UNIQUE INDEX `idx_iat_recipient` ON `inspection_access_tokens` (`inspection_id`,`recipient_email`);--> statement-breakpoint
 CREATE UNIQUE INDEX `idx_iat_token_hash` ON `inspection_access_tokens` (`token_hash`);--> statement-breakpoint
-CREATE TABLE `inspection_agreements` (
-	`id` text PRIMARY KEY NOT NULL,
-	`tenant_id` text NOT NULL,
-	`inspection_id` text NOT NULL,
-	`signature_base64` text NOT NULL,
-	`signed_at` integer NOT NULL,
-	`ip_address` text,
-	`user_agent` text,
-	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`inspection_id`) REFERENCES `inspections`(`id`) ON UPDATE no action ON DELETE no action
-);
---> statement-breakpoint
-CREATE INDEX `idx_insp_agreements_tenant` ON `inspection_agreements` (`tenant_id`);--> statement-breakpoint
-CREATE INDEX `idx_insp_agreements_insp` ON `inspection_agreements` (`inspection_id`);--> statement-breakpoint
 CREATE TABLE `inspection_conflicts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -550,7 +536,6 @@ CREATE TABLE `inspections` (
 	`county` text,
 	`selling_agent_id` text,
 	`disable_automations` integer DEFAULT false NOT NULL,
-	`message_token` text,
 	`template_snapshot` text,
 	`template_snapshot_version` integer DEFAULT 1,
 	`report_theme_override` text,
@@ -572,7 +557,6 @@ CREATE TABLE `inspections` (
 	FOREIGN KEY (`request_id`) REFERENCES `inspection_requests`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `idx_inspections_msg_token` ON `inspections` (`message_token`);--> statement-breakpoint
 CREATE INDEX `idx_inspections_tenant` ON `inspections` (`tenant_id`);--> statement-breakpoint
 CREATE INDEX `idx_inspections_request` ON `inspections` (`request_id`);--> statement-breakpoint
 CREATE INDEX `idx_inspections_inspector` ON `inspections` (`inspector_id`);--> statement-breakpoint
@@ -965,7 +949,6 @@ CREATE TABLE `tenant_configs` (
 	`video_mode` text DEFAULT 'r2' NOT NULL,
 	`sms_mode` text DEFAULT 'platform' NOT NULL,
 	`sender_display_name` text,
-	`use_inspector_from_name` integer DEFAULT false NOT NULL,
 	`point_of_contact` text DEFAULT 'company' NOT NULL,
 	`billing_url` text,
 	`review_url` text,
@@ -1055,8 +1038,6 @@ CREATE TABLE `users` (
 	`photo_url` text,
 	`default_signature_base64` text,
 	`signature_enabled` integer DEFAULT true NOT NULL,
-	`bio` text,
-	`service_areas` text,
 	`slug` text,
 	`role` text DEFAULT 'manager' NOT NULL,
 	`google_refresh_token` text,

@@ -53,36 +53,6 @@ export interface SlugAvailability {
 }
 
 /**
- * Booking #7 Sprint C-1 — public inspector profile shape consumed by
- * `/inspector/<slug>`. Service-areas JSON is parsed once here so the page
- * template (and Settings → Profile editor) never has to handle the raw blob.
- */
-export interface InspectorProfile {
-    id: string;
-    name: string | null;
-    bio: string | null;
-    photoUrl: string | null;
-    licenseNumber: string | null;
-    email: string | null;
-    phone: string | null;
-    slug: string | null;
-    serviceAreas: Array<{ city: string; state: string; zip: string }>;
-}
-
-function parseServiceAreas(raw: string | null): InspectorProfile['serviceAreas'] {
-    if (!raw) return [];
-    try {
-        const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        return parsed.filter((a): a is InspectorProfile['serviceAreas'][number] =>
-            !!a && typeof a === 'object' && typeof a.city === 'string' && typeof a.state === 'string' && typeof a.zip === 'string',
-        );
-    } catch {
-        return [];
-    }
-}
-
-/**
  * Booking #7 Sprint A — UserService.
  *
  * Owns slug-related queries that back the per-inspector `/book/<slug>` link.
@@ -109,30 +79,6 @@ export class UserService {
             .where(and(eq(users.tenantId, tenantId), eq(users.slug, slug)))
             .get();
         return row ?? null;
-    }
-
-    /**
-     * Booking #7 Sprint C-1 — returns the public-profile shape used by
-     * `/inspector/<slug>`. service_areas JSON is parsed defensively (malformed
-     * blobs degrade to an empty array rather than 500-ing the page).
-     */
-    async getProfileBySlug(tenantId: string, slug: string): Promise<InspectorProfile | null> {
-        const db = this.getDrizzle();
-        const row = await db.select().from(users)
-            .where(and(eq(users.tenantId, tenantId), eq(users.slug, slug)))
-            .get();
-        if (!row) return null;
-        return {
-            id: row.id,
-            name: row.name,
-            bio: row.bio,
-            photoUrl: row.photoUrl,
-            licenseNumber: row.licenseNumber,
-            email: row.email,
-            phone: row.phone,
-            slug: row.slug,
-            serviceAreas: parseServiceAreas(row.serviceAreas),
-        };
     }
 
     /**
