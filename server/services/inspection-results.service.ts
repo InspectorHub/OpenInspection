@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { inspections, inspectionResults } from '../lib/db/schema';
 import { findingKey, DEFAULT_UNIT } from '../lib/finding-key';
@@ -41,12 +41,27 @@ export async function applyResultsBatch(
 ): Promise<ResultsBatchOutcome> {
     if (patches.length === 0) return { applied: 0 };
 
-    // Locate the existing results row. We don't filter by tenant in the
-    // service — the route layer already enforces tenant ownership via the
-    // standard guard — but if a tenantId is supplied we use it for the
-    // insert path so the FK constraint is satisfied.
+    const tenantId = opts?.tenantId;
+
+    // Verify the inspection exists and is owned by the caller's tenant before
+    // touching any results. Without this check a cross-tenant inspectionId
+    // would create a results row under the wrong tenant — D1 does not enforce
+    // FK-level tenant isolation at runtime. Early-return (not throw) so the
+    // route layer can treat a foreign-tenant id as "not found" silently.
+    if (tenantId) {
+        const owner = await db.select({ id: inspections.id }).from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!owner) return { applied: 0 };
+    }
+
+    // Locate the existing results row scoped by tenant when available.
+    const existingWhere = tenantId
+        ? and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId))
+        : eq(inspectionResults.inspectionId, inspectionId);
+
     const existing = await db.select().from(inspectionResults)
-        .where(eq(inspectionResults.inspectionId, inspectionId))
+        .where(existingWhere)
         .get();
 
     const data: Record<string, Record<string, unknown>> = existing?.data
@@ -74,19 +89,19 @@ export async function applyResultsBatch(
         data[key] = next;
     }
 
-    const tenantId = opts?.tenantId ?? existing?.tenantId;
+    const resolvedTenantId = tenantId ?? existing?.tenantId;
 
     if (existing) {
         await db.update(inspectionResults)
             .set({ data: data as unknown as object, lastSyncedAt: new Date() })
-            .where(eq(inspectionResults.id, existing.id));
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, existing.tenantId)));
     } else {
-        if (!tenantId) {
+        if (!resolvedTenantId) {
             throw new Error('applyResultsBatch: no existing results row and no tenantId supplied for insert');
         }
         await db.insert(inspectionResults).values({
             id:           crypto.randomUUID(),
-            tenantId,
+            tenantId:     resolvedTenantId,
             inspectionId,
             data:         data as unknown as object,
             lastSyncedAt: new Date(),
@@ -94,11 +109,14 @@ export async function applyResultsBatch(
     }
 
     // Bump inspections.dataVersion to mirror the single-field path so offline
-    // queues notice that the world moved.
+    // queues notice that the world moved. Scope to tenant when available.
     try {
+        const versionWhere = tenantId
+            ? and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))
+            : eq(inspections.id, inspectionId);
         await db.update(inspections)
             .set({ dataVersion: sql`${inspections.dataVersion} + 1` })
-            .where(eq(inspections.id, inspectionId));
+            .where(versionWhere);
     } catch {
         // dataVersion may be absent on minimal test schemas — silently ignore;
         // the form-renderer doesn't depend on the bump.
