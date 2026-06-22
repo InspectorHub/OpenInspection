@@ -1,6 +1,8 @@
+import type { Context } from 'hono';
 import { createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
+import type { HonoConfig } from '../types/hono';
 import { inspections } from '../lib/db/schema';
 import { verifyRenderToken } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
@@ -35,6 +37,27 @@ export async function resolveRenderAccess(
     const v = await verifyRenderToken(render, secret);
     if (!v || v.inspectionId !== requestedId) return null;
     return v;
+}
+
+/**
+ * Shared client-facing tenant resolution for the public report endpoints:
+ * the persistent per-(recipient, order) portal token, falling back to the
+ * legacy KV agent-view-token bridge (`?view=agent&token=`). Returns the
+ * AUTHORITATIVE tenantId from whichever token resolves to THIS inspection, or
+ * null. Identical across the report-data, report-photo, and report-PDF routes.
+ */
+async function resolveClientTenant(
+    c: Context<HonoConfig>, token: string | undefined, id: string,
+): Promise<string | null> {
+    const tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
+    if (tenantId || !token) return tenantId;
+    // Bridge: existing customer share links carry the KV agent-view-token until
+    // persistent per-recipient token issuance is wired (see plan
+    // 2026-06-01-core-esign-redesign). Validate it the same way: token must
+    // resolve to THIS inspection; tenantId from the token.
+    const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
+    if (legacy && legacy.inspectionId === id) return legacy.tenantId;
+    return null;
 }
 
 /**
@@ -254,15 +277,7 @@ export const publicReportRoutes = createApiRouter()
     .openapi(reportRoute, async (c) => {
         const { tenant, id } = c.req.valid('param');
         const { token, render } = c.req.valid('query');
-        let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
-        if (!tenantId && token) {
-            // Bridge: existing customer share links carry the KV agent-view-token
-            // (`?view=agent&token=`) until persistent per-recipient token issuance
-            // is wired (see plan 2026-06-01-core-esign-redesign). Validate it the
-            // same way: token must resolve to THIS inspection; tenantId from the token.
-            const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
-            if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
-        }
+        let tenantId = await resolveClientTenant(c, token, id);
         // Render-token path: headless CF Browser Rendering cannot carry a session
         // cookie or portal token; trusted server flows mint a short-TTL render token
         // and pass it as `?render=`. Resolve tenantId from the inspection row so the
@@ -326,11 +341,7 @@ export const publicReportRoutes = createApiRouter()
     .openapi(reportPhotoRoute, async (c) => {
         const { id } = c.req.valid('param');
         const { key, token, download, render, w } = c.req.valid('query');
-        let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
-        if (!tenantId && token) {
-            const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
-            if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
-        }
+        let tenantId = await resolveClientTenant(c, token, id);
         let renderMode = false;
         let ownerPreview = false;
         if (!tenantId && render) {
@@ -400,11 +411,7 @@ export const publicReportRoutes = createApiRouter()
         // No owner-preview, no render-token acceptance — this is a public
         // client-facing endpoint; the handler mints its own render token for
         // the headless renderer below.
-        let tenantId = (await resolvePortalAccess(c.var.services.portalAccess, token, id))?.tenantId ?? null;
-        if (!tenantId && token) {
-            const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
-            if (legacy && legacy.inspectionId === id) tenantId = legacy.tenantId;
-        }
+        const tenantId = await resolveClientTenant(c, token, id);
         if (!tenantId) return c.notFound();
 
         if (!c.env.BROWSER || !c.env.PHOTOS) {

@@ -16,6 +16,15 @@ import { r2Keys } from '../../lib/r2-keys';
 
 const extFromName = (n: string) => (n.split('.').pop() || 'bin').toLowerCase();
 
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
+/** D1's JSON column comes back as a string (D1) or a parsed object (driver
+ *  cache). Normalize either into a record; an empty object when absent. */
+function parseResultData<T = Record<string, never>>(data: unknown): T {
+    if (!data) return {} as T;
+    return (typeof data === 'string' ? JSON.parse(data) : data) as T;
+}
+
 /**
  * Photo + media handling: R2 upload (EXIF strip), media center aggregation,
  * loose pool upload/attach/delete, item-photo reorder/detach/revert/move, the
@@ -36,31 +45,67 @@ export class InspectionPhotoService extends InspectionSubService {
     }
 
     /**
+     * Validate size, strip GPS/EXIF on ingest, and store the photo bytes at
+     * `key`. Shared by the item-photo and pool-photo upload paths.
+     *
+     * N2 — the EXIF strip is a fallback for any path that skipped the client
+     * canvas bake (original-quality uploads, direct API callers, browsers
+     * without createImageBitmap); it fails open when env.IMAGES is absent
+     * (standalone) — the client bake remains the primary guarantee.
+     *
+     * A-9 — the original upload filename is preserved in customMetadata so the
+     * serve route can set Content-Disposition without parsing it back out of
+     * the key (which may carry a sanitized variant).
+     */
+    /**
+     * Persist a results `data` map: UPDATE the located row by id, or INSERT a
+     * fresh inspection_results row when none exists. Shared by attachPoolPhoto
+     * and patchItem (both pre-load the row and mutate `data` in place).
+     */
+    private async upsertResultData(
+        tenantId: string,
+        inspectionId: string,
+        data: object,
+        existingId: string | undefined,
+    ): Promise<void> {
+        const db = this.getDrizzle();
+        if (existingId) {
+            await db.update(inspectionResults)
+                .set({ data: data as unknown as object, lastSyncedAt: new Date() })
+                .where(eq(inspectionResults.id, existingId));
+        } else {
+            await db.insert(inspectionResults).values({
+                id:           crypto.randomUUID(),
+                tenantId,
+                inspectionId,
+                data:         data as unknown as object,
+                lastSyncedAt: new Date(),
+            });
+        }
+    }
+
+    private async putPhoto(r2: R2Bucket, key: string, file: File): Promise<void> {
+        if (file.size > MAX_PHOTO_BYTES) {
+            throw Errors.BadRequest(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${file.size})`);
+        }
+        const { bytes, contentType } = await stripExifOnIngest(this.images, await file.arrayBuffer(), file.type || 'image/jpeg');
+        await r2.put(key, bytes, {
+            httpMetadata: { contentType },
+            customMetadata: { originalName: file.name || 'photo' },
+        });
+    }
+
+    /**
      * Multi-photo upload to R2.
      */
     async uploadPhoto(id: string, tenantId: string, _itemId: string, file: File) {
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(id, tenantId); // Ownership check
 
-        const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-        if (file.size > MAX_PHOTO_BYTES) {
-            throw Errors.BadRequest(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${file.size})`);
-        }
-
         const mediaId = crypto.randomUUID();
         const ext = extFromName(file.name);
         const key = r2Keys.inspectionPhoto(tenantId, id, mediaId, ext);
-        // N2 — strip GPS/EXIF on ingest (fallback for any path that skipped the
-        // client canvas bake: original-quality uploads, direct API callers,
-        // browsers without createImageBitmap). Fails open when env.IMAGES is
-        // absent (standalone) — the client bake remains the primary guarantee.
-        const { bytes, contentType } = await stripExifOnIngest(this.images, await file.arrayBuffer(), file.type || 'image/jpeg');
-        await this.r2.put(key, bytes, {
-            httpMetadata: { contentType },
-            // A-9: preserve the original upload filename so the serve route can
-            // set Content-Disposition without parsing it back out of the key.
-            customMetadata: { originalName: file.name || 'photo' },
-        });
+        await this.putPhoto(this.r2, key, file);
         return key;
     }
 
@@ -146,9 +191,7 @@ export class InspectionPhotoService extends InspectionSubService {
         const resultsRow = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
             .get();
-        const resultData: Record<string, never> = resultsRow?.data
-            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, never>
-            : {};
+        const resultData = parseResultData(resultsRow?.data);
 
         const attached = collectAttachedPhotos(
             resultData,
@@ -197,24 +240,11 @@ export class InspectionPhotoService extends InspectionSubService {
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(inspectionId, tenantId); // ownership check
 
-        const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
-        if (file.size > MAX_PHOTO_BYTES) {
-            throw Errors.BadRequest(`Photo exceeds ${MAX_PHOTO_BYTES} bytes (got ${file.size})`);
-        }
-
         const id = crypto.randomUUID();
         const safeName = (file.name || 'photo').replace(/[^a-zA-Z0-9._-]/g, '_');
         const mediaId = id; // the pool row id serves as the stable mediaId
         const key = r2Keys.inspectionPhoto(tenantId, inspectionId, mediaId, extFromName(safeName));
-        // N2 — strip GPS/EXIF on ingest (fallback for paths that skipped the
-        // client canvas bake). Fails open when env.IMAGES is absent.
-        const { bytes, contentType } = await stripExifOnIngest(this.images, await file.arrayBuffer(), file.type || 'image/jpeg');
-        await this.r2.put(key, bytes, {
-            httpMetadata: { contentType },
-            // A-9: keep the real original filename (the key only carries a
-            // sanitized variant) for the download Content-Disposition.
-            customMetadata: { originalName: file.name || 'photo' },
-        });
+        await this.putPhoto(this.r2, key, file);
 
         const uploadedAt = Date.now();
         const takenAt = (opts?.takenAt && Number.isFinite(opts.takenAt) && opts.takenAt > 0) ? opts.takenAt : null;
@@ -268,9 +298,7 @@ export class InspectionPhotoService extends InspectionSubService {
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
             .get();
 
-        const data: Record<string, ResultEntry> = existing?.data
-            ? (typeof existing.data === 'string' ? JSON.parse(existing.data) : existing.data) as Record<string, ResultEntry>
-            : {};
+        const data = parseResultData<Record<string, ResultEntry>>(existing?.data);
         const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
         const entry = data[key] ?? data[itemId] ?? {};
         const photos = Array.isArray(entry.photos) ? entry.photos.slice() : [];
@@ -279,19 +307,7 @@ export class InspectionPhotoService extends InspectionSubService {
         if (key !== itemId) delete data[itemId]; // migrate on write
         const photoIndex = photos.length - 1;
 
-        if (existing) {
-            await db.update(inspectionResults)
-                .set({ data: data as unknown as object, lastSyncedAt: new Date() })
-                .where(eq(inspectionResults.id, existing.id));
-        } else {
-            await db.insert(inspectionResults).values({
-                id:           crypto.randomUUID(),
-                tenantId,
-                inspectionId,
-                data:         data as unknown as object,
-                lastSyncedAt: new Date(),
-            });
-        }
+        await this.upsertResultData(tenantId, inspectionId, data, existing?.id);
 
         // The pool row is a staging pointer only; once the photo key is written
         // into results.data the pool row is always removed (the R2 object is
@@ -307,17 +323,19 @@ export class InspectionPhotoService extends InspectionSubService {
     }
 
     /**
-     * Media Studio (Plan 3, P4) — reorder an item's photos[] so the array
-     * order matches the report photo order. Pure permutation: the submitted
-     * key set must equal the current one (no add/drop). Reuses the pure
-     * {@link applyReorder} op.
+     * Shared read/transform/write for the single-item photo-array ops
+     * (reorder / detach / revert). Each loads the single inspection_results
+     * row, resolves the item entry (finding-key with legacy itemId fallback),
+     * runs `transform` on its photos[], and persists. Ownership is checked
+     * first. Throws NotFound when no results row exists and BadRequest when
+     * the resolved item has no photos.
      */
-    async reorderItemPhotos(
+    private async mutateItemPhotos(
         inspectionId: string,
         tenantId: string,
         itemId: string,
-        order: string[],
-        sectionId?: string,
+        sectionId: string | undefined,
+        transform: (photos: { key: string }[]) => { key: string }[],
     ): Promise<void> {
         await this.facade.getInspection(inspectionId, tenantId); // ownership check
         const db = this.getDrizzle();
@@ -331,11 +349,28 @@ export class InspectionPhotoService extends InspectionSubService {
         const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
         const entry = data[key] ?? data[itemId];
         if (!entry?.photos) throw Errors.BadRequest('no photos for item');
-        entry.photos = applyReorder(entry.photos, order);
+        entry.photos = transform(entry.photos);
         data[key] = entry;
         await db.update(inspectionResults)
             .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+    }
+
+    /**
+     * Media Studio (Plan 3, P4) — reorder an item's photos[] so the array
+     * order matches the report photo order. Pure permutation: the submitted
+     * key set must equal the current one (no add/drop). Reuses the pure
+     * {@link applyReorder} op.
+     */
+    async reorderItemPhotos(
+        inspectionId: string,
+        tenantId: string,
+        itemId: string,
+        order: string[],
+        sectionId?: string,
+    ): Promise<void> {
+        await this.mutateItemPhotos(inspectionId, tenantId, itemId, sectionId,
+            (photos) => applyReorder(photos, order));
     }
 
     /**
@@ -350,23 +385,8 @@ export class InspectionPhotoService extends InspectionSubService {
         photoIndex: number,
         sectionId?: string,
     ): Promise<void> {
-        await this.facade.getInspection(inspectionId, tenantId); // ownership check
-        const db = this.getDrizzle();
-        const rowSel = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
-            .get();
-        if (!rowSel) throw Errors.NotFound('Results not found');
-        const data: Record<string, { photos?: { key: string }[] }> = typeof rowSel.data === 'string'
-            ? JSON.parse(rowSel.data)
-            : (rowSel.data as Record<string, { photos?: { key: string }[] }>);
-        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
-        const entry = data[key] ?? data[itemId];
-        if (!entry?.photos) throw Errors.BadRequest('no photos for item');
-        entry.photos = applyDetach(entry.photos, photoIndex);
-        data[key] = entry;
-        await db.update(inspectionResults)
-            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+        await this.mutateItemPhotos(inspectionId, tenantId, itemId, sectionId,
+            (photos) => applyDetach(photos, photoIndex));
     }
 
     /**
@@ -381,23 +401,8 @@ export class InspectionPhotoService extends InspectionSubService {
         photoIndex: number,
         sectionId?: string,
     ): Promise<void> {
-        await this.facade.getInspection(inspectionId, tenantId); // ownership check
-        const db = this.getDrizzle();
-        const rowSel = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
-            .get();
-        if (!rowSel) throw Errors.NotFound('Results not found');
-        const data: Record<string, { photos?: { key: string }[] }> = typeof rowSel.data === 'string'
-            ? JSON.parse(rowSel.data)
-            : (rowSel.data as Record<string, { photos?: { key: string }[] }>);
-        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
-        const entry = data[key] ?? data[itemId];
-        if (!entry?.photos) throw Errors.BadRequest('no photos for item');
-        entry.photos = applyRevert(entry.photos, photoIndex);
-        data[key] = entry;
-        await db.update(inspectionResults)
-            .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
+        await this.mutateItemPhotos(inspectionId, tenantId, itemId, sectionId,
+            (photos) => applyRevert(photos, photoIndex));
     }
 
     /**
@@ -478,9 +483,7 @@ export class InspectionPhotoService extends InspectionSubService {
         const existing = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
             .get();
-        const data: Record<string, Record<string, unknown>> = existing?.data
-            ? (typeof existing.data === 'string' ? JSON.parse(existing.data) : existing.data) as Record<string, Record<string, unknown>>
-            : {};
+        const data = parseResultData<Record<string, Record<string, unknown>>>(existing?.data);
 
         const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
         const cur = data[key] ?? data[itemId]; // fallback for legacy
@@ -526,19 +529,7 @@ export class InspectionPhotoService extends InspectionSubService {
         sanitizeDefectStates(data);
         if (key !== itemId) delete data[itemId]; // migrate on write
 
-        if (existing) {
-            await db.update(inspectionResults)
-                .set({ data: data as unknown as object, lastSyncedAt: new Date() })
-                .where(eq(inspectionResults.id, existing.id));
-        } else {
-            await db.insert(inspectionResults).values({
-                id:           crypto.randomUUID(),
-                tenantId,
-                inspectionId,
-                data:         data as unknown as object,
-                lastSyncedAt: new Date(),
-            });
-        }
+        await this.upsertResultData(tenantId, inspectionId, data, existing?.id);
 
         // Bump inspections.dataVersion — offline queue uses this counter
         // to detect "the rest of the world moved" without re-fetching the
@@ -625,9 +616,8 @@ export class InspectionPhotoService extends InspectionSubService {
             ))
             .all();
         for (const row of rows) {
-            const data = (typeof row.data === 'string' ? JSON.parse(row.data) : row.data) as
-                Record<string, { photos?: Array<{ key?: string; annotatedKey?: string }> }> | null;
-            if (!data) continue;
+            if (!row.data) continue;
+            const data = parseResultData<Record<string, { photos?: Array<{ key?: string; annotatedKey?: string }> }>>(row.data);
             for (const entry of Object.values(data)) {
                 const photos = Array.isArray(entry?.photos) ? entry.photos : [];
                 for (const p of photos) {

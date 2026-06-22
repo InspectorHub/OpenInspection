@@ -176,25 +176,40 @@ export function usePhotoOps(ctx: {
     [patchItemPhotos, photoOpsFetcher, state.inspection.id, state.currentSection],
   );
 
-  /* Task 9 — bulk-detach photos by index. The strip emits indices DESC so each
-   * detach keeps the remaining (lower) indices valid; we POST highest-first too. */
-  const onBulkDetachPhotos = useCallback(
-    (itemId: string, indices: number[]) => {
+  /* Shared driver for the per-index bulk mutations (detach / move). The strip
+   * emits indices DESC so each mutation keeps the remaining (lower) indices
+   * valid; we POST highest-first in the same order. `buildBody` produces the
+   * JSON body for one index; a single revalidate runs after the last POST. */
+  const runBulkPhotoMutation = useCallback(
+    (
+      itemId: string,
+      indices: number[],
+      endpoint: string,
+      buildBody: () => Record<string, unknown>,
+    ) => {
       patchItemPhotos(itemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
-      const sectionId = state.currentSection?.id;
       (async () => {
         for (const idx of indices) {
-          await fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/detach`, {
+          await fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/${endpoint}`, {
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ sectionId }),
+            body: JSON.stringify(buildBody()),
           });
         }
         revalidator.revalidate();
       })();
     },
-    [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+    [patchItemPhotos, state.inspection.id, revalidator],
+  );
+
+  /* Task 9 — bulk-detach photos by index. */
+  const onBulkDetachPhotos = useCallback(
+    (itemId: string, indices: number[]) => {
+      const sectionId = state.currentSection?.id;
+      runBulkPhotoMutation(itemId, indices, "detach", () => ({ sectionId }));
+    },
+    [runBulkPhotoMutation, state.currentSection],
   );
 
   /* Task 9b — the OTHER items photos can be moved to: every item across the
@@ -217,21 +232,14 @@ export function usePhotoOps(ctx: {
    * valid; we POST highest-first too. The source section is the current one. */
   const onBulkMovePhotos = useCallback(
     (fromItemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => {
-      patchItemPhotos(fromItemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
       const fromSectionId = state.currentSection?.id;
-      (async () => {
-        for (const idx of indices) {
-          await fetch(`/api/inspections/${state.inspection.id}/items/${fromItemId}/photos/${idx}/move`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ toItemId: to.itemId, toSectionId: to.sectionId, fromSectionId }),
-          });
-        }
-        revalidator.revalidate();
-      })();
+      runBulkPhotoMutation(fromItemId, indices, "move", () => ({
+        toItemId: to.itemId,
+        toSectionId: to.sectionId,
+        fromSectionId,
+      }));
     },
-    [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+    [runBulkPhotoMutation, state.currentSection],
   );
 
   /* Task 8 — route a viewer per-photo action to the right mutation. */

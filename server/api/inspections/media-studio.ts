@@ -300,6 +300,24 @@ export const cropItemPhotoRoute = createRoute(withMcpMetadata({
 
 // ── Route handlers ────────────────────────────────────────────────────────────
 
+// Optional `sectionId` multipart field — present only for defect (composite-key)
+// photos. Treats empty strings as absent.
+function readSectionId(formData: Record<string, unknown>): string | undefined {
+    const raw = formData['sectionId'];
+    return typeof raw === 'string' && raw.length > 0 ? raw : undefined;
+}
+
+// Parse + validate the JSON-encoded crop transform from a multipart field.
+// Throws BadRequest('invalid crop') on malformed JSON or schema mismatch.
+function parseCrop<T>(formData: Record<string, unknown>, schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }): T {
+    let rawCrop: unknown;
+    try { rawCrop = JSON.parse(String(formData['crop'] ?? '{}')); }
+    catch { throw Errors.BadRequest('invalid crop'); }
+    const parsed = schema.safeParse(rawCrop);
+    if (!parsed.success) throw Errors.BadRequest('invalid crop');
+    return parsed.data;
+}
+
 const mediaStudioRoutes = createApiRouter()
     .openapi(videoCreateUploadRoute, async (c) => {
         const { id } = c.req.valid('param');
@@ -443,9 +461,7 @@ const mediaStudioRoutes = createApiRouter()
         const formData = await c.req.parseBody();
         const file = formData['image'] as File | undefined;
         const nodesJson = String(formData['nodes'] ?? '[]');
-        const sectionId = typeof formData['sectionId'] === 'string' && formData['sectionId'].length > 0
-            ? formData['sectionId']
-            : undefined;
+        const sectionId = readSectionId(formData);
         if (!file) throw Errors.BadRequest('image file required');
         const bytes = await file.arrayBuffer();
         const result = await c.var.services.inspection.saveAnnotation(
@@ -459,14 +475,10 @@ const mediaStudioRoutes = createApiRouter()
         const formData = await c.req.parseBody();
         const file = formData['image'] as File | undefined;
         if (!file) throw Errors.BadRequest('image file required');
-        let rawCrop: unknown;
-        try { rawCrop = JSON.parse(String(formData['crop'] ?? '{}')); }
-        catch { throw Errors.BadRequest('invalid crop'); }
-        const parsed = CoverCropSchema.safeParse(rawCrop);
-        if (!parsed.success) throw Errors.BadRequest('invalid crop');
+        const crop = parseCrop(formData, CoverCropSchema);
         const sourceKey = String(formData['sourceKey'] ?? '');
         const bytes = await file.arrayBuffer();
-        const result = await c.var.services.inspection.setCroppedCover(id, tenantId, sourceKey, bytes, parsed.data);
+        const result = await c.var.services.inspection.setCroppedCover(id, tenantId, sourceKey, bytes, crop);
         return c.json({ success: true, data: result }, 200);
     })
     .openapi(cropItemPhotoRoute, async (c) => {
@@ -475,16 +487,11 @@ const mediaStudioRoutes = createApiRouter()
         const formData = await c.req.parseBody();
         const file = formData['image'] as File | undefined;
         if (!file) throw Errors.BadRequest('image file required');
-        let rawCrop: unknown;
-        try { rawCrop = JSON.parse(String(formData['crop'] ?? '{}')); }
-        catch { throw Errors.BadRequest('invalid crop'); }
-        const parsed = PhotoCropSchema.safeParse(rawCrop);
-        if (!parsed.success) throw Errors.BadRequest('invalid crop');
-        const sectionId = typeof formData['sectionId'] === 'string' && formData['sectionId'].length > 0
-            ? formData['sectionId'] : undefined;
+        const crop = parseCrop(formData, PhotoCropSchema);
+        const sectionId = readSectionId(formData);
         const bytes = await file.arrayBuffer();
         const result = await c.var.services.inspection.saveCroppedItemPhoto(
-            id, tenantId, itemId, photoIndex, bytes, parsed.data, sectionId,
+            id, tenantId, itemId, photoIndex, bytes, crop, sectionId,
         );
         return c.json({ success: true, data: result }, 200);
     });

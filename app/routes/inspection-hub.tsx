@@ -118,21 +118,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 
   // Capability: whether the current user can publish reports (owner/manager/inspector).
   // Best-effort: falls back to false (inspector will see submit-only flow).
+  // The cast mirrors dashboard.tsx — hono/client collapses the typed union.
   let canPublishCap = false;
-  try {
-    const meGet = (api as unknown as { auth?: { me?: { $get?: (args?: unknown) => Promise<Response> } } })
-      ?.auth?.me?.$get;
-    if (meGet) {
-      const meRes = await meGet().catch(() => null);
-      if (meRes && meRes.ok) {
-        const meBody = (await meRes.json().catch(() => ({}))) as { data?: { user?: { role?: string } } };
-        const role = meBody.data?.user?.role ?? 'inspector';
-        const publishRoles = new Set(['owner', 'manager', 'inspector']);
-        canPublishCap = publishRoles.has(role);
-      }
-    }
-  } catch {
-    // Best-effort: fail open on cap check (canPublishCap stays false)
+  const meGet = api.auth?.me?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+  const meRes = meGet ? await meGet().catch(() => null) : null;
+  if (meRes && meRes.ok) {
+    const meBody = (await meRes.json().catch(() => ({}))) as { data?: { user?: { role?: string } } };
+    const role = meBody.data?.user?.role ?? 'inspector';
+    canPublishCap = new Set(['owner', 'manager', 'inspector']).has(role);
   }
 
   // Inspector documents (unified portal section ⑦). The inspector document
@@ -372,67 +365,16 @@ export default function InspectionHubPage() {
   const attestSms = useFetcher<typeof action>();
   const attesting = attestSms.state !== "idle";
 
-  // Send-agreement modal — its own dedicated fetcher (B-17: never share
-  // fetchers between mutations). Close on success; the loader revalidation
-  // refreshes agreementRequests automatically.
-  const [agreementModalOpen, setAgreementModalOpen] = useState(false);
-  const sendAgreement = useFetcher<typeof action>();
-  const sendingAgreement = sendAgreement.state !== "idle";
-  const agreementError =
-    sendAgreement.data?.intent === "send-agreement" && !sendAgreement.data.ok
-      ? sendAgreement.data.error
-      : undefined;
-  useEffect(() => {
-    if (
-      agreementModalOpen &&
-      sendAgreement.state === "idle" &&
-      sendAgreement.data?.intent === "send-agreement" &&
-      sendAgreement.data.ok
-    ) {
-      setAgreementModalOpen(false);
-    }
-  }, [agreementModalOpen, sendAgreement.state, sendAgreement.data]);
-
-  // Request-payment modal — its own dedicated fetcher (B-17). Close on success;
-  // the loader revalidation refreshes the invoice block automatically.
-  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
-  const requestPayment = useFetcher<typeof action>();
-  const requestingPayment = requestPayment.state !== "idle";
-  const paymentError =
-    requestPayment.data?.intent === "request-payment" && !requestPayment.data.ok
-      ? requestPayment.data.error
-      : undefined;
-  useEffect(() => {
-    if (
-      paymentModalOpen &&
-      requestPayment.state === "idle" &&
-      requestPayment.data?.intent === "request-payment" &&
-      requestPayment.data.ok
-    ) {
-      setPaymentModalOpen(false);
-    }
-  }, [paymentModalOpen, requestPayment.state, requestPayment.data]);
-
-  // Publish modal — its own dedicated fetcher (B-17). Close on success; the
-  // loader revalidation flips the Report card to Published + reveals the
-  // header View report link automatically.
-  const [publishModalOpen, setPublishModalOpen] = useState(false);
-  const publish = useFetcher<typeof action>();
-  const publishing = publish.state !== "idle";
-  const publishError =
-    publish.data?.intent === "publish" && !publish.data.ok
-      ? publish.data.error
-      : undefined;
-  useEffect(() => {
-    if (
-      publishModalOpen &&
-      publish.state === "idle" &&
-      publish.data?.intent === "publish" &&
-      publish.data.ok
-    ) {
-      setPublishModalOpen(false);
-    }
-  }, [publishModalOpen, publish.state, publish.data]);
+  // Each mutation gets its own dedicated fetcher (B-17: never share fetchers
+  // between mutations) and a modal that auto-closes on success — the loader
+  // revalidation then refreshes the affected block. `useModalFetcher` collapses
+  // that shared open-state + fetcher + error + close-on-success pattern.
+  //  - send-agreement → refreshes agreementRequests
+  //  - request-payment → refreshes the invoice block
+  //  - publish → flips the Report card to Published + reveals the header link
+  const agreementModal = useModalFetcher("send-agreement");
+  const paymentModal = useModalFetcher("request-payment");
+  const publishModal = useModalFetcher("publish");
 
   // Submit / return / unpublish — dedicated fetchers (B-17: never share).
   const submitReport = useFetcher<typeof action>();
@@ -442,16 +384,12 @@ export default function InspectionHubPage() {
   const returningReport = returnReport.state !== "idle";
   const unpublishingReport = unpublishReport.state !== "idle";
 
-  // Create-re-inspection modal — its own dedicated fetcher (B-17). On success
-  // the action returns the new inspection id; navigate to its hub (mirrors the
-  // app's create-then-navigate flow). Only published baselines can re-inspect.
-  const [reinspectModalOpen, setReinspectModalOpen] = useState(false);
-  const createReinspection = useFetcher<typeof action>();
-  const creatingReinspection = createReinspection.state !== "idle";
-  const reinspectError =
-    createReinspection.data?.intent === "create-reinspection" && !createReinspection.data.ok
-      ? createReinspection.data.error
-      : undefined;
+  // Create-re-inspection modal — its own dedicated fetcher (B-17). Only
+  // published baselines can re-inspect. Unlike the other modals it does NOT
+  // auto-close on success: the effect below navigates to the new inspection's
+  // editor instead (mirrors the app's create-then-navigate flow).
+  const reinspectModal = useModalFetcher("create-reinspection", { closeOnSuccess: false });
+  const createReinspection = reinspectModal.fetcher;
   useEffect(() => {
     if (
       createReinspection.state === "idle" &&
@@ -460,7 +398,7 @@ export default function InspectionHubPage() {
       createReinspection.data.newId
     ) {
       const newId = createReinspection.data.newId;
-      setReinspectModalOpen(false);
+      reinspectModal.setOpen(false);
       // Mirror the new-inspection wizard: a freshly created draft lands in the
       // editor so the inspector can start filling out the carried-forward items.
       navigate(`/inspections/${newId}/edit`);
@@ -704,7 +642,7 @@ export default function InspectionHubPage() {
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => setAgreementModalOpen(true)}
+            onClick={() => agreementModal.setOpen(true)}
           >
             Send agreement
           </Button>
@@ -724,7 +662,7 @@ export default function InspectionHubPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => setPaymentModalOpen(true)}
+                onClick={() => paymentModal.setOpen(true)}
               >
                 Resend request
               </Button>
@@ -734,7 +672,7 @@ export default function InspectionHubPage() {
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => setPaymentModalOpen(true)}
+              onClick={() => paymentModal.setOpen(true)}
             >
               Request payment
             </Button>
@@ -756,7 +694,7 @@ export default function InspectionHubPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => setReinspectModalOpen(true)}
+                  onClick={() => reinspectModal.setOpen(true)}
                 >
                   Create re-inspection
                 </Button>
@@ -796,7 +734,7 @@ export default function InspectionHubPage() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => setPublishModalOpen(true)}
+                    onClick={() => publishModal.setOpen(true)}
                   >
                     Publish report
                   </Button>
@@ -858,54 +796,85 @@ export default function InspectionHubPage() {
       />
 
       {/* Send-agreement modal — custom (no window.confirm) */}
-      {agreementModalOpen && (
+      {agreementModal.open && (
         <SendAgreementModal
           agreements={hub.agreements}
           defaultEmail={inspection.clientEmail ?? ""}
-          fetcher={sendAgreement}
-          submitting={sendingAgreement}
-          error={agreementError}
-          onClose={() => setAgreementModalOpen(false)}
+          fetcher={agreementModal.fetcher}
+          submitting={agreementModal.busy}
+          error={agreementModal.error}
+          onClose={() => agreementModal.setOpen(false)}
         />
       )}
 
       {/* Request-payment modal — custom (no window.confirm) */}
-      {paymentModalOpen && (
+      {paymentModal.open && (
         <RequestPaymentModal
           recipientEmail={inspection.clientEmail ?? ""}
           amountLabel={formatCents(invoiceAmountCents)}
           resend={invoiceSent}
-          fetcher={requestPayment}
-          submitting={requestingPayment}
-          error={paymentError}
-          onClose={() => setPaymentModalOpen(false)}
+          fetcher={paymentModal.fetcher}
+          submitting={paymentModal.busy}
+          error={paymentModal.error}
+          onClose={() => paymentModal.setOpen(false)}
         />
       )}
 
       {/* Publish modal — custom (no window.confirm) */}
-      {publishModalOpen && (
+      {publishModal.open && (
         <PublishReportModal
           agreementRequired={inspection.agreementRequired}
           paymentRequired={inspection.paymentRequired}
-          fetcher={publish}
-          submitting={publishing}
-          error={publishError}
-          onClose={() => setPublishModalOpen(false)}
+          fetcher={publishModal.fetcher}
+          submitting={publishModal.busy}
+          error={publishModal.error}
+          onClose={() => publishModal.setOpen(false)}
         />
       )}
 
       {/* Create-re-inspection modal — custom (no window.confirm) */}
-      {reinspectModalOpen && (
+      {reinspectModal.open && (
         <CreateReinspectionModal
           candidates={reinspectCandidates}
-          fetcher={createReinspection}
-          submitting={creatingReinspection}
-          error={reinspectError}
-          onClose={() => setReinspectModalOpen(false)}
+          fetcher={reinspectModal.fetcher}
+          submitting={reinspectModal.busy}
+          error={reinspectModal.error}
+          onClose={() => reinspectModal.setOpen(false)}
         />
       )}
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Modal + fetcher pairing hook                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Pairs a modal's open-state with its own dedicated action fetcher (B-17: never
+ * share fetchers between mutations). Derives the busy flag, the intent-matched
+ * error, and (by default) closes the modal once the action succeeds. Pass
+ * `closeOnSuccess: false` when the caller drives its own post-success effect
+ * (e.g. the re-inspection flow navigates instead of closing).
+ */
+function useModalFetcher<I extends string>(
+  intent: I,
+  opts?: { closeOnSuccess?: boolean },
+) {
+  const closeOnSuccess = opts?.closeOnSuccess ?? true;
+  const [open, setOpen] = useState(false);
+  const fetcher = useFetcher<typeof action>();
+  const busy = fetcher.state !== "idle";
+  const succeeded =
+    fetcher.state === "idle" && fetcher.data?.intent === intent && fetcher.data.ok;
+  const error =
+    fetcher.data?.intent === intent && !fetcher.data.ok ? fetcher.data.error : undefined;
+
+  useEffect(() => {
+    if (closeOnSuccess && open && succeeded) setOpen(false);
+  }, [closeOnSuccess, open, succeeded]);
+
+  return { open, setOpen, fetcher, busy, error, succeeded };
 }
 
 /* ------------------------------------------------------------------ */

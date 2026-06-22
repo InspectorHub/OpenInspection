@@ -190,6 +190,11 @@ export default function FormRendererPage() {
  return results[key] || { rating: null, value: null, notes: "", photos: [] };
  }
 
+ function isItemFilled(sectionId: string, item: TemplateItem): boolean {
+ const r = getResult(sectionId, item.id);
+ return item.type === "rich" ? !!r.rating : r.value != null && r.value !== "";
+ }
+
  function updateResult(sectionId: string, itemId: string, patch: Partial<ItemResult>) {
  const key = getKey(sectionId, itemId);
  setResults((prev) => ({
@@ -212,8 +217,7 @@ export default function FormRendererPage() {
  let count = 0;
  for (const sec of sections) {
  for (const item of sec.items) {
- const r = getResult(sec.id, item.id);
- if (item.type === "rich" ? r.rating : r.value != null && r.value !== "") count++;
+ if (isItemFilled(sec.id, item)) count++;
  }
  }
  return count;
@@ -314,10 +318,7 @@ export default function FormRendererPage() {
  {/* Section nav strip */}
  <div className="flex items-center gap-1 mb-6 overflow-x-auto pb-1">
  {sections.map((sec, idx) => {
- const secFilled = sec.items.filter((item) => {
- const r = getResult(sec.id, item.id);
- return item.type === "rich" ? r.rating : r.value != null && r.value !== "";
- }).length;
+ const secFilled = sec.items.filter((item) => isItemFilled(sec.id, item)).length;
  return (
  <button
  key={sec.id}

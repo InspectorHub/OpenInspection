@@ -17,6 +17,15 @@ import {
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
 
+/** Normalise a possibly-JSON-encoded D1 column: parse when it's a string,
+ *  pass objects through, and collapse any falsy value (undefined/null/'') to
+ *  null. computePublishReadiness reads templateSnapshot / template.schema /
+ *  inspection_results.data through this — all may arrive as either shape. */
+function parseMaybeJson(raw: unknown): unknown {
+    if (!raw) return null;
+    return typeof raw === 'string' ? JSON.parse(raw) : raw;
+}
+
 /**
  * Report publish + pre-publish gate logic: publishInspection (status flip +
  * automation trigger + auto-sign), computePublishReadiness (defect-field gate),
@@ -158,15 +167,20 @@ export class InspectionPublishService extends InspectionSubService {
         }
         const agreementLinkToken = signerLink ?? agreementToken;
 
-        const actionUrl = bothOutstanding && signerLink
-            ? `/checkout/${tenantSlug}/${signerLink}`
-            : reason === 'payment'
-                ? `/invoice/${inspectionId}`
-                : (agreementLinkToken ? `/agreements/sign/${tenantSlug}/${agreementLinkToken}` : `/report-gate/${tenantSlug}/${inspectionId}`);
-
-        const actionLabel = bothOutstanding && signerLink
-            ? 'Sign & pay'
-            : reason === 'payment' ? 'Pay invoice' : 'Sign agreement';
+        let actionUrl: string;
+        let actionLabel: string;
+        if (bothOutstanding && signerLink) {
+            actionUrl = `/checkout/${tenantSlug}/${signerLink}`;
+            actionLabel = 'Sign & pay';
+        } else if (reason === 'payment') {
+            actionUrl = `/invoice/${inspectionId}`;
+            actionLabel = 'Pay invoice';
+        } else {
+            actionUrl = agreementLinkToken
+                ? `/agreements/sign/${tenantSlug}/${agreementLinkToken}`
+                : `/report-gate/${tenantSlug}/${inspectionId}`;
+            actionLabel = 'Sign agreement';
+        }
 
         return {
             reason,
@@ -454,30 +468,32 @@ export class InspectionPublishService extends InspectionSubService {
 
         // Prefer per-inspection snapshot over live template schema (mirrors getReportData).
         const inspectionSnapshotRaw = (inspection as unknown as { templateSnapshot?: unknown }).templateSnapshot;
-        const inspectionSnapshot = inspectionSnapshotRaw
-            ? (typeof inspectionSnapshotRaw === 'string' ? JSON.parse(inspectionSnapshotRaw as string) : inspectionSnapshotRaw)
-            : null;
+        const inspectionSnapshot = parseMaybeJson(inspectionSnapshotRaw);
         const hasInspectionSnapshot = inspectionSnapshot
             && typeof inspectionSnapshot === 'object'
             && Array.isArray((inspectionSnapshot as { sections?: unknown }).sections)
             && (inspectionSnapshot as { sections: unknown[] }).sections.length > 0;
 
-        const rawSchema = hasInspectionSnapshot
-            ? inspectionSnapshot
-            : template?.schema
-                ? (typeof template.schema === 'string' ? JSON.parse(template.schema) : template.schema)
-                : { sections: [] };
+        let rawSchema: unknown;
+        if (hasInspectionSnapshot) {
+            rawSchema = inspectionSnapshot;
+        } else if (template?.schema) {
+            rawSchema = parseMaybeJson(template.schema);
+        } else {
+            rawSchema = { sections: [] };
+        }
 
         interface RawSchemaData { sections?: unknown[] }
-        const schemaData: TemplateSchemaV2 = Array.isArray(rawSchema)
-            ? ({ schemaVersion: 2, sections: [{ id: 'general', title: 'General', items: rawSchema }] } as unknown as TemplateSchemaV2)
-            : (rawSchema as RawSchemaData).sections
-                ? rawSchema as TemplateSchemaV2
-                : ({ schemaVersion: 2, sections: [] } as unknown as TemplateSchemaV2);
+        let schemaData: TemplateSchemaV2;
+        if (Array.isArray(rawSchema)) {
+            schemaData = { schemaVersion: 2, sections: [{ id: 'general', title: 'General', items: rawSchema }] } as unknown as TemplateSchemaV2;
+        } else if ((rawSchema as RawSchemaData).sections) {
+            schemaData = rawSchema as TemplateSchemaV2;
+        } else {
+            schemaData = { schemaVersion: 2, sections: [] } as unknown as TemplateSchemaV2;
+        }
 
-        const resultData: Record<string, unknown> = resultsRow?.data
-            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, unknown>
-            : {};
+        const resultData: Record<string, unknown> = (parseMaybeJson(resultsRow?.data) as Record<string, unknown> | null) ?? {};
 
         // Track H (IA-7 / P-6②) — effective requirement: per-inspection
         // override beats the tenant default; both unset → 'none' (loose).

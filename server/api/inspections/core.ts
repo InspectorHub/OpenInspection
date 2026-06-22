@@ -471,6 +471,6 @@ const coreRoutes = createApiRouter()
             },
         });
         return stub.fetch(fwd);
-    });;
+    });
 
 export default coreRoutes;

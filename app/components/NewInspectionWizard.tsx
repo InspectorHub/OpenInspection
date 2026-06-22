@@ -95,6 +95,15 @@ export function NewInspectionWizard({
   const [newAgentName, setNewAgentName] = useState("");
   const [newAgentEmail, setNewAgentEmail] = useState("");
 
+  // Drop a service's price override (used when unselecting, clearing the input,
+  // or when the entered price matches the catalog price = "no override").
+  const removePriceOverride = (serviceId: string) =>
+    setPriceOverrides((prev) => {
+      const m = new Map(prev);
+      m.delete(serviceId);
+      return m;
+    });
+
   const hasServiceCatalog = serviceCatalog.length > 0;
 
   // B-21 — steps with nothing to decide are skipped instead of rendered as
@@ -216,11 +225,7 @@ export function NewInspectionWizard({
       if (next.has(id)) {
         next.delete(id);
         // Clear any price override when unselecting a service.
-        setPriceOverrides((po) => {
-          const m = new Map(po);
-          m.delete(id);
-          return m;
-        });
+        removePriceOverride(id);
       } else {
         next.add(id);
       }
@@ -235,11 +240,7 @@ export function NewInspectionWizard({
    */
   function handlePriceOverrideChange(serviceId: string, dollarValue: string, catalogCents: number | null | undefined) {
     if (dollarValue === '') {
-      setPriceOverrides((prev) => {
-        const m = new Map(prev);
-        m.delete(serviceId);
-        return m;
-      });
+      removePriceOverride(serviceId);
       return;
     }
     const parsed = parseFloat(dollarValue);
@@ -247,11 +248,7 @@ export function NewInspectionWizard({
     const cents = Math.round(parsed * 100);
     // If the value equals the catalog price, treat it as "no override".
     if (catalogCents != null && cents === catalogCents) {
-      setPriceOverrides((prev) => {
-        const m = new Map(prev);
-        m.delete(serviceId);
-        return m;
-      });
+      removePriceOverride(serviceId);
     } else {
       setPriceOverrides((prev) => new Map(prev).set(serviceId, cents));
     }
@@ -261,15 +258,24 @@ export function NewInspectionWizard({
   const clientHasContact = clientEmail.trim().length > 0 || clientPhone.trim().length > 0;
   const clientNameMissing = clientHasContact && clientName.trim().length === 0;
 
-  const canNext =
-    // propertyAddress has a min(5) server constraint — enforce it here so the
-    // wizard cannot advance into an inevitable 400.
-    step === "property" ? address.trim().length >= 5 && templateId.length > 0 :
-    // People: optional, but name is required when email or phone are filled.
-    step === "people" ? !clientNameMissing :
-    step === "services" ? services.size > 0 :
-    step === "schedule" ? date.length > 0 :
-    true;
+  function canAdvanceFromStep(): boolean {
+    switch (step) {
+      case "property":
+        // propertyAddress has a min(5) server constraint — enforce it here so the
+        // wizard cannot advance into an inevitable 400.
+        return address.trim().length >= 5 && templateId.length > 0;
+      case "people":
+        // People: optional, but name is required when email or phone are filled.
+        return !clientNameMissing;
+      case "services":
+        return services.size > 0;
+      case "schedule":
+        return date.length > 0;
+      default:
+        return true;
+    }
+  }
+  const canNext = canAdvanceFromStep();
 
   // B-21 — the backdrop used to discard a half-filled wizard on a stray
   // click. Once the form is dirty, only Cancel / × close it (no native

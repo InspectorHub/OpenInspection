@@ -8,6 +8,32 @@ import { REPORT_STATUS, isReportPublished } from '../../lib/status/report-status
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
 
+type DefectCategory = 'safety' | 'recommendation' | 'maintenance';
+type DefectCounts = Record<DefectCategory, number>;
+
+/** A fresh all-zero defect tally. Each call returns a new object so callers
+ *  can mutate it without sharing state. */
+function zeroCounts(): DefectCounts {
+    return { safety: 0, recommendation: 0, maintenance: 0 };
+}
+
+/** Tally per-inspection custom defects (results[itemId].customComments.defects)
+ *  into an existing stats bucket. Skips explicitly-excluded rows; unknown
+ *  categories fall back to "maintenance". Mutates and returns `stats`. */
+function countCustomDefects(
+    data: Record<string, { customComments?: { defects?: Array<{ included?: boolean; category?: DefectCategory }> } }>,
+    stats: DefectCounts,
+): DefectCounts {
+    for (const key of Object.keys(data)) {
+        for (const d of (data[key]?.customComments?.defects ?? [])) {
+            if (d.included === false) continue;
+            const cat = d.category ?? 'maintenance';
+            if (cat in stats) stats[cat]++;
+        }
+    }
+    return stats;
+}
+
 /**
  * Dashboard + report analytics aggregation. Defect stats, repair list,
  * counts, dashboard buckets, observer progress. Extracted verbatim from
@@ -251,8 +277,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
      * category. Used by the inspection list / dashboard cards. Returns
      * zeros when the inspection has no template / no results.
      */
-    async getDefectStats(inspectionId: string, tenantId: string): Promise<{ safety: number; recommendation: number; maintenance: number }> {
-        const stats = { safety: 0, recommendation: 0, maintenance: 0 };
+    async getDefectStats(inspectionId: string, tenantId: string): Promise<DefectCounts> {
+        const stats = zeroCounts();
         try {
             const report = await this.facade.getReportData(inspectionId, tenantId);
             for (const sec of report.sections) {
@@ -272,18 +298,9 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
                 .get();
             if (resultsRow?.data) {
-                interface CustomDefect { included?: boolean; category?: 'safety' | 'recommendation' | 'maintenance' }
-                const data: Record<string, { customComments?: { defects?: CustomDefect[] } }> = typeof resultsRow.data === 'string'
-                    ? JSON.parse(resultsRow.data)
-                    : resultsRow.data as Record<string, { customComments?: { defects?: CustomDefect[] } }>;
-                for (const key of Object.keys(data)) {
-                    const customDefects = data[key]?.customComments?.defects ?? [];
-                    for (const d of customDefects) {
-                        if (d.included === false) continue;
-                        const cat = (d.category ?? 'maintenance');
-                        if (cat in stats) stats[cat as keyof typeof stats]++;
-                    }
-                }
+                const data = (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as
+                    Record<string, { customComments?: { defects?: Array<{ included?: boolean; category?: DefectCategory }> } }>;
+                countCustomDefects(data, stats);
             }
         } catch {
             // Inspection lookup may fail (deleted between bucket load + stats
@@ -299,8 +316,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
      * then in-memory aggregation. Avoids N+1 round trips when the
      * dashboard renders 50+ cards. Returns a Map keyed by inspection id.
      */
-    async getDefectStatsBatch(tenantId: string, inspectionIds: string[]): Promise<Map<string, { safety: number; recommendation: number; maintenance: number }>> {
-        const out = new Map<string, { safety: number; recommendation: number; maintenance: number }>();
+    async getDefectStatsBatch(tenantId: string, inspectionIds: string[]): Promise<Map<string, DefectCounts>> {
+        const out = new Map<string, DefectCounts>();
         if (inspectionIds.length === 0) return out;
 
         const db = this.getDrizzle();
@@ -321,12 +338,12 @@ export class InspectionAnalyticsService extends InspectionSubService {
         const dataById  = new Map<string, unknown>();
         for (const r of resultRows) dataById.set(r.inspectionId as string, r.data);
 
-        interface CannedDefect { id: string; category: 'safety' | 'recommendation' | 'maintenance'; default: boolean }
-        interface DefectState  { cannedId: string; included?: boolean; category?: 'safety' | 'recommendation' | 'maintenance' }
-        interface CustomDefect { included?: boolean; category?: 'safety' | 'recommendation' | 'maintenance' }
+        interface CannedDefect { id: string; category: DefectCategory; default: boolean }
+        interface DefectState  { cannedId: string; included?: boolean; category?: DefectCategory }
+        interface CustomDefect { included?: boolean; category?: DefectCategory }
 
         for (const id of inspectionIds) {
-            const stats = { safety: 0, recommendation: 0, maintenance: 0 };
+            const stats = zeroCounts();
             const rawTpl = tplById.get(id);
             const tpl = rawTpl ? (typeof rawTpl === 'string' ? JSON.parse(rawTpl) : rawTpl) : null;
             const rawData = dataById.get(id);
@@ -352,14 +369,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 }
             }
             // Custom defects (per-inspection additions).
-            for (const itemId of Object.keys(data)) {
-                const customDefects = data[itemId]?.customComments?.defects ?? [];
-                for (const d of customDefects) {
-                    if (d.included === false) continue;
-                    const cat = (d.category ?? 'maintenance') as keyof typeof stats;
-                    if (cat in stats) stats[cat]++;
-                }
-            }
+            countCustomDefects(data, stats);
             out.set(id, stats);
         }
         return out;
@@ -535,7 +545,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
         }
 
         const decorate = <T extends { id: unknown; status?: unknown; sellingAgentId?: unknown; referredByAgentId?: unknown; inspectorId?: unknown; price?: unknown; requestId?: unknown }>(rows: T[]): Array<T & {
-            defectStats:    { safety: number; recommendation: number; maintenance: number };
+            defectStats:    DefectCounts;
             agentName?:     string;
             inspectorName?: string;
             statusFlags:    { reportPublished: boolean; reportReady: boolean; agreementSigned: boolean; paid: boolean; sent: boolean; flagged: boolean; canceled: boolean };
@@ -558,7 +568,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 const sent        = isReportPublished((r as { reportStatus?: unknown }).reportStatus);
                 return {
                     ...r,
-                    defectStats: statsMap.get(id) ?? { safety: 0, recommendation: 0, maintenance: 0 },
+                    defectStats: statsMap.get(id) ?? zeroCounts(),
                     ...(agentName ? { agentName } : {}),
                     ...(inspectorName ? { inspectorName } : {}),
                     statusFlags: {
@@ -577,14 +587,14 @@ export class InspectionAnalyticsService extends InspectionSubService {
         // Sub-spec B Task 5 (B-4) — portfolio defect aggregation per top card.
         // Sums per-bucket safety / recommendation / maintenance counts so the
         // top 4 dashboard cards can render colored chips alongside the count.
-        const aggregate = (rows: Array<{ id: unknown }>): { safety: number; recommendation: number; maintenance: number } =>
+        const aggregate = (rows: Array<{ id: unknown }>): DefectCounts =>
             rows.reduce((acc, r) => {
-                const s = statsMap.get(r.id as string) ?? { safety: 0, recommendation: 0, maintenance: 0 };
+                const s = statsMap.get(r.id as string) ?? zeroCounts();
                 acc.safety         += s.safety;
                 acc.recommendation += s.recommendation;
                 acc.maintenance    += s.maintenance;
                 return acc;
-            }, { safety: 0, recommendation: 0, maintenance: 0 });
+            }, zeroCounts());
 
         const defectAggregate = {
             // Maps to the 4 top cards on /dashboard.

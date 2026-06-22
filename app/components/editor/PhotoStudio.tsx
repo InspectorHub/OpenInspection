@@ -46,6 +46,11 @@ type ToolId = (typeof TOOLS)[number]["id"];
 
 const ANNOTATION_COLOR = "#ef4444";
 
+/** Build an SVG path `d` string from a list of percent-space points. */
+function freehandPath(points: Array<{ x: number; y: number }>): string {
+  return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
+}
+
 /* ------------------------------------------------------------------ */
 /* Component                                                           */
 /* ------------------------------------------------------------------ */
@@ -98,6 +103,11 @@ export function PhotoStudio({
     }
   }, [labelInput]);
 
+  const closeLabelInput = useCallback(() => {
+    setLabelInput(null);
+    setLabelText("");
+  }, []);
+
   // Escape to close
   useEffect(() => {
     if (!open) return;
@@ -105,8 +115,7 @@ export function PhotoStudio({
       if (e.key === "Escape") {
         // If label input is open, close it first
         if (labelInput) {
-          setLabelInput(null);
-          setLabelText("");
+          closeLabelInput();
           return;
         }
         e.preventDefault();
@@ -115,7 +124,7 @@ export function PhotoStudio({
     }
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [open, onClose, labelInput]);
+  }, [open, onClose, labelInput, closeLabelInput]);
 
   /* -------------------------------------------------------------- */
   /* Canvas coords helper                                            */
@@ -216,9 +225,8 @@ export function PhotoStudio({
         { kind: "label", x: labelInput.x, y: labelInput.y, text: labelText.trim() },
       ]);
     }
-    setLabelInput(null);
-    setLabelText("");
-  }, [labelInput, labelText]);
+    closeLabelInput();
+  }, [labelInput, labelText, closeLabelInput]);
 
   /* -------------------------------------------------------------- */
   /* Undo last annotation                                            */
@@ -250,12 +258,7 @@ export function PhotoStudio({
 
   if (!open) return null;
 
-  const cursorClass =
-    tool === "pan"
-      ? "cursor-move"
-      : tool === "free"
-        ? "cursor-crosshair"
-        : "cursor-crosshair";
+  const cursorClass = tool === "pan" ? "cursor-move" : "cursor-crosshair";
 
   return (
     /* ds-allow: fixed-dark photo-studio chrome (white/* neutrals + amber-400 hints stay dark in both themes) */
@@ -455,13 +458,10 @@ export function PhotoStudio({
                   );
                 }
                 if (ann.kind === "freehand" && ann.points && ann.points.length > 1) {
-                  const d = ann.points
-                    .map((p, j) => `${j === 0 ? "M" : "L"}${p.x},${p.y}`)
-                    .join(" ");
                   return (
                     <path
                       key={i}
-                      d={d}
+                      d={freehandPath(ann.points)}
                       fill="none"
                       stroke={ANNOTATION_COLOR}
                       strokeWidth={0.3}
@@ -486,9 +486,7 @@ export function PhotoStudio({
               {/* Active freehand drawing */}
               {isDrawingFreehand && freehandPoints.length > 1 && (
                 <path
-                  d={freehandPoints
-                    .map((p, j) => `${j === 0 ? "M" : "L"}${p.x},${p.y}`)
-                    .join(" ")}
+                  d={freehandPath(freehandPoints)}
                   fill="none"
                   stroke={ANNOTATION_COLOR}
                   strokeWidth={0.3}
@@ -547,8 +545,7 @@ export function PhotoStudio({
                       }
                       if (e.key === "Escape") {
                         e.preventDefault();
-                        setLabelInput(null);
-                        setLabelText("");
+                        closeLabelInput();
                       }
                       e.stopPropagation();
                     }}
@@ -557,10 +554,7 @@ export function PhotoStudio({
                   />
                   <div className="flex justify-end gap-1 mt-1.5">
                     <button
-                      onClick={() => {
-                        setLabelInput(null);
-                        setLabelText("");
-                      }}
+                      onClick={closeLabelInput}
                       className="px-2 py-0.5 rounded text-[10px] font-bold text-white/50 hover:text-white/80"
                     >
                       Cancel

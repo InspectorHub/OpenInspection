@@ -153,6 +153,27 @@ function CoverPhotoPlaceholder() {
   );
 }
 
+/**
+ * React key for a media tile. Videos key on their stream/media id (stable across
+ * reorders); photos key on their storage key. Pulled out of the JSX because the
+ * inline form was a five-deep nested ternary.
+ */
+function mediaTileKey(photo: ReportPhoto, idx: number): string {
+  const media = photo.media;
+  switch (media?.kind) {
+    case "video-player":
+      return `v-${media.streamUid}-${idx}`;
+    case "video-poster":
+      return `vp-${media.streamUid}-${idx}`;
+    case "r2-video-player":
+      return `r2v-${media.mediaId}-${idx}`;
+    case "r2-video-poster":
+      return `r2vp-${media.mediaId}-${idx}`;
+    default:
+      return photo.key;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Component */
 /* ------------------------------------------------------------------ */
@@ -192,7 +213,7 @@ export function ReportView(props: ReportViewProps) {
   // onError/failedPhotos/aspect-[4/3]/alt hardening intact.
   const renderMediaTile = (photo: ReportPhoto, alt: string, idx: number) => (
     <ReportMediaTile
-      key={photo.media?.kind === "video-player" ? `v-${photo.media.streamUid}-${idx}` : photo.media?.kind === "video-poster" ? `vp-${photo.media.streamUid}-${idx}` : photo.media?.kind === "r2-video-player" ? `r2v-${photo.media.mediaId}-${idx}` : photo.media?.kind === "r2-video-poster" ? `r2vp-${photo.media.mediaId}-${idx}` : photo.key}
+      key={mediaTileKey(photo, idx)}
       photo={photo}
       alt={alt}
       idx={idx}

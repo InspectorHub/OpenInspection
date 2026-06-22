@@ -44,6 +44,31 @@ export function meta() {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
+// Empty dashboard payload — the loader's fail-closed fallback. Returning it from
+// a single source keeps the bucket shape identical to the success path (the two
+// must stay in sync, so we never let them drift).
+function emptyDashboard() {
+  return {
+    buckets: {
+      needsAttention: [] as Inspection[],
+      today: [] as Inspection[],
+      thisWeek: [] as Inspection[],
+      later: [] as Inspection[],
+      recentReports: [] as Inspection[],
+      cancelled: [] as Inspection[],
+    },
+    conciergePending: 0,
+    greeting: "Good morning",
+    tags: [] as Tag[],
+    templates: [] as TemplateOption[],
+    services: [] as ServiceOption[],
+    teamMembers: [] as WizardTeamMember[],
+    checklistDismissed: false,
+    templateCount: 0,
+    serviceCount: 0,
+  };
+}
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   try {
@@ -120,25 +145,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       serviceCount: svcOptions.length,
     };
   } catch {
-    return {
-      buckets: {
-        needsAttention: [] as Inspection[],
-        today: [] as Inspection[],
-        thisWeek: [] as Inspection[],
-        later: [] as Inspection[],
-        recentReports: [] as Inspection[],
-        cancelled: [] as Inspection[],
-      },
-      conciergePending: 0,
-      greeting: "Good morning",
-      tags: [] as Tag[],
-      templates: [] as TemplateOption[],
-      services: [] as ServiceOption[],
-      teamMembers: [] as WizardTeamMember[],
-      checklistDismissed: false,
-      templateCount: 0,
-      serviceCount: 0,
-    };
+    return emptyDashboard();
   }
 }
 
@@ -543,6 +550,21 @@ export default function DashboardPage() {
   // from the auth-layout session context the dashboard already consumes.
   const tenantSlug = sessionCtx?.branding?.tenantSlug ?? null;
 
+  // A row's props are identical in both the grouped and flat views; this keeps
+  // the two render sites in sync.
+  const renderRow = (insp: Inspection) => (
+    <DashboardInspectionRow
+      key={insp.id}
+      insp={insp}
+      reportView={activeTab === "published" || activeTab === "to_review"}
+      tenantSlug={tenantSlug}
+      selectedIds={selectedIds}
+      isColumnVisible={isColumnVisible}
+      toggleSelect={toggleSelect}
+      transitionStatus={transitionStatus}
+    />
+  );
+
   return (
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
       {/* F3 — Seat quota banner */}
@@ -733,18 +755,7 @@ export default function DashboardPage() {
                 </button>
                 {!collapsed && (
                   <div className="divide-y divide-ih-border">
-                    {items.map((insp) => (
-                      <DashboardInspectionRow
-                        key={insp.id}
-                        insp={insp}
-                        reportView={activeTab === "published" || activeTab === "to_review"}
-                        tenantSlug={tenantSlug}
-                        selectedIds={selectedIds}
-                        isColumnVisible={isColumnVisible}
-                        toggleSelect={toggleSelect}
-                        transitionStatus={transitionStatus}
-                      />
-                    ))}
+                    {items.map(renderRow)}
                   </div>
                 )}
               </Card>
@@ -766,18 +777,7 @@ export default function DashboardPage() {
                 </span>
               </div>
               <div className="divide-y divide-ih-border">
-                {!isSearching && displayList.map((insp) => (
-                  <DashboardInspectionRow
-                    key={insp.id}
-                    insp={insp}
-                    reportView={activeTab === "published" || activeTab === "to_review"}
-                    tenantSlug={tenantSlug}
-                    selectedIds={selectedIds}
-                    isColumnVisible={isColumnVisible}
-                    toggleSelect={toggleSelect}
-                    transitionStatus={transitionStatus}
-                  />
-                ))}
+                {!isSearching && displayList.map(renderRow)}
               </div>
               {isSearching && (
                 <div className="py-8 text-center text-[12px] text-ih-fg-4">Searching…</div>

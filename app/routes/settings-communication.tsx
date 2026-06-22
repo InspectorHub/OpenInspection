@@ -88,6 +88,42 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   };
 }
 
+type SecretActionResult = {
+  intent: string;
+  ok: boolean;
+  error: string | null;
+  field: string | null;
+  test: null;
+};
+
+// Shared persistence for the "paste API keys" intents: PUT the (already
+// filtered) secret body, then return the uniform action-result shape. An empty
+// body is a no-op success — the user submitted the form without changing keys.
+async function saveSecrets(
+  api: ReturnType<typeof createApi>,
+  intent: string,
+  body: Record<string, string>,
+  fallbackError: string,
+): Promise<SecretActionResult> {
+  if (Object.keys(body).length === 0) {
+    return { intent, ok: true, error: null, field: null, test: null };
+  }
+  const res = await api.secrets.secrets.$put({ json: body });
+  if (!res.ok) {
+    const errBody = (await res.json().catch(() => null)) as
+      | { error?: { message?: string; field?: string } }
+      | null;
+    return {
+      intent,
+      ok: false,
+      error: errBody?.error?.message ?? fallbackError,
+      field: errBody?.error?.field ?? null,
+      test: null,
+    };
+  }
+  return { intent, ok: true, error: null, field: null, test: null };
+}
+
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const form = await request.formData();
@@ -121,23 +157,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const body: Record<string, string> = {};
     const resendKey = form.get("RESEND_API_KEY");
     if (resendKey && typeof resendKey === "string" && resendKey.trim()) body.RESEND_API_KEY = resendKey;
-
-    if (Object.keys(body).length > 0) {
-      const res = await api.secrets.secrets.$put({ json: body });
-      if (!res.ok) {
-        const errBody = (await res.json().catch(() => null)) as
-          | { error?: { message?: string; field?: string } }
-          | null;
-        return {
-          intent,
-          ok: false,
-          error: errBody?.error?.message ?? "Failed to save email secrets.",
-          field: errBody?.error?.field ?? null,
-          test: null,
-        };
-      }
-    }
-    return { intent, ok: true, error: null, field: null, test: null };
+    return saveSecrets(api, intent, body, "Failed to save email secrets.");
   }
 
   if (intent === "test-resend") {
@@ -163,23 +183,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const clientSecret = form.get("GOOGLE_CLIENT_SECRET");
     if (clientId && typeof clientId === "string" && clientId.trim()) body.GOOGLE_CLIENT_ID = clientId;
     if (clientSecret && typeof clientSecret === "string" && clientSecret.trim()) body.GOOGLE_CLIENT_SECRET = clientSecret;
-
-    if (Object.keys(body).length > 0) {
-      const res = await api.secrets.secrets.$put({ json: body });
-      if (!res.ok) {
-        const errBody = (await res.json().catch(() => null)) as
-          | { error?: { message?: string; field?: string } }
-          | null;
-        return {
-          intent,
-          ok: false,
-          error: errBody?.error?.message ?? "Failed to save calendar secrets.",
-          field: errBody?.error?.field ?? null,
-          test: null,
-        };
-      }
-    }
-    return { intent, ok: true, error: null, field: null, test: null };
+    return saveSecrets(api, intent, body, "Failed to save calendar secrets.");
   }
 
   // ─── Track L — SMS settings ───────────────────────────────────────────────
@@ -199,18 +203,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       const v = form.get(key);
       if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
     }
-    if (Object.keys(body).length > 0) {
-      const res = await api.secrets.secrets.$put({ json: body });
-      if (!res.ok) {
-        const errBody = (await res.json().catch(() => null)) as { error?: { message?: string; field?: string } } | null;
-        return {
-          intent, ok: false,
-          error: errBody?.error?.message ?? "Failed to save Twilio credentials.",
-          field: errBody?.error?.field ?? null, test: null,
-        };
-      }
-    }
-    return { intent, ok: true, error: null, field: null, test: null };
+    return saveSecrets(api, intent, body, "Failed to save Twilio credentials.");
   }
 
   if (intent === "test-sms") {

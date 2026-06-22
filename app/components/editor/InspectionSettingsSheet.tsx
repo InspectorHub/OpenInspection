@@ -108,8 +108,10 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     }
   }
 
-  // Trigger load when the sheet opens or inspectionId changes
+  // Trigger load when the sheet opens or inspectionId changes; mark loading so
+  // the skeleton shows until the loader data lands.
   useEffect(() => {
+    if (open) setLoading(true);
     if (open && inspectionId) {
       loadFetcher.load(`/resources/inspection-settings-sheet?inspectionId=${encodeURIComponent(inspectionId)}`);
     }
@@ -169,7 +171,8 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   // the sheet loader here (that would flicker the entire settings sheet).
   useEffect(() => {
     const d = coverFetcher.data;
-    if (coverFetcher.state === "idle" && d?.intent === "upload-cover" && d.ok && d.coverKey) {
+    if (coverFetcher.state !== "idle" || !d?.ok || !d.coverKey) return;
+    if (d.intent === "upload-cover") {
       const key = d.coverKey;
       const url = d.coverUrl ?? null;
       if (url) {
@@ -177,7 +180,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
         setCropSource({ key, url });
       }
     }
-    if (coverFetcher.state === "idle" && d?.intent === "crop-cover" && d.ok && d.coverKey) {
+    if (d.intent === "crop-cover") {
       setCoverKey(d.coverKey);
     }
   }, [coverFetcher.state, coverFetcher.data]);
@@ -186,10 +189,6 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
   useEffect(() => {
     if (loadFetcher.state !== "idle") setLoading(true);
   }, [loadFetcher.state]);
-
-  useEffect(() => {
-    if (open) setLoading(true);
-  }, [open, inspectionId]);
 
   // Drive saveState from the dedicated fetcher's lifecycle. submitting → saving;
   // response ok → saved (+ onTemplateApplied if the template changed); not ok →

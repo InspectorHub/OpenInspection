@@ -357,12 +357,6 @@ export class ConciergeService {
     }
 
     /**
-     * Read-only token resolution for the public /confirm/<token> page. Returns
-     * a view-friendly summary (inspector + property + date + agreement flag),
-     * along with `expired` and `alreadyConfirmed` flags so the page can render
-     * the right state. Returns null when the token does not exist.
-     */
-    /**
      * Track I-a — resolve a presented confirm token to its row. Hash-first
      * (token_hash) with a permanent legacy plaintext fallback that lazily
      * upgrades the row in place. `token` is the PK; the upgrade rewrites it to a
@@ -384,6 +378,12 @@ export class ConciergeService {
         });
     }
 
+    /**
+     * Read-only token resolution for the public /confirm/<token> page. Returns
+     * a view-friendly summary (inspector + property + date + agreement flag),
+     * along with `expired` and `alreadyConfirmed` flags so the page can render
+     * the right state. Returns null when the token does not exist.
+     */
     async resolveToken(token: string): Promise<ConciergeTokenView | null> {
         const db = this.getDrizzle();
         const row = await this.resolveConfirmToken(token);
