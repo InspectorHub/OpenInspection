@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, asc, isNull, ne, inArray } from 'drizzle-orm';
+import { eq, and, asc, isNull, ne, inArray, sql } from 'drizzle-orm';
 import { services, inspectionServices, discountCodes, serviceInspectors, users } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { nanoid } from 'nanoid';
@@ -222,5 +222,25 @@ export class ServiceService {
             : Math.floor(subtotal * dc.value / 100);
 
         return { valid: true, discountAmount, discountCodeId: dc.id };
+    }
+
+    /**
+     * Atomically increments uses_count for a discount code, enforcing max_uses.
+     * Returns true if the redemption was accepted (a row changed), false if the
+     * cap blocked it (uses_count >= max_uses) or the code doesn't exist for
+     * this tenant. Tenant-scoped: the WHERE clause filters tenant_id so a
+     * cross-tenant id can never consume another tenant's quota.
+     */
+    async redeemDiscountCode(tenantId: string, discountCodeId: string): Promise<boolean> {
+        const db = this.getDrizzle();
+        const res = await db.update(discountCodes)
+            .set({ usesCount: sql`${discountCodes.usesCount} + 1` })
+            .where(and(
+                eq(discountCodes.id, discountCodeId),
+                eq(discountCodes.tenantId, tenantId),
+                sql`(${discountCodes.maxUses} IS NULL OR ${discountCodes.usesCount} < ${discountCodes.maxUses})`,
+            )).run();
+        const r = res as unknown as { meta?: { changes?: number }; changes?: number };
+        return (r.meta?.changes ?? r.changes ?? 0) > 0;
     }
 }
