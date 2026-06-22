@@ -827,6 +827,6 @@ export class AvailabilityService {
         )).get();
 
         if (!existing) throw Errors.NotFound('Override not found');
-        await db.delete(availabilityOverrides).where(eq(availabilityOverrides.id, id));
+        await db.delete(availabilityOverrides).where(and(eq(availabilityOverrides.id, id), eq(availabilityOverrides.tenantId, tenantId)));
     }
 }

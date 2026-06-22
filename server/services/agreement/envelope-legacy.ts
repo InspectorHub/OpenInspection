@@ -10,7 +10,7 @@ import type { AgreementServiceBase } from './base';
 /** Signer-state methods this tier depends on (cross-mixin call surface). */
 interface SignerStateDeps {
     synthesizeDefaultSigner(envelope: typeof agreementRequests.$inferSelect): Promise<typeof agreementSigners.$inferSelect>;
-    getSignerLink(requestId: string, signerId: string): Promise<string>;
+    getSignerLink(tenantId: string, requestId: string, signerId: string): Promise<string>;
 }
 
 /**
@@ -107,7 +107,7 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                     firstSigner = await this.synthesizeDefaultSigner(env);
                 }
                 try {
-                    token = await this.getSignerLink(env.id, firstSigner.id);
+                    token = await this.getSignerLink(env.tenantId, env.id, firstSigner.id);
                 } catch (e) {
                     logger.warn('AgreementService.findOrCreate reuse-link failed', { requestId: env.id, error: e instanceof Error ? e.message : String(e) });
                 }

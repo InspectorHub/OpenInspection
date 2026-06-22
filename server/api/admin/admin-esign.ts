@@ -314,7 +314,7 @@ export const adminEsignRoutes = createApiRouter()
             .get();
         if (!signer) throw Errors.NotFound('Signer not found');
         const tenantSlug = await resolveTenantSlug(c, tenantId);
-        const token = await svc.getSignerLink(requestId, signerId);
+        const token = await svc.getSignerLink(tenantId, requestId, signerId);
         const url = await buildSignUrl(c, tenantId, signer.inspectionId, tenantSlug, token);
         return c.json({ success: true as const, data: { url } }, 200);
     })
@@ -352,7 +352,7 @@ export const adminEsignRoutes = createApiRouter()
         }
 
         const tenantSlug = await resolveTenantSlug(c, tenantId);
-        const token = await svc.getSignerLink(requestId, signerId);
+        const token = await svc.getSignerLink(tenantId, requestId, signerId);
         const signUrl = await buildSignUrl(c, tenantId, row.inspectionId, tenantSlug, token);
         const sigInspector = await lookupSenderSignature(c, tenantId);
         await c.var.services.email.sendAgreementRequest(row.email, row.name, 'Agreement', signUrl, sigInspector, getBookingHost(c))

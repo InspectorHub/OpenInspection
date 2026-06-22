@@ -268,7 +268,7 @@ export const adminAgreementsRoutes = createApiRouter()
         for (const s of signerRows) {
             let signUrl: string;
             try {
-                const token = await svc.getSignerLink(env.requestId, s.id);
+                const token = await svc.getSignerLink(tenantId, env.requestId, s.id);
                 signUrl = await buildSignUrl(c, tenantId, inspectionId, tenantSlug, token);
             } catch (e) {
                 logger.warn('agreement.signer.link.failed', { signerId: s.id, error: (e as Error).message });
