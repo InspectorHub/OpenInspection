@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c655c229-a644-4043-959b-144dd16640b0",
+  "id": "f3a7cd4a-d8f2-4e88-ade0-39f162d02590",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agreement_requests": {
@@ -4237,6 +4237,13 @@
         },
         "partial_paid_at": {
           "name": "partial_paid_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "voided_at": {
+          "name": "voided_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

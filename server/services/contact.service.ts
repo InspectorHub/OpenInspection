@@ -112,6 +112,7 @@ export class ContactService {
                     eq(invoices.tenantId, tenantId),
                     inArray(invoices.inspectionId, chunk),
                     isNotNull(invoices.paidAt),
+                    isNull(invoices.voidedAt),
                 ))
                 .get();
             totalRevenueCents += res?.total ?? 0;

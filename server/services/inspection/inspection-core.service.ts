@@ -15,6 +15,7 @@ import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation, type Inspection, type InspectionListParams, type CreateInspectionData } from './shared';
 import { InspectionSubService } from './base';
+import { ServiceService } from '../service.service';
 
 /** Internal — one Publish-modal recipient row (client or agent). Not exported:
  *  the public `getRecipientList` signature keeps its inline structural type. */
@@ -58,6 +59,23 @@ export class InspectionCoreService extends InspectionSubService {
             .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
         for (const row of rows) byId.set(row.id as string, row);
         return byId;
+    }
+
+    /**
+     * Guard: every non-null id in `ids` must be a `contacts` row that belongs
+     * to `tenantId`. Throws BadRequest for the first id that fails — preventing
+     * cross-tenant contact/agent references from being persisted (D1 does not
+     * enforce FK constraints at runtime, so this is the application-layer gate).
+     * Called in createInspection before the inspections insert.
+     */
+    private async assertContactsBelongToTenant(tenantId: string, ids: Array<string | null | undefined>) {
+        const want = ids.filter((x): x is string => !!x);
+        if (!want.length) return;
+        const db = this.getDrizzle();
+        const found = await db.select({ id: contacts.id }).from(contacts)
+            .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, want))).all();
+        const ok = new Set(found.map(r => r.id as string));
+        for (const id of want) if (!ok.has(id)) throw Errors.BadRequest('Unknown contact for this workspace');
     }
 
     /**
@@ -285,6 +303,28 @@ export class InspectionCoreService extends InspectionSubService {
         const defaultPaymentRequired   = tenantPolicy?.blockUnpaid ?? false;
         const defaultAgreementRequired = tenantPolicy?.blockUnsignedAgreement ?? false;
 
+        // #180 — Atomic discount redemption. When a discountCodeId is supplied,
+        // attempt an atomic cap-guarded increment. If the cap has been reached
+        // (redeemDiscountCode returns false), drop the discount from the persisted
+        // row but still create the inspection successfully. The preview-only
+        // validateDiscountCode path is unaffected.
+        const rawDiscountCodeId = (data as { discountCodeId?: string | null }).discountCodeId ?? null;
+        const rawDiscountAmount = (data as { discountAmount?: number | null }).discountAmount ?? null;
+
+        let persistedDiscountCodeId: string | null = null;
+        let persistedDiscountAmount: number = 0;
+
+        if (rawDiscountCodeId) {
+            const svcSvc = new ServiceService(this.db);
+            const redeemed = await svcSvc.redeemDiscountCode(tenantId, rawDiscountCodeId);
+            if (redeemed) {
+                persistedDiscountCodeId = rawDiscountCodeId;
+                persistedDiscountAmount = rawDiscountAmount ?? 0;
+            }
+            // If redeemed === false: cap hit or code gone — drop the discount silently;
+            // the inspection is still created without it.
+        }
+
         const newInspection = {
             id,
             tenantId,
@@ -312,6 +352,10 @@ export class InspectionCoreService extends InspectionSubService {
             addressLat:        (data.addressLat as number | null) ?? null,
             addressLng:        (data.addressLng as number | null) ?? null,
             addressGeocodedAt: data.addressPlaceId ? Date.now() : null,
+            // #180 — discount columns set after atomic redemption above.
+            // null/0 when no code was supplied or the cap blocked redemption.
+            discountCodeId:    persistedDiscountCodeId,
+            discountAmount:    persistedDiscountAmount,
             // Round-2 #10 — block-report gating defaults inherited from tenant
             // policy. The Sprint 1 D-7 ReportGatePage check at /report/:id
             // reads these per-inspection columns directly.
@@ -320,6 +364,7 @@ export class InspectionCoreService extends InspectionSubService {
             createdAt
         };
 
+        await this.assertContactsBelongToTenant(tenantId, [data.referredByAgentId, data.sellingAgentId, data.clientContactId]);
         await this.sdb.insert(inspections, newInspection);
         // DB-8: mirror assignment into inspection_inspectors link table.
         // Non-fatal — a sync failure must not roll back a committed inspection row.

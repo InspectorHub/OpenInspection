@@ -67,4 +67,12 @@ describe('InvoiceService — report payment gate sync', () => {
         await svc.markRefunded('inv-1', TENANT);
         expect(await paymentStatus(testDb)).toBe('paid');
     });
+
+    it('voiding one of two paid invoices keeps the gate paid (non-voided paid invoice remains)', async () => {
+        await seedPaidInvoice('inv-1');
+        await seedPaidInvoice('inv-2');
+        // Void inv-1 (deleteInvoice sets voidedAt); inv-2 remains paid and non-voided.
+        await svc.deleteInvoice('inv-1', TENANT);
+        expect(await paymentStatus(testDb)).toBe('paid');
+    });
 });

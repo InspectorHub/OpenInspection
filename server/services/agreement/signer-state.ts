@@ -121,10 +121,10 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
          * token_enc (current → previous secret); on a backfilled row (token_enc
          * NULL) mints a fresh token and persists tokenHash + token_enc.
          */
-        async getSignerLink(requestId: string, signerId: string): Promise<string> {
+        async getSignerLink(tenantId: string, requestId: string, signerId: string): Promise<string> {
             const db = this.getDrizzle();
             const rows = await db.select().from(agreementSigners)
-                .where(and(eq(agreementSigners.id, signerId), eq(agreementSigners.requestId, requestId))).limit(1);
+                .where(and(eq(agreementSigners.id, signerId), eq(agreementSigners.requestId, requestId), eq(agreementSigners.tenantId, tenantId))).limit(1);
             if (rows.length === 0) throw Errors.NotFound('Signer not found');
             const signer = rows[0];
             if (signer.tokenEnc) {
@@ -173,7 +173,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
             if (!outstanding) return null;
 
             try {
-                return await this.getSignerLink(envelope.id, outstanding.id);
+                return await this.getSignerLink(tenantId, envelope.id, outstanding.id);
             } catch (e) {
                 logger.warn('AgreementService.getFirstOutstandingSignerLink failed', {
                     tenantId, inspectionId, requestId: envelope.id, error: e instanceof Error ? e.message : String(e),
@@ -216,7 +216,7 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                 const signer = signers.find((s) => (s.email || '').trim().toLowerCase() === target);
                 if (!signer) return null;
 
-                return await this.getSignerLink(envelope.id, signer.id);
+                return await this.getSignerLink(tenantId, envelope.id, signer.id);
             } catch (e) {
                 logger.warn('AgreementService.getSignerLinkByEmail failed', {
                     tenantId, inspectionId, error: e instanceof Error ? e.message : String(e),

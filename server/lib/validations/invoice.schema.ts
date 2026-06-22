@@ -29,7 +29,7 @@ export const RequestPaymentSchema = z.object({
 
 export const RequestPaymentResponseSchema = z.object({
     id: z.string().describe('Invoice row id'),
-    status: z.enum(['draft', 'sent', 'partial', 'paid']).describe('Invoice status after the request (sent)'),
+    status: z.enum(['draft', 'sent', 'partial', 'paid', 'void']).describe('Invoice status after the request (sent)'),
     amountCents: z.number().describe('Amount requested, in cents (money authority chain)'),
     sentAt: z.string().nullable().describe('ISO timestamp the request was marked sent'),
 }).openapi('RequestPaymentResponse');
@@ -52,5 +52,5 @@ export const InvoiceResponseSchema = z.object({
     sentAt: z.string().nullable().describe('TODO describe sentAt field for the OpenInspection MCP integration'),
     paidAt: z.string().nullable().describe('TODO describe paidAt field for the OpenInspection MCP integration'),
     createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-    status: z.enum(['draft', 'sent', 'paid', 'partial']).describe('TODO describe status field for the OpenInspection MCP integration'),
+    status: z.enum(['draft', 'sent', 'paid', 'partial', 'void']).describe('TODO describe status field for the OpenInspection MCP integration'),
 }).openapi('Invoice');

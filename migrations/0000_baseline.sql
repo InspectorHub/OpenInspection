@@ -597,6 +597,7 @@ CREATE TABLE `invoices` (
 	`paid_at` integer,
 	`payment_method` text,
 	`partial_paid_at` integer,
+	`voided_at` integer,
 	`qbo_sync_status` text,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action,

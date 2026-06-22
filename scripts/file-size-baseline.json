@@ -1,7 +1,7 @@
 {
   "app/routes/inspection-edit.tsx": 1964,
   "app/routes/inspection-hub.tsx": 992,
-  "server/services/inspection/inspection-core.service.ts": 907,
+  "server/services/inspection/inspection-core.service.ts": 952,
   "app/routes/dashboard.tsx": 841,
   "server/services/booking.service.ts": 833,
   "server/index.ts": 820,

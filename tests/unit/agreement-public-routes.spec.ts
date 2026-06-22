@@ -130,7 +130,7 @@ async function createTwoSignerEnvelope(
         .where(eq(schema.agreementSigners.requestId, r.requestId))
         .orderBy(asc(schema.agreementSigners.createdAt)).all();
     // signer-1 link = r.token; mint signer-2 link from the service
-    const token2 = await svc.getSignerLink(r.requestId, signers[1].id);
+    const token2 = await svc.getSignerLink(TENANT_ID, r.requestId, signers[1].id);
     return { token1: r.token, token2, requestId: r.requestId, signers };
 }
 

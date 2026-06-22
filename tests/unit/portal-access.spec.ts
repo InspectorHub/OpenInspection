@@ -118,7 +118,7 @@ describe('PortalAccessService — token hash-at-rest (tier-2)', () => {
 
     it('revoked row re-issue rotates to a fresh token (resolves, old does not)', async () => {
         const first = await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: 'c@x.com' });
-        await svc.revokeForRecipient(INSPECTION, 'c@x.com');
+        await svc.revokeForRecipient(TENANT, INSPECTION, 'c@x.com');
         const second = await svc.issueToken({ tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: 'c@x.com' });
         expect(second).not.toBe(first);
         expect(await svc.resolveToken(second)).not.toBeNull();

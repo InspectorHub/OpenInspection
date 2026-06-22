@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, sql, isNotNull } from 'drizzle-orm';
+import { eq, and, desc, sql, isNotNull, isNull } from 'drizzle-orm';
 import { invoices } from '../lib/db/schema/invoice';
 import { inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
@@ -8,7 +8,8 @@ import { AutomationService } from './automation.service';
 import { logger } from '../lib/logger';
 import type { PaymentMethod } from '../lib/payment-method';
 
-function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' {
+function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null; voidedAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' | 'void' {
+    if (inv.voidedAt) return 'void';
     if (inv.paidAt) return 'paid';
     if (inv.partialPaidAt) return 'partial';
     if (inv.sentAt) return 'sent';
@@ -143,7 +144,7 @@ export class InvoiceService {
         if (!inspectionId) return;
         const db = this.getDrizzle();
         const stillPaid = await db.select({ id: invoices.id }).from(invoices)
-            .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId), isNotNull(invoices.paidAt)))
+            .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId), isNotNull(invoices.paidAt), isNull(invoices.voidedAt)))
             .limit(1).get();
         if (stillPaid) return;
         await db.update(inspections).set({ paymentStatus: 'unpaid' })
@@ -156,12 +157,34 @@ export class InvoiceService {
             .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
     }
 
-    async deleteInvoice(id: string, tenantId: string) {
+    /**
+     * Void an invoice: set voidedAt to now and clear the payment gate if needed.
+     * Idempotent — calling on an already-voided invoice is a no-op (voidedAt
+     * is NOT updated again). Tenant-scoped — an invoice that belongs to another
+     * tenant is silently ignored (no error, no mutation).
+     */
+    async voidInvoice(id: string, tenantId: string): Promise<void> {
         const db = this.getDrizzle();
-        const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
-        if (!existing) throw Errors.NotFound('Invoice not found');
-        await db.delete(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+        const existing = await db.select().from(invoices)
+            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
+        // No-op: not found (cross-tenant guard) or already voided (idempotency).
+        if (!existing || existing.voidedAt) return;
+        await db.update(invoices).set({ voidedAt: new Date() })
+            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
         await this.syncInspectionPaymentGate(existing.inspectionId, tenantId);
+    }
+
+    /**
+     * "Delete" an invoice by voiding it — the row is preserved for the audit
+     * trail and accounting records. Hard deletion is intentionally prohibited
+     * (QuickBooks-style void lifecycle, see #182).
+     */
+    async deleteInvoice(id: string, tenantId: string): Promise<void> {
+        const db = this.getDrizzle();
+        const existing = await db.select().from(invoices)
+            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
+        if (!existing) throw Errors.NotFound('Invoice not found');
+        await this.voidInvoice(id, tenantId);
     }
 
     /**
@@ -173,9 +196,9 @@ export class InvoiceService {
     async getEarningsSummary(tenantId: string): Promise<{ paid: number; pending: number; count: number }> {
         const db = this.getDrizzle();
         const row = await db.select({
-            paid:    sql<number>`coalesce(sum(case when ${invoices.paidAt} is not null then ${invoices.amountCents} else 0 end), 0)`,
-            pending: sql<number>`coalesce(sum(case when ${invoices.sentAt} is not null and ${invoices.paidAt} is null then ${invoices.amountCents} else 0 end), 0)`,
-            count:   sql<number>`coalesce(sum(case when ${invoices.paidAt} is not null then 1 else 0 end), 0)`,
+            paid:    sql<number>`coalesce(sum(case when ${invoices.paidAt} is not null and ${invoices.voidedAt} is null then ${invoices.amountCents} else 0 end), 0)`,
+            pending: sql<number>`coalesce(sum(case when ${invoices.sentAt} is not null and ${invoices.paidAt} is null and ${invoices.voidedAt} is null then ${invoices.amountCents} else 0 end), 0)`,
+            count:   sql<number>`coalesce(sum(case when ${invoices.paidAt} is not null and ${invoices.voidedAt} is null then 1 else 0 end), 0)`,
         })
         .from(invoices)
         .where(eq(invoices.tenantId, tenantId))

@@ -91,7 +91,7 @@ const agreementsRoutes = createApiRouter()
 
         const signers = await c.var.services.agreement.listSigners(tenantId, env.requestId);
         const signer = signers[0];
-        const token = await c.var.services.agreement.getSignerLink(env.requestId, signer.id);
+        const token = await c.var.services.agreement.getSignerLink(tenantId, env.requestId, signer.id);
 
         // Build the public sign URL. Use the saas-aware resolver
         // (requestedTenantSlug is empty in saas → DB fallback).
@@ -273,7 +273,7 @@ const agreementsRoutes = createApiRouter()
             throw Errors.Conflict('Agreement is no longer signable');
         }
 
-        const plaintext = await svc.getSignerLink(env.requestId, signer.id);
+        const plaintext = await svc.getSignerLink(tenantId, env.requestId, signer.id);
 
         const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || null;
         const ua = (c.req.header('user-agent') || '').slice(0, 200) || null;

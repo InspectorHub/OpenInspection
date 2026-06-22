@@ -135,8 +135,8 @@ describe('AgreementService — signer-level envelope state machine', () => {
         });
         const signers = await testDb.select().from(schema.agreementSigners)
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
-        const link1 = await svc.getSignerLink(r.requestId, signers[0].id);
-        const link2 = await svc.getSignerLink(r.requestId, signers[1].id);
+        const link1 = await svc.getSignerLink(TENANT_A, r.requestId, signers[0].id);
+        const link2 = await svc.getSignerLink(TENANT_A, r.requestId, signers[1].id);
 
         const first = await svc.markSignedBySigner(link1, 'sig-jane', { signedAtMs: 1000, channel: 'remote' });
         expect(first.envelopeCompletedNow).toBe(false);
@@ -162,7 +162,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         });
         const signers = await testDb.select().from(schema.agreementSigners)
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
-        const link1 = await svc.getSignerLink(r.requestId, signers[0].id);
+        const link1 = await svc.getSignerLink(TENANT_A, r.requestId, signers[0].id);
         const res = await svc.markSignedBySigner(link1, 'sig-jane', { signedAtMs: 1000, channel: 'in_person' });
         expect(res.envelopeCompletedNow).toBe(true);
         expect(res.envelopeStatus).toBe('signed');
@@ -177,7 +177,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const sAll = await testDb.select().from(schema.agreementSigners)
             .where(eq(schema.agreementSigners.requestId, rAll.requestId))
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
-        const linkAll = await svc.getSignerLink(rAll.requestId, sAll[0].id);
+        const linkAll = await svc.getSignerLink(TENANT_A, rAll.requestId, sAll[0].id);
         const decAll = await svc.markDeclinedBySigner(linkAll, 'Price too high');
         expect(decAll.envelopeStatus).toBe('declined');
         const envAll = await testDb.select().from(schema.agreementRequests).where(eq(schema.agreementRequests.id, rAll.requestId)).get();
@@ -193,7 +193,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         const sOne = await testDb.select().from(schema.agreementSigners)
             .where(eq(schema.agreementSigners.requestId, rOne.requestId))
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
-        const linkOne = await svc.getSignerLink(rOne.requestId, sOne[0].id);
+        const linkOne = await svc.getSignerLink(TENANT_A, rOne.requestId, sOne[0].id);
         const decOne = await svc.markDeclinedBySigner(linkOne, 'No');
         expect(decOne.envelopeStatus).not.toBe('declined');
     });
@@ -204,7 +204,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
             completionPolicy: 'one',
         });
         const s = await testDb.select().from(schema.agreementSigners).all();
-        const link = await svc.getSignerLink(r.requestId, s[0].id);
+        const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
         const first = await svc.markSignedBySigner(link, 'sig', { signedAtMs: 1000, channel: 'remote' });
         expect(first.envelopeCompletedNow).toBe(true);
         const second = await svc.markSignedBySigner(link, 'sig-again', { signedAtMs: 2000, channel: 'remote' });
@@ -216,7 +216,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
             signers: [{ name: 'Jane', email: 'jane@test.com' }],
         });
         const s = await testDb.select().from(schema.agreementSigners).all();
-        const link = await svc.getSignerLink(r.requestId, s[0].id);
+        const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
         const resolved = await svc.getSignerByPresentedToken(link);
         expect(resolved!.signer.id).toBe(s[0].id);
 
@@ -232,7 +232,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
             id: backfillId, tenantId: TENANT_A, requestId: reqId,
             name: 'B', email: 'b@test.com', role: 'client', status: 'sent', createdAt: new Date(),
         });
-        const backfillLink = await svc.getSignerLink(reqId, backfillId);
+        const backfillLink = await svc.getSignerLink(TENANT_A, reqId, backfillId);
         expect(backfillLink).toBeTruthy();
         const row = await testDb.select().from(schema.agreementSigners).where(eq(schema.agreementSigners.id, backfillId)).get();
         expect(row!.tokenHash).toBe(await hashToken(backfillLink));
@@ -323,7 +323,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
     it('on-behalf + channel + ip/ua persist on signer through markSignedBySigner', async () => {
         const r = await svc.findOrCreate(TENANT_A, INSP_ID, { signers: [{ name: 'Agent', email: 'agent@test.com', role: 'agent' }], completionPolicy: 'one' });
         const s = await testDb.select().from(schema.agreementSigners).all();
-        const link = await svc.getSignerLink(r.requestId, s[0].id);
+        const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
         await svc.markSignedBySigner(link, 'sig', {
             signedAtMs: 5000, channel: 'in_person',
             ipAddress: '1.2.3.4', userAgent: 'UA/1.0',
@@ -348,8 +348,8 @@ describe('AgreementService — signer-level envelope state machine', () => {
         });
         const signers = await testDb.select().from(schema.agreementSigners)
             .orderBy(asc(schema.agreementSigners.createdAt)).all();
-        const linkA = await svc.getSignerLink(r.requestId, signers[0].id);
-        const linkB = await svc.getSignerLink(r.requestId, signers[1].id);
+        const linkA = await svc.getSignerLink(TENANT_A, r.requestId, signers[0].id);
+        const linkB = await svc.getSignerLink(TENANT_A, r.requestId, signers[1].id);
 
         // A signs first: envelope 1/2, not complete.
         const a = await svc.markSignedBySigner(linkA, 'sig-jane', { signedAtMs: 1000, channel: 'remote' });
@@ -377,7 +377,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
             completionPolicy: 'one',
         });
         const s = await testDb.select().from(schema.agreementSigners).all();
-        const link = await svc.getSignerLink(r.requestId, s[0].id);
+        const link = await svc.getSignerLink(TENANT_A, r.requestId, s[0].id);
 
         // better-sqlite3 is synchronous under the hood so this resolves
         // deterministically, but the service awaits between read + write, so the
@@ -418,7 +418,7 @@ describe('AgreementService — signer-level envelope state machine', () => {
         }
 
         // getSignerLink cannot reconstruct the link without a sealing key.
-        await expect(noSecretSvc.getSignerLink(r.requestId, signers[0].id))
+        await expect(noSecretSvc.getSignerLink(TENANT_A, r.requestId, signers[0].id))
             .rejects.toThrow(/Token sealing key unavailable/);
     });
 });
