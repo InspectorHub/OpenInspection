@@ -49,3 +49,6 @@ scripts/backfill-zod-descriptions.report.md
 
 # Transient wipe-d1 scratch SQL (scripts/wipe-d1.mjs cleans these up; ignore in case of crash)
 .wipe-d1.*.sql
+
+# SDD scratch (briefs, reports, diffs, progress ledger)
+.superpowers/
