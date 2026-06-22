@@ -264,6 +264,23 @@ export const reinspectCandidatesRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 
+// Shared body for the three report state-machine transitions (submit / return /
+// unpublish): run the service mutation, mapping a thrown error to a 400-ready
+// failure message. The per-route handlers keep their own valid('param') reads
+// and c.json() calls so each route's typed request/response shape stays exact.
+type ReportTransitionResult = { ok: true } | { ok: false; message: string };
+async function runReportTransition(
+    mutate: () => Promise<unknown>,
+    fallbackMessage: string,
+): Promise<ReportTransitionResult> {
+    try {
+        await mutate();
+        return { ok: true };
+    } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : fallbackMessage };
+    }
+}
+
 const publishRoutes = createApiRouter()
     .openapi(completeInspectionRoute, async (c) => {
         const { id } = c.req.valid('param');
@@ -509,34 +526,25 @@ const publishRoutes = createApiRouter()
         return c.json({ success: true, data: { candidates } }, 200);
     })
     .openapi(submitReportRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
+        const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
-        try {
-            await c.var.services.inspection.submitReport(id, tenantId);
-            return c.json({ success: true as const, data: { reportStatus: 'submitted' } }, 200);
-        } catch (err) {
-            return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to submit report' } }, 400);
-        }
+        const result = await runReportTransition(() => c.var.services.inspection.submitReport(id, tenantId), 'Failed to submit report');
+        if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
+        return c.json({ success: true as const, data: { reportStatus: 'submitted' } }, 200);
     })
     .openapi(returnReportRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
+        const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
-        try {
-            await c.var.services.inspection.returnReport(id, tenantId);
-            return c.json({ success: true as const, data: { reportStatus: 'in_progress' } }, 200);
-        } catch (err) {
-            return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to return report' } }, 400);
-        }
+        const result = await runReportTransition(() => c.var.services.inspection.returnReport(id, tenantId), 'Failed to return report');
+        if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
+        return c.json({ success: true as const, data: { reportStatus: 'in_progress' } }, 200);
     })
     .openapi(unpublishReportRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
+        const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
-        try {
-            await c.var.services.inspection.unpublishReport(id, tenantId);
-            return c.json({ success: true as const, data: { reportStatus: 'in_progress' } }, 200);
-        } catch (err) {
-            return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: err instanceof Error ? err.message : 'Failed to unpublish report' } }, 400);
-        }
+        const result = await runReportTransition(() => c.var.services.inspection.unpublishReport(id, tenantId), 'Failed to unpublish report');
+        if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
+        return c.json({ success: true as const, data: { reportStatus: 'in_progress' } }, 200);
     });
 
 export default publishRoutes;

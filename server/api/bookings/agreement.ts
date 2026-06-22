@@ -13,6 +13,12 @@ import { logger } from '../../lib/logger';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { runEnvelopeCompletionPipeline } from '../../lib/sign-effects';
 
+// Local aliases for the literal unions the DB columns are narrowed to in the
+// JSON responses below. Kept file-local (not exported) so the public router
+// type surface is unchanged; they only de-duplicate the inline casts.
+type EnvelopeStatus = 'pending' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired';
+type SignerRole = 'client' | 'co_client' | 'agent' | 'other';
+
 /**
  * GET /api/public/agreements/:token — fetch agreement content + mark viewed
  */
@@ -214,17 +220,16 @@ export const agreementRoutes = createApiRouter()
         return c.json({
             success: true as const,
             data: {
-                status: envelope.status as 'pending' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired',
+                status: envelope.status as EnvelopeStatus,
                 clientName: envelope.clientName ?? null,
                 agreementName: agreementRow?.name ?? 'Agreement',
                 agreementContent: snapshot.content,
                 signer: {
                     name: signer.name,
-                    role: signer.role as 'client' | 'co_client' | 'agent' | 'other',
+                    role: signer.role as SignerRole,
                     // Re-read this signer's status post-view (markViewedBySigner may
                     // have flipped it from sent → viewed).
-                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as
-                        'pending' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired',
+                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as EnvelopeStatus,
                 },
                 progress: { signed: signedCount, total: signers.length },
                 completionPolicy: envelope.completionPolicy as 'all' | 'one',
@@ -302,9 +307,8 @@ export const agreementRoutes = createApiRouter()
             data: {
                 signer: {
                     name: signer.name,
-                    role: signer.role as 'client' | 'co_client' | 'agent' | 'other',
-                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as
-                        'pending' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired',
+                    role: signer.role as SignerRole,
+                    status: (signers.find((s) => s.id === signer.id)?.status ?? signer.status) as EnvelopeStatus,
                 },
                 agreement: {
                     name: agreementRow?.name ?? 'Agreement',
@@ -312,7 +316,7 @@ export const agreementRoutes = createApiRouter()
                     contentHash: snapshot.hash,
                 },
                 envelope: {
-                    status: envelope.status as 'pending' | 'sent' | 'viewed' | 'signed' | 'declined' | 'expired',
+                    status: envelope.status as EnvelopeStatus,
                     completionPolicy: envelope.completionPolicy as 'all' | 'one',
                     progress: { signed: signedCount, total: signers.length },
                 },

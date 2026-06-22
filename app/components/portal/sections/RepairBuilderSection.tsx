@@ -136,6 +136,30 @@ interface ItemDraft {
 // Section entry — gated states OR the builder UI
 // ---------------------------------------------------------------------------
 
+// Gated states (everything except `ok`) render the same centered mini-card,
+// differing only in title + body copy. One lookup keeps them in lockstep.
+const GATED_STATES: Record<
+  Exclude<LoaderResult["kind"], "ok">,
+  { title: string; message: string }
+> = {
+  no_access: {
+    title: "Access Required",
+    message: "You need a valid token or login to view this page.",
+  },
+  not_published: {
+    title: "Report Not Published",
+    message: "The report must be published before you can build a repair request.",
+  },
+  forbidden: {
+    title: "Feature Not Available",
+    message: "The repair request builder is not enabled for this inspection company.",
+  },
+  error: {
+    title: "Something went wrong",
+    message: "Unable to load the repair builder. Please try again.",
+  },
+};
+
 export function RepairBuilderSection({
   result,
   actionPath,
@@ -144,46 +168,12 @@ export function RepairBuilderSection({
   actionPath: string;
 }) {
   // Error / gated states
-  if (result.kind === "no_access") {
+  if (result.kind !== "ok") {
+    const { title, message } = GATED_STATES[result.kind];
     return (
       <div className="max-w-xl mx-auto p-8 text-center">
-        <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">Access Required</h1>
-        <p className="text-[14px] text-ih-fg-3">
-          You need a valid token or login to view this page.
-        </p>
-      </div>
-    );
-  }
-
-  if (result.kind === "not_published") {
-    return (
-      <div className="max-w-xl mx-auto p-8 text-center">
-        <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">Report Not Published</h1>
-        <p className="text-[14px] text-ih-fg-3">
-          The report must be published before you can build a repair request.
-        </p>
-      </div>
-    );
-  }
-
-  if (result.kind === "forbidden") {
-    return (
-      <div className="max-w-xl mx-auto p-8 text-center">
-        <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">Feature Not Available</h1>
-        <p className="text-[14px] text-ih-fg-3">
-          The repair request builder is not enabled for this inspection company.
-        </p>
-      </div>
-    );
-  }
-
-  if (result.kind === "error") {
-    return (
-      <div className="max-w-xl mx-auto p-8 text-center">
-        <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">Something went wrong</h1>
-        <p className="text-[14px] text-ih-fg-3">
-          Unable to load the repair builder. Please try again.
-        </p>
+        <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">{title}</h1>
+        <p className="text-[14px] text-ih-fg-3">{message}</p>
       </div>
     );
   }
@@ -214,20 +204,17 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
   const existingList = mine[0] ?? null;
   const [rrId, setRrId] = useState<string | null>(existingList?.id ?? null);
 
-  // Build initial selection + drafts from existing list
+  // Build initial selection + drafts + item-id lookup from the existing list.
+  // (item-id lookup maps findingKey → server item id, used for PATCH/DELETE.)
   const existingItems: RepairRequestItem[] = (existingList?.items as RepairRequestItem[] | undefined) ?? [];
   const initialSelected = new Set(existingItems.map((it) => it.findingKey));
   const initialDrafts: Record<string, ItemDraft> = {};
+  const initialItemIds: Record<string, string> = {};
   for (const it of existingItems) {
     initialDrafts[it.findingKey] = {
       requestedCreditCents: it.requestedCreditCents,
       note: it.note ?? "",
     };
-  }
-
-  // Item id lookup (findingKey → server item id, for PATCH/DELETE)
-  const initialItemIds: Record<string, string> = {};
-  for (const it of existingItems) {
     initialItemIds[it.findingKey] = it.id;
   }
 

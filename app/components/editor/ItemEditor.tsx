@@ -300,17 +300,27 @@ export function ItemEditor({
  setCustomFormOpen(false);
  };
 
- // Count included per tab for badge
- const countIncluded = (tabName: CannedTabId): number => {
- return getIncludedSet(tabName).size;
- };
-
  // Build visible tabs for shared TabStrip (only tabs with entries)
  const visibleTabs = useMemo(() =>
  CANNED_TABS
   .filter((tab) => ((tabs[tab.id] || []) as unknown[]).length > 0)
-  .map((tab) => ({ id: tab.id, label: tab.label, count: countIncluded(tab.id) || undefined })),
+  .map((tab) => ({ id: tab.id, label: tab.label, count: getIncludedSet(tab.id).size || undefined })),
  [tabs, result]);
+
+ // Photo count is read in several places (badge, caption, empty-state copy).
+ const photoCount = ((result.photos as unknown[]) || []).length;
+ const queuedCount = queuedPreviews?.length ?? 0;
+
+ // Photo-strip status line (uploading / empty / counts).
+ let photoStatus: string;
+ if (photoUploading) {
+ photoStatus = "Uploading…";
+ } else if (photoCount === 0 && queuedCount === 0) {
+ photoStatus = "No photos yet";
+ } else {
+ const queuedSuffix = queuedCount > 0 ? ` · ${queuedCount} queued` : "";
+ photoStatus = `${photoCount} photo${photoCount === 1 ? "" : "s"}${queuedSuffix}`;
+ }
 
  return (
  <div className="max-w-2xl space-y-6">
@@ -467,12 +477,12 @@ export function ItemEditor({
  <label className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">
  Photos
  </label>
- {((result.photos as unknown[]) || []).length > 0 && (
+ {photoCount > 0 && (
  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-ih-primary bg-ih-primary-tint px-1.5 py-0.5 rounded">
  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
  </svg>
- {((result.photos as unknown[]) || []).length}
+ {photoCount}
  </span>
  )}
  </div>
@@ -496,7 +506,7 @@ export function ItemEditor({
  videoPosterUrl={videoPosterUrl}
  />
  {/* Task 4 — queued offline photo previews rendered below the strip */}
- {(queuedPreviews ?? []).length > 0 && (
+ {queuedCount > 0 && (
  <div className="flex flex-wrap items-center gap-2 mt-2">
  {(queuedPreviews ?? []).map((preview) => (
  <div key={preview.objectUrl} className="relative w-16 h-16 rounded-lg overflow-hidden border border-ih-border flex-shrink-0">
@@ -515,11 +525,7 @@ export function ItemEditor({
  </div>
  )}
  <span className="block mt-1 text-[12px] text-ih-fg-4">
- {photoUploading
- ? "Uploading…"
- : ((result.photos as unknown[]) || []).length === 0 && !(queuedPreviews?.length)
- ? "No photos yet"
- : `${((result.photos as unknown[]) || []).length} photo${((result.photos as unknown[]) || []).length === 1 ? "" : "s"}${(queuedPreviews?.length) ? ` · ${queuedPreviews.length} queued` : ""}`}
+ {photoStatus}
  </span>
  </div>
  </div>

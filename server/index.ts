@@ -261,7 +261,7 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
     // the dedicated observer-cookie middleware, not JWT.
     const isObserverPublic = path.startsWith('/observe/') || path === OBSERVER_EXPIRED_PATH;
 
-    if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || isObserverPublic || path === '/setup' || path === '/login' || path === '/join' || path.startsWith('/agreements/sign/')) return next();
+    if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || isObserverPublic || path === '/setup' || path === '/login' || path === '/join') return next();
 
     // First-time setup is gated solely by the SETUP_CODE secret, validated in
     // POST /api/auth/setup. No KV bootstrap code is generated here.

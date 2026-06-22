@@ -514,6 +514,18 @@ export default function InspectionEditPage() {
  const [photoStudioKey, setPhotoStudioKey] = useState<string | null>(null);
  const [photoStudioIndex, setPhotoStudioIndex] = useState(0);
  const [photoStudioTotal, setPhotoStudioTotal] = useState(0);
+ // Single entry point for opening the PhotoAnnotator — keeps the five state
+ // setters in lockstep across every caller (gallery annotate, tools dock).
+ const openPhotoStudio = useCallback(
+  (next: { url: string | null; key: string | null; index: number; total: number }) => {
+   setPhotoStudioUrl(next.url);
+   setPhotoStudioKey(next.key);
+   setPhotoStudioIndex(next.index);
+   setPhotoStudioTotal(next.total);
+   setPhotoStudioOpen(true);
+  },
+  [],
+ );
  // DB-16 — dedicated fetcher for set/clear report cover (avoids the
  // shared-fetcher abort hazard; the loader revalidates the cover after).
  const coverFetcher = useFetcher();
@@ -804,6 +816,19 @@ export default function InspectionEditPage() {
  const idx = state.speedQueue[state.speedCurrent];
  return idx != null ? state.speedItemsRef.current[idx] || null : null;
  }, [state.speedMode, state.speedQueue, state.speedCurrent]);
+
+ // Shared next/prev cursor moves for the SpeedMode overlay (clamped to the queue).
+ const speedNext = useCallback(() => {
+ if (state.speedCurrent < state.speedQueue.length - 1) {
+ state.setSpeedCurrent(state.speedCurrent + 1);
+ }
+ }, [state.speedCurrent, state.speedQueue.length, state.setSpeedCurrent]);
+
+ const speedPrev = useCallback(() => {
+ if (state.speedCurrent > 0) {
+ state.setSpeedCurrent(state.speedCurrent - 1);
+ }
+ }, [state.speedCurrent, state.setSpeedCurrent]);
 
  /* ---------------------------------------------------------------- */
  /* Photo upload */
@@ -1324,13 +1349,7 @@ export default function InspectionEditPage() {
  inspectionId={String(state.inspection.id)}
  photoCount={inspectionPhotoCount}
  onGallerySetCover={(p) => setGalleryCropSource(p)}
- onGalleryAnnotate={(p) => {
-  setPhotoStudioUrl(p.url);
-  setPhotoStudioKey(p.key);
-  setPhotoStudioIndex(0);
-  setPhotoStudioTotal(0);
-  setPhotoStudioOpen(true);
- }}
+ onGalleryAnnotate={(p) => openPhotoStudio({ url: p.url, key: p.key, index: 0, total: 0 })}
  />
  );
 
@@ -1463,25 +1482,13 @@ export default function InspectionEditPage() {
  );
  if (levelIdx >= 0) speedRate(levelIdx);
  }}
- onPrev={() => {
- if (state.speedCurrent > 0)
- state.setSpeedCurrent(state.speedCurrent - 1);
- }}
- onNext={() => {
- if (state.speedCurrent < state.speedQueue.length - 1)
- state.setSpeedCurrent(state.speedCurrent + 1);
- }}
+ onPrev={speedPrev}
+ onNext={speedNext}
  onExit={() => state.setSpeedMode(false)}
  currentIndex={state.speedCurrent}
  totalCount={state.speedQueue.length}
- onNextItem={() => {
- if (state.speedCurrent < state.speedQueue.length - 1)
- state.setSpeedCurrent(state.speedCurrent + 1);
- }}
- onPrevItem={() => {
- if (state.speedCurrent > 0)
- state.setSpeedCurrent(state.speedCurrent - 1);
- }}
+ onNextItem={speedNext}
+ onPrevItem={speedPrev}
  onJumpTo={(sectionId, itemId) => {
  state.selectSectionById(sectionId);
  state.setActiveItemId(itemId);
@@ -1933,17 +1940,15 @@ export default function InspectionEditPage() {
  const result = state.getResult(state.activeItemId);
  const photos = (result?.photos as string[]) || [];
  if (photos.length > 0) {
-  setPhotoStudioUrl(`/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(photos[0])}`);
-  setPhotoStudioKey(photos[0]);
-  setPhotoStudioIndex(1);
-  setPhotoStudioTotal(photos.length);
+  openPhotoStudio({
+   url: `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(photos[0])}`,
+   key: photos[0],
+   index: 1,
+   total: photos.length,
+  });
  } else {
-  setPhotoStudioUrl(null);
-  setPhotoStudioKey(null);
-  setPhotoStudioIndex(0);
-  setPhotoStudioTotal(0);
+  openPhotoStudio({ url: null, key: null, index: 0, total: 0 });
  }
- setPhotoStudioOpen(true);
  }}
  onToggleCheatsheet={() =>
  state.setShowCheatsheet(!state.showCheatsheet)

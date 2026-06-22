@@ -288,7 +288,7 @@ export class BookingService {
             r.createdAt instanceof Date ? r.createdAt.getTime() : Number(r.createdAt ?? 0),
             r.inspectionId,
         ];
-        const cmp = (a: Key, b: Key) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0);
+        const cmp = (a: Key, b: Key) => a[0] - b[0] || (Number(a[1] > b[1]) - Number(a[1] < b[1]));
         const myKey    = mine.map(key).sort(cmp)[0]!;
         const otherKey = others.map(key).sort(cmp)[0]!;
         return cmp(otherKey, myKey) < 0 ? 'lose' : 'win';
@@ -514,7 +514,7 @@ export class BookingService {
             createdRequestId = `req-${primaryInspectionId}`;
             const now = new Date();
             // Insert one-inspection request first so the FK is satisfied.
-            await db.insert((await import('../lib/db/schema')).inspectionRequests).values({
+            await db.insert(inspectionRequests).values({
                 id:              createdRequestId,
                 tenantId,
                 clientName:      body.clientName,
@@ -660,9 +660,13 @@ export class BookingService {
             // Calendar / Google Calendar. Duration defaults to 3 hours, with
             // 4 hours for morning/afternoon windows and 9 hours for all-day.
             const startMs = new Date(`${body.date}T${requestedTime}:00Z`).getTime();
-            const durationHours = body.timeSlot === 'all-day' ? 9
-                : body.timeSlot === 'morning' || body.timeSlot === 'afternoon' ? 4
-                : 3;
+            let durationHours: number;
+            switch (body.timeSlot) {
+                case 'all-day':   durationHours = 9; break;
+                case 'morning':
+                case 'afternoon': durationHours = 4; break;
+                default:          durationHours = 3; break;
+            }
             const endMs = startMs + durationHours * 60 * 60 * 1000;
             // Booking-confirmation greeting falls back to the brand, never the
             // inspector's inbox — keeps the email looking professional even if a

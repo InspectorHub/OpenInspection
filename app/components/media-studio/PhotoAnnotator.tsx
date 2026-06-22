@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { Stage, Layer, Image as KonvaImage, Circle, Arrow, Line, Label, Tag, Text } from "react-konva";
 import type Konva from "konva";
 import {
@@ -256,6 +256,11 @@ export function PhotoAnnotator({
   /* -------------------------------------------------------------- */
   /* Label commit                                                    */
   /* -------------------------------------------------------------- */
+  const cancelLabel = useCallback(() => {
+    setLabelInput(null);
+    setLabelText("");
+  }, []);
+
   const commitLabel = useCallback(() => {
     if (labelInput && labelText.trim()) {
       setAnnotations((prev) => [
@@ -263,9 +268,8 @@ export function PhotoAnnotator({
         { kind: "label", x: labelInput.x, y: labelInput.y, text: labelText.trim() },
       ]);
     }
-    setLabelInput(null);
-    setLabelText("");
-  }, [labelInput, labelText]);
+    cancelLabel();
+  }, [labelInput, labelText, cancelLabel]);
 
   /* -------------------------------------------------------------- */
   /* Calibration commit                                              */
@@ -519,28 +523,27 @@ export function PhotoAnnotator({
 
                   {/* Committed measurements: line + distance text */}
                   {measures.map((m, i) => (
-                    <Arrow
-                      key={`m-${i}`}
-                      points={[m.a.x, m.a.y, m.b.x, m.b.y]}
-                      stroke="#fbbf24"
-                      fill="#fbbf24"
-                      strokeWidth={sw}
-                      pointerAtBeginning
-                      pointerLength={10 / scale}
-                      pointerWidth={10 / scale}
-                    />
-                  ))}
-                  {measures.map((m, i) => (
-                    <Label key={`mt-${i}`} x={(m.a.x + m.b.x) / 2} y={(m.a.y + m.b.y) / 2}>
-                      <Tag fill="#000000" opacity={0.85} cornerRadius={3 / scale} />
-                      <Text
-                        text={fmtDistance(m.a, m.b)}
+                    <Fragment key={`m-${i}`}>
+                      <Arrow
+                        points={[m.a.x, m.a.y, m.b.x, m.b.y]}
+                        stroke="#fbbf24"
                         fill="#fbbf24"
-                        fontStyle="bold"
-                        fontSize={14 / scale}
-                        padding={4 / scale}
+                        strokeWidth={sw}
+                        pointerAtBeginning
+                        pointerLength={10 / scale}
+                        pointerWidth={10 / scale}
                       />
-                    </Label>
+                      <Label x={(m.a.x + m.b.x) / 2} y={(m.a.y + m.b.y) / 2}>
+                        <Tag fill="#000000" opacity={0.85} cornerRadius={3 / scale} />
+                        <Text
+                          text={fmtDistance(m.a, m.b)}
+                          fill="#fbbf24"
+                          fontStyle="bold"
+                          fontSize={14 / scale}
+                          padding={4 / scale}
+                        />
+                      </Label>
+                    </Fragment>
                   ))}
                 </Layer>
               </Stage>
@@ -568,8 +571,7 @@ export function PhotoAnnotator({
                         }
                         if (e.key === "Escape") {
                           e.preventDefault();
-                          setLabelInput(null);
-                          setLabelText("");
+                          cancelLabel();
                         }
                         e.stopPropagation();
                       }}
@@ -578,10 +580,7 @@ export function PhotoAnnotator({
                     />
                     <div className="flex justify-end gap-1 mt-1.5">
                       <button
-                        onClick={() => {
-                          setLabelInput(null);
-                          setLabelText("");
-                        }}
+                        onClick={cancelLabel}
                         className="px-2 py-0.5 rounded text-[10px] font-bold text-white/50 hover:text-white/80"
                       >
                         Cancel

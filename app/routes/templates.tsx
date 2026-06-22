@@ -64,6 +64,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
+// Dig the created template's id out of the `{ data: { template: { id } } }`
+// envelope these endpoints return; null when any layer is missing.
+function extractTemplateId(result: unknown): string | null {
+  const data = (result as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
+  const template = data?.template as Record<string, unknown> | undefined;
+  const id = template?.id;
+  return typeof id === "string" ? id : null;
+}
+
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const formData = await request.formData();
@@ -78,13 +87,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       json: { name, schema: { schemaVersion: 2, sections: [] } },
     });
     if (res.ok) {
-      const result = await res.json();
-      const newId = (result as Record<string, unknown>)?.data
-        ? ((result as Record<string, unknown>).data as Record<string, unknown>)?.template
-          ? (((result as Record<string, unknown>).data as Record<string, unknown>).template as Record<string, unknown>)?.id
-          : null
-        : null;
-      return { ok: true, newId };
+      return { ok: true, newId: extractTemplateId(await res.json()) };
     }
     const err = await res.json().catch(() => ({}));
     return { error: (err as Record<string, unknown>)?.message || "Failed to create" };
@@ -106,13 +109,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       },
     });
     if (res.ok) {
-      const result = await res.json();
-      const newId = (result as Record<string, unknown>)?.data
-        ? ((result as Record<string, unknown>).data as Record<string, unknown>)?.template
-          ? (((result as Record<string, unknown>).data as Record<string, unknown>).template as Record<string, unknown>)?.id
-          : null
-        : null;
-      return { ok: true, newId, intent: "duplicate" };
+      return { ok: true, newId: extractTemplateId(await res.json()), intent: "duplicate" };
     }
     return { error: "Duplication failed", intent: "duplicate" };
   }
@@ -129,9 +126,8 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (res.ok) {
       const result = await res.json();
       const d = (result as Record<string, unknown>)?.data as Record<string, unknown> | undefined;
-      const newId = d?.template ? (d.template as Record<string, unknown>)?.id : null;
       const stats = d?.stats as Record<string, unknown> | undefined;
-      return { ok: true, newId, stats, intent: "import-spectora" };
+      return { ok: true, newId: extractTemplateId(result), stats, intent: "import-spectora" };
     }
     const err = await res.json().catch(() => ({}));
     return { error: (err as Record<string, unknown>)?.message || "Import failed" };

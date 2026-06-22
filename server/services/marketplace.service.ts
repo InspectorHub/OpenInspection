@@ -124,6 +124,64 @@ export class MarketplaceService {
     }
   }
 
+  /**
+   * Gate a marketplace template's schema on v2 validation. Re-wraps the
+   * "schema invalid" failure as a BadRequest with launch-friendly copy;
+   * re-throws anything else untouched.
+   */
+  private assertV2Schema(schema: unknown): void {
+    try {
+      new TemplateService(this.rawDb).validateSchema(schema as string | Record<string, unknown>);
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith('Template schema invalid')) {
+        throw Errors.BadRequest('Invalid template schema (must be v2): ' + err.message);
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Chunked bulk INSERT of canned-comment rows. Raw SQL with a placeholder
+   * list is one statement per chunk — dramatically faster than N individual
+   * inserts. D1 caps SQL statement size and bound-parameter count, so chunk to
+   * 25 rows (25 × 6 = 150 placeholders, well under D1 limits).
+   *
+   * @param firstId When supplied, the very first inserted row uses this id
+   *   instead of a fresh UUID (lets the caller return a stable local id).
+   * @returns The number of rows inserted.
+   */
+  private async insertLibraryComments(
+    libraryId: string,
+    entries: Array<{ text: string; section?: string }>,
+    firstId?: string,
+  ): Promise<number> {
+    const CHUNK = 25;
+    const nowSec = Math.floor(Date.now() / 1000);
+    let inserted = 0;
+    for (let i = 0; i < entries.length; i += CHUNK) {
+      const batch = entries.slice(i, i + CHUNK);
+      const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+      const params: (string | number | null)[] = [];
+      for (let j = 0; j < batch.length; j++) {
+        const c = batch[j];
+        const isFirst = i === 0 && j === 0;
+        params.push(
+          isFirst && firstId ? firstId : crypto.randomUUID(),
+          this.tenantId,
+          c.text,
+          c.section ?? null,
+          libraryId,             // S2-7 — provenance for replace mode
+          nowSec,
+        );
+      }
+      const stmt = `INSERT INTO comments (id, tenant_id, text, category, library_id, created_at) VALUES ${placeholders}`;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (this.rawDb as any).prepare(stmt).bind(...params).run();
+      inserted += batch.length;
+    }
+    return inserted;
+  }
+
   async importTemplate(marketplaceId: string, userId: string = 'system'): Promise<string> {
     const [mkt] = await this.db
       .select()
@@ -151,17 +209,8 @@ export class MarketplaceService {
     // Spec 5B P3 — gate marketplace imports on v2 schema validation. The
     // marketplace can technically host any JSON; without this check, a v1
     // (legacy `type: 'rating'`) template would leak into a tenant and break
-    // the editor. validateSchema throws Errors.BadRequest with a Zod-style
-    // message on failure.
-    try {
-      const tplSvc = new TemplateService(this.rawDb);
-      tplSvc.validateSchema(mkt.schema as string | Record<string, unknown>);
-    } catch (err) {
-      if (err instanceof Error && err.message.startsWith('Template schema invalid')) {
-        throw Errors.BadRequest('Invalid template schema (must be v2): ' + err.message);
-      }
-      throw err;
-    }
+    // the editor.
+    this.assertV2Schema(mkt.schema);
 
     const newTemplateId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -249,15 +298,7 @@ export class MarketplaceService {
     // Re-validate the new schema. A v1 template should never have made it
     // into the marketplace, but if it did we refuse to import it (same
     // gate as importTemplate above).
-    try {
-      const tplSvc = new TemplateService(this.rawDb);
-      tplSvc.validateSchema(mkt.schema as string | Record<string, unknown>);
-    } catch (err) {
-      if (err instanceof Error && err.message.startsWith('Template schema invalid')) {
-        throw Errors.BadRequest('Invalid template schema (must be v2): ' + err.message);
-      }
-      throw err;
-    }
+    this.assertV2Schema(mkt.schema);
 
     const newTemplateId = crypto.randomUUID();
     const now = new Date().toISOString();
@@ -365,42 +406,10 @@ export class MarketplaceService {
     const firstId = crypto.randomUUID();
 
     if (lib.kind === 'comments') {
-      // schema may arrive as parsed object (Drizzle json mode) or raw string
-      // (some D1 driver / json encoding paths). Handle both.
-      let schema: { comments?: Array<{ text: string; section?: string; rating?: string }> } = {};
-      if (typeof lib.schema === 'string') {
-        try { schema = JSON.parse(lib.schema); } catch { schema = {}; }
-      } else if (lib.schema && typeof lib.schema === 'object') {
-        schema = lib.schema as typeof schema;
-      }
-      const entries = Array.isArray(schema.comments) ? schema.comments : [];
-      // Use raw SQL with placeholder list — single statement per chunk
-      // is dramatically faster than 248 individual inserts. D1 caps SQL
-      // statement size and bound-parameter count, so chunk to 25 rows
-      // (25 × 6 = 150 placeholders, well under D1 limits).
-      const CHUNK = 25;
-      const nowSec = Math.floor(Date.now() / 1000);
-      for (let i = 0; i < entries.length; i += CHUNK) {
-        const batch = entries.slice(i, i + CHUNK);
-        const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
-        const params: (string | number | null)[] = [];
-        for (let j = 0; j < batch.length; j++) {
-          const c = batch[j];
-          const isFirst = i === 0 && j === 0;
-          params.push(
-            isFirst ? firstId : crypto.randomUUID(),
-            this.tenantId,
-            c.text,
-            c.section ?? null,
-            libraryId,             // S2-7 — provenance for replace mode
-            nowSec,
-          );
-        }
-        const stmt = `INSERT INTO comments (id, tenant_id, text, category, library_id, created_at) VALUES ${placeholders}`;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (this.rawDb as any).prepare(stmt).bind(...params).run();
-        rowCount += batch.length;
-      }
+      const entries = parseLibraryComments(lib.schema);
+      // The very first inserted row reuses firstId so the caller can return a
+      // stable local id; every other row gets a fresh UUID.
+      rowCount = await this.insertLibraryComments(libraryId, entries, firstId);
     } else {
       // 'snippets' or future kinds — extend with their target tables here
       throw new Error(`Library kind '${lib.kind}' not yet supported for import`);
@@ -433,16 +442,6 @@ export class MarketplaceService {
     return { rowCount, localFirstId: firstId };
   }
 
-  /**
-   * Round 37 — Library equivalent of updateTemplateImport. Scheme 2:
-   * does NOT delete previously imported library rows (e.g. existing
-   * canned_comments). Instead, re-runs the chunked INSERT to add the
-   * new pack's rows alongside the old ones, then advances the import
-   * marker to the new semver. If the inspector wants a clean state,
-   * they can delete the old rows from /comments after updating.
-   *
-   * Throws Errors.BadRequest if no prior import or no version bump.
-   */
   /**
    * Sprint 2 S2-7 — Library update with explicit Append vs Replace mode.
    *
@@ -511,37 +510,9 @@ export class MarketplaceService {
       rowsDeleted = typeof changes === 'number' ? changes : 0;
     }
 
-    // Parse the new pack's entries.
-    let parsed: { comments?: Array<{ text: string; section?: string; rating?: string }> } = {};
-    if (typeof lib.schema === 'string') {
-      try { parsed = JSON.parse(lib.schema); } catch { parsed = {}; }
-    } else if (lib.schema && typeof lib.schema === 'object') {
-      parsed = lib.schema as typeof parsed;
-    }
-    const entries = Array.isArray(parsed.comments) ? parsed.comments : [];
-
-    const CHUNK = 25;
-    const nowSec = Math.floor(Date.now() / 1000);
-    for (let i = 0; i < entries.length; i += CHUNK) {
-      const batch = entries.slice(i, i + CHUNK);
-      const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
-      const params: (string | number | null)[] = [];
-      for (let j = 0; j < batch.length; j++) {
-        const c = batch[j];
-        params.push(
-          crypto.randomUUID(),
-          this.tenantId,
-          c.text,
-          c.section ?? null,
-          libraryId,             // S2-7 provenance
-          nowSec,
-        );
-      }
-      const stmt = `INSERT INTO comments (id, tenant_id, text, category, library_id, created_at) VALUES ${placeholders}`;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await (this.rawDb as any).prepare(stmt).bind(...params).run();
-      rowsAdded += batch.length;
-    }
+    // Parse the new pack's entries and insert them (all fresh UUIDs).
+    const entries = parseLibraryComments(lib.schema);
+    rowsAdded = await this.insertLibraryComments(libraryId, entries);
 
     // Update the marker. Replace mode resets rowCount to the new size; append
     // mode accumulates as before.
@@ -587,6 +558,23 @@ export class MarketplaceService {
       mode,
     };
   }
+}
+
+/**
+ * Extract the comment entries from a library schema. The schema may arrive as a
+ * parsed object (Drizzle json mode) or a raw string (some D1 driver / json
+ * encoding paths); both are handled. Returns [] for anything malformed.
+ */
+function parseLibraryComments(
+  schema: unknown,
+): Array<{ text: string; section?: string; rating?: string }> {
+  let parsed: { comments?: Array<{ text: string; section?: string; rating?: string }> } = {};
+  if (typeof schema === 'string') {
+    try { parsed = JSON.parse(schema); } catch { parsed = {}; }
+  } else if (schema && typeof schema === 'object') {
+    parsed = schema as typeof parsed;
+  }
+  return Array.isArray(parsed.comments) ? parsed.comments : [];
 }
 
 function countLibrarySchemaItems(schema: unknown): number {

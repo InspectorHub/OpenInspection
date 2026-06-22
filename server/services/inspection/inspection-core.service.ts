@@ -1,4 +1,3 @@
-import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions } from '../../lib/db/schema';
 import { contacts } from '../../lib/db/schema/contact';
@@ -17,6 +16,23 @@ import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation, type Inspection, type InspectionListParams, type CreateInspectionData } from './shared';
 import { InspectionSubService } from './base';
 
+/** Internal — one Publish-modal recipient row (client or agent). Not exported:
+ *  the public `getRecipientList` signature keeps its inline structural type. */
+interface InspectionRecipient {
+    contactId: string | null;
+    name:      string;
+    role:      'client' | 'agent_buyer' | 'agent_listing';
+    email:     string | null;
+    phone:     string | null;
+}
+
+/** Parse a report_versions.snapshotJson payload (snapshotOnPublish serialises
+ *  `{ inspection, data, units }`); both re-inspection paths read only `.data`,
+ *  keyed by findingKey or legacy item id. */
+function parseSnapshotData(snapshotJson: string): { data?: Record<string, Record<string, unknown>> } {
+    return JSON.parse(snapshotJson) as { data?: Record<string, Record<string, unknown>> };
+}
+
 /**
  * Core inspection CRUD + lifecycle: list / stats / preflight / get / create /
  * reinspection / candidates / service-price overrides / wizard create / clone,
@@ -25,6 +41,25 @@ import { InspectionSubService } from './base';
  * internally on this service).
  */
 export class InspectionCoreService extends InspectionSubService {
+    /**
+     * Fetch the contact rows for an inspection's buyer/listing agents, keyed by
+     * id. Tenant-scoped. Shared by getRecipientList + getPeopleCard, which both
+     * resolve `referredByAgentId` / `sellingAgentId` against `contacts`.
+     */
+    private async fetchAgentsById(
+        db: ReturnType<InspectionCoreService['getDrizzle']>,
+        tenantId: string,
+        agentIds: Array<string | null | undefined>,
+    ): Promise<Map<string, typeof contacts.$inferSelect>> {
+        const ids = agentIds.filter((x): x is string => typeof x === 'string' && x.length > 0);
+        const byId = new Map<string, typeof contacts.$inferSelect>();
+        if (ids.length === 0) return byId;
+        const rows = await db.select().from(contacts)
+            .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
+        for (const row of rows) byId.set(row.id as string, row);
+        return byId;
+    }
+
     /**
      * Lists inspections with pagination and filtering.
      */
@@ -217,10 +252,12 @@ export class InspectionCoreService extends InspectionSubService {
         const status = INSPECTION_STATUS.REQUESTED;
         const date = data.date || createdAt.toISOString();
 
+        const db = this.getDrizzle();
+
         let templateSnapshot: unknown = null;
         let templateSnapshotVersion = 1;
         if (data.templateId) {
-            const tpl = await drizzle(this.db).select().from(templates)
+            const tpl = await db.select().from(templates)
                 .where(and(eq(templates.id, data.templateId), eq(templates.tenantId, tenantId))).get();
             if (tpl) {
                 templateSnapshot = tpl.schema;
@@ -237,7 +274,7 @@ export class InspectionCoreService extends InspectionSubService {
         // inherit `paymentRequired` / `agreementRequired` defaults from
         // `tenant_configs`. Per-inspection override (if the caller sets
         // either flag explicitly) still wins.
-        const tenantPolicy = await drizzle(this.db)
+        const tenantPolicy = await db
             .select({
                 blockUnpaid:            tenantConfigs.blockUnpaid,
                 blockUnsignedAgreement: tenantConfigs.blockUnsignedAgreement,
@@ -287,7 +324,7 @@ export class InspectionCoreService extends InspectionSubService {
         // DB-8: mirror assignment into inspection_inspectors link table.
         // Non-fatal — a sync failure must not roll back a committed inspection row.
         try {
-            await syncInspectionAssignments(this.getDrizzle(), tenantId, id, { inspectorId: newInspection.inspectorId });
+            await syncInspectionAssignments(db, tenantId, id, { inspectorId: newInspection.inspectorId });
         } catch (e) {
             logger.error('inspection.assignment-sync.failed', { inspectionId: id }, e instanceof Error ? e : undefined);
         }
@@ -299,13 +336,12 @@ export class InspectionCoreService extends InspectionSubService {
         // creation must not break because of a contact-side issue.
         if (newInspection.clientName && newInspection.clientName !== 'Private Client') {
             try {
-                const dbForContacts = this.getDrizzle();
                 const matchConds = [eq(contacts.tenantId, tenantId), eq(contacts.type, 'client')];
                 if (newInspection.clientEmail) matchConds.push(eq(contacts.email, newInspection.clientEmail));
                 else matchConds.push(eq(contacts.name, newInspection.clientName));
-                const existing = await dbForContacts.select().from(contacts).where(and(...matchConds)).get();
+                const existing = await db.select().from(contacts).where(and(...matchConds)).get();
                 if (!existing) {
-                    await dbForContacts.insert(contacts).values({
+                    await db.insert(contacts).values({
                         id: crypto.randomUUID(),
                         tenantId,
                         type: 'client',
@@ -331,15 +367,14 @@ export class InspectionCoreService extends InspectionSubService {
             ? serviceSelectionsInput.map(s => s.serviceId)
             : (data.serviceIds ?? []);
         if (effectiveServiceIds.length > 0) {
-            const db2 = this.getDrizzle();
-            const svcRows = await db2.select().from(services)
+            const svcRows = await db.select().from(services)
                 .where(and(eq(services.tenantId, tenantId), inArray(services.id, effectiveServiceIds)));
             if (svcRows.length > 0) {
                 // Build a map from serviceId → priceOverrideCents for fast lookup.
                 const overrideMap = new Map<string, number | undefined>(
                     (serviceSelectionsInput ?? []).map(s => [s.serviceId, s.priceOverrideCents]),
                 );
-                await db2.insert(inspectionServices).values(svcRows.map(s => ({
+                await db.insert(inspectionServices).values(svcRows.map(s => ({
                     id:            crypto.randomUUID(),
                     tenantId,
                     inspectionId:  id,
@@ -402,9 +437,7 @@ export class InspectionCoreService extends InspectionSubService {
 
         // The latest published snapshot is the carry-forward source. snapshotOnPublish
         // serialises { inspection, data, units }; we read .data[itemId].
-        const baseSnapshot = JSON.parse(latestVersion.snapshotJson) as {
-            data?: Record<string, Record<string, unknown>>;
-        };
+        const baseSnapshot = parseSnapshotData(latestVersion.snapshotJson);
         const baselineIsReinspection = baseline.sourceInspectionId != null;
 
         const seeded: Record<string, unknown> = {};
@@ -504,10 +537,7 @@ export class InspectionCoreService extends InspectionSubService {
 
         // Snapshot data is keyed by findingKey (unit:section:item) or, for legacy
         // inspections, the plain item id — the same keys createReinspection reads.
-        const snapshot = JSON.parse(latestVersion.snapshotJson) as {
-            data?: Record<string, Record<string, unknown>>;
-        };
-        const snapData = snapshot.data ?? {};
+        const snapData = parseSnapshotData(latestVersion.snapshotJson).data ?? {};
 
         // Resolve item labels from the baseline's templateSnapshot (authoritative
         // shape once an inspection exists). Both {sections:[...]} and flat-array
@@ -746,13 +776,7 @@ export class InspectionCoreService extends InspectionSubService {
      * compound `where(eq(id), eq(tenantId))` guard on the inspection lookup
      * AND the contact lookup.
      */
-    async getRecipientList(inspectionId: string, tenantId: string): Promise<Array<{
-        contactId: string | null;
-        name:      string;
-        role:      'client' | 'agent_buyer' | 'agent_listing';
-        email:     string | null;
-        phone:     string | null;
-    }>> {
+    async getRecipientList(inspectionId: string, tenantId: string): Promise<InspectionRecipient[]> {
         const db = this.getDrizzle();
 
         const inspection = await db.select().from(inspections)
@@ -760,13 +784,7 @@ export class InspectionCoreService extends InspectionSubService {
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
 
-        const recipients: Array<{
-            contactId: string | null;
-            name:      string;
-            role:      'client' | 'agent_buyer' | 'agent_listing';
-            email:     string | null;
-            phone:     string | null;
-        }> = [];
+        const recipients: InspectionRecipient[] = [];
 
         // Client — stored inline on inspections (not contacts table). Only
         // include when there is at least a name AND at least one channel.
@@ -781,35 +799,25 @@ export class InspectionCoreService extends InspectionSubService {
         }
 
         // Agents — buyer's agent (referredByAgentId) + listing agent (sellingAgentId).
-        const agentIds = [inspection.referredByAgentId, inspection.sellingAgentId]
-            .filter((x): x is string => typeof x === 'string' && x.length > 0);
-        if (agentIds.length > 0) {
-            const agentRows = await db.select().from(contacts)
-                .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, agentIds)));
-            const byId = new Map<string, typeof agentRows[number]>();
-            for (const row of agentRows) byId.set(row.id as string, row);
-
-            const buyerId   = inspection.referredByAgentId as string | null;
-            const listingId = inspection.sellingAgentId   as string | null;
-
-            for (const [id, role] of [
-                [buyerId,   'agent_buyer'  as const],
-                [listingId, 'agent_listing' as const],
-            ] as Array<[string | null, 'agent_buyer' | 'agent_listing']>) {
-                if (!id) continue;
-                const row = byId.get(id);
-                if (!row) continue;
-                const email = (row.email as string | null) ?? null;
-                const phone = (row.phone as string | null) ?? null;
-                if (!email && !phone) continue; // no delivery channel
-                recipients.push({
-                    contactId: row.id as string,
-                    name:      row.name as string,
-                    role,
-                    email,
-                    phone,
-                });
-            }
+        const byId = await this.fetchAgentsById(db, tenantId, [inspection.referredByAgentId, inspection.sellingAgentId]);
+        const agentRoles: Array<[string | null, 'agent_buyer' | 'agent_listing']> = [
+            [inspection.referredByAgentId as string | null, 'agent_buyer'],
+            [inspection.sellingAgentId   as string | null, 'agent_listing'],
+        ];
+        for (const [id, role] of agentRoles) {
+            if (!id) continue;
+            const row = byId.get(id);
+            if (!row) continue;
+            const email = (row.email as string | null) ?? null;
+            const phone = (row.phone as string | null) ?? null;
+            if (!email && !phone) continue; // no delivery channel
+            recipients.push({
+                contactId: row.id as string,
+                name:      row.name as string,
+                role,
+                email,
+                phone,
+            });
         }
 
         return recipients;
@@ -872,14 +880,7 @@ export class InspectionCoreService extends InspectionSubService {
             : null;
 
         // Agents — fetch both in one query.
-        const agentIds = [inspection.referredByAgentId, inspection.sellingAgentId]
-            .filter((x): x is string => typeof x === 'string' && x.length > 0);
-        const agentRowsById = new Map<string, typeof contacts.$inferSelect>();
-        if (agentIds.length > 0) {
-            const rows = await db.select().from(contacts)
-                .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, agentIds)));
-            for (const row of rows) agentRowsById.set(row.id as string, row);
-        }
+        const agentRowsById = await this.fetchAgentsById(db, tenantId, [inspection.referredByAgentId, inspection.sellingAgentId]);
         const toAgent = (id: string | null) => {
             if (!id) return null;
             const row = agentRowsById.get(id);

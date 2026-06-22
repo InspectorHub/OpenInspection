@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../lib/errors';
@@ -377,9 +377,6 @@ export const coreAuthRoutes = createApiRouter()
         try { parsed = JSON.parse(raw); } catch { return c.redirect('/login?sso=invalid', 302); }
         if (!parsed.userId || !parsed.tenantId) return c.redirect('/login?sso=invalid', 302);
 
-        const { drizzle } = await import('drizzle-orm/d1');
-        const { eq, and } = await import('drizzle-orm');
-        const { users } = await import('../lib/db/schema');
         const d = drizzle(c.env.DB);
         const user = await d.select().from(users)
             .where(and(eq(users.id, parsed.userId), eq(users.tenantId, parsed.tenantId)))

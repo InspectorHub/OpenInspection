@@ -99,6 +99,12 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
+// Serialize an information/limitations canned comment to its v2 wire shape.
+// (Defects carry extra fields and are serialized inline.)
+function serializeCanned(c: CannedComment): Record<string, unknown> {
+  return { id: c.id, title: c.title || "", comment: c.comment || "", default: !!c.default };
+}
+
 export default function TemplateEditPage() {
   const { name: initialName, version: initialVersion, schema: initial } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
@@ -273,8 +279,8 @@ export default function TemplateEditPage() {
           if (it.type === "rich") {
             base.ratingOptions = it.ratingOptions?.length ? it.ratingOptions : ["Inspected"];
             base.tabs = {
-              information: (it.tabs?.information || []).map((c) => ({ id: c.id, title: c.title || "", comment: c.comment || "", default: !!c.default })),
-              limitations: (it.tabs?.limitations || []).map((c) => ({ id: c.id, title: c.title || "", comment: c.comment || "", default: !!c.default })),
+              information: (it.tabs?.information || []).map(serializeCanned),
+              limitations: (it.tabs?.limitations || []).map(serializeCanned),
               defects: (it.tabs?.defects || []).map((c) => ({
                 id: c.id, title: c.title || "", category: c.category || "recommendation",
                 location: c.location || "", comment: c.comment || "",
