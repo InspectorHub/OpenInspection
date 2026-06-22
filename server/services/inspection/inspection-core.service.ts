@@ -61,6 +61,23 @@ export class InspectionCoreService extends InspectionSubService {
     }
 
     /**
+     * Guard: every non-null id in `ids` must be a `contacts` row that belongs
+     * to `tenantId`. Throws BadRequest for the first id that fails — preventing
+     * cross-tenant contact/agent references from being persisted (D1 does not
+     * enforce FK constraints at runtime, so this is the application-layer gate).
+     * Called in createInspection before the inspections insert.
+     */
+    private async assertContactsBelongToTenant(tenantId: string, ids: Array<string | null | undefined>) {
+        const want = ids.filter((x): x is string => !!x);
+        if (!want.length) return;
+        const db = this.getDrizzle();
+        const found = await db.select({ id: contacts.id }).from(contacts)
+            .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, want))).all();
+        const ok = new Set(found.map(r => r.id as string));
+        for (const id of want) if (!ok.has(id)) throw Errors.BadRequest('Unknown contact for this workspace');
+    }
+
+    /**
      * Lists inspections with pagination and filtering.
      */
     async listInspections(tenantId: string, params: InspectionListParams) {
@@ -320,6 +337,7 @@ export class InspectionCoreService extends InspectionSubService {
             createdAt
         };
 
+        await this.assertContactsBelongToTenant(tenantId, [data.referredByAgentId, data.sellingAgentId, data.clientContactId]);
         await this.sdb.insert(inspections, newInspection);
         // DB-8: mirror assignment into inspection_inspectors link table.
         // Non-fatal — a sync failure must not roll back a committed inspection row.
