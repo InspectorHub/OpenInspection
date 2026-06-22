@@ -14,7 +14,7 @@ type InvoiceRow = {
   clientName: string | null;
   amountCents: number;
   dueDate: string | null;
-  status: "draft" | "sent" | "paid" | "partial";
+  status: "draft" | "sent" | "paid" | "partial" | "void";
   paymentMethod: "card" | "check" | "cash" | "offline" | "other" | null;
   inspectionId: string | null;
 };
@@ -108,6 +108,7 @@ const STATUS_PILL: Record<string, string> = {
   partial: "bg-ih-watch-bg text-ih-watch-fg",
   sent: "bg-ih-info-bg text-ih-info-fg",
   draft: "bg-ih-bg-muted text-ih-fg-3",
+  void: "bg-ih-bg-muted text-ih-fg-3",
 };
 
 const METHOD_LABEL: Record<string, string> = {

@@ -8,7 +8,8 @@ import { AutomationService } from './automation.service';
 import { logger } from '../lib/logger';
 import type { PaymentMethod } from '../lib/payment-method';
 
-function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' {
+function getStatus(inv: { sentAt: Date | null; paidAt: Date | null; partialPaidAt?: Date | null; voidedAt?: Date | null }): 'draft' | 'sent' | 'paid' | 'partial' | 'void' {
+    if (inv.voidedAt) return 'void';
     if (inv.paidAt) return 'paid';
     if (inv.partialPaidAt) return 'partial';
     if (inv.sentAt) return 'sent';
@@ -173,9 +174,9 @@ export class InvoiceService {
     async getEarningsSummary(tenantId: string): Promise<{ paid: number; pending: number; count: number }> {
         const db = this.getDrizzle();
         const row = await db.select({
-            paid:    sql<number>`coalesce(sum(case when ${invoices.paidAt} is not null then ${invoices.amountCents} else 0 end), 0)`,
-            pending: sql<number>`coalesce(sum(case when ${invoices.sentAt} is not null and ${invoices.paidAt} is null then ${invoices.amountCents} else 0 end), 0)`,
-            count:   sql<number>`coalesce(sum(case when ${invoices.paidAt} is not null then 1 else 0 end), 0)`,
+            paid:    sql<number>`coalesce(sum(case when ${invoices.paidAt} is not null and ${invoices.voidedAt} is null then ${invoices.amountCents} else 0 end), 0)`,
+            pending: sql<number>`coalesce(sum(case when ${invoices.sentAt} is not null and ${invoices.paidAt} is null and ${invoices.voidedAt} is null then ${invoices.amountCents} else 0 end), 0)`,
+            count:   sql<number>`coalesce(sum(case when ${invoices.paidAt} is not null and ${invoices.voidedAt} is null then 1 else 0 end), 0)`,
         })
         .from(invoices)
         .where(eq(invoices.tenantId, tenantId))

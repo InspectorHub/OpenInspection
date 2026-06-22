@@ -45,6 +45,9 @@ export function buildPaymentIntentParams(
     if (invoice.status === 'paid' || invoice.paidAt) {
         throw new InvoiceNotPayableError('Invoice already paid');
     }
+    if (invoice.status === 'void') {
+        throw new InvoiceNotPayableError('Invoice is void');
+    }
     if (!Number.isInteger(invoice.amountCents) || invoice.amountCents <= 0) {
         throw new InvoiceNotPayableError('Invoice has no payable amount');
     }
