@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, sql, isNotNull } from 'drizzle-orm';
+import { eq, and, desc, sql, isNotNull, isNull } from 'drizzle-orm';
 import { invoices } from '../lib/db/schema/invoice';
 import { inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
@@ -144,7 +144,7 @@ export class InvoiceService {
         if (!inspectionId) return;
         const db = this.getDrizzle();
         const stillPaid = await db.select({ id: invoices.id }).from(invoices)
-            .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId), isNotNull(invoices.paidAt)))
+            .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId), isNotNull(invoices.paidAt), isNull(invoices.voidedAt)))
             .limit(1).get();
         if (stillPaid) return;
         await db.update(inspections).set({ paymentStatus: 'unpaid' })
