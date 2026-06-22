@@ -23,6 +23,10 @@ export const invoices = sqliteTable('invoices', {
     // (check / cash / offline) recorded by the inspector via "Mark as paid".
     paymentMethod: text('payment_method', { enum: ['card', 'check', 'cash', 'offline', 'other'] }),
     partialPaidAt: integer('partial_paid_at', { mode: 'timestamp' }),
+    // Accounting void (QuickBooks-style): a voided invoice stays in the ledger at $0
+    // with its audit trail intact and is excluded from all revenue rollups. Distinct
+    // from refund (paid->unpaid). See spec 2026-06-22 #182.
+    voidedAt: integer('voided_at', { mode: 'timestamp' }),
     qboSyncStatus: text('qbo_sync_status', { enum: ['synced', 'pending', 'failed'] }),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (t) => [
