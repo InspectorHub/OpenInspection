@@ -1,4 +1,4 @@
-import { eq, and, sql, inArray } from 'drizzle-orm';
+import { eq, and, sql, inArray, isNull } from 'drizzle-orm';
 import { inspections, inspectionResults, tenantConfigs, invoices, agreementRequests, users } from '../../lib/db/schema';
 import { contacts } from '../../lib/db/schema/contact';
 import { parseFindingKey } from '../../lib/finding-key';
@@ -419,7 +419,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
         // 2) Unpaid invoices with dueDate past invoice-overdue threshold.
         const overdueInvoices = await db.select({ inspectionId: invoices.inspectionId, dueDate: invoices.dueDate })
             .from(invoices)
-            .where(and(eq(invoices.tenantId, tenantId), sql`${invoices.paidAt} IS NULL`));
+            .where(and(eq(invoices.tenantId, tenantId), sql`${invoices.paidAt} IS NULL`, isNull(invoices.voidedAt)));
         const overdueSet = new Set(
             overdueInvoices
                 .filter(r => {
@@ -509,7 +509,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
         const paidIdSet = new Set<string>();
         const paidRows = await db.select({ inspectionId: invoices.inspectionId })
             .from(invoices)
-            .where(and(eq(invoices.tenantId, tenantId), sql`${invoices.paidAt} IS NOT NULL`));
+            .where(and(eq(invoices.tenantId, tenantId), sql`${invoices.paidAt} IS NOT NULL`, isNull(invoices.voidedAt)));
         for (const r of paidRows) {
             if (r.inspectionId) paidIdSet.add(r.inspectionId as string);
         }
