@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c26b74eb-aede-4197-90ba-7f4ad8386b39",
+  "id": "c655c229-a644-4043-959b-144dd16640b0",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agreement_requests": {
@@ -1606,125 +1606,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "customer_messages": {
-      "name": "customer_messages",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "inspection_id": {
-          "name": "inspection_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "from_role": {
-          "name": "from_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "from_name": {
-          "name": "from_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "body": {
-          "name": "body",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "attachments": {
-          "name": "attachments",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "read_at": {
-          "name": "read_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_msg_inspection": {
-          "name": "idx_msg_inspection",
-          "columns": [
-            "inspection_id",
-            "created_at"
-          ],
-          "isUnique": false
-        },
-        "idx_msg_unread": {
-          "name": "idx_msg_unread",
-          "columns": [
-            "tenant_id",
-            "inspection_id",
-            "from_role"
-          ],
-          "isUnique": false,
-          "where": "\"customer_messages\".\"read_at\" IS NULL"
-        }
-      },
-      "foreignKeys": {
-        "customer_messages_tenant_id_tenants_id_fk": {
-          "name": "customer_messages_tenant_id_tenants_id_fk",
-          "tableFrom": "customer_messages",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "customer_messages_inspection_id_inspections_id_fk": {
-          "name": "customer_messages_inspection_id_inspections_id_fk",
-          "tableFrom": "customer_messages",
-          "tableTo": "inspections",
-          "columnsFrom": [
-            "inspection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "discount_codes": {
       "name": "discount_codes",
       "columns": {
@@ -1809,8 +1690,8 @@
           ],
           "isUnique": false
         },
-        "discount_codes_code_tenant": {
-          "name": "discount_codes_code_tenant",
+        "uq_discount_codes_code_tenant": {
+          "name": "uq_discount_codes_code_tenant",
           "columns": [
             "upper(code)",
             "tenant_id"
@@ -2123,8 +2004,8 @@
         }
       },
       "indexes": {
-        "event_types_tenant_slug_idx": {
-          "name": "event_types_tenant_slug_idx",
+        "uq_event_types_tenant_slug": {
+          "name": "uq_event_types_tenant_slug",
           "columns": [
             "tenant_id",
             "slug"
@@ -2593,16 +2474,16 @@
         }
       },
       "indexes": {
-        "inspection_events_scheduled_idx": {
-          "name": "inspection_events_scheduled_idx",
+        "idx_inspection_events_scheduled": {
+          "name": "idx_inspection_events_scheduled",
           "columns": [
             "tenant_id",
             "scheduled_at"
           ],
           "isUnique": false
         },
-        "inspection_events_inspection_idx": {
-          "name": "inspection_events_inspection_idx",
+        "idx_inspection_events_inspection": {
+          "name": "idx_inspection_events_inspection",
           "columns": [
             "inspection_id"
           ],
@@ -2942,6 +2823,125 @@
         }
       },
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "inspection_messages": {
+      "name": "inspection_messages",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "from_role": {
+          "name": "from_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "from_name": {
+          "name": "from_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attachments": {
+          "name": "attachments",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_msg_inspection": {
+          "name": "idx_msg_inspection",
+          "columns": [
+            "inspection_id",
+            "created_at"
+          ],
+          "isUnique": false
+        },
+        "idx_msg_unread": {
+          "name": "idx_msg_unread",
+          "columns": [
+            "tenant_id",
+            "inspection_id",
+            "from_role"
+          ],
+          "isUnique": false,
+          "where": "\"inspection_messages\".\"read_at\" IS NULL"
+        }
+      },
+      "foreignKeys": {
+        "inspection_messages_tenant_id_tenants_id_fk": {
+          "name": "inspection_messages_tenant_id_tenants_id_fk",
+          "tableFrom": "inspection_messages",
+          "tableTo": "tenants",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "inspection_messages_inspection_id_inspections_id_fk": {
+          "name": "inspection_messages_inspection_id_inspections_id_fk",
+          "tableFrom": "inspection_messages",
+          "tableTo": "inspections",
+          "columnsFrom": [
+            "inspection_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -3473,16 +3473,16 @@
         }
       },
       "indexes": {
-        "inspection_units_tenant_inspection_idx": {
-          "name": "inspection_units_tenant_inspection_idx",
+        "idx_inspection_units_tenant_inspection": {
+          "name": "idx_inspection_units_tenant_inspection",
           "columns": [
             "tenant_id",
             "inspection_id"
           ],
           "isUnique": false
         },
-        "inspection_units_parent_idx": {
-          "name": "inspection_units_parent_idx",
+        "idx_inspection_units_parent": {
+          "name": "idx_inspection_units_parent",
           "columns": [
             "parent_unit_id"
           ],
@@ -3749,8 +3749,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "order_id": {
-          "name": "order_id",
+        "reference_number": {
+          "name": "reference_number",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -4605,8 +4605,8 @@
           ],
           "isUnique": true
         },
-        "observer_links_inspection_idx": {
-          "name": "observer_links_inspection_idx",
+        "idx_observer_links_inspection": {
+          "name": "idx_observer_links_inspection",
           "columns": [
             "inspection_id"
           ],
@@ -4912,7 +4912,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -5479,16 +5479,16 @@
         }
       },
       "indexes": {
-        "report_versions_inspection_idx": {
-          "name": "report_versions_inspection_idx",
+        "idx_report_versions_inspection": {
+          "name": "idx_report_versions_inspection",
           "columns": [
             "inspection_id",
             "version_number"
           ],
           "isUnique": false
         },
-        "report_versions_inspection_version_unique": {
-          "name": "report_versions_inspection_version_unique",
+        "uq_report_versions_inspection_version": {
+          "name": "uq_report_versions_inspection_version",
           "columns": [
             "inspection_id",
             "version_number"
@@ -6480,15 +6480,15 @@
         }
       },
       "indexes": {
-        "user_identity_links_primary_idx": {
-          "name": "user_identity_links_primary_idx",
+        "idx_user_identity_links_primary": {
+          "name": "idx_user_identity_links_primary",
           "columns": [
             "primary_user_id"
           ],
           "isUnique": false
         },
-        "user_identity_links_primary_linked_unique": {
-          "name": "user_identity_links_primary_linked_unique",
+        "uq_user_identity_links_primary_linked": {
+          "name": "uq_user_identity_links_primary_linked",
           "columns": [
             "primary_user_id",
             "linked_user_id"
@@ -6586,8 +6586,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "site_name": {
-          "name": "site_name",
+        "company_name": {
+          "name": "company_name",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -6734,8 +6734,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "encrypted_secrets": {
-          "name": "encrypted_secrets",
+        "secrets_enc": {
+          "name": "secrets_enc",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -7000,13 +7000,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'shared'"
-        },
-        "nachi_number": {
-          "name": "nachi_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "applied_cmd_seq": {
           "name": "applied_cmd_seq",
@@ -7511,8 +7504,8 @@
           ],
           "isUnique": false
         },
-        "users_tenant_email_unique": {
-          "name": "users_tenant_email_unique",
+        "uq_users_tenant_email": {
+          "name": "uq_users_tenant_email",
           "columns": [
             "tenant_id",
             "email"
@@ -8322,7 +8315,7 @@
   },
   "internal": {
     "indexes": {
-      "discount_codes_code_tenant": {
+      "uq_discount_codes_code_tenant": {
         "columns": {
           "upper(code)": {
             "isExpression": true

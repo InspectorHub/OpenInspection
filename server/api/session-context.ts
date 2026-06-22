@@ -122,7 +122,7 @@ export const sessionContextRoutes = createApiRouter()
             success: true,
             data: {
                 branding: {
-                    siteName: branding?.siteName || 'OpenInspection',
+                    companyName: branding?.companyName || 'OpenInspection',
                     primaryColor: branding?.primaryColor || '#6366f1',
                     logoUrl: branding?.logoUrl || null,
                     reportTheme: branding?.reportTheme || 'modern',

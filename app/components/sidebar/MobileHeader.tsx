@@ -7,7 +7,7 @@ export function MobileHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const ctx = useSessionContext();
 
-  const siteName = ctx?.branding?.siteName || "OpenInspection";
+  const companyName = ctx?.branding?.companyName || "OpenInspection";
   const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
 
   return (
@@ -15,7 +15,7 @@ export function MobileHeader() {
       <div className="lg:hidden sticky top-0 z-40 bg-ih-bg-card border-b border-ih-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img src={logoUrl} alt="" className="w-8 h-8 shrink-0" width={32} height={32} />
-          <span className="text-lg font-extrabold text-ih-fg-1 tracking-tight">{siteName}</span>
+          <span className="text-lg font-extrabold text-ih-fg-1 tracking-tight">{companyName}</span>
         </div>
         <div className="flex items-center gap-1">
           <NavLink to="/notifications" className="relative flex items-center justify-center w-10 h-10 rounded-[6px] text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-primary transition-all" aria-label="Notifications">

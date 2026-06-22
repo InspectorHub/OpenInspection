@@ -9,7 +9,7 @@ interface SettingsForm {
   date: string;
   closingDate: string;
   inspectorId: string;
-  orderId: string;
+  referenceNumber: string;
   referralSource: string;
   templateId: string;
   price: number;
@@ -51,7 +51,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     date: "",
     closingDate: "",
     inspectorId: "",
-    orderId: "",
+    referenceNumber: "",
     referralSource: "",
     templateId: "",
     price: 0,
@@ -129,7 +129,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
         date: ((insp.date as string) || "").replace(/T.*/, ''),
         closingDate: ((insp.closingDate as string) || "").replace(/T.*/, ''),
         inspectorId: (insp.inspectorId as string) || "",
-        orderId: (insp.orderId as string) || "",
+        referenceNumber: (insp.referenceNumber as string) || "",
         referralSource: (insp.referralSource as string) || "",
         templateId: loadedTemplateId,
         price: (insp.price as number) || 0,
@@ -284,8 +284,8 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                 <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Order & referral</legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
-                    <span className={labelClass}>Order ID</span>
-                    <input type="text" maxLength={64} placeholder="---" value={form.orderId} onChange={(e) => updateForm("orderId", e.target.value)} className={inputClass} data-testid="inspection-order-id" />
+                    <span className={labelClass}>Reference #</span>
+                    <input type="text" maxLength={64} placeholder="---" value={form.referenceNumber} onChange={(e) => updateForm("referenceNumber", e.target.value)} className={inputClass} data-testid="inspection-reference-number" />
                   </label>
                   <label className="block">
                     <span className={labelClass}>Referral Source</span>

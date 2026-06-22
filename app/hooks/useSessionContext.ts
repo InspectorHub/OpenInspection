@@ -7,7 +7,7 @@ import { useRouteLoaderData } from "react-router";
  */
 export interface SessionContext {
   branding: {
-    siteName: string;
+    companyName: string;
     primaryColor: string;
     logoUrl: string | null;
     reportTheme: string;

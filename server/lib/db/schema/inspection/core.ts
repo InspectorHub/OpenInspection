@@ -55,7 +55,7 @@ export const inspections = sqliteTable('inspections', {
     discountAmount:      integer('discount_amount_cents'),
     closingDate:         text('closing_date'),
     referralSource:      text('referral_source'),
-    orderId:             text('order_id'),
+    referenceNumber:             text('reference_number'),
     internalNotes:       text('internal_notes'),
     yearBuilt:           integer('year_built'),
     sqft:                integer('sqft'),

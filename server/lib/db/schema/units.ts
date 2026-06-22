@@ -24,6 +24,6 @@ export const inspectionUnits = sqliteTable('inspection_units', {
     sortOrder:    integer('sort_order').notNull().default(0),
     createdAt:    text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
-    index('inspection_units_tenant_inspection_idx').on(t.tenantId, t.inspectionId),
-    index('inspection_units_parent_idx').on(t.parentUnitId),
+    index('idx_inspection_units_tenant_inspection').on(t.tenantId, t.inspectionId),
+    index('idx_inspection_units_parent').on(t.parentUnitId),
 ]);

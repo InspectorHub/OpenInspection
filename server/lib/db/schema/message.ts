@@ -12,7 +12,7 @@ export interface MessageAttachment {
     uploadedAt: number;
 }
 
-export const customerMessages = sqliteTable('customer_messages', {
+export const inspectionMessages = sqliteTable('inspection_messages', {
     id:           text('id').primaryKey(),
     tenantId:     text('tenant_id').notNull().references(() => tenants.id),
     inspectionId: text('inspection_id').notNull().references(() => inspections.id, { onDelete: 'cascade' }),

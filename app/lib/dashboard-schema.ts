@@ -72,7 +72,7 @@ export const COLUMN_REGISTRY: ColumnDef[] = [
   { id: "agent", label: "Agent", defaultOn: true },
   { id: "price", label: "Price", defaultOn: true },
   { id: "closingDate", label: "Closing Date", defaultOn: true },
-  { id: "orderId", label: "Order ID", defaultOn: false },
+  { id: "referenceNumber", label: "Reference #", defaultOn: false },
   { id: "referralSource", label: "Referral Source", defaultOn: false },
   { id: "propertyFacts", label: "Property Facts", defaultOn: false },
 ];

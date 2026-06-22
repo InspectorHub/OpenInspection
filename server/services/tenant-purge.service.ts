@@ -1,32 +1,15 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { eq, getTableColumns, getTableName } from 'drizzle-orm';
 import { logger } from '../lib/logger';
-import {
-    inspections, inspectionResults, automationLogs, automations, templates,
-    agreements, agreementRequests, agreementSigners, services, inspectionServices, discountCodes,
-    comments, contacts, users, tenantConfigs, tenants,
-    availability, availabilityOverrides, inspectionAgreements,
-    eventTypes, inspectionEvents, tenantDestructionRecords,
-    inspectionInspectors, serviceInspectors, erasureLog, contractorTypes,
-    clientUploads,
-} from '../lib/db/schema';
-
-const TENANT_TABLES = [
-    // DB-8: link tables must be deleted before their parent rows.
-    inspectionInspectors, serviceInspectors,
-    // Track I-a: signer rows (PII) hang off agreement_requests — purge them first.
-    inspectionAgreements, agreementSigners, agreementRequests, agreements, automationLogs,
-    inspectionEvents, eventTypes, automations,
-    inspectionServices, services, discountCodes, comments, contractorTypes, contacts,
-    // client_uploads (per-inspection documents) carry R2 objects under a SEPARATE
-    // `uploads/` prefix (swept below) — the rows must be purged with the tenant.
-    clientUploads,
-    availabilityOverrides, availability, inspectionResults, inspections, templates,
-    // erasureLog holds subject_email PII scoped by tenantId — must be purged on
-    // whole-tenant teardown. Per-subject erasure retains it (Art. 5(2)/30 proof).
-    erasureLog,
-    users, tenantConfigs, tenants,
-];
+import { tenants, tenantDestructionRecords, users } from '../lib/db/schema';
+// The tenant-scoped table set is DERIVED from the schema (every table with a
+// `tenant_id` column, minus the destruction-record ledger) so the purge can
+// never silently drift as tables are added. The former hand-maintained list
+// omitted invoices, messages, access tokens, report versions, signing keys,
+// e-sign audit logs, qbo_*, repair requests, media pool, etc. — leaving PII
+// behind after a destruction request. Re-exported for the drift-guard test.
+import { tenantScopedTables } from '../lib/db/scoped-tables';
+export { tenantScopedTables };
 
 export interface PurgeResult {
     rows:    number;
@@ -58,18 +41,26 @@ export class TenantPurgeService {
         //    `id` — match on the correct column so the tenant row is actually
         //    destroyed (matching on a non-existent `tenants.tenantId` produces
         //    malformed SQL and silently leaves the row behind).
+        // D1 reports row changes under `meta.changes`; better-sqlite3 (unit tests)
+        // reports them as a top-level `changes`. Tolerate both.
+        const countChanges = (r: unknown) => {
+            const rr = r as { meta?: { changes?: number }; changes?: number };
+            return rr.meta?.changes ?? rr.changes ?? 0;
+        };
         let rows = 0;
-        for (const tbl of TENANT_TABLES) {
+        for (const tbl of tenantScopedTables()) {
             try {
-                const scope = (tbl as { tenantId?: unknown }).tenantId ?? (tbl as { id?: unknown }).id;
-                const r = await d.delete(tbl).where(eq(scope as never, tenantId)).run();
-                // D1 reports row changes under `meta.changes`; better-sqlite3 (unit
-                // tests) reports them as a top-level `changes`. Tolerate both.
-                const rr = r as unknown as { meta?: { changes?: number }; changes?: number };
-                rows += rr.meta?.changes ?? rr.changes ?? 0;
+                const col = getTableColumns(tbl).tenantId as never;
+                rows += countChanges(await d.delete(tbl).where(eq(col, tenantId)).run());
             } catch (err) {
-                logger.error('Tenant table delete failed', { tenantId, table: (tbl as { _ : { name: string } })._?.name }, err instanceof Error ? err : undefined);
+                logger.error('Tenant table delete failed', { tenantId, table: getTableName(tbl) }, err instanceof Error ? err : undefined);
             }
+        }
+        // The tenant row itself is keyed by `id`, not `tenant_id` — delete last.
+        try {
+            rows += countChanges(await d.delete(tenants).where(eq(tenants.id, tenantId)).run());
+        } catch (err) {
+            logger.error('Tenant row delete failed', { tenantId }, err instanceof Error ? err : undefined);
         }
 
         // 3. R2 list + batch delete (accumulate object count + byte totals for the

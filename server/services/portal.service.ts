@@ -13,7 +13,7 @@
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, inArray, isNull, or, gt } from 'drizzle-orm';
-import { inspectionAccessTokens, inspections, agreementRequests, customerMessages } from '../lib/db/schema';
+import { inspectionAccessTokens, inspections, agreementRequests, inspectionMessages } from '../lib/db/schema';
 import { isReportPublished } from '../lib/status/report-status';
 
 interface ObserveProgressLike {
@@ -138,14 +138,14 @@ export class PortalService {
             .get();
 
         const unread = await db
-            .select({ id: customerMessages.id })
-            .from(customerMessages)
+            .select({ id: inspectionMessages.id })
+            .from(inspectionMessages)
             .where(
                 and(
-                    eq(customerMessages.tenantId, tenantId),
-                    eq(customerMessages.inspectionId, inspectionId),
-                    isNull(customerMessages.readAt),
-                    eq(customerMessages.fromRole, 'inspector'),
+                    eq(inspectionMessages.tenantId, tenantId),
+                    eq(inspectionMessages.inspectionId, inspectionId),
+                    isNull(inspectionMessages.readAt),
+                    eq(inspectionMessages.fromRole, 'inspector'),
                 ),
             );
 

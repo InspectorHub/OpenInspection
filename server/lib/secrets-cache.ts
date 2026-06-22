@@ -1,6 +1,6 @@
 /**
  * A-16 / envelope-encryption — the single loader + decrypt entry point for a
- * tenant's canonical integration secrets (`tenant_configs.encrypted_secrets`,
+ * tenant's canonical integration secrets (`tenant_configs.secrets_enc`,
  * ENV-name keys, written by PUT/POST /api/admin/secrets; envelope DEK in
  * `tenant_configs.dek_enc`).
  *
@@ -56,12 +56,12 @@ export async function loadTenantSecretsCipher(
     }
 
     const row = await drizzle(db)
-        .select({ encryptedSecrets: tenantConfigs.encryptedSecrets, dekEnc: tenantConfigs.dekEnc })
+        .select({ secretsEnc: tenantConfigs.secretsEnc, dekEnc: tenantConfigs.dekEnc })
         .from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId))
         .get();
-    const out = row?.encryptedSecrets
-        ? { blob: row.encryptedSecrets, dekEnc: row.dekEnc ?? null }
+    const out = row?.secretsEnc
+        ? { blob: row.secretsEnc, dekEnc: row.dekEnc ?? null }
         : null;
     await kv?.put(cacheKey, out ? JSON.stringify(out) : SECRETS_CACHE_NONE, { expirationTtl: SECRETS_CACHE_TTL_S });
     return out;

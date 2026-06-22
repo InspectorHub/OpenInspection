@@ -253,7 +253,7 @@ test.describe.serial('Standalone Browser Tests', () => {
 
     test('UI-10: Settings page has all sections', async ({ page }) => {
         await gotoAuth(page, '/settings', adminToken);
-        await expect(page.locator('#siteName')).toBeVisible({ timeout: 10000 });
+        await expect(page.locator('#companyName')).toBeVisible({ timeout: 10000 });
         await expect(page.locator('#primaryColor')).toBeVisible();
         await expect(page.locator('#saveBrandingBtn')).toBeVisible();
         await expect(page.locator('#currentPassword')).toBeVisible();

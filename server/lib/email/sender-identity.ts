@@ -8,7 +8,7 @@
  * reply-to that vary per send.
  *
  * `pointOfContact` drives the From display name + reply-to:
- *   - 'company'  → configured display name (falls back to siteName); reply-to
+ *   - 'company'  → configured display name (falls back to companyName); reply-to
  *                  is the configured address only — the inspector email is
  *                  never exposed.
  *   - 'inspector' → sending inspector's name (falls back to display name when
@@ -21,7 +21,7 @@ export interface EmailIdentityConfig {
   replyTo: string | null;
   senderDisplayName: string | null;
   pointOfContact: 'inspector' | 'company';
-  siteName: string | null;
+  companyName: string | null;
 }
 
 export interface SenderInspector {
@@ -43,7 +43,7 @@ export function resolveSenderIdentity(
   config: EmailIdentityConfig,
   inspector?: SenderInspector,
 ): ResolvedSenderIdentity {
-  const companyName = clean(config.senderDisplayName) ?? clean(config.siteName);
+  const companyName = clean(config.senderDisplayName) ?? clean(config.companyName);
   const result: ResolvedSenderIdentity = {};
 
   if (config.pointOfContact === 'inspector') {

@@ -9,7 +9,7 @@ import type { OnboardingInput, OnboardingStep } from '~/lib/onboarding-progress'
 describe('computeOnboardingSteps', () => {
   it('returns all four steps in fixed order', () => {
     const steps = computeOnboardingSteps({
-      siteNameSet: false,
+      companyNameSet: false,
       templateCount: 0,
       serviceCount: 0,
       inspectionCount: 0,
@@ -21,7 +21,7 @@ describe('computeOnboardingSteps', () => {
 
   it('marks all steps done when all criteria are met', () => {
     const steps = computeOnboardingSteps({
-      siteNameSet: true,
+      companyNameSet: true,
       templateCount: 3,
       serviceCount: 2,
       inspectionCount: 5,
@@ -31,7 +31,7 @@ describe('computeOnboardingSteps', () => {
 
   it('marks all steps not-done when tenant is brand new', () => {
     const steps = computeOnboardingSteps({
-      siteNameSet: false,
+      companyNameSet: false,
       templateCount: 0,
       serviceCount: 0,
       inspectionCount: 0,
@@ -39,9 +39,9 @@ describe('computeOnboardingSteps', () => {
     expect(steps.every((s) => !s.done)).toBe(true);
   });
 
-  it('company step: done when siteNameSet=true, not done when false', () => {
-    const withName = computeOnboardingSteps({ siteNameSet: true, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
-    const withoutName = computeOnboardingSteps({ siteNameSet: false, templateCount: 1, serviceCount: 1, inspectionCount: 1 });
+  it('company step: done when companyNameSet=true, not done when false', () => {
+    const withName = computeOnboardingSteps({ companyNameSet: true, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const withoutName = computeOnboardingSteps({ companyNameSet: false, templateCount: 1, serviceCount: 1, inspectionCount: 1 });
 
     const companyDone = withName.find((s) => s.id === 'company')!;
     const companyMissing = withoutName.find((s) => s.id === 'company')!;
@@ -51,53 +51,53 @@ describe('computeOnboardingSteps', () => {
   });
 
   it('template step: done when templateCount >= 1, not done at 0', () => {
-    const done = computeOnboardingSteps({ siteNameSet: false, templateCount: 1, serviceCount: 0, inspectionCount: 0 });
-    const notDone = computeOnboardingSteps({ siteNameSet: true, templateCount: 0, serviceCount: 1, inspectionCount: 1 });
+    const done = computeOnboardingSteps({ companyNameSet: false, templateCount: 1, serviceCount: 0, inspectionCount: 0 });
+    const notDone = computeOnboardingSteps({ companyNameSet: true, templateCount: 0, serviceCount: 1, inspectionCount: 1 });
 
     expect(done.find((s) => s.id === 'template')!.done).toBe(true);
     expect(notDone.find((s) => s.id === 'template')!.done).toBe(false);
   });
 
   it('services step: done when serviceCount >= 1, not done at 0', () => {
-    const done = computeOnboardingSteps({ siteNameSet: false, templateCount: 0, serviceCount: 1, inspectionCount: 0 });
-    const notDone = computeOnboardingSteps({ siteNameSet: true, templateCount: 1, serviceCount: 0, inspectionCount: 1 });
+    const done = computeOnboardingSteps({ companyNameSet: false, templateCount: 0, serviceCount: 1, inspectionCount: 0 });
+    const notDone = computeOnboardingSteps({ companyNameSet: true, templateCount: 1, serviceCount: 0, inspectionCount: 1 });
 
     expect(done.find((s) => s.id === 'services')!.done).toBe(true);
     expect(notDone.find((s) => s.id === 'services')!.done).toBe(false);
   });
 
   it('first-inspection step: done when inspectionCount >= 1, not done at 0', () => {
-    const done = computeOnboardingSteps({ siteNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 1 });
-    const notDone = computeOnboardingSteps({ siteNameSet: true, templateCount: 1, serviceCount: 1, inspectionCount: 0 });
+    const done = computeOnboardingSteps({ companyNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 1 });
+    const notDone = computeOnboardingSteps({ companyNameSet: true, templateCount: 1, serviceCount: 1, inspectionCount: 0 });
 
     expect(done.find((s) => s.id === 'first-inspection')!.done).toBe(true);
     expect(notDone.find((s) => s.id === 'first-inspection')!.done).toBe(false);
   });
 
   it('first-inspection step has href "#new-inspection"', () => {
-    const steps = computeOnboardingSteps({ siteNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const steps = computeOnboardingSteps({ companyNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
     const step = steps.find((s) => s.id === 'first-inspection')!;
     expect(step.href).toBe('#new-inspection');
   });
 
   it('company step links to /settings/workspace', () => {
-    const steps = computeOnboardingSteps({ siteNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const steps = computeOnboardingSteps({ companyNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
     expect(steps.find((s) => s.id === 'company')!.href).toBe('/settings/workspace');
   });
 
   it('template step links to /library/templates', () => {
-    const steps = computeOnboardingSteps({ siteNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const steps = computeOnboardingSteps({ companyNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
     expect(steps.find((s) => s.id === 'template')!.href).toBe('/library/templates');
   });
 
   it('services step links to /settings/services', () => {
-    const steps = computeOnboardingSteps({ siteNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const steps = computeOnboardingSteps({ companyNameSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
     expect(steps.find((s) => s.id === 'services')!.href).toBe('/settings/services');
   });
 
   it('partial completion: only matching steps are done', () => {
     const steps = computeOnboardingSteps({
-      siteNameSet: true,
+      companyNameSet: true,
       templateCount: 0,
       serviceCount: 2,
       inspectionCount: 0,
@@ -134,7 +134,7 @@ describe('allDone', () => {
 
   it('returns false for all-undone steps', () => {
     const steps = computeOnboardingSteps({
-      siteNameSet: false,
+      companyNameSet: false,
       templateCount: 0,
       serviceCount: 0,
       inspectionCount: 0,
@@ -144,7 +144,7 @@ describe('allDone', () => {
 
   it('returns true for a fully-done set via computeOnboardingSteps', () => {
     const steps = computeOnboardingSteps({
-      siteNameSet: true,
+      companyNameSet: true,
       templateCount: 1,
       serviceCount: 1,
       inspectionCount: 1,

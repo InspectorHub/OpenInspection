@@ -278,8 +278,8 @@ const CommunicationResponseSchema = z.object({
     senderEmail:             z.string().nullable().describe('From: address for tenant transactional email.'),
     replyTo:                 z.string().nullable().describe('Reply-To: header for tenant transactional email.'),
     emailMode:               z.enum(['platform', 'own']).describe('platform = shared Resend; own = tenant Resend.'),
-    senderDisplayName:       z.string().nullable().describe('From: display name (override; falls back to siteName).'),
-    siteName:                z.string().nullable().describe('Canonical company name (from workspace branding).'),
+    senderDisplayName:       z.string().nullable().describe('From: display name (override; falls back to companyName).'),
+    companyName:                z.string().nullable().describe('Canonical company name (from workspace branding).'),
     pointOfContact:          z.enum(['inspector', 'company']).describe('Who client-facing emails come from.'),
     resendConfigured:        z.boolean().describe('Whether a Resend API key is configured (env or tenant secret).'),
     templates:               z.array(z.object({
@@ -396,7 +396,7 @@ export const adminSettingsRoutes = createApiRouter()
         // exists); we only read config flags here, so the branding defaults are
         // throwaway placeholders. Without this arg a brand-new tenant with no
         // tenant_configs row would TypeError on undefined defaults.
-        const config = await c.var.services.branding.getBranding(tenantId, { siteName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown> | undefined;
+        const config = await c.var.services.branding.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown> | undefined;
         return c.json({
             success: true as const,
             data: {
@@ -477,9 +477,9 @@ export const adminSettingsRoutes = createApiRouter()
     })
     .openapi(getCommunicationRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const cfg = await c.var.services.branding.getBranding(tenantId, { siteName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>;
+        const cfg = await c.var.services.branding.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>;
         // Resend is "configured" if a key is in env OR stored in tenant secrets.
-        // C-15: reads the CANONICAL `encrypted_secrets` store (ENV-name keys).
+        // C-15: reads the CANONICAL `secrets_enc` store (ENV-name keys).
         let resendConfigured = !!c.env.RESEND_API_KEY;
         if (!resendConfigured) {
             try {
@@ -499,7 +499,7 @@ export const adminSettingsRoutes = createApiRouter()
                 replyTo: (cfg.replyTo as string | null) ?? null,
                 emailMode: (cfg.emailMode as 'platform' | 'own') ?? 'platform',
                 senderDisplayName: (cfg.senderDisplayName as string | null) ?? null,
-                siteName: (cfg.siteName as string | null) ?? null,
+                companyName: (cfg.companyName as string | null) ?? null,
                 pointOfContact: (cfg.pointOfContact as 'inspector' | 'company') ?? 'company',
                 resendConfigured,
                 templates: [],

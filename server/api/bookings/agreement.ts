@@ -295,7 +295,7 @@ export const agreementRoutes = createApiRouter()
             .limit(1)
             .get();
 
-        const branding = await db.select({ siteName: tenantConfigs.siteName, primaryColor: tenantConfigs.primaryColor })
+        const branding = await db.select({ companyName: tenantConfigs.companyName, primaryColor: tenantConfigs.primaryColor })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 
         const invoiceStatus = invoiceRow
@@ -332,7 +332,7 @@ export const agreementRoutes = createApiRouter()
                     propertyAddress: inspectionRow.propertyAddress ?? null,
                 },
                 branding: {
-                    companyName: branding?.siteName ?? 'OpenInspection',
+                    companyName: branding?.companyName ?? 'OpenInspection',
                     primaryColor: branding?.primaryColor ?? null,
                 },
             },

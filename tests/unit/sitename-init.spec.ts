@@ -1,10 +1,10 @@
 /**
- * IA-27 — tenant_configs.siteName initialization on both provisioning paths.
+ * IA-27 — tenant_configs.companyName initialization on both provisioning paths.
  *
  * Verifies that:
- *  1. When no tenant_configs row exists, one is created with siteName = name.
- *  2. When a row exists with a null/empty siteName, it is filled in.
- *  3. When a row already has a user-chosen siteName, it is never overwritten.
+ *  1. When no tenant_configs row exists, one is created with companyName = name.
+ *  2. When a row exists with a null/empty companyName, it is filled in.
+ *  3. When a row already has a user-chosen companyName, it is never overwritten.
  *  4. When handleTenantUpdate is called without a name param, no config row is written.
  *
  * Runs the REAL implementations (PortalProvider + StandaloneProvider) against
@@ -43,7 +43,7 @@ async function seedTenant(id = TENANT_ID, slug = TENANT_SLUG) {
 // ────────────────────────────────────────────────────────────────────────────
 // SaaS path — PortalProvider.handleTenantUpdate
 // ────────────────────────────────────────────────────────────────────────────
-describe('PortalProvider — siteName init (SaaS path)', () => {
+describe('PortalProvider — companyName init (SaaS path)', () => {
     let provider: PortalProvider;
 
     beforeEach(async () => {
@@ -60,7 +60,7 @@ describe('PortalProvider — siteName init (SaaS path)', () => {
         vi.clearAllMocks();
     });
 
-    it('creates a tenant_configs row with siteName when none exists', async () => {
+    it('creates a tenant_configs row with companyName when none exists', async () => {
         await provider.handleTenantUpdate({
             id: TENANT_ID,
             slug: TENANT_SLUG,
@@ -75,21 +75,21 @@ describe('PortalProvider — siteName init (SaaS path)', () => {
             .get();
 
         expect(cfg).toBeDefined();
-        expect(cfg?.siteName).toBe('Acme Inspections');
+        expect(cfg?.companyName).toBe('Acme Inspections');
     });
 
-    it('fills in siteName when a config row exists with null siteName', async () => {
-        // Provision the tenant first, then insert a config row with no siteName.
+    it('fills in companyName when a config row exists with null companyName', async () => {
+        // Provision the tenant first, then insert a config row with no companyName.
         await provider.handleTenantUpdate({
             id: TENANT_ID,
             slug: TENANT_SLUG,
             name: 'Acme Inspections',
             status: 'active',
         });
-        // Manually clear siteName to simulate a partially-initialized row.
+        // Manually clear companyName to simulate a partially-initialized row.
         await testDb
             .update(tenantConfigs)
-            .set({ siteName: null })
+            .set({ companyName: null })
             .where(eq(tenantConfigs.tenantId, TENANT_ID));
 
         // Call again — should backfill the null.
@@ -105,10 +105,10 @@ describe('PortalProvider — siteName init (SaaS path)', () => {
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, TENANT_ID))
             .get();
-        expect(cfg?.siteName).toBe('Acme Inspections');
+        expect(cfg?.companyName).toBe('Acme Inspections');
     });
 
-    it('does NOT overwrite an existing siteName (initialize-only)', async () => {
+    it('does NOT overwrite an existing companyName (initialize-only)', async () => {
         // Provision with initial name.
         await provider.handleTenantUpdate({
             id: TENANT_ID,
@@ -119,7 +119,7 @@ describe('PortalProvider — siteName init (SaaS path)', () => {
         // User customises their brand name in Settings.
         await testDb
             .update(tenantConfigs)
-            .set({ siteName: 'My Brand' })
+            .set({ companyName: 'My Brand' })
             .where(eq(tenantConfigs.tenantId, TENANT_ID));
 
         // Portal syncs a name update — must not overwrite the user's choice.
@@ -135,7 +135,7 @@ describe('PortalProvider — siteName init (SaaS path)', () => {
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, TENANT_ID))
             .get();
-        expect(cfg?.siteName).toBe('My Brand');
+        expect(cfg?.companyName).toBe('My Brand');
     });
 
     it('writes no tenant_configs row when name is absent', async () => {
@@ -158,7 +158,7 @@ describe('PortalProvider — siteName init (SaaS path)', () => {
 // ────────────────────────────────────────────────────────────────────────────
 // Standalone path — StandaloneProvider.handleTenantUpdate
 // ────────────────────────────────────────────────────────────────────────────
-describe('StandaloneProvider — siteName init (standalone path)', () => {
+describe('StandaloneProvider — companyName init (standalone path)', () => {
     let provider: StandaloneProvider;
 
     beforeEach(async () => {
@@ -175,7 +175,7 @@ describe('StandaloneProvider — siteName init (standalone path)', () => {
         vi.clearAllMocks();
     });
 
-    it('creates a tenant_configs row with siteName when none exists', async () => {
+    it('creates a tenant_configs row with companyName when none exists', async () => {
         await provider.handleTenantUpdate({
             id: TENANT_ID,
             slug: TENANT_SLUG,
@@ -189,10 +189,10 @@ describe('StandaloneProvider — siteName init (standalone path)', () => {
             .where(eq(tenantConfigs.tenantId, TENANT_ID))
             .get();
         expect(cfg).toBeDefined();
-        expect(cfg?.siteName).toBe('Solo Inspections LLC');
+        expect(cfg?.companyName).toBe('Solo Inspections LLC');
     });
 
-    it('fills in siteName when a config row exists with null siteName', async () => {
+    it('fills in companyName when a config row exists with null companyName', async () => {
         await provider.handleTenantUpdate({
             id: TENANT_ID,
             slug: TENANT_SLUG,
@@ -201,7 +201,7 @@ describe('StandaloneProvider — siteName init (standalone path)', () => {
         });
         await testDb
             .update(tenantConfigs)
-            .set({ siteName: null })
+            .set({ companyName: null })
             .where(eq(tenantConfigs.tenantId, TENANT_ID));
 
         await provider.handleTenantUpdate({
@@ -216,10 +216,10 @@ describe('StandaloneProvider — siteName init (standalone path)', () => {
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, TENANT_ID))
             .get();
-        expect(cfg?.siteName).toBe('Solo Inspections LLC');
+        expect(cfg?.companyName).toBe('Solo Inspections LLC');
     });
 
-    it('does NOT overwrite an existing siteName (initialize-only)', async () => {
+    it('does NOT overwrite an existing companyName (initialize-only)', async () => {
         await provider.handleTenantUpdate({
             id: TENANT_ID,
             slug: TENANT_SLUG,
@@ -228,7 +228,7 @@ describe('StandaloneProvider — siteName init (standalone path)', () => {
         });
         await testDb
             .update(tenantConfigs)
-            .set({ siteName: 'My Brand' })
+            .set({ companyName: 'My Brand' })
             .where(eq(tenantConfigs.tenantId, TENANT_ID));
 
         await provider.handleTenantUpdate({
@@ -243,7 +243,7 @@ describe('StandaloneProvider — siteName init (standalone path)', () => {
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, TENANT_ID))
             .get();
-        expect(cfg?.siteName).toBe('My Brand');
+        expect(cfg?.companyName).toBe('My Brand');
     });
 
     it('writes no tenant_configs row when name is absent', async () => {

@@ -7,7 +7,7 @@ const base: EmailIdentityConfig = {
   replyTo: null,
   senderDisplayName: 'Acme Inspections',
   pointOfContact: 'company',
-  siteName: 'Acme Site',
+  companyName: 'Acme Site',
 };
 
 describe('resolveSenderIdentity — Point of Contact', () => {
@@ -15,7 +15,7 @@ describe('resolveSenderIdentity — Point of Contact', () => {
     const r = resolveSenderIdentity({ ...base, pointOfContact: 'company' }, { name: 'John Doe', email: 'john@gmail.com' });
     expect(r.fromName).toBe('Acme Inspections');
   });
-  it('company: falls back to siteName when display name blank', () => {
+  it('company: falls back to companyName when display name blank', () => {
     const r = resolveSenderIdentity({ ...base, pointOfContact: 'company', senderDisplayName: null }, { name: 'John Doe' });
     expect(r.fromName).toBe('Acme Site');
   });

@@ -46,7 +46,7 @@ const inspectorRoute = createRoute(withMcpMetadata({
 // Fields are nullable verbatim from tenant_configs; null primaryColor means
 // "keep the platform design tokens" (no per-surface fallback drift).
 export const PublicBrandSchema = z.object({
-    siteName: z.string().nullable(),
+    companyName: z.string().nullable(),
     primaryColor: z.string().nullable(),
     logoUrl: z.string().nullable(),
 });
@@ -62,7 +62,7 @@ const brandRoute = createRoute(withMcpMetadata({
         404: { description: 'Tenant not found' },
     },
     operationId: 'getPublicBrand',
-    description: 'Public, no-login tenant branding (siteName / primaryColor / logoUrl) resolved by tenant slug. Powers the consistent brand overlay on profile, booking, report, and invoice surfaces.',
+    description: 'Public, no-login tenant branding (companyName / primaryColor / logoUrl) resolved by tenant slug. Powers the consistent brand overlay on profile, booking, report, and invoice surfaces.',
 }, { scopes: [], tier: 'extended' }));
 
 // A-10 — public brand-asset serve (tenant logos). Logos are public marketing

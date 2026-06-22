@@ -65,7 +65,7 @@ export class PortalProvider implements IntegrationProvider {
             if (this.kv && existingTenant.slug !== slug) await this.kv.delete(`tenant:${existingTenant.slug}`);
         }
 
-        // IA-27: initialize tenant_configs.siteName from the company name so the
+        // IA-27: initialize tenant_configs.companyName from the company name so the
         // brand never boots as the platform default. This is initialize-only —
         // if the tenant has already chosen a site name we leave it untouched.
         if (name) {
@@ -75,15 +75,15 @@ export class PortalProvider implements IntegrationProvider {
                 if (!cfg) {
                     await db.insert(tenantConfigs).values({
                         tenantId: finalTenantId,
-                        siteName: name,
+                        companyName: name,
                         updatedAt: new Date(),
                     });
-                } else if (!cfg.siteName) {
+                } else if (!cfg.companyName) {
                     await db.update(tenantConfigs)
-                        .set({ siteName: name, updatedAt: new Date() })
+                        .set({ companyName: name, updatedAt: new Date() })
                         .where(eq(tenantConfigs.tenantId, finalTenantId));
                 }
-                // siteName already set → leave it (initialize-only, never overwrite)
+                // companyName already set → leave it (initialize-only, never overwrite)
             }
         }
 

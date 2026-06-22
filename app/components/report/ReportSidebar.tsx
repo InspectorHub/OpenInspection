@@ -12,11 +12,11 @@ interface ReportSidebarProps {
   role: "inspector" | "agent" | "client";
   inspectionId: string;
   brandLogo?: string;
-  siteName: string;
+  companyName: string;
   onPublish?: () => void;
 }
 
-export function ReportSidebar({ sections, role, inspectionId, brandLogo, siteName, onPublish }: ReportSidebarProps) {
+export function ReportSidebar({ sections, role, inspectionId, brandLogo, companyName, onPublish }: ReportSidebarProps) {
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   return (
@@ -24,8 +24,8 @@ export function ReportSidebar({ sections, role, inspectionId, brandLogo, siteNam
     <aside className="lg:fixed lg:top-0 lg:left-0 lg:bottom-0 lg:w-60 bg-slate-900 text-slate-200 flex flex-col z-30 print:hidden hidden lg:flex" aria-label="Report navigation">
       <div className="px-5 py-5 border-b border-slate-800">
         {brandLogo
-          ? <img src={brandLogo} alt={siteName} className="h-7 brightness-0 invert opacity-90" />
-          : <div className="text-[15px] font-bold tracking-tight text-white">{siteName}</div>}
+          ? <img src={brandLogo} alt={companyName} className="h-7 brightness-0 invert opacity-90" />
+          : <div className="text-[15px] font-bold tracking-tight text-white">{companyName}</div>}
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mt-2">Inspection Report</p>
       </div>
 

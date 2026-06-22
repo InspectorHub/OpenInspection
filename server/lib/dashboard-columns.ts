@@ -98,8 +98,8 @@ export const DASHBOARD_COLUMNS: ReadonlyArray<DashboardColumn> = [
         mobileVisible: false,
     },
     {
-        id: 'orderId',
-        label: 'Order ID',
+        id: 'referenceNumber',
+        label: 'Reference #',
         defaultOn: false,
         mobileVisible: false,
     },

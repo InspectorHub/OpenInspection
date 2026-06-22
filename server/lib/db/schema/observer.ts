@@ -24,6 +24,6 @@ export const observerLinks = sqliteTable('observer_links', {
     tokenHash:       text('token_hash'),
     tokenEnc:        text('token_enc'),
 }, (t) => [
-    index('observer_links_inspection_idx').on(t.inspectionId),
+    index('idx_observer_links_inspection').on(t.inspectionId),
     uniqueIndex('idx_observer_links_token_hash').on(t.tokenHash),
 ]);

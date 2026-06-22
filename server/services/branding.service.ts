@@ -15,7 +15,7 @@ export interface IntegrationConfig {
 
 // C-15 (2026-06-06): the legacy `SecretsConfig` shape (camelCase keys in the
 // retired `tenant_configs.secrets` column) is GONE. Tenant secrets live solely
-// in `encrypted_secrets` (ENV-name keys; server/api/secrets.ts +
+// in `secrets_enc` (ENV-name keys; server/api/secrets.ts +
 // lib/secrets-cache.ts + lib/middleware/integration-secrets.ts).
 
 /**
@@ -32,12 +32,12 @@ export class BrandingService {
     /**
      * Fetches the current branding configuration for a tenant.
      */
-    async getBranding(tenantId: string, defaults: { siteName: string; primaryColor: string; supportEmail: string }) {
+    async getBranding(tenantId: string, defaults: { companyName: string; primaryColor: string; supportEmail: string }) {
         const db = this.getDrizzle();
         const config = await db.select().from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 
         return config ?? {
-            siteName: defaults.siteName,
+            companyName: defaults.companyName,
             primaryColor: defaults.primaryColor,
             logoUrl: null,
             supportEmail: defaults.supportEmail,
@@ -58,7 +58,7 @@ export class BrandingService {
                 replyTo: tenantConfigs.replyTo,
                 senderDisplayName: tenantConfigs.senderDisplayName,
                 pointOfContact: tenantConfigs.pointOfContact,
-                siteName: tenantConfigs.siteName,
+                companyName: tenantConfigs.companyName,
             })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
@@ -69,7 +69,7 @@ export class BrandingService {
             replyTo: row?.replyTo ?? null,
             senderDisplayName: row?.senderDisplayName ?? null,
             pointOfContact: row?.pointOfContact ?? 'company',
-            siteName: row?.siteName ?? null,
+            companyName: row?.companyName ?? null,
         };
     }
 
@@ -78,15 +78,15 @@ export class BrandingService {
      * (profile / booking / report / invoice / email) paints with.
      * Returns nulls when no config row exists; callers apply platform fallbacks.
      */
-    async getBrand(tenantId: string): Promise<{ siteName: string | null; logoUrl: string | null; primaryColor: string | null }> {
+    async getBrand(tenantId: string): Promise<{ companyName: string | null; logoUrl: string | null; primaryColor: string | null }> {
         const db = this.getDrizzle();
         const row = await db
-            .select({ siteName: tenantConfigs.siteName, logoUrl: tenantConfigs.logoUrl, primaryColor: tenantConfigs.primaryColor })
+            .select({ companyName: tenantConfigs.companyName, logoUrl: tenantConfigs.logoUrl, primaryColor: tenantConfigs.primaryColor })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
         return {
-            siteName: row?.siteName ?? null,
+            companyName: row?.companyName ?? null,
             logoUrl: row?.logoUrl ?? null,
             primaryColor: row?.primaryColor ?? null,
         };
@@ -96,7 +96,7 @@ export class BrandingService {
      * Email-template Phase 2 — the brand the email layout paints with.
      * Same projection as getBrand (kept as the email-path entry point).
      */
-    async getEmailBrand(tenantId: string): Promise<{ siteName: string | null; logoUrl: string | null; primaryColor: string | null }> {
+    async getEmailBrand(tenantId: string): Promise<{ companyName: string | null; logoUrl: string | null; primaryColor: string | null }> {
         return this.getBrand(tenantId);
     }
 
@@ -187,5 +187,5 @@ export class BrandingService {
     // C-15 (2026-06-06): getDecryptedSecrets / getMaskedSecrets / updateSecrets
     // were RETIRED with the legacy `tenant_configs.secrets` dual store (the
     // A-16 wrong-store bug came from exactly this duality). Reads + writes go
-    // through the canonical `encrypted_secrets` column only.
+    // through the canonical `secrets_enc` column only.
 }

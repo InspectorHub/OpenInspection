@@ -36,7 +36,7 @@ export const qboSyncErrors = sqliteTable('qbo_sync_errors', {
     errorCode: text('error_code').notNull(),
     errorMsg:  text('error_msg').notNull(),
     retries:   integer('retries').notNull().default(0),
-    resolved:  integer('resolved').notNull().default(0),
+    resolved:  integer('resolved', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
 });

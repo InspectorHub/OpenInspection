@@ -103,7 +103,7 @@ export const UpdateInspectionSchema = z.object({
     clientEmail: z.string().email().optional().nullable().openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    price: z.number().min(0).optional().openapi({ example: 450 }).describe('TODO describe price field for the OpenInspection MCP integration'),
+    price: z.number().int().min(0).optional().openapi({ example: 450 }).describe('TODO describe price field for the OpenInspection MCP integration'),
     status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     paymentRequired:   z.boolean().optional().openapi({ example: false }).describe('TODO describe paymentRequired field for the OpenInspection MCP integration'),
     agreementRequired: z.boolean().optional().openapi({ example: false }).describe('TODO describe agreementRequired field for the OpenInspection MCP integration'),
@@ -121,7 +121,7 @@ export const UpdateInspectionSchema = z.object({
     closingDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date (YYYY-MM-DD)').nullable().optional().openapi({ example: '2026-07-15' }).describe('TODO describe closingDate field for the OpenInspection MCP integration'),
     // Round-2 backlog G3 (Spectora §4.1) — free-text Order ID for ISN-style
     // integrations. Surfaced in PMS exports.
-    orderId:        z.string().max(64).nullable().optional().openapi({ example: 'ORD-2026-0142' }).describe('TODO describe orderId field for the OpenInspection MCP integration'),
+    referenceNumber:        z.string().max(64).nullable().optional().openapi({ example: 'REF-2026-0142' }).describe('TODO describe referenceNumber field for the OpenInspection MCP integration'),
     // Round-2 backlog G3 — referral source label. Free-text so the seed
     // list ("Realtor", "Past Client", ...) plus tenant custom values both
     // round-trip without a separate enum.

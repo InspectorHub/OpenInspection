@@ -37,7 +37,7 @@ const SECRET = 'cur-secret';
  * mocked to return this instance, so the function-under-test's one query runs
  * against the real table.
  */
-async function makeDb(row?: { encryptedSecrets: string; dekEnc: string | null }) {
+async function makeDb(row?: { secretsEnc: string; dekEnc: string | null }) {
     const fix = createTestDb();
     await setupSchema(fix.sqlite);
     vi.mocked(drizzle).mockReturnValue(fix.db as never);
@@ -47,7 +47,7 @@ async function makeDb(row?: { encryptedSecrets: string; dekEnc: string | null })
         } as never);
         await fix.db.insert(tenantConfigs).values({
             tenantId: TENANT,
-            encryptedSecrets: row.encryptedSecrets,
+            secretsEnc: row.secretsEnc,
             dekEnc: row.dekEnc,
             updatedAt: new Date(),
         } as never);
@@ -61,7 +61,7 @@ describe('loadTenantSecrets (envelope-aware, KV-cached)', () => {
 
     it('decrypts a v2 row and caches ciphertext JSON', async () => {
         const sealed = await sealSecrets({ A: '1' }, TENANT, SECRET);
-        const db = await makeDb({ encryptedSecrets: sealed.blob, dekEnc: sealed.dekEnc });
+        const db = await makeDb({ secretsEnc: sealed.blob, dekEnc: sealed.dekEnc });
         const out = await loadTenantSecrets(db, kv, TENANT, SECRET);
         expect(out).toEqual({ A: '1' });
         const cached = kv.store.get(secretsCacheKey(TENANT))!;
@@ -78,7 +78,7 @@ describe('loadTenantSecrets (envelope-aware, KV-cached)', () => {
     it('treats a stale pre-envelope cache entry (raw blob string) as a miss', async () => {
         const sealed = await sealSecrets({ A: '1' }, TENANT, SECRET);
         kv.store.set(secretsCacheKey(TENANT), sealed.blob); // old cache format
-        const db = await makeDb({ encryptedSecrets: sealed.blob, dekEnc: sealed.dekEnc });
+        const db = await makeDb({ secretsEnc: sealed.blob, dekEnc: sealed.dekEnc });
         expect(await loadTenantSecrets(db, kv, TENANT, SECRET)).toEqual({ A: '1' });
     });
 });

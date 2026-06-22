@@ -89,17 +89,17 @@ export default function InspectionHub({
         <div>
           {/* Brand line — tenant logo and/or company name above the address.
               Hidden entirely when the tenant has no logo/name. */}
-          {(brand?.logoUrl || brand?.siteName) && (
+          {(brand?.logoUrl || brand?.companyName) && (
             <div className="mb-2 flex items-center gap-2">
               {brand.logoUrl && (
                 <img
                   src={brand.logoUrl}
-                  alt={brand.siteName ?? "Company"}
+                  alt={brand.companyName ?? "Company"}
                   className="h-8 w-auto"
                 />
               )}
-              {brand.siteName && (
-                <span className="text-[13px] font-semibold text-ih-fg-3">{brand.siteName}</span>
+              {brand.companyName && (
+                <span className="text-[13px] font-semibold text-ih-fg-3">{brand.companyName}</span>
               )}
             </div>
           )}

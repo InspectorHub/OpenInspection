@@ -27,7 +27,7 @@ const b = env as unknown as { DB: D1Database };
 describe('cmd golden fixtures — consumer can apply every fixture (A-21)', () => {
     beforeAll(async () => {
         await b.DB.exec(
-            "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, tier TEXT NOT NULL DEFAULT 'free', stripe_connect_account_id TEXT, status TEXT NOT NULL DEFAULT 'pending', max_users INTEGER NOT NULL DEFAULT 5, deployment_mode TEXT NOT NULL DEFAULT 'shared', nachi_number TEXT, applied_cmd_seq INTEGER NOT NULL DEFAULT 0, applied_cred_seq INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);",
+            "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, tier TEXT NOT NULL DEFAULT 'free', stripe_connect_account_id TEXT, status TEXT NOT NULL DEFAULT 'pending', max_users INTEGER NOT NULL DEFAULT 5, deployment_mode TEXT NOT NULL DEFAULT 'shared', applied_cmd_seq INTEGER NOT NULL DEFAULT 0, applied_cred_seq INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);",
         );
         // Batch 2: replies (the replyto fixture) append to the sync outbox.
         await b.DB.exec(
@@ -41,8 +41,8 @@ describe('cmd golden fixtures — consumer can apply every fixture (A-21)', () =
         await b.DB.exec('CREATE TABLE IF NOT EXISTS processed_cmd_events (event_id TEXT PRIMARY KEY, cmd_type TEXT NOT NULL, processed_at INTEGER NOT NULL);');
         await b.DB.exec('CREATE TABLE IF NOT EXISTS parked_cmd_events (id TEXT PRIMARY KEY, envelope TEXT NOT NULL, reason TEXT NOT NULL, received_at INTEGER NOT NULL);');
         // The update fixture carries `name` → PortalProvider initializes
-        // tenant_configs.siteName (IA-27). Columns unconstrained on purpose —
-        // only (tenant_id, site_name, updated_at) are written by this path.
+        // tenant_configs.companyName (IA-27). Columns unconstrained on purpose —
+        // only (tenant_id, company_name, updated_at) are written by this path.
         // Shared with cmd-consumer; guarded against schema drift by
         // inline-ddl-schema-sync.spec.ts.
         await b.DB.exec(TENANT_CONFIGS_TEST_DDL);

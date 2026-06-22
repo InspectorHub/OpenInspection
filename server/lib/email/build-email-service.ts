@@ -29,7 +29,7 @@ export interface EmailServiceEnv {
  * A-10 — email clients can't resolve app-relative URLs, so the stored logo
  * path (`/api/public/brand-asset?key=...`) must be absolutized against
  * APP_BASE_URL before it goes into an email body. Without a base URL the
- * logo is dropped (the layout falls back to the siteName text header).
+ * logo is dropped (the layout falls back to the companyName text header).
  */
 function absoluteLogoUrl(logoUrl: string | null | undefined, baseUrl: string | undefined): string | null {
     if (!logoUrl) return null;
@@ -41,7 +41,7 @@ function absoluteLogoUrl(logoUrl: string | null | undefined, baseUrl: string | u
 /** Tenant email config the assembler needs — loaded by `di` (pre-fetched) or by `buildTenantEmailService`. */
 export interface LoadedEmailConfig {
     emailIdentity?: EmailIdentityConfig | undefined;
-    emailBrand?: { siteName: string | null; logoUrl: string | null; primaryColor: string | null } | undefined;
+    emailBrand?: { companyName: string | null; logoUrl: string | null; primaryColor: string | null } | undefined;
     dbSecrets: { resendApiKey?: string; senderEmail?: string; geminiApiKey?: string };
     emailOverrides?: Map<string, TemplateOverride> | undefined;
 }
@@ -64,11 +64,11 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
     const fromAddress = ownReady
         ? emailIdentity!.senderEmail!
         : (env.SENDER_EMAIL || emailIdentity?.senderEmail || '');
-    const appName = emailIdentity?.siteName || env.APP_NAME || 'OpenInspection';
+    const appName = emailIdentity?.companyName || env.APP_NAME || 'OpenInspection';
     const platformColor = env.PRIMARY_COLOR || '#4f46e5';
     const renderer = new EmailTemplateRenderer({
         tenantBrand: {
-            name: emailBrand?.siteName || emailIdentity?.senderDisplayName || appName,
+            name: emailBrand?.companyName || emailIdentity?.senderDisplayName || appName,
             logoUrl: absoluteLogoUrl(emailBrand?.logoUrl, env.APP_BASE_URL),
             primaryColor: emailBrand?.primaryColor || platformColor,
         },
@@ -88,7 +88,7 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
 
 /**
  * A-16 — the tenant's Resend + Gemini keys come from the CANONICAL secrets
- * store (`tenant_configs.encrypted_secrets`, ENV-name keys — the column every
+ * store (`tenant_configs.secrets_enc`, ENV-name keys — the column every
  * Settings page writes via PUT/POST /api/admin/secrets). The legacy camelCase
  * `secrets` column this used to read has no remaining UI write path, so keys
  * saved in Settings never reached email/AI construction. Blob is KV-cached

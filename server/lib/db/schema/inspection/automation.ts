@@ -80,7 +80,7 @@ export const eventTypes = sqliteTable('event_types', {
     active:             integer('active', { mode: 'boolean' }).notNull().default(true),
     createdAt:          integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (t) => [
-    uniqueIndex('event_types_tenant_slug_idx').on(t.tenantId, t.slug),
+    uniqueIndex('uq_event_types_tenant_slug').on(t.tenantId, t.slug),
 ]);
 
 // Settings + Library IA — tenant-defined inspection subtypes layered on the
@@ -117,6 +117,6 @@ export const inspectionEvents = sqliteTable('inspection_events', {
     gcalEventId:       text('gcal_event_id'),
     createdAt:         integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (t) => [
-    index('inspection_events_scheduled_idx').on(t.tenantId, t.scheduledAt),
-    index('inspection_events_inspection_idx').on(t.inspectionId),
+    index('idx_inspection_events_scheduled').on(t.tenantId, t.scheduledAt),
+    index('idx_inspection_events_inspection').on(t.inspectionId),
 ]);

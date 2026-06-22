@@ -198,7 +198,7 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
             deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
         } as any);
         await db.insert(schema.tenantConfigs).values({
-            tenantId: TENANT_ID, siteName: 'Acme Inspections', primaryColor: '#ff5500', updatedAt: new Date(),
+            tenantId: TENANT_ID, companyName: 'Acme Inspections', primaryColor: '#ff5500', updatedAt: new Date(),
         } as any);
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',

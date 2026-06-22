@@ -81,12 +81,12 @@ export default function InvoicePage() {
     <div className="min-h-screen bg-ih-bg-app py-8 px-4 print:bg-white print:py-0" style={brandTokens(brand.primaryColor)}>
       <div className="max-w-[560px] mx-auto">
         {/* Tenant brand bar */}
-        {(brand.logoUrl || brand.siteName) && (
+        {(brand.logoUrl || brand.companyName) && (
           <div className="mb-4 flex items-center gap-2.5">
             {brand.logoUrl ? (
-              <img src={brand.logoUrl} alt={brand.siteName ?? "Logo"} className="h-8 w-auto" />
+              <img src={brand.logoUrl} alt={brand.companyName ?? "Logo"} className="h-8 w-auto" />
             ) : (
-              <span className="font-serif text-[16px] font-semibold text-ih-fg-2">{brand.siteName}</span>
+              <span className="font-serif text-[16px] font-semibold text-ih-fg-2">{brand.companyName}</span>
             )}
           </div>
         )}

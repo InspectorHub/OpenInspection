@@ -5,7 +5,7 @@ import { createApiResponseSchema } from '../shared.schema';
  * Validation schema for the branding configuration update.
  */
 export const UpdateBrandingSchema = z.object({
-    siteName: z.string().min(1, 'Site name is required').max(50).optional().openapi({ example: 'My Inspection Pro' }).describe('TODO describe siteName field for the OpenInspection MCP integration'),
+    companyName: z.string().min(1, 'Company name is required').max(50).optional().openapi({ example: 'My Inspection Pro' }).describe('TODO describe companyName field for the OpenInspection MCP integration'),
     primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().openapi({ example: '#4f46e5' }).describe('TODO describe primaryColor field for the OpenInspection MCP integration'),
     supportEmail: z.string().email('Invalid email address').optional().openapi({ example: 'support@example.com' }).describe('TODO describe supportEmail field for the OpenInspection MCP integration'),
     billingUrl: z.string().url('Invalid URL').or(z.literal('')).optional().openapi({ example: 'https://example.com/billing' }).describe('TODO describe billingUrl field for the OpenInspection MCP integration'),
@@ -40,12 +40,6 @@ export const UpdateBrandingSchema = z.object({
     pdfShowFooter: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders the company footer block.'),
     pdfShowPageNumbers: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders page numbers.'),
     pdfShowLicense: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders the inspector license number.'),
-    // Design System 0520 subsystem E P8 — InterNACHI inspector ID.
-    // Surfaced in the TeamCredit footer block on the customer report.
-    // Accepts the canonical NACHI format (NACHI##### or numeric IDs).
-    nachiNumber: z.string().regex(/^[A-Za-z0-9-]{4,32}$/, 'Invalid NACHI number')
-        .nullable().optional()
-        .openapi({ example: 'NACHI22041901' }).describe('TODO describe nachiNumber field for the OpenInspection MCP integration'),
 }).openapi('UpdateBranding');
 
 /**
@@ -58,7 +52,7 @@ export const StripeConnectAccountSchema = z.object({
 
 export const BrandingResponseSchema = createApiResponseSchema(z.object({
     branding: z.object({
-        siteName: z.string().describe('TODO describe siteName field for the OpenInspection MCP integration'),
+        companyName: z.string().describe('TODO describe companyName field for the OpenInspection MCP integration'),
         primaryColor: z.string().describe('TODO describe primaryColor field for the OpenInspection MCP integration'),
         logoUrl: z.string().nullable().describe('TODO describe logoUrl field for the OpenInspection MCP integration'),
         supportEmail: z.string().describe('TODO describe supportEmail field for the OpenInspection MCP integration'),

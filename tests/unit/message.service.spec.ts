@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MessageService } from '../../server/services/message.service';
 import { createTestDb, setupSchema } from './db';
-import { customerMessages, inspections, tenants } from '../../server/lib/db/schema';
+import { inspectionMessages, inspections, tenants } from '../../server/lib/db/schema';
 import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -33,7 +33,7 @@ describe('MessageService', () => {
             fromName: 'Mike', body: 'Hello', attachments: [],
         });
         expect(row.id).toBeTruthy();
-        const all = await testDb.select().from(customerMessages);
+        const all = await testDb.select().from(inspectionMessages);
         expect(all).toHaveLength(1);
     });
 

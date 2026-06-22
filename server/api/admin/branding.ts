@@ -104,14 +104,14 @@ export const adminBrandingRoutes = createApiRouter()
     .openapi(getBrandingRoute, async (c) => {
         const brandingService = c.var.services.branding;
         const branding = await brandingService.getBranding(c.get('tenantId'), {
-            siteName: c.env.APP_NAME || 'OpenInspection',
+            companyName: c.env.APP_NAME || 'OpenInspection',
             primaryColor: c.env.PRIMARY_COLOR || '#4f46e5',
             supportEmail: c.env.SENDER_EMAIL || 'support@example.com'
         });
 
         const formattedBranding = {
             ...branding,
-            siteName: branding.siteName || c.env.APP_NAME || 'OpenInspection',
+            companyName: branding.companyName || c.env.APP_NAME || 'OpenInspection',
             primaryColor: branding.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
             supportEmail: branding.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
             logoUrl: branding.logoUrl || null,
@@ -127,7 +127,7 @@ export const adminBrandingRoutes = createApiRouter()
 
         const formattedResult = {
             ...result,
-            siteName: result.siteName || c.env.APP_NAME || 'OpenInspection',
+            companyName: result.companyName || c.env.APP_NAME || 'OpenInspection',
             primaryColor: result.primaryColor || c.env.PRIMARY_COLOR || '#4f46e5',
             supportEmail: result.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
             logoUrl: result.logoUrl || null,

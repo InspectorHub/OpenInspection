@@ -308,7 +308,7 @@ export const emailTemplateRoutes = createApiRouter()
         const PRIMARY_COLOR = c.env.PRIMARY_COLOR;
 
         const tenantBrand = {
-            name: emailBrand.siteName || APP_NAME || 'OpenInspection',
+            name: emailBrand.companyName || APP_NAME || 'OpenInspection',
             logoUrl: emailBrand.logoUrl,
             primaryColor: emailBrand.primaryColor || PRIMARY_COLOR || '#4f46e5',
         };

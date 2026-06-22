@@ -57,7 +57,7 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
 
         async resolveError(tenantId: string, errorId: string): Promise<void> {
             const db = this.getDrizzle();
-            await db.update(qboSyncErrors).set({ resolved: 1 })
+            await db.update(qboSyncErrors).set({ resolved: true })
                 .where(and(eq(qboSyncErrors.id, errorId), eq(qboSyncErrors.tenantId, tenantId)));
         }
 
@@ -67,7 +67,7 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 .where(eq(qboConnections.tenantId, tenantId)).get();
             if (!row) return null;
             const errorRows = await db.select().from(qboSyncErrors)
-                .where(and(eq(qboSyncErrors.tenantId, tenantId), eq(qboSyncErrors.resolved, 0))).all();
+                .where(and(eq(qboSyncErrors.tenantId, tenantId), eq(qboSyncErrors.resolved, false))).all();
             return {
                 realmId:               row.realmId,
                 companyName:           row.companyName,

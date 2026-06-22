@@ -17,7 +17,8 @@ import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/valida
 import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults, inspectionInspectors } from '../../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
+import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -226,10 +227,9 @@ const coreRoutes = createApiRouter()
         const service = c.var.services.inspection;
         const { inspection } = await service.getInspection(id, tenantId);
 
-        const db = drizzle(c.env.DB);
-        // DB-8: delete link rows before (or together with) the inspection row.
-        await db.delete(inspectionInspectors).where(and(eq(inspectionInspectors.inspectionId, id), eq(inspectionInspectors.tenantId, tenantId)));
-        await db.delete(inspectionTable).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
+        // Cascade-delete every inspection-scoped row + R2 asset (D1 does not honor
+        // FK cascades at runtime). Ownership verified by getInspection above.
+        await deleteInspectionCascade(drizzle(c.env.DB), c.env.PHOTOS, tenantId, id);
 
         auditFromContext(c, 'inspection.delete', 'inspection', {
             entityId: id,

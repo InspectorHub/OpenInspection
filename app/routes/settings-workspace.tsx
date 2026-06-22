@@ -15,7 +15,7 @@ import { AccessDenied } from "~/components/AccessDenied";
 /* ------------------------------------------------------------------ */
 
 interface Branding {
-  siteName?: string | null;
+  companyName?: string | null;
   primaryColor?: string | null;
   logoUrl?: string | null;
   reportTheme?: string | null;
@@ -74,7 +74,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const v = submission.value;
 
   const body: Record<string, unknown> = {};
-  if (v.siteName !== undefined) body.siteName = v.siteName;
+  if (v.companyName !== undefined) body.companyName = v.companyName;
   if (v.primaryColor !== undefined) body.primaryColor = v.primaryColor;
   if (v.reportTheme !== undefined) body.reportTheme = v.reportTheme;
 
@@ -173,12 +173,12 @@ export default function SettingsWorkspacePage() {
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Branding</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label htmlFor={fields.siteName.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Company name</label>
-              <input type="text" id={fields.siteName.id} name={fields.siteName.name} defaultValue={branding.siteName ?? "OpenInspection"}
-                aria-invalid={fields.siteName.errors ? true : undefined}
+              <label htmlFor={fields.companyName.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Company name</label>
+              <input type="text" id={fields.companyName.id} name={fields.companyName.name} defaultValue={branding.companyName ?? "OpenInspection"}
+                aria-invalid={fields.companyName.errors ? true : undefined}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] text-ih-fg-1" />
-              {fields.siteName.errors && (
-                <p className="mt-1 text-xs text-ih-bad-fg">{fields.siteName.errors[0]}</p>
+              {fields.companyName.errors && (
+                <p className="mt-1 text-xs text-ih-bad-fg">{fields.companyName.errors[0]}</p>
               )}
             </div>
             <div className="space-y-2">

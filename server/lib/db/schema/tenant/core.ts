@@ -10,13 +10,6 @@ export const tenants = sqliteTable('tenants', {
     status: text('status', { enum: ['pending','active','suspended','trial'] }).notNull().default('pending'),
     maxUsers: integer('max_users').notNull().default(5),
     deploymentMode: text('deployment_mode').notNull().default('shared'), // shared, silo
-    // Design System 0520 subsystem E P8 — optional InterNACHI inspector
-    // certification number, intended for the TeamCredit report footer.
-    // NOTE (2026-06-11, schema-cleanup): accepted by admin.schema.ts input
-    // validation but NEVER persisted or read anywhere — unwired since
-    // introduction. Either wire a writer/reader or retire the column + the
-    // validation field. Do not assume it holds data.
-    nachiNumber: text('nachi_number'),
     // A-21 — high-water mark of the portal→core command sequence applied to
     // this tenant (envelope `tenantseq`). The cmd consumer drops any command
     // with tenantseq <= this value (stale/reordered last-writer-wins guard).
@@ -33,7 +26,7 @@ export const tenants = sqliteTable('tenants', {
 
 export const tenantConfigs = sqliteTable('tenant_configs', {
     tenantId: text('tenant_id').primaryKey().references(() => tenants.id),
-    siteName: text('site_name'),
+    companyName: text('company_name'),
     primaryColor: text('primary_color'),
     logoUrl: text('logo_url'),
     supportEmail: text('support_email'),
@@ -83,7 +76,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // 14 integration API keys configurable via Settings UI. Supersedes the
     // `secrets` column which held a smaller subset. Worker env vars still
     // take precedence (backwards compat); DB secrets are the fallback.
-    encryptedSecrets: text('encrypted_secrets'),
+    secretsEnc: text('secrets_enc'),
     // Envelope encryption (2026-06-07) — the tenant's wrapped DEK
     // (`k1:iv:wrapped`, AES-GCM under the HKDF KEK from JWT_SECRET, AAD=tenantId).
     // NULL while the tenant still has a legacy un-prefixed blob (or no secrets).

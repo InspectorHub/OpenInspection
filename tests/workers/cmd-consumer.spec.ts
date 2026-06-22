@@ -41,7 +41,7 @@ function envelope(over: Partial<{ id: string; type: string; dataschema: string; 
 
 async function seedSchema(): Promise<void> {
     await b.DB.exec(
-        "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, tier TEXT NOT NULL DEFAULT 'free', stripe_connect_account_id TEXT, status TEXT NOT NULL DEFAULT 'pending', max_users INTEGER NOT NULL DEFAULT 5, deployment_mode TEXT NOT NULL DEFAULT 'shared', nachi_number TEXT, applied_cmd_seq INTEGER NOT NULL DEFAULT 0, applied_cred_seq INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);",
+        "CREATE TABLE IF NOT EXISTS tenants (id TEXT PRIMARY KEY, name TEXT NOT NULL, slug TEXT UNIQUE NOT NULL, tier TEXT NOT NULL DEFAULT 'free', stripe_connect_account_id TEXT, status TEXT NOT NULL DEFAULT 'pending', max_users INTEGER NOT NULL DEFAULT 5, deployment_mode TEXT NOT NULL DEFAULT 'shared', applied_cmd_seq INTEGER NOT NULL DEFAULT 0, applied_cred_seq INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL);",
     );
     // Batch 2: reply emission appends to the sync outbox.
     await b.DB.exec(
@@ -57,9 +57,9 @@ async function seedSchema(): Promise<void> {
         'CREATE TABLE IF NOT EXISTS parked_cmd_events (id TEXT PRIMARY KEY, envelope TEXT NOT NULL, reason TEXT NOT NULL, received_at INTEGER NOT NULL);',
     );
     // PortalProvider.handleTenantUpdate reads/initializes tenant_configs when a
-    // command carries `name` (IA-27 siteName init). Test DDL keeps every column
+    // command carries `name` (IA-27 companyName init). Test DDL keeps every column
     // SELECTed by drizzle present but unconstrained — the apply path only ever
-    // writes (tenant_id, site_name, updated_at) here. Shared with cmd-fixtures
+    // writes (tenant_id, company_name, updated_at) here. Shared with cmd-fixtures
     // and guarded against schema drift by inline-ddl-schema-sync.spec.ts.
     await b.DB.exec(TENANT_CONFIGS_TEST_DDL);
     await b.DB.exec(
