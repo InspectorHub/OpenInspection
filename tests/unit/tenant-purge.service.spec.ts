@@ -7,7 +7,8 @@
  * TENANT_TABLES), so it is the compliance proof that outlives the tenant.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TenantPurgeService } from '../../server/services/tenant-purge.service';
+import { TenantPurgeService, tenantScopedTables } from '../../server/services/tenant-purge.service';
+import { getTableName } from 'drizzle-orm';
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -223,5 +224,38 @@ describe('TenantPurgeService.purge', () => {
         expect(names).not.toContain('email');
         expect(names).not.toContain('name');
         expect(names).not.toContain('property_address');
+    });
+
+    it('purges previously-uncovered tenant tables (invoices, messages, access tokens)', async () => {
+        const { drizzle } = await import('drizzle-orm/d1');
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        await testDb.insert(schema.invoices).values({
+            id: 'inv-1', tenantId: TENANT, inspectionId: 'i-1', amountCents: 5000,
+            lineItems: [{ description: 'Inspection', amountCents: 5000 }], createdAt: new Date(),
+        } as never);
+        await testDb.insert(schema.inspectionMessages).values({
+            id: 'msg-1', tenantId: TENANT, inspectionId: 'i-1', fromRole: 'client',
+            body: 'When is my report ready?', createdAt: Date.now(),
+        } as never);
+        await testDb.insert(schema.inspectionAccessTokens).values({
+            id: 'tok-1', tenantId: TENANT, inspectionId: 'i-1', recipientEmail: 'jane@test.com',
+            role: 'client', token: crypto.randomUUID(), createdAt: Date.now(),
+        } as never);
+
+        const svc = new TenantPurgeService({} as D1Database, makeR2([]).bucket, makeKv().ns);
+        await svc.purge(TENANT);
+
+        expect(await testDb.select().from(schema.invoices).all()).toHaveLength(0);
+        expect(await testDb.select().from(schema.inspectionMessages).all()).toHaveLength(0);
+        expect(await testDb.select().from(schema.inspectionAccessTokens).all()).toHaveLength(0);
+    });
+
+    it('derived tenant-scoped set covers tenant_id tables but excludes the destruction ledger', () => {
+        const names = new Set(tenantScopedTables().map(getTableName));
+        for (const t of ['invoices', 'inspection_messages', 'inspection_access_tokens']) {
+            expect(names.has(t), `tenant purge must cover ${t}`).toBe(true);
+        }
+        // The durable, non-personal compliance proof must survive the purge.
+        expect(names.has('tenant_destruction_records')).toBe(false);
     });
 });

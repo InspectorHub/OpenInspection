@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, isNotNull } from 'drizzle-orm';
 import { invoices } from '../lib/db/schema/invoice';
+import { inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { AutomationService } from './automation.service';
@@ -124,8 +125,29 @@ export class InvoiceService {
 
     async markRefunded(id: string, tenantId: string): Promise<void> {
         const db = this.getDrizzle();
+        const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
+        if (!existing) throw Errors.NotFound('Invoice not found');
         await db.update(invoices).set({ paidAt: null, partialPaidAt: null })
             .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+        await this.syncInspectionPaymentGate(existing.inspectionId, tenantId);
+    }
+
+    /**
+     * After an invoice loses its paid status (refund/delete), clear a now-stale
+     * `inspections.payment_status = 'paid'` report gate when NO paid invoice
+     * remains for that inspection. Without this the report stays publicly
+     * unlocked with no backing payment. Only downgrades a 'paid' gate; partial/
+     * unpaid and inspections with another paid invoice are left untouched.
+     */
+    private async syncInspectionPaymentGate(inspectionId: string | null, tenantId: string): Promise<void> {
+        if (!inspectionId) return;
+        const db = this.getDrizzle();
+        const stillPaid = await db.select({ id: invoices.id }).from(invoices)
+            .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId), isNotNull(invoices.paidAt)))
+            .limit(1).get();
+        if (stillPaid) return;
+        await db.update(inspections).set({ paymentStatus: 'unpaid' })
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId), eq(inspections.paymentStatus, 'paid')));
     }
 
     async setQboSyncStatus(id: string, tenantId: string, status: 'synced' | 'pending' | 'failed'): Promise<void> {
@@ -139,6 +161,7 @@ export class InvoiceService {
         const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Invoice not found');
         await db.delete(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+        await this.syncInspectionPaymentGate(existing.inspectionId, tenantId);
     }
 
     /**
