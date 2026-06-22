@@ -14,19 +14,19 @@ export async function resolveTenantBrand(
 ): Promise<TenantBrand> {
   const fallbackName =
     ((context.cloudflare?.env as { APP_NAME?: string } | undefined)?.APP_NAME ?? null);
-  if (!tenantSlug) return { ...EMPTY_BRAND, siteName: fallbackName };
+  if (!tenantSlug) return { ...EMPTY_BRAND, companyName: fallbackName };
   try {
     const api = createApi(context);
     const res = await api.publicReport.brand[":tenant"].$get({ param: { tenant: tenantSlug } });
-    if (!res.ok) return { ...EMPTY_BRAND, siteName: fallbackName };
+    if (!res.ok) return { ...EMPTY_BRAND, companyName: fallbackName };
     const body = (await res.json()) as { data?: TenantBrand };
     const d = body.data;
     return {
-      siteName: d?.siteName ?? fallbackName,
+      companyName: d?.companyName ?? fallbackName,
       primaryColor: d?.primaryColor ?? null,
       logoUrl: d?.logoUrl ?? null,
     };
   } catch {
-    return { ...EMPTY_BRAND, siteName: fallbackName };
+    return { ...EMPTY_BRAND, companyName: fallbackName };
   }
 }

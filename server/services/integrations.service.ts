@@ -43,7 +43,7 @@ export class IntegrationsService {
         );
         // Gemini is bring-your-own-key (per-tenant). "Connected" reflects the
         // tenant's own bound key in encrypted secrets, never a platform env key.
-        // C-15: reads the CANONICAL `encrypted_secrets` store (ENV-name keys) —
+        // C-15: reads the CANONICAL `secrets_enc` store (ENV-name keys) —
         // the legacy `tenant_configs.secrets` column is retired.
         const dbSecrets = await this._safeGet(() =>
             loadTenantSecrets(

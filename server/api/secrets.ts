@@ -2,7 +2,7 @@
  * Secret UI化 — GET/PUT /api/admin/secrets
  *
  * Manages all 14 integration API keys stored as AES-256-GCM encrypted JSON
- * in `tenant_configs.encrypted_secrets`. Worker env vars always take precedence
+ * in `tenant_configs.secrets_enc`. Worker env vars always take precedence
  * (backwards compatibility); DB secrets are the fallback for self-hosted
  * tenants who configure keys via the Settings UI.
  */
@@ -203,16 +203,16 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
     // 1. Load + decrypt existing secrets (envelope-aware). Failure → start fresh
     //    (corrupt / key-rotated; admin is re-entering).
     const row = await db
-        .select({ encryptedSecrets: tenantConfigs.encryptedSecrets, dekEnc: tenantConfigs.dekEnc })
+        .select({ secretsEnc: tenantConfigs.secretsEnc, dekEnc: tenantConfigs.dekEnc })
         .from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId))
         .get();
 
     let existing: Record<string, string> = {};
-    if (row?.encryptedSecrets) {
+    if (row?.secretsEnc) {
         try {
             existing = await openSecrets(
-                row.encryptedSecrets, row.dekEnc ?? null, tenantId,
+                row.secretsEnc, row.dekEnc ?? null, tenantId,
                 c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
             );
         } catch {
@@ -313,12 +313,12 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
 
     if (row) {
         await db.update(tenantConfigs)
-            .set({ encryptedSecrets: encrypted, dekEnc, updatedAt: new Date() })
+            .set({ secretsEnc: encrypted, dekEnc, updatedAt: new Date() })
             .where(eq(tenantConfigs.tenantId, tenantId));
     } else {
         await db.insert(tenantConfigs).values({
             tenantId,
-            encryptedSecrets: encrypted,
+            secretsEnc: encrypted,
             dekEnc,
             updatedAt: new Date(),
         });
@@ -340,16 +340,16 @@ export const secretsRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
 
         const row = await db
-            .select({ encryptedSecrets: tenantConfigs.encryptedSecrets, dekEnc: tenantConfigs.dekEnc })
+            .select({ secretsEnc: tenantConfigs.secretsEnc, dekEnc: tenantConfigs.dekEnc })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
 
         let stored: Record<string, string> = {};
-        if (row?.encryptedSecrets) {
+        if (row?.secretsEnc) {
             try {
                 stored = await openSecrets(
-                    row.encryptedSecrets, row.dekEnc ?? null, tenantId,
+                    row.secretsEnc, row.dekEnc ?? null, tenantId,
                     c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
                 );
             } catch {

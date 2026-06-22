@@ -8,7 +8,7 @@ const identity: EmailIdentityConfig = {
   replyTo: 'team@acme.com',
   senderDisplayName: 'Acme Inspections',
   pointOfContact: 'inspector',
-  siteName: 'Acme',
+  companyName: 'Acme',
 };
 
 function lastResendBody(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
@@ -37,7 +37,7 @@ describe('EmailService sender identity', () => {
   it('omits reply_to and uses a bare From when nothing resolves', async () => {
     const bare: EmailIdentityConfig = {
       mode: 'platform', senderEmail: null, replyTo: null,
-      senderDisplayName: null, pointOfContact: 'company', siteName: null,
+      senderDisplayName: null, pointOfContact: 'company', companyName: null,
     };
     const svc = new EmailService('re_test', 'reports@acme.com', 'Acme', bare);
     await svc.sendEmail(['c@x.com'], 'Hi', '<p>hi</p>');

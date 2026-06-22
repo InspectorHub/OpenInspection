@@ -24,6 +24,6 @@ export const userIdentityLinks = sqliteTable('user_identity_links', {
     linkedDisplayName:  text('linked_display_name').notNull(),
     createdAt:          text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
-    index('user_identity_links_primary_idx').on(t.primaryUserId),
-    uniqueIndex('user_identity_links_primary_linked_unique').on(t.primaryUserId, t.linkedUserId),
+    index('idx_user_identity_links_primary').on(t.primaryUserId),
+    uniqueIndex('uq_user_identity_links_primary_linked').on(t.primaryUserId, t.linkedUserId),
 ]);

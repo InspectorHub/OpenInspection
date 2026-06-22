@@ -7,7 +7,7 @@
 
 export interface OnboardingInput {
   /** True when the tenant has saved a company/site name other than the system default. */
-  siteNameSet: boolean;
+  companyNameSet: boolean;
   /** Number of inspection templates that exist for this tenant. */
   templateCount: number;
   /** Number of services that exist for this tenant. */
@@ -34,7 +34,7 @@ export function computeOnboardingSteps(input: OnboardingInput): OnboardingStep[]
     {
       id: 'company',
       label: 'Set your company name',
-      done: input.siteNameSet,
+      done: input.companyNameSet,
       href: '/settings/workspace',
     },
     {

@@ -32,7 +32,7 @@ const IntegrationConfigSchema = z.object({
 
 // C-15 (2026-06-06): SecretsInputSchema + the POST /config/secrets route were
 // RETIRED with the legacy `tenant_configs.secrets` store. Tenant secrets are
-// written exclusively via PUT /api/secrets (canonical `encrypted_secrets`).
+// written exclusively via PUT /api/secrets (canonical `secrets_enc`).
 
 const getConfigRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -311,7 +311,7 @@ export const adminConfigRoutes = createApiRouter()
         const svc = c.var.services.branding;
         const integrationConfig = await svc.getIntegrationConfig(tenantId);
         // C-15: the legacy `tenant_configs.secrets` store is retired. Masked
-        // secrets are served by GET /api/secrets (canonical `encrypted_secrets`);
+        // secrets are served by GET /api/secrets (canonical `secrets_enc`);
         // the field is kept (empty) for response-shape compatibility.
         return c.json({ success: true, data: { integrationConfig, secrets: {} } }, 200);
     })

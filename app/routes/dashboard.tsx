@@ -424,17 +424,17 @@ export default function DashboardPage() {
   }, [searchFetcher.state, searchFetcher.data]);
 
   /* ---- IA-12: Onboarding steps ---- */
-  // siteNameSet: the session context always returns a non-null siteName
+  // companyNameSet: the session context always returns a non-null companyName
   // (falling back to 'OpenInspection' when not configured). If the value
   // differs from the system default, the user has deliberately set a name.
   // This is correct for virtually all real tenants; someone who names their
   // company exactly "OpenInspection" would still need the other three steps.
   const onboardingSteps = useMemo(() => {
-    const siteName = sessionCtx?.branding?.siteName ?? 'OpenInspection';
-    const siteNameSet = siteName !== 'OpenInspection';
+    const companyName = sessionCtx?.branding?.companyName ?? 'OpenInspection';
+    const companyNameSet = companyName !== 'OpenInspection';
     const inspectionCount = allInspections.length;
     return computeOnboardingSteps({
-      siteNameSet,
+      companyNameSet,
       templateCount,
       serviceCount,
       inspectionCount,

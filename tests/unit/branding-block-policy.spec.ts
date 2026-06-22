@@ -60,7 +60,7 @@ describe('BrandingService — Round-2 #10 persistence', () => {
         });
 
         const cfg = await svc.getBranding(TENANT, {
-            siteName: 'OpenInspection',
+            companyName: 'OpenInspection',
             primaryColor: '#4f46e5',
             supportEmail: 'support@example.com',
         });
@@ -81,7 +81,7 @@ describe('BrandingService — Round-2 #10 persistence', () => {
         });
 
         const cfg = await svc.getBranding(TENANT, {
-            siteName: 'OpenInspection',
+            companyName: 'OpenInspection',
             primaryColor: '#4f46e5',
             supportEmail: 'support@example.com',
         });

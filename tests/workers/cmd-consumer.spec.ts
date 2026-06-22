@@ -57,9 +57,9 @@ async function seedSchema(): Promise<void> {
         'CREATE TABLE IF NOT EXISTS parked_cmd_events (id TEXT PRIMARY KEY, envelope TEXT NOT NULL, reason TEXT NOT NULL, received_at INTEGER NOT NULL);',
     );
     // PortalProvider.handleTenantUpdate reads/initializes tenant_configs when a
-    // command carries `name` (IA-27 siteName init). Test DDL keeps every column
+    // command carries `name` (IA-27 companyName init). Test DDL keeps every column
     // SELECTed by drizzle present but unconstrained — the apply path only ever
-    // writes (tenant_id, site_name, updated_at) here. Shared with cmd-fixtures
+    // writes (tenant_id, company_name, updated_at) here. Shared with cmd-fixtures
     // and guarded against schema drift by inline-ddl-schema-sync.spec.ts.
     await b.DB.exec(TENANT_CONFIGS_TEST_DDL);
     await b.DB.exec(

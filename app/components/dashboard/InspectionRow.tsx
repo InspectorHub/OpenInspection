@@ -17,7 +17,7 @@ interface Inspection {
  inspectorName?: string;
  date?: string;
  closingDate?: string;
- orderId?: string;
+ referenceNumber?: string;
  referralSource?: string;
  yearBuilt?: number;
  sqft?: number;
@@ -80,7 +80,7 @@ export function InspectionRow({ inspection: i, visibleColumns }: InspectionRowPr
  {isVisible(cols, "date") && <span> · {formatInspectionDateTime(i.date)}</span>}
  {isVisible(cols, "inspector") && i.inspectorName && <span> · <span className="text-ih-fg-4">by</span> {i.inspectorName}</span>}
  {isVisible(cols, "closingDate") && i.closingDate && <ClosingDateBadge closingDate={i.closingDate} />}
- {isVisible(cols, "orderId") && i.orderId && <span> · <span className="text-ih-fg-4">#</span><span className="font-mono">{i.orderId}</span></span>}
+ {isVisible(cols, "referenceNumber") && i.referenceNumber && <span> · <span className="text-ih-fg-4">#</span><span className="font-mono">{i.referenceNumber}</span></span>}
  {isVisible(cols, "referralSource") && i.referralSource && <span> · <span className="text-ih-fg-4">via</span> {i.referralSource}</span>}
  {isVisible(cols, "propertyFacts") && (i.yearBuilt || i.sqft) && (
  <span className="text-ih-fg-4">

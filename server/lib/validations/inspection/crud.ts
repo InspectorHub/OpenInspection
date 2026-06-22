@@ -121,7 +121,7 @@ export const UpdateInspectionSchema = z.object({
     closingDate:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date (YYYY-MM-DD)').nullable().optional().openapi({ example: '2026-07-15' }).describe('TODO describe closingDate field for the OpenInspection MCP integration'),
     // Round-2 backlog G3 (Spectora §4.1) — free-text Order ID for ISN-style
     // integrations. Surfaced in PMS exports.
-    orderId:        z.string().max(64).nullable().optional().openapi({ example: 'ORD-2026-0142' }).describe('TODO describe orderId field for the OpenInspection MCP integration'),
+    referenceNumber:        z.string().max(64).nullable().optional().openapi({ example: 'REF-2026-0142' }).describe('TODO describe referenceNumber field for the OpenInspection MCP integration'),
     // Round-2 backlog G3 — referral source label. Free-text so the seed
     // list ("Realtor", "Past Client", ...) plus tenant custom values both
     // round-trip without a separate enum.

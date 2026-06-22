@@ -80,7 +80,7 @@ function buildApp(hasStream: boolean) {
         c.set('tenantId', TENANT_ID);
         // Branding stub — handler reads these defensively with || fallbacks.
         c.set('branding', {
-            siteName: 'Test',
+            companyName: 'Test',
             primaryColor: '#000',
             logoUrl: null,
             reportTheme: 'modern',

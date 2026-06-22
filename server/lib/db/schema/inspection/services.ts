@@ -50,5 +50,5 @@ export const discountCodes = sqliteTable('discount_codes', {
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (t) => [
     index('idx_discount_codes_tenant').on(t.tenantId),
-    uniqueIndex('discount_codes_code_tenant').on(sql`upper(code)`, t.tenantId),
+    uniqueIndex('uq_discount_codes_code_tenant').on(sql`upper(code)`, t.tenantId),
 ]);

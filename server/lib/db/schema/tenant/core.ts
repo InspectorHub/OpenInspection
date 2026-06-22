@@ -26,7 +26,7 @@ export const tenants = sqliteTable('tenants', {
 
 export const tenantConfigs = sqliteTable('tenant_configs', {
     tenantId: text('tenant_id').primaryKey().references(() => tenants.id),
-    siteName: text('site_name'),
+    companyName: text('company_name'),
     primaryColor: text('primary_color'),
     logoUrl: text('logo_url'),
     supportEmail: text('support_email'),
@@ -76,7 +76,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // 14 integration API keys configurable via Settings UI. Supersedes the
     // `secrets` column which held a smaller subset. Worker env vars still
     // take precedence (backwards compat); DB secrets are the fallback.
-    encryptedSecrets: text('encrypted_secrets'),
+    secretsEnc: text('secrets_enc'),
     // Envelope encryption (2026-06-07) — the tenant's wrapped DEK
     // (`k1:iv:wrapped`, AES-GCM under the HKDF KEK from JWT_SECRET, AAD=tenantId).
     // NULL while the tenant still has a legacy un-prefixed blob (or no secrets).

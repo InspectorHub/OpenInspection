@@ -146,26 +146,26 @@ describe('PropertyFactsSchema (Zod)', () => {
     });
 });
 
-describe('UpdateInspectionSchema — G2 closingDate / G3 orderId / G3 referralSource', () => {
+describe('UpdateInspectionSchema — G2 closingDate / G3 referenceNumber / G3 referralSource', () => {
     it('accepts all three new fields', () => {
         const parsed = UpdateInspectionSchema.parse({
             closingDate:    '2026-07-15',
-            orderId:        'ORD-2026-0142',
+            referenceNumber:        'REF-2026-0142',
             referralSource: 'Realtor',
         });
         expect(parsed.closingDate).toBe('2026-07-15');
-        expect(parsed.orderId).toBe('ORD-2026-0142');
+        expect(parsed.referenceNumber).toBe('REF-2026-0142');
         expect(parsed.referralSource).toBe('Realtor');
     });
 
     it('null clears each new field', () => {
         const parsed = UpdateInspectionSchema.parse({
             closingDate:    null,
-            orderId:        null,
+            referenceNumber:        null,
             referralSource: null,
         });
         expect(parsed.closingDate).toBeNull();
-        expect(parsed.orderId).toBeNull();
+        expect(parsed.referenceNumber).toBeNull();
         expect(parsed.referralSource).toBeNull();
     });
 
@@ -174,7 +174,7 @@ describe('UpdateInspectionSchema — G2 closingDate / G3 orderId / G3 referralSo
         expect(() => UpdateInspectionSchema.parse({ closingDate: '2026-7-15' })).toThrow();
     });
 
-    it('rejects orderId longer than 64 chars', () => {
-        expect(() => UpdateInspectionSchema.parse({ orderId: 'X'.repeat(65) })).toThrow();
+    it('rejects referenceNumber longer than 64 chars', () => {
+        expect(() => UpdateInspectionSchema.parse({ referenceNumber: 'X'.repeat(65) })).toThrow();
     });
 });

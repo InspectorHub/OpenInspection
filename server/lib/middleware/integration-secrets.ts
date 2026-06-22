@@ -1,6 +1,6 @@
 /**
  * Secret UI化 — runtime middleware to load encrypted integration secrets
- * from tenant_configs.encrypted_secrets and merge them into c.env.
+ * from tenant_configs.secrets_enc and merge them into c.env.
  *
  * Precedence (A-8 secret-resolution matrix):
  *  - Platform-shared keys (default): Worker env wins; the tenant DB value is a
@@ -13,7 +13,7 @@
  *    the platform account; DB-wins prevents that money-misrouting.
  *
  * Performance: decryption happens once per request and only if the tenant
- * has a non-null encrypted_secrets value. The result is cached on the
+ * has a non-null secrets_enc value. The result is cached on the
  * request context so multiple accesses to c.env.RESEND_API_KEY etc.
  * don't re-decrypt.
  */

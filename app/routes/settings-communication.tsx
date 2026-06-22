@@ -26,7 +26,7 @@ interface CommConfig {
   resendConfigured: boolean;
   emailMode: "platform" | "own";
   senderDisplayName: string | null;
-  siteName: string | null;
+  companyName: string | null;
   pointOfContact: "inspector" | "company";
 }
 
@@ -69,7 +69,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       resendConfigured: Boolean(d?.resendConfigured),
       emailMode: (d?.emailMode as "platform" | "own") || "platform",
       senderDisplayName: (d?.senderDisplayName as string) || null,
-      siteName: (d?.siteName as string) || null,
+      companyName: (d?.companyName as string) || null,
       pointOfContact: ((d?.pointOfContact as string) === "inspector" ? "inspector" : "company") as "inspector" | "company",
     } as CommConfig,
     emailTemplates,
@@ -237,7 +237,7 @@ export default function SettingsCommunication() {
   const denied = "forbidden" in loaderResult;
   const EMPTY_CONFIG: CommConfig = {
     senderEmail: null, replyTo: null, resendConfigured: false, emailMode: "platform",
-    senderDisplayName: null, siteName: null, pointOfContact: "company",
+    senderDisplayName: null, companyName: null, pointOfContact: "company",
   };
   const config = denied ? EMPTY_CONFIG : loaderResult.config;
   const emailTemplates = denied ? [] : loaderResult.emailTemplates;
@@ -273,9 +273,9 @@ export default function SettingsCommunication() {
 
   const [mode, setMode] = useState<"platform" | "own">(isSaas ? config.emailMode : "own");
   const [smsMode, setSmsMode] = useState<"platform" | "own">(isSaas ? smsConfig.mode : "own");
-  // Override toggle: ON when senderDisplayName is set AND differs from siteName.
+  // Override toggle: ON when senderDisplayName is set AND differs from companyName.
   const [overrideName, setOverrideName] = useState<boolean>(
-    !!config.senderDisplayName && config.senderDisplayName !== config.siteName
+    !!config.senderDisplayName && config.senderDisplayName !== config.companyName
   );
   // Track current PoC selection for the identity summary line.
   const [poc, setPoc] = useState<"inspector" | "company">(config.pointOfContact);

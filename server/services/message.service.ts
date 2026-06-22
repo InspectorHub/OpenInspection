@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull, sql } from 'drizzle-orm';
-import { customerMessages, inspections } from '../lib/db/schema';
+import { inspectionMessages, inspections } from '../lib/db/schema';
 import type { MessageAttachment } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import type { NotificationService } from './notification.service';
@@ -22,7 +22,7 @@ export class MessageService {
     async createMessage(input: CreateMessageInput) {
         const id = crypto.randomUUID();
         const now = Date.now();
-        await this.db().insert(customerMessages).values({
+        await this.db().insert(inspectionMessages).values({
             id,
             tenantId: input.tenantId,
             inspectionId: input.inspectionId,
@@ -33,7 +33,7 @@ export class MessageService {
             readAt: null,
             createdAt: now,
         });
-        const [row] = await this.db().select().from(customerMessages).where(eq(customerMessages.id, id)).limit(1);
+        const [row] = await this.db().select().from(inspectionMessages).where(eq(inspectionMessages.id, id)).limit(1);
         if (!row) throw Errors.Internal('Failed to create message');
 
         // B3: in-app notification — when a client posts, alert the inspector
@@ -62,29 +62,29 @@ export class MessageService {
     }
 
     async listForInspection(inspectionId: string, tenantId: string) {
-        return this.db().select().from(customerMessages)
-            .where(and(eq(customerMessages.inspectionId, inspectionId), eq(customerMessages.tenantId, tenantId)))
-            .orderBy(customerMessages.createdAt);
+        return this.db().select().from(inspectionMessages)
+            .where(and(eq(inspectionMessages.inspectionId, inspectionId), eq(inspectionMessages.tenantId, tenantId)))
+            .orderBy(inspectionMessages.createdAt);
     }
 
     async markAllReadForRole(inspectionId: string, tenantId: string, fromRole: 'client' | 'inspector') {
-        await this.db().update(customerMessages)
+        await this.db().update(inspectionMessages)
             .set({ readAt: Date.now() })
             .where(and(
-                eq(customerMessages.inspectionId, inspectionId),
-                eq(customerMessages.tenantId, tenantId),
-                eq(customerMessages.fromRole, fromRole),
-                isNull(customerMessages.readAt),
+                eq(inspectionMessages.inspectionId, inspectionId),
+                eq(inspectionMessages.tenantId, tenantId),
+                eq(inspectionMessages.fromRole, fromRole),
+                isNull(inspectionMessages.readAt),
             ));
     }
 
     async unreadCountForTenant(tenantId: string): Promise<number> {
         const [row] = await this.db().select({ c: sql<number>`count(*)` })
-            .from(customerMessages)
+            .from(inspectionMessages)
             .where(and(
-                eq(customerMessages.tenantId, tenantId),
-                eq(customerMessages.fromRole, 'client'),
-                isNull(customerMessages.readAt),
+                eq(inspectionMessages.tenantId, tenantId),
+                eq(inspectionMessages.fromRole, 'client'),
+                isNull(inspectionMessages.readAt),
             ));
         return Number(row?.c ?? 0);
     }

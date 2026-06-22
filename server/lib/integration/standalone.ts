@@ -248,7 +248,7 @@ export class StandaloneProvider implements IntegrationProvider {
             await db.update(tenants).set(update).where(eq(tenants.id, tenantId));
         }
 
-        // IA-27: initialize tenant_configs.siteName from the company name so the
+        // IA-27: initialize tenant_configs.companyName from the company name so the
         // brand never boots as the platform default. Initialize-only — never
         // overwrites a name the tenant has already chosen.
         if (name) {
@@ -256,15 +256,15 @@ export class StandaloneProvider implements IntegrationProvider {
             if (!cfg) {
                 await db.insert(tenantConfigs).values({
                     tenantId,
-                    siteName: name,
+                    companyName: name,
                     updatedAt: new Date(),
                 });
-            } else if (!cfg.siteName) {
+            } else if (!cfg.companyName) {
                 await db.update(tenantConfigs)
-                    .set({ siteName: name, updatedAt: new Date() })
+                    .set({ companyName: name, updatedAt: new Date() })
                     .where(eq(tenantConfigs.tenantId, tenantId));
             }
-            // siteName already set → leave it (initialize-only, never overwrite)
+            // companyName already set → leave it (initialize-only, never overwrite)
         }
 
         // Handle Admin User creation/sync

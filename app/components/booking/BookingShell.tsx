@@ -47,7 +47,7 @@ export function BookingShell({
         {/* Company header */}
         <nav className="mb-8 flex items-center gap-3">
           {brand.logoUrl ? (
-            <img src={brand.logoUrl} alt={brand.siteName ?? profile.company ?? "Logo"} className="h-10 w-auto" />
+            <img src={brand.logoUrl} alt={brand.companyName ?? profile.company ?? "Logo"} className="h-10 w-auto" />
           ) : (
             <div className="w-10 h-10 rounded-full bg-ih-primary-tint flex items-center justify-center text-ih-primary text-lg font-bold">
               {profile.company.charAt(0)}

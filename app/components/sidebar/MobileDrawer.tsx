@@ -8,7 +8,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
   const { scheme, setColorScheme } = useTheme();
   const ctx = useSessionContext();
 
-  const siteName = ctx?.branding?.siteName || "OpenInspection";
+  const companyName = ctx?.branding?.companyName || "OpenInspection";
   const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
   const tenantSlug = ctx?.branding?.tenantSlug || "openinspection.dev";
   const userName = ctx?.user?.name || "Inspector";
@@ -24,7 +24,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
         <div className="p-4 flex items-center justify-between border-b border-ih-border">
           <div className="flex items-center gap-3">
             <img src={logoUrl} alt="" className="w-7 h-7 shrink-0" width={28} height={28} />
-            <span className="text-sm font-bold text-ih-fg-1 tracking-tight">{siteName}</span>
+            <span className="text-sm font-bold text-ih-fg-1 tracking-tight">{companyName}</span>
           </div>
           <button onClick={onClose} className="p-2 rounded-[6px] text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-fg-2 transition-colors" aria-label="Close menu">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -55,7 +55,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
           <div className="pt-3 mt-1 border-t border-ih-border">
             {/* Workspace identity card */}
             <div className="px-3 py-2 mb-1 rounded-[6px] bg-ih-bg-muted/60">
-              <div className="text-[11px] font-bold text-ih-fg-1 truncate">{siteName}</div>
+              <div className="text-[11px] font-bold text-ih-fg-1 truncate">{companyName}</div>
               <div className="text-[10px] font-[var(--font-ih-mono)] text-ih-fg-4 truncate">{tenantSlug}</div>
               {userRole && <div className="text-[10px] text-ih-fg-3 capitalize">{userRole}</div>}
             </div>

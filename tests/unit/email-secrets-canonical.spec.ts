@@ -2,7 +2,7 @@
  * A-16 — email/AI keys must come from the CANONICAL secrets store.
  *
  * Every Settings page writes keys via PUT/POST /api/admin/secrets into
- * `tenant_configs.encrypted_secrets` (ENV-name keys). The email/AI config
+ * `tenant_configs.secrets_enc` (ENV-name keys). The email/AI config
  * loader used to read the legacy camelCase `secrets` column, which no UI
  * writes anymore — so a tenant's saved Resend (own mode) and Gemini (BYOK)
  * keys never reached EmailService/AIService construction. This pins the
@@ -33,7 +33,7 @@ describe('loadTenantEmailConfig — canonical secrets store', () => {
         vi.mocked(drizzle).mockReturnValue(fix.db as never);
     });
 
-    it('reads Resend + Gemini keys from encrypted_secrets (ENV-name keys)', async () => {
+    it('reads Resend + Gemini keys from secrets_enc (ENV-name keys)', async () => {
         const db = vi.mocked(drizzle)({} as never);
         await db.insert(tenants).values({
             id: TENANT_ID,
@@ -43,7 +43,7 @@ describe('loadTenantEmailConfig — canonical secrets store', () => {
         } as never);
         await db.insert(tenantConfigs).values({
             tenantId: TENANT_ID,
-            encryptedSecrets: await encryptSecrets(
+            secretsEnc: await encryptSecrets(
                 { RESEND_API_KEY: 're_own_key', GEMINI_API_KEY: 'g_byok_key' },
                 JWT_SECRET,
             ),

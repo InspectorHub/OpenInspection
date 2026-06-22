@@ -24,7 +24,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
 
     // Default system branding (fallback)
     const defaultBranding: BrandingConfig = {
-        siteName: c.env.APP_NAME || 'OpenInspection',
+        companyName: c.env.APP_NAME || 'OpenInspection',
         primaryColor: c.env.PRIMARY_COLOR || '#6366f1',
         logoUrl: null,
         supportEmail: c.env.SENDER_EMAIL || 'support@openinspection.org',
@@ -55,7 +55,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
     const db = drizzle(c.env.DB);
     try {
         const config = await db.select({
-            siteName: tenantConfigs.siteName,
+            companyName: tenantConfigs.companyName,
             primaryColor: tenantConfigs.primaryColor,
             logoUrl: tenantConfigs.logoUrl,
             supportEmail: tenantConfigs.supportEmail,
@@ -67,7 +67,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         .get();
 
         const branding: BrandingConfig = config ? {
-            siteName: config.siteName || defaultBranding.siteName,
+            companyName: config.companyName || defaultBranding.companyName,
             primaryColor: config.primaryColor || defaultBranding.primaryColor,
             logoUrl: config.logoUrl,
             supportEmail: config.supportEmail || defaultBranding.supportEmail,
@@ -88,7 +88,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
         if (config && c.env.TENANT_CACHE) {
             try {
                 const cacheable: BrandingConfig = {
-                    siteName:     branding.siteName,
+                    companyName:     branding.companyName,
                     primaryColor: branding.primaryColor,
                     logoUrl:      branding.logoUrl,
                     supportEmail: branding.supportEmail,

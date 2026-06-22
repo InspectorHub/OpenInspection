@@ -35,7 +35,7 @@ function makeApp(opts: {
         (c as { env: Record<string, unknown> }).env = { DB: {}, TENANT_CACHE: kv };
         c.set('user', { sub: 'u1', role: 'owner', tenantId: 't1' } as never);
         c.set('tenantId', 't1' as never);
-        c.set('branding', { siteName: 'X', primaryColor: '#fff' } as never);
+        c.set('branding', { companyName: 'X', primaryColor: '#fff' } as never);
         if (opts.requestedTenantSlug) c.set('requestedTenantSlug', opts.requestedTenantSlug as never);
         Object.defineProperty(c, 'executionCtx', {
             value: { waitUntil: (p: Promise<unknown>) => { void p; } },

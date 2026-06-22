@@ -41,8 +41,8 @@ describe('cmd golden fixtures — consumer can apply every fixture (A-21)', () =
         await b.DB.exec('CREATE TABLE IF NOT EXISTS processed_cmd_events (event_id TEXT PRIMARY KEY, cmd_type TEXT NOT NULL, processed_at INTEGER NOT NULL);');
         await b.DB.exec('CREATE TABLE IF NOT EXISTS parked_cmd_events (id TEXT PRIMARY KEY, envelope TEXT NOT NULL, reason TEXT NOT NULL, received_at INTEGER NOT NULL);');
         // The update fixture carries `name` → PortalProvider initializes
-        // tenant_configs.siteName (IA-27). Columns unconstrained on purpose —
-        // only (tenant_id, site_name, updated_at) are written by this path.
+        // tenant_configs.companyName (IA-27). Columns unconstrained on purpose —
+        // only (tenant_id, company_name, updated_at) are written by this path.
         // Shared with cmd-consumer; guarded against schema drift by
         // inline-ddl-schema-sync.spec.ts.
         await b.DB.exec(TENANT_CONFIGS_TEST_DDL);

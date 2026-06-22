@@ -331,7 +331,7 @@ export function ReportView(props: ReportViewProps) {
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-3">
             {data.brand.logoUrl ? (
-              <img src={data.brand.logoUrl} alt={data.brand.siteName ?? "Logo"} className="h-10 w-auto" />
+              <img src={data.brand.logoUrl} alt={data.brand.companyName ?? "Logo"} className="h-10 w-auto" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-ih-ok/10 flex items-center justify-center">
                 <svg className="w-5 h-5 text-ih-ok" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,7 +340,7 @@ export function ReportView(props: ReportViewProps) {
               </div>
             )}
             <span className="text-xs font-semibold tracking-widest uppercase text-ih-fg-4">
-              {data.brand.siteName ? `${data.brand.siteName} · Certified Inspection Report` : "Certified Inspection Report"}
+              {data.brand.companyName ? `${data.brand.companyName} · Certified Inspection Report` : "Certified Inspection Report"}
             </span>
           </div>
           <div className="flex items-center gap-2 print:hidden">

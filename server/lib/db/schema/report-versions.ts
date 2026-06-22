@@ -34,7 +34,7 @@ export const reportVersions = sqliteTable('report_versions', {
     publishedBy:    text('published_by').notNull(),
     createdAt:      text('created_at').notNull().default(sql`(datetime('now'))`),
 }, (t) => [
-    index('report_versions_inspection_idx').on(t.inspectionId, t.versionNumber),
-    uniqueIndex('report_versions_inspection_version_unique').on(t.inspectionId, t.versionNumber),
+    index('idx_report_versions_inspection').on(t.inspectionId, t.versionNumber),
+    uniqueIndex('uq_report_versions_inspection_version').on(t.inspectionId, t.versionNumber),
     uniqueIndex('idx_report_versions_verify_token').on(t.verificationToken),
 ]);

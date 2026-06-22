@@ -105,14 +105,14 @@ export type ProfileInput = z.infer<typeof profileSchema>;
 
 /**
  * Workspace branding — mirrors the API's `UpdateBrandingSchema`
- * (siteName 1..50, primaryColor #hex, reportTheme enum, customReferralSources
+ * (companyName 1..50, primaryColor #hex, reportTheme enum, customReferralSources
  * is a textarea split per-line in the action so it is NOT validated as an
  * array here).
  */
 const THEMES = ["modern", "classic", "minimal"] as const;
 
 export const workspaceSchema = z.object({
-  siteName: z
+  companyName: z
     .string()
     .min(1, "Workspace name is required")
     .max(50, "Workspace name is too long"),

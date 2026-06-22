@@ -45,9 +45,9 @@ test.describe('Branding System E2E', () => {
         // 4. Update Branding in Settings
         console.log('Updating Branding in /settings...');
         await page.goto('http://localhost:8789/settings');
-        await page.waitForSelector('#siteName');
+        await page.waitForSelector('#companyName');
         
-        await page.fill('#siteName', 'NitroInspect');
+        await page.fill('#companyName', 'NitroInspect');
         await page.fill('#primaryColor', '#ff5722'); 
         
         // --- REAL LOGO UPLOAD TEST ---

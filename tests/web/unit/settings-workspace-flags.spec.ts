@@ -22,7 +22,7 @@ function fd(pairs: [string, string][]) {
 describe('workspace settings — report-feature checkboxes coerce to booleans', () => {
   it('checked ("on") → success with the flag true', () => {
     const submission = parseWithZod(
-      fd([['siteName', 'Acme'], ['reportTheme', 'modern'], ['enableCustomerRepairExport', 'on']]),
+      fd([['companyName', 'Acme'], ['reportTheme', 'modern'], ['enableCustomerRepairExport', 'on']]),
       { schema: workspaceSchema },
     );
     expect(submission.status).toBe('success');
@@ -33,7 +33,7 @@ describe('workspace settings — report-feature checkboxes coerce to booleans', 
 
   it('unchecked (absent) → success with the flag falsy', () => {
     const submission = parseWithZod(
-      fd([['siteName', 'Acme'], ['reportTheme', 'modern']]),
+      fd([['companyName', 'Acme'], ['reportTheme', 'modern']]),
       { schema: workspaceSchema },
     );
     expect(submission.status).toBe('success');

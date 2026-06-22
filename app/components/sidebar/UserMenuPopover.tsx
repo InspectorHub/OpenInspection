@@ -7,7 +7,7 @@ import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 interface UserMenuPopoverProps {
   open: boolean;
   onClose: () => void;
-  siteName: string;
+  companyName: string;
   tenantSlug: string;
   userRole?: string | null;
   showSwitchWorkspace: boolean;
@@ -18,7 +18,7 @@ interface UserMenuPopoverProps {
 export function UserMenuPopover({
   open,
   onClose,
-  siteName,
+  companyName,
   tenantSlug,
   userRole,
   showSwitchWorkspace,
@@ -56,7 +56,7 @@ export function UserMenuPopover({
     >
       {/* Workspace card */}
       <div className="px-3 py-2 mb-0.5">
-        <div className="text-[12px] font-bold text-ih-fg-1 truncate">{siteName}</div>
+        <div className="text-[12px] font-bold text-ih-fg-1 truncate">{companyName}</div>
         <div className="text-[10px] font-[var(--font-ih-mono)] text-ih-fg-4 truncate">{tenantSlug}</div>
         {userRole && (
           <div className="text-[10px] text-ih-fg-3 capitalize mt-0.5">{userRole}</div>

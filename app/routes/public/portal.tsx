@@ -91,16 +91,16 @@ function BrandEyebrow({ brand }: { brand: TenantBrand }) {
   if (brand.logoUrl) {
     return (
       <div className="flex items-center gap-2 mb-2">
-        <img src={brand.logoUrl} alt={brand.siteName ?? "Company"} className="h-8 w-auto" />
-        {brand.siteName && (
-          <span className="text-[13px] font-semibold text-ih-fg-2">{brand.siteName}</span>
+        <img src={brand.logoUrl} alt={brand.companyName ?? "Company"} className="h-8 w-auto" />
+        {brand.companyName && (
+          <span className="text-[13px] font-semibold text-ih-fg-2">{brand.companyName}</span>
         )}
       </div>
     );
   }
   return (
     <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
-      {brand.siteName ?? "Client Portal"}
+      {brand.companyName ?? "Client Portal"}
     </p>
   );
 }

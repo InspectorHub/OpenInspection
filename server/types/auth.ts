@@ -12,7 +12,7 @@ export interface User {
 export type UserRole = Role;
 
 export interface BrandingConfig {
-    siteName: string;
+    companyName: string;
     primaryColor: string;
     logoUrl: string | null;
     supportEmail: string;

@@ -6,12 +6,12 @@ import type { CSSProperties } from "react";
  * primaryColor keeps the platform design tokens untouched.
  */
 export interface TenantBrand {
-  siteName: string | null;
+  companyName: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
 }
 
-export const EMPTY_BRAND: TenantBrand = { siteName: null, primaryColor: null, logoUrl: null };
+export const EMPTY_BRAND: TenantBrand = { companyName: null, primaryColor: null, logoUrl: null };
 
 /**
  * Pick a readable text color for content sitting ON the brand primary color.

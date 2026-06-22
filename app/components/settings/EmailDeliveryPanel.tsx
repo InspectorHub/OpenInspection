@@ -7,7 +7,7 @@ interface CommConfig {
   resendConfigured: boolean;
   emailMode: "platform" | "own";
   senderDisplayName: string | null;
-  siteName: string | null;
+  companyName: string | null;
   pointOfContact: "inspector" | "company";
 }
 
@@ -146,11 +146,11 @@ export function EmailDeliveryPanel({
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">From name</p>
               <p className="text-[13px] text-ih-fg-2">
                 <strong>
-                  {config.siteName || config.senderDisplayName || (
+                  {config.companyName || config.senderDisplayName || (
                     <Link to="/settings/workspace" className="text-ih-primary hover:underline">Set your company name in Settings &rsaquo; Workspace</Link>
                   )}
                 </strong>
-                {config.siteName && (
+                {config.companyName && (
                   <span className="text-[11px] text-ih-fg-4 ml-2">(from Workspace settings)</span>
                 )}
               </p>
@@ -220,7 +220,7 @@ export function EmailDeliveryPanel({
               Emails send as:{" "}
               <strong>
                 {poc === "company"
-                  ? (overrideName && config.senderDisplayName ? config.senderDisplayName : (config.siteName || config.senderDisplayName || "your company"))
+                  ? (overrideName && config.senderDisplayName ? config.senderDisplayName : (config.companyName || config.senderDisplayName || "your company"))
                   : "the sending inspector"}
               </strong>
               {poc === "inspector"

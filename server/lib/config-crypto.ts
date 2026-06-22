@@ -63,7 +63,7 @@ export async function decryptSecrets(encrypted: string, jwtSecret: string): Prom
 // only re-wraps DEKs — data blobs are untouched. AAD = tenantId on BOTH layers
 // binds ciphertext to its tenant (transplant defense). Formats:
 //   dek_enc:            k1:<ivB64>:<wrappedB64>
-//   encrypted_secrets:  v2:<ivB64>:<cipherB64>
+//   secrets_enc:  v2:<ivB64>:<cipherB64>
 //   legacy (pre-v2):    <ivB64>:<cipherB64>   — PBKDF2 global key, read-only,
 //                        kept permanently for OSS self-host upgrades.
 

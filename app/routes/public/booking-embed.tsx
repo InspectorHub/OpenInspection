@@ -127,7 +127,7 @@ export function EmbedWizard({
         {data.theme === "branded" && data.brand?.logoUrl && (
           <img
             src={data.brand.logoUrl}
-            alt={data.brand.siteName ?? "Logo"}
+            alt={data.brand.companyName ?? "Logo"}
             className="h-7 w-auto mb-3"
           />
         )}

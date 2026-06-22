@@ -128,7 +128,7 @@ export class InspectionPublishService extends InspectionSubService {
         // Track I-a Task 7 — both gates outstanding → combined "Sign & pay".
         const bothOutstanding = reason === 'agreement' && paymentOutstanding;
 
-        const branding = await db.select({ siteName: tenantConfigs.siteName, primaryColor: tenantConfigs.primaryColor })
+        const branding = await db.select({ companyName: tenantConfigs.companyName, primaryColor: tenantConfigs.primaryColor })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 
         let inspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null } | undefined;
@@ -184,7 +184,7 @@ export class InspectionPublishService extends InspectionSubService {
 
         return {
             reason,
-            companyName: branding?.siteName ?? 'OpenInspection',
+            companyName: branding?.companyName ?? 'OpenInspection',
             // A-10 — nullable: null means "tenant set no accent", the page
             // keeps the platform design tokens (no per-surface fallback hex).
             primaryColor: branding?.primaryColor ?? null,

@@ -287,16 +287,16 @@ api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
     const report = await reencryptAllTenantSecrets({
         listRows: async () => {
             const rows = await db
-                .select({ tenantId: tenantConfigs.tenantId, blob: tenantConfigs.encryptedSecrets, dekEnc: tenantConfigs.dekEnc })
+                .select({ tenantId: tenantConfigs.tenantId, blob: tenantConfigs.secretsEnc, dekEnc: tenantConfigs.dekEnc })
                 .from(tenantConfigs)
-                .where(isNotNull(tenantConfigs.encryptedSecrets))
+                .where(isNotNull(tenantConfigs.secretsEnc))
                 .all();
             return rows.map(r => ({ tenantId: r.tenantId, blob: r.blob as string, dekEnc: r.dekEnc ?? null }));
         },
         updateRow: async (tenantId, patch) => {
             await db.update(tenantConfigs)
                 .set({
-                    ...(patch.blob !== undefined ? { encryptedSecrets: patch.blob } : {}),
+                    ...(patch.blob !== undefined ? { secretsEnc: patch.blob } : {}),
                     ...(patch.dekEnc !== undefined ? { dekEnc: patch.dekEnc } : {}),
                     updatedAt: new Date(),
                 })

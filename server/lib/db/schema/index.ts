@@ -40,7 +40,7 @@ export {
     tenantLibraryImports,
     tenantMarketplaceImportHistory,
 } from './marketplace';
-export { customerMessages } from './message';
+export { inspectionMessages } from './message';
 export type { MessageAttachment } from './message';
 export { reportPdfs } from './report-pdf';
 export type { ReportPdf, NewReportPdf } from './report-pdf';
