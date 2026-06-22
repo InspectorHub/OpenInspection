@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c26b74eb-aede-4197-90ba-7f4ad8386b39",
+  "id": "808026e4-8d47-461b-b0a1-d49572b256d7",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agreement_requests": {
@@ -4912,7 +4912,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": 0
+          "default": false
         },
         "created_at": {
           "name": "created_at",
@@ -7000,13 +7000,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'shared'"
-        },
-        "nachi_number": {
-          "name": "nachi_number",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "applied_cmd_seq": {
           "name": "applied_cmd_seq",

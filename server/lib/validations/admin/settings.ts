@@ -40,12 +40,6 @@ export const UpdateBrandingSchema = z.object({
     pdfShowFooter: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders the company footer block.'),
     pdfShowPageNumbers: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders page numbers.'),
     pdfShowLicense: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders the inspector license number.'),
-    // Design System 0520 subsystem E P8 — InterNACHI inspector ID.
-    // Surfaced in the TeamCredit footer block on the customer report.
-    // Accepts the canonical NACHI format (NACHI##### or numeric IDs).
-    nachiNumber: z.string().regex(/^[A-Za-z0-9-]{4,32}$/, 'Invalid NACHI number')
-        .nullable().optional()
-        .openapi({ example: 'NACHI22041901' }).describe('TODO describe nachiNumber field for the OpenInspection MCP integration'),
 }).openapi('UpdateBranding');
 
 /**

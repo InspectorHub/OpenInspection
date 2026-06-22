@@ -103,7 +103,7 @@ export const UpdateInspectionSchema = z.object({
     clientEmail: z.string().email().optional().nullable().openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
-    price: z.number().min(0).optional().openapi({ example: 450 }).describe('TODO describe price field for the OpenInspection MCP integration'),
+    price: z.number().int().min(0).optional().openapi({ example: 450 }).describe('TODO describe price field for the OpenInspection MCP integration'),
     status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     paymentRequired:   z.boolean().optional().openapi({ example: false }).describe('TODO describe paymentRequired field for the OpenInspection MCP integration'),
     agreementRequired: z.boolean().optional().openapi({ example: false }).describe('TODO describe agreementRequired field for the OpenInspection MCP integration'),

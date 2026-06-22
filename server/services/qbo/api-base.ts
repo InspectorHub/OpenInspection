@@ -155,7 +155,7 @@ export class QBOServiceBase {
                 eq(qboSyncErrors.tenantId, tenantId),
                 eq(qboSyncErrors.oiType, oiType),
                 eq(qboSyncErrors.oiId, oiId),
-                eq(qboSyncErrors.resolved, 0),
+                eq(qboSyncErrors.resolved, false),
             )).get();
 
         if (existing) {
@@ -173,7 +173,7 @@ export class QBOServiceBase {
                 errorCode: 'SYNC_ERROR',
                 errorMsg:  msg,
                 retries:   0,
-                resolved:  0,
+                resolved:  false,
                 createdAt: now,
                 updatedAt: now,
             });

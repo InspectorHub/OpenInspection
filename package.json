@@ -65,7 +65,8 @@
     "backup": "node scripts/backup.js",
     "restore": "node scripts/restore.js",
     "rotate:jwt": "node scripts/rotate-jwt-keys.js",
-    "prepare": "node -e \"try{require('child_process').execSync('git config core.hooksPath .githooks',{stdio:'ignore'})}catch(e){}\"",
+    "bootstrap": "node scripts/gen-version.js && npm run vendor:copy",
+    "prepare": "node -e \"const{execSync}=require('child_process');try{execSync('git config core.hooksPath .githooks',{stdio:'ignore'})}catch(e){};try{execSync('node scripts/gen-version.js',{stdio:'ignore'})}catch(e){}\"",
     "check:bundle": "node scripts/check-bundle-size.mjs"
   },
   "dependencies": {

@@ -10,13 +10,6 @@ export const tenants = sqliteTable('tenants', {
     status: text('status', { enum: ['pending','active','suspended','trial'] }).notNull().default('pending'),
     maxUsers: integer('max_users').notNull().default(5),
     deploymentMode: text('deployment_mode').notNull().default('shared'), // shared, silo
-    // Design System 0520 subsystem E P8 — optional InterNACHI inspector
-    // certification number, intended for the TeamCredit report footer.
-    // NOTE (2026-06-11, schema-cleanup): accepted by admin.schema.ts input
-    // validation but NEVER persisted or read anywhere — unwired since
-    // introduction. Either wire a writer/reader or retire the column + the
-    // validation field. Do not assume it holds data.
-    nachiNumber: text('nachi_number'),
     // A-21 — high-water mark of the portal→core command sequence applied to
     // this tenant (envelope `tenantseq`). The cmd consumer drops any command
     // with tenantseq <= this value (stale/reordered last-writer-wins guard).

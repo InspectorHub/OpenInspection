@@ -697,7 +697,7 @@ CREATE TABLE `qbo_sync_errors` (
 	`error_code` text NOT NULL,
 	`error_msg` text NOT NULL,
 	`retries` integer DEFAULT 0 NOT NULL,
-	`resolved` integer DEFAULT 0 NOT NULL,
+	`resolved` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -1006,7 +1006,6 @@ CREATE TABLE `tenants` (
 	`status` text DEFAULT 'pending' NOT NULL,
 	`max_users` integer DEFAULT 5 NOT NULL,
 	`deployment_mode` text DEFAULT 'shared' NOT NULL,
-	`nachi_number` text,
 	`applied_cmd_seq` integer DEFAULT 0 NOT NULL,
 	`applied_cred_seq` integer DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL
