@@ -157,12 +157,34 @@ export class InvoiceService {
             .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
     }
 
-    async deleteInvoice(id: string, tenantId: string) {
+    /**
+     * Void an invoice: set voidedAt to now and clear the payment gate if needed.
+     * Idempotent — calling on an already-voided invoice is a no-op (voidedAt
+     * is NOT updated again). Tenant-scoped — an invoice that belongs to another
+     * tenant is silently ignored (no error, no mutation).
+     */
+    async voidInvoice(id: string, tenantId: string): Promise<void> {
         const db = this.getDrizzle();
-        const existing = await db.select().from(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
-        if (!existing) throw Errors.NotFound('Invoice not found');
-        await db.delete(invoices).where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
+        const existing = await db.select().from(invoices)
+            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
+        // No-op: not found (cross-tenant guard) or already voided (idempotency).
+        if (!existing || existing.voidedAt) return;
+        await db.update(invoices).set({ voidedAt: new Date() })
+            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId)));
         await this.syncInspectionPaymentGate(existing.inspectionId, tenantId);
+    }
+
+    /**
+     * "Delete" an invoice by voiding it — the row is preserved for the audit
+     * trail and accounting records. Hard deletion is intentionally prohibited
+     * (QuickBooks-style void lifecycle, see #182).
+     */
+    async deleteInvoice(id: string, tenantId: string): Promise<void> {
+        const db = this.getDrizzle();
+        const existing = await db.select().from(invoices)
+            .where(and(eq(invoices.id, id), eq(invoices.tenantId, tenantId))).get();
+        if (!existing) throw Errors.NotFound('Invoice not found');
+        await this.voidInvoice(id, tenantId);
     }
 
     /**

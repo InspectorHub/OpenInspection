@@ -4,11 +4,15 @@
  *
  * Task 7 TDD: RED first (before the void filter is added to getEarningsSummary),
  * then GREEN after the SQL gains AND voided_at IS NULL in each CASE WHEN branch.
+ *
+ * Task 8 TDD: deleteInvoice must void (keep audit trail) not hard-delete.
+ *   voidInvoice must be idempotent and tenant-scoped.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InvoiceService } from '../../server/services/invoice.service';
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
@@ -144,5 +148,139 @@ describe('InvoiceService — getStatus void variant', () => {
 
         const inv = await svc.findByInspectionId(T2, I2);
         expect(inv?.status).toBe('paid');
+    });
+});
+
+// ─── Task 8: deleteInvoice voids (keeps audit trail) ─────────────────────────
+
+const T_VOID = '00000000-0000-0000-0000-000000000004';
+const T_OTHER = '00000000-0000-0000-0000-000000000005';
+const I_VOID  = 'i-void-task8';
+
+describe('InvoiceService — deleteInvoice voids (audit trail)', () => {
+    let testDb: BetterSQLite3Database<typeof schema>;
+    let svc: InvoiceService;
+
+    beforeEach(async () => {
+        const fix = createTestDb();
+        testDb = fix.db;
+        await setupSchema(fix.sqlite);
+        const { drizzle } = await import('drizzle-orm/d1');
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        svc = new InvoiceService({} as D1Database);
+
+        await testDb.insert(schema.tenants).values({
+            id: T_VOID, name: 'AuditCo', slug: 'auditco', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        });
+        await testDb.insert(schema.tenants).values({
+            id: T_OTHER, name: 'OtherCo', slug: 'otherco', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        });
+        await testDb.insert(schema.inspections).values({
+            id: I_VOID, tenantId: T_VOID, propertyAddress: '8 Audit Lane', date: '2026-06-22',
+            status: 'scheduled', paymentStatus: 'unpaid', price: 0,
+            agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        });
+    });
+
+    it('deleteInvoice keeps the row with voidedAt set — not hard-deleted', async () => {
+        await testDb.insert(schema.invoices).values({
+            id: 'inv-1', tenantId: T_VOID, inspectionId: I_VOID,
+            amountCents: 20000,
+            lineItems: [{ description: 'Inspection', amountCents: 20000 }],
+            createdAt: new Date(),
+        } as never);
+
+        await svc.deleteInvoice('inv-1', T_VOID);
+
+        // Row must STILL be present (not hard-deleted)
+        const row = await testDb.select().from(schema.invoices)
+            .where(eq(schema.invoices.id, 'inv-1')).get();
+        // Discriminating: if deleteInvoice still hard-deletes, row is null → test fails
+        expect(row).not.toBeNull();
+        expect(row?.voidedAt).toBeInstanceOf(Date);
+    });
+
+    it('deleteInvoice — voided invoice is excluded from earnings', async () => {
+        await testDb.insert(schema.invoices).values({
+            id: 'inv-2', tenantId: T_VOID, inspectionId: I_VOID,
+            amountCents: 50000,
+            lineItems: [{ description: 'Inspection', amountCents: 50000 }],
+            paidAt: new Date('2026-06-20'),
+            createdAt: new Date(),
+        } as never);
+
+        await svc.deleteInvoice('inv-2', T_VOID);
+
+        const summary = await svc.getEarningsSummary(T_VOID);
+        expect(summary.paid).toBe(0);
+        expect(summary.count).toBe(0);
+    });
+});
+
+describe('InvoiceService — voidInvoice idempotency + tenant guard', () => {
+    let testDb: BetterSQLite3Database<typeof schema>;
+    let svc: InvoiceService;
+
+    beforeEach(async () => {
+        const fix = createTestDb();
+        testDb = fix.db;
+        await setupSchema(fix.sqlite);
+        const { drizzle } = await import('drizzle-orm/d1');
+        (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        svc = new InvoiceService({} as D1Database);
+
+        await testDb.insert(schema.tenants).values({
+            id: T_VOID, name: 'AuditCo', slug: 'auditco', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        });
+        await testDb.insert(schema.tenants).values({
+            id: T_OTHER, name: 'OtherCo', slug: 'otherco', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        });
+        await testDb.insert(schema.inspections).values({
+            id: I_VOID, tenantId: T_VOID, propertyAddress: '8 Audit Lane', date: '2026-06-22',
+            status: 'scheduled', paymentStatus: 'unpaid', price: 0,
+            agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        });
+    });
+
+    it('voidInvoice is idempotent — voiding twice does not change voidedAt', async () => {
+        await testDb.insert(schema.invoices).values({
+            id: 'inv-3', tenantId: T_VOID, inspectionId: I_VOID,
+            amountCents: 15000,
+            lineItems: [],
+            createdAt: new Date(),
+        } as never);
+
+        await svc.voidInvoice('inv-3', T_VOID);
+        const after1 = await testDb.select().from(schema.invoices)
+            .where(eq(schema.invoices.id, 'inv-3')).get();
+        const firstVoidedAt = after1?.voidedAt;
+
+        // Second call must not throw and must not change voidedAt
+        await expect(svc.voidInvoice('inv-3', T_VOID)).resolves.not.toThrow();
+        const after2 = await testDb.select().from(schema.invoices)
+            .where(eq(schema.invoices.id, 'inv-3')).get();
+
+        expect(after2?.voidedAt).toEqual(firstVoidedAt);
+    });
+
+    it('voidInvoice cross-tenant guard — voiding inv-1 as T_OTHER is a no-op', async () => {
+        await testDb.insert(schema.invoices).values({
+            id: 'inv-4', tenantId: T_VOID, inspectionId: I_VOID,
+            amountCents: 30000,
+            lineItems: [],
+            createdAt: new Date(),
+        } as never);
+
+        // T_OTHER tries to void T_VOID's invoice — must be no-op
+        await svc.voidInvoice('inv-4', T_OTHER);
+
+        const row = await testDb.select().from(schema.invoices)
+            .where(eq(schema.invoices.id, 'inv-4')).get();
+        // Discriminating: if tenant guard is absent, voidedAt would be set → test fails
+        expect(row?.voidedAt).toBeNull();
     });
 });
