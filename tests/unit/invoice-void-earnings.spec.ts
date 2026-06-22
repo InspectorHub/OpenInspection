@@ -90,17 +90,8 @@ describe('InvoiceService — void exclusion from earnings', () => {
         expect(result.count).toBe(2);
     });
 
-    it('getStatus returns "void" when voidedAt is set, regardless of paidAt', () => {
-        // We test the function via listInvoices indirectly — but since getStatus
-        // is module-internal, we verify via findByInspectionId round-trip through
-        // the DB.  A voided+paid row must surface status="void".
-        //
-        // We assert this via the public API: insert a row, call findByInspectionId,
-        // confirm status is 'void'.  This is intentionally a discriminating test:
-        // if voidedAt guard is removed the status would be 'paid'.
-        expect(true).toBe(true); // placeholder; real assertion below via async test
-    });
 });
+
 
 describe('InvoiceService — getStatus void variant', () => {
     let testDb: BetterSQLite3Database<typeof schema>;
