@@ -4,6 +4,8 @@ import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
+import { sealToken } from '../../server/lib/config-crypto';
+import { mintToken, hashToken, deadTokenSentinel } from '../../server/lib/token-hash';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -31,52 +33,59 @@ describe('PortalAccessService tenant scoping', () => {
         svc = new PortalAccessService({} as D1Database, { jwtSecret: JWT });
     });
 
-    it('issueToken: existing-token lookup scoped to tenant — T2 does not see or modify T1 row', async () => {
-        // Arrange: seed a live token row for (T1, i-1, jane@x.com).
-        // The token_enc column is intentionally absent (null) so that any attempt to
-        // reconstruct T1's token via the T2 path would throw (no token_enc).
+    it('issueToken: existing-token lookup scoped to tenant — T2 cannot reuse T1 row for same inspection', async () => {
+        // Arrange: seed a live token row for (T1, i-1, jane@x.com) with a valid tokenEnc.
+        //
+        // Why tokenEnc must be set: reconstruct() tries the legacy plaintext column first
+        // (skipped because token = sentinel), then opens tokenEnc. Without tokenEnc the
+        // no-predicate path would also throw ("no token_enc") — both paths would throw and
+        // the test would be non-discriminating. With tokenEnc set, the no-predicate path
+        // succeeds: it finds T1's row and returns T1's plaintext token. This is the
+        // cross-tenant data-leak the predicate guards against.
+        //
+        // Discriminator:
+        //   WITH    eq(tenantId) predicate → T2 lookup misses T1's row → INSERT
+        //           (T2, 'i-1', jane@x.com) → UNIQUE(inspection_id, recipient_email)
+        //           violation → rejects/throws.
+        //   WITHOUT eq(tenantId) predicate → T2 lookup finds T1's row (revokedAt=null)
+        //           → reconstruct() succeeds → RETURNS T1's plaintext token (no throw).
+        // Removing the predicate flips rejects → resolves-with-T1-token.
+        const t1PlaintextToken = mintToken();
+        const t1TokenHash = await hashToken(t1PlaintextToken);
+        const t1TokenEnc = await sealToken(t1PlaintextToken, T1, JWT);
         const id = crypto.randomUUID();
-        const sentinel = `dead:${id}`;
         await db.insert(schema.inspectionAccessTokens).values({
             id,
             tenantId: T1,
             inspectionId: 'i-1',
             recipientEmail: 'jane@x.com',
             role: 'client',
-            token: sentinel,
+            token: deadTokenSentinel(id),
+            tokenHash: t1TokenHash,
+            tokenEnc: t1TokenEnc,
             createdAt: Date.now(),
             expiresAt: null,
             revokedAt: null,
-            // tokenEnc intentionally omitted — if the lookup finds T1's row under T2,
-            // reconstruct() would throw "no token_enc" exposing T1's record to T2.
         });
 
-        // Act: T2 issues for a different inspection ('i-2') with the same recipient.
-        // Without tenant scoping, issuing for (T2, 'i-1', jane@x.com) would find T1's
-        // row (cross-tenant leak). We use 'i-2' to avoid the (inspection_id, recipient_email)
-        // UNIQUE constraint while still verifying the scoped lookup path:
-        // T2 queries for (T2, 'i-1', jane@x.com) → finds nothing (T1's row is excluded)
-        // → mints a fresh row for T2. T1's row must remain untouched.
-        //
-        // We assert the scoping directly: call issueToken with T2 but inspectionId='i-2'
-        // (T2's own inspection). T1's (i-1) row must be unaffected.
-        await svc.issueToken({ tenantId: T2, inspectionId: 'i-2', recipientEmail: 'jane@x.com' });
+        // Act: T2 issues a token for the SAME (inspectionId='i-1', recipientEmail='jane@x.com').
+        // With the tenant predicate the lookup finds nothing for T2, so issueToken tries to
+        // INSERT — hitting the UNIQUE(inspection_id, recipient_email) constraint → throws.
+        // Without the predicate it would find T1's row, reconstruct it, and RETURN T1's token.
+        await expect(
+            svc.issueToken({ tenantId: T2, inspectionId: 'i-1', recipientEmail: 'jane@x.com' }),
+        ).rejects.toThrow();
 
-        // Assert: T1's row is untouched (revokedAt null, token still sentinel)
+        // Assert: T1's row is completely untouched — no side-effect from the T2 attempt.
         const t1Row = await db.select().from(schema.inspectionAccessTokens)
             .where(eq(schema.inspectionAccessTokens.id, id)).get();
         expect(t1Row).not.toBeUndefined();
-        expect(t1Row!.revokedAt).toBeNull();
-        expect(t1Row!.token).toBe(sentinel);
         expect(t1Row!.tenantId).toBe(T1);
-
-        // And a separate row was created for T2
+        expect(t1Row!.revokedAt).toBeNull();
+        expect(t1Row!.tokenHash).toBe(t1TokenHash);
+        // Only T1's row exists — no partial T2 row was committed.
         const allRows = await db.select().from(schema.inspectionAccessTokens).all();
-        expect(allRows).toHaveLength(2);
-        const t2Row = allRows.find(r => r.tenantId === T2);
-        expect(t2Row).not.toBeUndefined();
-        expect(t2Row!.tenantId).toBe(T2);
-        expect(t2Row!.inspectionId).toBe('i-2');
+        expect(allRows).toHaveLength(1);
     });
 
     it('revokeForRecipient: T2 revoke does not affect T1 row', async () => {
