@@ -20,20 +20,20 @@ describe('AvailabilityService — deleteOverride cross-tenant isolation', () => 
         const fixture = createTestDb();
         db = fixture.db;
         await setupSchema(fixture.sqlite);
-        (mockDrizzle as any).mockReturnValue(db);
-        svc = new AvailabilityService({} as any);
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(db);
+        svc = new AvailabilityService({} as D1Database);
 
         // Seed TENANT_A and TENANT_B
         await db.insert(tenants).values([
             { id: TENANT_A, name: 'Tenant A', slug: 'tenant-a', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: TENANT_B, name: 'Tenant B', slug: 'tenant-b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
-        ] as any[]);
+        ]);
 
         // Seed a user (inspector) under TENANT_A
         await db.insert(users).values({
             id: INSPECTOR_ID, tenantId: TENANT_A, email: 'inspector@a.com',
             passwordHash: 'hash', role: 'inspector', name: 'Inspector A', createdAt: new Date(),
-        } as any);
+        });
     });
 
     it('foreign-tenant deleteOverride does not delete TENANT_A row (same id, wrong tenantId)', async () => {
@@ -46,7 +46,7 @@ describe('AvailabilityService — deleteOverride cross-tenant isolation', () => 
             date: '2026-07-01',
             isAvailable: false,
             createdAt: new Date(),
-        } as any);
+        });
 
         // Confirm it exists
         const before = await db.select().from(availabilityOverrides).all();
