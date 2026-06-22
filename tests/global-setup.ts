@@ -26,7 +26,6 @@ export default function globalSetup() {
         'audit_logs',
         'erasure_log',
         'agreement_signers',
-        'inspection_agreements',
         'inspection_results',
         'inspections',
         'availability_overrides',

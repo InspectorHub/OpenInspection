@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f3a7cd4a-d8f2-4e88-ade0-39f162d02590",
+  "id": "6ac825f2-bc97-43a8-9966-99faae20b885",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agreement_requests": {
@@ -2165,107 +2165,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "inspection_agreements": {
-      "name": "inspection_agreements",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "tenant_id": {
-          "name": "tenant_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "inspection_id": {
-          "name": "inspection_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "signature_base64": {
-          "name": "signature_base64",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "signed_at": {
-          "name": "signed_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "ip_address": {
-          "name": "ip_address",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "user_agent": {
-          "name": "user_agent",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "idx_insp_agreements_tenant": {
-          "name": "idx_insp_agreements_tenant",
-          "columns": [
-            "tenant_id"
-          ],
-          "isUnique": false
-        },
-        "idx_insp_agreements_insp": {
-          "name": "idx_insp_agreements_insp",
-          "columns": [
-            "inspection_id"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "inspection_agreements_tenant_id_tenants_id_fk": {
-          "name": "inspection_agreements_tenant_id_tenants_id_fk",
-          "tableFrom": "inspection_agreements",
-          "tableTo": "tenants",
-          "columnsFrom": [
-            "tenant_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "inspection_agreements_inspection_id_inspections_id_fk": {
-          "name": "inspection_agreements_inspection_id_inspections_id_fk",
-          "tableFrom": "inspection_agreements",
-          "tableTo": "inspections",
-          "columnsFrom": [
-            "inspection_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "inspection_conflicts": {
       "name": "inspection_conflicts",
       "columns": {
@@ -3876,13 +3775,6 @@
           "autoincrement": false,
           "default": false
         },
-        "message_token": {
-          "name": "message_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "template_snapshot": {
           "name": "template_snapshot",
           "type": "text",
@@ -3980,13 +3872,6 @@
         }
       },
       "indexes": {
-        "idx_inspections_msg_token": {
-          "name": "idx_inspections_msg_token",
-          "columns": [
-            "message_token"
-          ],
-          "isUnique": true
-        },
         "idx_inspections_tenant": {
           "name": "idx_inspections_tenant",
           "columns": [
@@ -6697,14 +6582,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "use_inspector_from_name": {
-          "name": "use_inspector_from_name",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": false
-        },
         "point_of_contact": {
           "name": "point_of_contact",
           "type": "text",
@@ -7341,20 +7218,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": true
-        },
-        "bio": {
-          "name": "bio",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "service_areas": {
-          "name": "service_areas",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "slug": {
           "name": "slug",

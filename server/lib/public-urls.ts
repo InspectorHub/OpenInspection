@@ -35,14 +35,6 @@ export function embedBookingUrl(host: string, tenantSlug: string, inspectorSlug:
     return joinUrl(host, `/embed/${tenantSlug}/${inspectorSlug}`);
 }
 
-export function inspectorProfileUrl(host: string, tenantSlug: string, inspectorSlug: string): string {
-    return joinUrl(host, `/inspector/${tenantSlug}/${inspectorSlug}`);
-}
-
-export function inspectorCalendarUrl(host: string, tenantSlug: string, inspectorSlug: string): string {
-    return joinUrl(host, `/inspector/${tenantSlug}/${inspectorSlug}/calendar.ics`);
-}
-
 export function reportUrl(host: string, tenantSlug: string, inspectionId: string): string {
     // Canonical published-report renderer is `/report-view/` (report-card-stack):
     // the maintained, repair-item-aware view that matches the current

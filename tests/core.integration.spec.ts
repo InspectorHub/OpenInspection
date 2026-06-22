@@ -48,7 +48,6 @@ async function resetAndBootstrap(request: import('@playwright/test').APIRequestC
     // 1. Clear all rows (FK-safe order)
     const sql = [
         'PRAGMA foreign_keys=OFF;',
-        'DELETE FROM inspection_agreements;',
         'DELETE FROM inspection_results;',
         'DELETE FROM inspections;',
         'DELETE FROM availability_overrides;',

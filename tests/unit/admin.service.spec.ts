@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { AdminService } from '../../server/services/admin.service';
 import { MockKV } from './mocks';
 import { createTestDb, setupSchema } from './db';
-import { users, tenantInvites, inspections, inspectionAgreements, tenants, templates, agreements, agreementRequests, agreementSigners } from '../../server/lib/db/schema';
+import { users, tenantInvites, inspections, tenants, templates, agreements, agreementRequests, agreementSigners } from '../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../server/lib/db/schema';
@@ -118,8 +118,6 @@ describe('AdminService', () => {
         // Subject signature + content survive the export (it's their data).
         expect(result.agreementRequests[0].signatureBase64).toBe('data:image/png;base64,SIG');
         expect(result.agreementSigners[0].email).toBe('client@example.com');
-        // Back-compat key retained (dead table -> empty).
-        expect('inspectionAgreements' in result).toBe(true);
 
         // NO token material anywhere in the serialized export.
         const serialized = JSON.stringify(result);
@@ -169,16 +167,6 @@ describe('AdminService', () => {
             createdAt: new Date(),
         });
 
-        // Seed agreement
-        // Note: signatureBase64 is NOT NULL in schema
-        await testDb.insert(inspectionAgreements).values({
-            id: 'agree-1',
-            tenantId,
-            inspectionId: 'insp-1',
-            signatureBase64: 'data:image/png;base64,abc',
-            signedAt: new Date(),
-        });
-
         const result = await adminService.eraseClientData(tenantId, clientEmail);
         // Legacy additive contract.
         expect(result.matched).toBe(1);
@@ -195,9 +183,6 @@ describe('AdminService', () => {
         expect(insp).toBeDefined();
         expect(insp!.clientName).toBeNull();
         expect(insp!.clientEmail).toBeNull();
-
-        const agree = await testDb.select().from(inspectionAgreements).where(eq(inspectionAgreements.id as any, 'agree-1')).get();
-        expect(agree).toBeUndefined();
 
         // An append-only erasure_log decision row was written (Art. 5(2)/30).
         const logs = await testDb.select().from(schema.erasureLog).all();
