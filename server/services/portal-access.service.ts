@@ -55,6 +55,7 @@ export class PortalAccessService {
         const db = this.getDrizzle();
         const existing = await db.select().from(inspectionAccessTokens)
             .where(and(
+                eq(inspectionAccessTokens.tenantId, input.tenantId),
                 eq(inspectionAccessTokens.inspectionId, input.inspectionId),
                 eq(inspectionAccessTokens.recipientEmail, input.recipientEmail),
             ))
@@ -161,11 +162,12 @@ export class PortalAccessService {
     }
 
     /** Inspector "Reset access link" — revoke a recipient's current token. */
-    async revokeForRecipient(inspectionId: string, recipientEmail: string): Promise<void> {
+    async revokeForRecipient(tenantId: string, inspectionId: string, recipientEmail: string): Promise<void> {
         const db = this.getDrizzle();
         await db.update(inspectionAccessTokens)
             .set({ revokedAt: Date.now() })
             .where(and(
+                eq(inspectionAccessTokens.tenantId, tenantId),
                 eq(inspectionAccessTokens.inspectionId, inspectionId),
                 eq(inspectionAccessTokens.recipientEmail, recipientEmail),
             ))
@@ -173,11 +175,14 @@ export class PortalAccessService {
     }
 
     /** Lifecycle: set an expiry (e.g. delivery + 45d) on all of an order's tokens. */
-    async setExpiryForInspection(inspectionId: string, expiresAt: number): Promise<void> {
+    async setExpiryForInspection(tenantId: string, inspectionId: string, expiresAt: number): Promise<void> {
         const db = this.getDrizzle();
         await db.update(inspectionAccessTokens)
             .set({ expiresAt })
-            .where(eq(inspectionAccessTokens.inspectionId, inspectionId))
+            .where(and(
+                eq(inspectionAccessTokens.tenantId, tenantId),
+                eq(inspectionAccessTokens.inspectionId, inspectionId),
+            ))
             .run();
     }
 }
