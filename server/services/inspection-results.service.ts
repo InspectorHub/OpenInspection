@@ -37,31 +37,25 @@ export async function applyResultsBatch(
     db: DrizzleD1Database,
     inspectionId: string,
     patches: ResultPatch[],
-    opts?: { tenantId?: string; userId?: string },
+    opts: { tenantId: string; userId?: string },
 ): Promise<ResultsBatchOutcome> {
     if (patches.length === 0) return { applied: 0 };
 
-    const tenantId = opts?.tenantId;
+    const { tenantId, userId = 'batch' } = opts;
 
     // Verify the inspection exists and is owned by the caller's tenant before
     // touching any results. Without this check a cross-tenant inspectionId
     // would create a results row under the wrong tenant — D1 does not enforce
     // FK-level tenant isolation at runtime. Early-return (not throw) so the
     // route layer can treat a foreign-tenant id as "not found" silently.
-    if (tenantId) {
-        const owner = await db.select({ id: inspections.id }).from(inspections)
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-            .get();
-        if (!owner) return { applied: 0 };
-    }
+    const owner = await db.select({ id: inspections.id }).from(inspections)
+        .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+        .get();
+    if (!owner) return { applied: 0 };
 
-    // Locate the existing results row scoped by tenant when available.
-    const existingWhere = tenantId
-        ? and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId))
-        : eq(inspectionResults.inspectionId, inspectionId);
-
+    // Locate the existing results row — always scoped to the verified tenant.
     const existing = await db.select().from(inspectionResults)
-        .where(existingWhere)
+        .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
         .get();
 
     const data: Record<string, Record<string, unknown>> = existing?.data
@@ -69,7 +63,6 @@ export async function applyResultsBatch(
         : {};
 
     const now = Math.floor(Date.now() / 1000);
-    const userId = opts?.userId ?? 'batch';
 
     for (const p of patches) {
         const key = findingKey(DEFAULT_UNIT, p.sectionId, p.itemId);
@@ -89,19 +82,14 @@ export async function applyResultsBatch(
         data[key] = next;
     }
 
-    const resolvedTenantId = tenantId ?? existing?.tenantId;
-
     if (existing) {
         await db.update(inspectionResults)
             .set({ data: data as unknown as object, lastSyncedAt: new Date() })
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, existing.tenantId)));
+            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
     } else {
-        if (!resolvedTenantId) {
-            throw new Error('applyResultsBatch: no existing results row and no tenantId supplied for insert');
-        }
         await db.insert(inspectionResults).values({
             id:           crypto.randomUUID(),
-            tenantId:     resolvedTenantId,
+            tenantId,
             inspectionId,
             data:         data as unknown as object,
             lastSyncedAt: new Date(),
@@ -109,14 +97,11 @@ export async function applyResultsBatch(
     }
 
     // Bump inspections.dataVersion to mirror the single-field path so offline
-    // queues notice that the world moved. Scope to tenant when available.
+    // queues notice that the world moved. Always scoped to the verified tenant.
     try {
-        const versionWhere = tenantId
-            ? and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))
-            : eq(inspections.id, inspectionId);
         await db.update(inspections)
             .set({ dataVersion: sql`${inspections.dataVersion} + 1` })
-            .where(versionWhere);
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
     } catch {
         // dataVersion may be absent on minimal test schemas — silently ignore;
         // the form-renderer doesn't depend on the bump.

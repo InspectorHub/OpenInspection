@@ -63,7 +63,7 @@ describe('applyResultsBatch', () => {
         const result = await applyResultsBatch(db, 'i-1', [
             { itemId: 'item-a', sectionId: 'sec-1', field: 'rating', value: 'defect' },
             { itemId: 'item-a', sectionId: 'sec-1', field: 'notes', value: 'cracked' },
-        ]);
+        ], { tenantId: 't-1' });
 
         expect(result.applied).toBe(2);
         const rows = await db.select().from(inspectionResults).all();

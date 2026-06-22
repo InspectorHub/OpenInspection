@@ -3,12 +3,13 @@ import { applyResultsBatch } from '../../server/services/inspection-results.serv
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
+import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
 const T1 = '00000000-0000-0000-0000-000000000001';
 const T2 = '00000000-0000-0000-0000-000000000002';
 
 describe('applyResultsBatch tenant scoping', () => {
-  let db: any;
+  let db: BetterSQLite3Database<typeof schema>;
   beforeEach(async () => {
     const fix = createTestDb(); db = fix.db; await setupSchema(fix.sqlite);
     for (const t of [T1, T2]) await db.insert(schema.tenants).values({ id: t, name: t, slug: t, status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
