@@ -57,6 +57,48 @@ const STORAGE_KEY = 'ydoc';
 /** DO storage key for the persisted tenant/inspection identity. */
 const IDENTITY_KEY = 'identity';
 
+/** DO storage key for the JSON array of projection snapshots (version history). */
+const SNAPSHOTS_KEY = 'snapshots';
+
+/** Maximum snapshots retained; oldest are dropped when the cap is exceeded. */
+const SNAPSHOT_CAP = 25;
+
+/** Auto-snapshot cadence: capture once every N real (non-restore) doc updates. */
+const SNAPSHOT_EVERY = 20;
+
+/**
+ * Transaction origin sentinel used when restore rebuilds/broadcasts the doc.
+ * `onDocUpdate` checks identity against this object to SKIP auto-snapshot
+ * counting, so a restore (which itself loads a whole projection) never triggers
+ * a snapshot storm.
+ */
+const RESTORE_ORIGIN: unique symbol = Symbol('collab-restore-origin');
+
+/**
+ * One persisted projection snapshot — a point-in-time copy of the doc projected
+ * to the `inspection_results.data` JSON shape. Snapshots are doc-replacement
+ * restore points (Condition B): restore rebuilds a fresh Y.Doc from `projection`
+ * rather than replaying CRDT updates.
+ */
+interface ResultsSnapshot {
+    seq:        number;
+    atMs:       number;
+    byUserId:   string | null;
+    projection: ResultsProjection;
+}
+
+/** Snapshot metadata (the list view omits the heavy `projection` payload). */
+type ResultsSnapshotMeta = Omit<ResultsSnapshot, 'projection'>;
+
+/**
+ * Narrow an `unknown` value loaded from DO storage to a snapshot array. DO
+ * storage round-trips structured-clone, so the shape is trusted, but a defensive
+ * guard keeps the no-`any` rule and tolerates a missing/legacy key.
+ */
+function asSnapshotArray(value: unknown): ResultsSnapshot[] {
+    return Array.isArray(value) ? (value as ResultsSnapshot[]) : [];
+}
+
 /** Shape of the persisted identity stored across hibernation. */
 interface PersistedIdentity {
     tenantId:     string;
@@ -81,8 +123,23 @@ function isNonEmptyProjection(value: unknown): value is ResultsProjection {
 // ─── InspectionDocDO ─────────────────────────────────────────────────────────
 
 export class InspectionDocDO extends DurableObject<AppEnv> {
-    private readonly doc: Y.Doc;
+    /**
+     * The live authoritative Y.Doc. NOT `readonly` — restore swaps in a fresh
+     * doc (doc-replacement, Condition B). The update listener is the stable
+     * bound method `onDocUpdate`, re-attached to the new doc after each swap.
+     */
+    private doc: Y.Doc;
     private persistTimer: ReturnType<typeof setTimeout> | null = null;
+    /**
+     * Count of real (non-restore) doc updates since the last auto-snapshot.
+     * When it reaches SNAPSHOT_EVERY, a snapshot is captured and it resets to 0.
+     */
+    private updatesSinceSnapshot = 0;
+    /**
+     * In-flight guard so concurrent triggers (auto + on-demand + restore's
+     * pre-capture) never double-write the snapshot array.
+     */
+    private capturing = false;
     /**
      * Forwarded by the authorized route (Task 5); populated on first WS accept
      * and durably persisted to DO storage (I1) so hibernation reconstruction
@@ -119,12 +176,35 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         ctx.blockConcurrencyWhile(() => this.hydrate());
 
         // Relay doc updates to all connected sockets (except the originator)
-        // and schedule a debounced persist.
-        this.doc.on('update', (update: Uint8Array, origin: unknown) => {
-            this.broadcastDocUpdate(update, origin);
-            this.schedulePersist();
-        });
+        // and schedule a debounced persist. The handler is a STABLE bound method
+        // (class field arrow) so restore can `.off`/`.on` the IDENTICAL reference
+        // when it swaps in a fresh doc.
+        this.doc.on('update', this.onDocUpdate);
     }
+
+    /**
+     * Stable doc-update handler — wired in the constructor and re-wired by
+     * restore (doc-replacement) onto the fresh doc. Behaviour preserved from the
+     * original inline ctor closure (broadcast + debounced persist), plus the
+     * auto-snapshot cadence.
+     *
+     * Auto-snapshot: every SNAPSHOT_EVERY real updates, capture a snapshot.
+     * Updates whose origin is RESTORE_ORIGIN are NOT counted — restore loads a
+     * whole projection in one transaction and pre-captures its own snapshot, so
+     * counting it would cause a snapshot storm.
+     */
+    private onDocUpdate = (update: Uint8Array, origin: unknown): void => {
+        this.broadcastDocUpdate(update, origin);
+        this.schedulePersist();
+
+        if (origin === RESTORE_ORIGIN) return; // restore-driven — do not count
+
+        this.updatesSinceSnapshot += 1;
+        if (this.updatesSinceSnapshot >= SNAPSHOT_EVERY) {
+            this.updatesSinceSnapshot = 0;
+            void this.captureSnapshot(null);
+        }
+    };
 
     // ── fetch ─────────────────────────────────────────────────────────────────
 
@@ -182,6 +262,39 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             server.send(encoding.toUint8Array(syncEncoder));
 
             return new Response(null, { status: 101, webSocket: client });
+        }
+
+        // ── Snapshot version-history routes ──────────────────────────────────
+        // These arrive from the authorized route (server/api/inspections/collab.ts),
+        // which has already done the 5-check fail-closed auth and forwards
+        // x-tenant-id / x-inspection-id / x-user-id. The DO trusts the route as
+        // the sole trust boundary (same as the /ws path).
+        if (url.pathname.endsWith('/snapshots')) {
+            if (req.method === 'GET') {
+                return Response.json(await this.listSnapshots());
+            }
+            if (req.method === 'POST') {
+                const snap = await this.captureSnapshot(req.headers.get('x-user-id'));
+                return Response.json({ seq: snap.seq, atMs: snap.atMs });
+            }
+            return new Response('method not allowed', { status: 405 });
+        }
+
+        if (url.pathname.endsWith('/restore') && req.method === 'POST') {
+            let seq: unknown;
+            try {
+                const body = (await req.json()) as { seq?: unknown };
+                seq = body.seq;
+            } catch {
+                return new Response('invalid body', { status: 400 });
+            }
+            if (typeof seq !== 'number' || !Number.isInteger(seq) || seq < 0) {
+                return new Response('invalid seq', { status: 400 });
+            }
+            const out = await this.restoreSnapshot(seq, req.headers.get('x-user-id'));
+            return out.ok
+                ? Response.json({ ok: true })
+                : new Response('snapshot not found', { status: 404 });
         }
 
         return new Response('not found', { status: 404 });
@@ -287,6 +400,105 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                     eq(inspectionResults.inspectionId, inspectionId),
                 ),
             );
+    }
+
+    // ── Snapshot version history (#181 Phase 4) ───────────────────────────────
+
+    /**
+     * Capture a projection snapshot of the CURRENT doc and append it to the
+     * persisted snapshot array (capped to the last SNAPSHOT_CAP, oldest dropped).
+     *
+     * `seq` is derived from the stored max + 1 on every call, so it survives
+     * hibernation (never held only in memory). `Date.now()` is allowed in the DO
+     * runtime (this is not a Workflow script). The in-flight guard prevents two
+     * concurrent triggers from racing the read-modify-write of the array.
+     */
+    private async captureSnapshot(byUserId: string | null): Promise<ResultsSnapshot> {
+        // Spin-wait briefly if another capture is mid-flight, then take the lock.
+        while (this.capturing) {
+            await new Promise<void>((resolve) => setTimeout(resolve, 5));
+        }
+        this.capturing = true;
+        try {
+            const stored = await this.ctx.storage.get(SNAPSHOTS_KEY);
+            const snapshots = asSnapshotArray(stored);
+
+            const maxSeq = snapshots.reduce((m, s) => (s.seq > m ? s.seq : m), -1);
+            const snap: ResultsSnapshot = {
+                seq:        maxSeq + 1,
+                atMs:       Date.now(),
+                byUserId,
+                projection: projectResults(this.doc),
+            };
+
+            snapshots.push(snap);
+            // Cap to the last SNAPSHOT_CAP entries (drop oldest).
+            const capped = snapshots.slice(-SNAPSHOT_CAP);
+            await this.ctx.storage.put(SNAPSHOTS_KEY, capped);
+            return snap;
+        } finally {
+            this.capturing = false;
+        }
+    }
+
+    /**
+     * List snapshot metadata (no `projection` payload), newest-first.
+     */
+    private async listSnapshots(): Promise<ResultsSnapshotMeta[]> {
+        const stored = await this.ctx.storage.get(SNAPSHOTS_KEY);
+        const snapshots = asSnapshotArray(stored);
+        return snapshots
+            .map(({ seq, atMs, byUserId }) => ({ seq, atMs, byUserId }))
+            .sort((a, b) => b.seq - a.seq);
+    }
+
+    /**
+     * Doc-replacement restore (Condition B): rebuild a FRESH Y.Doc from the
+     * snapshot's projection — NOT `Y.applyUpdate` of an old binary state.
+     *
+     * Steps:
+     *   1. Load the array; find the snapshot with `seq` (absent → { ok: false }).
+     *   2. Capture a snapshot of the CURRENT state first so the restore is itself
+     *      reversible.
+     *   3. Build a fresh Y.Doc and load the target projection into it.
+     *   4. Detach the listener from the old doc, swap `this.doc`, re-attach the
+     *      IDENTICAL bound handler (so `.off`/`.on` line up).
+     *   5. Broadcast the restored state to every connected socket (best-effort,
+     *      origin RESTORE_ORIGIN so auto-snapshot counting is skipped).
+     *   6. Persist the restored projection to D1.
+     */
+    private async restoreSnapshot(
+        seq: number,
+        byUserId: string | null,
+    ): Promise<{ ok: boolean }> {
+        const stored = await this.ctx.storage.get(SNAPSHOTS_KEY);
+        const snapshots = asSnapshotArray(stored);
+        const target = snapshots.find((s) => s.seq === seq);
+        if (!target) return { ok: false };
+
+        // (2) Capture current state first — makes the restore reversible.
+        await this.captureSnapshot(byUserId);
+
+        // (3) Build a fresh doc from the target projection (doc-replacement).
+        const fresh = new Y.Doc();
+        loadResultsProjection(fresh, target.projection);
+
+        // (4) Swap the doc, re-wiring the SAME bound update handler.
+        this.doc.off('update', this.onDocUpdate);
+        this.doc = fresh;
+        this.doc.on('update', this.onDocUpdate);
+
+        // (5) Broadcast the restored full state to connected sockets.
+        // Origin RESTORE_ORIGIN → onDocUpdate (if any future doc emits) skips
+        // auto-snapshot counting; here we broadcast directly. Best-effort: true
+        // client convergence (drop + resync) is Task 12; this task's authoritative
+        // guarantee is the DO doc + the D1 projection.
+        this.broadcastDocUpdate(Y.encodeStateAsUpdate(this.doc), RESTORE_ORIGIN);
+
+        // (6) Persist the restored projection to D1 + DO storage.
+        await this.persist();
+
+        return { ok: true };
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
