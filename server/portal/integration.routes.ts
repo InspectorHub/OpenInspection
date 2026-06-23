@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, isNotNull } from 'drizzle-orm';
+import { eq, isNotNull, and, inArray, isNull, or, gt } from 'drizzle-orm';
 import { HonoConfig } from '../types/hono';
 import { TenantUpdateParams } from '../lib/integration';
 import { TenantStatusBodySchema, SeedStarterContentBodySchema } from '../lib/validations/admin.schema';
 import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { logger } from '../lib/logger';
-import { tenantConfigs } from '../lib/db/schema';
+import { tenantConfigs, inspectionAccessTokens, tenants } from '../lib/db/schema';
 import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
 import { secretsCacheKey } from '../lib/secrets-cache';
 import { OutboxService } from './outbox.service';
@@ -329,6 +329,48 @@ api.get('/usage', requireServiceBinding, async (c) => {
         return c.json({ success: true, data: aggregateUsage(rows) });
     } catch (error: unknown) {
         logger.error('usage aggregation failed', {}, error instanceof Error ? error : undefined);
+        return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
+    }
+});
+
+/**
+ * GET /api/integration/tenants/by-email?email=<email>
+ * Cross-tenant client grant lookup: returns the slugs of tenants where the
+ * email holds a LIVE (not revoked, not expired) client/co_client access grant.
+ * Platform-level read (raw drizzle, no tenant scope) — guarded by
+ * requireServiceBinding. Enables a portal-side "find my report" fan-out that
+ * triggers each tenant's own magic-link without a cross-tenant session layer.
+ */
+api.get('/tenants/by-email', requireServiceBinding, async (c) => {
+    const email = c.req.query('email');
+    if (!email || !email.includes('@')) {
+        return c.json({ success: false, error: { message: 'email required' } }, 400);
+    }
+    try {
+        const d = drizzle(c.env.DB);
+        const now = Date.now();
+
+        const grants = await d
+            .select({ tenantId: inspectionAccessTokens.tenantId })
+            .from(inspectionAccessTokens)
+            .where(and(
+                eq(inspectionAccessTokens.recipientEmail, email),
+                inArray(inspectionAccessTokens.role, ['client', 'co_client']),
+                isNull(inspectionAccessTokens.revokedAt),
+                or(isNull(inspectionAccessTokens.expiresAt), gt(inspectionAccessTokens.expiresAt, now)),
+            ));
+
+        const tenantIds = [...new Set(grants.map((g) => g.tenantId as string))];
+        if (tenantIds.length === 0) return c.json({ success: true, data: { slugs: [] } });
+
+        const rows = await d
+            .select({ slug: tenants.slug })
+            .from(tenants)
+            .where(inArray(tenants.id, tenantIds));
+
+        return c.json({ success: true, data: { slugs: rows.map((r) => r.slug as string) } });
+    } catch (error: unknown) {
+        logger.error('tenants by-email lookup failed', {}, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Internal server error' } }, 500);
     }
 });
