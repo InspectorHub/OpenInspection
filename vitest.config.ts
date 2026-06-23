@@ -3,6 +3,10 @@ import path from 'node:path';
 
 export default defineConfig({
   resolve: {
+    // Dedupe React so a component pulled in from packages/shared-ui (which has a
+    // nested react copy) shares the single root React instance — otherwise its
+    // hooks throw "Invalid hook call" under the test renderer.
+    dedupe: ['react', 'react-dom'],
     alias: {
       '~': path.resolve(__dirname, 'app'),
       '@core/shared-ui': path.resolve(__dirname, 'packages/shared-ui/src'),

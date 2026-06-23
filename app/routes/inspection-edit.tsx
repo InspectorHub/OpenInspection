@@ -24,6 +24,7 @@ import { usePresence } from "~/hooks/usePresence";
 import { useTheme } from "~/hooks/useTheme";
 import { useResultsDoc } from "~/lib/collab/use-results-doc";
 import { bindResultMap } from "~/lib/collab/results-binding";
+import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
 import { SectionRail } from "~/components/editor/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { ItemList } from "~/components/editor/ItemList";
@@ -458,6 +459,8 @@ export default function InspectionEditPage() {
   !!(state.inspection as Record<string, unknown>).autoSignOnPublish,
  );
  const [signModalOpen, setSignModalOpen] = useState(false);
+ // #181 — version-history panel (collab Phase 4). Inert when collab is off.
+ const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
 
  // Sync autoSign local state from loader data when inspection changes
  useEffect(() => {
@@ -1728,6 +1731,16 @@ export default function InspectionEditPage() {
  />
  )}
 
+ {/* #181 — Version history panel (collab Phase 4). Only reachable when the
+     collabEditing flag is on (the trigger button is gated in EditorHeader);
+     onRestored revalidates the editor — live convergence is Task 12b. */}
+ <VersionHistoryPanel
+ open={versionHistoryOpen}
+ onClose={() => setVersionHistoryOpen(false)}
+ inspectionId={String(loaderData.inspection.id)}
+ onRestored={() => { revalidator.revalidate(); }}
+ />
+
  {/* Inspector sign modal */}
  {signModalOpen && (
  <SignModal
@@ -1825,6 +1838,8 @@ export default function InspectionEditPage() {
  tenantSlug={loaderData.tenantSlug}
  setSignModalOpen={setSignModalOpen}
  handlePublishClick={handlePublishClick}
+ collabEditing={loaderData.collabEditing}
+ onOpenVersionHistory={() => setVersionHistoryOpen(true)}
  />
  {/* ------------------------------------------------------------ */}
  {/* 4-column layout below header */}
