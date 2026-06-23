@@ -113,6 +113,7 @@ export function ScheduleStep({
   setSmsOptin,
   privacyUrl,
   termsUrl,
+  companyName,
 }: {
   inspectionDate: string;
   setInspectionDate: (v: string) => void;
@@ -132,7 +133,10 @@ export function ScheduleStep({
   setSmsOptin: (v: boolean) => void;
   privacyUrl: string | null;
   termsUrl: string | null;
+  companyName: string;
 }) {
+  // Twilio/CTIA require the opt-in to be branded with the end business name.
+  const company = companyName?.trim() || "your inspection company";
   return (
     <section className="space-y-8">
       <div className="space-y-5">
@@ -231,10 +235,10 @@ export function ScheduleStep({
             className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary"
           />
           <span className="text-[13px] text-ih-fg-3 leading-relaxed">
-            Text me appointment &amp; report updates. By checking this box you agree to
-            receive automated text messages about your inspection. Message frequency varies
-            by your inspection activity. Message &amp; data rates may apply; reply STOP to opt
-            out, HELP for help. Consent is not a condition of booking.
+            Text me appointment &amp; report updates from {company}. By checking this box you
+            agree to receive automated text messages from {company} about your inspection.
+            Message frequency varies by your inspection activity. Message &amp; data rates may
+            apply; reply STOP to opt out, HELP for help. Consent is not a condition of booking.
             {(privacyUrl || termsUrl) && (
               <>
                 {" "}
