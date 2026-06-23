@@ -4,19 +4,25 @@
  * Tests the exported `findUnscopedByIdQueries` function from
  * `scripts/check-tenant-scoping.mjs` using string fixtures.
  */
-import { describe, it, expect } from 'vitest';
-import { createRequire } from 'node:module';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 
-// Import the exported function from the .mjs script.
-// We use a dynamic import via an absolute file URL to avoid the TypeScript
-// resolver trying to process the .mjs file.
-const scriptPath = path.resolve(
-    import.meta.dirname ?? path.join(process.cwd()),
-    '../../scripts/check-tenant-scoping.mjs',
-);
-const { findUnscopedByIdQueries } = await import(pathToFileURL(scriptPath).href);
+// Load the exported function from the .mjs script at runtime, inside beforeAll.
+// A top-level `await import(...)` here fails the vitest/esbuild transform
+// ("Invalid or unexpected token"); deferring it into an async hook avoids the
+// top-level await while still letting Node natively load the .mjs via a file URL.
+let findUnscopedByIdQueries: (source: string, tables: Set<string>) => Array<{ line: number; context: string }>;
+
+beforeAll(async () => {
+    const scriptPath = path.resolve(
+        import.meta.dirname ?? path.join(process.cwd()),
+        '../../scripts/check-tenant-scoping.mjs',
+    );
+    // @vite-ignore — load the .mjs via native Node import; vitest's transform
+    // cannot process this script (esbuild target) and throws a SyntaxError.
+    ({ findUnscopedByIdQueries } = await import(/* @vite-ignore */ pathToFileURL(scriptPath).href));
+});
 
 // A small tenant-scoped table set for fixture tests
 const TABLES = new Set(['inspections', 'contacts', 'templates', 'agreements']);
