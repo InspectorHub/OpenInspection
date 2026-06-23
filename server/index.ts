@@ -801,6 +801,7 @@ export { SignCompletionWorkflow } from './workflows/sign-completion-workflow';
 // the class names referenced by [[durable_objects.bindings]] in wrangler.jsonc.
 export { InspectionPresenceDO } from './durable-objects/inspection-presence';
 export { TenantPresenceDO     } from './durable-objects/tenant-presence';
+export { InspectionDocDO      } from './durable-objects/inspection-doc';
 
 // Exported for the route-metadata vitest gate; OpenAPIHono.getOpenAPIDocument()
 // inspects the doc without needing a live request.

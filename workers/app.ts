@@ -112,4 +112,5 @@ export default {
 // import graphs must stay light — see the lazy-API note above.
 export { InspectionPresenceDO } from "../server/durable-objects/inspection-presence";
 export { TenantPresenceDO } from "../server/durable-objects/tenant-presence";
+export { InspectionDocDO } from "../server/durable-objects/inspection-doc";
 export { SignCompletionWorkflow } from "../server/workflows/sign-completion-workflow";

@@ -54,11 +54,13 @@
   "durable_objects": {
     "bindings": [
       { "name": "INSPECTION_PRESENCE", "class_name": "InspectionPresenceDO" },
-      { "name": "TENANT_PRESENCE", "class_name": "TenantPresenceDO" }
+      { "name": "TENANT_PRESENCE", "class_name": "TenantPresenceDO" },
+      { "name": "INSPECTION_DOC", "class_name": "InspectionDocDO" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["InspectionPresenceDO", "TenantPresenceDO"] }
+    { "tag": "v1", "new_sqlite_classes": ["InspectionPresenceDO", "TenantPresenceDO"] },
+    { "tag": "v2", "new_sqlite_classes": ["InspectionDocDO"] }
   ],
   "unsafe": {
     "bindings": [
