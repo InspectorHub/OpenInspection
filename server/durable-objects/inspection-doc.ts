@@ -48,14 +48,29 @@ const PERSIST_DEBOUNCE_MS = 1_000;
 /** DO storage key for the serialised Y.Doc state vector. */
 const STORAGE_KEY = 'ydoc';
 
+/** DO storage key for the persisted tenant/inspection identity. */
+const IDENTITY_KEY = 'identity';
+
+/** Shape of the persisted identity stored across hibernation. */
+interface PersistedIdentity {
+    tenantId:     string;
+    inspectionId: string;
+}
+
 // ─── InspectionDocDO ─────────────────────────────────────────────────────────
 
 export class InspectionDocDO extends DurableObject<AppEnv> {
     private readonly doc: Y.Doc;
     private persistTimer: ReturnType<typeof setTimeout> | null = null;
-    /** Forwarded by the authorized route (Task 5); populated on first WS accept. */
-    private tenantId:     string | null = null;
-    private inspectionId: string | null = null;
+    /**
+     * Forwarded by the authorized route (Task 5); populated on first WS accept
+     * and durably persisted to DO storage (I1) so hibernation reconstruction
+     * can restore identity without waiting for a new WS connection.
+     */
+    private tenantId:          string | null = null;
+    private inspectionId:      string | null = null;
+    /** True once identity has been written to DO storage (avoids redundant puts). */
+    private identityPersisted: boolean       = false;
 
     constructor(ctx: DurableObjectState, env: AppEnv) {
         super(ctx, env);
@@ -93,6 +108,23 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             const headerInspectionId = req.headers.get('x-inspection-id');
             if (headerTenantId)     this.tenantId     = headerTenantId;
             if (headerInspectionId) this.inspectionId = headerInspectionId;
+
+            // M3: fail-closed — reject the upgrade if identity is unknown from
+            // both headers and stored state (hydrate() would have loaded it).
+            if (!this.tenantId || !this.inspectionId) {
+                return new Response('missing tenant/inspection identity', { status: 400 });
+            }
+
+            // I1: persist identity to DO storage on the first WS accept so a
+            // hibernation-reconstructed DO knows its tenant/inspection even
+            // before the next client connects (alarm() can then flush to D1).
+            if (!this.identityPersisted) {
+                await this.ctx.storage.put<PersistedIdentity>(IDENTITY_KEY, {
+                    tenantId:     this.tenantId,
+                    inspectionId: this.inspectionId,
+                });
+                this.identityPersisted = true;
+            }
 
             const pair   = new WebSocketPair();
             const client = pair[0];
@@ -147,10 +179,21 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
     async webSocketClose(ws: WebSocket): Promise<void> {
         try { ws.close(); } catch { /* already closed */ }
+        await this.flushOnLastDisconnect();
     }
 
     async webSocketError(ws: WebSocket): Promise<void> {
         try { ws.close(1011, 'error'); } catch { /* already closed */ }
+        await this.flushOnLastDisconnect();
+    }
+
+    /**
+     * I2 — durable alarm backstop: called by the DO runtime when the alarm
+     * fires. Persists the Y.Doc if the in-memory setTimeout was lost to
+     * hibernation before it could fire.
+     */
+    async alarm(): Promise<void> {
+        await this.persist();
     }
 
     // ── Persistence seam (Task 5 extends this) ────────────────────────────────
@@ -206,17 +249,36 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
     // ── Private helpers ───────────────────────────────────────────────────────
 
-    /** Load the persisted Y.Doc binary from DO storage into the in-memory doc. */
+    /**
+     * I1: Load the persisted Y.Doc binary AND the stored tenant/inspection
+     * identity from DO storage. Called inside blockConcurrencyWhile() so a
+     * hibernation-reconstructed DO is always fully initialised before any
+     * webSocketMessage fires or alarm() runs.
+     */
     private async hydrate(): Promise<void> {
-        const stored = await this.ctx.storage.get<Uint8Array>(STORAGE_KEY);
+        const [stored, identity] = await Promise.all([
+            this.ctx.storage.get<Uint8Array>(STORAGE_KEY),
+            this.ctx.storage.get<PersistedIdentity>(IDENTITY_KEY),
+        ]);
+
         if (stored instanceof Uint8Array && stored.length > 0) {
             Y.applyUpdate(this.doc, stored);
+        }
+
+        // Restore identity so persist() / alarm() can write D1 without waiting
+        // for the next WS connection to deliver the identity headers again.
+        if (identity) {
+            this.tenantId          = identity.tenantId;
+            this.inspectionId      = identity.inspectionId;
+            this.identityPersisted = true; // already in storage — skip the put
         }
     }
 
     /**
-     * Debounced persist: cancel any pending timer and schedule a new one.
-     * Fires ~1 s after the last doc update in a burst.
+     * I2 debounced persist: cancel any pending timer and schedule a new one.
+     * Fires ~1 s after the last doc update in a burst (warm-path fast flush).
+     * Also sets a DO storage alarm as a durable backstop: the alarm survives
+     * hibernation; the in-memory setTimeout does not.
      */
     private schedulePersist(): void {
         if (this.persistTimer !== null) clearTimeout(this.persistTimer);
@@ -224,6 +286,24 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             this.persistTimer = null;
             void this.persist();
         }, PERSIST_DEBOUNCE_MS);
+
+        // Alarm is overwritten (idempotent) on every update burst — it always
+        // lands PERSIST_DEBOUNCE_MS from the latest update, matching setTimeout.
+        void this.ctx.storage.setAlarm(Date.now() + PERSIST_DEBOUNCE_MS);
+    }
+
+    /**
+     * I2 final-flush: if this is the last socket to disconnect, cancel any
+     * pending debounce timer and persist immediately so the final burst of
+     * edits is never lost.
+     */
+    private async flushOnLastDisconnect(): Promise<void> {
+        if (this.ctx.getWebSockets().length > 0) return; // other clients remain
+        if (this.persistTimer !== null) {
+            clearTimeout(this.persistTimer);
+            this.persistTimer = null;
+        }
+        await this.persist();
     }
 
     /**
