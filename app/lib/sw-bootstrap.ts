@@ -6,7 +6,7 @@
  * The kill switch takes effect on the next page load; the SW is unregistered and
  * nothing is re-registered until the flag is removed.
  */
-import { unregisterAllServiceWorkers, type SWContainerLike } from '../sw-cleanup';
+import { unregisterAllServiceWorkers, type SWContainerLike } from './sw-cleanup';
 
 /** Kill switch: '?no-sw=1' in the URL or localStorage 'oi:sw-disable' === '1'.
  *  FE-1 escape hatch — lets anyone rule the SW out in one reload. */

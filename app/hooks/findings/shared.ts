@@ -1,6 +1,4 @@
 import type { useFetcher } from "react-router";
-import type { ResultMap } from "../useInspection";
-import type { OfflineQueue } from "~/lib/offline/offline-queue";
 
 const DEFAULT_UNIT = "_default";
 
@@ -40,11 +38,11 @@ export interface CustomCommentEntry {
 }
 
 /**
- * Task 6 — a repair item (Recommendation) snapshotted onto a finding. Stored
- * under `result.recommendations[]`. The aggregate read endpoint
- * (`GET /api/inspections/:id/recommendations`) and offline diff3 union both key
- * on `recommendationId`. Estimate/summary/contractor are snapshotted at attach
- * time so later catalog edits never silently rewrite a published finding.
+ * A repair item (Recommendation) snapshotted onto a finding. Stored under
+ * `result.recommendations[]`. The aggregate read endpoint
+ * (`GET /api/inspections/:id/recommendations`) keys on `recommendationId`.
+ * Estimate/summary/contractor are snapshotted at attach time so later catalog
+ * edits never silently rewrite a published finding.
  */
 export interface AttachedRepairItem {
   recommendationId: string;
@@ -76,35 +74,8 @@ export function cloneByScope(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Shared sub-hook context                                            */
+/*  Options                                                            */
 /* ------------------------------------------------------------------ */
-
-/**
- * The state + setters + helpers shared by every findings sub-hook. The main
- * `useFindings` owns the live `results`/`setResults`/`fetcher` and threads them
- * down here so each slice sees the SAME values (no per-slice state). This is
- * what keeps the save-all fresh-map invariant intact: every save-all mutation
- * reads the same `results` the main hook was rendered with and submits the
- * freshly-computed `next` map (never a stale per-slice copy).
- */
-export interface FindingsContext {
-  results: ResultMap;
-  setResults: (fn: (prev: ResultMap) => ResultMap) => void;
-  fetcher: ReturnType<typeof useFetcher>;
-  notesFetcher: ReturnType<typeof useFetcher>;
-  sectionIdForItem: (itemId: string) => string | null;
-  setDirty: (v: boolean) => void;
-  setSaveStatus: (s: "idle" | "saving" | "saved" | "error") => void;
-  /** Offline-queue write helper (shared useOfflineWrite, NOT re-created here). */
-  tryEnqueueOffline: (
-    intent: string,
-    itemId: string | undefined,
-    field: string | undefined,
-    payload: Record<string, unknown>,
-  ) => boolean;
-  /** Read helper shared across slices (composite-key-preferred lookup). */
-  getResult: (itemId: string, sectionId?: string) => Record<string, unknown>;
-}
 
 export interface FindingsOptions {
   sectionIdForItem: (itemId: string) => string | null;
@@ -112,17 +83,12 @@ export interface FindingsOptions {
   setSaveStatus: (s: "idle" | "saving" | "saved" | "error") => void;
   inspectionId: string;
   /**
-   * B-17: notes commit (textarea blur) and the next mutation (rating click)
-   * fire in the same gesture. On a shared fetcher, React Router aborts the
-   * in-flight notes submission when the rating submits — the note is lost.
-   * Callers should pass a dedicated fetcher for notes commits.
+   * Notes commit (textarea blur) and the next mutation (rating click) fire in
+   * the same gesture. On a shared fetcher, React Router aborts the in-flight
+   * notes submission when the rating submits — the note is lost. Callers pass a
+   * dedicated fetcher for notes commits.
    */
   notesFetcher?: ReturnType<typeof useFetcher>;
-  /**
-   * When provided, field writes are routed through the offline queue instead
-   * of the fetcher when `navigator.onLine === false`.  Task 3 offline branch.
-   */
-  offlineQueue?: OfflineQueue;
-  /** #181 — when present, the editor routes writes through the Yjs doc (collab). */
+  /** #181 — the editor routes every write through the Yjs doc (collab). */
   collab?: { doc: import("yjs").Doc };
 }

@@ -382,7 +382,7 @@ export function addPhotoToCustomDefect(
 /**
  * Append `text` to the item's `notes` scalar field.
  *
- * Mirrors `useFindingsCanned.insertComment` join semantics:
+ * Library-comment insertion join semantics:
  *   - empty existing notes → just `text`
  *   - otherwise → `oldNotes.trimEnd() + sep + text`
  *     where sep is `'\n\n'` when `withExtraNewline` is true, else `'\n'`.

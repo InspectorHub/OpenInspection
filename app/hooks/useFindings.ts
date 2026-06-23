@@ -1,26 +1,20 @@
+import { useCallback } from "react";
 import type { ResultMap } from "./useInspection";
-import { useOfflineWrite } from "./useOfflineWrite";
+import { fKey } from "./useInspection";
 import {
   findingKey,
   cloneByScope,
-  type FindingsContext,
   type FindingsOptions,
   type TabStateEntry,
   type CustomCommentEntry,
   type AttachedRepairItem,
 } from "./findings/shared";
-import { useFindingsCore } from "./findings/useFindingsCore";
-import { useFindingsRating } from "./findings/useFindingsRating";
-import { useFindingsCanned } from "./findings/useFindingsCanned";
-import { useFindingsPhotos } from "./findings/useFindingsPhotos";
-import { useFindingsCustom } from "./findings/useFindingsCustom";
-import { useFindingsRepair } from "./findings/useFindingsRepair";
-import { buildCollabFindingsApi } from "~/lib/collab/collab-findings-api";
+import { buildCollabFindingsApi, type CollabFindingsApi } from "~/lib/collab/collab-findings-api";
 import type { useFetcher } from "react-router";
 
 // Re-exported so existing imports (`~/hooks/useFindings`) keep resolving. The
-// type/helper definitions now live in ./findings/shared; consumers and tests
-// see the same names and signatures.
+// type/helper definitions live in ./findings/shared; consumers and tests see
+// the same names and signatures.
 export {
   findingKey,
   cloneByScope,
@@ -31,75 +25,43 @@ export {
 
 /**
  * The inspection findings state hook: ratings, canned comments, photos, custom
- * defects, repair items, and the offline write queue. Behavior-preserving
- * decomposition (Phase 4): the per-concern mutations live in composed
- * sub-hooks under ./findings/*; this function owns the live `results` /
- * `setResults` / `fetcher`, builds the shared offline-write helper + read
- * helper once, threads them into every slice as a single context, and assembles
- * the (unchanged) return object.
+ * defects, and repair items.
  *
- * The save-all fresh-map invariant (FE-2 / FE-3) is preserved by passing the
- * SAME render-time `results` to every slice via `ctx`: each save-all mutation
- * reads that snapshot, computes `next`, and submits THAT `next` — never a stale
- * per-slice copy.
+ * #181 (Phase 5) — collaboration is unconditional. Every write routes through
+ * the live Y.Doc via {@link buildCollabFindingsApi}; the legacy per-field CAS /
+ * offline-queue write path was retired. The editor always supplies `collab.doc`
+ * once the doc connects (a client-only effect), so this hook only has to bridge
+ * the brief SSR / first-paint window before the connection initialises — during
+ * which it returns a read-only / local-optimistic API (no persistence), because
+ * the editor cannot accept user input before its first paint anyway.
  */
 export function useFindings(
   results: ResultMap,
   setResults: (fn: (prev: ResultMap) => ResultMap) => void,
-  fetcher: ReturnType<typeof useFetcher>,
+  _fetcher: ReturnType<typeof useFetcher>,
   options: FindingsOptions,
 ) {
   const { sectionIdForItem, setDirty, setSaveStatus } = options;
-  const notesFetcher = options.notesFetcher ?? fetcher;
-  const offlineQueue = options.offlineQueue;
 
-  // Offline-queue write helper (version-freeze / shouldQueue / lastKnownVersion
-  // semantics live in useOfflineWrite). Returns true when the write was queued
-  // (caller skips the fetcher path), false otherwise. Shared across all slices.
-  const tryEnqueueOffline = useOfflineWrite({
-    results,
-    sectionIdForItem,
-    inspectionId: options.inspectionId,
-    offlineQueue,
-  });
+  // Composite-key-preferred read helper (shared by the collab API and the
+  // pre-connect fallback below).
+  const getResult = useCallback(
+    (itemId: string, sectionId?: string): Record<string, unknown> => {
+      const sid = sectionId || sectionIdForItem(itemId);
+      if (sid) {
+        const ck = fKey(sid, itemId);
+        if (results[ck]) return results[ck];
+      }
+      return results[itemId] || {};
+    },
+    [results, sectionIdForItem],
+  );
 
-  // Core slice owns the read helper + save-all serializers. `getResult` is
-  // threaded back into the shared context so the other slices read through one
-  // canonical lookup.
-  const core = useFindingsCore({
-    results,
-    fetcher,
-    sectionIdForItem,
-    setDirty,
-    setSaveStatus,
-  });
-
-  // Single shared context: every slice sees the SAME live state + setters +
-  // helpers. This is what keeps the fresh-map invariant intact.
-  const ctx: FindingsContext = {
-    results,
-    setResults,
-    fetcher,
-    notesFetcher,
-    sectionIdForItem,
-    setDirty,
-    setSaveStatus,
-    tryEnqueueOffline,
-    getResult: core.getResult,
-  };
-
-  const rating = useFindingsRating(ctx);
-  const canned = useFindingsCanned(ctx);
-  const photos = useFindingsPhotos(ctx);
-  const custom = useFindingsCustom(ctx);
-  const repair = useFindingsRepair(ctx);
-
-  // #181 — collab branch: when a live Y.Doc is present, return the pure collab
-  // write API (every write goes to the doc via the binding) instead of the
-  // legacy per-field-CAS / offline path below. The legacy return is unchanged.
+  // #181 — collab is the only write path. Once the doc is live, return the pure
+  // collab write API (every write goes to the doc via the binding).
   if (options.collab?.doc) {
     return buildCollabFindingsApi(options.collab.doc, {
-      getResult: core.getResult,
+      getResult,
       sectionIdForItem,
       setResults,
       setDirty,
@@ -107,25 +69,35 @@ export function useFindings(
     });
   }
 
-  return {
-    getResult: core.getResult,
-    setRating: rating.setRating,
-    setNotes: rating.setNotes,
-    commitNotes: rating.commitNotes,
-    setItemValue: rating.setItemValue,
-    toggleCannedComment: canned.toggleCannedComment,
-    setDefectFields: canned.setDefectFields,
-    insertComment: canned.insertComment,
-    cloneLast: rating.cloneLast,
-    batchSetRating: rating.batchSetRating,
-    addPhotoToItem: photos.addPhotoToItem,
-    addPhotoToDefect: photos.addPhotoToDefect,
-    getPhotoCount: photos.getPhotoCount,
-    addCustomDefect: custom.addCustomDefect,
-    toggleCustomDefect: custom.toggleCustomDefect,
-    attachRepairItem: repair.attachRepairItem,
-    detachRepairItem: repair.detachRepairItem,
-    debounceSave: core.debounceSave,
-    saveNow: core.saveNow,
+  // Pre-connect window (SSR / first paint, before the doc connects). The editor
+  // renders but cannot yet persist. Reads work; writes are inert no-ops with a
+  // settled save status so the indicator never hangs. This window closes within
+  // a tick of mount when `useResultsDoc` sets the live handle.
+  const noop = () => {};
+  const settled = () => setSaveStatus("saved");
+  const fallback: CollabFindingsApi = {
+    getResult,
+    setRating: noop,
+    setNotes: noop,
+    commitNotes: noop,
+    setItemValue: noop,
+    toggleCannedComment: noop,
+    setDefectFields: noop,
+    insertComment: noop,
+    cloneLast: () => false,
+    batchSetRating: () => 0,
+    addPhotoToItem: noop,
+    addPhotoToDefect: noop,
+    getPhotoCount: (itemId: string) => {
+      const photos = getResult(itemId).photos as unknown[] | undefined;
+      return Array.isArray(photos) ? photos.length : 0;
+    },
+    addCustomDefect: noop,
+    toggleCustomDefect: noop,
+    attachRepairItem: noop,
+    detachRepairItem: noop,
+    debounceSave: settled,
+    saveNow: settled,
   };
+  return fallback;
 }

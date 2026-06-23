@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { swKillSwitchActive, bootstrapServiceWorker } from '~/lib/offline/sw-bootstrap';
-import type { SWRegistrarLike } from '~/lib/offline/sw-bootstrap';
+import { swKillSwitchActive, bootstrapServiceWorker } from '~/lib/sw-bootstrap';
+import type { SWRegistrarLike } from '~/lib/sw-bootstrap';
 
 // ── swKillSwitchActive ────────────────────────────────────────────────────────
 
