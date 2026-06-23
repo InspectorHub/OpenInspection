@@ -1,0 +1,1 @@
+ALTER TABLE `tenant_configs` ADD `collab_editing` integer DEFAULT false NOT NULL;
