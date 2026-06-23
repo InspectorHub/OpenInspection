@@ -30,6 +30,7 @@ import reportDeliveryRoutes from './inspections/report-delivery';
 import agreementsRoutes from './inspections/agreements';
 import coreRoutes from './inspections/core';
 import resultsRoutes from './inspections/results';
+import collabRoutes from './inspections/collab';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
@@ -41,7 +42,10 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', publishRoutes)
     .route('/', reportDeliveryRoutes)
     .route('/', agreementsRoutes)
-    .route('/', hierarchyRoutes);
+    .route('/', hierarchyRoutes)
+    // Yjs collab WS upgrade route (#181) — GET /:id/collab/ws.
+    // Auth + forward to INSPECTION_DOC DO; mirrors the presence WS pattern.
+    .route('/', collabRoutes);
 
 export type InspectionsApi = typeof inspectionsRoutes;
 
