@@ -24,7 +24,14 @@ import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
-import { seedResultsDoc, applyItemPatch, projectResults } from '../../server/lib/collab/results-doc';
+import {
+    seedResultsDoc,
+    applyItemPatch,
+    projectResults,
+    appendPhoto,
+    upsertCanned,
+    upsertRecommendation,
+} from '../../server/lib/collab/results-doc';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
 
 // ─── Bindings ─────────────────────────────────────────────────────────────────
@@ -545,5 +552,82 @@ describe('#181 — multi-client DO merge + projection parity', () => {
         const itemB = d1Data[FINDING_KEY_B] as Record<string, unknown> | undefined;
         expect(itemA?.rating).toBe('NI');
         expect(itemB?.rating).toBe('IN');
+    });
+
+    // ── Scenario 6: Nested fields survive DO persist (projection parity) ──────
+    //
+    // Drive a client doc that mutates the CRDT containers (photos / tabs.defects
+    // / recommendations) via the dedicated container mutators, push the update
+    // through the real DO webSocketMessage handler, persist(), then read D1 and
+    // assert the persisted blob faithfully materializes every nested field —
+    // i.e. projectResults parity holds for nested fields through the real DO
+    // persist path (the bug this task fixes: nested fields used to project to {}).
+    it('Scenario 6 — nested fields survive DO persist (projection parity)', async () => {
+        const inspectionId = 'insp-nested-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            io.tenantId          = TENANT;
+            io.inspectionId      = inspectionId;
+            io.identityPersisted = true;
+
+            seedResultsDoc(io.doc, [{ findingKey: FINDING_KEY_A }]);
+
+            // Client drives nested-field mutations on a synced doc.
+            const clientA = new Y.Doc();
+            await syncClientWithDO(io, clientA);
+
+            appendPhoto(clientA, FINDING_KEY_A, { key: 'r2/nested-1.jpg', mediaType: 'photo' });
+            upsertCanned(clientA, FINDING_KEY_A, 'defects', {
+                cannedId: 'd1',
+                included: true,
+                location: 'North wall',
+                trade: 'Roofing',
+            });
+            upsertRecommendation(clientA, FINDING_KEY_A, {
+                recommendationId: 'r1',
+                estimateSnapshotMin: 100,
+                estimateSnapshotMax: 200,
+                summarySnapshot: 'Fix the roof',
+                contractorTypeSnapshot: 'Roofer',
+                attachedAt: 1700000000000,
+            });
+
+            const ws = new MockWebSocket();
+            await instance.webSocketMessage(ws as unknown as WebSocket, encodeUpdate(Y.encodeStateAsUpdate(clientA)).buffer as ArrayBuffer);
+
+            // The DO's internal doc must already reflect the nested fields.
+            const projection = projectResults(io.doc);
+            expect(projection[FINDING_KEY_A]?.photos).toEqual([
+                { key: 'r2/nested-1.jpg', mediaType: 'photo' },
+            ]);
+
+            await io.persist();
+        });
+
+        // The persisted D1 blob must contain the nested fields (would be {} pre-fix).
+        const d1Data = await readResultsData(TENANT, inspectionId);
+        const item = d1Data[FINDING_KEY_A] as Record<string, unknown> | undefined;
+
+        expect(item?.photos).toEqual([{ key: 'r2/nested-1.jpg', mediaType: 'photo' }]);
+
+        const tabs = item?.tabs as Record<string, unknown> | undefined;
+        expect(tabs?.defects).toEqual([
+            { cannedId: 'd1', included: true, location: 'North wall', trade: 'Roofing' },
+        ]);
+
+        expect(item?.recommendations).toEqual([
+            {
+                recommendationId: 'r1',
+                estimateSnapshotMin: 100,
+                estimateSnapshotMax: 200,
+                summarySnapshot: 'Fix the roof',
+                contractorTypeSnapshot: 'Roofer',
+                attachedAt: 1700000000000,
+            },
+        ]);
     });
 });

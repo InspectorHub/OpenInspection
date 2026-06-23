@@ -38,6 +38,37 @@ export interface CannedState {
     comment?:  string | null;
 }
 
+/**
+ * Snapshot of a repair item attached to a finding.
+ *
+ * Read by `server/lib/aggregate-recommendations.ts`
+ * (`aggregateAttachedRecommendations`, the `GET /:id/recommendations` list).
+ */
+export interface RepairItemSnapshot {
+    recommendationId:       string;
+    estimateSnapshotMin:    number | null;
+    estimateSnapshotMax:    number | null;
+    summarySnapshot:        string;
+    contractorTypeSnapshot: string | null;
+    attachedAt:             number;
+}
+
+/**
+ * A per-inspection custom comment (inspector free-text, not from the library).
+ *
+ * Read by `server/services/inspection/inspection-report.service.ts`
+ * (`mapCustomDefectsForReport` reads `res.customComments.defects`).
+ */
+export interface CustomCommentEntry {
+    id:        string;
+    title:     string;
+    comment:   string;
+    included:  boolean;
+    category?: string;
+    location?: string;
+    photos?:   PhotoEntry[];
+}
+
 /** Toggle-state for a single canned defect, with per-defect overrides. */
 export interface DefectState {
     cannedId:          string;
@@ -97,6 +128,14 @@ export interface ItemEntry {
     /** Re-inspection disposition assigned by the inspector. */
     followupStatus?: string | null;
     followupNotes?:  string | null;
+    /** Repair items attached to this finding (read by aggregate-recommendations). */
+    recommendations?: RepairItemSnapshot[];
+    /** Per-inspection custom comments, grouped by tab. */
+    customComments?: {
+        information?: CustomCommentEntry[];
+        limitations?: CustomCommentEntry[];
+        defects?:     CustomCommentEntry[];
+    };
 }
 
 /**

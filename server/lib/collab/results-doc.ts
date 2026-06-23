@@ -21,18 +21,24 @@ import type {
     PhotoEntry,
     CannedState,
     DefectState,
+    RepairItemSnapshot,
+    CustomCommentEntry,
 } from './results-doc.types';
+
+type CannedTab = 'information' | 'limitations' | 'defects';
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 /**
  * Build the fully-formed nested Y.Map structure for one item.
  * Called only when the item is absent from the results map.
+ *
+ * Every top-level collection is a real Yjs container so concurrent edits to the
+ * same item merge with no loss. Scalar fields (rating, notes, value, …) remain
+ * lazy — they are set on demand via applyItemPatch.
  */
 function buildItemMap(): Y.Map<unknown> {
     const item = new Y.Map<unknown>();
-
-    // Scalar fields (rating, notes, value) are set lazily via applyItemPatch.
 
     // attributes: Y.Map — structured property bag (e.g. checkbox fields)
     item.set('attributes', new Y.Map<unknown>());
@@ -44,10 +50,122 @@ function buildItemMap(): Y.Map<unknown> {
     tabs.set('defects', new Y.Array<unknown>());
     item.set('tabs', tabs);
 
-    // photos: Y.Array of photo attachment objects
+    // photos: Y.Array of photo attachment Y.Maps
     item.set('photos', new Y.Array<unknown>());
 
+    // recommendations: Y.Array of attached repair-item snapshot Y.Maps
+    item.set('recommendations', new Y.Array<unknown>());
+
+    // customComments: Y.Map holding three arrays of custom-comment Y.Maps
+    const customComments = new Y.Map<unknown>();
+    customComments.set('information', new Y.Array<unknown>());
+    customComments.set('limitations', new Y.Array<unknown>());
+    customComments.set('defects', new Y.Array<unknown>());
+    item.set('customComments', customComments);
+
     return item;
+}
+
+/** Get the item Y.Map for `findingKey`, seeding it first if absent. */
+function getOrSeedItem(
+    results: Y.Map<unknown>,
+    findingKey: FindingKey,
+): Y.Map<unknown> {
+    if (results.get(findingKey) === undefined) {
+        results.set(findingKey, buildItemMap());
+    }
+    return results.get(findingKey) as Y.Map<unknown>;
+}
+
+/**
+ * Get a nested Y.Array on the item, tolerating items that were seeded by an
+ * older buildItemMap (defensive — the field is created if absent).
+ */
+function getOrCreateArray(parent: Y.Map<unknown>, key: string): Y.Array<unknown> {
+    const existing = parent.get(key);
+    if (existing instanceof Y.Array) return existing;
+    const arr = new Y.Array<unknown>();
+    parent.set(key, arr);
+    return arr;
+}
+
+/** Get a nested Y.Map on the item, creating it if absent. */
+function getOrCreateMap(parent: Y.Map<unknown>, key: string): Y.Map<unknown> {
+    const existing = parent.get(key);
+    if (existing instanceof Y.Map) return existing;
+    const map = new Y.Map<unknown>();
+    parent.set(key, map);
+    return map;
+}
+
+/**
+ * Core primitive: find a Y.Map element inside `arr` whose `identityField`
+ * equals `identityValue`. Returns undefined if none matches.
+ */
+function findElementByKey(
+    arr: Y.Array<unknown>,
+    identityField: string,
+    identityValue: unknown,
+): Y.Map<unknown> | undefined {
+    for (let i = 0; i < arr.length; i++) {
+        const el = arr.get(i);
+        if (el instanceof Y.Map && el.get(identityField) === identityValue) {
+            return el;
+        }
+    }
+    return undefined;
+}
+
+/**
+ * Set every own field of a plain object onto a Y.Map, one scalar at a time.
+ *
+ * Setting each field individually (rather than nesting the plain object as a
+ * single value) keeps the element CRDT-mergeable at the field level. An array
+ * field (e.g. a defect's `photos`) is stored as a plain JS array value: that is
+ * deliberately LWW per element — element-level sub-array merge is out of scope
+ * for this task; only the top-level collections are CRDT containers.
+ */
+function assignFields(target: Y.Map<unknown>, source: Record<string, unknown>): void {
+    for (const [k, v] of Object.entries(source)) {
+        if (v === undefined) continue;
+        target.set(k, v);
+    }
+}
+
+/**
+ * Upsert a Y.Map element keyed by `identityField` into `arr`: if an element
+ * with the same identity exists, merge `entry`'s fields onto it; otherwise push
+ * a new Y.Map built from `entry`.
+ */
+function upsertElement(
+    arr: Y.Array<unknown>,
+    identityField: string,
+    entry: Record<string, unknown>,
+): void {
+    const identityValue = entry[identityField];
+    const existing = findElementByKey(arr, identityField, identityValue);
+    if (existing) {
+        assignFields(existing, entry);
+        return;
+    }
+    const el = new Y.Map<unknown>();
+    assignFields(el, entry);
+    arr.push([el]);
+}
+
+/** Remove the first Y.Map element keyed by `identityField` === `identityValue`. */
+function removeElement(
+    arr: Y.Array<unknown>,
+    identityField: string,
+    identityValue: unknown,
+): void {
+    for (let i = 0; i < arr.length; i++) {
+        const el = arr.get(i);
+        if (el instanceof Y.Map && el.get(identityField) === identityValue) {
+            arr.delete(i, 1);
+            return;
+        }
+    }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -80,32 +198,214 @@ export function seedResultsDoc(
 }
 
 /**
- * Apply a single-field patch to an item inside a Y.Doc transaction.
+ * Apply a single SCALAR-field patch to an item inside a Y.Doc transaction.
  *
  * The item is expected to have been pre-seeded via `seedResultsDoc`. If it is
  * absent (defensive path), it is seeded first.
  *
- * For scalar fields (`rating`, `notes`, `value`) the value is set directly on
- * the item Y.Map. The `attributes`, `tabs`, and `photos` fields hold nested
- * Yjs structures that are replaced wholesale — callers must pass the full
- * intended state for those fields.
+ * This function only handles scalar fields — last-write-wins per scalar is the
+ * correct semantics for them. Nested fields (attributes, tabs, photos,
+ * recommendations, customComments) are NO LONGER set through this function:
+ * setting a plain JS array/object here would REPLACE the seeded Yjs container
+ * with a plain value, defeating CRDT merge and breaking projectResults'
+ * instanceof checks. Use the dedicated container mutators below for those.
  */
 export function applyItemPatch(
     doc: Y.Doc,
     findingKey: FindingKey,
-    field: 'rating' | 'notes' | 'value' | 'attributes' | 'tabs' | 'photos',
+    field:
+        | 'rating'
+        | 'notes'
+        | 'value'
+        | 'recommendation'
+        | 'estimateMin'
+        | 'estimateMax'
+        | 'followupStatus'
+        | 'followupNotes',
     value: unknown,
 ): void {
     const results = doc.getMap<unknown>('results');
 
     doc.transact(() => {
-        // Defensive: seed if somehow absent.
-        if (results.get(findingKey) === undefined) {
-            results.set(findingKey, buildItemMap());
-        }
-
-        const item = results.get(findingKey) as Y.Map<unknown>;
+        const item = getOrSeedItem(results, findingKey);
         item.set(field, value);
+    });
+}
+
+// ─── Container mutators (CRDT-native, in-place merge) ──────────────────────────
+
+/** Set a key on the item's `attributes` Y.Map (creates the item if absent). */
+export function setItemAttribute(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    key: string,
+    value: unknown,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        getOrCreateMap(item, 'attributes').set(key, value);
+    });
+}
+
+/** Delete a key from the item's `attributes` Y.Map. */
+export function deleteItemAttribute(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    key: string,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        getOrCreateMap(item, 'attributes').delete(key);
+    });
+}
+
+/**
+ * Append (or merge) a photo into the item's `photos` Y.Array.
+ * If a photo Y.Map with the same `key` exists, its fields are replaced/merged;
+ * otherwise a new photo Y.Map is pushed.
+ */
+export function appendPhoto(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    photo: PhotoEntry,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        upsertElement(getOrCreateArray(item, 'photos'), 'key', { ...photo });
+    });
+}
+
+/** Apply a partial patch to the photo Y.Map matching `key`. */
+export function updatePhoto(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    key: string,
+    patch: Partial<PhotoEntry>,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const el = findElementByKey(getOrCreateArray(item, 'photos'), 'key', key);
+        if (el) assignFields(el, { ...patch });
+    });
+}
+
+/** Remove the photo Y.Map matching `key`. */
+export function removePhoto(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    key: string,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        removeElement(getOrCreateArray(item, 'photos'), 'key', key);
+    });
+}
+
+/**
+ * Upsert a canned-comment entry into `tabs[tab]`, keyed by `cannedId`.
+ * Provided fields are merged onto the existing entry (or a new one is created).
+ */
+export function upsertCanned(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    tab: CannedTab,
+    entry: Partial<CannedState & DefectState> & { cannedId: string },
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const tabs = getOrCreateMap(item, 'tabs');
+        upsertElement(getOrCreateArray(tabs, tab), 'cannedId', { ...entry });
+    });
+}
+
+/** Remove the canned-comment entry in `tabs[tab]` matching `cannedId`. */
+export function removeCanned(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    tab: CannedTab,
+    cannedId: string,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const tabs = getOrCreateMap(item, 'tabs');
+        removeElement(getOrCreateArray(tabs, tab), 'cannedId', cannedId);
+    });
+}
+
+/**
+ * Upsert a custom-comment entry into `customComments[tab]`, keyed by `id`.
+ * Provided fields are merged onto the existing entry (or a new one is created).
+ */
+export function upsertCustomComment(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    tab: CannedTab,
+    entry: Partial<CustomCommentEntry> & { id: string },
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const cc = getOrCreateMap(item, 'customComments');
+        upsertElement(getOrCreateArray(cc, tab), 'id', { ...entry });
+    });
+}
+
+/** Remove the custom-comment entry in `customComments[tab]` matching `id`. */
+export function removeCustomComment(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    tab: CannedTab,
+    id: string,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const cc = getOrCreateMap(item, 'customComments');
+        removeElement(getOrCreateArray(cc, tab), 'id', id);
+    });
+}
+
+/**
+ * Upsert a repair-item snapshot into the item's `recommendations` Y.Array,
+ * keyed by `recommendationId`.
+ */
+export function upsertRecommendation(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    rec: RepairItemSnapshot,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        upsertElement(
+            getOrCreateArray(item, 'recommendations'),
+            'recommendationId',
+            { ...rec },
+        );
+    });
+}
+
+/** Remove the recommendation snapshot matching `recommendationId`. */
+export function removeRecommendation(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    recommendationId: string,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        removeElement(
+            getOrCreateArray(item, 'recommendations'),
+            'recommendationId',
+            recommendationId,
+        );
     });
 }
 
@@ -203,6 +503,40 @@ export function projectResults(doc: Y.Doc): ResultsProjection {
         const photosRaw = rawItem.get('photos');
         if (photosRaw instanceof Y.Array && photosRaw.length > 0) {
             entry.photos = photosRaw.toJSON() as PhotoEntry[];
+        }
+
+        // ── recommendations ────────────────────────────────────────────────────
+
+        const recsRaw = rawItem.get('recommendations');
+        if (recsRaw instanceof Y.Array && recsRaw.length > 0) {
+            entry.recommendations = recsRaw.toJSON() as RepairItemSnapshot[];
+        }
+
+        // ── customComments ─────────────────────────────────────────────────────
+
+        const customRaw = rawItem.get('customComments');
+        if (customRaw instanceof Y.Map) {
+            const ccInfo = customRaw.get('information');
+            const ccLim  = customRaw.get('limitations');
+            const ccDef  = customRaw.get('defects');
+
+            const ccInfoArr = ccInfo instanceof Y.Array
+                ? (ccInfo.toJSON() as CustomCommentEntry[])
+                : [];
+            const ccLimArr  = ccLim instanceof Y.Array
+                ? (ccLim.toJSON() as CustomCommentEntry[])
+                : [];
+            const ccDefArr  = ccDef instanceof Y.Array
+                ? (ccDef.toJSON() as CustomCommentEntry[])
+                : [];
+
+            if (ccInfoArr.length > 0 || ccLimArr.length > 0 || ccDefArr.length > 0) {
+                const ccEntry: NonNullable<ItemEntry['customComments']> = {};
+                if (ccInfoArr.length > 0) ccEntry.information = ccInfoArr;
+                if (ccLimArr.length  > 0) ccEntry.limitations = ccLimArr;
+                if (ccDefArr.length  > 0) ccEntry.defects     = ccDefArr;
+                entry.customComments = ccEntry;
+            }
         }
 
         // ── re-inspection fields ──────────────────────────────────────────────

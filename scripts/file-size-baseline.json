@@ -15,6 +15,7 @@
   "app/components/portal/sections/RepairBuilderSection.tsx": 596,
   "server/services/marketplace.service.ts": 587,
   "app/hooks/useInspection.ts": 574,
+  "server/lib/collab/results-doc.ts": 574,
   "server/api/inspections/publish.ts": 551,
   "app/components/editor/ItemEditor.tsx": 534,
   "server/api/inspections/report-delivery.ts": 534,
