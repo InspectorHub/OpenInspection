@@ -126,7 +126,10 @@ export function connectResultsDoc(
 
     const docUpdateHandler = (update: Uint8Array, origin: unknown): void => {
         if (origin === ws) return; // do not echo socket-received updates
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        // Use the instance's own OPEN constant (not the global WebSocket.OPEN)
+        // so this pure module never references a `WebSocket` global that may be
+        // absent if it is imported/called outside a browser (e.g. SSR misuse).
+        if (!ws || ws.readyState !== ws.OPEN) return;
         const encoder = encoding.createEncoder();
         encoding.writeVarUint(encoder, MSG_SYNC);
         syncProtocol.writeUpdate(encoder, update);
@@ -181,7 +184,7 @@ export function connectResultsDoc(
             if (
                 syncMsgType === syncProtocol.messageYjsSyncStep1 &&
                 ws &&
-                ws.readyState === WebSocket.OPEN
+                ws.readyState === ws.OPEN
             ) {
                 // DO sent us a step1 — reply with our step2.
                 ws.send(encoding.toUint8Array(replyEncoder));
