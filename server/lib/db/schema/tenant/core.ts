@@ -157,8 +157,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     reinspectionStatuses: text('reinspection_statuses'),
     // #181 — when true, the inspection editor routes reads/writes through the Yjs
     // collaborative document (Durable Object) instead of the per-field CAS path.
-    // Per-tenant operator toggle; default off until collab is GA.
-    collabEditing: integer('collab_editing', { mode: 'boolean' }).notNull().default(false),
+    // Per-tenant operator toggle; default ON (#181 Phase 5) — new tenants get collab
+    // unless they explicitly opt out. The legacy CAS path stays available until
+    // Tasks 14/15 retire it.
+    collabEditing: integer('collab_editing', { mode: 'boolean' }).notNull().default(true),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
