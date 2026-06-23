@@ -16,6 +16,12 @@ import { isReportPublished } from '../../lib/status/report-status';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
 import { InspectionSubService } from './base';
+import type {
+    PhotoEntry,
+    CannedState,
+    DefectState,
+    ResultsProjection,
+} from '../../lib/collab/results-doc.types';
 
 /**
  * Report data aggregation: getReportData (the resolved, render-ready report
@@ -69,30 +75,9 @@ export class InspectionReportService extends InspectionSubService {
         // legacy templates without these fields render unchanged.
         interface SchemaSection     { id: string; title: string; icon?: string; items: SchemaItem[]; disclaimerText?: string | null; alwaysPageBreak?: boolean }
         interface SchemaData        { schemaVersion?: number; sections: SchemaSection[]; ratingSystem?: { levels: RatingLevel[] } }
-        interface PhotoEntry        { key: string; croppedKey?: string; annotatedKey?: string; annotationsJson?: string; mediaType?: 'photo' | 'video'; provider?: 'stream' | 'r2'; streamUid?: string; mediaId?: string; posterKey?: string; posterPct?: number; durationSec?: number }
-        // Sprint 2 S2-3 / S2-4 — per-defect recommendation slug + repair
-        // estimate range (cents). All optional so legacy defects render.
-        interface DefectState       { cannedId: string; included: boolean; comment?: string | null; category?: 'maintenance' | 'recommendation' | 'safety'; location?: string | null; photos?: PhotoEntry[]; recommendationId?: string | null; estimateLow?: number | null; estimateHigh?: number | null; trade?: string | null; deadline?: string | null; timeframe?: string | null }
-        interface CannedState       { cannedId: string; included: boolean; comment?: string | null }
-        interface ResultEntry {
-            rating?:         string;
-            notes?:          string;
-            photos?:         PhotoEntry[];
-            recommendation?: string;
-            estimateMin?:    number;
-            estimateMax?:    number;
-            attributes?:     Record<string, unknown>;
-            tabs?: {
-                information?: CannedState[];
-                limitations?: CannedState[];
-                defects?:     DefectState[];
-            };
-            // #119 — on a re-inspection result, the carried item retains a
-            // snapshot of the original finding plus the follow-up disposition.
-            original?:       { rating?: string | null; notes?: string | null; photos?: PhotoEntry[] };
-            followupStatus?: string | null;
-            followupNotes?:  string | null;
-        }
+        // PhotoEntry, CannedState, DefectState, and ResultsProjection (ItemEntry)
+        // are imported from '../../lib/collab/results-doc.types' — single
+        // source of truth for the inspection_results.data projection shape.
 
         // Feature #20 — prefer the per-inspection templateSnapshot over the
         // source template.schema. The snapshot is the authoritative shape
@@ -156,8 +141,8 @@ export class InspectionReportService extends InspectionSubService {
         if (levels.length === 0) {
             levels = schemaData.ratingSystem?.levels ?? [];
         }
-        const resultData: Record<string, ResultEntry> = resultsRow?.data
-            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as Record<string, ResultEntry>
+        const resultData: ResultsProjection = resultsRow?.data
+            ? (typeof resultsRow.data === 'string' ? JSON.parse(resultsRow.data) : resultsRow.data) as ResultsProjection
             : {};
 
         const stats = computeReportStats(schemaData.sections, resultData, levels);
