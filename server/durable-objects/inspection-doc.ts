@@ -414,7 +414,9 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * concurrent triggers from racing the read-modify-write of the array.
      */
     private async captureSnapshot(byUserId: string | null): Promise<ResultsSnapshot> {
-        // Spin-wait briefly if another capture is mid-flight, then take the lock.
+        // The DO runs single-threaded; this guard serializes the read-modify-write
+        // of the snapshot array across INTERLEAVED awaits (an auto-capture firing
+        // while an on-demand capture is parked on storage I/O), not OS threads.
         while (this.capturing) {
             await new Promise<void>((resolve) => setTimeout(resolve, 5));
         }
@@ -487,6 +489,9 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         this.doc.off('update', this.onDocUpdate);
         this.doc = fresh;
         this.doc.on('update', this.onDocUpdate);
+        // Re-baseline the auto-snapshot cadence to the restored state so the next
+        // periodic capture is measured from here (not the pre-restore counter).
+        this.updatesSinceSnapshot = 0;
 
         // (5) Broadcast the restored full state to connected sockets.
         // Origin RESTORE_ORIGIN → onDocUpdate (if any future doc emits) skips
