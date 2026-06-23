@@ -54,14 +54,15 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       agentRefSlug,
       brand,
       privacyUrl: legal?.privacyUrl ?? null,
+      termsUrl: legal?.termsUrl ?? null,
     };
   } catch {
-    return { profile: null, preselected: null, error: "Service unavailable", tenant: "", agentRefSlug: null, brand: EMPTY_BRAND as TenantBrand, privacyUrl: null };
+    return { profile: null, preselected: null, error: "Service unavailable", tenant: "", agentRefSlug: null, brand: EMPTY_BRAND as TenantBrand, privacyUrl: null, termsUrl: null };
   }
 }
 
 export default function BookingPage() {
-  const { profile, preselected, error, agentRefSlug, brand, tenant, privacyUrl } = useLoaderData<typeof loader>();
+  const { profile, preselected, error, agentRefSlug, brand, tenant, privacyUrl, termsUrl } = useLoaderData<typeof loader>();
   const form = useBookingFormState({ profile, preselected, tenant, agentRefSlug });
 
   if (error || !profile) {
@@ -74,7 +75,7 @@ export default function BookingPage() {
 
   return (
     <BookingShell profile={profile} brand={brand} privacyUrl={privacyUrl}>
-      <BookingWizard profile={profile} privacyUrl={privacyUrl} form={form} />
+      <BookingWizard profile={profile} privacyUrl={privacyUrl} termsUrl={termsUrl} form={form} />
     </BookingShell>
   );
 }

@@ -19,7 +19,7 @@ import { drizzle } from 'drizzle-orm/d1';
 // Track L (D7) — default TCPA SMS opt-in disclosure (version 1). Seeded once by
 // ensureSeeds (SaaS) and the standalone raw-SQL path; kept identical in both.
 export const SMS_DISCLOSURE_V1 =
-    'By providing your phone number and opting in, you agree to receive appointment and report text messages from {{company_name}}. Message and data rates may apply. Reply STOP to opt out, HELP for help.';
+    'By providing your phone number and opting in, you agree to receive appointment and report text messages from {{company_name}}. Message frequency varies by your inspection activity. Message and data rates may apply. Reply STOP to opt out, HELP for help.';
 
 export function interpolate(template: string, vars: Record<string, string>): string {
     return template.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? '');

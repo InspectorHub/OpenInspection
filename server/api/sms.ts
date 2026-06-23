@@ -45,9 +45,33 @@ import { getBaseUrl } from '../lib/url';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
 
-// STOP-set → revoke; START-set → grant; anything else is logged, not a state change.
+// STOP-set → revoke; START-set → grant; HELP-set → informational auto-reply
+// (TCPA/CTIA + Twilio toll-free verification require HELP to respond); anything
+// else is logged, not a state change.
 const STOP_WORDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT']);
 const START_WORDS = new Set(['START', 'UNSTOP', 'YES']);
+const HELP_WORDS = new Set(['HELP', 'INFO']);
+
+function escapeXml(s: string): string {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+
+/**
+ * Brand name for the HELP auto-reply: the tenant's company name in the
+ * tenant-scoped inbound shape, else the operator's APP_NAME (self-host) or the
+ * platform default. The platform toll-free is shared, so a brand-level name is
+ * the correct identity for a HELP reply on the platform shape.
+ */
+async function helpReplyBrand(c: Context<HonoConfig>, scopeTenantId: string | null): Promise<string> {
+    if (scopeTenantId) {
+        const db = drizzle(c.env.DB);
+        const t = await db.select({ name: tenants.name }).from(tenants)
+            .where(eq(tenants.id, scopeTenantId)).get().catch(() => null);
+        if (t?.name) return t.name;
+    }
+    return (c.env as { APP_NAME?: string }).APP_NAME?.trim() || 'Inspector Hub';
+}
 
 // ─── Public router ───────────────────────────────────────────────────────────
 
@@ -64,6 +88,8 @@ const optinResolveRoute = createRoute(withMcpMetadata({
                 data: z.object({
                     companyName: z.string(),
                     disclosureText: z.string(),
+                    privacyUrl: z.string().nullable(),
+                    termsUrl: z.string().nullable(),
                 }),
             }) } },
             description: 'Resolved opt-in context',
@@ -98,9 +124,12 @@ export const smsPublicRoutes = createApiRouter()
         if (!tenant) throw Errors.NotFound('This opt-in link is invalid or has expired.');
 
         const disc = await new SmsConsentService(c.env.DB).currentDisclosure();
-        const disclosureText = (disc?.text ?? 'By confirming, you agree to receive appointment and report text messages. Message and data rates may apply. Reply STOP to opt out.')
+        const disclosureText = (disc?.text ?? 'By confirming, you agree to receive appointment and report text messages. Message frequency varies by your inspection activity. Message and data rates may apply. Reply STOP to opt out, HELP for help.')
             .replace(/\{\{\s*company_name\s*\}\}/g, tenant.name);
-        return c.json({ success: true as const, data: { companyName: tenant.name, disclosureText } }, 200);
+        const env = c.env as { PRIVACY_URL?: string; TERMS_URL?: string };
+        const privacyUrl = env.PRIVACY_URL?.trim() || null;
+        const termsUrl = env.TERMS_URL?.trim() || null;
+        return c.json({ success: true as const, data: { companyName: tenant.name, disclosureText, privacyUrl, termsUrl } }, 200);
     })
     .openapi(optinConfirmRoute, async (c) => {
         const { token } = c.req.valid('json');
@@ -162,6 +191,14 @@ async function handleInbound(
     const cmd = (params.Body ?? '').trim().toUpperCase();
     const isRevoke = STOP_WORDS.has(cmd);
     const isGrant = START_WORDS.has(cmd);
+
+    // HELP — respond with an informational message identifying the program. Does
+    // not depend on matching a contact (Twilio expects HELP answered regardless).
+    if (HELP_WORDS.has(cmd)) {
+        const brand = await helpReplyBrand(c, opts.scopeTenantId);
+        const msg = `${brand}: appointment & report text alerts. Message frequency varies by your inspection activity. Msg & data rates may apply. Reply STOP to unsubscribe.`;
+        return c.text(`<Response><Message>${escapeXml(msg)}</Message></Response>`, 200, { 'Content-Type': 'text/xml' });
+    }
 
     if (!from) return c.text('<Response/>', 200, { 'Content-Type': 'text/xml' });
 

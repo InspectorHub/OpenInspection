@@ -118,7 +118,7 @@ async function seedSmsDisclosureV1(db: D1Database): Promise<void> {
             SELECT 1, ?, unixepoch('now') * 1000
             WHERE NOT EXISTS (SELECT 1 FROM sms_disclosure_versions)
         `).bind(
-            'By providing your phone number and opting in, you agree to receive appointment and report text messages from {{company_name}}. Message and data rates may apply. Reply STOP to opt out, HELP for help.',
+            'By providing your phone number and opting in, you agree to receive appointment and report text messages from {{company_name}}. Message frequency varies by your inspection activity. Message and data rates may apply. Reply STOP to opt out, HELP for help.',
         ).run();
     } catch (err) {
         // non-fatal: setup wizard must not fail because of seed data

@@ -8,10 +8,12 @@ type BookingFormState = ReturnType<typeof useBookingFormState>;
 export function BookingWizard({
   profile,
   privacyUrl,
+  termsUrl,
   form,
 }: {
   profile: CompanyProfile;
   privacyUrl: string | null;
+  termsUrl: string | null;
   form: BookingFormState;
 }) {
   const {
@@ -106,6 +108,8 @@ export function BookingWizard({
           setClientEmail={setClientEmail}
           smsOptin={smsOptin}
           setSmsOptin={setSmsOptin}
+          privacyUrl={privacyUrl}
+          termsUrl={termsUrl}
         />
       )}
 

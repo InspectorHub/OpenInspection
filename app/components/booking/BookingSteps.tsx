@@ -111,6 +111,8 @@ export function ScheduleStep({
   setClientEmail,
   smsOptin,
   setSmsOptin,
+  privacyUrl,
+  termsUrl,
 }: {
   inspectionDate: string;
   setInspectionDate: (v: string) => void;
@@ -128,6 +130,8 @@ export function ScheduleStep({
   setClientEmail: (v: string) => void;
   smsOptin: boolean;
   setSmsOptin: (v: boolean) => void;
+  privacyUrl: string | null;
+  termsUrl: string | null;
 }) {
   return (
     <section className="space-y-8">
@@ -228,8 +232,22 @@ export function ScheduleStep({
           />
           <span className="text-[13px] text-ih-fg-3 leading-relaxed">
             Text me appointment &amp; report updates. By checking this box you agree to
-            receive automated text messages about your inspection. Message &amp; data rates
-            may apply; reply STOP to opt out. Consent is not a condition of booking.
+            receive automated text messages about your inspection. Message frequency varies
+            by your inspection activity. Message &amp; data rates may apply; reply STOP to opt
+            out, HELP for help. Consent is not a condition of booking.
+            {(privacyUrl || termsUrl) && (
+              <>
+                {" "}
+                {privacyUrl && (
+                  <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>
+                )}
+                {privacyUrl && termsUrl && <span> · </span>}
+                {termsUrl && (
+                  <a href={termsUrl} target="_blank" rel="noreferrer" className="underline">Terms</a>
+                )}
+                .
+              </>
+            )}
           </span>
         </label>
       </div>
