@@ -123,4 +123,6 @@ export interface FindingsOptions {
    * of the fetcher when `navigator.onLine === false`.  Task 3 offline branch.
    */
   offlineQueue?: OfflineQueue;
+  /** #181 — when present, the editor routes writes through the Yjs doc (collab). */
+  collab?: { doc: import("yjs").Doc };
 }

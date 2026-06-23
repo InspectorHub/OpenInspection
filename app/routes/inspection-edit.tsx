@@ -22,6 +22,8 @@ import {
 import { useUnsavedChanges } from "~/hooks/useUnsavedChanges";
 import { usePresence } from "~/hooks/usePresence";
 import { useTheme } from "~/hooks/useTheme";
+import { useResultsDoc } from "~/lib/collab/use-results-doc";
+import { bindResultMap } from "~/lib/collab/results-binding";
 import { SectionRail } from "~/components/editor/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { ItemList } from "~/components/editor/ItemList";
@@ -163,6 +165,24 @@ export default function InspectionEditPage() {
  });
 
  /* ---------------------------------------------------------------- */
+ /* #181 — collab Y.Doc (real-time editing behind the collabEditing flag) */
+ /* ---------------------------------------------------------------- */
+
+ // Called unconditionally (rules of hooks); only connects when the flag is on.
+ const collab = useResultsDoc(
+   loaderData.collabEditing ? String(loaderData.inspection.id) : null,
+ );
+
+ // Once the doc is live, project it into the editor's `results`. First paint
+ // uses loaderData.results (legacy projection); the DO hydrated from the SAME
+ // D1 blob (8.6) so swapping in the doc projection causes no flash. Inert when
+ // collab is off (no doc → effect returns immediately).
+ useEffect(() => {
+   if (!collab?.doc) return;
+   return bindResultMap(collab.doc, (next) => state.setResults(() => next));
+ }, [collab?.doc, state.setResults]);
+
+ /* ---------------------------------------------------------------- */
  /* Findings (CRUD) */
  /* ---------------------------------------------------------------- */
 
@@ -174,6 +194,8 @@ export default function InspectionEditPage() {
  notesFetcher,
     // Offline-first: route field writes into the queue when shouldQueue() says so.
     offlineQueue: getOfflineQueue(),
+    // #181 — when the collab doc is live, route writes through the Y.Doc.
+    collab: collab?.doc ? { doc: collab.doc } : undefined,
  });
 
  /* ---------------------------------------------------------------- */

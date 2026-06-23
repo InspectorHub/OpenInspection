@@ -12,6 +12,11 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // Load `scripts/*.mjs` (e.g. the tenant-scoping gate) via native Node import
+    // instead of vitest's transform pipeline, which throws "Invalid or unexpected
+    // token" on these standalone build scripts. Tests import their exported pure
+    // functions through a runtime `import(fileURL)`.
+    server: { deps: { external: [/scripts[\\/].+\.mjs$/] } },
     // Per-file environment overrides: add `// @vitest-environment happy-dom`
     // docblock to client-side test files (db, sync-engine, photo-resize, etc.)
     // that need a DOM environment. This is the vitest v4 equivalent of the

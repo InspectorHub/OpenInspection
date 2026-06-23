@@ -82,6 +82,7 @@
     "fflate": "^0.8.3",
     "hono": "^4.12.25",
     "isbot": "^5.1.0",
+    "lib0": "^0.2.117",
     "node-diff3": "^3.1.2",
     "otpauth": "^9.5.1",
     "qrcode": "^1.5.4",
@@ -93,7 +94,10 @@
     "react-router": "^7.6.0",
     "sortablejs": "^1.15.7",
     "stripe": "^22.2.0",
+    "y-indexeddb": "^9.0.12",
+    "y-protocols": "^1.0.7",
     "yet-another-react-lightbox": "^3.32.0",
+    "yjs": "^13.6.31",
     "zod": "^4.4.3"
   },
   "devDependencies": {

@@ -55,10 +55,14 @@ describe('InspectionAnalyticsService — voided invoice exclusion', () => {
             status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
 
-        // Inspection A — used for the paid+voided test
+        // Inspection A — used for the paid tests. reportStatus 'published' so it
+        // lands deterministically in the decorated `recentReports` bucket
+        // (completed + published), independent of the current date. Without an
+        // explicit published status it only appeared in the date-relative `today`
+        // bucket, making the assertions silently date-dependent.
         await testDb.insert(schema.inspections).values({
             id: INSP_A, tenantId: TENANT, propertyAddress: '10 Void Ave',
-            date: '2026-06-22', status: 'completed', paymentStatus: 'paid',
+            date: '2026-06-22', status: 'completed', reportStatus: 'published', paymentStatus: 'paid',
             price: 0, agreementRequired: false, paymentRequired: true, createdAt: new Date(),
         });
 

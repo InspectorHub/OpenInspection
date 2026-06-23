@@ -116,6 +116,23 @@ export const sessionContextRoutes = createApiRouter()
             }
         }
 
+        // Resolve the collaborative editing flag for this tenant. Plain per-tenant
+        // operator toggle (not plan-gated); default off until collab is GA.
+        let collabEditing = false;
+        if (tenantId) {
+            try {
+                const db = drizzle(c.env.DB);
+                const row = await db
+                    .select({ collabEditing: tenantConfigs.collabEditing })
+                    .from(tenantConfigs)
+                    .where(eq(tenantConfigs.tenantId, tenantId))
+                    .get();
+                collabEditing = row?.collabEditing === true;
+            } catch (e) {
+                logger.warn('[session-context] collabEditing resolution failed', { error: (e as Error).message });
+            }
+        }
+
         const privacyUrl = (c.env as unknown as Record<string, string | undefined>).PRIVACY_URL?.trim() || null;
 
         return c.json({
@@ -147,6 +164,7 @@ export const sessionContextRoutes = createApiRouter()
                 },
                 seatUsage,
                 videoProvider,
+                collabEditing,
             },
         });
     });

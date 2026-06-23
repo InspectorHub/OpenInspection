@@ -116,6 +116,12 @@ export interface AppEnv {
     INSPECTION_PRESENCE?: DurableObjectNamespace;
     TENANT_PRESENCE?: DurableObjectNamespace;
 
+    // Collab editing (#181) — one DO instance per inspection holding the
+    // authoritative Y.Doc for results. Optional so builds without the binding
+    // (local dev without wrangler.local.jsonc) boot cleanly; Task-5 route
+    // feature-detects before forwarding the WS upgrade.
+    INSPECTION_DOC?: DurableObjectNamespace;
+
     // Spec 5H — Public verifier base URL embedded in Certificate of Completion
     ESIGN_PUBLIC_VERIFY_BASE?: string;
 

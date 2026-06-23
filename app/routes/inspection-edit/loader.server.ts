@@ -71,17 +71,21 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 
  let tenantSlug: string | null = null;
  let videoProvider: "r2" | "stream" = "r2";
+ let collabEditing = false;
  if (sessRes?.ok) {
  const sb = await sessRes.json() as {
   data?: {
    branding?: { tenantSlug?: string | null };
    videoProvider?: "r2" | "stream";
+   collabEditing?: boolean;
   };
  };
  tenantSlug = sb.data?.branding?.tenantSlug ?? null;
  // Plan 7 — resolved video backend provider for this tenant (default 'r2').
  // Drives VideoCapture/VideoPlayer branch selection in the editor.
  videoProvider = sb.data?.videoProvider ?? "r2";
+ // #181 — per-tenant collab editing flag (default false until collab is GA).
+ collabEditing = sb.data?.collabEditing ?? false;
  }
 
  // Plan 7 — the Stream customer subdomain (env) drives video poster thumbnails
@@ -90,5 +94,5 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const streamCustomerSubdomain =
    ((context.cloudflare?.env as { STREAM_CUSTOMER_SUBDOMAIN?: string } | undefined)?.STREAM_CUSTOMER_SUBDOMAIN) ?? null;
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider };
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing };
 }

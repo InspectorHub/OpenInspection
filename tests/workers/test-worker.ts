@@ -9,6 +9,10 @@
 // This is NOT production code — it exists only to give the queue a real sink
 // inside the test runtime. Production delivery goes to the portal worker.
 
+// Re-export the DO so vitest-pool-workers can bind it as INSPECTION_DOC.
+// runInDurableObject() only works with DOs defined in the `main` worker.
+export { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
+
 interface TestEnv {
     DB: D1Database;
 }

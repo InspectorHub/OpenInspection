@@ -155,6 +155,10 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // [{ key, label, closed:boolean }]; null = use the built-in default
     // (Resolved/closed, Not resolved/open, Not inspected/open).
     reinspectionStatuses: text('reinspection_statuses'),
+    // #181 — when true, the inspection editor routes reads/writes through the Yjs
+    // collaborative document (Durable Object) instead of the per-field CAS path.
+    // Per-tenant operator toggle; default off until collab is GA.
+    collabEditing: integer('collab_editing', { mode: 'boolean' }).notNull().default(false),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
