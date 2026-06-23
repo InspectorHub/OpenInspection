@@ -26,6 +26,44 @@ import * as decoding from 'lib0/decoding';
 /** Framing prefix byte for y-protocols/sync messages (mirrors the DO constant). */
 const MSG_SYNC = 0;
 
+/**
+ * Framing byte for the restore control frame (a bare signal, no body). The DO
+ * sends this after a version restore; on receipt the client drops its local
+ * state (Y.Doc + IndexedDB) and resyncs from scratch. The literal `2` is
+ * duplicated DO-side in `server/durable-objects/inspection-doc.ts` (MSG_RESTORE)
+ * — there is no shared package; keep the two in sync (mirrors the duplicated
+ * MSG_SYNC = 0 pattern).
+ */
+const MSG_RESTORE = 2;
+
+// ─── IndexedDB helper ───────────────────────────────────────────────────────────
+
+/** The IndexedDB database name for an inspection's results doc. */
+function resultsDbName(inspectionId: string): string {
+    return 'results-' + inspectionId;
+}
+
+/**
+ * Delete the IndexedDB database backing a results doc, resolving once the
+ * delete settles. Resolves on success, block, OR error so a restore-resync is
+ * never wedged by a transient IndexedDB failure (best-effort cleanup — the
+ * fresh empty doc + remote step2 are the authoritative convergence path).
+ *
+ * Exported so the connection module and tests can await the same teardown.
+ */
+export function deleteResultsDb(inspectionId: string): Promise<void> {
+    return new Promise<void>((resolve) => {
+        try {
+            const req = indexedDB.deleteDatabase(resultsDbName(inspectionId));
+            req.onsuccess = () => resolve();
+            req.onerror = () => resolve();
+            req.onblocked = () => resolve();
+        } catch {
+            resolve();
+        }
+    });
+}
+
 // ─── Public types ──────────────────────────────────────────────────────────────
 
 /** Live state snapshot of the connection, mutated in-place by connectResultsDoc. */
@@ -92,6 +130,9 @@ export function buildCollabWsUrl(
  *      - step1 → reply with step2 (our current state).
  *      - step2 → flip `synced`, call `onChange`.
  *      - update → apply to doc (origin = ws, so the forwarder skips the echo).
+ *   6. An inbound MSG_RESTORE control frame drops all local state (Y.Doc +
+ *      IndexedDB), rebuilds a fresh empty doc, and resyncs via a new step1 — so
+ *      a version restore converges even when additive Yjs merge cannot.
  */
 export function connectResultsDoc(
     inspectionId: string,
@@ -100,14 +141,14 @@ export function connectResultsDoc(
     const WS = opts.WebSocketImpl ?? globalThis.WebSocket;
     const loc = opts.location ?? (typeof window !== 'undefined' ? window.location : { protocol: 'https:', host: 'localhost' });
 
-    // ── Yjs doc ──────────────────────────────────────────────────────────────
+    // ── Reassignable doc + persistence ─────────────────────────────────────────
+    // `doc` and `persistence` are NOT const: a MSG_RESTORE control frame rebuilds
+    // both (drop + resync). The update-forwarder + message handler always read
+    // the CURRENT `doc` via these closure variables, so the rebuild re-wires
+    // cleanly. Database name is `results-<id>` (distinct from the POC prefix).
 
-    const doc = new Y.Doc();
-
-    // ── IndexedDB persistence ─────────────────────────────────────────────────
-    // Database name is `results-<id>` (distinct from the POC `poc-collab-` prefix).
-
-    const persistence = new IndexeddbPersistence('results-' + inspectionId, doc);
+    let doc = new Y.Doc();
+    let persistence = new IndexeddbPersistence(resultsDbName(inspectionId), doc);
 
     // ── Mutable handle (mutated in-place; React wrapper reads it via onChange) ─
 
@@ -119,6 +160,8 @@ export function connectResultsDoc(
 
     let ws: InstanceType<typeof WebSocket> | null = null;
     let destroyed = false;
+    /** Re-entrancy guard: a MSG_RESTORE arriving mid-reset must not re-trigger. */
+    let restoring = false;
 
     // ── Local update forwarder ────────────────────────────────────────────────
     // Forward every local doc mutation to the server as a framed update message.
@@ -136,7 +179,68 @@ export function connectResultsDoc(
         ws.send(encoding.toUint8Array(encoder));
     };
 
-    doc.on('update', docUpdateHandler);
+    /** Attach the forwarder to the CURRENT doc. */
+    function bindDoc(): void {
+        doc.on('update', docUpdateHandler);
+    }
+
+    /** Send a sync step1 from the CURRENT (possibly empty) doc on the open socket. */
+    function sendStep1(): void {
+        if (!ws || ws.readyState !== ws.OPEN) return;
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, MSG_SYNC);
+        syncProtocol.writeSyncStep1(encoder, doc);
+        ws.send(encoding.toUint8Array(encoder));
+    }
+
+    // ── Restore handler (drop + resync) ─────────────────────────────────────────
+    // On a MSG_RESTORE control frame the authoritative doc was replaced by a
+    // version restore. Yjs updates are additive (union), so a connected client
+    // that already holds post-restore edits cannot have deletions reverted by a
+    // plain update broadcast. We therefore drop ALL local state and resync:
+    //   1. Detach the forwarder + destroy the current persistence (closes the DB).
+    //   2. Delete the IndexedDB database so the rebuilt doc starts EMPTY
+    //      (otherwise persistence would restore the stale state and re-contaminate
+    //      the merge).
+    //   3. Build a FRESH Y.Doc + fresh persistence, re-wire, publish via onChange.
+    //   4. Send a fresh step1 on the still-open socket; the DO replies with a
+    //      step2 carrying the full restored state, which applies cleanly to the
+    //      empty doc with NO contamination from the dropped edits.
+    async function handleRestore(): Promise<void> {
+        if (destroyed || restoring) return; // re-entrancy / post-destroy guard
+        restoring = true;
+        try {
+            // (1) Detach forwarder + tear down current persistence.
+            doc.off('update', docUpdateHandler);
+            const oldPersistence = persistence;
+            const oldDoc = doc;
+            await oldPersistence.destroy().catch(() => { /* ignore */ });
+            if (destroyed) return; // destroyed while awaiting
+
+            // (2) Clear local IndexedDB so the rebuilt doc starts empty.
+            await deleteResultsDb(inspectionId);
+            if (destroyed) return;
+
+            // (3) Fresh doc + fresh persistence, re-wired and published.
+            const freshDoc = new Y.Doc();
+            doc = freshDoc;
+            persistence = new IndexeddbPersistence(resultsDbName(inspectionId), freshDoc);
+            bindDoc();
+            oldDoc.destroy();
+
+            handle.doc = freshDoc;
+            handle.synced = false; // not yet synced with the restored remote state
+            // persistenceSynced semantics: the fresh empty store will fire its own
+            // 'synced'; leave the flag true (local state IS settled — it is empty)
+            // since the socket is already open and we resync via step1 directly.
+            opts.onChange?.(handle);
+
+            // (4) Re-pull the authoritative restored state on the open socket.
+            sendStep1();
+        } finally {
+            restoring = false;
+        }
+    }
 
     // ── Socket opener ─────────────────────────────────────────────────────────
 
@@ -150,10 +254,7 @@ export function connectResultsDoc(
         ws.addEventListener('open', () => {
             if (!ws || destroyed) return;
             // Send sync step1 so the DO replies with step2 (its full state).
-            const encoder = encoding.createEncoder();
-            encoding.writeVarUint(encoder, MSG_SYNC);
-            syncProtocol.writeSyncStep1(encoder, doc);
-            ws.send(encoding.toUint8Array(encoder));
+            sendStep1();
         });
 
         ws.addEventListener('message', (ev: MessageEvent) => {
@@ -164,6 +265,12 @@ export function connectResultsDoc(
 
             const decoder = decoding.createDecoder(data);
             const msgType = decoding.readVarUint(decoder);
+
+            if (msgType === MSG_RESTORE) {
+                // Control frame: drop local state and resync from scratch.
+                void handleRestore();
+                return;
+            }
 
             if (msgType !== MSG_SYNC) return; // drop unknown frame types
 
@@ -206,10 +313,12 @@ export function connectResultsDoc(
         });
     }
 
-    // ── Wait for IndexedDB before opening the socket ──────────────────────────
+    // ── Wire the initial doc + wait for IndexedDB before opening the socket ────
     // This is the persistence-synced gate: the socket is opened ONLY after
     // IndexedDB restores its stored state, so a fresh empty remote cannot
     // race-overwrite local data.
+
+    bindDoc();
 
     persistence.once('synced', () => {
         if (destroyed) return;

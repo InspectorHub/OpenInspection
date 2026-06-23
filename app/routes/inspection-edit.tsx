@@ -1732,8 +1732,11 @@ export default function InspectionEditPage() {
  )}
 
  {/* #181 — Version history panel (collab Phase 4). Only reachable when the
-     collabEditing flag is on (the trigger button is gated in EditorHeader);
-     onRestored revalidates the editor — live convergence is Task 12b. */}
+     collabEditing flag is on (the trigger button is gated in EditorHeader).
+     Live convergence for ALL clients (incl. the initiator) is now driven by the
+     DO's MSG_RESTORE control frame (Task 12b): each client drops its local Y.Doc
+     + IndexedDB and resyncs. The onRestored revalidate below is belt-and-braces —
+     it refreshes loader data for the non-collab projection path. */}
  <VersionHistoryPanel
  open={versionHistoryOpen}
  onClose={() => setVersionHistoryOpen(false)}

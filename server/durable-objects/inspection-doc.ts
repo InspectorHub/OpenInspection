@@ -19,6 +19,12 @@
  * WebSocket message framing:
  *   byte 0 = 0 → sync (y-protocols/sync message: step1 / step2 / update)
  *   (byte 0 = 1 was awareness — dropped in this production DO)
+ *   byte 0 = 2 → restore (a bare control frame, no body): the authoritative doc
+ *                was replaced by a version restore. The DO only SENDS this; it
+ *                tells every connected client to drop its local state and resync
+ *                from scratch (Yjs updates are additive/union, so a plain update
+ *                broadcast cannot revert deletions on a live client — see #181
+ *                Task 12b). Unknown inbound framing bytes are silently dropped.
  *
  * Identity: tenantId + inspectionId are passed in request headers by the
  * authorized route (Task 5). The DO reads them for logging only and never
@@ -48,6 +54,15 @@ import { inspectionResults, inspections } from '../lib/db/schema';
 /** Framing byte for y-protocols sync messages. */
 const MSG_SYNC = 0;
 
+/**
+ * Framing byte for the restore control frame (a bare signal, no body). The DO
+ * broadcasts this after a version restore so live clients drop their local
+ * state and resync from scratch. The literal `2` is duplicated client-side in
+ * `app/lib/collab/results-doc-connection.ts` (MSG_RESTORE) — there is no shared
+ * package; keep the two in sync (mirrors the duplicated MSG_SYNC = 0 pattern).
+ */
+const MSG_RESTORE = 2;
+
 /** Debounce window before flushing the Y.Doc to DO storage (ms). */
 const PERSIST_DEBOUNCE_MS = 1_000;
 
@@ -67,10 +82,15 @@ const SNAPSHOT_CAP = 25;
 const SNAPSHOT_EVERY = 20;
 
 /**
- * Transaction origin sentinel used when restore rebuilds/broadcasts the doc.
+ * Transaction origin sentinel used when restore rebuilds the doc.
  * `onDocUpdate` checks identity against this object to SKIP auto-snapshot
  * counting, so a restore (which itself loads a whole projection) never triggers
  * a snapshot storm.
+ *
+ * Since Task 12b the restore broadcast is a separate control frame
+ * (broadcastRestore / MSG_RESTORE), so this sentinel is no longer passed to
+ * broadcastDocUpdate. It is kept as defensive coverage: should any future
+ * doc-internal emit fire during a doc swap, onDocUpdate still skips counting it.
  */
 const RESTORE_ORIGIN: unique symbol = Symbol('collab-restore-origin');
 
@@ -465,8 +485,9 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      *   3. Build a fresh Y.Doc and load the target projection into it.
      *   4. Detach the listener from the old doc, swap `this.doc`, re-attach the
      *      IDENTICAL bound handler (so `.off`/`.on` line up).
-     *   5. Broadcast the restored state to every connected socket (best-effort,
-     *      origin RESTORE_ORIGIN so auto-snapshot counting is skipped).
+     *   5. Broadcast a MSG_RESTORE control frame to every connected socket so
+     *      each client drops its local state and resyncs from scratch (a plain
+     *      additive update broadcast cannot revert deletions on a live client).
      *   6. Persist the restored projection to D1.
      */
     private async restoreSnapshot(
@@ -493,12 +514,12 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // periodic capture is measured from here (not the pre-restore counter).
         this.updatesSinceSnapshot = 0;
 
-        // (5) Broadcast the restored full state to connected sockets.
-        // Origin RESTORE_ORIGIN → onDocUpdate (if any future doc emits) skips
-        // auto-snapshot counting; here we broadcast directly. Best-effort: true
-        // client convergence (drop + resync) is Task 12; this task's authoritative
-        // guarantee is the DO doc + the D1 projection.
-        this.broadcastDocUpdate(Y.encodeStateAsUpdate(this.doc), RESTORE_ORIGIN);
+        // (5) Tell every connected client to drop its local state and resync.
+        // A plain additive update broadcast (Yjs union semantics) cannot revert
+        // deletions on a client that already holds the post-restore edits, so a
+        // dedicated MSG_RESTORE control frame drives true convergence: the client
+        // clears its IndexedDB + Y.Doc and re-pulls the authoritative state.
+        this.broadcastRestore();
 
         // (6) Persist the restored projection to D1 + DO storage.
         await this.persist();
@@ -655,6 +676,22 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         const msg = encoding.toUint8Array(encoder);
         for (const sock of this.ctx.getWebSockets()) {
             if (sock === origin) continue; // do not echo back to sender
+            try { sock.send(msg); } catch { /* already closed */ }
+        }
+    }
+
+    /**
+     * Broadcast a bare MSG_RESTORE control frame (one varint byte, no body) to
+     * EVERY connected socket — no origin skip, because every client (including
+     * whoever triggered the restore) must drop its local state and resync. The
+     * client handles this by clearing its IndexedDB + Y.Doc and re-pulling the
+     * authoritative restored state via a fresh sync step1 (#181 Task 12b).
+     */
+    private broadcastRestore(): void {
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, MSG_RESTORE);
+        const msg = encoding.toUint8Array(encoder);
+        for (const sock of this.ctx.getWebSockets()) {
             try { sock.send(msg); } catch { /* already closed */ }
         }
     }
