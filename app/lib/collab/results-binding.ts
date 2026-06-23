@@ -17,6 +17,7 @@ import {
     upsertCustomComment,
     upsertRecommendation,
 } from '../../../server/lib/collab/results-doc';
+import type { RepairItemSnapshot } from '../../../server/lib/collab/results-doc.types';
 
 // ─── ResultMap type ──────────────────────────────────────────────────────────
 //
@@ -173,14 +174,10 @@ export function attachRepairItem(
     doc: Y.Doc,
     sectionId: string,
     itemId: string,
-    rec: { recommendationId: string } & Record<string, unknown>,
+    rec: RepairItemSnapshot,
 ): void {
-    // upsertRecommendation expects RepairItemSnapshot but we need to accept
-    // the wider editor signature here. The double-cast through unknown is safe:
-    // the mutator writes every own field onto a Y.Map regardless of type.
-    upsertRecommendation(
-        doc,
-        findingKey(null, sectionId, itemId),
-        rec as unknown as Parameters<typeof upsertRecommendation>[2],
-    );
+    // The editor's AttachedRepairItem is structurally a RepairItemSnapshot
+    // (recommendationId + the five estimate/summary/contractor/attachedAt
+    // fields), so the call boundary is fully typed — no cast.
+    upsertRecommendation(doc, findingKey(null, sectionId, itemId), rec);
 }
