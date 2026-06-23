@@ -12,6 +12,11 @@ import {
     appendPhoto,
     addCustomDefect,
     attachRepairItem,
+    detachRepairItem,
+    toggleCustomDefect,
+    addPhotoToCannedDefect,
+    addPhotoToCustomDefect,
+    appendNote,
 } from '../../../app/lib/collab/results-binding';
 
 // ─── Group 1: Round-trip scalar ───────────────────────────────────────────────
@@ -211,5 +216,191 @@ describe('results-binding – dual-key invariant', () => {
 
         // Cross-check: item keys do not bleed.
         expect(map['i1'].rating).not.toBe(map['i2'].rating);
+    });
+});
+
+// ─── Group 5: detachRepairItem ────────────────────────────────────────────────
+
+describe('results-binding – detachRepairItem', () => {
+    it('removes only the targeted recommendation, leaving other recs intact', () => {
+        const doc = new Y.Doc();
+
+        attachRepairItem(doc, 's1', 'i1', {
+            recommendationId: 'r1',
+            estimateSnapshotMin: 100,
+            estimateSnapshotMax: 200,
+            summarySnapshot: 'fix A',
+            contractorTypeSnapshot: null,
+            attachedAt: 1,
+        });
+        attachRepairItem(doc, 's1', 'i1', {
+            recommendationId: 'r2',
+            estimateSnapshotMin: 300,
+            estimateSnapshotMax: 400,
+            summarySnapshot: 'fix B',
+            contractorTypeSnapshot: null,
+            attachedAt: 2,
+        });
+
+        detachRepairItem(doc, 's1', 'i1', 'r1');
+
+        const map = readResultMap(doc);
+        const recs = map['_default:s1:i1'].recommendations as Array<{ recommendationId: string }> | undefined;
+
+        // r1 is gone.
+        expect(recs?.some((r) => r.recommendationId === 'r1')).toBe(false);
+
+        // r2 survives.
+        expect(recs?.some((r) => r.recommendationId === 'r2')).toBe(true);
+    });
+});
+
+// ─── Group 6: toggleCustomDefect ─────────────────────────────────────────────
+
+describe('results-binding – toggleCustomDefect', () => {
+    it('flips included to false while preserving other fields on the custom defect', () => {
+        const doc = new Y.Doc();
+
+        addCustomDefect(doc, 's1', 'i1', {
+            id: 'cd1',
+            title: 'Crack in foundation',
+            comment: 'visible hairline crack',
+            included: true,
+            category: 'safety',
+        });
+
+        toggleCustomDefect(doc, 's1', 'i1', 'cd1', false);
+
+        const map = readResultMap(doc);
+        const customComments = map['_default:s1:i1'].customComments as {
+            defects?: Array<{ id: string; included: boolean; title: string; category: string }>;
+        } | undefined;
+
+        const defect = customComments?.defects?.find((d) => d.id === 'cd1');
+        expect(defect).toBeDefined();
+        expect(defect?.included).toBe(false);
+        // Other fields must survive the toggle.
+        expect(defect?.title).toBe('Crack in foundation');
+        expect(defect?.category).toBe('safety');
+    });
+});
+
+// ─── Group 7: addPhotoToCannedDefect ─────────────────────────────────────────
+
+describe('results-binding – addPhotoToCannedDefect', () => {
+    it('appends a photo to the canned defect and deduplicates by key', () => {
+        const doc = new Y.Doc();
+
+        // Create the canned defect first.
+        toggleCanned(doc, 's1', 'i1', 'defects', 'def1', true);
+        setDefectFields(doc, 's1', 'i1', 'def1', { location: 'Roof' });
+
+        const photo = { key: 'r2/photo1.jpg', size: 1024 };
+        addPhotoToCannedDefect(doc, 's1', 'i1', 'def1', photo);
+
+        const map = readResultMap(doc);
+        const tabs = map['_default:s1:i1'].tabs as {
+            defects?: Array<{ cannedId: string; photos?: Array<{ key: string }> }>;
+        } | undefined;
+        const defect = tabs?.defects?.find((d) => d.cannedId === 'def1');
+
+        expect(defect?.photos).toBeDefined();
+        expect(defect?.photos?.some((p) => p.key === 'r2/photo1.jpg')).toBe(true);
+        expect(defect?.photos?.length).toBe(1);
+
+        // Adding the same key again must NOT duplicate.
+        addPhotoToCannedDefect(doc, 's1', 'i1', 'def1', photo);
+        const map2 = readResultMap(doc);
+        const tabs2 = map2['_default:s1:i1'].tabs as {
+            defects?: Array<{ cannedId: string; photos?: Array<{ key: string }> }>;
+        } | undefined;
+        const defect2 = tabs2?.defects?.find((d) => d.cannedId === 'def1');
+        expect(defect2?.photos?.length).toBe(1);
+    });
+
+    it('no-ops when the target canned defect id is absent', () => {
+        const doc = new Y.Doc();
+
+        // No canned defect added — call must be a no-op (no throw, no entry created).
+        expect(() => {
+            addPhotoToCannedDefect(doc, 's1', 'i1', 'nonexistent', { key: 'r2/x.jpg' });
+        }).not.toThrow();
+    });
+});
+
+// ─── Group 8: addPhotoToCustomDefect ─────────────────────────────────────────
+
+describe('results-binding – addPhotoToCustomDefect', () => {
+    it('appends a photo to the custom defect', () => {
+        const doc = new Y.Doc();
+
+        addCustomDefect(doc, 's1', 'i1', {
+            id: 'cd2',
+            title: 'Leaking pipe',
+            comment: 'under sink',
+            included: true,
+        });
+
+        addPhotoToCustomDefect(doc, 's1', 'i1', 'cd2', { key: 'r2/leak.jpg' });
+
+        const map = readResultMap(doc);
+        const customComments = map['_default:s1:i1'].customComments as {
+            defects?: Array<{ id: string; photos?: Array<{ key: string }> }>;
+        } | undefined;
+        const defect = customComments?.defects?.find((d) => d.id === 'cd2');
+
+        expect(defect?.photos).toBeDefined();
+        expect(defect?.photos?.some((p) => p.key === 'r2/leak.jpg')).toBe(true);
+    });
+
+    it('no-ops when the target custom defect id is absent', () => {
+        const doc = new Y.Doc();
+
+        expect(() => {
+            addPhotoToCustomDefect(doc, 's1', 'i1', 'ghost', { key: 'r2/ghost.jpg' });
+        }).not.toThrow();
+    });
+});
+
+// ─── Group 9: appendNote ─────────────────────────────────────────────────────
+
+describe('results-binding – appendNote', () => {
+    it('on an item with existing notes appends with single newline by default', () => {
+        const doc = new Y.Doc();
+        setNotes(doc, 's1', 'i1', 'first note');
+
+        appendNote(doc, 's1', 'i1', 'second note');
+
+        const map = readResultMap(doc);
+        expect(map['_default:s1:i1'].notes).toBe('first note\nsecond note');
+    });
+
+    it('trims trailing whitespace from old notes before joining', () => {
+        const doc = new Y.Doc();
+        setNotes(doc, 's1', 'i1', 'first note   ');
+
+        appendNote(doc, 's1', 'i1', 'second note');
+
+        const map = readResultMap(doc);
+        expect(map['_default:s1:i1'].notes).toBe('first note\nsecond note');
+    });
+
+    it('uses double newline when withExtraNewline is true', () => {
+        const doc = new Y.Doc();
+        setNotes(doc, 's1', 'i1', 'old');
+
+        appendNote(doc, 's1', 'i1', 'new', true);
+
+        const map = readResultMap(doc);
+        expect(map['_default:s1:i1'].notes).toBe('old\n\nnew');
+    });
+
+    it('on an item with no existing notes stores just the text', () => {
+        const doc = new Y.Doc();
+
+        appendNote(doc, 's1', 'i1', 'only note');
+
+        const map = readResultMap(doc);
+        expect(map['_default:s1:i1'].notes).toBe('only note');
     });
 });
