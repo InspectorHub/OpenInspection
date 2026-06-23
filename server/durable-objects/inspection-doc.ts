@@ -206,7 +206,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * WS accept after the authorized route forwards the upgrade).
      *
      *   inspection_results.ydoc_state  ← Y.encodeStateAsUpdate(doc) (binary)
-     *   inspection_results.data        ← JSON.stringify(projectResults(doc))
+     *   inspection_results.data        ← projectResults(doc) (raw object; drizzle mode:'json' serializes once)
      *   inspection_results.lastSyncedAt← now
      *
      * Both columns are updated in a single `.set()` call so readers never
@@ -236,7 +236,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             .update(inspectionResults)
             .set({
                 ydocState:    stateUpdate,
-                data:         JSON.stringify(projection),
+                data:         projection,
                 lastSyncedAt: new Date(),
             })
             .where(

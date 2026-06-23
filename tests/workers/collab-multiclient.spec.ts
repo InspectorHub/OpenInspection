@@ -121,13 +121,11 @@ async function ensureResultsRow(
 /**
  * Read the persisted `data` JSON column back from D1.
  *
- * The DO's persist() passes `JSON.stringify(projection)` to drizzle's
- * `text({ mode: 'json' })` column, which calls `JSON.stringify()` again
- * (mapToDriverValue). The stored TEXT value is therefore doubly-encoded.
- * Raw D1 SQL returns the raw stored TEXT, so we must `JSON.parse` twice:
- *   stored TEXT : '"{\\"key\\":\\"val\\"}"'
- *   parse once  : '{"key":"val"}'  (still a JSON string)
- *   parse twice : { key: "val" }   (the actual projection object)
+ * persist() passes the raw projection OBJECT to drizzle's
+ * `text({ mode: 'json' })` column, which calls JSON.stringify exactly once
+ * (mapToDriverValue). Raw D1 SQL returns the stored TEXT, so one JSON.parse
+ * recovers the object. A second parse would only be needed if the value were
+ * double-encoded — this test MUST fail if double-encoding ever returns.
  */
 async function readResultsData(
     tenantId: string,
@@ -138,11 +136,9 @@ async function readResultsData(
         .bind(tenantId, inspectionId)
         .first<{ data: string }>();
     if (!row) return {};
-    const once = JSON.parse(row.data) as unknown;
-    // If drizzle double-encoded (string result after first parse), parse again.
-    return (typeof once === 'string'
-        ? JSON.parse(once)
-        : once) as Record<string, unknown>;
+    // Single parse only — if this returns a string, the DO double-encoded and
+    // the downstream expect().toEqual(expectedProjection) will fail.
+    return JSON.parse(row.data) as Record<string, unknown>;
 }
 
 // ─── Core DO sync helper ──────────────────────────────────────────────────────
