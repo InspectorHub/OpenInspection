@@ -593,6 +593,9 @@ export default function InspectionEditPage() {
   findings,
   streamCustomerSubdomain,
   revalidator,
+  // #181 — when collab is ON, photo array ops route through the Y.Doc (the DO
+  // persists it to D1); null keeps the legacy REST path byte-identical.
+  collabDoc: collab?.doc ?? null,
   setPhotoStudioUrl,
   setPhotoStudioKey,
   setPhotoStudioIndex,

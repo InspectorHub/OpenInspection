@@ -13,6 +13,10 @@ import {
     applyItemPatch,
     setItemAttribute as docSetItemAttribute,
     appendPhoto as docAppendPhoto,
+    removePhoto as docRemovePhoto,
+    revertPhoto as docRevertPhoto,
+    reorderPhotos as docReorderPhotos,
+    movePhoto as docMovePhoto,
     upsertCanned,
     upsertCustomComment,
     upsertRecommendation,
@@ -152,6 +156,55 @@ export function appendPhoto(
     photo: { key: string } & Record<string, unknown>,
 ): void {
     docAppendPhoto(doc, findingKey(null, sectionId, itemId), photo);
+}
+
+/**
+ * Reorder a finding's photo array to follow `orderedKeys` (original photo keys).
+ * No-op if `orderedKeys` is not a 1:1 permutation of the current keys (mirrors
+ * the legacy REST path guard). `findingKey` is the composite key.
+ */
+export function reorderPhotos(
+    doc: Y.Doc,
+    findingKey: string,
+    orderedKeys: string[],
+): void {
+    docReorderPhotos(doc, findingKey, orderedKeys);
+}
+
+/**
+ * Move one photo (by original `key`) from one finding to another, in a single
+ * transaction. No-op if the photo is absent on the source. Both keys are
+ * composite finding keys.
+ */
+export function movePhoto(
+    doc: Y.Doc,
+    fromFindingKey: string,
+    toFindingKey: string,
+    photoKey: string,
+): void {
+    docMovePhoto(doc, fromFindingKey, toFindingKey, photoKey);
+}
+
+/** Detach (delete) a photo from a finding's photo array, by original `key`. */
+export function removePhoto(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+): void {
+    docRemovePhoto(doc, findingKey, key);
+}
+
+/**
+ * Revert a photo back to its original `key`, stripping all derivatives
+ * (croppedKey / annotatedKey / annotationsJson / crop). `findingKey` is the
+ * composite key.
+ */
+export function revertPhoto(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+): void {
+    docRevertPhoto(doc, findingKey, key);
 }
 
 /**

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
 import { useFetcher, useRevalidator } from "react-router";
+import type * as Y from "yjs";
 import { pushToast } from "~/hooks/useToast";
 import { getOfflineQueue } from "~/hooks/useOfflineQueue";
 import { shouldQueue } from "~/lib/offline/should-queue";
@@ -11,6 +12,12 @@ import { fKey } from "~/hooks/useInspection";
 import { type PhotoCrop } from "~/components/media-studio/PhotoCropper";
 import type { useInspectionState } from "~/hooks/useInspection";
 import type { useFindings } from "~/hooks/useFindings";
+import {
+  reorderPhotos as bindingReorderPhotos,
+  movePhoto as bindingMovePhoto,
+  removePhoto as bindingRemovePhoto,
+  revertPhoto as bindingRevertPhoto,
+} from "~/lib/collab/results-binding";
 
 /**
  * The photo / media-operations cluster of the inspection editor. Behavior-
@@ -30,6 +37,11 @@ export function usePhotoOps(ctx: {
   findings: ReturnType<typeof useFindings>;
   streamCustomerSubdomain: string | null;
   revalidator: ReturnType<typeof useRevalidator>;
+  // #181 — when the collab flag is ON the Y.Doc is the authoritative writer of
+  // inspection_results.data (the DO persists projectResults(doc) to D1). Photo
+  // ARRAY ops must mutate the doc instead of REST; otherwise the next DO persist
+  // silently clobbers the REST write. null when collab is off (legacy REST path).
+  collabDoc: Y.Doc | null;
   // PhotoAnnotator (Photo Studio) overlay setters — owned by the component; the
   // annotate branch of onViewerAction opens that overlay. Threaded so the moved
   // body stays byte-identical (these setters are stable, so deps are unaffected).
@@ -44,6 +56,7 @@ export function usePhotoOps(ctx: {
     findings,
     streamCustomerSubdomain,
     revalidator,
+    collabDoc,
     setPhotoStudioUrl,
     setPhotoStudioKey,
     setPhotoStudioIndex,
@@ -156,9 +169,23 @@ export function usePhotoOps(ctx: {
     [state.sectionIdForItem, state.setResults, state.setDirty],
   );
 
+  /* #181 — the composite finding key the collab doc is keyed by. The doc seeds
+   * keys as `_default:{sectionId}:{itemId}` (fKey); resolve the section the same
+   * way patchItemPhotos does. Returns null when the item has no resolvable
+   * section (defensive — should not happen for a real template item). */
+  const docFindingKey = useCallback(
+    (itemId: string, sectionIdOverride?: string): string | null => {
+      const sid = sectionIdOverride ?? state.sectionIdForItem(itemId);
+      return sid ? fKey(sid, itemId) : null;
+    },
+    [state.sectionIdForItem],
+  );
+
   /* Task 8 — persist a reorder. CONTRACT: `order` is the ORIGINAL key order
    * (the server reorderItemPhotos route matches photos[].key). Optimistically
-   * reorder local state by key, then POST. */
+   * reorder local state by key, then POST.
+   * #181 — when collab is ON, the Y.Doc is authoritative: reorder the doc photo
+   * array instead of POSTing (the optimistic patch stays for instant feedback). */
   const onReorderPhotos = useCallback(
     (itemId: string, order: string[]) => {
       patchItemPhotos(itemId, (photos) => {
@@ -166,6 +193,11 @@ export function usePhotoOps(ctx: {
         const reordered = order.map((k) => byKey.get(k)).filter((p): p is ItemPhoto => !!p);
         return reordered.length === photos.length ? reordered : photos;
       });
+      if (collabDoc) {
+        const fk = docFindingKey(itemId, state.currentSection?.id);
+        if (fk) bindingReorderPhotos(collabDoc, fk, order);
+        return;
+      }
       photoOpsFetcher.submit(null, {
         method: "POST",
         action: `/api/inspections/${state.inspection.id}/items/${itemId}/photos/reorder`,
@@ -173,7 +205,7 @@ export function usePhotoOps(ctx: {
         body: JSON.stringify({ order, sectionId: state.currentSection?.id }),
       } as Parameters<typeof photoOpsFetcher.submit>[1]);
     },
-    [patchItemPhotos, photoOpsFetcher, state.inspection.id, state.currentSection],
+    [patchItemPhotos, photoOpsFetcher, state.inspection.id, state.currentSection, collabDoc, docFindingKey],
   );
 
   /* Shared driver for the per-index bulk mutations (detach / move). The strip
@@ -203,13 +235,26 @@ export function usePhotoOps(ctx: {
     [patchItemPhotos, state.inspection.id, revalidator],
   );
 
-  /* Task 9 — bulk-detach photos by index. */
+  /* Task 9 — bulk-detach photos by index.
+   * #181 — when collab is ON, resolve each index→key from the PRE-mutation
+   * snapshot (the doc is keyed by `key`, not index — indices drift as elements
+   * are removed) and remove from the doc instead of POSTing. */
   const onBulkDetachPhotos = useCallback(
     (itemId: string, indices: number[]) => {
       const sectionId = state.currentSection?.id;
+      if (collabDoc) {
+        const fk = docFindingKey(itemId, sectionId);
+        const snapshot = getItemPhotos(itemId);
+        const keys = indices
+          .map((i) => snapshot[i]?.key)
+          .filter((k): k is string => !!k);
+        patchItemPhotos(itemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
+        if (fk) for (const key of keys) bindingRemovePhoto(collabDoc, fk, key);
+        return;
+      }
       runBulkPhotoMutation(itemId, indices, "detach", () => ({ sectionId }));
     },
-    [runBulkPhotoMutation, state.currentSection],
+    [runBulkPhotoMutation, state.currentSection, collabDoc, docFindingKey, getItemPhotos, patchItemPhotos],
   );
 
   /* Task 9b — the OTHER items photos can be moved to: every item across the
@@ -233,13 +278,24 @@ export function usePhotoOps(ctx: {
   const onBulkMovePhotos = useCallback(
     (fromItemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => {
       const fromSectionId = state.currentSection?.id;
+      if (collabDoc) {
+        const fromFk = docFindingKey(fromItemId, fromSectionId);
+        const toFk = docFindingKey(to.itemId, to.sectionId);
+        const snapshot = getItemPhotos(fromItemId);
+        const keys = indices
+          .map((i) => snapshot[i]?.key)
+          .filter((k): k is string => !!k);
+        patchItemPhotos(fromItemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
+        if (fromFk && toFk) for (const key of keys) bindingMovePhoto(collabDoc, fromFk, toFk, key);
+        return;
+      }
       runBulkPhotoMutation(fromItemId, indices, "move", () => ({
         toItemId: to.itemId,
         toSectionId: to.sectionId,
         fromSectionId,
       }));
     },
-    [runBulkPhotoMutation, state.currentSection],
+    [runBulkPhotoMutation, state.currentSection, collabDoc, docFindingKey, getItemPhotos, patchItemPhotos],
   );
 
   /* Task 8 — route a viewer per-photo action to the right mutation. */
@@ -266,7 +322,22 @@ export function usePhotoOps(ctx: {
           patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
           // Route delete by provider — DELETE /{id}/media/video/{ref} accepts a
           // Stream UID or an R2 mediaId and resolves the backend per provider.
+          // The Stream/R2 object is ALWAYS freed via REST (frees the media
+          // backend). #181 — under collab, remove the doc entry instead of
+          // relying on the REST results.data write + revalidate.
           const videoRef = photo.provider === "r2" ? photo.mediaId : photo.streamUid;
+          const docKey = photo.originalKey || photo.key;
+          if (collabDoc) {
+            const fk = docFindingKey(itemId, sectionId);
+            if (fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
+            if (videoRef) {
+              void fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(videoRef)}`, {
+                method: "DELETE",
+                credentials: "include",
+              });
+            }
+            return;
+          }
           if (videoRef) {
             fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(videoRef)}`, {
               method: "DELETE",
@@ -312,6 +383,12 @@ export function usePhotoOps(ctx: {
       }
       if (action === "revert") {
         patchItemPhotos(itemId, (photos) => photos.map((p, i) => (i === idx ? { key: p.key } : p)));
+        if (collabDoc) {
+          const fk = docFindingKey(itemId, sectionId);
+          const docKey = photo.originalKey || photo.key;
+          if (fk && docKey) bindingRevertPhoto(collabDoc, fk, docKey);
+          return;
+        }
         fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/revert`, {
           method: "POST",
           credentials: "include",
@@ -322,6 +399,12 @@ export function usePhotoOps(ctx: {
       }
       if (action === "delete") {
         patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
+        if (collabDoc) {
+          const fk = docFindingKey(itemId, sectionId);
+          const docKey = photo.originalKey || photo.key;
+          if (fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
+          return;
+        }
         fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/detach`, {
           method: "POST",
           credentials: "include",
@@ -333,7 +416,7 @@ export function usePhotoOps(ctx: {
       // rotate / caption — routed here but not yet implemented (not Plan 4).
       // TODO rotate/caption on item photos.
     },
-    [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+    [patchItemPhotos, state.inspection.id, state.currentSection, revalidator, collabDoc, docFindingKey],
   );
 
   /* Plan 4 (Task 8/9) — persist a baked crop for the targeted photo. When online,
