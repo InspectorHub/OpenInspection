@@ -9,6 +9,8 @@ export function meta() {
 interface OptinData {
     companyName: string;
     disclosureText: string;
+    privacyUrl: string | null;
+    termsUrl: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -96,6 +98,17 @@ export default function SmsOptinPage() {
                 </p>
                 <div className="bg-ih-bg-muted border border-ih-border rounded-xl p-4 mb-5">
                     <p className="text-xs text-ih-fg-3 leading-relaxed">{data.disclosureText}</p>
+                    {(data.privacyUrl || data.termsUrl) && (
+                        <p className="text-xs text-ih-fg-3 leading-relaxed mt-2">
+                            {data.privacyUrl && (
+                                <a href={data.privacyUrl} target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>
+                            )}
+                            {data.privacyUrl && data.termsUrl && <span> · </span>}
+                            {data.termsUrl && (
+                                <a href={data.termsUrl} target="_blank" rel="noreferrer" className="underline">Terms of Service</a>
+                            )}
+                        </p>
+                    )}
                 </div>
                 {actionData?.error && (
                     <p className="text-sm text-ih-bad-fg mb-3" role="alert">
@@ -112,7 +125,8 @@ export default function SmsOptinPage() {
                     </button>
                 </Form>
                 <p className="text-xs text-ih-fg-3 mt-4 text-center">
-                    Message &amp; data rates may apply. Reply STOP to opt out.
+                    Message frequency varies by your inspection activity. Message &amp; data rates
+                    may apply. Reply STOP to opt out, HELP for help.
                 </p>
             </div>
         </div>

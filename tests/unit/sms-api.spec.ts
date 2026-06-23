@@ -232,7 +232,7 @@ describe('SMS consent API (Track L Task 8)', () => {
         expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, contactId)).toBe('granted');
     });
 
-    it('opt-in resolve returns disclosure + company name', async () => {
+    it('opt-in resolve returns disclosure + company name + legal links', async () => {
         const contactId = crypto.randomUUID();
         await db.insert(schema.contacts).values({
             id: contactId, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', createdAt: new Date(),
@@ -241,10 +241,44 @@ describe('SMS consent API (Track L Task 8)', () => {
         const token = await mintOptinToken(TENANT, contactId, FAKE_ENV.JWT_SECRET);
 
         const app = buildApp(db);
+        // No PRIVACY_URL/TERMS_URL configured → links resolve to null.
         const res = await app.request(`/api/public/sms/optin-resolve?token=${encodeURIComponent(token)}`, {}, FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(200);
-        const body = await res.json() as { data: { companyName: string; disclosureText: string } };
+        const body = await res.json() as { data: { companyName: string; disclosureText: string; privacyUrl: string | null; termsUrl: string | null } };
         expect(body.data.companyName).toBe('T-acme');
         expect(body.data.disclosureText).toContain('disclosure');
+        expect(body.data.privacyUrl).toBeNull();
+        expect(body.data.termsUrl).toBeNull();
+
+        // With operator legal URLs set, they flow through to the opt-in page.
+        const envWithLegal = { ...FAKE_ENV, PRIVACY_URL: 'https://ops.example/privacy', TERMS_URL: 'https://ops.example/terms' } as unknown as HonoConfig['Bindings'];
+        const res2 = await app.request(`/api/public/sms/optin-resolve?token=${encodeURIComponent(token)}`, {}, envWithLegal, makeExecCtx());
+        const body2 = await res2.json() as { data: { privacyUrl: string | null; termsUrl: string | null } };
+        expect(body2.data.privacyUrl).toBe('https://ops.example/privacy');
+        expect(body2.data.termsUrl).toBe('https://ops.example/terms');
+    });
+
+    it('inbound HELP → 200 TwiML auto-reply identifying the program (no consent change)', async () => {
+        const contactId = crypto.randomUUID();
+        await db.insert(schema.contacts).values({
+            id: contactId, tenantId: TENANT, type: 'client', name: 'Jane', phone: '+15551234567', createdAt: new Date(),
+        } as never);
+        await new SmsConsentService({} as D1Database).record(TENANT, contactId, 'granted', 'admin', {});
+
+        const params = { From: '+15551234567', Body: 'HELP' };
+        const url = `${APP_BASE_URL}/api/public/sms/inbound`;
+        const sig = await signParams(PLATFORM_TOKEN, url, params);
+
+        const app = buildApp(db);
+        const res = await app.request('/api/public/sms/inbound',
+            { ...form(params), headers: { 'content-type': 'application/x-www-form-urlencoded', 'X-Twilio-Signature': sig } },
+            FAKE_ENV, makeExecCtx());
+        expect(res.status).toBe(200);
+        const xml = await res.text();
+        expect(xml).toContain('<Message>');
+        expect(xml).toContain('Inspector Hub'); // APP_NAME unset → platform brand fallback
+        expect(xml).toContain('STOP');
+        // HELP is informational only — consent state is untouched.
+        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, contactId)).toBe('granted');
     });
 });
