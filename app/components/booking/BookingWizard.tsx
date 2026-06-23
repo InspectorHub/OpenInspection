@@ -110,6 +110,7 @@ export function BookingWizard({
           setSmsOptin={setSmsOptin}
           privacyUrl={privacyUrl}
           termsUrl={termsUrl}
+          companyName={profile.company}
         />
       )}
 

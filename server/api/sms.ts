@@ -48,7 +48,7 @@ import type { HonoConfig } from '../types/hono';
 // STOP-set → revoke; START-set → grant; HELP-set → informational auto-reply
 // (TCPA/CTIA + Twilio toll-free verification require HELP to respond); anything
 // else is logged, not a state change.
-const STOP_WORDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'CANCEL', 'END', 'QUIT']);
+const STOP_WORDS = new Set(['STOP', 'STOPALL', 'UNSUBSCRIBE', 'OPTOUT', 'CANCEL', 'END', 'REVOKE', 'QUIT']);
 const START_WORDS = new Set(['START', 'UNSTOP', 'YES']);
 const HELP_WORDS = new Set(['HELP', 'INFO']);
 
