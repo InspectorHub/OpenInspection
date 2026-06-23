@@ -29,6 +29,8 @@ import {
     applyItemPatch,
     projectResults,
     appendPhoto,
+    updatePhoto,
+    replacePhoto,
     reorderPhotos,
     removePhoto,
     movePhoto,
@@ -675,6 +677,77 @@ describe('#181 — multi-client DO merge + projection parity', () => {
                 attachedAt: 1700000000000,
             },
         ]);
+    });
+
+    // ── Scenario 6b: photo crop + annotate bakes survive DO persist ───────────
+    //
+    // #181 13a-2: under collab the bake endpoints SKIP the results.data write;
+    // the client mirrors the baked key into the doc (crop = replacePhoto,
+    // annotate = updatePhoto). Drive both doc writes through the real DO
+    // webSocketMessage handler, persist(), then read D1 and assert:
+    //   - a cropped photo persists croppedKey + crop and DROPS the annotation
+    //     (sequential layering), and
+    //   - a separately-annotated photo persists annotatedKey + annotationsJson.
+    // This is the clobber-close: without the doc write the next persist would
+    // wipe the server's (now skipped) metadata.
+    it('Scenario 6b — photo crop + annotate doc writes survive DO persist', async () => {
+        const inspectionId = 'insp-bake-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            io.tenantId          = TENANT;
+            io.inspectionId      = inspectionId;
+            io.identityPersisted = true;
+
+            seedResultsDoc(io.doc, [{ findingKey: FINDING_KEY_A }]);
+
+            const clientA = new Y.Doc();
+            await syncClientWithDO(io, clientA);
+
+            // Two photos: one will be cropped (was annotated), one annotated.
+            appendPhoto(clientA, FINDING_KEY_A, {
+                key: 'r2/crop-src.jpg',
+                annotatedKey: 'r2/crop-src.annotated.png',
+                annotationsJson: '[{"kind":"circle"}]',
+                mediaType: 'photo',
+            });
+            appendPhoto(clientA, FINDING_KEY_A, { key: 'r2/ann-src.jpg', mediaType: 'photo' });
+
+            // Crop the first (mirror setPhotoCrop: replace-in-place, drop annotation).
+            replacePhoto(clientA, FINDING_KEY_A, 'r2/crop-src.jpg', {
+                key: 'r2/crop-src.jpg',
+                croppedKey: 'r2/crop-src.cropped.jpg',
+                crop: { aspect: 'free', orientation: 'landscape', x: 0, y: 0, width: 100, height: 80 },
+                mediaType: 'photo',
+            });
+            // Annotate the second (additive merge).
+            updatePhoto(clientA, FINDING_KEY_A, 'r2/ann-src.jpg', {
+                annotatedKey: 'r2/ann-src.annotated.png',
+                annotationsJson: '[{"kind":"arrow"}]',
+            });
+
+            const ws = new MockWebSocket();
+            await instance.webSocketMessage(ws as unknown as WebSocket, encodeUpdate(Y.encodeStateAsUpdate(clientA)).buffer as ArrayBuffer);
+
+            await io.persist();
+        });
+
+        const d1Data = await readResultsData(TENANT, inspectionId);
+        const item = d1Data[FINDING_KEY_A] as { photos?: PhotoEntry[] } | undefined;
+        const photos = item?.photos ?? [];
+
+        const cropped = photos.find((p) => p.key === 'r2/crop-src.jpg');
+        expect(cropped?.croppedKey).toBe('r2/crop-src.cropped.jpg');
+        expect(cropped?.crop).toMatchObject({ aspect: 'free', width: 100, height: 80 });
+        expect(cropped?.annotatedKey).toBeUndefined();      // dropped on crop
+        expect(cropped?.annotationsJson).toBeUndefined();
+
+        const annotated = photos.find((p) => p.key === 'r2/ann-src.jpg');
+        expect(annotated?.annotatedKey).toBe('r2/ann-src.annotated.png');
+        expect(annotated?.annotationsJson).toBe('[{"kind":"arrow"}]');
     });
 
     // ── Scenario 7: No-wipe D1 hydration on first connect ─────────────────────

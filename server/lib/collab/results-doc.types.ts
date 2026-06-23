@@ -16,10 +16,22 @@
 
 // ─── Leaf types ──────────────────────────────────────────────────────────────
 
+/** Re-editable crop transform (source-pixel coords) baked into a cropped photo. */
+export interface PhotoCropTransform {
+    aspect:      string;
+    orientation: 'landscape' | 'portrait';
+    x:           number;
+    y:           number;
+    width:       number;
+    height:      number;
+}
+
 /** A photo / video attachment stored inside an inspection result. */
 export interface PhotoEntry {
     key:             string;
     croppedKey?:     string;
+    /** Re-editable crop transform recorded alongside `croppedKey`. */
+    crop?:           PhotoCropTransform;
     annotatedKey?:   string;
     annotationsJson?: string;
     mediaType?:      'photo' | 'video';

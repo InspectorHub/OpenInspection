@@ -9,6 +9,7 @@ import {
   updatePhoto,
   removePhoto,
   revertPhoto,
+  replacePhoto,
   reorderPhotos,
   movePhoto,
   upsertCanned,
@@ -418,6 +419,46 @@ describe('results-doc', () => {
     expect(reverted?.croppedKey).toBeUndefined();
     expect(reverted?.annotatedKey).toBeUndefined();
     expect(reverted?.annotationsJson).toBeUndefined();
+  });
+
+  it('#181 replacePhoto drops the annotation on crop (replace-in-place, exact fields)', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p0' });
+    appendPhoto(doc, FK, {
+      key: 'p1',
+      annotatedKey: 'p1-annot',
+      annotationsJson: '{"shapes":[]}',
+      mediaType: 'photo',
+    });
+    appendPhoto(doc, FK, { key: 'p2' });
+
+    // Crop: set croppedKey + crop, preserve mediaType, DROP the annotation.
+    replacePhoto(doc, FK, 'p1', {
+      key: 'p1',
+      croppedKey: 'p1-cropped',
+      crop: { aspect: 'free', orientation: 'landscape', x: 0, y: 0, width: 100, height: 80 },
+      mediaType: 'photo',
+    });
+
+    const photos = projectResults(doc)[FK].photos ?? [];
+    // Position preserved (replace-in-place), order intact.
+    expect(photos.map((p) => p.key)).toEqual(['p0', 'p1', 'p2']);
+    const cropped = photos.find((p) => p.key === 'p1');
+    expect(cropped?.croppedKey).toBe('p1-cropped');
+    expect(cropped?.crop).toMatchObject({ aspect: 'free', width: 100, height: 80 });
+    expect(cropped?.mediaType).toBe('photo');         // non-annotation field survives
+    expect(cropped?.annotatedKey).toBeUndefined();    // dropped by the crop
+    expect(cropped?.annotationsJson).toBeUndefined();
+  });
+
+  it('#181 replacePhoto is a no-op when the key is absent', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p0' });
+    replacePhoto(doc, FK, 'missing', { key: 'missing', croppedKey: 'x' });
+    const photos = projectResults(doc)[FK].photos ?? [];
+    expect(photos.map((p) => p.key)).toEqual(['p0']);
   });
 
   it('removePhoto deletes the matching entry by key', () => {

@@ -17,7 +17,10 @@ import {
   movePhoto as bindingMovePhoto,
   removePhoto as bindingRemovePhoto,
   revertPhoto as bindingRevertPhoto,
+  setPhotoCrop as bindingSetPhotoCrop,
+  setPhotoAnnotation as bindingSetPhotoAnnotation,
 } from "~/lib/collab/results-binding";
+import type { PhotoEntry } from "../../server/lib/collab/results-doc.types";
 
 /**
  * The photo / media-operations cluster of the inspection editor. Behavior-
@@ -427,6 +430,60 @@ export function usePhotoOps(ctx: {
     (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, crop: PhotoCrop) => {
       const { itemId, photoIndex, sectionId } = target;
       const cropTransform = { aspect: crop.aspect, orientation: crop.orientation, ...crop.pixels };
+
+      const nav = typeof navigator !== "undefined" ? navigator : undefined;
+      const offline = shouldQueue(nav);
+
+      // #181 — under collab the Y.Doc owns results.data. Image baking ALWAYS
+      // needs the network (the server derives + stores the cropped R2 object),
+      // and the legacy offline queue replays via REST with no doc to write — a
+      // clobber/loss hole. So when collab is ON and we're offline, refuse the
+      // crop with a toast instead of enqueueing or mutating anything.
+      if (collabDoc) {
+        if (offline) {
+          pushToast({ message: "Crop & annotate need a connection", durationMs: 3000 });
+          return;
+        }
+        // Optimistic local apply for instant feedback (the doc drives the real
+        // UI once the bake returns + we write it back).
+        patchItemPhotos(itemId, (photos) =>
+          photos.map((p, i) =>
+            i === photoIndex
+              ? clearAnnotationOnRecrop(p, p.croppedKey ?? p.key, cropTransform)
+              : p,
+          ),
+        );
+        // Snapshot the photo's CURRENT entry + original key BEFORE the bake so
+        // the doc write preserves non-annotation fields and addresses by key.
+        const current = getItemPhotos(itemId)[photoIndex];
+        const originalKey = current?.key;
+        const fk = docFindingKey(itemId, sectionId);
+        const fd = new FormData();
+        fd.append("image", new File([blob], "cropped.jpg", { type: "image/jpeg" }));
+        fd.append("crop", JSON.stringify(cropTransform));
+        if (sectionId) fd.append("sectionId", sectionId);
+        void (async () => {
+          const res = await fetch(
+            `/api/inspections/${state.inspection.id}/items/${itemId}/photos/${photoIndex}/crop`,
+            { method: "POST", credentials: "include", body: fd },
+          );
+          const body = (await res.json().catch(() => null)) as { data?: { croppedKey?: string } } | null;
+          const croppedKey = body?.data?.croppedKey;
+          if (fk && originalKey && croppedKey) {
+            bindingSetPhotoCrop(
+              collabDoc,
+              fk,
+              originalKey,
+              croppedKey,
+              cropTransform,
+              current as PhotoEntry,
+            );
+          }
+          // No revalidate — the doc drives the UI under collab.
+        })();
+        return;
+      }
+
       // Optimistic local apply: drop annotation, set crop. The croppedKey is not
       // yet known client-side; revalidate (online) / replay (offline) supplies it.
       patchItemPhotos(itemId, (photos) =>
@@ -437,8 +494,7 @@ export function usePhotoOps(ctx: {
         ),
       );
 
-      const nav = typeof navigator !== "undefined" ? navigator : undefined;
-      if (shouldQueue(nav)) {
+      if (offline) {
         // Plan 4 Q3 — offline: enqueue the baked crop; replay on reconnect.
         void getOfflineQueue().enqueueCrop({
           inspectionId: String(state.inspection.id),
@@ -466,7 +522,52 @@ export function usePhotoOps(ctx: {
         revalidator.revalidate();
       })();
     },
-    [patchItemPhotos, state.inspection.id, revalidator],
+    [patchItemPhotos, state.inspection.id, revalidator, collabDoc, docFindingKey, getItemPhotos],
+  );
+
+  /* #181 — collab-aware annotation save. Returns true when it HANDLED the save
+   * (collab is ON); the caller then skips its legacy fetcher/offline path. When
+   * collab is OFF returns false so the caller keeps byte-identical behavior.
+   *
+   * Annotation baking ALWAYS needs the network (the server derives + stores the
+   * annotated PNG); offline under collab refuses with a toast rather than using
+   * the legacy offline queue (which replays via REST with no doc → loss). On
+   * success, POST the bake, read the annotatedKey, and mirror it into the doc
+   * (additive merge — annotation never clears the crop). No revalidate. */
+  const performPhotoAnnotationSave = useCallback(
+    (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, nodesJson: string): boolean => {
+      if (!collabDoc) return false;
+      const { itemId, photoIndex, sectionId } = target;
+
+      const nav = typeof navigator !== "undefined" ? navigator : undefined;
+      if (shouldQueue(nav)) {
+        pushToast({ message: "Crop & annotate need a connection", durationMs: 3000 });
+        return true;
+      }
+
+      // The doc is keyed by the photo's ORIGINAL key; resolve from the snapshot.
+      const originalKey = getItemPhotos(itemId)[photoIndex]?.key;
+      const fk = docFindingKey(itemId, sectionId);
+
+      const fd = new FormData();
+      fd.append("nodes", nodesJson);
+      if (sectionId) fd.append("sectionId", sectionId);
+      fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
+      void (async () => {
+        const res = await fetch(
+          `/api/inspections/${state.inspection.id}/items/${itemId}/photos/${photoIndex}/annotation`,
+          { method: "POST", credentials: "include", body: fd },
+        );
+        const body = (await res.json().catch(() => null)) as { data?: { annotatedKey?: string } } | null;
+        const annotatedKey = body?.data?.annotatedKey;
+        if (fk && originalKey && annotatedKey) {
+          bindingSetPhotoAnnotation(collabDoc, fk, originalKey, annotatedKey, nodesJson);
+        }
+        // No revalidate — the doc drives the UI under collab.
+      })();
+      return true;
+    },
+    [collabDoc, docFindingKey, getItemPhotos, state.inspection.id],
   );
 
   return {
@@ -492,5 +593,6 @@ export function usePhotoOps(ctx: {
     onBulkMovePhotos,
     onViewerAction,
     performPhotoCropSave,
+    performPhotoAnnotationSave,
   };
 }

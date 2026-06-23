@@ -22,7 +22,7 @@ import {
 import { MediaVideoService } from '../../services/media-video.service';
 import { resolveVideoBackend } from '../../services/video/resolve';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspectionMediaPool } from '../../lib/db/schema';
+import { inspectionMediaPool, tenantConfigs } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { registerR2VideoRoutes } from './media-video-r2';
@@ -307,6 +307,26 @@ function readSectionId(formData: Record<string, unknown>): string | undefined {
     return typeof raw === 'string' && raw.length > 0 ? raw : undefined;
 }
 
+// #181 — resolve the tenant's collaborative-editing flag (authoritative server
+// read, never a client-supplied field). Tenant-scoped; defaults to false when
+// the row is absent or the lookup fails. When ON, the bake endpoints skip the
+// inspection_results.data write so the Y.Doc / Durable Object stays the sole
+// authoritative writer of that blob (the client mirrors the baked key into the
+// doc). Mirrors the read in server/api/session-context.ts.
+async function isCollabEditingEnabled(db: D1Database, tenantId: string): Promise<boolean> {
+    try {
+        const row = await drizzle(db)
+            .select({ collabEditing: tenantConfigs.collabEditing })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        return row?.collabEditing === true;
+    } catch (e) {
+        logger.warn('[media-studio] collabEditing resolution failed', { error: (e as Error).message });
+        return false;
+    }
+}
+
 // Parse + validate the JSON-encoded crop transform from a multipart field.
 // Throws BadRequest('invalid crop') on malformed JSON or schema mismatch.
 function parseCrop<T>(formData: Record<string, unknown>, schema: { safeParse(v: unknown): { success: true; data: T } | { success: false } }): T {
@@ -464,8 +484,11 @@ const mediaStudioRoutes = createApiRouter()
         const sectionId = readSectionId(formData);
         if (!file) throw Errors.BadRequest('image file required');
         const bytes = await file.arrayBuffer();
+        // #181 — under collab the doc owns results.data; bake to R2 + return the
+        // key, but skip the metadata write (the client mirrors it into the doc).
+        const skipResultsWrite = await isCollabEditingEnabled(c.env.DB, tenantId);
         const result = await c.var.services.inspection.saveAnnotation(
-            id, tenantId, itemId, photoIndex, bytes, nodesJson, sectionId,
+            id, tenantId, itemId, photoIndex, bytes, nodesJson, sectionId, { skipResultsWrite },
         );
         return c.json({ success: true, data: result }, 200);
     })
@@ -490,8 +513,11 @@ const mediaStudioRoutes = createApiRouter()
         const crop = parseCrop(formData, PhotoCropSchema);
         const sectionId = readSectionId(formData);
         const bytes = await file.arrayBuffer();
+        // #181 — under collab the doc owns results.data; bake to R2 + return the
+        // key, but skip the metadata write (the client mirrors it into the doc).
+        const skipResultsWrite = await isCollabEditingEnabled(c.env.DB, tenantId);
         const result = await c.var.services.inspection.saveCroppedItemPhoto(
-            id, tenantId, itemId, photoIndex, bytes, crop, sectionId,
+            id, tenantId, itemId, photoIndex, bytes, crop, sectionId, { skipResultsWrite },
         );
         return c.json({ success: true, data: result }, 200);
     });

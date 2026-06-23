@@ -13,8 +13,10 @@ import {
     applyItemPatch,
     setItemAttribute as docSetItemAttribute,
     appendPhoto as docAppendPhoto,
+    updatePhoto as docUpdatePhoto,
     removePhoto as docRemovePhoto,
     revertPhoto as docRevertPhoto,
+    replacePhoto as docReplacePhoto,
     reorderPhotos as docReorderPhotos,
     movePhoto as docMovePhoto,
     upsertCanned,
@@ -22,7 +24,7 @@ import {
     upsertRecommendation,
     removeRecommendation,
 } from '../../../server/lib/collab/results-doc';
-import type { RepairItemSnapshot } from '../../../server/lib/collab/results-doc.types';
+import type { PhotoEntry, RepairItemSnapshot } from '../../../server/lib/collab/results-doc.types';
 
 // ─── ResultMap type ──────────────────────────────────────────────────────────
 //
@@ -205,6 +207,57 @@ export function revertPhoto(
     key: string,
 ): void {
     docRevertPhoto(doc, findingKey, key);
+}
+
+/**
+ * Replace a photo entry IN PLACE with `entry` (a full PhotoEntry). Used by the
+ * crop flow to drop the annotation while setting the new crop. `findingKey` is
+ * the composite key. No-op if `key` is absent.
+ */
+export function replacePhoto(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+    entry: PhotoEntry,
+): void {
+    docReplacePhoto(doc, findingKey, key, entry);
+}
+
+/**
+ * #181 — mirror a server crop bake into the doc. Builds the post-crop entry
+ * from the photo's CURRENT fields MINUS any annotation (sequential-layering
+ * rule: a re-crop discards the prior annotation, whose coords were in the OLD
+ * cropped-pixel space), then sets the new `croppedKey` + `crop` and replaces the
+ * entry in place. `baseEntry` is the photo's current entry so non-annotation
+ * fields (mediaType / provider / streamUid / …) survive the crop.
+ */
+export function setPhotoCrop(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+    croppedKey: string,
+    crop: PhotoEntry['crop'],
+    baseEntry: PhotoEntry,
+): void {
+    // Strip the annotation fields from the base, then re-pin key + crop result.
+    const { annotatedKey: _a, annotationsJson: _j, ...keep } = baseEntry;
+    void _a; void _j;
+    const next: PhotoEntry = { ...keep, key, croppedKey, crop };
+    docReplacePhoto(doc, findingKey, key, next);
+}
+
+/**
+ * #181 — mirror a server annotation bake into the doc. Annotation is additive
+ * (it never clears the crop), so a merge patch via `updatePhoto` is correct.
+ */
+export function setPhotoAnnotation(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+    annotatedKey: string,
+    annotationsJson: string,
+): void {
+    docUpdatePhoto(doc, findingKey, key, { annotatedKey, annotationsJson });
 }
 
 /**

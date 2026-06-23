@@ -389,8 +389,9 @@ export class InspectionService {
         compositeBytes: ArrayBuffer,
         nodesJson: string,
         sectionId?: string,
+        opts?: { skipResultsWrite?: boolean },
     ): Promise<{ annotatedKey: string }> {
-        return this.annotations.saveAnnotation(inspectionId, tenantId, itemId, photoIndex, compositeBytes, nodesJson, sectionId);
+        return this.annotations.saveAnnotation(inspectionId, tenantId, itemId, photoIndex, compositeBytes, nodesJson, sectionId, opts);
     }
 
     async setCroppedCover(
@@ -411,8 +412,9 @@ export class InspectionService {
         bakedBytes: ArrayBuffer,
         crop: PhotoCrop,
         sectionId?: string,
+        opts?: { skipResultsWrite?: boolean },
     ): Promise<{ croppedKey: string }> {
-        return this.annotations.saveCroppedItemPhoto(inspectionId, tenantId, itemId, photoIndex, bakedBytes, crop, sectionId);
+        return this.annotations.saveCroppedItemPhoto(inspectionId, tenantId, itemId, photoIndex, bakedBytes, crop, sectionId, opts);
     }
 
     /**

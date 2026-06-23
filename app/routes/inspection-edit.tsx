@@ -588,6 +588,7 @@ export default function InspectionEditPage() {
   onBulkMovePhotos,
   onViewerAction,
   performPhotoCropSave,
+  performPhotoAnnotationSave,
  } = usePhotoOps({
   state,
   findings,
@@ -1560,6 +1561,13 @@ export default function InspectionEditPage() {
   const itemId = state.activeItemId;
   if (itemId && photoStudioIndex != null) {
    const sectionId = state.currentSection?.id;
+   // #181 — under collab the Y.Doc owns results.data: bake to R2 + mirror the
+   // returned annotatedKey into the doc (offline refuses with a toast). When it
+   // handles the save, skip the legacy fetcher/offline-queue path below.
+   if (performPhotoAnnotationSave({ itemId, photoIndex: photoStudioIndex, sectionId }, blob, nodesJson)) {
+    setPhotoStudioOpen(false);
+    return;
+   }
    // Task 9c — offline-capable annotate. When offline, enqueue the baked PNG
    // through the SAME media queue photo uploads use; the annotation derivative
    // replays to the annotation endpoint on reconnect. When online, submit

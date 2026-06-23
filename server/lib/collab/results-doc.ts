@@ -338,6 +338,41 @@ export function revertPhoto(
 }
 
 /**
+ * Replace the photo Y.Map matching `key` IN PLACE with a fresh Y.Map built from
+ * `entry`, so the resulting projection has EXACTLY `entry`'s fields — no stale
+ * derivatives survive.
+ *
+ * Crop's sequential-layering rule requires DROPPING `annotatedKey` /
+ * `annotationsJson` while setting `croppedKey` / `crop`. `updatePhoto` cannot do
+ * this: `assignFields` skips `undefined` and never deletes a Y.Map entry, so a
+ * merge would leave the old annotation behind. Replace-in-place (mirror of
+ * `revertPhoto`, but with a full entry) is the correct primitive. Array position
+ * is preserved (`delete(i,1)` + `insert(i, …)`). No-op if `key` is absent.
+ */
+export function replacePhoto(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    key: string,
+    entry: PhotoEntry,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const arr = getOrCreateArray(item, 'photos');
+        for (let i = 0; i < arr.length; i++) {
+            const el = arr.get(i);
+            if (el instanceof Y.Map && el.get('key') === key) {
+                const fresh = new Y.Map<unknown>();
+                assignFields(fresh, { ...entry });
+                arr.delete(i, 1);
+                arr.insert(i, [fresh]);
+                return;
+            }
+        }
+    });
+}
+
+/**
  * Reorder the item's `photos` Y.Array so its elements follow `orderedKeys`
  * (matched by each photo Y.Map's `key`).
  *
