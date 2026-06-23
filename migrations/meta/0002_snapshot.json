@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "58753e1a-5f06-4db7-99d0-85755ed1152d",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "6e13ba0f-2ed1-4aae-9cee-10a83d6e7aef",
+  "prevId": "2dc7d650-aff0-4b6c-93c8-36007e4ffc51",
   "tables": {
     "agreement_requests": {
       "name": "agreement_requests",
@@ -3031,6 +3031,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "ydoc_state": {
+          "name": "ydoc_state",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "last_synced_at": {
@@ -6793,6 +6800,14 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "collab_editing": {
+          "name": "collab_editing",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         },
         "updated_at": {
           "name": "updated_at",

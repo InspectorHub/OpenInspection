@@ -431,7 +431,6 @@ CREATE TABLE `inspection_results` (
 	`tenant_id` text NOT NULL,
 	`inspection_id` text NOT NULL,
 	`data` text NOT NULL,
-	`ydoc_state` blob,
 	`last_synced_at` integer NOT NULL,
 	`rating_system_id` text,
 	`rating_system_snapshot` text,

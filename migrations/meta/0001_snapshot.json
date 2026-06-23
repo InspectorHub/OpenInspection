@@ -3033,13 +3033,6 @@
           "notNull": true,
           "autoincrement": false
         },
-        "ydoc_state": {
-          "name": "ydoc_state",
-          "type": "blob",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "last_synced_at": {
           "name": "last_synced_at",
           "type": "integer",

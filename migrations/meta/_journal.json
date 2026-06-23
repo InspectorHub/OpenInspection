@@ -15,6 +15,13 @@
       "when": 1782196828733,
       "tag": "0001_puzzling_retro_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1782213281147,
+      "tag": "0002_broken_amazoness",
+      "breakpoints": true
     }
   ]
 }
