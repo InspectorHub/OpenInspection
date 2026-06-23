@@ -39,6 +39,12 @@ export default defineConfig({
                         maxBatchTimeout: 0,
                     },
                 },
+                // #181 collab editing — bind the production InspectionDocDO so
+                // collab-multiclient.spec.ts can drive it with runInDurableObject.
+                // The class is re-exported from test-worker.ts (required: main worker).
+                durableObjects: {
+                    INSPECTION_DOC: 'InspectionDocDO',
+                },
             },
         }),
     ],
