@@ -410,6 +410,130 @@ export function removeRecommendation(
 }
 
 /**
+ * Hydrate a Y.Doc from an existing `inspection_results.data` projection blob.
+ *
+ * The faithful INVERSE of `projectResults`: after `loadResultsProjection(doc, p)`,
+ * `projectResults(doc)` deep-equals `p`. Used by the Durable Object (#181) to
+ * import the legacy/current D1 blob on first connect so collaborative editing
+ * starts from current truth instead of an empty doc (which would otherwise wipe
+ * the D1 row on the first persist).
+ *
+ * Pure Yjs, no I/O. Idempotent: every nested collection is rebuilt through the
+ * upsert-by-identity-key mutators, so re-loading the same blob never duplicates
+ * array elements. The whole load runs in a single `doc.transact`.
+ */
+export function loadResultsProjection(doc: Y.Doc, projection: ResultsProjection): void {
+    const results = doc.getMap<unknown>('results');
+
+    doc.transact(() => {
+        for (const [findingKey, entry] of Object.entries(projection)) {
+            // Idempotent structure first (Condition A): never clobber existing.
+            getOrSeedItem(results, findingKey);
+
+            // ── Scalar fields (LWW) ────────────────────────────────────────────
+            // Only set fields that projectResults would surface, matching its
+            // type/empty guards so the round-trip is exact.
+            if (typeof entry.rating === 'string' && entry.rating.length > 0) {
+                applyItemPatch(doc, findingKey, 'rating', entry.rating);
+            }
+            if (typeof entry.notes === 'string' && entry.notes.length > 0) {
+                applyItemPatch(doc, findingKey, 'notes', entry.notes);
+            }
+            if (entry.value !== undefined && entry.value !== null) {
+                applyItemPatch(doc, findingKey, 'value', entry.value);
+            }
+            if (typeof entry.recommendation === 'string' && entry.recommendation.length > 0) {
+                applyItemPatch(doc, findingKey, 'recommendation', entry.recommendation);
+            }
+            if (typeof entry.estimateMin === 'number') {
+                applyItemPatch(doc, findingKey, 'estimateMin', entry.estimateMin);
+            }
+            if (typeof entry.estimateMax === 'number') {
+                applyItemPatch(doc, findingKey, 'estimateMax', entry.estimateMax);
+            }
+            if (entry.followupStatus !== undefined) {
+                applyItemPatch(doc, findingKey, 'followupStatus', entry.followupStatus);
+            }
+            if (entry.followupNotes !== undefined) {
+                applyItemPatch(doc, findingKey, 'followupNotes', entry.followupNotes);
+            }
+
+            // ── attributes ─────────────────────────────────────────────────────
+            if (entry.attributes) {
+                for (const [k, v] of Object.entries(entry.attributes)) {
+                    setItemAttribute(doc, findingKey, k, v);
+                }
+            }
+
+            // ── photos ─────────────────────────────────────────────────────────
+            if (entry.photos) {
+                for (const photo of entry.photos) {
+                    appendPhoto(doc, findingKey, photo);
+                }
+            }
+
+            // ── tabs (information / limitations / defects) ──────────────────────
+            if (entry.tabs) {
+                for (const e of entry.tabs.information ?? []) {
+                    upsertCanned(doc, findingKey, 'information', e);
+                }
+                for (const e of entry.tabs.limitations ?? []) {
+                    upsertCanned(doc, findingKey, 'limitations', e);
+                }
+                for (const e of entry.tabs.defects ?? []) {
+                    upsertCanned(doc, findingKey, 'defects', e);
+                }
+            }
+
+            // ── customComments ─────────────────────────────────────────────────
+            if (entry.customComments) {
+                for (const e of entry.customComments.information ?? []) {
+                    upsertCustomComment(doc, findingKey, 'information', e);
+                }
+                for (const e of entry.customComments.limitations ?? []) {
+                    upsertCustomComment(doc, findingKey, 'limitations', e);
+                }
+                for (const e of entry.customComments.defects ?? []) {
+                    upsertCustomComment(doc, findingKey, 'defects', e);
+                }
+            }
+
+            // ── recommendations ────────────────────────────────────────────────
+            if (entry.recommendations) {
+                for (const rec of entry.recommendations) {
+                    upsertRecommendation(doc, findingKey, rec);
+                }
+            }
+
+            // ── re-inspection `original` snapshot ──────────────────────────────
+            // projectResults reads `original` as a Y.Map (rating/notes scalars +
+            // a photos Y.Array). It is a read-only snapshot, so LWW assignment is
+            // correct. Rebuild the Y.Map in place (idempotent — overwrite).
+            if (entry.original) {
+                const item = getOrSeedItem(results, findingKey);
+                const orig = getOrCreateMap(item, 'original');
+                if (entry.original.rating !== undefined) {
+                    orig.set('rating', entry.original.rating);
+                }
+                if (entry.original.notes !== undefined) {
+                    orig.set('notes', entry.original.notes);
+                }
+                if (entry.original.photos && entry.original.photos.length > 0) {
+                    // Replace the photos array wholesale (idempotent snapshot).
+                    const photosArr = new Y.Array<unknown>();
+                    for (const photo of entry.original.photos) {
+                        const el = new Y.Map<unknown>();
+                        assignFields(el, { ...photo });
+                        photosArr.push([el]);
+                    }
+                    orig.set('photos', photosArr);
+                }
+            }
+        }
+    });
+}
+
+/**
  * Project the Y.Doc to the `inspection_results.data` JSON shape.
  *
  * Empty optionals are omitted so the output equals what the legacy blob

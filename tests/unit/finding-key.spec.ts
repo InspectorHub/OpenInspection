@@ -5,6 +5,7 @@ import {
     findingsForUnit,
     isLegacyKey,
     migrateLegacyKey,
+    findingKeysFromTemplateSnapshot,
     DEFAULT_UNIT,
 } from '../../server/lib/finding-key';
 
@@ -118,5 +119,61 @@ describe('migrateLegacyKey', () => {
 describe('DEFAULT_UNIT', () => {
     it('is _default', () => {
         expect(DEFAULT_UNIT).toBe('_default');
+    });
+});
+
+describe('findingKeysFromTemplateSnapshot', () => {
+    it('enumerates a v2 {sections:[...]} snapshot', () => {
+        const snap = { sections: [{ id: 's1', items: [{ id: 'i1' }, { id: 'i2' }] }] };
+        expect(findingKeysFromTemplateSnapshot(snap)).toEqual([
+            '_default:s1:i1',
+            '_default:s1:i2',
+        ]);
+    });
+
+    it('enumerates multiple sections', () => {
+        const snap = {
+            sections: [
+                { id: 'roof', items: [{ id: 'covering' }] },
+                { id: 'electrical', items: [{ id: 'panel' }, { id: 'wiring' }] },
+            ],
+        };
+        expect(findingKeysFromTemplateSnapshot(snap)).toEqual([
+            '_default:roof:covering',
+            '_default:electrical:panel',
+            '_default:electrical:wiring',
+        ]);
+    });
+
+    it('treats a flat legacy array as a single "general" section', () => {
+        const snap = [{ id: 'a1' }, { id: 'a2' }];
+        expect(findingKeysFromTemplateSnapshot(snap)).toEqual([
+            '_default:general:a1',
+            '_default:general:a2',
+        ]);
+    });
+
+    it('parses a JSON STRING snapshot', () => {
+        const snap = JSON.stringify({ sections: [{ id: 's1', items: [{ id: 'i1' }] }] });
+        expect(findingKeysFromTemplateSnapshot(snap)).toEqual(['_default:s1:i1']);
+    });
+
+    it('skips items with empty/missing id', () => {
+        const snap = { sections: [{ id: 's1', items: [{ id: '' }, {}, { id: 'i3' }] }] };
+        expect(findingKeysFromTemplateSnapshot(snap)).toEqual(['_default:s1:i3']);
+    });
+
+    it('coerces non-string section/item ids to strings', () => {
+        const snap = { sections: [{ id: 5, items: [{ id: 7 }] }] };
+        expect(findingKeysFromTemplateSnapshot(snap)).toEqual(['_default:5:7']);
+    });
+
+    it('returns [] for null/empty/garbage input (never throws)', () => {
+        expect(findingKeysFromTemplateSnapshot(null)).toEqual([]);
+        expect(findingKeysFromTemplateSnapshot(undefined)).toEqual([]);
+        expect(findingKeysFromTemplateSnapshot({})).toEqual([]);
+        expect(findingKeysFromTemplateSnapshot('not json')).toEqual([]);
+        expect(findingKeysFromTemplateSnapshot(42)).toEqual([]);
+        expect(findingKeysFromTemplateSnapshot({ sections: 'nope' })).toEqual([]);
     });
 });

@@ -34,8 +34,14 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { AppEnv } from '../types/hono';
-import { projectResults } from '../lib/collab/results-doc';
-import { inspectionResults } from '../lib/db/schema';
+import {
+    projectResults,
+    seedResultsDoc,
+    loadResultsProjection,
+} from '../lib/collab/results-doc';
+import type { ResultsProjection } from '../lib/collab/results-doc.types';
+import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
+import { inspectionResults, inspections } from '../lib/db/schema';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,6 +63,21 @@ interface PersistedIdentity {
     inspectionId: string;
 }
 
+/**
+ * Narrow a D1 `inspection_results.data` json value to a non-empty projection.
+ * The column is `text({ mode: 'json' })`, so drizzle returns the parsed value
+ * as `unknown`. Empty / null / non-object / `{}` blobs are not worth importing
+ * (an empty doc projects to `{}`), so the guard rejects them.
+ */
+function isNonEmptyProjection(value: unknown): value is ResultsProjection {
+    return (
+        typeof value === 'object' &&
+        value !== null &&
+        !Array.isArray(value) &&
+        Object.keys(value).length > 0
+    );
+}
+
 // ─── InspectionDocDO ─────────────────────────────────────────────────────────
 
 export class InspectionDocDO extends DurableObject<AppEnv> {
@@ -71,6 +92,20 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
     private inspectionId:      string | null = null;
     /** True once identity has been written to DO storage (avoids redundant puts). */
     private identityPersisted: boolean       = false;
+    /**
+     * True when this DO already had a persisted Y.Doc binary in DO storage at
+     * construction time (set in hydrate()). This is the NO-WIPE guard: when prior
+     * collab state exists, the collaborative doc is authoritative and ahead of
+     * D1, so the (potentially stale) D1 `inspection_results.data` blob MUST NOT be
+     * imported on top of it — doing so would clobber unflushed collab edits. The
+     * D1 blob is imported ONLY when this is false (no prior collab state).
+     */
+    private hadStoredState: boolean = false;
+    /**
+     * Memoizes the one-time D1 hydration so concurrent first connects await the
+     * same load (one D1 read per DO lifetime). Lazily created in hydrateFromD1Once.
+     */
+    private d1HydrationPromise: Promise<void> | null = null;
 
     constructor(ctx: DurableObjectState, env: AppEnv) {
         super(ctx, env);
@@ -125,6 +160,13 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 });
                 this.identityPersisted = true;
             }
+
+            // Hydrate from D1 once per DO lifetime, AFTER identity is known and
+            // BEFORE step1 is sent so the step1 state vector reflects the seeded
+            // template structure (Condition A) and any imported D1 blob. The
+            // memoized promise guarantees a single D1 load; concurrent connects
+            // await the same promise.
+            await this.hydrateFromD1Once();
 
             const pair   = new WebSocketPair();
             const client = pair[0];
@@ -263,6 +305,9 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
 
         if (stored instanceof Uint8Array && stored.length > 0) {
             Y.applyUpdate(this.doc, stored);
+            // NO-WIPE guard: prior collab state existed. The D1 blob must never be
+            // imported on top of it (see hadStoredState + doHydrateFromD1).
+            this.hadStoredState = true;
         }
 
         // Restore identity so persist() / alarm() can write D1 without waiting
@@ -271,6 +316,81 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             this.tenantId          = identity.tenantId;
             this.inspectionId      = identity.inspectionId;
             this.identityPersisted = true; // already in storage — skip the put
+        }
+    }
+
+    /**
+     * One-time D1 hydration, memoized: the first caller starts the load; all
+     * later/concurrent callers await the same promise. Guarantees exactly one
+     * D1 read per DO lifetime regardless of how many clients connect.
+     */
+    private hydrateFromD1Once(): Promise<void> {
+        this.d1HydrationPromise ??= this.doHydrateFromD1();
+        return this.d1HydrationPromise;
+    }
+
+    /**
+     * Seed the full template structure (Condition A) and — only when there is no
+     * prior collab state — import the existing D1 `inspection_results.data` blob
+     * so collaborative editing starts from current truth.
+     *
+     * Requires identity (tenantId + inspectionId) to be set — only called from
+     * fetch() after identity is established.
+     *
+     * Tenant scoping: both D1 reads include `eq(table.tenantId, this.tenantId)`
+     * (the tenant-scoping invariant for every read in this DO).
+     */
+    private async doHydrateFromD1(): Promise<void> {
+        const { tenantId, inspectionId } = this;
+        if (!tenantId || !inspectionId) return; // identity unknown — nothing to load
+
+        const db: DrizzleD1Database = drizzle(this.env.DB);
+
+        // ── Load the template snapshot + the existing results blob (tenant-scoped).
+        const [inspectionRow, resultsRow] = await Promise.all([
+            db
+                .select({ templateSnapshot: inspections.templateSnapshot })
+                .from(inspections)
+                .where(
+                    and(
+                        eq(inspections.tenantId, tenantId),
+                        eq(inspections.id,       inspectionId),
+                    ),
+                )
+                .get(),
+            db
+                .select({ data: inspectionResults.data })
+                .from(inspectionResults)
+                .where(
+                    and(
+                        eq(inspectionResults.tenantId,     tenantId),
+                        eq(inspectionResults.inspectionId, inspectionId),
+                    ),
+                )
+                .get(),
+        ]);
+
+        // ── Condition A: ALWAYS seed every template item's findingKey structure
+        // (idempotent — seedResultsDoc skips keys that already exist), so two
+        // clients can never lazily create the same item Y.Map and race.
+        const findingKeys = findingKeysFromTemplateSnapshot(
+            inspectionRow?.templateSnapshot ?? null,
+        );
+        if (findingKeys.length > 0) {
+            seedResultsDoc(
+                this.doc,
+                findingKeys.map((key) => ({ findingKey: key })),
+            );
+        }
+
+        // ── NO-WIPE import: only when there is NO prior collab state. When prior
+        // collab state existed (hadStoredState), the doc is authoritative and
+        // ahead of D1 — importing the stale blob would clobber unflushed edits.
+        if (!this.hadStoredState) {
+            const blob = resultsRow?.data;
+            if (isNonEmptyProjection(blob)) {
+                loadResultsProjection(this.doc, blob);
+            }
         }
     }
 

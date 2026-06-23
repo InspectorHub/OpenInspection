@@ -48,10 +48,49 @@ async function seedSchema(): Promise<void> {
     // Minimal inline DDL — FK references omitted (miniflare D1 does not enforce
     // FK constraints, so parent tenant/inspection rows need not be present).
     await b.DB.exec('CREATE TABLE IF NOT EXISTS inspection_results (id TEXT PRIMARY KEY NOT NULL, tenant_id TEXT NOT NULL, inspection_id TEXT NOT NULL, data TEXT NOT NULL, ydoc_state BLOB, last_synced_at INTEGER NOT NULL, rating_system_id TEXT, rating_system_snapshot TEXT);');
+    // Minimal FK-free inspections table — only the columns the DO hydration reads
+    // (id, tenant_id, template_snapshot). Mirrors the existing FK-free pattern.
+    await b.DB.exec('CREATE TABLE IF NOT EXISTS inspections (id TEXT PRIMARY KEY NOT NULL, tenant_id TEXT NOT NULL, template_snapshot TEXT);');
 }
 
 async function clearResults(): Promise<void> {
     await b.DB.exec('DELETE FROM inspection_results;');
+    await b.DB.exec('DELETE FROM inspections;');
+}
+
+/**
+ * Seed an inspections row with a template_snapshot. The DO reads this to
+ * enumerate findingKeys for Condition-A seeding. `data` json column wins for the
+ * blob import — this only drives the seeded structure.
+ */
+async function ensureInspectionRow(
+    tenantId: string,
+    inspectionId: string,
+    templateSnapshot: unknown,
+): Promise<void> {
+    await b.DB
+        .prepare(
+            'INSERT OR REPLACE INTO inspections (id, tenant_id, template_snapshot) VALUES (?, ?, ?)',
+        )
+        .bind(inspectionId, tenantId, JSON.stringify(templateSnapshot))
+        .run();
+}
+
+/**
+ * Overwrite the `data` blob of an existing inspection_results row (the legacy /
+ * current projection that the DO no-wipe import reads on first connect).
+ */
+async function writeResultsData(
+    tenantId: string,
+    inspectionId: string,
+    data: unknown,
+): Promise<void> {
+    await b.DB
+        .prepare(
+            'UPDATE inspection_results SET data = ? WHERE tenant_id = ? AND inspection_id = ?',
+        )
+        .bind(JSON.stringify(data), tenantId, inspectionId)
+        .run();
 }
 
 // ─── Helpers: Yjs sync-protocol frame builders ────────────────────────────────
@@ -159,7 +198,9 @@ interface DOInternals {
     tenantId: string | null;
     inspectionId: string | null;
     identityPersisted: boolean;
+    hadStoredState: boolean;
     persist(): Promise<void>;
+    hydrateFromD1Once(): Promise<void>;
     webSocketMessage(ws: MockWebSocket, data: ArrayBuffer): Promise<void>;
 }
 
@@ -629,5 +670,134 @@ describe('#181 — multi-client DO merge + projection parity', () => {
                 attachedAt: 1700000000000,
             },
         ]);
+    });
+
+    // ── Scenario 7: No-wipe D1 hydration on first connect ─────────────────────
+    //
+    // An inspection already has a real `inspection_results.data` blob (created
+    // via the legacy path) and a template_snapshot covering those items, but NO
+    // prior DO collab state. On first connect the DO must:
+    //   (a) import the D1 blob so the doc starts from current truth, and
+    //   (b) seed every template item key (Condition A).
+    // Then persist() must NOT wipe the D1 row back to {}.
+    it('Scenario 7 — no-wipe: DO hydrates the existing D1 blob + seeds template, persist does not wipe', async () => {
+        const inspectionId = 'insp-hydrate-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        const blob = {
+            [FINDING_KEY_A]: { rating: 'D', notes: 'cracked wall' },
+        };
+        await writeResultsData(TENANT, inspectionId, blob);
+        await ensureInspectionRow(TENANT, inspectionId, {
+            sections: [{ id: 'sec1', items: [{ id: 'item1' }, { id: 'item2' }] }],
+        });
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            io.tenantId          = TENANT;
+            io.inspectionId      = inspectionId;
+            io.identityPersisted = true;
+            // No prior collab state for a fresh DO.
+            expect(io.hadStoredState).toBe(false);
+
+            await io.hydrateFromD1Once();
+
+            // (a) The D1 blob was imported faithfully.
+            const projection = projectResults(io.doc);
+            expect(projection[FINDING_KEY_A]?.rating).toBe('D');
+            expect(projection[FINDING_KEY_A]?.notes).toBe('cracked wall');
+
+            // (b) All template item keys exist as seeded Y.Maps (Condition A).
+            const results = io.doc.getMap('results');
+            expect(results.get(FINDING_KEY_A)).toBeInstanceOf(Y.Map);
+            expect(results.get(FINDING_KEY_B)).toBeInstanceOf(Y.Map);
+
+            // Persist must NOT wipe the real blob to {}.
+            await io.persist();
+        });
+
+        const d1Data = await readResultsData(TENANT, inspectionId);
+        const item = d1Data[FINDING_KEY_A] as Record<string, unknown> | undefined;
+        expect(item?.rating).toBe('D');
+        expect(item?.notes).toBe('cracked wall');
+    });
+
+    // ── Scenario 8: Prior-collab-state guard (no stale import) ────────────────
+    //
+    // When prior collab state exists (hadStoredState=true) the DO doc is
+    // authoritative and ahead of D1. Hydration must SEED structure but must NOT
+    // import the (different, stale) D1 blob over the live collab edits.
+    it('Scenario 8 — prior collab state: hydration seeds but does NOT import the stale D1 blob', async () => {
+        const inspectionId = 'insp-guard-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        // A DIFFERENT, stale blob sits in D1.
+        await writeResultsData(TENANT, inspectionId, {
+            [FINDING_KEY_A]: { rating: 'STALE', notes: 'old D1 value' },
+        });
+        await ensureInspectionRow(TENANT, inspectionId, {
+            sections: [{ id: 'sec1', items: [{ id: 'item1' }, { id: 'item2' }] }],
+        });
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            io.tenantId          = TENANT;
+            io.inspectionId      = inspectionId;
+            io.identityPersisted = true;
+
+            // Simulate prior collab state: a live edit + the no-wipe guard set.
+            seedResultsDoc(io.doc, [{ findingKey: FINDING_KEY_A }]);
+            applyItemPatch(io.doc, FINDING_KEY_A, 'rating', 'LIVE');
+            io.hadStoredState = true;
+
+            await io.hydrateFromD1Once();
+
+            // The collab value wins — the stale D1 blob was NOT imported.
+            const projection = projectResults(io.doc);
+            expect(projection[FINDING_KEY_A]?.rating).toBe('LIVE');
+            expect(projection[FINDING_KEY_A]?.notes).toBeUndefined();
+
+            // Condition A still applies: the second template key was seeded.
+            expect(io.doc.getMap('results').get(FINDING_KEY_B)).toBeInstanceOf(Y.Map);
+        });
+    });
+
+    // ── Scenario 9: Condition-A structure from an empty D1 blob ───────────────
+    //
+    // Empty `data` blob ({}) but a template with items i1, i2. After hydration
+    // both finding keys must exist as seeded Y.Maps so concurrent edits never
+    // lazily race to create the same item map.
+    it('Scenario 9 — Condition A: empty D1 blob still seeds every template item key', async () => {
+        const inspectionId = 'insp-condA-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId); // data defaults to '{}'
+        await ensureInspectionRow(TENANT, inspectionId, {
+            sections: [{ id: 'sec1', items: [{ id: 'item1' }, { id: 'item2' }] }],
+        });
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            io.tenantId          = TENANT;
+            io.inspectionId      = inspectionId;
+            io.identityPersisted = true;
+
+            await io.hydrateFromD1Once();
+
+            const results = io.doc.getMap('results');
+            const itemA = results.get(FINDING_KEY_A);
+            const itemB = results.get(FINDING_KEY_B);
+            expect(itemA).toBeInstanceOf(Y.Map);
+            expect(itemB).toBeInstanceOf(Y.Map);
+            // Seeded-only items carry NO data from the empty blob — each projects
+            // to an empty entry (the seeded structure with no scalar/nested writes).
+            const projection = projectResults(io.doc);
+            expect(projection[FINDING_KEY_A]).toEqual({});
+            expect(projection[FINDING_KEY_B]).toEqual({});
+        });
     });
 });

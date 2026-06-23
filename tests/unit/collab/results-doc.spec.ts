@@ -9,7 +9,9 @@ import {
   upsertCanned,
   upsertCustomComment,
   upsertRecommendation,
+  loadResultsProjection,
 } from '../../../server/lib/collab/results-doc';
+import type { ResultsProjection } from '../../../server/lib/collab/results-doc.types';
 
 const FK = '_default:s1:i1';
 
@@ -171,6 +173,113 @@ describe('results-doc', () => {
 
     const ids = (projectResults(a)[FK].recommendations ?? []).map((r) => r.recommendationId).sort();
     expect(ids).toEqual(['r1', 'r2']);
+    expect(projectResults(a)).toEqual(projectResults(b));
+  });
+
+  // ── loadResultsProjection — inverse of projectResults (#181 DO hydration) ────
+
+  it('loadResultsProjection round-trips a fully-populated blob (deep-equal)', () => {
+    const blob: ResultsProjection = {
+      '_default:s1:i1': {
+        rating: 'D',
+        notes: 'cracked',
+        value: 'some value',
+        recommendation: 'replace',
+        estimateMin: 100,
+        estimateMax: 500,
+        followupStatus: 'repaired',
+        followupNotes: 'fixed on re-inspection',
+        attributes: { yearBuilt: 1998, material: 'brick' },
+        photos: [
+          { key: 'r2/p1.jpg', mediaType: 'photo' },
+          { key: 'r2/p2.jpg', croppedKey: 'r2/p2-crop.jpg' },
+        ],
+        tabs: {
+          information: [{ cannedId: 'info1', included: true, comment: 'note' }],
+          limitations: [{ cannedId: 'lim1', included: false }],
+          defects: [
+            {
+              cannedId: 'd1',
+              included: true,
+              location: 'North wall',
+              category: 'safety',
+              trade: 'Roofing',
+            },
+          ],
+        },
+        customComments: {
+          defects: [
+            { id: 'c1', title: 'Custom defect', comment: 'Observed crack', included: true, location: 'roof' },
+          ],
+        },
+        recommendations: [
+          {
+            recommendationId: 'r1',
+            estimateSnapshotMin: 100,
+            estimateSnapshotMax: 200,
+            summarySnapshot: 'Fix the roof',
+            contractorTypeSnapshot: 'Roofer',
+            attachedAt: 1700000000000,
+          },
+        ],
+        original: {
+          rating: 'X',
+          notes: 'was broken',
+          photos: [{ key: 'r2/orig.jpg' }],
+        },
+      },
+      '_default:s1:i2': {
+        rating: 'IN',
+      },
+    };
+
+    const doc = new Y.Doc();
+    loadResultsProjection(doc, blob);
+    expect(projectResults(doc)).toEqual(blob);
+  });
+
+  it('loadResultsProjection is idempotent (reload does not duplicate array entries)', () => {
+    const blob: ResultsProjection = {
+      '_default:s1:i1': {
+        rating: 'D',
+        photos: [{ key: 'r2/p1.jpg' }],
+        tabs: { defects: [{ cannedId: 'd1', included: true }] },
+        customComments: { defects: [{ id: 'c1', title: 't', comment: 'c', included: true }] },
+        recommendations: [
+          {
+            recommendationId: 'r1',
+            estimateSnapshotMin: null,
+            estimateSnapshotMax: null,
+            summarySnapshot: 's',
+            contractorTypeSnapshot: null,
+            attachedAt: 1,
+          },
+        ],
+      },
+    };
+
+    const doc = new Y.Doc();
+    loadResultsProjection(doc, blob);
+    loadResultsProjection(doc, blob);
+    expect(projectResults(doc)).toEqual(blob);
+  });
+
+  it('loadResultsProjection produces CRDT containers that still merge after load', () => {
+    const blob: ResultsProjection = {
+      '_default:s1:i1': { rating: 'D', photos: [{ key: 'p1' }] },
+    };
+    const a = new Y.Doc();
+    loadResultsProjection(a, blob);
+    const b = new Y.Doc();
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+
+    appendPhoto(a, FK, { key: 'p2' });
+    appendPhoto(b, FK, { key: 'p3' });
+    Y.applyUpdate(a, Y.encodeStateAsUpdate(b));
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+
+    const keys = (projectResults(a)[FK].photos ?? []).map((p) => p.key).sort();
+    expect(keys).toEqual(['p1', 'p2', 'p3']);
     expect(projectResults(a)).toEqual(projectResults(b));
   });
 
