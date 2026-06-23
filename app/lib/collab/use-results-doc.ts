@@ -17,14 +17,24 @@ export type { ResultsDocHandle };
 /**
  * Returns the live ResultsDocHandle once the client connection is established,
  * or null on the SSR pass / before the connection initialises.
+ *
+ * Accepts `string | null`: when `inspectionId` is null/empty the effect returns
+ * early and the hook yields `null` (no connection). This lets the editor call
+ * it unconditionally (rules of hooks) while only connecting when collab is on.
  */
-export function useResultsDoc(inspectionId: string): ResultsDocHandle | null {
+export function useResultsDoc(inspectionId: string | null): ResultsDocHandle | null {
     const [handle, setHandle] = useState<ResultsDocHandle | null>(null);
 
     useEffect(() => {
         // SSR guard — should not be reached in practice (useEffect is
         // browser-only), but defend against edge cases in test environments.
         if (typeof window === 'undefined') return;
+
+        // No id → collab disabled; do not connect (hook yields null).
+        if (!inspectionId) {
+            setHandle(null);
+            return;
+        }
 
         const { handle: initial, destroy } = connectResultsDoc(inspectionId, {
             onChange: (updated) => {

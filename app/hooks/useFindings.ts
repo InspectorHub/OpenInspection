@@ -15,6 +15,7 @@ import { useFindingsCanned } from "./findings/useFindingsCanned";
 import { useFindingsPhotos } from "./findings/useFindingsPhotos";
 import { useFindingsCustom } from "./findings/useFindingsCustom";
 import { useFindingsRepair } from "./findings/useFindingsRepair";
+import { buildCollabFindingsApi } from "~/lib/collab/collab-findings-api";
 import type { useFetcher } from "react-router";
 
 // Re-exported so existing imports (`~/hooks/useFindings`) keep resolving. The
@@ -92,6 +93,19 @@ export function useFindings(
   const photos = useFindingsPhotos(ctx);
   const custom = useFindingsCustom(ctx);
   const repair = useFindingsRepair(ctx);
+
+  // #181 — collab branch: when a live Y.Doc is present, return the pure collab
+  // write API (every write goes to the doc via the binding) instead of the
+  // legacy per-field-CAS / offline path below. The legacy return is unchanged.
+  if (options.collab?.doc) {
+    return buildCollabFindingsApi(options.collab.doc, {
+      getResult: core.getResult,
+      sectionIdForItem,
+      setResults,
+      setDirty,
+      setSaveStatus,
+    });
+  }
 
   return {
     getResult: core.getResult,
