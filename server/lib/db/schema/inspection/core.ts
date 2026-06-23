@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, blob, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 import { tenants, users } from '../tenant';
 import { contacts } from '../contact';
 import { INSPECTION_STATUSES } from '../../../status/inspection-status';
@@ -110,6 +110,8 @@ export const inspections = sqliteTable('inspections', {
     //   helperInspectorIds   = JSON array of additional inspectors with edit access.
     //   dataVersion          = monotonic counter; bumped on every successful field write
     //                          (see InspectionService.patchItem) for offline-queue staleness checks.
+    //                          Superseded by the Yjs state vector under collab editing (#181);
+    //                          column frozen — stop writes once the DO is the authority.
     teamMode:            integer('team_mode', { mode: 'boolean' }).notNull().default(false),
     leadInspectorId:     text('lead_inspector_id'),
     helperInspectorIds:  text('helper_inspector_ids').notNull().default('[]'),
@@ -167,6 +169,12 @@ export const inspectionResults = sqliteTable('inspection_results', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     inspectionId: text('inspection_id').notNull().references(() => inspections.id),
     data: text('data', { mode: 'json' }).notNull(),
+    // Authoritative Yjs CRDT state for collaborative results editing (#181). The
+    // Durable Object persists Y.encodeStateAsUpdate here; `data` above is the
+    // materialized JSON projection of this doc that all readers consume. Nullable:
+    // inspections created before collab editing have no doc yet. This is the only
+    // BLOB column in the schema.
+    ydocState: blob('ydoc_state'),
     lastSyncedAt: integer('last_synced_at', { mode: 'timestamp' }).notNull(),
     // Sprint 2 S2-1 — denormalized rating system reference and a frozen
     // snapshot of the levels array at inspection creation. Editing the

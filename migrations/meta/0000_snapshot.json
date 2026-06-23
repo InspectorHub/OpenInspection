@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6ac825f2-bc97-43a8-9966-99faae20b885",
+  "id": "58753e1a-5f06-4db7-99d0-85755ed1152d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agreement_requests": {
@@ -3031,6 +3031,13 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "ydoc_state": {
+          "name": "ydoc_state",
+          "type": "blob",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "last_synced_at": {
