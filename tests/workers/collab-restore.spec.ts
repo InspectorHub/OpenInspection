@@ -70,10 +70,17 @@ async function readResultsData(
 
 // ─── DOInternals — typed access to the snapshot/restore members under test ─────
 
+type SnapshotReason = 'periodic' | 'manual' | 'connect';
+
 interface SnapshotMeta {
     seq:      number;
     atMs:     number;
     byUserId: string | null;
+    reason?:  SnapshotReason;
+}
+
+interface SnapshotRecord extends SnapshotMeta {
+    projection: ResultsProjection;
 }
 
 interface DOInternals {
@@ -83,7 +90,12 @@ interface DOInternals {
     identityPersisted: boolean;
     hadStoredState: boolean;
     persist(): Promise<void>;
-    captureSnapshot(byUserId: string | null): Promise<{ seq: number; atMs: number }>;
+    captureSnapshot(
+        byUserId: string | null,
+        reason?: SnapshotReason,
+    ): Promise<{ seq: number; atMs: number }>;
+    captureSnapshotOnConnect(byUserId: string | null): Promise<void>;
+    getSnapshot(seq: number): Promise<SnapshotRecord | null>;
     listSnapshots(): Promise<SnapshotMeta[]>;
     restoreSnapshot(seq: number, byUserId: string | null): Promise<{ ok: boolean }>;
 }
@@ -310,6 +322,136 @@ describe('#181 Phase 4 — DO snapshots + doc-replacement restore', () => {
             // No snapshot was created by the failed restore.
             const list = await io.listSnapshots();
             expect(list.length).toBe(0);
+        });
+    });
+
+    // ── Scenario 6: connect captures the PRE-MERGE boundary ───────────────────
+    // The connect-capture is factored into captureSnapshotOnConnect (driven by
+    // the /ws accept path AFTER hydrate, BEFORE acceptWebSocket). We test the
+    // helper directly: seed 'NI', take the connect snapshot at 'NI', THEN change
+    // to 'RR' — the connect snapshot must still hold the pre-change 'NI' value, so
+    // the about-to-be-overwritten value is recoverable.
+    it('Scenario 6 — connect captures the pre-merge state (reason:connect)', async () => {
+        const inspectionId = 'insp-connect-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            setIdentity(io, TENANT, inspectionId);
+
+            seedResultsDoc(io.doc, [{ findingKey: FINDING_KEY_A }]);
+
+            // Pre-merge state: rating NI.
+            applyItemPatch(io.doc, FINDING_KEY_A, 'rating', 'NI');
+
+            // A client reconnects — snapshot taken BEFORE its offline edits merge.
+            await io.captureSnapshotOnConnect('u-connector');
+
+            // Now the reconnecting client's buffered edit merges (LWW → RR),
+            // which would otherwise silently overwrite NI.
+            applyItemPatch(io.doc, FINDING_KEY_A, 'rating', 'RR');
+            expect(projectResults(io.doc)[FINDING_KEY_A]?.rating).toBe('RR');
+
+            // The connect snapshot preserves the pre-merge NI value.
+            const list = await io.listSnapshots();
+            const connectSnap = list.find((s) => s.reason === 'connect');
+            expect(connectSnap).toBeDefined();
+            expect(connectSnap?.byUserId).toBe('u-connector');
+
+            const full = await io.getSnapshot(connectSnap!.seq);
+            expect(full?.projection[FINDING_KEY_A]?.rating).toBe('NI');
+        });
+    });
+
+    // ── Scenario 7: connect-capture dedup (no change → no second snapshot) ────
+    it('Scenario 7 — two no-change connects add only ONE snapshot (dedup)', async () => {
+        const inspectionId = 'insp-dedup-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            setIdentity(io, TENANT, inspectionId);
+
+            seedResultsDoc(io.doc, [{ findingKey: FINDING_KEY_A }]);
+            applyItemPatch(io.doc, FINDING_KEY_A, 'rating', 'NI');
+
+            // First connect → one snapshot.
+            await io.captureSnapshotOnConnect('u1');
+            const afterFirst = await io.listSnapshots();
+            const connectCountFirst = afterFirst.filter((s) => s.reason === 'connect').length;
+            expect(connectCountFirst).toBe(1);
+
+            // Second connect with NO intervening change → deduped (no new snapshot).
+            await io.captureSnapshotOnConnect('u2');
+            const afterSecond = await io.listSnapshots();
+            expect(afterSecond.length).toBe(afterFirst.length);
+            expect(afterSecond.filter((s) => s.reason === 'connect').length).toBe(1);
+
+            // A real change THEN reconnect → a new connect snapshot is taken.
+            applyItemPatch(io.doc, FINDING_KEY_A, 'rating', 'RR');
+            await io.captureSnapshotOnConnect('u3');
+            const afterChange = await io.listSnapshots();
+            expect(afterChange.filter((s) => s.reason === 'connect').length).toBe(2);
+        });
+    });
+
+    // ── Scenario 8: reason is surfaced + distinguishes periodic/manual/connect ─
+    it('Scenario 8 — listSnapshots surfaces reason for each capture kind', async () => {
+        const inspectionId = 'insp-reason-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            setIdentity(io, TENANT, inspectionId);
+
+            seedResultsDoc(io.doc, [{ findingKey: FINDING_KEY_A }]);
+
+            applyItemPatch(io.doc, FINDING_KEY_A, 'rating', 'NI');
+            const manual = await io.captureSnapshot('u-manual', 'manual');
+
+            applyItemPatch(io.doc, FINDING_KEY_A, 'rating', 'RR');
+            await io.captureSnapshotOnConnect('u-connect');
+
+            applyItemPatch(io.doc, FINDING_KEY_A, 'notes', 'changed');
+            const periodic = await io.captureSnapshot(null, 'periodic');
+
+            const list = await io.listSnapshots();
+            const bySeq = new Map(list.map((s) => [s.seq, s.reason]));
+            expect(bySeq.get(manual.seq)).toBe('manual');
+            expect(bySeq.get(periodic.seq)).toBe('periodic');
+            expect(list.some((s) => s.reason === 'connect')).toBe(true);
+        });
+    });
+
+    // ── Scenario 9: get-by-seq returns the full projection / null on unknown ──
+    it('Scenario 9 — getSnapshot returns the full projection, null for unknown seq', async () => {
+        const inspectionId = 'insp-getbyseq-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            setIdentity(io, TENANT, inspectionId);
+
+            seedResultsDoc(io.doc, [{ findingKey: FINDING_KEY_A }]);
+            applyItemPatch(io.doc, FINDING_KEY_A, 'rating', 'NI');
+            const snap = await io.captureSnapshot('u-x', 'manual');
+
+            const full = await io.getSnapshot(snap.seq);
+            expect(full).not.toBeNull();
+            expect(full?.seq).toBe(snap.seq);
+            expect(full?.reason).toBe('manual');
+            expect(full?.projection[FINDING_KEY_A]?.rating).toBe('NI');
+
+            // Unknown seq → null (the route maps this to 404).
+            expect(await io.getSnapshot(9999)).toBeNull();
         });
     });
 });

@@ -48,6 +48,7 @@ import {
 import type { ResultsProjection } from '../lib/collab/results-doc.types';
 import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
 import { inspectionResults, inspections } from '../lib/db/schema';
+import { logger } from '../lib/logger';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -104,8 +105,21 @@ interface ResultsSnapshot {
     seq:        number;
     atMs:       number;
     byUserId:   string | null;
+    /**
+     * Why the snapshot was taken (see #181 PR-H):
+     *   'periodic' — the auto every-SNAPSHOT_EVERY capture in onDocUpdate.
+     *   'manual'   — an on-demand POST capture or restore's pre-restore capture.
+     *   'connect'  — the pre-merge boundary capture taken when a client reconnects,
+     *                BEFORE its buffered offline edits merge (preserves the
+     *                about-to-be-overwritten value for the H2 compare/recover UI).
+     * Optional so legacy snapshots persisted before this field stay readable.
+     */
+    reason?:    SnapshotReason;
     projection: ResultsProjection;
 }
+
+/** Discriminator for why a snapshot was captured. */
+type SnapshotReason = 'periodic' | 'manual' | 'connect';
 
 /** Snapshot metadata (the list view omits the heavy `projection` payload). */
 type ResultsSnapshotMeta = Omit<ResultsSnapshot, 'projection'>;
@@ -117,6 +131,37 @@ type ResultsSnapshotMeta = Omit<ResultsSnapshot, 'projection'>;
  */
 function asSnapshotArray(value: unknown): ResultsSnapshot[] {
     return Array.isArray(value) ? (value as ResultsSnapshot[]) : [];
+}
+
+/**
+ * Match a `…/snapshots/<seq>` path and parse the trailing `seq` as a
+ * non-negative integer. Returns the parsed seq, or `null` when the path is not
+ * a snapshot-by-seq request or the trailing segment is not a valid non-negative
+ * integer (so the caller falls through to the generic 404). Trailing slashes are
+ * ignored. The `/snapshots` (list/capture) path has no trailing segment and
+ * therefore never matches here.
+ */
+function matchSnapshotBySeqPath(pathname: string): number | null {
+    const segments = pathname.replace(/\/+$/, '').split('/');
+    const last = segments[segments.length - 1];
+    const parent = segments[segments.length - 2];
+    if (parent !== 'snapshots') return null;
+    // Strict non-negative integer (no signs, decimals, or whitespace).
+    if (!/^\d+$/.test(last)) return null;
+    const seq = Number(last);
+    return Number.isSafeInteger(seq) ? seq : null;
+}
+
+/**
+ * Stable deep-equality for two result projections. `projectResults` emits a
+ * plain, JSON-serialisable object with a deterministic key/element order (Yjs
+ * iteration order is insertion order, which is stable across reads of the same
+ * doc), so a `JSON.stringify` compare is both correct and cheap here. Used by
+ * the connect-time dedup to skip a no-op snapshot when nothing changed since the
+ * last capture.
+ */
+function projectionsEqual(a: ResultsProjection, b: ResultsProjection): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
 }
 
 /** Shape of the persisted identity stored across hibernation. */
@@ -222,7 +267,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         this.updatesSinceSnapshot += 1;
         if (this.updatesSinceSnapshot >= SNAPSHOT_EVERY) {
             this.updatesSinceSnapshot = 0;
-            void this.captureSnapshot(null);
+            void this.captureSnapshot(null, 'periodic');
         }
     };
 
@@ -268,6 +313,19 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
             // await the same promise.
             await this.hydrateFromD1Once();
 
+            // PR-H pre-merge boundary snapshot (#181): capture the CURRENT doc
+            // state attributed to the connecting user BEFORE accepting the socket
+            // and BEFORE this client's buffered offline edits arrive (those come
+            // later via webSocketMessage step2). This preserves the state — and
+            // any about-to-be-overwritten scalar value — so the H2 compare/recover
+            // UI can surface a value LWW would otherwise silently drop.
+            //
+            // FAIL-OPEN: a snapshot problem must NEVER break collab connect, so the
+            // capture is wrapped in try/catch and only logged. The dedup inside
+            // captureSnapshotOnConnect skips no-op captures on plain online
+            // reconnects (nothing changed since the last snapshot).
+            await this.captureSnapshotOnConnect(req.headers.get('x-user-id'));
+
             const pair   = new WebSocketPair();
             const client = pair[0];
             const server = pair[1];
@@ -294,10 +352,23 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 return Response.json(await this.listSnapshots());
             }
             if (req.method === 'POST') {
-                const snap = await this.captureSnapshot(req.headers.get('x-user-id'));
+                const snap = await this.captureSnapshot(req.headers.get('x-user-id'), 'manual');
                 return Response.json({ seq: snap.seq, atMs: snap.atMs });
             }
             return new Response('method not allowed', { status: 405 });
+        }
+
+        // ── GET …/snapshots/<seq> — one snapshot's FULL record (incl projection).
+        // The H2 compare/recover UI diffs two snapshots → it needs each one's
+        // full projection (the list view omits it). The seq is the last path
+        // segment; it is validated as a non-negative integer (the authorized
+        // route also validates, but the DO re-guards as the persistence boundary).
+        const snapshotBySeq = matchSnapshotBySeqPath(url.pathname);
+        if (snapshotBySeq !== null && req.method === 'GET') {
+            const snap = await this.getSnapshot(snapshotBySeq);
+            return snap
+                ? Response.json(snap)
+                : new Response('snapshot not found', { status: 404 });
         }
 
         if (url.pathname.endsWith('/restore') && req.method === 'POST') {
@@ -433,7 +504,10 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
      * runtime (this is not a Workflow script). The in-flight guard prevents two
      * concurrent triggers from racing the read-modify-write of the array.
      */
-    private async captureSnapshot(byUserId: string | null): Promise<ResultsSnapshot> {
+    private async captureSnapshot(
+        byUserId: string | null,
+        reason: SnapshotReason = 'manual',
+    ): Promise<ResultsSnapshot> {
         // The DO runs single-threaded; this guard serializes the read-modify-write
         // of the snapshot array across INTERLEAVED awaits (an auto-capture firing
         // while an on-demand capture is parked on storage I/O), not OS threads.
@@ -450,6 +524,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 seq:        maxSeq + 1,
                 atMs:       Date.now(),
                 byUserId,
+                reason,
                 projection: projectResults(this.doc),
             };
 
@@ -464,14 +539,67 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
     }
 
     /**
+     * PR-H connect-time capture (#181): take a 'connect' snapshot of the CURRENT
+     * doc state, UNLESS it would be a no-op — i.e. the current projection deep-
+     * equals the most recent stored snapshot's projection. The dedup avoids a
+     * snapshot on every plain online reconnect when nothing has changed since the
+     * last snapshot, while still capturing the pre-merge boundary whenever a
+     * reconnecting client is about to merge buffered offline edits on top of a
+     * state that has moved since the last snapshot.
+     *
+     * FAIL-OPEN: any failure here is logged and swallowed — a snapshot problem
+     * must never break the collab connect (the caller proceeds to accept the WS).
+     */
+    private async captureSnapshotOnConnect(byUserId: string | null): Promise<void> {
+        try {
+            const stored = await this.ctx.storage.get(SNAPSHOTS_KEY);
+            const snapshots = asSnapshotArray(stored);
+
+            // Dedup against the most-recently-stored snapshot (snapshots are
+            // appended in seq order, so the last element is the newest).
+            const latest = snapshots[snapshots.length - 1];
+            const current = projectResults(this.doc);
+            if (latest && projectionsEqual(latest.projection, current)) {
+                return; // no change since the last snapshot — skip the no-op
+            }
+
+            await this.captureSnapshot(byUserId, 'connect');
+        } catch (err) {
+            logger.error(
+                'collab: connect-time snapshot failed (fail-open)',
+                { tenantId: this.tenantId, inspectionId: this.inspectionId },
+                err instanceof Error ? err : undefined,
+            );
+        }
+    }
+
+    /**
      * List snapshot metadata (no `projection` payload), newest-first.
      */
     private async listSnapshots(): Promise<ResultsSnapshotMeta[]> {
         const stored = await this.ctx.storage.get(SNAPSHOTS_KEY);
         const snapshots = asSnapshotArray(stored);
         return snapshots
-            .map(({ seq, atMs, byUserId }) => ({ seq, atMs, byUserId }))
+            .map(({ seq, atMs, byUserId, reason }): ResultsSnapshotMeta =>
+                // Spread `reason` only when present so the result conforms to
+                // `exactOptionalPropertyTypes` (no explicit `undefined` on the
+                // optional key) — legacy snapshots have no `reason`.
+                reason === undefined
+                    ? { seq, atMs, byUserId }
+                    : { seq, atMs, byUserId, reason },
+            )
             .sort((a, b) => b.seq - a.seq);
+    }
+
+    /**
+     * Fetch ONE snapshot's full record (including the heavy `projection`) by seq,
+     * or `null` when no snapshot with that seq is retained. The H2 compare/recover
+     * UI uses this to diff two snapshots' projections.
+     */
+    private async getSnapshot(seq: number): Promise<ResultsSnapshot | null> {
+        const stored = await this.ctx.storage.get(SNAPSHOTS_KEY);
+        const snapshots = asSnapshotArray(stored);
+        return snapshots.find((s) => s.seq === seq) ?? null;
     }
 
     /**
@@ -500,7 +628,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         if (!target) return { ok: false };
 
         // (2) Capture current state first — makes the restore reversible.
-        await this.captureSnapshot(byUserId);
+        await this.captureSnapshot(byUserId, 'manual');
 
         // (3) Build a fresh doc from the target projection (doc-replacement).
         const fresh = new Y.Doc();

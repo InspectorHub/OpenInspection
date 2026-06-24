@@ -27,7 +27,7 @@
 import type { Context } from 'hono';
 import { createApiRouter } from '../../lib/openapi-router';
 import { logger } from '../../lib/logger';
-import { CollabRestoreRequestSchema } from '../../lib/validations/collab.schema';
+import { CollabRestoreRequestSchema, CollabSnapshotParamSchema } from '../../lib/validations/collab.schema';
 import type { HonoConfig } from '../../types/hono';
 
 /**
@@ -142,6 +142,31 @@ const collabRoutes = createApiRouter()
 
         const stub = collabStub(c, auth.tenantId, auth.inspectionId);
         const fwd = new Request('https://do.local/snapshots', {
+            method:  'GET',
+            headers: {
+                'x-tenant-id':     auth.tenantId,
+                'x-inspection-id': auth.inspectionId,
+                'x-user-id':       auth.userId,
+            },
+        });
+        return stub.fetch(fwd);
+    })
+    // ── GET /:id/collab/snapshots/:seq — one snapshot's full projection ───────
+    // H2's compare/recover UI diffs two snapshots → it needs each one's full
+    // `projection` (the list route omits it). Mirrors the list route's auth +
+    // tenant-scoped DO addressing; the :seq param is Zod-validated as a
+    // non-negative int before it is forwarded (the DO re-guards as well).
+    .get('/:id/collab/snapshots/:seq', async (c) => {
+        const auth = await authorizeCollab(c);
+        if (!auth.ok) return auth.response;
+
+        const parsedParam = CollabSnapshotParamSchema.safeParse({ seq: c.req.param('seq') });
+        if (!parsedParam.success) {
+            return c.json({ error: 'invalid snapshot seq' }, 400);
+        }
+
+        const stub = collabStub(c, auth.tenantId, auth.inspectionId);
+        const fwd = new Request(`https://do.local/snapshots/${parsedParam.data.seq}`, {
             method:  'GET',
             headers: {
                 'x-tenant-id':     auth.tenantId,
