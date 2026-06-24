@@ -154,7 +154,8 @@ export function useInspectionState(opts: UseInspectionOptions) {
   const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("items");
-  const [viewMode, setViewMode] = useState<ViewMode>("split");
+  const [itemFullscreen, setItemFullscreen] = useState(false);
+  const [sideRailCollapsed, setSideRailCollapsed] = useState(false);
   const [itemFilter, setItemFilter] = useState<ItemFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -460,8 +461,10 @@ export function useInspectionState(opts: UseInspectionOptions) {
     activeItem,
     activeView,
     setActiveView,
-    viewMode,
-    setViewMode,
+    itemFullscreen,
+    setItemFullscreen,
+    sideRailCollapsed,
+    setSideRailCollapsed,
     itemFilter,
     setItemFilter,
     selectSection,

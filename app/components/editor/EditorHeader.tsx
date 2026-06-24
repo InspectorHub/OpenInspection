@@ -1,6 +1,7 @@
 import type { useInspectionState } from "~/hooks/useInspection";
 import type { ColorScheme } from "~/lib/ui-prefs";
 import { ProgressStripText } from "~/components/editor/ProgressStripText";
+import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
 
 type EditorState = ReturnType<typeof useInspectionState>;
 
@@ -142,19 +143,11 @@ export function EditorHeader({
   className="w-44 h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
  />
 
- {/* View mode */}
- <div className="flex items-center gap-0.5 bg-ih-bg-muted rounded-md p-0.5">
-  <button
-  onClick={() => state.setViewMode("split")}
-  className={`px-2 py-1 rounded text-[11px] font-bold ${state.viewMode === "split" ? "bg-ih-bg-card text-ih-fg-1 shadow-ih-card" : "text-ih-fg-3"}`}
-  title="Split view (Cmd+1)"
-  >Split</button>
-  <button
-  onClick={() => state.setViewMode("focus")}
-  className={`px-2 py-1 rounded text-[11px] font-bold ${state.viewMode === "focus" ? "bg-ih-bg-card text-ih-fg-1 shadow-ih-card" : "text-ih-fg-3"}`}
-  title="Focus view (Cmd+2)"
-  >Focus</button>
- </div>
+ {/* Item fullscreen toggle */}
+ <FullscreenToggle
+  active={state.itemFullscreen}
+  onToggle={() => state.setItemFullscreen(!state.itemFullscreen)}
+ />
 
  {/* Batch mode toggle */}
  <button

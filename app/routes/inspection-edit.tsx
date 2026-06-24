@@ -1078,13 +1078,8 @@ export default function InspectionEditPage() {
  if (!state.activeItemId) return;
  setTagPickerOpen(true);
  },
- onSetViewMode: (mode: "split" | "focus" | "preview") => {
- if (mode === "preview") {
- window.open(`/inspections/${state.inspection.id}/preview`, "_blank");
- return;
- }
- state.setViewMode(mode);
- },
+ onToggleFullscreen: () => state.setItemFullscreen(!state.itemFullscreen),
+ onExitFullscreen: () => state.setItemFullscreen(false),
  }),
  [
  state,
@@ -1749,10 +1744,11 @@ export default function InspectionEditPage() {
  </div>
  ) : (
  <>
- {/* Column 1: Section Rail (200px) */}
- {sectionRailEl}
+ {/* Column 1: Section Rail (200px) — hidden in fullscreen */}
+ {!state.itemFullscreen && sectionRailEl}
 
- {/* Column 2: Item List (280px, items-only) */}
+ {/* Column 2: Item List (280px, items-only) — hidden in fullscreen */}
+ {!state.itemFullscreen && (
  <div className="w-[280px] flex-shrink-0 border-r border-ih-border flex flex-col overflow-hidden relative">
  {/* Item filter tabs */}
  <div className="flex items-center gap-1 px-3 py-1.5 border-b border-ih-border">
@@ -1816,8 +1812,9 @@ export default function InspectionEditPage() {
  </div>
  )}
  </div>
+ )}
 
- {/* Column 3: Item Editor (flex-1, focal) or Inspection Details overview */}
+ {/* Column 3: Item Editor (flex-1, focal) or Inspection Details overview — always rendered */}
  <main className="flex-1 overflow-y-auto border-t-2 border-ih-primary p-6">
  {state.activeView === "property" ? (
   <PropertyInfoForm
@@ -1832,8 +1829,37 @@ export default function InspectionEditPage() {
  ) : itemEditorEl}
  </main>
 
- {/* Column 4: SideRail */}
- {sideRailEl}
+ {/* Column 4: SideRail — hidden in fullscreen; collapsible otherwise */}
+ {!state.itemFullscreen && (
+  state.sideRailCollapsed ? (
+  <div className="w-8 flex-shrink-0 border-l border-ih-border flex flex-col items-center pt-3">
+   <button
+   type="button"
+   onClick={() => state.setSideRailCollapsed(false)}
+   className="w-7 h-7 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
+   title="Expand photo rail"
+   >
+   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+   </svg>
+   </button>
+  </div>
+  ) : (
+  <div className="relative flex-shrink-0">
+   <button
+   type="button"
+   onClick={() => state.setSideRailCollapsed(true)}
+   className="absolute top-3 left-1 z-10 w-6 h-6 rounded-md flex items-center justify-center text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-fg-2"
+   title="Collapse photo rail"
+   >
+   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+   </svg>
+   </button>
+   {sideRailEl}
+  </div>
+  )
+ )}
  </>
  )}
  </div>

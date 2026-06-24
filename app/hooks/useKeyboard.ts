@@ -48,8 +48,9 @@ export interface KeyboardHandlers {
   // Tags
   onOpenTagPicker: () => void;
 
-  // View modes
-  onSetViewMode: (mode: "split" | "focus" | "preview") => void;
+  // Fullscreen
+  onToggleFullscreen: () => void;
+  onExitFullscreen: () => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -104,21 +105,6 @@ export function useKeyboard(
         if (e.key === "Enter" && h.showCommentLibrary) {
           e.preventDefault();
           h.onLibrarySelect?.();
-          return;
-        }
-        if (e.key === "1") {
-          e.preventDefault();
-          h.onSetViewMode("split");
-          return;
-        }
-        if (e.key === "2") {
-          e.preventDefault();
-          h.onSetViewMode("focus");
-          return;
-        }
-        if (e.key === "3") {
-          e.preventDefault();
-          h.onSetViewMode("preview");
           return;
         }
         return;
@@ -209,6 +195,12 @@ export function useKeyboard(
         return;
       }
 
+      // Escape exits fullscreen (when library is not open)
+      if (e.key === "Escape") {
+        h.onExitFullscreen();
+        return;
+      }
+
       // G-prefix mode
       if (gPrefixRef.current && /^[0-9]$/.test(e.key)) {
         e.preventDefault();
@@ -263,6 +255,13 @@ export function useKeyboard(
       if (e.key === "t" || e.key === "T") {
         e.preventDefault();
         h.onOpenTagPicker();
+        return;
+      }
+
+      // F = toggle item fullscreen
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        h.onToggleFullscreen();
         return;
       }
 
