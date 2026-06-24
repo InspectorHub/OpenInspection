@@ -1617,6 +1617,8 @@ export default function InspectionEditPage() {
  setPublishError(null);
  publishFetcher.submit({ intent: "publish" }, { method: "post" });
  }}
+ autoSign={autoSign}
+ onAutoSignToggle={handleAutoSignToggle}
  />
  )}
 
@@ -1727,8 +1729,6 @@ export default function InspectionEditPage() {
  state={state}
  scheme={scheme}
  setColorScheme={setColorScheme}
- autoSign={autoSign}
- handleAutoSignToggle={handleAutoSignToggle}
  tenantSlug={loaderData.tenantSlug}
  setSignModalOpen={setSignModalOpen}
  handlePublishClick={handlePublishClick}
