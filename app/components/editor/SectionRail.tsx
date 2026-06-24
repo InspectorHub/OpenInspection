@@ -1,4 +1,5 @@
 import { SectionDonut } from './SectionDonut';
+import { sectionIconFor } from './section-icons';
 
 interface SectionRailProps {
  sections: Array<{ id: string; title: string; items: Array<{ id: string }> }>;
@@ -41,6 +42,7 @@ export function SectionRail({ sections, activeSection, onSelect, results, sectio
  }`}
  >
  <div className="flex items-center justify-between gap-1">
+ <span className="mr-1 shrink-0 text-ih-fg-3">{sectionIconFor(section.title ?? section.id)}</span>
  <span className="truncate">{section.title}</span>
  <span className="ml-1 shrink-0 flex items-center">
  <SectionDonut rated={rated} total={total} hasDefect={hasDefect} />
