@@ -63,7 +63,7 @@
   "server/services/inspection/inspection-annotations.service.ts:256",
   "server/services/inspection/inspection-cascade.ts:41",
   "server/services/inspection/inspection-core.service.ts:544",
-  "server/services/inspection/inspection-photo.service.ts:73",
+  "server/services/inspection/inspection-photo.service.ts:72",
   "server/services/inspection/inspection-publish.service.ts:420",
   "server/services/inspection/inspection-results.service.ts:110",
   "server/services/inspection/inspection-results.service.ts:292",
