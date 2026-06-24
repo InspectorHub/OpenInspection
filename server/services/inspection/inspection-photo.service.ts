@@ -25,10 +25,9 @@ function parseResultData<T = Record<string, never>>(data: unknown): T {
 
 /**
  * Photo + media handling: R2 upload (EXIF strip), media center aggregation,
- * loose pool upload/attach/delete, item-photo reorder/detach/revert/move, the
- * field-version-aware item patch, and the cover-key validation predicate.
- * Extracted verbatim from InspectionService. Ownership checks call back
- * through the facade (getInspection).
+ * loose pool upload/attach/delete, item-photo reorder/detach/revert/move, and
+ * the cover-key validation predicate. Ownership checks call back through the
+ * facade (getInspection).
  */
 export class InspectionPhotoService extends InspectionSubService {
     constructor(
@@ -57,8 +56,8 @@ export class InspectionPhotoService extends InspectionSubService {
      */
     /**
      * Persist a results `data` map: UPDATE the located row by id, or INSERT a
-     * fresh inspection_results row when none exists. Shared by attachPoolPhoto
-     * and patchItem (both pre-load the row and mutate `data` in place).
+     * fresh inspection_results row when none exists. Shared by the photo
+     * mutators (which pre-load the row and mutate `data` in place).
      */
     private async upsertResultData(
         tenantId: string,
