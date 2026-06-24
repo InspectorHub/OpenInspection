@@ -1127,11 +1127,14 @@ export default function InspectionEditPage() {
  activeSection={state.currentSection?.id || ""}
  onSelect={(id) => {
  state.selectSectionById(id);
+ state.setActiveView("items");
  if (isMobile) setMobileDrawer(null);
  }}
  results={state.results}
  sectionProgress={state.sectionProgress}
  sectionDefectCount={state.sectionDefectCount}
+ overviewActive={state.activeView === "property"}
+ onSelectOverview={() => state.setActiveView("property")}
  />
  );
 
@@ -1749,33 +1752,8 @@ export default function InspectionEditPage() {
  {/* Column 1: Section Rail (200px) */}
  {sectionRailEl}
 
- {/* Column 2: Item List (280px) OR Property Info */}
+ {/* Column 2: Item List (280px, items-only) */}
  <div className="w-[280px] flex-shrink-0 border-r border-ih-border flex flex-col overflow-hidden relative">
- {/* View toggle (Items / Property) */}
- <div className="flex items-center border-b border-ih-border">
- <button
- onClick={() => state.setActiveView("items")}
- className={`flex-1 py-2 text-[11px] font-bold text-center ${state.activeView === "items" ? "text-ih-primary border-b-2 border-ih-primary" : "text-ih-fg-3"}`}
- >Items</button>
- <button
- onClick={() => state.setActiveView("property")}
- className={`flex-1 py-2 text-[11px] font-bold text-center ${state.activeView === "property" ? "text-ih-primary border-b-2 border-ih-primary" : "text-ih-fg-3"}`}
- >Property</button>
- </div>
- {state.activeView === "property" ? (
- <div className="flex-1 overflow-y-auto">
- <PropertyInfoForm
- inspection={state.inspection}
- onSave={(fieldId, value) => {
- state.setInspection((prev) => ({
- ...prev,
- [fieldId]: value,
- }));
- }}
- />
- </div>
- ) : (
- <>
  {/* Item filter tabs */}
  <div className="flex items-center gap-1 px-3 py-1.5 border-b border-ih-border">
  {(["all", "unrated", "issues", "flagged"] as const).map((f) => (
@@ -1837,13 +1815,21 @@ export default function InspectionEditPage() {
   </button>
  </div>
  )}
- </>
- )}
  </div>
 
- {/* Column 3: Item Editor (flex-1, focal) */}
+ {/* Column 3: Item Editor (flex-1, focal) or Inspection Details overview */}
  <main className="flex-1 overflow-y-auto border-t-2 border-ih-primary p-6">
- {itemEditorEl}
+ {state.activeView === "property" ? (
+  <PropertyInfoForm
+  inspection={state.inspection}
+  onSave={(fieldId, value) => {
+  state.setInspection((prev) => ({
+   ...prev,
+   [fieldId]: value,
+  }));
+  }}
+  />
+ ) : itemEditorEl}
  </main>
 
  {/* Column 4: SideRail */}
