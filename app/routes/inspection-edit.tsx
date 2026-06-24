@@ -27,6 +27,7 @@ import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
 import { SideRail } from "~/components/editor/SideRail";
 import { SpeedMode } from "~/components/editor/SpeedMode";
 import { FooterBar } from "~/components/editor/FooterBar";
+import { BatchActionBar } from "~/components/editor/BatchActionBar";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
@@ -1771,46 +1772,7 @@ export default function InspectionEditPage() {
  </button>
  ))}
  </div>
- {state.batchMode && (
- <div className="flex items-center gap-1 px-3 py-1 border-b border-ih-border">
-  <button
-  onClick={() => state.batchSelectAll()}
-  className="px-2 py-0.5 rounded text-[11px] font-bold text-ih-primary hover:bg-ih-primary-tint"
-  >
-  Select All
-  </button>
-  <button
-  onClick={() => state.setBatchSelected({})}
-  className="px-2 py-0.5 rounded text-[11px] font-bold text-ih-fg-3 hover:text-ih-fg-2"
-  >
-  Clear
-  </button>
- </div>
- )}
  {itemListEl}
- {state.batchMode && state.selectedBatchCount > 0 && (
- <div className="absolute bottom-0 left-0 right-0 bg-ih-bg-card border-t border-ih-border p-2 flex items-center gap-2">
-  <span className="text-[11px] font-bold text-ih-fg-2">{state.selectedBatchCount} selected</span>
-  <div className="flex gap-1 ml-auto">
-  {state.ratingLevels.slice(0, 5).map((level, idx) => (
-   <button
-   key={level.id}
-   onClick={() => findings.batchSetRating(state.currentSection?.id || "", state.currentSectionItems, state.batchSelected, level.id)}
-   className="w-7 h-7 rounded text-[10px] font-bold"
-   style={{ background: state.getRatingColor(level.id), color: "white" }}
-   >
-   {idx + 1}
-   </button>
-  ))}
-  </div>
-  <button
-  onClick={() => { state.setBatchMode(false); state.setBatchSelected({}); }}
-  className="text-[11px] text-ih-fg-3 hover:text-ih-fg-1"
-  >
-  Cancel
-  </button>
- </div>
- )}
  </div>
  )}
 
@@ -1863,6 +1825,21 @@ export default function InspectionEditPage() {
  </>
  )}
  </div>
+
+ {/* ------------------------------------------------------------ */}
+ {/* Batch Action Bar — spans full editor width, shown when items are selected */}
+ {/* ------------------------------------------------------------ */}
+ {state.batchMode && state.selectedBatchCount > 0 && (
+ <BatchActionBar
+  count={state.selectedBatchCount}
+  ratingLevels={state.ratingLevels.slice(0, 5)}
+  getRatingColor={state.getRatingColor}
+  onSelectAll={() => state.batchSelectAll()}
+  onClear={() => state.setBatchSelected({})}
+  onSetRating={(levelId) => findings.batchSetRating(state.currentSection?.id || "", state.currentSectionItems, state.batchSelected, levelId)}
+  onExit={() => { state.setBatchMode(false); state.setBatchSelected({}); }}
+ />
+ )}
 
  {/* ------------------------------------------------------------ */}
  {/* Footer Bar */}
