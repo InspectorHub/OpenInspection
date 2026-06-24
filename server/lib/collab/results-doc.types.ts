@@ -41,6 +41,10 @@ export interface PhotoEntry {
     posterKey?:      string;
     posterPct?:      number;
     durationSec?:    number;
+    /** #181 PR-G — true while the binary is only in the local pending store (not yet on R2). */
+    pendingUpload?:  boolean;
+    /** #181 PR-G — id into the local media-pending IndexedDB store; resolves to a local blob URL. */
+    pendingId?:      string;
 }
 
 /** Toggle-state for a single canned information or limitation comment. */

@@ -471,4 +471,27 @@ describe('results-doc', () => {
 
     expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key)).toEqual(['p2']);
   });
+
+  it('#181 PR-G a pending PhotoEntry round-trips through projectResults/loadResultsProjection', () => {
+    // A pending upload carries an empty `key` + pendingUpload + pendingId, no
+    // R2 derivative. It must survive the projection round-trip untouched so the
+    // doc can hold it offline until the upload queue swaps in the real key.
+    const projection: ResultsProjection = {
+      [FK]: {
+        photos: [
+          { key: 'real-r2-key' },
+          { key: '', pendingUpload: true, pendingId: 'p1' },
+        ],
+      },
+    };
+
+    const doc = new Y.Doc();
+    loadResultsProjection(doc, projection);
+    const out = projectResults(doc);
+
+    expect(out[FK].photos).toEqual(projection[FK].photos);
+    const pending = (out[FK].photos ?? []).find((p) => p.pendingUpload === true);
+    expect(pending?.pendingId).toBe('p1');
+    expect(pending?.key).toBe('');
+  });
 });
