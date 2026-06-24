@@ -29,6 +29,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { logger } from '../../lib/logger';
 import { CollabRestoreRequestSchema, CollabSnapshotParamSchema } from '../../lib/validations/collab.schema';
 import type { HonoConfig } from '../../types/hono';
+import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 
 /**
  * Result of the shared fail-closed auth: either an early `Response` (the caller
@@ -81,16 +82,8 @@ async function authorizeCollab(c: Context<HonoConfig>): Promise<AuthResult> {
     }
 
     // ── (5) Edit-permission check (mirrors presence route) ────────────────────
-    let helpers: string[] = [];
-    try {
-        const parsed = JSON.parse(inspection.helperInspectorIds ?? '[]');
-        if (Array.isArray(parsed)) helpers = parsed as string[];
-    } catch { /* malformed — treat as no helpers */ }
-
-    const allowed =
-        inspection.inspectorId     === userId ||
-        inspection.leadInspectorId === userId ||
-        helpers.includes(userId);
+    const userRole = c.get('userRole') as string | undefined;
+    const allowed = canAccessInspectionCollab(inspection, { id: userId, role: userRole ?? '' });
 
     if (!allowed) {
         return { ok: false, response: new Response('forbidden', { status: 403 }) };
