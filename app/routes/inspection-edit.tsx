@@ -28,6 +28,7 @@ import { SideRail } from "~/components/editor/SideRail";
 import { SpeedMode } from "~/components/editor/SpeedMode";
 import { FooterBar } from "~/components/editor/FooterBar";
 import { BatchActionBar } from "~/components/editor/BatchActionBar";
+import { capturePriorRatings } from "~/lib/editor/batch-undo";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
@@ -1837,7 +1838,26 @@ export default function InspectionEditPage() {
   getRatingColor={state.getRatingColor}
   onSelectAll={() => state.batchSelectAll()}
   onClear={() => state.setBatchSelected({})}
-  onSetRating={(levelId) => findings.batchSetRating(state.currentSection?.id || "", state.currentSectionItems, state.batchSelected, levelId)}
+  onSetRating={(levelId) => {
+   const sectionId = state.currentSection?.id || "";
+   const selectedIds = Object.keys(state.batchSelected).filter((id) => state.batchSelected[id]);
+   const prior = capturePriorRatings(selectedIds, (id) => {
+    const r = state.getResult(id, sectionId);
+    return (r?.rating as string | null) ?? null;
+   });
+   findings.batchSetRating(sectionId, state.currentSectionItems, state.batchSelected, levelId);
+   const label = state.ratingLevels.find((l) => l.id === levelId)?.label ?? levelId;
+   pushToast({
+    message: `Rated ${selectedIds.length} item${selectedIds.length === 1 ? '' : 's'} as ${label}`,
+    actionLabel: 'Undo',
+    durationMs: 6000,
+    onAction: () => {
+     for (const { itemId, prior: p } of prior) {
+      findings.setRating(sectionId, itemId, p);
+     }
+    },
+   });
+  }}
   onExit={() => { state.setBatchMode(false); state.setBatchSelected({}); }}
  />
  )}
