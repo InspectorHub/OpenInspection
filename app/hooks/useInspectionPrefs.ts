@@ -7,8 +7,9 @@ export type RequireDefectFields = 'none' | 'location' | 'trade' | 'both';
 export interface InspectionPrefs {
     cloneDefault:       'rating' | 'rating_notes' | 'all';
     /** B-18 — when rating an item advances to the next unrated one.
-     *  'keyboard' (default): only keyboard 1-5 speed-scanning advances;
-     *  pointer clicks stay put for the rate → describe → photo flow. */
+     *  'always' (default): satisfactory/non-pausing ratings advance on click or key; defect/monitor pause to write notes.
+     *  'keyboard': only keyboard 1-5 speed-scanning advances; pointer clicks stay put.
+     *  'off': never advances, always stays on the rated item. */
     autoAdvance:        AutoAdvanceMode;
     autoAdvanceDelayMs: number;
     pinnedTagIds:       string[];
@@ -19,7 +20,7 @@ export interface InspectionPrefs {
 
 const DEFAULTS: InspectionPrefs = {
     cloneDefault:       'rating_notes',
-    autoAdvance:        'keyboard',
+    autoAdvance:        'always',
     autoAdvanceDelayMs: 200,
     pinnedTagIds:       [],
     requireDefectFields: 'none',
