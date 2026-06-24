@@ -42,15 +42,6 @@ body:
     validations:
       required: true
   - type: checkboxes
-    id: scope
-    attributes:
-      label: Scope check
-      description: Help us route the feature.
-      options:
-        - label: This belongs in the open-source `apps/core` engine.
-        - label: This is SaaS-only (InspectorHub portal) — please move to that tracker.
-        - label: I am unsure where it fits and want maintainer input.
-  - type: checkboxes
     id: terms
     attributes:
       label: Code of conduct
