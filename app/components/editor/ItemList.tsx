@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface ItemListProps {
   items: Array<{ id: string; label: string; type: string }>;
@@ -9,6 +9,7 @@ interface ItemListProps {
   batchMode?: boolean;
   batchSelected?: Record<string, boolean>;
   onBatchToggle?: (id: string) => void;
+  onBatchRange?: (fromId: string, toId: string) => void;
 }
 
 /** Map rating to dot color for the item list */
@@ -19,8 +20,9 @@ function ratingDotClass(rating: string): string {
   return "bg-ih-border-strong";
 }
 
-export function ItemList({ items, sectionId, activeItemId, onSelect, results, batchMode, batchSelected, onBatchToggle }: ItemListProps) {
+export function ItemList({ items, sectionId, activeItemId, onSelect, results, batchMode, batchSelected, onBatchToggle, onBatchRange }: ItemListProps) {
   const [filter, setFilter] = useState("all");
+  const lastClickedRef = useRef<string | null>(null);
 
   const filters = [
     { id: "all", label: "All" },
@@ -63,9 +65,14 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
           return (
             <button
               key={item.id}
-              onClick={() => {
+              onClick={(e) => {
                 if (batchMode && onBatchToggle) {
-                  onBatchToggle(item.id);
+                  if (e.shiftKey && lastClickedRef.current && onBatchRange) {
+                    onBatchRange(lastClickedRef.current, item.id);
+                  } else {
+                    onBatchToggle(item.id);
+                  }
+                  lastClickedRef.current = item.id;
                 } else {
                   onSelect(item.id);
                 }

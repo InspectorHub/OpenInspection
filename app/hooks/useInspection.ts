@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { backfillLevelDescriptions } from "./inspection/helpers";
 import type { InspectionContext } from "./inspection/helpers";
+import { rangeIds } from "~/lib/editor/batch-range";
 import { useInspectionProgress } from "./inspection/useInspectionProgress";
 import { useInspectionNavigation } from "./inspection/useInspectionNavigation";
 import { useInspectionSearch } from "./inspection/useInspectionSearch";
@@ -421,6 +422,13 @@ export function useInspectionState(opts: UseInspectionOptions) {
     pickSection,
   } = useInspectionBatch(ctx, selectSection);
 
+  /** Merge every item in the inclusive range [fromId, toId] into batchSelected. */
+  const batchSelectRange = useCallback((fromId: string, toId: string) => {
+    const ids = rangeIds(currentSectionItems.map(it => it.id), fromId, toId);
+    if (ids.length === 0) return;
+    setBatchSelected(prev => { const next = { ...prev }; for (const id of ids) next[id] = true; return next; });
+  }, [currentSectionItems]);
+
   /* ---------------------------------------------------------------- */
   /*  Formatted date                                                   */
   /* ---------------------------------------------------------------- */
@@ -490,6 +498,7 @@ export function useInspectionState(opts: UseInspectionOptions) {
     setBatchSelected,
     toggleBatchSelect,
     batchSelectAll,
+    batchSelectRange,
     selectedBatchCount,
 
     // Speed mode

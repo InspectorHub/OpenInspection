@@ -1147,6 +1147,7 @@ export default function InspectionEditPage() {
  batchMode={state.batchMode}
  batchSelected={state.batchSelected}
  onBatchToggle={(id) => state.toggleBatchSelect(id)}
+ onBatchRange={(from, to) => state.batchSelectRange(from, to)}
  />
  );
 
