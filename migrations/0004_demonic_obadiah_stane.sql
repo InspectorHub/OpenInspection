@@ -1,0 +1,1 @@
+DROP TABLE `inspection_conflicts`;

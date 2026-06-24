@@ -15,14 +15,10 @@ import {
     InspectionListResponseSchema,
     InspectionCountsSchema,
     DashboardResponseSchema,
-    ConflictListResponseSchema,
-    ConflictResolveSchema,
-    ConflictResolveResponseSchema,
 } from '../../lib/validations/inspection.schema';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
-import { listPendingConflicts, resolveConflicts } from '../../services/conflicts.service';
 import { findScheduleConflicts } from '../../lib/schedule-conflicts';
 import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -198,51 +194,6 @@ export const scheduleConflictsRoute = createRoute(withMcpMetadata({
     description: 'IA-6 — advisory same-day-hour collision check counting lead and helper assignments. Callers render a warning; scheduling is never blocked.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-// Tasks 12-14 — sync conflict adjudication. GET lists the pending field-level
-// conflicts persisted by inspection-sync.ts at merge time; POST clears them
-// once the inspector has chosen a winning side.
-export const listConflictsRoute = createRoute(withMcpMetadata({
-    method:     'get',
-    path:       '/{id}/conflicts',
-    tags:       ['inspections'],
-    summary:    'List pending sync conflicts for an inspection',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: {
-        params: z.object({ id: z.string().min(1).describe('Inspection id whose conflicts are listed') }),
-    },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: ConflictListResponseSchema } },
-            description: 'Pending conflicts (empty array when none)',
-        },
-        404: { description: 'Inspection not found in this tenant' },
-    },
-    operationId: 'listInspectionConflicts',
-    description: 'Returns the field-level merge conflicts the sync endpoint persisted, so the conflict-resolver UI can adjudicate them out-of-band from the transient 409.',
-}, { scopes: ['read'], tier: 'extended' }));
-
-export const resolveConflictsRoute = createRoute(withMcpMetadata({
-    method:     'post',
-    path:       '/{id}/conflicts/resolve',
-    tags:       ['inspections'],
-    summary:    'Clear sync conflicts the inspector has adjudicated',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: {
-        params: z.object({ id: z.string().min(1).describe('Inspection id whose conflicts are resolved') }),
-        body:   { content: { 'application/json': { schema: ConflictResolveSchema } } },
-    },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: ConflictResolveResponseSchema } },
-            description: 'Resolved',
-        },
-        404: { description: 'Inspection not found in this tenant' },
-    },
-    operationId: 'resolveInspectionConflicts',
-    description: 'Deletes the pending conflict rows matching each { itemId, field } resolution. The winning side was already written on the prior sync; clearing the flag is the resolution.',
-}, { scopes: ['write'], tier: 'extended' }));
-
-
 const bulkRoutes = createApiRouter()
     .openapi(dashboardRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -358,43 +309,6 @@ const bulkRoutes = createApiRouter()
         const targetId = inspectorId || c.get('user').sub;
         const conflicts = await findScheduleConflicts(db, tenantId, targetId, date, excludeId);
         return c.json({ success: true, data: { conflicts } }, 200);
-    })
-    .openapi(listConflictsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const tenantId = c.get('tenantId');
-
-        // Ownership guard — 404 on tenant mismatch keeps the enumeration leak closed.
-        try {
-            await c.var.services.inspection.getInspection(id, tenantId);
-        } catch {
-            throw Errors.NotFound('Inspection not found');
-        }
-
-        const db = drizzle(c.env.DB);
-        const data = await listPendingConflicts(db, tenantId, id);
-        return c.json({ success: true as const, data }, 200);
-    })
-    // Typed-Hono dead-routes cleanup Task 13 — clear adjudicated conflicts.
-    .openapi(resolveConflictsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { resolutions } = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const user     = c.get('user') as { sub?: string } | undefined;
-        const userId   = user?.sub;
-        if (!userId) throw Errors.Unauthorized('Missing user identity');
-
-        try {
-            await c.var.services.inspection.getInspection(id, tenantId);
-        } catch {
-            throw Errors.NotFound('Inspection not found');
-        }
-
-        const db = drizzle(c.env.DB);
-        const data = await resolveConflicts(db, tenantId, id, resolutions);
-        auditFromContext(c, 'inspection.conflicts_resolved', 'inspection', {
-            entityId: id, metadata: { resolved: data.resolved, by: userId },
-        });
-        return c.json({ success: true as const, data }, 200);
     });
 
 export default bulkRoutes;
