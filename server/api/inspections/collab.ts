@@ -214,6 +214,27 @@ const collabRoutes = createApiRouter()
             body: JSON.stringify({ seq: parsed.data.seq }),
         });
         return stub.fetch(fwd);
+    })
+    // ── POST /:id/collab/restructure — converge DO doc after templateSnapshot change (D8) ──
+    // Called after the templateSnapshot PATCH has already landed in D1. The DO
+    // re-reads the updated snapshot, diffs the current results keys, seeds
+    // additions, removes deletions, persists, and broadcasts MSG_RESTORE so every
+    // connected client drops its local state and resyncs. Reuses the same
+    // fail-closed auth as /restore (no additional permission check needed).
+    .post('/:id/collab/restructure', async (c) => {
+        const auth = await authorizeCollab(c);
+        if (!auth.ok) return auth.response;
+
+        const stub = collabStub(c, auth.tenantId, auth.inspectionId);
+        const fwd = new Request('https://do.local/restructure', {
+            method:  'POST',
+            headers: {
+                'x-tenant-id':     auth.tenantId,
+                'x-inspection-id': auth.inspectionId,
+                'x-user-id':       auth.userId,
+            },
+        });
+        return stub.fetch(fwd);
     });
 
 export default collabRoutes;

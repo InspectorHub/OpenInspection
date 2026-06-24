@@ -608,6 +608,27 @@ export function removeRecommendation(
 }
 
 /**
+ * Delete each key in `keys` from `doc.getMap('results')` in a single transaction.
+ *
+ * Used by the DO restructure path (D8): when a templateSnapshot edit removes a
+ * section or item, the corresponding findingKey entry is purged from the live doc
+ * so the projection no longer includes stale keys. The change is broadcast to all
+ * clients via broadcastRestore() (same convergence guarantee as restore).
+ *
+ * No-op when `keys` is empty (avoids an unnecessary transaction).
+ * Silently ignores keys that are absent — idempotent.
+ */
+export function removeFindingKeys(doc: Y.Doc, keys: string[]): void {
+    if (keys.length === 0) return;
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        for (const k of keys) {
+            results.delete(k);
+        }
+    });
+}
+
+/**
  * Hydrate a Y.Doc from an existing `inspection_results.data` projection blob.
  *
  * The faithful INVERSE of `projectResults`: after `loadResultsProjection(doc, p)`,
