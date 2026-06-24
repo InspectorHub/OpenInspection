@@ -119,6 +119,8 @@ interface ItemEditorProps {
  onBulkMovePhotos?: (itemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => void;
  /** Plan 7 — resolve a Stream poster URL for a video strip thumbnail (fail-closed → null). */
  videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
+ /** #181 PR-G — resolve the local blob URL for a pending (offline) photo entry. */
+ pendingPhotoUrl?: (pendingId: string) => string | undefined;
 }
 
 /* ------------------------------------------------------------------ */
@@ -163,6 +165,7 @@ export function ItemEditor({
  moveTargets,
  onBulkMovePhotos,
  videoPosterUrl,
+ pendingPhotoUrl,
 }: ItemEditorProps) {
  const [activeTab, setActiveTab] = useState<CannedTabId>("information");
  const [defectQuery, setDefectQuery] = useState("");
@@ -504,6 +507,7 @@ export function ItemEditor({
  onBulkMove={onBulkMovePhotos ? (indices, to) => onBulkMovePhotos(item.id, indices, to) : undefined}
  photoUploading={photoUploading}
  videoPosterUrl={videoPosterUrl}
+ pendingPhotoUrl={pendingPhotoUrl}
  />
  {/* Task 4 — queued offline photo previews rendered below the strip */}
  {queuedCount > 0 && (

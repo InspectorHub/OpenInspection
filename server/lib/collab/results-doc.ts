@@ -278,6 +278,27 @@ export function appendPhoto(
     });
 }
 
+/**
+ * #181 PR-G — push a brand-new PENDING photo entry, deduped by `pendingId`
+ * (NOT by `key`).
+ *
+ * A brand-new offline photo has an EMPTY `key`, so `appendPhoto`'s upsert-by-key
+ * would merge two concurrent offline adds into one element. This mutator instead
+ * keys on the unique `pendingId`: an entry with the same `pendingId` is merged,
+ * otherwise a fresh element is pushed — so two offline adds yield two entries.
+ */
+export function pushPendingPhoto(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    photo: PhotoEntry & { pendingId: string },
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        upsertElement(getOrCreateArray(item, 'photos'), 'pendingId', { ...photo });
+    });
+}
+
 /** Apply a partial patch to the photo Y.Map matching `key`. */
 export function updatePhoto(
     doc: Y.Doc,
@@ -362,6 +383,38 @@ export function replacePhoto(
         for (let i = 0; i < arr.length; i++) {
             const el = arr.get(i);
             if (el instanceof Y.Map && el.get('key') === key) {
+                const fresh = new Y.Map<unknown>();
+                assignFields(fresh, { ...entry });
+                arr.delete(i, 1);
+                arr.insert(i, [fresh]);
+                return;
+            }
+        }
+    });
+}
+
+/**
+ * #181 PR-G — replace the photo Y.Map whose `pendingId` === `pendingId` IN PLACE
+ * with a fresh Y.Map built from `entry`.
+ *
+ * A brand-new offline photo entry has an EMPTY `key`, so two concurrent offline
+ * adds collide under `replacePhoto` (which matches by `key`). The drain swap must
+ * therefore address by the unique `pendingId`, not the key. Array position is
+ * preserved. No-op if no element carries the id.
+ */
+export function replacePhotoByPendingId(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    pendingId: string,
+    entry: PhotoEntry,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const arr = getOrCreateArray(item, 'photos');
+        for (let i = 0; i < arr.length; i++) {
+            const el = arr.get(i);
+            if (el instanceof Y.Map && el.get('pendingId') === pendingId) {
                 const fresh = new Y.Map<unknown>();
                 assignFields(fresh, { ...entry });
                 arr.delete(i, 1);

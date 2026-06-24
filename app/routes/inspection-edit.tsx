@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
 import { findRatingLevel, ratingAdvanceDecision } from "~/lib/rating-levels";
 import { makeCustomDefect } from "~/lib/custom-defects";
-import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
+import { useInspectionState, fKey, type InspectionSchema } from "~/hooks/useInspection";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
@@ -13,7 +13,9 @@ import { useUnsavedChanges } from "~/hooks/useUnsavedChanges";
 import { usePresence } from "~/hooks/usePresence";
 import { useTheme } from "~/hooks/useTheme";
 import { useResultsDoc } from "~/lib/collab/use-results-doc";
-import { bindResultMap } from "~/lib/collab/results-binding";
+import { useMediaDrain } from "~/hooks/useMediaDrain";
+import { bindResultMap, appendPendingPhoto } from "~/lib/collab/results-binding";
+import { enqueueMedia } from "~/lib/collab/media-upload-queue";
 import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
 import { SectionRail } from "~/components/editor/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
@@ -163,7 +165,17 @@ export default function InspectionEditPage() {
  // (the legacy CAS / offline-queue write path was retired in Phase 5). The doc
  // connects in a client-only effect, so `collab?.doc` is briefly null on the
  // SSR / first-paint window before the connection initialises.
- const collab = useResultsDoc(String(loaderData.inspection.id));
+ //
+ // #181 PR-G — the collab onSynced (initial connect + every reconnect) triggers
+ // the offline media drain. `drainRef` breaks the cycle: useResultsDoc needs the
+ // drain callback, but the drain (useMediaDrain) needs the live doc that
+ // useResultsDoc returns. The ref is filled right after useMediaDrain below.
+ const drainRef = useRef<() => void>(() => {});
+ const collab = useResultsDoc(String(loaderData.inspection.id), () => drainRef.current());
+
+ // #181 PR-G — build the media drain (uploader + doc swap) over the live doc.
+ const { drain: mediaDrain } = useMediaDrain(String(loaderData.inspection.id), collab?.doc ?? null);
+ drainRef.current = mediaDrain;
 
  // Once the doc is live, project it into the editor's `results`. First paint
  // uses loaderData.results (initial projection); the DO hydrated from the SAME
@@ -515,6 +527,7 @@ export default function InspectionEditPage() {
   setPosterTarget,
   coverKey,
   videoPosterUrl,
+  pendingPhotoUrl,
   itemGalleryPhotos,
   onOpenPhoto,
   onReorderPhotos,
@@ -824,6 +837,30 @@ export default function InspectionEditPage() {
  pendingPhotoTargetRef.current = null;
  void (async () => {
  const baked = orig ? file : await preprocessImage(file);
+
+ // #181 PR-G — offline: persist the baked photo locally + append a PENDING
+ // doc entry (empty key + pendingUpload). The strip renders it from the
+ // local blob; the drain (on reconnect / online) uploads it to R2 and swaps
+ // in the real key. Defect-targeted offline adds fall back to the online
+ // fetcher (the pending-doc model covers item photos; defect pending is out
+ // of scope) — they simply re-fire when back online.
+ const doc = collab?.doc ?? null;
+ const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
+ if (typeof navigator !== "undefined" && navigator.onLine === false && doc && sid && !target) {
+  const fk = fKey(sid, itemId);
+  const pendingId = crypto.randomUUID();
+  await enqueueMedia({
+  pendingId,
+  inspectionId: String(state.inspection.id),
+  findingKey: fk,
+  kind: "photo",
+  blob: baked,
+  enqueuedAt: Date.now(),
+  });
+  appendPendingPhoto(doc, fk, pendingId);
+  return;
+ }
+
  const formData = new FormData();
  formData.append("intent", "upload-photo");
  formData.append("itemId", itemId);
@@ -838,7 +875,7 @@ export default function InspectionEditPage() {
  // Reset input so picking the same file twice re-fires onChange
  if (photoInputRef.current) photoInputRef.current.value = "";
  },
- [state.activeItemId, state.inspection.id, uploadFetcher],
+ [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection],
  );
 
  const handleBurstCommit = useCallback(
@@ -1238,6 +1275,7 @@ export default function InspectionEditPage() {
  moveTargets={moveTargets}
  onBulkMovePhotos={onBulkMovePhotos}
  videoPosterUrl={videoPosterUrl}
+ pendingPhotoUrl={pendingPhotoUrl}
  />
  ) : (
  <div className="flex items-center justify-center h-full text-ih-fg-4">

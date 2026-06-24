@@ -1,6 +1,5 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type * as Y from "yjs";
-import { pushToast } from "~/hooks/useToast";
 import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "~/components/media-studio/photo-display-key";
 import { type MediaAction } from "~/components/media-studio/MediaViewer";
 import { streamThumbUrl } from "~/components/media-studio/PosterPicker";
@@ -16,8 +15,18 @@ import {
   revertPhoto as bindingRevertPhoto,
   setPhotoCrop as bindingSetPhotoCrop,
   setPhotoAnnotation as bindingSetPhotoAnnotation,
+  markPhotoPending as bindingMarkPhotoPending,
 } from "~/lib/collab/results-binding";
+import { enqueueMedia } from "~/lib/collab/media-upload-queue";
+import { getPendingMedia } from "~/lib/collab/media-pending-store";
 import type { PhotoEntry } from "../../server/lib/collab/results-doc.types";
+
+/** #181 PR-G — offline detection. The legacy app/lib/offline helper was removed
+ * (Task 15); a bare `navigator.onLine === false` check is the offline gate. SSR
+ * has no navigator, so guard the global access. */
+function isOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
 
 /**
  * The photo / media-operations cluster of the inspection editor. Behavior-
@@ -106,7 +115,7 @@ export function usePhotoOps(ctx: {
   /* Task 8 — read an item's stored photos[] (item-level bucket) from the live
    * results map. Item photos are `{ key; croppedKey?; crop?; annotatedKey?; annotationsJson? }`. */
   type ItemCrop = { aspect: string; orientation: "landscape" | "portrait"; x: number; y: number; width: number; height: number };
-  type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; provider?: "stream" | "r2"; streamUid?: string; mediaId?: string; posterPct?: number; durationSec?: number };
+  type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; provider?: "stream" | "r2"; streamUid?: string; mediaId?: string; posterPct?: number; durationSec?: number; pendingUpload?: boolean; pendingId?: string; pendingKind?: "photo" | "crop" | "annotate" };
   const getItemPhotos = useCallback(
     (itemId: string): ItemPhoto[] => {
       const r = findings.getResult(itemId, state.sectionIdForItem(itemId) ?? undefined);
@@ -115,6 +124,82 @@ export function usePhotoOps(ctx: {
     [findings, state.sectionIdForItem],
   );
 
+  /* #181 PR-G — local objectURL map for pending (offline) media. A pending photo
+   * entry has no servable R2 key, so the strip/viewer renders the LOCAL blob from
+   * the media-pending store. The effect loads a blob URL for every pending id in
+   * the inspection's results and revokes URLs when their entry resolves/unmounts.
+   * Pending entries with NO local blob (another device's upload) get no URL → the
+   * gallery shows an "uploading…" placeholder instead of a broken image. */
+  const [pendingUrls, setPendingUrls] = useState<Record<string, string>>({});
+
+  // Collect every pending id currently present in the live results map. A change
+  // to this set (a new offline capture, or one resolving) re-runs the loader.
+  const pendingIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!collabDoc) return ids;
+    for (const sec of state.sections) {
+      for (const it of sec.items || []) {
+        for (const p of getItemPhotos(it.id)) {
+          if (p.pendingId) ids.add(p.pendingId);
+        }
+      }
+    }
+    return ids;
+    // state.results drives getItemPhotos; depend on it so resolution re-runs.
+  }, [collabDoc, state.sections, state.results, getItemPhotos]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const created: Record<string, string> = {};
+    void (async () => {
+      for (const id of pendingIds) {
+        if (pendingUrls[id]) continue; // already have a URL for this id
+        const rec = await getPendingMedia(id);
+        if (cancelled) break;
+        // happy-dom/fake-indexeddb revives Blob as a plain object; guard for a
+        // real Blob before createObjectURL (placeholder path otherwise).
+        if (rec && typeof URL !== "undefined" && rec.blob instanceof Blob) {
+          created[id] = URL.createObjectURL(rec.blob);
+        }
+      }
+      if (!cancelled && Object.keys(created).length > 0) {
+        setPendingUrls((prev) => ({ ...prev, ...created }));
+      }
+    })();
+
+    // Revoke URLs for ids that are no longer pending (entry resolved).
+    setPendingUrls((prev) => {
+      let changed = false;
+      const next: Record<string, string> = {};
+      for (const [id, url] of Object.entries(prev)) {
+        if (pendingIds.has(id)) {
+          next[id] = url;
+        } else {
+          if (typeof URL !== "undefined") URL.revokeObjectURL(url);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // `pendingUrls` is read but intentionally excluded: including it would re-run
+    // on every URL we add and loop. New ids arrive via `pendingIds`.
+  }, [pendingIds]);
+
+  // Revoke all objectURLs on unmount. `pendingUrlsRef` mirrors the latest map so
+  // the unmount cleanup revokes everything without re-subscribing per change.
+  const pendingUrlsRef = useRef(pendingUrls);
+  pendingUrlsRef.current = pendingUrls;
+  useEffect(() => {
+    return () => {
+      if (typeof URL === "undefined") return;
+      for (const url of Object.values(pendingUrlsRef.current)) URL.revokeObjectURL(url);
+    };
+  }, []);
+
   /* Task 8 — map an item's photos[] → GalleryPhoto[] for the unified MediaViewer.
    * displayKey (annotatedKey||key) drives the rendered image + URL; originalKey
    * keeps the un-annotated source; photoIndex addresses detach/revert; annotated
@@ -122,6 +207,38 @@ export function usePhotoOps(ctx: {
   const itemGalleryPhotos = useCallback(
     (itemId: string): GalleryPhoto[] =>
       getItemPhotos(itemId).map((p, i) => {
+        // #181 PR-G — pending (offline) entry: render from the local blob URL when
+        // this client owns it; otherwise (another device's upload) show a
+        // placeholder. `pendingUpload` (brand-new photo) has no real key at all;
+        // a pending crop/annotate keeps its base key but its NEW derivative is the
+        // local blob, so prefer the local URL while pending.
+        const localUrl = p.pendingId ? pendingUrls[p.pendingId] : undefined;
+        if (p.pendingId) {
+          const hasLocal = !!localUrl;
+          // Brand-new pending photo with no base key → must use the local blob.
+          // Pending crop/annotate → prefer local derivative preview, else the base.
+          const baseKey = resolvePhotoDisplayKey(p);
+          const url = hasLocal
+            ? localUrl as string
+            : baseKey
+              ? `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(baseKey)}`
+              : "";
+          return {
+            key: baseKey || p.pendingId,
+            url,
+            label: "",
+            itemId,
+            photoIndex: i,
+            annotated: !!p.annotatedKey || p.pendingKind === "annotate",
+            originalKey: p.key,
+            croppedKey: p.croppedKey,
+            mediaType: p.mediaType,
+            pending: true,
+            // No local blob AND no base key to fall back on → placeholder, not a
+            // broken image (another device captured this offline).
+            pendingPlaceholder: !hasLocal && !baseKey,
+          };
+        }
         const dk = resolvePhotoDisplayKey(p);
         return {
           key: dk,
@@ -141,7 +258,7 @@ export function usePhotoOps(ctx: {
           durationSec: p.durationSec,
         };
       }),
-    [getItemPhotos, state.inspection.id],
+    [getItemPhotos, state.inspection.id, pendingUrls],
   );
 
   /* Task 8 — open the viewer for an item at index i. */
@@ -355,17 +472,14 @@ export function usePhotoOps(ctx: {
       const { itemId, photoIndex, sectionId } = target;
       const cropTransform = { aspect: crop.aspect, orientation: crop.orientation, ...crop.pixels };
 
-      // #181 — the Y.Doc owns results.data. Image baking ALWAYS needs the
-      // network (the server derives + stores the cropped R2 object); offline
-      // refuses with a toast rather than mutating anything.
-      const nav = typeof navigator !== "undefined" ? navigator : undefined;
-      if (nav && nav.onLine === false) {
-        pushToast({ message: "Crop & annotate need a connection", durationMs: 3000 });
-        return;
-      }
+      // Snapshot the photo's CURRENT entry + original key BEFORE any mutation so
+      // both the online doc write and the offline enqueue address by key.
+      const current = getItemPhotos(itemId)[photoIndex];
+      const originalKey = current?.key;
+      const fk = docFindingKey(itemId, sectionId);
 
       // Optimistic local apply for instant feedback (the doc drives the real UI
-      // once the bake returns + we write it back).
+      // once the bake returns / drains + we write it back).
       patchItemPhotos(itemId, (photos) =>
         photos.map((p, i) =>
           i === photoIndex
@@ -373,11 +487,31 @@ export function usePhotoOps(ctx: {
             : p,
         ),
       );
-      // Snapshot the photo's CURRENT entry + original key BEFORE the bake so the
-      // doc write preserves non-annotation fields and addresses by key.
-      const current = getItemPhotos(itemId)[photoIndex];
-      const originalKey = current?.key;
-      const fk = docFindingKey(itemId, sectionId);
+
+      // #181 PR-G — offline: persist the baked crop locally + mark the doc photo
+      // pending-crop (KEEP the base key so the report still serves the original).
+      // The drain (on reconnect) uploads the derivative and swaps in croppedKey.
+      if (isOffline()) {
+        if (collabDoc && fk && originalKey) {
+          const pendingId = crypto.randomUUID();
+          void enqueueMedia({
+            pendingId,
+            inspectionId: String(state.inspection.id),
+            findingKey: fk,
+            kind: "crop",
+            blob,
+            photoKey: originalKey,
+            crop: cropTransform,
+            enqueuedAt: Date.now(),
+          }).then(() => {
+            bindingMarkPhotoPending(collabDoc, fk, originalKey, pendingId, "crop", {
+              crop: cropTransform,
+            });
+          });
+        }
+        return;
+      }
+
       const fd = new FormData();
       fd.append("image", new File([blob], "cropped.jpg", { type: "image/jpeg" }));
       fd.append("crop", JSON.stringify(cropTransform));
@@ -419,15 +553,33 @@ export function usePhotoOps(ctx: {
       if (!collabDoc) return false;
       const { itemId, photoIndex, sectionId } = target;
 
-      const nav = typeof navigator !== "undefined" ? navigator : undefined;
-      if (nav && nav.onLine === false) {
-        pushToast({ message: "Crop & annotate need a connection", durationMs: 3000 });
-        return true;
-      }
-
       // The doc is keyed by the photo's ORIGINAL key; resolve from the snapshot.
       const originalKey = getItemPhotos(itemId)[photoIndex]?.key;
       const fk = docFindingKey(itemId, sectionId);
+
+      // #181 PR-G — offline: persist the baked annotation PNG locally + mark the
+      // doc photo pending-annotate (KEEP base/cropped key — annotation layers on
+      // top; the report serves the base until the derivative drains).
+      if (isOffline()) {
+        if (fk && originalKey) {
+          const pendingId = crypto.randomUUID();
+          void enqueueMedia({
+            pendingId,
+            inspectionId: String(state.inspection.id),
+            findingKey: fk,
+            kind: "annotate",
+            blob,
+            photoKey: originalKey,
+            nodesJson,
+            enqueuedAt: Date.now(),
+          }).then(() => {
+            bindingMarkPhotoPending(collabDoc, fk, originalKey, pendingId, "annotate", {
+              annotationsJson: nodesJson,
+            });
+          });
+        }
+        return true;
+      }
 
       const fd = new FormData();
       fd.append("nodes", nodesJson);
@@ -450,9 +602,17 @@ export function usePhotoOps(ctx: {
     [collabDoc, docFindingKey, getItemPhotos, state.inspection.id],
   );
 
+  /* #181 PR-G — resolve a pending entry's local blob URL for the strip/viewer.
+   * Returns undefined when this client does not own the blob (another device). */
+  const pendingPhotoUrl = useCallback(
+    (pendingId: string): string | undefined => pendingUrls[pendingId],
+    [pendingUrls],
+  );
+
   return {
     viewer,
     setViewer,
+    pendingPhotoUrl,
     photoCropTarget,
     setPhotoCropTarget,
     recropWarn,

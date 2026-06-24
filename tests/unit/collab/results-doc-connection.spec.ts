@@ -8,7 +8,7 @@
  * Frame helpers are ported from tests/workers/collab-multiclient.spec.ts.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
@@ -17,6 +17,7 @@ import {
     buildCollabWsUrl,
     connectResultsDoc,
     deleteResultsDb,
+    reconnectDelayMs,
 } from '../../../app/lib/collab/results-doc-connection';
 import {
     seedResultsDoc,
@@ -507,6 +508,181 @@ describe('connectResultsDoc — MSG_RESTORE drop+resync convergence', () => {
         // Additive merge: the local edit (V2 'RR', a later clock) survives.
         const item = handle.doc.getMap('results').get('_default:s1:i1') as Y.Map<unknown> | undefined;
         expect(item?.get('rating')).toBe('RR'); // NOT reverted — the failure mode
+
+        destroy();
+    });
+});
+
+// ── Test: reconnectDelayMs exponential backoff with cap ───────────────────────
+
+describe('reconnectDelayMs', () => {
+    it('doubles each attempt and caps at 30s', () => {
+        expect(reconnectDelayMs(0)).toBe(1000);
+        expect(reconnectDelayMs(1)).toBe(2000);
+        expect(reconnectDelayMs(2)).toBe(4000);
+        expect(reconnectDelayMs(3)).toBe(8000);
+        expect(reconnectDelayMs(4)).toBe(16000);
+        // 32000 would exceed the cap → clamped to 30000.
+        expect(reconnectDelayMs(5)).toBe(30000);
+        expect(reconnectDelayMs(20)).toBe(30000);
+    });
+});
+
+// ── Test: a socket close schedules a reopen after the backoff delay ────────────
+//
+// Count the StubWebSocket constructions: the initial connect makes one; an
+// unexpected close should schedule a reopen that constructs a SECOND socket once
+// the backoff timer fires. We drive the timer with vitest fake timers (installed
+// only AFTER the initial real-timer sync so fake-indexeddb is not starved).
+
+describe('connectResultsDoc — auto-reconnect on close', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('reopens the socket (new construction) after the backoff delay', async () => {
+        let constructions = 0;
+        class CountingStub extends StubWebSocket {
+            constructor(url: string) {
+                super(url);
+                constructions += 1;
+                stubSocket = this;
+            }
+        }
+        const id = `test-reconnect-${Date.now()}`;
+        const { destroy } = connectResultsDoc(id, {
+            WebSocketImpl: CountingStub as unknown as typeof WebSocket,
+            location: testLoc,
+        });
+
+        await flushAsync(10);
+        expect(constructions).toBe(1);
+        const first = stubSocket;
+
+        // Switch to fake timers, then close the socket → schedules a reopen.
+        vi.useFakeTimers();
+        first.close();
+
+        // Before the backoff elapses, no new socket exists.
+        expect(constructions).toBe(1);
+
+        // Advance past the first backoff (1s) → the reopen timer fires.
+        vi.advanceTimersByTime(1000);
+        expect(constructions).toBe(2);
+        expect(stubSocket).not.toBe(first);
+
+        vi.useRealTimers();
+        destroy();
+    });
+
+    it('does not reconnect after destroy()', async () => {
+        let constructions = 0;
+        class CountingStub extends StubWebSocket {
+            constructor(url: string) {
+                super(url);
+                constructions += 1;
+                stubSocket = this;
+            }
+        }
+        const id = `test-noreconnect-${Date.now()}`;
+        const { destroy } = connectResultsDoc(id, {
+            WebSocketImpl: CountingStub as unknown as typeof WebSocket,
+            location: testLoc,
+        });
+        await flushAsync(10);
+        expect(constructions).toBe(1);
+
+        vi.useFakeTimers();
+        destroy(); // closes the socket; the close handler must NOT schedule a reopen
+        vi.advanceTimersByTime(5000);
+        expect(constructions).toBe(1);
+        vi.useRealTimers();
+    });
+});
+
+// ── Test: window 'online' reopens immediately + resets backoff ─────────────────
+
+describe('connectResultsDoc — window online event', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('reopens immediately on the online event after a close', async () => {
+        let constructions = 0;
+        class CountingStub extends StubWebSocket {
+            constructor(url: string) {
+                super(url);
+                constructions += 1;
+                stubSocket = this;
+            }
+        }
+        const id = `test-online-${Date.now()}`;
+        const { destroy } = connectResultsDoc(id, {
+            WebSocketImpl: CountingStub as unknown as typeof WebSocket,
+            location: testLoc,
+        });
+        await flushAsync(10);
+        expect(constructions).toBe(1);
+        const first = stubSocket;
+
+        vi.useFakeTimers();
+        first.close(); // schedules a delayed reopen
+        expect(constructions).toBe(1);
+
+        // The online event reopens NOW (cancelling the pending delayed reopen).
+        window.dispatchEvent(new Event('online'));
+        expect(constructions).toBe(2);
+        const second = stubSocket;
+        expect(second).not.toBe(first);
+
+        // The previously-scheduled delayed reopen must NOT fire a third socket
+        // (online cleared the timer + a live socket exists).
+        vi.advanceTimersByTime(5000);
+        expect(constructions).toBe(2);
+
+        vi.useRealTimers();
+        destroy();
+    });
+});
+
+// ── Test: onSynced fires on the initial connect AND on each reconnect ──────────
+
+describe('connectResultsDoc — onSynced trigger', () => {
+    it('fires onSynced on every step2 (initial + reconnect)', async () => {
+        let syncedCalls = 0;
+        const id = `test-onsynced-${Date.now()}`;
+        const { handle, destroy } = connectResultsDoc(id, {
+            WebSocketImpl: makeCapturingImpl(),
+            location: testLoc,
+            onSynced: () => { syncedCalls += 1; },
+        });
+
+        await flushAsync(10);
+        expect(stubSocket).toBeDefined();
+
+        // Initial step2 → onSynced #1.
+        const remote = new Y.Doc();
+        seedResultsDoc(remote, [{ findingKey: '_default:s1:i1' }]);
+        applyItemPatch(remote, '_default:s1:i1', 'rating', 'NI');
+        const step1a = lastStep1Frame(stubSocket.sent);
+        stubSocket.pushInbound(encodeSyncStep2(remote, readStep1StateVector(step1a!)));
+        await flushAsync(3);
+        expect(handle.synced).toBe(true);
+        expect(syncedCalls).toBe(1);
+
+        // Close + reconnect with real timers (short-circuit via window online).
+        const first = stubSocket;
+        first.close();
+        window.dispatchEvent(new Event('online')); // reopen immediately
+        await flushAsync(5);
+        expect(stubSocket).not.toBe(first);
+
+        // Second step2 on the reconnected socket → onSynced #2 (handle.synced
+        // stays true; the trigger still fires).
+        const step1b = lastStep1Frame(stubSocket.sent);
+        stubSocket.pushInbound(encodeSyncStep2(remote, readStep1StateVector(step1b!)));
+        await flushAsync(3);
+        expect(syncedCalls).toBe(2);
 
         destroy();
     });

@@ -91,6 +91,27 @@ export interface ConnectOptions {
      * can trigger a re-render with the updated handle.
      */
     onChange?: (handle: ResultsDocHandle) => void;
+    /**
+     * #181 PR-G — called EACH time `handle.synced` flips to true: on the initial
+     * connect AND on every successful reconnect (after an offline window or a
+     * dropped socket). The editor uses this as the trigger to drain the offline
+     * media queue, so freshly-captured photos/crops/annotations upload as soon as
+     * the collab socket is healthy again.
+     */
+    onSynced?: () => void;
+}
+
+// ─── Reconnect backoff ──────────────────────────────────────────────────────────
+
+/** First reconnect delay (ms). Doubles each attempt up to RECONNECT_MAX_MS. */
+const RECONNECT_BASE_MS = 1000;
+/** Backoff ceiling (ms): attempts never wait longer than this between reopens. */
+const RECONNECT_MAX_MS = 30_000;
+
+/** Compute the exponential backoff delay for the Nth (0-based) reconnect attempt. */
+export function reconnectDelayMs(attempt: number): number {
+    const exp = RECONNECT_BASE_MS * Math.pow(2, Math.max(0, attempt));
+    return Math.min(exp, RECONNECT_MAX_MS);
 }
 
 // ─── URL builder ──────────────────────────────────────────────────────────────
@@ -162,6 +183,60 @@ export function connectResultsDoc(
     let destroyed = false;
     /** Re-entrancy guard: a MSG_RESTORE arriving mid-reset must not re-trigger. */
     let restoring = false;
+
+    // ── Reconnect state ─────────────────────────────────────────────────────────
+    // On an unexpected socket close (not destroyed, not mid-restore) we reopen
+    // with exponential backoff; a `window 'online'` event reopens immediately and
+    // resets the backoff. `reconnectAttempts` resets to 0 once a fresh step2
+    // (synced) arrives, so a flapping connection that briefly syncs starts its
+    // backoff over rather than compounding from a stale count.
+    let reconnectAttempts = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    /** Clear any pending reconnect timer (idempotent). */
+    function clearReconnectTimer(): void {
+        if (reconnectTimer !== null) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+    }
+
+    /**
+     * Schedule a reconnect after the current backoff delay, unless one is already
+     * scheduled, the connection is destroyed, or a restore is in flight (the
+     * restore path resyncs on the still-open socket and must not race a reopen).
+     */
+    function scheduleReconnect(): void {
+        if (destroyed || restoring) return;
+        if (reconnectTimer !== null) return; // a reopen is already pending
+        const delay = reconnectDelayMs(reconnectAttempts);
+        reconnectAttempts += 1;
+        reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            if (destroyed || restoring) return;
+            // Only reopen if there is no live/connecting socket.
+            if (ws && (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING)) return;
+            openSocket();
+        }, delay);
+    }
+
+    /**
+     * `window 'online'` handler: the network just came back. Reset the backoff and
+     * reopen now (cancelling any pending delayed reopen) so field merges + the
+     * media-queue drain happen with no wait.
+     */
+    function handleOnline(): void {
+        if (destroyed) return;
+        reconnectAttempts = 0;
+        clearReconnectTimer();
+        if (ws && (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING)) return;
+        openSocket();
+    }
+
+    const hasWindow = typeof window !== 'undefined';
+    if (hasWindow) {
+        window.addEventListener('online', handleOnline);
+    }
 
     // ── Local update forwarder ────────────────────────────────────────────────
     // Forward every local doc mutation to the server as a framed update message.
@@ -297,15 +372,28 @@ export function connectResultsDoc(
                 ws.send(encoding.toUint8Array(replyEncoder));
             }
 
-            if (syncMsgType === syncProtocol.messageYjsSyncStep2 && !handle.synced) {
-                // First step2 received → we are now synced with the DO.
-                handle.synced = true;
-                opts.onChange?.(handle);
+            if (syncMsgType === syncProtocol.messageYjsSyncStep2) {
+                // A fresh step2 → we are synced with the DO. Reset the reconnect
+                // backoff (a healthy sync earns a clean slate) and fire onSynced
+                // EACH time (initial connect + every reconnect) so the editor can
+                // re-drain the offline media queue. The handle flag flips on the
+                // first step2 only; the onSynced trigger fires on every one.
+                reconnectAttempts = 0;
+                if (!handle.synced) {
+                    handle.synced = true;
+                    opts.onChange?.(handle);
+                }
+                opts.onSynced?.();
             }
         });
 
         ws.addEventListener('close', () => {
-            // No automatic reconnect in this version — Task 9 can layer it on.
+            // Auto-reconnect: a dropped socket (network loss, server restart) is
+            // reopened with exponential backoff. The restore path resyncs on the
+            // SAME open socket, so its close (if any) is guarded by `restoring`.
+            // Destroyed connections never reconnect.
+            if (destroyed || restoring) return;
+            scheduleReconnect();
         });
 
         ws.addEventListener('error', () => {
@@ -332,6 +420,10 @@ export function connectResultsDoc(
     function destroy(): void {
         if (destroyed) return;
         destroyed = true;
+        clearReconnectTimer();
+        if (hasWindow) {
+            window.removeEventListener('online', handleOnline);
+        }
         doc.off('update', docUpdateHandler);
         try { ws?.close(); } catch { /* already closing */ }
         persistence.destroy().catch(() => { /* ignore */ });

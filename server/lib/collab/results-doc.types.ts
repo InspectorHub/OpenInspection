@@ -45,6 +45,15 @@ export interface PhotoEntry {
     pendingUpload?:  boolean;
     /** #181 PR-G — id into the local media-pending IndexedDB store; resolves to a local blob URL. */
     pendingId?:      string;
+    /**
+     * #181 PR-G — which offline operation produced this pending entry. `'photo'`
+     * is a brand-new offline photo (paired with `pendingUpload: true` + an empty
+     * `key`, so the report skips it). `'crop'` / `'annotate'` are offline
+     * derivatives of an EXISTING photo: the base `key` is KEPT (and serves the
+     * report as an honest fallback) and `pendingUpload` is NOT set, while the
+     * editor shows the local derivative preview until the upload drains.
+     */
+    pendingKind?:    'photo' | 'crop' | 'annotate';
 }
 
 /** Toggle-state for a single canned information or limitation comment. */
