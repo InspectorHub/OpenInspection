@@ -46,7 +46,7 @@ export function usePresence(options: {
   const everConnectedRef = useRef(false);
   const wsRef = useRef<WebSocket | null>(null);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const backoffRef = useRef(1000);
+  const backoffRef = useRef(400);
   const closedRef = useRef(false);
 
   const send = useCallback((msg: Record<string, unknown>) => {
@@ -67,7 +67,7 @@ export function usePresence(options: {
       wsRef.current = ws;
 
       ws.addEventListener("open", () => {
-        backoffRef.current = 1000;
+        backoffRef.current = 400;
         everConnectedRef.current = true;
         setStatus("connected");
         setConnected(true);
