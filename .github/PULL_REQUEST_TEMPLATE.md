@@ -37,8 +37,8 @@ Thanks for sending a PR! Before you submit:
 - [ ] My code follows the [contributing guidelines](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/CONTRIBUTING.md)
 - [ ] I have read and agreed to the [Code of Conduct](https://github.com/InspectorHub/OpenInspection/blob/main/apps/core/CODE_OF_CONDUCT.md)
 - [ ] I have added tests that prove my fix is effective or that my feature works (or explained why tests are not feasible)
-- [ ] I have updated the documentation in `apps/core/docs/` where relevant
-- [ ] I have added entries to `apps/core/CHANGELOG.md` if this PR is user-visible
+- [ ] I have updated the documentation in `docs/` where relevant
+- [ ] I have added entries to `CHANGELOG.md` if this PR is user-visible
 - [ ] My commits include `Co-Authored-By:` lines for any AI assistants used
 
 <!-- Maintainer note: PRs targeting `apps/core` may be auto-merged after CI green
