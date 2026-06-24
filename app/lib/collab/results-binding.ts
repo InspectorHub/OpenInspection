@@ -13,12 +13,20 @@ import {
     applyItemPatch,
     setItemAttribute as docSetItemAttribute,
     appendPhoto as docAppendPhoto,
+    pushPendingPhoto as docPushPendingPhoto,
+    updatePhoto as docUpdatePhoto,
+    removePhoto as docRemovePhoto,
+    revertPhoto as docRevertPhoto,
+    replacePhoto as docReplacePhoto,
+    replacePhotoByPendingId as docReplacePhotoByPendingId,
+    reorderPhotos as docReorderPhotos,
+    movePhoto as docMovePhoto,
     upsertCanned,
     upsertCustomComment,
     upsertRecommendation,
     removeRecommendation,
 } from '../../../server/lib/collab/results-doc';
-import type { RepairItemSnapshot } from '../../../server/lib/collab/results-doc.types';
+import type { PhotoEntry, RepairItemSnapshot } from '../../../server/lib/collab/results-doc.types';
 
 // ─── ResultMap type ──────────────────────────────────────────────────────────
 //
@@ -155,6 +163,240 @@ export function appendPhoto(
 }
 
 /**
+ * Reorder a finding's photo array to follow `orderedKeys` (original photo keys).
+ * No-op if `orderedKeys` is not a 1:1 permutation of the current keys (mirrors
+ * the legacy REST path guard). `findingKey` is the composite key.
+ */
+export function reorderPhotos(
+    doc: Y.Doc,
+    findingKey: string,
+    orderedKeys: string[],
+): void {
+    docReorderPhotos(doc, findingKey, orderedKeys);
+}
+
+/**
+ * Move one photo (by original `key`) from one finding to another, in a single
+ * transaction. No-op if the photo is absent on the source. Both keys are
+ * composite finding keys.
+ */
+export function movePhoto(
+    doc: Y.Doc,
+    fromFindingKey: string,
+    toFindingKey: string,
+    photoKey: string,
+): void {
+    docMovePhoto(doc, fromFindingKey, toFindingKey, photoKey);
+}
+
+/** Detach (delete) a photo from a finding's photo array, by original `key`. */
+export function removePhoto(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+): void {
+    docRemovePhoto(doc, findingKey, key);
+}
+
+/**
+ * Revert a photo back to its original `key`, stripping all derivatives
+ * (croppedKey / annotatedKey / annotationsJson / crop). `findingKey` is the
+ * composite key.
+ */
+export function revertPhoto(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+): void {
+    docRevertPhoto(doc, findingKey, key);
+}
+
+/**
+ * Replace a photo entry IN PLACE with `entry` (a full PhotoEntry). Used by the
+ * crop flow to drop the annotation while setting the new crop. `findingKey` is
+ * the composite key. No-op if `key` is absent.
+ */
+export function replacePhoto(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+    entry: PhotoEntry,
+): void {
+    docReplacePhoto(doc, findingKey, key, entry);
+}
+
+/**
+ * #181 — mirror a server crop bake into the doc. Builds the post-crop entry
+ * from the photo's CURRENT fields MINUS any annotation (sequential-layering
+ * rule: a re-crop discards the prior annotation, whose coords were in the OLD
+ * cropped-pixel space), then sets the new `croppedKey` + `crop` and replaces the
+ * entry in place. `baseEntry` is the photo's current entry so non-annotation
+ * fields (mediaType / provider / streamUid / …) survive the crop.
+ */
+export function setPhotoCrop(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+    croppedKey: string,
+    crop: PhotoEntry['crop'],
+    baseEntry: PhotoEntry,
+): void {
+    // Strip the annotation fields from the base, then re-pin key + crop result.
+    const { annotatedKey: _a, annotationsJson: _j, ...keep } = baseEntry;
+    void _a; void _j;
+    const next: PhotoEntry = { ...keep, key, croppedKey, crop };
+    docReplacePhoto(doc, findingKey, key, next);
+}
+
+/**
+ * #181 — mirror a server annotation bake into the doc. Annotation is additive
+ * (it never clears the crop), so a merge patch via `updatePhoto` is correct.
+ */
+export function setPhotoAnnotation(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+    annotatedKey: string,
+    annotationsJson: string,
+): void {
+    docUpdatePhoto(doc, findingKey, key, { annotatedKey, annotationsJson });
+}
+
+/**
+ * #181 PR-G — append a brand-new offline photo as a PENDING doc entry.
+ *
+ * The binary is only in the local media-pending store (not yet on R2), so the
+ * entry has an EMPTY `key` + `pendingUpload: true` + the `pendingId` that
+ * resolves to the local blob. The report SKIPS such entries (it filters
+ * `pendingUpload`); the editor renders them from the local objectURL. On drain
+ * the entry is swapped to its real R2 key via `resolvePendingPhoto` below.
+ */
+export function appendPendingPhoto(
+    doc: Y.Doc,
+    findingKey: string,
+    pendingId: string,
+): void {
+    docPushPendingPhoto(doc, findingKey, {
+        key: '',
+        pendingUpload: true,
+        pendingId,
+        pendingKind: 'photo',
+        mediaType: 'photo',
+    });
+}
+
+/**
+ * #181 PR-G — mark an EXISTING photo (matched by base `key`) as having a pending
+ * offline crop/annotate derivative.
+ *
+ * The base `key` is KEPT (it still serves the report as an honest fallback) and
+ * `pendingUpload` is deliberately NOT set — only the derivative is pending. The
+ * `pendingId` + `pendingKind` + the local derivative fields (`crop` for a crop,
+ * `annotationsJson` for an annotate) are merged onto the photo so the editor can
+ * preview the local derivative. On drain the real `croppedKey` / `annotatedKey`
+ * is set and the pending fields are cleared via `resolvePendingPhoto`.
+ *
+ * Implemented as a replace-in-place (mirror of `setPhotoCrop`/`replacePhoto`)
+ * because Y.Map field-delete is not supported by `assignFields`; we build the
+ * fresh entry from the photo's CURRENT fields plus the pending markers.
+ */
+export function markPhotoPending(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+    pendingId: string,
+    kind: 'crop' | 'annotate',
+    extra: { crop?: PhotoEntry['crop']; annotationsJson?: string },
+): void {
+    const entry = findPhotoEntry(doc, findingKey, key);
+    if (!entry) return;
+    // A re-crop discards any prior annotation (its coords were in the OLD cropped
+    // space). Strip annotation derivatives when the pending op is a crop; keep
+    // them for an annotate (annotation layers on top of the crop).
+    const base: PhotoEntry =
+        kind === 'crop'
+            ? (() => {
+                  const { annotatedKey: _a, annotationsJson: _j, ...keep } = entry;
+                  void _a; void _j;
+                  return keep;
+              })()
+            : entry;
+    const next: PhotoEntry = {
+        ...base,
+        key,
+        pendingId,
+        pendingKind: kind,
+    };
+    if (kind === 'crop' && extra.crop !== undefined) next.crop = extra.crop;
+    if (kind === 'annotate' && extra.annotationsJson !== undefined) {
+        next.annotationsJson = extra.annotationsJson;
+    }
+    docReplacePhoto(doc, findingKey, key, next);
+}
+
+/**
+ * #181 PR-G — read one photo entry by `key` from the live doc (or undefined).
+ * Used by the drain swap + the pending-mark helpers to rebuild a fresh entry.
+ */
+export function findPhotoEntry(
+    doc: Y.Doc,
+    findingKey: string,
+    key: string,
+): PhotoEntry | undefined {
+    const entry = readResultMap(doc)[findingKey];
+    const photos = (entry?.photos as PhotoEntry[] | undefined) ?? [];
+    return photos.find((p) => p.key === key);
+}
+
+/**
+ * #181 PR-G — resolve a pending photo after its offline blob has uploaded.
+ *
+ * Swaps the doc entry pending→real key and CLEARS the pending markers
+ * (`pendingUpload` / `pendingId` / `pendingKind`) by replace-in-place (field
+ * delete is unsupported). The match key differs by kind:
+ *  - `photo`:    the entry's `key` is empty; match by the entry whose
+ *                `pendingId === pendingId`, then set the real `key` = result.key.
+ *  - `crop`:     match by base `key`, set `croppedKey` = result.croppedKey.
+ *  - `annotate`: match by base `key`, set `annotatedKey` = result.annotatedKey.
+ *
+ * No-op if no matching pending entry is found (idempotent — a duplicate drain
+ * after the swap simply finds nothing).
+ */
+export function resolvePendingPhoto(
+    doc: Y.Doc,
+    findingKey: string,
+    pendingId: string,
+    kind: 'photo' | 'crop' | 'annotate',
+    photoKey: string | undefined,
+    result: { key?: string; croppedKey?: string; annotatedKey?: string },
+): void {
+    const map = readResultMap(doc)[findingKey];
+    const photos = (map?.photos as PhotoEntry[] | undefined) ?? [];
+
+    if (kind === 'photo') {
+        const target = photos.find((p) => p.pendingId === pendingId && p.pendingUpload);
+        if (!target || !result.key) return;
+        const { pendingUpload: _u, pendingId: _p, pendingKind: _k, ...keep } = target;
+        void _u; void _p; void _k;
+        // The pending entry's key is empty (two concurrent offline adds collide
+        // under a key match), so address by the unique pendingId.
+        docReplacePhotoByPendingId(doc, findingKey, pendingId, { ...keep, key: result.key });
+        return;
+    }
+
+    // crop / annotate: match by the base key the derivative was applied to.
+    if (!photoKey) return;
+    const target = photos.find((p) => p.key === photoKey && p.pendingId === pendingId);
+    if (!target) return;
+    const { pendingUpload: _u, pendingId: _p, pendingKind: _k, ...keep } = target;
+    void _u; void _p; void _k;
+    const next: PhotoEntry = { ...keep, key: photoKey };
+    if (kind === 'crop' && result.croppedKey) next.croppedKey = result.croppedKey;
+    if (kind === 'annotate' && result.annotatedKey) next.annotatedKey = result.annotatedKey;
+    docReplacePhoto(doc, findingKey, photoKey, next);
+}
+
+/**
  * Add (or merge) a custom defect entry into `customComments.defects`.
  * Keyed by `entry.id`.
  */
@@ -276,7 +518,7 @@ export function addPhotoToCustomDefect(
 /**
  * Append `text` to the item's `notes` scalar field.
  *
- * Mirrors `useFindingsCanned.insertComment` join semantics:
+ * Library-comment insertion join semantics:
  *   - empty existing notes → just `text`
  *   - otherwise → `oldNotes.trimEnd() + sep + text`
  *     where sep is `'\n\n'` when `withExtraNewline` is true, else `'\n'`.

@@ -6,6 +6,12 @@ import {
   projectResults,
   setItemAttribute,
   appendPhoto,
+  updatePhoto,
+  removePhoto,
+  revertPhoto,
+  replacePhoto,
+  reorderPhotos,
+  movePhoto,
   upsertCanned,
   upsertCustomComment,
   upsertRecommendation,
@@ -293,5 +299,199 @@ describe('results-doc', () => {
     expect(proj.recommendations).toBeUndefined();
     expect(proj.attributes).toBeUndefined();
     expect(proj.tabs).toBeUndefined();
+  });
+
+  // ── Photo ARRAY ops (#181, Task 13a-1) ───────────────────────────────────────
+
+  it('reorderPhotos: permutation round-trips through projectResults', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p1' });
+    appendPhoto(doc, FK, { key: 'p2', mediaType: 'photo' });
+    appendPhoto(doc, FK, { key: 'p3' });
+
+    reorderPhotos(doc, FK, ['p3', 'p1', 'p2']);
+
+    const photos = projectResults(doc)[FK].photos ?? [];
+    expect(photos.map((p) => p.key)).toEqual(['p3', 'p1', 'p2']);
+    // Per-photo derivative fields survive the wholesale rebuild.
+    expect(photos.find((p) => p.key === 'p2')?.mediaType).toBe('photo');
+  });
+
+  it('reorderPhotos: NON-permutation (missing / extra / duplicate) is a no-op', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p1' });
+    appendPhoto(doc, FK, { key: 'p2' });
+    appendPhoto(doc, FK, { key: 'p3' });
+
+    reorderPhotos(doc, FK, ['p3', 'p1']);            // missing p2
+    expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key)).toEqual(['p1', 'p2', 'p3']);
+
+    reorderPhotos(doc, FK, ['p1', 'p2', 'p4']);      // extra/unknown p4
+    expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key)).toEqual(['p1', 'p2', 'p3']);
+
+    reorderPhotos(doc, FK, ['p1', 'p1', 'p2']);      // duplicate p1
+    expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key)).toEqual(['p1', 'p2', 'p3']);
+  });
+
+  it('movePhoto: relocates the photo (gone from source, present on target)', () => {
+    const FK2 = '_default:s1:i2';
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }, { findingKey: FK2 }]);
+    appendPhoto(doc, FK, { key: 'p1', mediaType: 'photo' });
+    appendPhoto(doc, FK, { key: 'p2' });
+
+    movePhoto(doc, FK, FK2, 'p1');
+
+    const proj = projectResults(doc);
+    expect((proj[FK].photos ?? []).map((p) => p.key)).toEqual(['p2']);
+    expect((proj[FK2].photos ?? []).map((p) => p.key)).toEqual(['p1']);
+    // Carried fields survive the move.
+    expect((proj[FK2].photos ?? [])[0].mediaType).toBe('photo');
+  });
+
+  it('movePhoto: absent photo is a no-op', () => {
+    const FK2 = '_default:s1:i2';
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }, { findingKey: FK2 }]);
+    appendPhoto(doc, FK, { key: 'p1' });
+
+    movePhoto(doc, FK, FK2, 'nope');
+
+    const proj = projectResults(doc);
+    expect((proj[FK].photos ?? []).map((p) => p.key)).toEqual(['p1']);
+    expect(proj[FK2].photos).toBeUndefined();
+  });
+
+  it('two concurrent moves of DIFFERENT photos both survive (CRDT merge)', () => {
+    const FK2 = '_default:s1:i2';
+    const a = new Y.Doc();
+    seedResultsDoc(a, [{ findingKey: FK }, { findingKey: FK2 }]);
+    appendPhoto(a, FK, { key: 'p1' });
+    appendPhoto(a, FK, { key: 'p2' });
+    const b = new Y.Doc();
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+
+    movePhoto(a, FK, FK2, 'p1');
+    movePhoto(b, FK, FK2, 'p2');
+    Y.applyUpdate(a, Y.encodeStateAsUpdate(b));
+    Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
+
+    const proj = projectResults(a);
+    expect((proj[FK2].photos ?? []).map((p) => p.key).sort()).toEqual(['p1', 'p2']);
+    expect(proj[FK].photos ?? []).toEqual([]);
+    expect(projectResults(a)).toEqual(projectResults(b));
+  });
+
+  it('updatePhoto CANNOT clear a field (assignFields skips undefined) — documents why revert replaces', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p1', croppedKey: 'p1-cropped', annotatedKey: 'p1-annot' });
+
+    updatePhoto(doc, FK, 'p1', { croppedKey: undefined, annotatedKey: undefined });
+
+    const photo = (projectResults(doc)[FK].photos ?? [])[0];
+    // Derivatives are STILL present — updatePhoto with undefined is a no-op clear.
+    expect(photo.croppedKey).toBe('p1-cropped');
+    expect(photo.annotatedKey).toBe('p1-annot');
+  });
+
+  it('revertPhoto strips ALL derivatives in the projection (replace-by-key)', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p0' });
+    appendPhoto(doc, FK, {
+      key: 'p1',
+      croppedKey: 'p1-cropped',
+      annotatedKey: 'p1-annot',
+      annotationsJson: '{"shapes":[]}',
+    });
+    appendPhoto(doc, FK, { key: 'p2' });
+
+    revertPhoto(doc, FK, 'p1');
+
+    const photos = projectResults(doc)[FK].photos ?? [];
+    // Position preserved (replace-in-place), order intact.
+    expect(photos.map((p) => p.key)).toEqual(['p0', 'p1', 'p2']);
+    const reverted = photos.find((p) => p.key === 'p1');
+    expect(reverted).toEqual({ key: 'p1' }); // ONLY key — no derivatives remain
+    expect(reverted?.croppedKey).toBeUndefined();
+    expect(reverted?.annotatedKey).toBeUndefined();
+    expect(reverted?.annotationsJson).toBeUndefined();
+  });
+
+  it('#181 replacePhoto drops the annotation on crop (replace-in-place, exact fields)', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p0' });
+    appendPhoto(doc, FK, {
+      key: 'p1',
+      annotatedKey: 'p1-annot',
+      annotationsJson: '{"shapes":[]}',
+      mediaType: 'photo',
+    });
+    appendPhoto(doc, FK, { key: 'p2' });
+
+    // Crop: set croppedKey + crop, preserve mediaType, DROP the annotation.
+    replacePhoto(doc, FK, 'p1', {
+      key: 'p1',
+      croppedKey: 'p1-cropped',
+      crop: { aspect: 'free', orientation: 'landscape', x: 0, y: 0, width: 100, height: 80 },
+      mediaType: 'photo',
+    });
+
+    const photos = projectResults(doc)[FK].photos ?? [];
+    // Position preserved (replace-in-place), order intact.
+    expect(photos.map((p) => p.key)).toEqual(['p0', 'p1', 'p2']);
+    const cropped = photos.find((p) => p.key === 'p1');
+    expect(cropped?.croppedKey).toBe('p1-cropped');
+    expect(cropped?.crop).toMatchObject({ aspect: 'free', width: 100, height: 80 });
+    expect(cropped?.mediaType).toBe('photo');         // non-annotation field survives
+    expect(cropped?.annotatedKey).toBeUndefined();    // dropped by the crop
+    expect(cropped?.annotationsJson).toBeUndefined();
+  });
+
+  it('#181 replacePhoto is a no-op when the key is absent', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p0' });
+    replacePhoto(doc, FK, 'missing', { key: 'missing', croppedKey: 'x' });
+    const photos = projectResults(doc)[FK].photos ?? [];
+    expect(photos.map((p) => p.key)).toEqual(['p0']);
+  });
+
+  it('removePhoto deletes the matching entry by key', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    appendPhoto(doc, FK, { key: 'p1' });
+    appendPhoto(doc, FK, { key: 'p2' });
+
+    removePhoto(doc, FK, 'p1');
+
+    expect((projectResults(doc)[FK].photos ?? []).map((p) => p.key)).toEqual(['p2']);
+  });
+
+  it('#181 PR-G a pending PhotoEntry round-trips through projectResults/loadResultsProjection', () => {
+    // A pending upload carries an empty `key` + pendingUpload + pendingId, no
+    // R2 derivative. It must survive the projection round-trip untouched so the
+    // doc can hold it offline until the upload queue swaps in the real key.
+    const projection: ResultsProjection = {
+      [FK]: {
+        photos: [
+          { key: 'real-r2-key' },
+          { key: '', pendingUpload: true, pendingId: 'p1' },
+        ],
+      },
+    };
+
+    const doc = new Y.Doc();
+    loadResultsProjection(doc, projection);
+    const out = projectResults(doc);
+
+    expect(out[FK].photos).toEqual(projection[FK].photos);
+    const pending = (out[FK].photos ?? []).find((p) => p.pendingUpload === true);
+    expect(pending?.pendingId).toBe('p1');
+    expect(pending?.key).toBe('');
   });
 });

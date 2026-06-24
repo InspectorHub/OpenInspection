@@ -3,13 +3,11 @@ import { inspections, inspectionResults, inspectionMediaPool, templates } from '
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { findingKey, parseFindingKey, DEFAULT_UNIT } from '../../lib/finding-key';
-import { decideFieldWrite, applyFieldWrite } from '../../lib/field-version';
 import { stripExifOnIngest, type ImagesBinding } from '../../lib/media/strip-exif';
 import { collectAttachedPhotos } from '../../lib/media/collect-attached';
 import { applyReorder, applyDetach, applyRevert, moveEntry } from '../../lib/media/photo-ops';
 import type { PhotoEntry } from '../../lib/media/collect-attached';
 import type { ScopedDB } from '../../lib/db/scoped';
-import { sanitizeDefectStates } from './shared';
 import { InspectionSubService } from './base';
 import type { InspectionService } from '../inspection.service';
 import { r2Keys } from '../../lib/r2-keys';
@@ -27,10 +25,9 @@ function parseResultData<T = Record<string, never>>(data: unknown): T {
 
 /**
  * Photo + media handling: R2 upload (EXIF strip), media center aggregation,
- * loose pool upload/attach/delete, item-photo reorder/detach/revert/move, the
- * field-version-aware item patch, and the cover-key validation predicate.
- * Extracted verbatim from InspectionService. Ownership checks call back
- * through the facade (getInspection).
+ * loose pool upload/attach/delete, item-photo reorder/detach/revert/move, and
+ * the cover-key validation predicate. Ownership checks call back through the
+ * facade (getInspection).
  */
 export class InspectionPhotoService extends InspectionSubService {
     constructor(
@@ -59,8 +56,8 @@ export class InspectionPhotoService extends InspectionSubService {
      */
     /**
      * Persist a results `data` map: UPDATE the located row by id, or INSERT a
-     * fresh inspection_results row when none exists. Shared by attachPoolPhoto
-     * and patchItem (both pre-load the row and mutate `data` in place).
+     * fresh inspection_results row when none exists. Shared by the photo
+     * mutators (which pre-load the row and mutate `data` in place).
      */
     private async upsertResultData(
         tenantId: string,
@@ -442,103 +439,6 @@ export class InspectionPhotoService extends InspectionSubService {
             .set({ data: JSON.stringify(data), lastSyncedAt: new Date() })
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
         return { toItemId, photoIndex: moved.to.length - 1 };
-    }
-
-    /**
-     * Design System 0520 subsystem B phase 3 — field-version-aware item patch.
-     *
-     * Reads inspection_results.data, runs the field through the version-
-     * arithmetic helper (decideFieldWrite), persists on match, returns a
-     * conflict payload otherwise. Bumps inspections.dataVersion on every
-     * successful write so the offline-queue can detect staleness without
-     * fetching the full results blob.
-     *
-     * Tenant isolation enforced via getInspection ownership check before
-     * any read/write touches inspection_results.
-     */
-    async patchItem(
-        inspectionId: string,
-        tenantId: string,
-        itemId: string,
-        field: 'rating' | 'notes' | 'value' | 'cannedToggle' | 'defectFields' | 'itemAttribute',
-        value: unknown,
-        expectedVersion: number,
-        userId: string,
-        opts?: { force?: boolean },
-        sectionId?: string,
-    ): Promise<
-        | { kind: 'ok'; newVersion: number; by: string; at: number }
-        | { kind: 'conflict'; current: { value: unknown; by?: string; at?: number; v: number }; yours: { value: unknown; expectedVersion: number } }
-        | { kind: 'not_found' }
-    > {
-        // Verify ownership — throws if foreign tenant.
-        try {
-            await this.facade.getInspection(inspectionId, tenantId);
-        } catch {
-            return { kind: 'not_found' };
-        }
-
-        const db = this.getDrizzle();
-
-        const existing = await db.select().from(inspectionResults)
-            .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
-            .get();
-        const data = parseResultData<Record<string, Record<string, unknown>>>(existing?.data);
-
-        const key = sectionId ? findingKey(DEFAULT_UNIT, sectionId, itemId) : itemId;
-        const cur = data[key] ?? data[itemId]; // fallback for legacy
-
-        // Compound writes: defectFields / itemAttribute mutate nested shapes
-        // inside the item entry instead of overwriting a single scalar field.
-        // We translate them into a normalized entry update on the umbrella
-        // sub-key (`tabs` or `attributes`), then let applyFieldWrite handle
-        // the version bump on that sub-key so the optimistic-concurrency
-        // counter is preserved.
-        let mutableField: string = field;
-        let mutableValue: unknown = value;
-        if (field === 'defectFields' && value && typeof value === 'object' && 'cannedId' in (value as Record<string, unknown>)) {
-            const v = value as { cannedId: string; location?: string | null; trade?: string | null; deadline?: string | null; timeframe?: string | null };
-            const base = (cur ?? {}) as Record<string, unknown>;
-            const tabs = (base.tabs ?? {}) as Record<string, unknown>;
-            const defects = Array.isArray(tabs.defects) ? (tabs.defects as Array<Record<string, unknown>>) : [];
-            const idx = defects.findIndex(d => d?.cannedId === v.cannedId);
-            const next: Record<string, unknown> = idx >= 0 ? { ...defects[idx] } : { cannedId: v.cannedId, included: true };
-            if ('location'  in v) next.location  = v.location;
-            if ('trade'     in v) next.trade     = v.trade;
-            if ('deadline'  in v) next.deadline  = v.deadline;
-            if ('timeframe' in v) next.timeframe = v.timeframe;
-            const nextDefects = idx >= 0 ? defects.map((d, i) => i === idx ? next : d) : [...defects, next];
-            mutableValue = { ...tabs, defects: nextDefects };
-            mutableField = 'tabs';
-        }
-        if (field === 'itemAttribute' && value && typeof value === 'object' && 'attributeId' in (value as Record<string, unknown>)) {
-            const v = value as { attributeId: string; value: unknown };
-            const base = (cur ?? {}) as Record<string, unknown>;
-            const attrs = (base.attributes ?? {}) as Record<string, unknown>;
-            const nextAttrs = { ...attrs, [v.attributeId]: v.value };
-            mutableField = 'attributes' as typeof field;
-            mutableValue = nextAttrs;
-        }
-
-        const decision = decideFieldWrite(cur, mutableField, mutableValue, expectedVersion, { force: opts?.force ?? false });
-        if (decision.kind === 'conflict') return decision;
-
-        const now = Math.floor(Date.now() / 1000);
-        const { entry, newVersion } = applyFieldWrite(cur, mutableField, mutableValue, userId, now);
-        data[key] = entry;
-        sanitizeDefectStates(data);
-        if (key !== itemId) delete data[itemId]; // migrate on write
-
-        await this.upsertResultData(tenantId, inspectionId, data, existing?.id);
-
-        // Bump inspections.dataVersion — offline queue uses this counter
-        // to detect "the rest of the world moved" without re-fetching the
-        // entire results JSON.
-        await db.update(inspections)
-            .set({ dataVersion: sql`${inspections.dataVersion} + 1` })
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
-
-        return { kind: 'ok', newVersion, by: userId, at: now };
     }
 
     /**

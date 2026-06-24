@@ -206,7 +206,8 @@ export class InspectionReportService extends InspectionSubService {
 
                 // Phase T (T16): prefer annotated composite when present; expose original via originalKey.
                 // Plan 7: mapReportPhoto enriches video entries with their media kind.
-                const photos = (res.photos || []).map(mapReportPhoto);
+                // #181 PR-G: skip pending uploads — they have no R2 object yet (would 404 a render).
+                const photos = (res.photos || []).filter(p => !p.pendingUpload).map(mapReportPhoto);
 
                 // Spec 5B — resolve the three canned-comment tabs.
                 const information = resolveTab(item.tabs?.information, res.tabs?.information);
@@ -225,7 +226,8 @@ export class InspectionReportService extends InspectionSubService {
                         effectiveComment: renderTemplate(override ?? d.comment, resolveDefectMustacheVars(st as DefectCommentState | undefined, d as CannedDefect, res.attributes)),
                         effectiveCategory: st?.category ?? d.category,
                         effectiveLocation: (typeof st?.location === 'string' && st.location.length > 0) ? st.location : d.location,
-                        defectPhotos: (st?.photos ?? []).map(mapReportPhoto),
+                        // #181 PR-G: pending uploads have no R2 object yet — skip them.
+                        defectPhotos: (st?.photos ?? []).filter(p => !p.pendingUpload).map(mapReportPhoto),
                         // Sprint 2 S2-3 / S2-4 — per-defect contractor recommendation +
                         // repair estimate range. Null when the inspector left them blank.
                         recommendationId: st?.recommendationId ?? null,
@@ -327,7 +329,8 @@ export class InspectionReportService extends InspectionSubService {
                         ? {
                             rating: res.original.rating ?? null,
                             notes:  res.original.notes ?? null,
-                            photos: (res.original.photos || []).map(mapReportPhoto),
+                            // #181 PR-G: pending uploads have no R2 object yet — skip them.
+                            photos: (res.original.photos || []).filter(p => !p.pendingUpload).map(mapReportPhoto),
                         }
                         : null,
                     followupStatus: res.followupStatus ?? null,

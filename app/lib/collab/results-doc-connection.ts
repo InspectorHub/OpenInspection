@@ -26,6 +26,44 @@ import * as decoding from 'lib0/decoding';
 /** Framing prefix byte for y-protocols/sync messages (mirrors the DO constant). */
 const MSG_SYNC = 0;
 
+/**
+ * Framing byte for the restore control frame (a bare signal, no body). The DO
+ * sends this after a version restore; on receipt the client drops its local
+ * state (Y.Doc + IndexedDB) and resyncs from scratch. The literal `2` is
+ * duplicated DO-side in `server/durable-objects/inspection-doc.ts` (MSG_RESTORE)
+ * — there is no shared package; keep the two in sync (mirrors the duplicated
+ * MSG_SYNC = 0 pattern).
+ */
+const MSG_RESTORE = 2;
+
+// ─── IndexedDB helper ───────────────────────────────────────────────────────────
+
+/** The IndexedDB database name for an inspection's results doc. */
+function resultsDbName(inspectionId: string): string {
+    return 'results-' + inspectionId;
+}
+
+/**
+ * Delete the IndexedDB database backing a results doc, resolving once the
+ * delete settles. Resolves on success, block, OR error so a restore-resync is
+ * never wedged by a transient IndexedDB failure (best-effort cleanup — the
+ * fresh empty doc + remote step2 are the authoritative convergence path).
+ *
+ * Exported so the connection module and tests can await the same teardown.
+ */
+export function deleteResultsDb(inspectionId: string): Promise<void> {
+    return new Promise<void>((resolve) => {
+        try {
+            const req = indexedDB.deleteDatabase(resultsDbName(inspectionId));
+            req.onsuccess = () => resolve();
+            req.onerror = () => resolve();
+            req.onblocked = () => resolve();
+        } catch {
+            resolve();
+        }
+    });
+}
+
 // ─── Public types ──────────────────────────────────────────────────────────────
 
 /** Live state snapshot of the connection, mutated in-place by connectResultsDoc. */
@@ -53,6 +91,27 @@ export interface ConnectOptions {
      * can trigger a re-render with the updated handle.
      */
     onChange?: (handle: ResultsDocHandle) => void;
+    /**
+     * #181 PR-G — called EACH time `handle.synced` flips to true: on the initial
+     * connect AND on every successful reconnect (after an offline window or a
+     * dropped socket). The editor uses this as the trigger to drain the offline
+     * media queue, so freshly-captured photos/crops/annotations upload as soon as
+     * the collab socket is healthy again.
+     */
+    onSynced?: () => void;
+}
+
+// ─── Reconnect backoff ──────────────────────────────────────────────────────────
+
+/** First reconnect delay (ms). Doubles each attempt up to RECONNECT_MAX_MS. */
+const RECONNECT_BASE_MS = 1000;
+/** Backoff ceiling (ms): attempts never wait longer than this between reopens. */
+const RECONNECT_MAX_MS = 30_000;
+
+/** Compute the exponential backoff delay for the Nth (0-based) reconnect attempt. */
+export function reconnectDelayMs(attempt: number): number {
+    const exp = RECONNECT_BASE_MS * Math.pow(2, Math.max(0, attempt));
+    return Math.min(exp, RECONNECT_MAX_MS);
 }
 
 // ─── URL builder ──────────────────────────────────────────────────────────────
@@ -92,6 +151,9 @@ export function buildCollabWsUrl(
  *      - step1 → reply with step2 (our current state).
  *      - step2 → flip `synced`, call `onChange`.
  *      - update → apply to doc (origin = ws, so the forwarder skips the echo).
+ *   6. An inbound MSG_RESTORE control frame drops all local state (Y.Doc +
+ *      IndexedDB), rebuilds a fresh empty doc, and resyncs via a new step1 — so
+ *      a version restore converges even when additive Yjs merge cannot.
  */
 export function connectResultsDoc(
     inspectionId: string,
@@ -100,14 +162,14 @@ export function connectResultsDoc(
     const WS = opts.WebSocketImpl ?? globalThis.WebSocket;
     const loc = opts.location ?? (typeof window !== 'undefined' ? window.location : { protocol: 'https:', host: 'localhost' });
 
-    // ── Yjs doc ──────────────────────────────────────────────────────────────
+    // ── Reassignable doc + persistence ─────────────────────────────────────────
+    // `doc` and `persistence` are NOT const: a MSG_RESTORE control frame rebuilds
+    // both (drop + resync). The update-forwarder + message handler always read
+    // the CURRENT `doc` via these closure variables, so the rebuild re-wires
+    // cleanly. Database name is `results-<id>` (distinct from the POC prefix).
 
-    const doc = new Y.Doc();
-
-    // ── IndexedDB persistence ─────────────────────────────────────────────────
-    // Database name is `results-<id>` (distinct from the POC `poc-collab-` prefix).
-
-    const persistence = new IndexeddbPersistence('results-' + inspectionId, doc);
+    let doc = new Y.Doc();
+    let persistence = new IndexeddbPersistence(resultsDbName(inspectionId), doc);
 
     // ── Mutable handle (mutated in-place; React wrapper reads it via onChange) ─
 
@@ -119,6 +181,62 @@ export function connectResultsDoc(
 
     let ws: InstanceType<typeof WebSocket> | null = null;
     let destroyed = false;
+    /** Re-entrancy guard: a MSG_RESTORE arriving mid-reset must not re-trigger. */
+    let restoring = false;
+
+    // ── Reconnect state ─────────────────────────────────────────────────────────
+    // On an unexpected socket close (not destroyed, not mid-restore) we reopen
+    // with exponential backoff; a `window 'online'` event reopens immediately and
+    // resets the backoff. `reconnectAttempts` resets to 0 once a fresh step2
+    // (synced) arrives, so a flapping connection that briefly syncs starts its
+    // backoff over rather than compounding from a stale count.
+    let reconnectAttempts = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
+    /** Clear any pending reconnect timer (idempotent). */
+    function clearReconnectTimer(): void {
+        if (reconnectTimer !== null) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+    }
+
+    /**
+     * Schedule a reconnect after the current backoff delay, unless one is already
+     * scheduled, the connection is destroyed, or a restore is in flight (the
+     * restore path resyncs on the still-open socket and must not race a reopen).
+     */
+    function scheduleReconnect(): void {
+        if (destroyed || restoring) return;
+        if (reconnectTimer !== null) return; // a reopen is already pending
+        const delay = reconnectDelayMs(reconnectAttempts);
+        reconnectAttempts += 1;
+        reconnectTimer = setTimeout(() => {
+            reconnectTimer = null;
+            if (destroyed || restoring) return;
+            // Only reopen if there is no live/connecting socket.
+            if (ws && (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING)) return;
+            openSocket();
+        }, delay);
+    }
+
+    /**
+     * `window 'online'` handler: the network just came back. Reset the backoff and
+     * reopen now (cancelling any pending delayed reopen) so field merges + the
+     * media-queue drain happen with no wait.
+     */
+    function handleOnline(): void {
+        if (destroyed) return;
+        reconnectAttempts = 0;
+        clearReconnectTimer();
+        if (ws && (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING)) return;
+        openSocket();
+    }
+
+    const hasWindow = typeof window !== 'undefined';
+    if (hasWindow) {
+        window.addEventListener('online', handleOnline);
+    }
 
     // ── Local update forwarder ────────────────────────────────────────────────
     // Forward every local doc mutation to the server as a framed update message.
@@ -136,7 +254,68 @@ export function connectResultsDoc(
         ws.send(encoding.toUint8Array(encoder));
     };
 
-    doc.on('update', docUpdateHandler);
+    /** Attach the forwarder to the CURRENT doc. */
+    function bindDoc(): void {
+        doc.on('update', docUpdateHandler);
+    }
+
+    /** Send a sync step1 from the CURRENT (possibly empty) doc on the open socket. */
+    function sendStep1(): void {
+        if (!ws || ws.readyState !== ws.OPEN) return;
+        const encoder = encoding.createEncoder();
+        encoding.writeVarUint(encoder, MSG_SYNC);
+        syncProtocol.writeSyncStep1(encoder, doc);
+        ws.send(encoding.toUint8Array(encoder));
+    }
+
+    // ── Restore handler (drop + resync) ─────────────────────────────────────────
+    // On a MSG_RESTORE control frame the authoritative doc was replaced by a
+    // version restore. Yjs updates are additive (union), so a connected client
+    // that already holds post-restore edits cannot have deletions reverted by a
+    // plain update broadcast. We therefore drop ALL local state and resync:
+    //   1. Detach the forwarder + destroy the current persistence (closes the DB).
+    //   2. Delete the IndexedDB database so the rebuilt doc starts EMPTY
+    //      (otherwise persistence would restore the stale state and re-contaminate
+    //      the merge).
+    //   3. Build a FRESH Y.Doc + fresh persistence, re-wire, publish via onChange.
+    //   4. Send a fresh step1 on the still-open socket; the DO replies with a
+    //      step2 carrying the full restored state, which applies cleanly to the
+    //      empty doc with NO contamination from the dropped edits.
+    async function handleRestore(): Promise<void> {
+        if (destroyed || restoring) return; // re-entrancy / post-destroy guard
+        restoring = true;
+        try {
+            // (1) Detach forwarder + tear down current persistence.
+            doc.off('update', docUpdateHandler);
+            const oldPersistence = persistence;
+            const oldDoc = doc;
+            await oldPersistence.destroy().catch(() => { /* ignore */ });
+            if (destroyed) return; // destroyed while awaiting
+
+            // (2) Clear local IndexedDB so the rebuilt doc starts empty.
+            await deleteResultsDb(inspectionId);
+            if (destroyed) return;
+
+            // (3) Fresh doc + fresh persistence, re-wired and published.
+            const freshDoc = new Y.Doc();
+            doc = freshDoc;
+            persistence = new IndexeddbPersistence(resultsDbName(inspectionId), freshDoc);
+            bindDoc();
+            oldDoc.destroy();
+
+            handle.doc = freshDoc;
+            handle.synced = false; // not yet synced with the restored remote state
+            // persistenceSynced semantics: the fresh empty store will fire its own
+            // 'synced'; leave the flag true (local state IS settled — it is empty)
+            // since the socket is already open and we resync via step1 directly.
+            opts.onChange?.(handle);
+
+            // (4) Re-pull the authoritative restored state on the open socket.
+            sendStep1();
+        } finally {
+            restoring = false;
+        }
+    }
 
     // ── Socket opener ─────────────────────────────────────────────────────────
 
@@ -150,10 +329,7 @@ export function connectResultsDoc(
         ws.addEventListener('open', () => {
             if (!ws || destroyed) return;
             // Send sync step1 so the DO replies with step2 (its full state).
-            const encoder = encoding.createEncoder();
-            encoding.writeVarUint(encoder, MSG_SYNC);
-            syncProtocol.writeSyncStep1(encoder, doc);
-            ws.send(encoding.toUint8Array(encoder));
+            sendStep1();
         });
 
         ws.addEventListener('message', (ev: MessageEvent) => {
@@ -164,6 +340,12 @@ export function connectResultsDoc(
 
             const decoder = decoding.createDecoder(data);
             const msgType = decoding.readVarUint(decoder);
+
+            if (msgType === MSG_RESTORE) {
+                // Control frame: drop local state and resync from scratch.
+                void handleRestore();
+                return;
+            }
 
             if (msgType !== MSG_SYNC) return; // drop unknown frame types
 
@@ -190,15 +372,28 @@ export function connectResultsDoc(
                 ws.send(encoding.toUint8Array(replyEncoder));
             }
 
-            if (syncMsgType === syncProtocol.messageYjsSyncStep2 && !handle.synced) {
-                // First step2 received → we are now synced with the DO.
-                handle.synced = true;
-                opts.onChange?.(handle);
+            if (syncMsgType === syncProtocol.messageYjsSyncStep2) {
+                // A fresh step2 → we are synced with the DO. Reset the reconnect
+                // backoff (a healthy sync earns a clean slate) and fire onSynced
+                // EACH time (initial connect + every reconnect) so the editor can
+                // re-drain the offline media queue. The handle flag flips on the
+                // first step2 only; the onSynced trigger fires on every one.
+                reconnectAttempts = 0;
+                if (!handle.synced) {
+                    handle.synced = true;
+                    opts.onChange?.(handle);
+                }
+                opts.onSynced?.();
             }
         });
 
         ws.addEventListener('close', () => {
-            // No automatic reconnect in this version — Task 9 can layer it on.
+            // Auto-reconnect: a dropped socket (network loss, server restart) is
+            // reopened with exponential backoff. The restore path resyncs on the
+            // SAME open socket, so its close (if any) is guarded by `restoring`.
+            // Destroyed connections never reconnect.
+            if (destroyed || restoring) return;
+            scheduleReconnect();
         });
 
         ws.addEventListener('error', () => {
@@ -206,10 +401,12 @@ export function connectResultsDoc(
         });
     }
 
-    // ── Wait for IndexedDB before opening the socket ──────────────────────────
+    // ── Wire the initial doc + wait for IndexedDB before opening the socket ────
     // This is the persistence-synced gate: the socket is opened ONLY after
     // IndexedDB restores its stored state, so a fresh empty remote cannot
     // race-overwrite local data.
+
+    bindDoc();
 
     persistence.once('synced', () => {
         if (destroyed) return;
@@ -223,6 +420,10 @@ export function connectResultsDoc(
     function destroy(): void {
         if (destroyed) return;
         destroyed = true;
+        clearReconnectTimer();
+        if (hasWindow) {
+            window.removeEventListener('online', handleOnline);
+        }
         doc.off('update', docUpdateHandler);
         try { ws?.close(); } catch { /* already closing */ }
         persistence.destroy().catch(() => { /* ignore */ });

@@ -94,6 +94,13 @@ export class InspectionAnnotationsService extends InspectionSubService {
      * Phase T (T11): Saves an annotated composite PNG and Konva node tree for re-editing.
      * Updates inspection_results.data so that data[itemId].photos[photoIndex] gains
      * `annotatedKey` and `annotationsJson` fields. The original photo key is preserved.
+     *
+     * #181 — when `opts.skipResultsWrite` is true (the tenant's collabEditing flag
+     * is ON), the R2 derivative is still baked and the key returned, but the
+     * `inspection_results.data` write is skipped entirely: the Y.Doc / Durable
+     * Object is the sole authoritative writer of that blob, and the client mirrors
+     * the returned `annotatedKey` into the doc. Without this skip the next DO
+     * `persist()` would clobber the server's metadata write.
      */
     async saveAnnotation(
         inspectionId: string,
@@ -103,6 +110,7 @@ export class InspectionAnnotationsService extends InspectionSubService {
         compositeBytes: ArrayBuffer,
         nodesJson: string,
         sectionId?: string,
+        opts?: { skipResultsWrite?: boolean },
     ): Promise<{ annotatedKey: string }> {
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(inspectionId, tenantId);
@@ -132,6 +140,13 @@ export class InspectionAnnotationsService extends InspectionSubService {
         await this.r2.put(annotatedKey, compositeBytes, {
             httpMetadata: { contentType: 'image/png' }
         });
+
+        // #181 — collab ON: the R2 object is the authoritative binary; the doc
+        // owns the JSON metadata. Skip the results.data write entirely.
+        if (opts?.skipResultsWrite) {
+            return { annotatedKey };
+        }
+
         photos[photoIndex] = { ...photos[photoIndex], annotatedKey, annotationsJson: nodesJson };
         data[key] = { ...entry, photos };
         if (key !== itemId) delete data[itemId]; // migrate on write
@@ -184,6 +199,13 @@ export class InspectionAnnotationsService extends InspectionSubService {
      * Mirrors saveAnnotation's data load + finding-key resolution + results upsert.
      * Sequential layering rule: a (re-)crop CLEARS any existing annotatedKey/
      * annotationsJson, whose coords were in the previous cropped-pixel space.
+     *
+     * #181 — when `opts.skipResultsWrite` is true (the tenant's collabEditing flag
+     * is ON), the cropped R2 derivative is still baked and `croppedKey` returned,
+     * but the `inspection_results.data` write is skipped: the Y.Doc / Durable
+     * Object owns that blob. The client mirrors the crop into the doc (replacing
+     * the photo entry in place, which also drops the annotation per the
+     * sequential-layering rule above).
      */
     async saveCroppedItemPhoto(
         inspectionId: string,
@@ -193,6 +215,7 @@ export class InspectionAnnotationsService extends InspectionSubService {
         bakedBytes: ArrayBuffer,
         crop: PhotoCrop,
         sectionId?: string,
+        opts?: { skipResultsWrite?: boolean },
     ): Promise<{ croppedKey: string }> {
         if (!this.r2) throw Errors.BadRequest('Storage not available');
         await this.facade.getInspection(inspectionId, tenantId);
@@ -214,6 +237,13 @@ export class InspectionAnnotationsService extends InspectionSubService {
         const sourceMediaId = mediaIdFromKey(photos[photoIndex].key) ?? crypto.randomUUID();
         const croppedKey = r2Keys.inspectionPhotoCropped(tenantId, inspectionId, sourceMediaId);
         await this.r2.put(croppedKey, bakedBytes, { httpMetadata: { contentType: 'image/jpeg' } });
+
+        // #181 — collab ON: the R2 object is the authoritative binary; the doc
+        // owns the JSON metadata. Skip the results.data write entirely.
+        if (opts?.skipResultsWrite) {
+            return { croppedKey };
+        }
+
         // Sequential layering: drop annotation (its coords are in the OLD cropped
         // space), set the new crop.
         const { annotatedKey: _a, annotationsJson: _j, ...keep } = photos[photoIndex];

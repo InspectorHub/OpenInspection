@@ -2,28 +2,22 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
 import { findRatingLevel, ratingAdvanceDecision } from "~/lib/rating-levels";
 import { makeCustomDefect } from "~/lib/custom-defects";
-import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
+import { useInspectionState, fKey, type InspectionSchema } from "~/hooks/useInspection";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
 import { pushToast } from "~/hooks/useToast";
 import { useKeyboard } from "~/hooks/useKeyboard";
 import { useCannedComments } from "~/hooks/useCannedComments";
-import { useOfflineQueue, getOfflineQueue } from "~/hooks/useOfflineQueue";
-import { shouldQueue } from "~/lib/offline/should-queue";
-import { formatReplayToasts } from "~/lib/offline/replay-toasts";
-import { NetworkPill } from "~/components/sync/NetworkPill";
-import {
- addQueuedPreview,
- clearQueuedPreviews,
- collectObjectUrls,
- type QueuedPreviewMap,
-} from "~/lib/offline/queued-photo-previews";
 import { useUnsavedChanges } from "~/hooks/useUnsavedChanges";
 import { usePresence } from "~/hooks/usePresence";
 import { useTheme } from "~/hooks/useTheme";
 import { useResultsDoc } from "~/lib/collab/use-results-doc";
-import { bindResultMap } from "~/lib/collab/results-binding";
+import { useMediaDrain } from "~/hooks/useMediaDrain";
+import { bindResultMap, appendPendingPhoto } from "~/lib/collab/results-binding";
+import { enqueueMedia } from "~/lib/collab/media-upload-queue";
+import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
+import type { ResultsProjection } from "../../server/lib/collab/results-doc.types";
 import { SectionRail } from "~/components/editor/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { ItemList } from "~/components/editor/ItemList";
@@ -165,18 +159,28 @@ export default function InspectionEditPage() {
  });
 
  /* ---------------------------------------------------------------- */
- /* #181 — collab Y.Doc (real-time editing behind the collabEditing flag) */
+ /* #181 — collab Y.Doc (real-time editing; the only editor write path) */
  /* ---------------------------------------------------------------- */
 
- // Called unconditionally (rules of hooks); only connects when the flag is on.
- const collab = useResultsDoc(
-   loaderData.collabEditing ? String(loaderData.inspection.id) : null,
- );
+ // Collaboration is unconditional: every editor write routes through the Y.Doc
+ // (the legacy CAS / offline-queue write path was retired in Phase 5). The doc
+ // connects in a client-only effect, so `collab?.doc` is briefly null on the
+ // SSR / first-paint window before the connection initialises.
+ //
+ // #181 PR-G — the collab onSynced (initial connect + every reconnect) triggers
+ // the offline media drain. `drainRef` breaks the cycle: useResultsDoc needs the
+ // drain callback, but the drain (useMediaDrain) needs the live doc that
+ // useResultsDoc returns. The ref is filled right after useMediaDrain below.
+ const drainRef = useRef<() => void>(() => {});
+ const collab = useResultsDoc(String(loaderData.inspection.id), () => drainRef.current());
+
+ // #181 PR-G — build the media drain (uploader + doc swap) over the live doc.
+ const { drain: mediaDrain } = useMediaDrain(String(loaderData.inspection.id), collab?.doc ?? null);
+ drainRef.current = mediaDrain;
 
  // Once the doc is live, project it into the editor's `results`. First paint
- // uses loaderData.results (legacy projection); the DO hydrated from the SAME
- // D1 blob (8.6) so swapping in the doc projection causes no flash. Inert when
- // collab is off (no doc → effect returns immediately).
+ // uses loaderData.results (initial projection); the DO hydrated from the SAME
+ // D1 blob (8.6) so swapping in the doc projection causes no flash.
  useEffect(() => {
    if (!collab?.doc) return;
    return bindResultMap(collab.doc, (next) => state.setResults(() => next));
@@ -192,9 +196,8 @@ export default function InspectionEditPage() {
  setSaveStatus: state.setSaveStatus,
  inspectionId: String(state.inspection.id),
  notesFetcher,
-    // Offline-first: route field writes into the queue when shouldQueue() says so.
-    offlineQueue: getOfflineQueue(),
-    // #181 — when the collab doc is live, route writes through the Y.Doc.
+    // #181 — every write routes through the Y.Doc. The doc is briefly null on
+    // the SSR / first-paint window before the connection initialises.
     collab: collab?.doc ? { doc: collab.doc } : undefined,
  });
 
@@ -366,61 +369,7 @@ export default function InspectionEditPage() {
  state.bucketForRatingId,
  ]);
 
- /* ---------------------------------------------------------------- */
- /* Offline queue */
- /* ---------------------------------------------------------------- */
-
- const offline = useOfflineQueue();
  const revalidator = useRevalidator();
-
- /* ---------------------------------------------------------------- */
- /* Queued photo previews (Task 4) */
- /* ---------------------------------------------------------------- */
-
- // itemId → Array<{ name, objectUrl }> — local blob previews for photos
- // queued while offline.  Object URLs are created on enqueue and revoked
- // on unmount or after a successful replay clears the queue.
- const [queuedPhotoPreviews, setQueuedPhotoPreviews] = useState<QueuedPreviewMap>({});
- const queuedPhotoPreviewsRef = useRef(queuedPhotoPreviews);
- queuedPhotoPreviewsRef.current = queuedPhotoPreviews;
-
- // Revoke all object URLs when the route unmounts.
- useEffect(() => {
-  return () => {
-   for (const url of collectObjectUrls(queuedPhotoPreviewsRef.current)) {
-    URL.revokeObjectURL(url);
-   }
-  };
- }, []);
-
- // When a replay finishes (syncing flips false → true → false) AND pending
- // count reaches 0, clear the preview map and revalidate loader data so the
- // confirmed server photos appear in the strip.
- const prevSyncing = useRef(false);
- useEffect(() => {
-  const justFinished = prevSyncing.current && !offline.syncing;
-  prevSyncing.current = offline.syncing;
-  if (justFinished && offline.pendingCount === 0) {
-   // Revoke object URLs before clearing so the browser can GC the blobs.
-   for (const url of collectObjectUrls(queuedPhotoPreviewsRef.current)) {
-    URL.revokeObjectURL(url);
-   }
-   setQueuedPhotoPreviews(clearQueuedPreviews());
-   revalidator.revalidate();
-  }
- }, [offline.syncing, offline.pendingCount, revalidator]);
-
- /* ---------------------------------------------------------------- */
- /* Manual sync — fires toasts from the ReplayResult */
- /* ---------------------------------------------------------------- */
-
- const handleSyncNow = useCallback(async () => {
-  const result = await offline.replayNow();
-  if (!result) return; // single-flight guard fired — a replay was already running
-  for (const t of formatReplayToasts(result)) {
-   pushToast({ message: t.message, durationMs: t.durationMs });
-  }
- }, [offline]);
 
  /* ---------------------------------------------------------------- */
  /* Unsaved changes guard */
@@ -458,6 +407,8 @@ export default function InspectionEditPage() {
   !!(state.inspection as Record<string, unknown>).autoSignOnPublish,
  );
  const [signModalOpen, setSignModalOpen] = useState(false);
+ // #181 — version-history panel (collab Phase 4). Inert when collab is off.
+ const [versionHistoryOpen, setVersionHistoryOpen] = useState(false);
 
  // Sync autoSign local state from loader data when inspection changes
  useEffect(() => {
@@ -577,6 +528,7 @@ export default function InspectionEditPage() {
   setPosterTarget,
   coverKey,
   videoPosterUrl,
+  pendingPhotoUrl,
   itemGalleryPhotos,
   onOpenPhoto,
   onReorderPhotos,
@@ -585,11 +537,13 @@ export default function InspectionEditPage() {
   onBulkMovePhotos,
   onViewerAction,
   performPhotoCropSave,
+  performPhotoAnnotationSave,
  } = usePhotoOps({
   state,
   findings,
   streamCustomerSubdomain,
-  revalidator,
+  // #181 — photo array ops route through the Y.Doc (the DO persists it to D1).
+  collabDoc: collab?.doc ?? null,
   setPhotoStudioUrl,
   setPhotoStudioKey,
   setPhotoStudioIndex,
@@ -874,31 +828,8 @@ export default function InspectionEditPage() {
  if (!file || !state.activeItemId) return;
  const itemId = state.activeItemId;
 
- // Task 4 — when offline, enqueue for later replay and show a local preview.
- const nav = typeof navigator !== "undefined" ? navigator : undefined;
- if (shouldQueue(nav)) {
-  const objectUrl = URL.createObjectURL(file);
-  setQueuedPhotoPreviews((prev) =>
-   addQueuedPreview(prev, itemId, { name: file.name, objectUrl }),
-  );
-  void getOfflineQueue().enqueuePhoto({
-   inspectionId: String(state.inspection.id),
-   itemId,
-   name: file.name,
-   blob: file,
-   enqueuedAt: Date.now(),
-   // N4 — capture the opt-out at enqueue time; the RAW file is stored and baked
-   // at replay (so a failed-then-retried entry never double-bakes).
-   originalQuality: originalQualityEnabled(),
-  });
-  pushToast({ message: "Photo queued — will upload when back online", durationMs: 3000 });
-  // Reset input so picking the same file twice re-fires onChange
-  if (photoInputRef.current) photoInputRef.current.value = "";
-  return;
- }
-
- // N2+N4 — bake on the ONLINE path before submit (auto-orient + downscale +
- // EXIF/GPS strip), unless the user opted into original quality. Capture the
+ // N2+N4 — bake before submit (auto-orient + downscale + EXIF/GPS strip),
+ // unless the user opted into original quality. Capture the
  // defect target ref into a local BEFORE the await so a second picker open
  // cannot clobber it. The offline branch above keeps the RAW File (Task 5
  // bakes at replay).
@@ -907,6 +838,30 @@ export default function InspectionEditPage() {
  pendingPhotoTargetRef.current = null;
  void (async () => {
  const baked = orig ? file : await preprocessImage(file);
+
+ // #181 PR-G — offline: persist the baked photo locally + append a PENDING
+ // doc entry (empty key + pendingUpload). The strip renders it from the
+ // local blob; the drain (on reconnect / online) uploads it to R2 and swaps
+ // in the real key. Defect-targeted offline adds fall back to the online
+ // fetcher (the pending-doc model covers item photos; defect pending is out
+ // of scope) — they simply re-fire when back online.
+ const doc = collab?.doc ?? null;
+ const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
+ if (typeof navigator !== "undefined" && navigator.onLine === false && doc && sid && !target) {
+  const fk = fKey(sid, itemId);
+  const pendingId = crypto.randomUUID();
+  await enqueueMedia({
+  pendingId,
+  inspectionId: String(state.inspection.id),
+  findingKey: fk,
+  kind: "photo",
+  blob: baked,
+  enqueuedAt: Date.now(),
+  });
+  appendPendingPhoto(doc, fk, pendingId);
+  return;
+ }
+
  const formData = new FormData();
  formData.append("intent", "upload-photo");
  formData.append("itemId", itemId);
@@ -921,7 +876,7 @@ export default function InspectionEditPage() {
  // Reset input so picking the same file twice re-fires onChange
  if (photoInputRef.current) photoInputRef.current.value = "";
  },
- [state.activeItemId, state.inspection.id, uploadFetcher],
+ [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection],
  );
 
  const handleBurstCommit = useCallback(
@@ -929,33 +884,7 @@ export default function InspectionEditPage() {
  if (!state.burstCameraItemId || blobs.length === 0) return;
  const itemId = state.burstCameraItemId;
 
- // Task 6 (rider) — same offline branch as handlePhotoUpload: when offline,
- // enqueue each captured blob and show a local preview instead of uploading.
- const nav = typeof navigator !== "undefined" ? navigator : undefined;
- if (shouldQueue(nav)) {
-  blobs.forEach((blob, i) => {
-  const name = `burst-${i + 1}.jpg`;
-  const objectUrl = URL.createObjectURL(blob);
-  setQueuedPhotoPreviews((prev) =>
-   addQueuedPreview(prev, itemId, { name, objectUrl }),
-  );
-  void getOfflineQueue().enqueuePhoto({
-   inspectionId: String(state.inspection.id),
-   itemId,
-   name,
-   blob,
-   enqueuedAt: Date.now(),
-   originalQuality: originalQualityEnabled(),
-  });
-  });
-  pushToast({
-  message: `${blobs.length} photo${blobs.length === 1 ? "" : "s"} queued — will upload when back online`,
-  durationMs: 3000,
-  });
-  return;
- }
-
- // N4 — bake each frame on the ONLINE path. Burst frames are already
+ // N4 — bake each frame before upload. Burst frames are already
  // canvas-captured JPEGs (no EXIF), so this is purely the downscale; it
  // no-ops on frames already below the cap. Honors the original-quality opt-out.
  const orig = originalQualityEnabled();
@@ -1330,7 +1259,7 @@ export default function InspectionEditPage() {
  if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", variant: "error", durationMs: 6000 });
  });
  }}
- queuedPreviews={state.activeItemId ? (queuedPhotoPreviews[state.activeItemId] ?? []) : []}
+ queuedPreviews={[]}
  attachedRepairItems={
  (state.activeItemId
  ? (findings.getResult(state.activeItemId, state.currentSection?.id)
@@ -1347,6 +1276,7 @@ export default function InspectionEditPage() {
  moveTargets={moveTargets}
  onBulkMovePhotos={onBulkMovePhotos}
  videoPosterUrl={videoPosterUrl}
+ pendingPhotoUrl={pendingPhotoUrl}
  />
  ) : (
  <div className="flex items-center justify-center h-full text-ih-fg-4">
@@ -1394,27 +1324,6 @@ export default function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
  /* Render */
  /* ---------------------------------------------------------------- */
-
- // Offline status surfaces — shared by BOTH layout branches (a phone in the
- // field is exactly where the offline indicator matters most).
- const offlineStatusEl = (
-  <>
-   {!offline.online && (
-    <div className="fixed top-14 left-0 right-0 z-40 bg-ih-watch-bg border-b border-ih-watch px-4 py-2 text-center">
-     <span className="text-[12px] font-bold text-ih-watch-fg">
-      Saved on this device — will sync when you&apos;re back online.
-     </span>
-    </div>
-   )}
-   <NetworkPill
-    online={offline.online}
-    pendingCount={offline.pendingCount}
-    failedCount={offline.failedCount}
-    syncing={offline.syncing}
-    onSyncNow={handleSyncNow}
-   />
-  </>
- );
 
  if (isMobile) {
  return (
@@ -1470,7 +1379,6 @@ export default function InspectionEditPage() {
  >
  {sideRailEl}
  </MobileBottomDrawer>
-   {offlineStatusEl}
  </div>
  );
  }
@@ -1554,27 +1462,11 @@ export default function InspectionEditPage() {
   const itemId = state.activeItemId;
   if (itemId && photoStudioIndex != null) {
    const sectionId = state.currentSection?.id;
-   // Task 9c — offline-capable annotate. When offline, enqueue the baked PNG
-   // through the SAME media queue photo uploads use; the annotation derivative
-   // replays to the annotation endpoint on reconnect. When online, submit
-   // directly (unchanged).
-   const nav = typeof navigator !== "undefined" ? navigator : undefined;
-   if (shouldQueue(nav)) {
-    void getOfflineQueue().enqueuePhoto({
-     inspectionId: String(state.inspection.id),
-     itemId,
-     name: "annotated.png",
-     blob: new File([blob], "annotated.png", { type: "image/png" }),
-     enqueuedAt: Date.now(),
-     derivative: {
-      kind: "annotation",
-      photoIndex: photoStudioIndex,
-      nodes: nodesJson,
-      ...(sectionId ? { sectionId } : {}),
-     },
-    });
-    pushToast({ message: "Annotation queued — will save when back online", durationMs: 3000 });
-   } else {
+   // #181 — the Y.Doc owns results.data: bake the annotation PNG to R2 + mirror
+   // the returned annotatedKey into the doc (offline refuses with a toast).
+   // performPhotoAnnotationSave returns false only in the brief pre-connect
+   // window before the doc is live; fall back to the online annotate relay then.
+   if (!performPhotoAnnotationSave({ itemId, photoIndex: photoStudioIndex, sectionId }, blob, nodesJson)) {
     const fd = new FormData();
     fd.append("intent", "annotate");
     fd.append("itemId", itemId);
@@ -1728,6 +1620,21 @@ export default function InspectionEditPage() {
  />
  )}
 
+ {/* #181 — Version history panel (collab Phase 4). Only reachable when the
+     collabEditing flag is on (the trigger button is gated in EditorHeader).
+     Live convergence for ALL clients (incl. the initiator) is now driven by the
+     DO's MSG_RESTORE control frame (Task 12b): each client drops its local Y.Doc
+     + IndexedDB and resyncs. The onRestored revalidate below is belt-and-braces —
+     it refreshes loader data for the non-collab projection path. */}
+ <VersionHistoryPanel
+ open={versionHistoryOpen}
+ onClose={() => setVersionHistoryOpen(false)}
+ inspectionId={String(loaderData.inspection.id)}
+ onRestored={() => { revalidator.revalidate(); }}
+ doc={collab?.doc ?? null}
+ currentResults={state.results as unknown as ResultsProjection}
+ />
+
  {/* Inspector sign modal */}
  {signModalOpen && (
  <SignModal
@@ -1825,6 +1732,8 @@ export default function InspectionEditPage() {
  tenantSlug={loaderData.tenantSlug}
  setSignModalOpen={setSignModalOpen}
  handlePublishClick={handlePublishClick}
+ collabEditing={loaderData.collabEditing}
+ onOpenVersionHistory={() => setVersionHistoryOpen(true)}
  />
  {/* ------------------------------------------------------------ */}
  {/* 4-column layout below header */}
@@ -1978,8 +1887,6 @@ export default function InspectionEditPage() {
  activeItemId={state.activeItemId || undefined}
  hidden={state.speedMode}
  />
-
- {offlineStatusEl}
  </div>
  );
 }

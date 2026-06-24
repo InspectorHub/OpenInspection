@@ -61,7 +61,6 @@ export default [
   route("setup", "routes/setup.tsx"),
   route("inspections/:id/form", "routes/form-renderer.tsx"),
   route("join/:token", "routes/join.tsx"),
-  route("conflict-resolver/:id", "routes/conflict-resolver.tsx"),
   route("version-diff/:id", "routes/version-diff.tsx"),
   // Standalone public — no layout (iframe-friendly)
   // IA-26 — company-level embed (no inspector slug); legacy per-inspector kept alive.

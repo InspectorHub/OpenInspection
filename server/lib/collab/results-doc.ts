@@ -278,6 +278,27 @@ export function appendPhoto(
     });
 }
 
+/**
+ * #181 PR-G — push a brand-new PENDING photo entry, deduped by `pendingId`
+ * (NOT by `key`).
+ *
+ * A brand-new offline photo has an EMPTY `key`, so `appendPhoto`'s upsert-by-key
+ * would merge two concurrent offline adds into one element. This mutator instead
+ * keys on the unique `pendingId`: an entry with the same `pendingId` is merged,
+ * otherwise a fresh element is pushed — so two offline adds yield two entries.
+ */
+export function pushPendingPhoto(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    photo: PhotoEntry & { pendingId: string },
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        upsertElement(getOrCreateArray(item, 'photos'), 'pendingId', { ...photo });
+    });
+}
+
 /** Apply a partial patch to the photo Y.Map matching `key`. */
 export function updatePhoto(
     doc: Y.Doc,
@@ -303,6 +324,183 @@ export function removePhoto(
     doc.transact(() => {
         const item = getOrSeedItem(results, findingKey);
         removeElement(getOrCreateArray(item, 'photos'), 'key', key);
+    });
+}
+
+/**
+ * Revert a photo back to its original `key`, stripping every derivative
+ * (croppedKey / annotatedKey / annotationsJson / crop).
+ *
+ * `assignFields` skips `undefined` and never deletes a Y.Map entry, so
+ * `updatePhoto(key, { croppedKey: undefined, ... })` CANNOT clear derivatives.
+ * Revert therefore REPLACES the photo Y.Map with a fresh `{ key }`-only entry,
+ * preserving array position (replace-in-place by index). No-ops if absent.
+ */
+export function revertPhoto(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    key: string,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const arr = getOrCreateArray(item, 'photos');
+        for (let i = 0; i < arr.length; i++) {
+            const el = arr.get(i);
+            if (el instanceof Y.Map && el.get('key') === key) {
+                const fresh = new Y.Map<unknown>();
+                fresh.set('key', key);
+                arr.delete(i, 1);
+                arr.insert(i, [fresh]);
+                return;
+            }
+        }
+    });
+}
+
+/**
+ * Replace the photo Y.Map matching `key` IN PLACE with a fresh Y.Map built from
+ * `entry`, so the resulting projection has EXACTLY `entry`'s fields — no stale
+ * derivatives survive.
+ *
+ * Crop's sequential-layering rule requires DROPPING `annotatedKey` /
+ * `annotationsJson` while setting `croppedKey` / `crop`. `updatePhoto` cannot do
+ * this: `assignFields` skips `undefined` and never deletes a Y.Map entry, so a
+ * merge would leave the old annotation behind. Replace-in-place (mirror of
+ * `revertPhoto`, but with a full entry) is the correct primitive. Array position
+ * is preserved (`delete(i,1)` + `insert(i, …)`). No-op if `key` is absent.
+ */
+export function replacePhoto(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    key: string,
+    entry: PhotoEntry,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const arr = getOrCreateArray(item, 'photos');
+        for (let i = 0; i < arr.length; i++) {
+            const el = arr.get(i);
+            if (el instanceof Y.Map && el.get('key') === key) {
+                const fresh = new Y.Map<unknown>();
+                assignFields(fresh, { ...entry });
+                arr.delete(i, 1);
+                arr.insert(i, [fresh]);
+                return;
+            }
+        }
+    });
+}
+
+/**
+ * #181 PR-G — replace the photo Y.Map whose `pendingId` === `pendingId` IN PLACE
+ * with a fresh Y.Map built from `entry`.
+ *
+ * A brand-new offline photo entry has an EMPTY `key`, so two concurrent offline
+ * adds collide under `replacePhoto` (which matches by `key`). The drain swap must
+ * therefore address by the unique `pendingId`, not the key. Array position is
+ * preserved. No-op if no element carries the id.
+ */
+export function replacePhotoByPendingId(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    pendingId: string,
+    entry: PhotoEntry,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const arr = getOrCreateArray(item, 'photos');
+        for (let i = 0; i < arr.length; i++) {
+            const el = arr.get(i);
+            if (el instanceof Y.Map && el.get('pendingId') === pendingId) {
+                const fresh = new Y.Map<unknown>();
+                assignFields(fresh, { ...entry });
+                arr.delete(i, 1);
+                arr.insert(i, [fresh]);
+                return;
+            }
+        }
+    });
+}
+
+/**
+ * Reorder the item's `photos` Y.Array so its elements follow `orderedKeys`
+ * (matched by each photo Y.Map's `key`).
+ *
+ * If `orderedKeys` is a 1:1 permutation of the existing photo keys, the array
+ * is rebuilt wholesale in the requested order (fresh Y.Maps from each entry's
+ * `.toJSON()`). If it is NOT a 1:1 permutation (missing / extra / duplicate
+ * keys), the array is left unchanged — mirrors the guard in
+ * `usePhotoOps.onReorderPhotos` (`reordered.length === photos.length`).
+ *
+ * Reorder is inherently wholesale; losing per-photo CRDT identity on reorder is
+ * acceptable and matches LWW semantics for ordering.
+ */
+export function reorderPhotos(
+    doc: Y.Doc,
+    findingKey: FindingKey,
+    orderedKeys: string[],
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const item = getOrSeedItem(results, findingKey);
+        const arr = getOrCreateArray(item, 'photos');
+
+        // Snapshot current photos into a key → PhotoEntry map.
+        const byKey = new Map<string, PhotoEntry>();
+        for (let i = 0; i < arr.length; i++) {
+            const el = arr.get(i);
+            if (el instanceof Y.Map) {
+                const entry = el.toJSON() as PhotoEntry;
+                if (typeof entry.key === 'string') byKey.set(entry.key, entry);
+            }
+        }
+
+        // Guard: orderedKeys must be a 1:1 permutation of the existing keys.
+        if (orderedKeys.length !== byKey.size) return;
+        const seen = new Set<string>();
+        for (const k of orderedKeys) {
+            if (!byKey.has(k) || seen.has(k)) return; // missing / duplicate → no-op
+            seen.add(k);
+        }
+
+        // Rebuild the array in the requested order.
+        arr.delete(0, arr.length);
+        const rebuilt = orderedKeys.map((k) => {
+            const el = new Y.Map<unknown>();
+            assignFields(el, { ...(byKey.get(k) as PhotoEntry) });
+            return el;
+        });
+        arr.push(rebuilt);
+    });
+}
+
+/**
+ * Move one photo between items in a single transaction: read the photo
+ * `PhotoEntry` from the source item's `photos` (by `key`); if absent, no-op;
+ * else remove it from the source array and upsert it (by `key`) into the target
+ * item's `photos` array. Tenant / finding-key scoping is the caller's concern.
+ */
+export function movePhoto(
+    doc: Y.Doc,
+    fromFindingKey: FindingKey,
+    toFindingKey: FindingKey,
+    photoKey: string,
+): void {
+    const results = doc.getMap<unknown>('results');
+    doc.transact(() => {
+        const fromItem = getOrSeedItem(results, fromFindingKey);
+        const fromArr = getOrCreateArray(fromItem, 'photos');
+        const el = findElementByKey(fromArr, 'key', photoKey);
+        if (!el) return; // absent → no-op
+        const entry = el.toJSON() as PhotoEntry;
+
+        removeElement(fromArr, 'key', photoKey);
+
+        const toItem = getOrSeedItem(results, toFindingKey);
+        upsertElement(getOrCreateArray(toItem, 'photos'), 'key', { ...entry });
     });
 }
 

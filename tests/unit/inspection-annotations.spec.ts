@@ -80,6 +80,29 @@ describe('saveAnnotation', () => {
     expect(entry.key).toBe('orig.jpg');
   });
 
+  it('#181 skipResultsWrite: bakes R2 + returns the key but leaves inspection_results.data UNTOUCHED', async () => {
+    const before = await testDb.select().from(schema.inspectionResults)
+      .where(eq(schema.inspectionResults.inspectionId, INSPECTION_ID)).get();
+    const beforeData = JSON.stringify(typeof before!.data === 'string' ? JSON.parse(before!.data) : before!.data);
+
+    const { annotatedKey } = await svc.saveAnnotation(
+      INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), '[{"kind":"circle"}]', undefined,
+      { skipResultsWrite: true },
+    );
+
+    // R2 object still written + key returned (authoritative binary).
+    expect(annotatedKey).toMatch(/\.annotated\.png$/);
+    expect(r2.store.has(annotatedKey)).toBe(true);
+
+    // results.data is byte-identical — the doc owns the metadata under collab.
+    const after = await testDb.select().from(schema.inspectionResults)
+      .where(eq(schema.inspectionResults.inspectionId, INSPECTION_ID)).get();
+    const afterData = JSON.stringify(typeof after!.data === 'string' ? JSON.parse(after!.data) : after!.data);
+    expect(afterData).toBe(beforeData);
+    const entry = (JSON.parse(afterData) as Record<string, { photos: Array<{ key: string; annotatedKey?: string }> }>)[ITEM_ID].photos[0];
+    expect(entry.annotatedKey).toBeUndefined(); // never written
+  });
+
   it('co-locates annotatedKey under the same mediaId as the new-convention source key', async () => {
     // Update the seeded photo to use a new-convention key so mediaIdFromKey extracts the mediaId.
     const MEDIAID = 'a1b2c3d4-0000-0000-0000-000000000002';

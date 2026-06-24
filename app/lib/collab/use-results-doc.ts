@@ -8,7 +8,7 @@
  * Browser E2E coverage: Task 10 (not unit-tested here — no render harness).
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { connectResultsDoc } from './results-doc-connection';
 import type { ResultsDocHandle } from './results-doc-connection';
 
@@ -21,9 +21,21 @@ export type { ResultsDocHandle };
  * Accepts `string | null`: when `inspectionId` is null/empty the effect returns
  * early and the hook yields `null` (no connection). This lets the editor call
  * it unconditionally (rules of hooks) while only connecting when collab is on.
+ *
+ * `onSynced` (optional) is invoked each time the collab socket (re)syncs with the
+ * DO — the editor passes a media-queue drain trigger. It is held in a ref so a
+ * changing callback identity never re-creates the connection (the effect only
+ * re-runs on `inspectionId`).
  */
-export function useResultsDoc(inspectionId: string | null): ResultsDocHandle | null {
+export function useResultsDoc(
+    inspectionId: string | null,
+    onSynced?: () => void,
+): ResultsDocHandle | null {
     const [handle, setHandle] = useState<ResultsDocHandle | null>(null);
+
+    // Keep the latest onSynced without re-subscribing the connection.
+    const onSyncedRef = useRef<(() => void) | undefined>(onSynced);
+    onSyncedRef.current = onSynced;
 
     useEffect(() => {
         // SSR guard — should not be reached in practice (useEffect is
@@ -40,6 +52,9 @@ export function useResultsDoc(inspectionId: string | null): ResultsDocHandle | n
             onChange: (updated) => {
                 // Spread so React sees a new object reference and re-renders.
                 setHandle({ ...updated });
+            },
+            onSynced: () => {
+                onSyncedRef.current?.();
             },
         });
 

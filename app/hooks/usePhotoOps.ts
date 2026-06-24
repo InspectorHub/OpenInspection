@@ -1,8 +1,5 @@
-import { useState, useCallback, useMemo } from "react";
-import { useFetcher, useRevalidator } from "react-router";
-import { pushToast } from "~/hooks/useToast";
-import { getOfflineQueue } from "~/hooks/useOfflineQueue";
-import { shouldQueue } from "~/lib/offline/should-queue";
+import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import type * as Y from "yjs";
 import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "~/components/media-studio/photo-display-key";
 import { type MediaAction } from "~/components/media-studio/MediaViewer";
 import { streamThumbUrl } from "~/components/media-studio/PosterPicker";
@@ -11,6 +8,25 @@ import { fKey } from "~/hooks/useInspection";
 import { type PhotoCrop } from "~/components/media-studio/PhotoCropper";
 import type { useInspectionState } from "~/hooks/useInspection";
 import type { useFindings } from "~/hooks/useFindings";
+import {
+  reorderPhotos as bindingReorderPhotos,
+  movePhoto as bindingMovePhoto,
+  removePhoto as bindingRemovePhoto,
+  revertPhoto as bindingRevertPhoto,
+  setPhotoCrop as bindingSetPhotoCrop,
+  setPhotoAnnotation as bindingSetPhotoAnnotation,
+  markPhotoPending as bindingMarkPhotoPending,
+} from "~/lib/collab/results-binding";
+import { enqueueMedia } from "~/lib/collab/media-upload-queue";
+import { getPendingMedia } from "~/lib/collab/media-pending-store";
+import type { PhotoEntry } from "../../server/lib/collab/results-doc.types";
+
+/** #181 PR-G — offline detection. The legacy app/lib/offline helper was removed
+ * (Task 15); a bare `navigator.onLine === false` check is the offline gate. SSR
+ * has no navigator, so guard the global access. */
+function isOffline(): boolean {
+  return typeof navigator !== "undefined" && navigator.onLine === false;
+}
 
 /**
  * The photo / media-operations cluster of the inspection editor. Behavior-
@@ -21,15 +37,19 @@ import type { useFindings } from "~/hooks/useFindings";
  * reference (overlays, ItemList, MediaViewer, PhotoCropper, etc.) is unchanged.
  *
  * Component-local values that the moved bodies reference but don't own —
- * `state`, `findings`, `revalidator`, and the loader-derived
- * `streamCustomerSubdomain` (used elsewhere in the component too) — are threaded
- * in via the single `ctx` param. Module-level helpers are imported directly.
+ * `state`, `findings`, and the loader-derived `streamCustomerSubdomain` (used
+ * elsewhere in the component too) — are threaded in via the single `ctx` param.
+ * Module-level helpers are imported directly.
  */
 export function usePhotoOps(ctx: {
   state: ReturnType<typeof useInspectionState>;
   findings: ReturnType<typeof useFindings>;
   streamCustomerSubdomain: string | null;
-  revalidator: ReturnType<typeof useRevalidator>;
+  // #181 — the Y.Doc is the authoritative writer of inspection_results.data (the
+  // DO persists projectResults(doc) to D1). Photo ARRAY ops mutate the doc; the
+  // binary R2/Stream calls (upload, crop/annotation bake, video delete) remain
+  // network ops. null only in the brief pre-connect window before the doc syncs.
+  collabDoc: Y.Doc | null;
   // PhotoAnnotator (Photo Studio) overlay setters — owned by the component; the
   // annotate branch of onViewerAction opens that overlay. Threaded so the moved
   // body stays byte-identical (these setters are stable, so deps are unaffected).
@@ -43,7 +63,7 @@ export function usePhotoOps(ctx: {
     state,
     findings,
     streamCustomerSubdomain,
-    revalidator,
+    collabDoc,
     setPhotoStudioUrl,
     setPhotoStudioKey,
     setPhotoStudioIndex,
@@ -68,7 +88,6 @@ export function usePhotoOps(ctx: {
    * index means "closed". A dedicated fetcher persists reorder/detach/revert
    * (per-photo POSTs, separate from the shared save-all fetcher). */
   const [viewer, setViewer] = useState<{ itemId: string; index: number | null }>({ itemId: "", index: null });
-  const photoOpsFetcher = useFetcher();
 
   /* Plan 7 — resolve a Stream poster thumbnail URL for a video strip thumb. */
   const videoPosterUrl = useCallback(
@@ -96,7 +115,7 @@ export function usePhotoOps(ctx: {
   /* Task 8 — read an item's stored photos[] (item-level bucket) from the live
    * results map. Item photos are `{ key; croppedKey?; crop?; annotatedKey?; annotationsJson? }`. */
   type ItemCrop = { aspect: string; orientation: "landscape" | "portrait"; x: number; y: number; width: number; height: number };
-  type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; provider?: "stream" | "r2"; streamUid?: string; mediaId?: string; posterPct?: number; durationSec?: number };
+  type ItemPhoto = { key: string; croppedKey?: string; crop?: ItemCrop; annotatedKey?: string; annotationsJson?: string; mediaType?: "photo" | "video"; provider?: "stream" | "r2"; streamUid?: string; mediaId?: string; posterPct?: number; durationSec?: number; pendingUpload?: boolean; pendingId?: string; pendingKind?: "photo" | "crop" | "annotate" };
   const getItemPhotos = useCallback(
     (itemId: string): ItemPhoto[] => {
       const r = findings.getResult(itemId, state.sectionIdForItem(itemId) ?? undefined);
@@ -105,6 +124,82 @@ export function usePhotoOps(ctx: {
     [findings, state.sectionIdForItem],
   );
 
+  /* #181 PR-G — local objectURL map for pending (offline) media. A pending photo
+   * entry has no servable R2 key, so the strip/viewer renders the LOCAL blob from
+   * the media-pending store. The effect loads a blob URL for every pending id in
+   * the inspection's results and revokes URLs when their entry resolves/unmounts.
+   * Pending entries with NO local blob (another device's upload) get no URL → the
+   * gallery shows an "uploading…" placeholder instead of a broken image. */
+  const [pendingUrls, setPendingUrls] = useState<Record<string, string>>({});
+
+  // Collect every pending id currently present in the live results map. A change
+  // to this set (a new offline capture, or one resolving) re-runs the loader.
+  const pendingIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!collabDoc) return ids;
+    for (const sec of state.sections) {
+      for (const it of sec.items || []) {
+        for (const p of getItemPhotos(it.id)) {
+          if (p.pendingId) ids.add(p.pendingId);
+        }
+      }
+    }
+    return ids;
+    // state.results drives getItemPhotos; depend on it so resolution re-runs.
+  }, [collabDoc, state.sections, state.results, getItemPhotos]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const created: Record<string, string> = {};
+    void (async () => {
+      for (const id of pendingIds) {
+        if (pendingUrls[id]) continue; // already have a URL for this id
+        const rec = await getPendingMedia(id);
+        if (cancelled) break;
+        // happy-dom/fake-indexeddb revives Blob as a plain object; guard for a
+        // real Blob before createObjectURL (placeholder path otherwise).
+        if (rec && typeof URL !== "undefined" && rec.blob instanceof Blob) {
+          created[id] = URL.createObjectURL(rec.blob);
+        }
+      }
+      if (!cancelled && Object.keys(created).length > 0) {
+        setPendingUrls((prev) => ({ ...prev, ...created }));
+      }
+    })();
+
+    // Revoke URLs for ids that are no longer pending (entry resolved).
+    setPendingUrls((prev) => {
+      let changed = false;
+      const next: Record<string, string> = {};
+      for (const [id, url] of Object.entries(prev)) {
+        if (pendingIds.has(id)) {
+          next[id] = url;
+        } else {
+          if (typeof URL !== "undefined") URL.revokeObjectURL(url);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+
+    return () => {
+      cancelled = true;
+    };
+    // `pendingUrls` is read but intentionally excluded: including it would re-run
+    // on every URL we add and loop. New ids arrive via `pendingIds`.
+  }, [pendingIds]);
+
+  // Revoke all objectURLs on unmount. `pendingUrlsRef` mirrors the latest map so
+  // the unmount cleanup revokes everything without re-subscribing per change.
+  const pendingUrlsRef = useRef(pendingUrls);
+  pendingUrlsRef.current = pendingUrls;
+  useEffect(() => {
+    return () => {
+      if (typeof URL === "undefined") return;
+      for (const url of Object.values(pendingUrlsRef.current)) URL.revokeObjectURL(url);
+    };
+  }, []);
+
   /* Task 8 — map an item's photos[] → GalleryPhoto[] for the unified MediaViewer.
    * displayKey (annotatedKey||key) drives the rendered image + URL; originalKey
    * keeps the un-annotated source; photoIndex addresses detach/revert; annotated
@@ -112,6 +207,38 @@ export function usePhotoOps(ctx: {
   const itemGalleryPhotos = useCallback(
     (itemId: string): GalleryPhoto[] =>
       getItemPhotos(itemId).map((p, i) => {
+        // #181 PR-G — pending (offline) entry: render from the local blob URL when
+        // this client owns it; otherwise (another device's upload) show a
+        // placeholder. `pendingUpload` (brand-new photo) has no real key at all;
+        // a pending crop/annotate keeps its base key but its NEW derivative is the
+        // local blob, so prefer the local URL while pending.
+        const localUrl = p.pendingId ? pendingUrls[p.pendingId] : undefined;
+        if (p.pendingId) {
+          const hasLocal = !!localUrl;
+          // Brand-new pending photo with no base key → must use the local blob.
+          // Pending crop/annotate → prefer local derivative preview, else the base.
+          const baseKey = resolvePhotoDisplayKey(p);
+          const url = hasLocal
+            ? localUrl as string
+            : baseKey
+              ? `/api/inspections/${state.inspection.id}/photo?key=${encodeURIComponent(baseKey)}`
+              : "";
+          return {
+            key: baseKey || p.pendingId,
+            url,
+            label: "",
+            itemId,
+            photoIndex: i,
+            annotated: !!p.annotatedKey || p.pendingKind === "annotate",
+            originalKey: p.key,
+            croppedKey: p.croppedKey,
+            mediaType: p.mediaType,
+            pending: true,
+            // No local blob AND no base key to fall back on → placeholder, not a
+            // broken image (another device captured this offline).
+            pendingPlaceholder: !hasLocal && !baseKey,
+          };
+        }
         const dk = resolvePhotoDisplayKey(p);
         return {
           key: dk,
@@ -131,7 +258,7 @@ export function usePhotoOps(ctx: {
           durationSec: p.durationSec,
         };
       }),
-    [getItemPhotos, state.inspection.id],
+    [getItemPhotos, state.inspection.id, pendingUrls],
   );
 
   /* Task 8 — open the viewer for an item at index i. */
@@ -156,9 +283,21 @@ export function usePhotoOps(ctx: {
     [state.sectionIdForItem, state.setResults, state.setDirty],
   );
 
-  /* Task 8 — persist a reorder. CONTRACT: `order` is the ORIGINAL key order
-   * (the server reorderItemPhotos route matches photos[].key). Optimistically
-   * reorder local state by key, then POST. */
+  /* #181 — the composite finding key the collab doc is keyed by. The doc seeds
+   * keys as `_default:{sectionId}:{itemId}` (fKey); resolve the section the same
+   * way patchItemPhotos does. Returns null when the item has no resolvable
+   * section (defensive — should not happen for a real template item). */
+  const docFindingKey = useCallback(
+    (itemId: string, sectionIdOverride?: string): string | null => {
+      const sid = sectionIdOverride ?? state.sectionIdForItem(itemId);
+      return sid ? fKey(sid, itemId) : null;
+    },
+    [state.sectionIdForItem],
+  );
+
+  /* Task 8 — persist a reorder. CONTRACT: `order` is the ORIGINAL key order.
+   * #181 — the Y.Doc is the authoritative writer of results.data: reorder the
+   * doc photo array (the optimistic patch stays for instant feedback). */
   const onReorderPhotos = useCallback(
     (itemId: string, order: string[]) => {
       patchItemPhotos(itemId, (photos) => {
@@ -166,50 +305,29 @@ export function usePhotoOps(ctx: {
         const reordered = order.map((k) => byKey.get(k)).filter((p): p is ItemPhoto => !!p);
         return reordered.length === photos.length ? reordered : photos;
       });
-      photoOpsFetcher.submit(null, {
-        method: "POST",
-        action: `/api/inspections/${state.inspection.id}/items/${itemId}/photos/reorder`,
-        encType: "application/json",
-        body: JSON.stringify({ order, sectionId: state.currentSection?.id }),
-      } as Parameters<typeof photoOpsFetcher.submit>[1]);
+      if (collabDoc) {
+        const fk = docFindingKey(itemId, state.currentSection?.id);
+        if (fk) bindingReorderPhotos(collabDoc, fk, order);
+      }
     },
-    [patchItemPhotos, photoOpsFetcher, state.inspection.id, state.currentSection],
+    [patchItemPhotos, state.currentSection, collabDoc, docFindingKey],
   );
 
-  /* Shared driver for the per-index bulk mutations (detach / move). The strip
-   * emits indices DESC so each mutation keeps the remaining (lower) indices
-   * valid; we POST highest-first in the same order. `buildBody` produces the
-   * JSON body for one index; a single revalidate runs after the last POST. */
-  const runBulkPhotoMutation = useCallback(
-    (
-      itemId: string,
-      indices: number[],
-      endpoint: string,
-      buildBody: () => Record<string, unknown>,
-    ) => {
-      patchItemPhotos(itemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
-      (async () => {
-        for (const idx of indices) {
-          await fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/${endpoint}`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buildBody()),
-          });
-        }
-        revalidator.revalidate();
-      })();
-    },
-    [patchItemPhotos, state.inspection.id, revalidator],
-  );
-
-  /* Task 9 — bulk-detach photos by index. */
+  /* Task 9 — bulk-detach photos by index. The doc is keyed by `key`, not index
+   * (indices drift as elements are removed), so resolve each index→key from the
+   * PRE-mutation snapshot and remove from the doc. */
   const onBulkDetachPhotos = useCallback(
     (itemId: string, indices: number[]) => {
       const sectionId = state.currentSection?.id;
-      runBulkPhotoMutation(itemId, indices, "detach", () => ({ sectionId }));
+      const fk = docFindingKey(itemId, sectionId);
+      const snapshot = getItemPhotos(itemId);
+      const keys = indices
+        .map((i) => snapshot[i]?.key)
+        .filter((k): k is string => !!k);
+      patchItemPhotos(itemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
+      if (collabDoc && fk) for (const key of keys) bindingRemovePhoto(collabDoc, fk, key);
     },
-    [runBulkPhotoMutation, state.currentSection],
+    [state.currentSection, collabDoc, docFindingKey, getItemPhotos, patchItemPhotos],
   );
 
   /* Task 9b — the OTHER items photos can be moved to: every item across the
@@ -227,19 +345,22 @@ export function usePhotoOps(ctx: {
     [state.sections],
   );
 
-  /* Task 9b — bulk-move photos by index to a target item. Like bulk detach, the
-   * strip emits indices DESC so each move keeps the remaining (lower) indices
-   * valid; we POST highest-first too. The source section is the current one. */
+  /* Task 9b — bulk-move photos by index to a target item. The doc is keyed by
+   * `key`, not index, so resolve index→key from the PRE-mutation snapshot and
+   * move each in the doc. The source section is the current one. */
   const onBulkMovePhotos = useCallback(
     (fromItemId: string, indices: number[], to: { itemId: string; sectionId?: string }) => {
       const fromSectionId = state.currentSection?.id;
-      runBulkPhotoMutation(fromItemId, indices, "move", () => ({
-        toItemId: to.itemId,
-        toSectionId: to.sectionId,
-        fromSectionId,
-      }));
+      const fromFk = docFindingKey(fromItemId, fromSectionId);
+      const toFk = docFindingKey(to.itemId, to.sectionId);
+      const snapshot = getItemPhotos(fromItemId);
+      const keys = indices
+        .map((i) => snapshot[i]?.key)
+        .filter((k): k is string => !!k);
+      patchItemPhotos(fromItemId, (photos) => photos.filter((_, i) => !indices.includes(i)));
+      if (collabDoc && fromFk && toFk) for (const key of keys) bindingMovePhoto(collabDoc, fromFk, toFk, key);
     },
-    [runBulkPhotoMutation, state.currentSection],
+    [state.currentSection, collabDoc, docFindingKey, getItemPhotos, patchItemPhotos],
   );
 
   /* Task 8 — route a viewer per-photo action to the right mutation. */
@@ -264,14 +385,22 @@ export function usePhotoOps(ctx: {
         }
         if (action === "delete") {
           patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
-          // Route delete by provider — DELETE /{id}/media/video/{ref} accepts a
-          // Stream UID or an R2 mediaId and resolves the backend per provider.
+          // Remove the doc entry (the Y.Doc owns results.data). Separately, free
+          // the Stream/R2 backing object via the binary media DELETE — that is a
+          // network op, not the retired CAS results write. DELETE
+          // /{id}/media/video/{ref} accepts a Stream UID or an R2 mediaId and
+          // resolves the backend per provider.
           const videoRef = photo.provider === "r2" ? photo.mediaId : photo.streamUid;
+          const docKey = photo.originalKey || photo.key;
+          if (collabDoc) {
+            const fk = docFindingKey(itemId, sectionId);
+            if (fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
+          }
           if (videoRef) {
-            fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(videoRef)}`, {
+            void fetch(`/api/inspections/${state.inspection.id}/media/video/${encodeURIComponent(videoRef)}`, {
               method: "DELETE",
               credentials: "include",
-            }).then(() => revalidator.revalidate());
+            });
           }
           return;
         }
@@ -312,28 +441,26 @@ export function usePhotoOps(ctx: {
       }
       if (action === "revert") {
         patchItemPhotos(itemId, (photos) => photos.map((p, i) => (i === idx ? { key: p.key } : p)));
-        fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/revert`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sectionId }),
-        }).then(() => revalidator.revalidate());
+        if (collabDoc) {
+          const fk = docFindingKey(itemId, sectionId);
+          const docKey = photo.originalKey || photo.key;
+          if (fk && docKey) bindingRevertPhoto(collabDoc, fk, docKey);
+        }
         return;
       }
       if (action === "delete") {
         patchItemPhotos(itemId, (photos) => photos.filter((_, i) => i !== idx));
-        fetch(`/api/inspections/${state.inspection.id}/items/${itemId}/photos/${idx}/detach`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sectionId }),
-        }).then(() => revalidator.revalidate());
+        if (collabDoc) {
+          const fk = docFindingKey(itemId, sectionId);
+          const docKey = photo.originalKey || photo.key;
+          if (fk && docKey) bindingRemovePhoto(collabDoc, fk, docKey);
+        }
         return;
       }
       // rotate / caption — routed here but not yet implemented (not Plan 4).
       // TODO rotate/caption on item photos.
     },
-    [patchItemPhotos, state.inspection.id, state.currentSection, revalidator],
+    [patchItemPhotos, state.inspection.id, state.currentSection, collabDoc, docFindingKey],
   );
 
   /* Plan 4 (Task 8/9) — persist a baked crop for the targeted photo. When online,
@@ -344,8 +471,15 @@ export function usePhotoOps(ctx: {
     (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, crop: PhotoCrop) => {
       const { itemId, photoIndex, sectionId } = target;
       const cropTransform = { aspect: crop.aspect, orientation: crop.orientation, ...crop.pixels };
-      // Optimistic local apply: drop annotation, set crop. The croppedKey is not
-      // yet known client-side; revalidate (online) / replay (offline) supplies it.
+
+      // Snapshot the photo's CURRENT entry + original key BEFORE any mutation so
+      // both the online doc write and the offline enqueue address by key.
+      const current = getItemPhotos(itemId)[photoIndex];
+      const originalKey = current?.key;
+      const fk = docFindingKey(itemId, sectionId);
+
+      // Optimistic local apply for instant feedback (the doc drives the real UI
+      // once the bake returns / drains + we write it back).
       patchItemPhotos(itemId, (photos) =>
         photos.map((p, i) =>
           i === photoIndex
@@ -354,41 +488,131 @@ export function usePhotoOps(ctx: {
         ),
       );
 
-      const nav = typeof navigator !== "undefined" ? navigator : undefined;
-      if (shouldQueue(nav)) {
-        // Plan 4 Q3 — offline: enqueue the baked crop; replay on reconnect.
-        void getOfflineQueue().enqueueCrop({
-          inspectionId: String(state.inspection.id),
-          itemId,
-          photoIndex,
-          blob,
-          crop: cropTransform,
-          sectionId,
-          enqueuedAt: Date.now(),
-        });
-        pushToast({ message: "Crop queued — will save when back online", durationMs: 3000 });
+      // #181 PR-G — offline: persist the baked crop locally + mark the doc photo
+      // pending-crop (KEEP the base key so the report still serves the original).
+      // The drain (on reconnect) uploads the derivative and swaps in croppedKey.
+      if (isOffline()) {
+        if (collabDoc && fk && originalKey) {
+          const pendingId = crypto.randomUUID();
+          void enqueueMedia({
+            pendingId,
+            inspectionId: String(state.inspection.id),
+            findingKey: fk,
+            kind: "crop",
+            blob,
+            photoKey: originalKey,
+            crop: cropTransform,
+            enqueuedAt: Date.now(),
+          }).then(() => {
+            bindingMarkPhotoPending(collabDoc, fk, originalKey, pendingId, "crop", {
+              crop: cropTransform,
+            });
+          });
+        }
         return;
       }
 
-      // Online: POST the bake directly to the crop endpoint.
       const fd = new FormData();
       fd.append("image", new File([blob], "cropped.jpg", { type: "image/jpeg" }));
       fd.append("crop", JSON.stringify(cropTransform));
       if (sectionId) fd.append("sectionId", sectionId);
       void (async () => {
-        await fetch(
+        const res = await fetch(
           `/api/inspections/${state.inspection.id}/items/${itemId}/photos/${photoIndex}/crop`,
           { method: "POST", credentials: "include", body: fd },
         );
-        revalidator.revalidate();
+        const body = (await res.json().catch(() => null)) as { data?: { croppedKey?: string } } | null;
+        const croppedKey = body?.data?.croppedKey;
+        if (collabDoc && fk && originalKey && croppedKey) {
+          bindingSetPhotoCrop(
+            collabDoc,
+            fk,
+            originalKey,
+            croppedKey,
+            cropTransform,
+            current as PhotoEntry,
+          );
+        }
+        // No revalidate — the doc drives the UI.
       })();
     },
-    [patchItemPhotos, state.inspection.id, revalidator],
+    [patchItemPhotos, state.inspection.id, collabDoc, docFindingKey, getItemPhotos],
+  );
+
+  /* #181 — collab-aware annotation save. Returns true when it HANDLED the save
+   * (collab is ON); the caller then skips its legacy fetcher/offline path. When
+   * collab is OFF returns false so the caller keeps byte-identical behavior.
+   *
+   * Annotation baking ALWAYS needs the network (the server derives + stores the
+   * annotated PNG); offline under collab refuses with a toast rather than using
+   * the legacy offline queue (which replays via REST with no doc → loss). On
+   * success, POST the bake, read the annotatedKey, and mirror it into the doc
+   * (additive merge — annotation never clears the crop). No revalidate. */
+  const performPhotoAnnotationSave = useCallback(
+    (target: { itemId: string; photoIndex: number; sectionId?: string }, blob: Blob, nodesJson: string): boolean => {
+      if (!collabDoc) return false;
+      const { itemId, photoIndex, sectionId } = target;
+
+      // The doc is keyed by the photo's ORIGINAL key; resolve from the snapshot.
+      const originalKey = getItemPhotos(itemId)[photoIndex]?.key;
+      const fk = docFindingKey(itemId, sectionId);
+
+      // #181 PR-G — offline: persist the baked annotation PNG locally + mark the
+      // doc photo pending-annotate (KEEP base/cropped key — annotation layers on
+      // top; the report serves the base until the derivative drains).
+      if (isOffline()) {
+        if (fk && originalKey) {
+          const pendingId = crypto.randomUUID();
+          void enqueueMedia({
+            pendingId,
+            inspectionId: String(state.inspection.id),
+            findingKey: fk,
+            kind: "annotate",
+            blob,
+            photoKey: originalKey,
+            nodesJson,
+            enqueuedAt: Date.now(),
+          }).then(() => {
+            bindingMarkPhotoPending(collabDoc, fk, originalKey, pendingId, "annotate", {
+              annotationsJson: nodesJson,
+            });
+          });
+        }
+        return true;
+      }
+
+      const fd = new FormData();
+      fd.append("nodes", nodesJson);
+      if (sectionId) fd.append("sectionId", sectionId);
+      fd.append("image", new File([blob], "annotated.png", { type: "image/png" }));
+      void (async () => {
+        const res = await fetch(
+          `/api/inspections/${state.inspection.id}/items/${itemId}/photos/${photoIndex}/annotation`,
+          { method: "POST", credentials: "include", body: fd },
+        );
+        const body = (await res.json().catch(() => null)) as { data?: { annotatedKey?: string } } | null;
+        const annotatedKey = body?.data?.annotatedKey;
+        if (fk && originalKey && annotatedKey) {
+          bindingSetPhotoAnnotation(collabDoc, fk, originalKey, annotatedKey, nodesJson);
+        }
+        // No revalidate — the doc drives the UI under collab.
+      })();
+      return true;
+    },
+    [collabDoc, docFindingKey, getItemPhotos, state.inspection.id],
+  );
+
+  /* #181 PR-G — resolve a pending entry's local blob URL for the strip/viewer.
+   * Returns undefined when this client does not own the blob (another device). */
+  const pendingPhotoUrl = useCallback(
+    (pendingId: string): string | undefined => pendingUrls[pendingId],
+    [pendingUrls],
   );
 
   return {
     viewer,
     setViewer,
+    pendingPhotoUrl,
     photoCropTarget,
     setPhotoCropTarget,
     recropWarn,
@@ -409,5 +633,6 @@ export function usePhotoOps(ctx: {
     onBulkMovePhotos,
     onViewerAction,
     performPhotoCropSave,
+    performPhotoAnnotationSave,
   };
 }

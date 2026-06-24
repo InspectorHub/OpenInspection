@@ -29,9 +29,16 @@ import {
     applyItemPatch,
     projectResults,
     appendPhoto,
+    updatePhoto,
+    replacePhoto,
+    reorderPhotos,
+    removePhoto,
+    movePhoto,
+    revertPhoto,
     upsertCanned,
     upsertRecommendation,
 } from '../../server/lib/collab/results-doc';
+import type { PhotoEntry } from '../../server/lib/collab/results-doc.types';
 import type { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
 
 // ─── Bindings ─────────────────────────────────────────────────────────────────
@@ -672,6 +679,77 @@ describe('#181 — multi-client DO merge + projection parity', () => {
         ]);
     });
 
+    // ── Scenario 6b: photo crop + annotate bakes survive DO persist ───────────
+    //
+    // #181 13a-2: under collab the bake endpoints SKIP the results.data write;
+    // the client mirrors the baked key into the doc (crop = replacePhoto,
+    // annotate = updatePhoto). Drive both doc writes through the real DO
+    // webSocketMessage handler, persist(), then read D1 and assert:
+    //   - a cropped photo persists croppedKey + crop and DROPS the annotation
+    //     (sequential layering), and
+    //   - a separately-annotated photo persists annotatedKey + annotationsJson.
+    // This is the clobber-close: without the doc write the next persist would
+    // wipe the server's (now skipped) metadata.
+    it('Scenario 6b — photo crop + annotate doc writes survive DO persist', async () => {
+        const inspectionId = 'insp-bake-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            io.tenantId          = TENANT;
+            io.inspectionId      = inspectionId;
+            io.identityPersisted = true;
+
+            seedResultsDoc(io.doc, [{ findingKey: FINDING_KEY_A }]);
+
+            const clientA = new Y.Doc();
+            await syncClientWithDO(io, clientA);
+
+            // Two photos: one will be cropped (was annotated), one annotated.
+            appendPhoto(clientA, FINDING_KEY_A, {
+                key: 'r2/crop-src.jpg',
+                annotatedKey: 'r2/crop-src.annotated.png',
+                annotationsJson: '[{"kind":"circle"}]',
+                mediaType: 'photo',
+            });
+            appendPhoto(clientA, FINDING_KEY_A, { key: 'r2/ann-src.jpg', mediaType: 'photo' });
+
+            // Crop the first (mirror setPhotoCrop: replace-in-place, drop annotation).
+            replacePhoto(clientA, FINDING_KEY_A, 'r2/crop-src.jpg', {
+                key: 'r2/crop-src.jpg',
+                croppedKey: 'r2/crop-src.cropped.jpg',
+                crop: { aspect: 'free', orientation: 'landscape', x: 0, y: 0, width: 100, height: 80 },
+                mediaType: 'photo',
+            });
+            // Annotate the second (additive merge).
+            updatePhoto(clientA, FINDING_KEY_A, 'r2/ann-src.jpg', {
+                annotatedKey: 'r2/ann-src.annotated.png',
+                annotationsJson: '[{"kind":"arrow"}]',
+            });
+
+            const ws = new MockWebSocket();
+            await instance.webSocketMessage(ws as unknown as WebSocket, encodeUpdate(Y.encodeStateAsUpdate(clientA)).buffer as ArrayBuffer);
+
+            await io.persist();
+        });
+
+        const d1Data = await readResultsData(TENANT, inspectionId);
+        const item = d1Data[FINDING_KEY_A] as { photos?: PhotoEntry[] } | undefined;
+        const photos = item?.photos ?? [];
+
+        const cropped = photos.find((p) => p.key === 'r2/crop-src.jpg');
+        expect(cropped?.croppedKey).toBe('r2/crop-src.cropped.jpg');
+        expect(cropped?.crop).toMatchObject({ aspect: 'free', width: 100, height: 80 });
+        expect(cropped?.annotatedKey).toBeUndefined();      // dropped on crop
+        expect(cropped?.annotationsJson).toBeUndefined();
+
+        const annotated = photos.find((p) => p.key === 'r2/ann-src.jpg');
+        expect(annotated?.annotatedKey).toBe('r2/ann-src.annotated.png');
+        expect(annotated?.annotationsJson).toBe('[{"kind":"arrow"}]');
+    });
+
     // ── Scenario 7: No-wipe D1 hydration on first connect ─────────────────────
     //
     // An inspection already has a real `inspection_results.data` blob (created
@@ -799,5 +877,67 @@ describe('#181 — multi-client DO merge + projection parity', () => {
             expect(projection[FINDING_KEY_A]).toEqual({});
             expect(projection[FINDING_KEY_B]).toEqual({});
         });
+    });
+
+    // ── Scenario 10: photo ARRAY ops survive a DO persist() (#181, Task 13a-1) ─
+    //
+    // THE CLOBBER, CLOSED. Before this task, photo reorder/detach/move/revert ran
+    // via REST against inspection_results.data; under collab the DO is the
+    // authoritative writer of that blob, so the next persist() silently
+    // overwrote the REST write. Now those ops mutate the Y.Doc directly. This
+    // seeds an item with 3 photos, drives reorder + detach + move + revert
+    // through the doc helpers, persist()s, and asserts the persisted projection
+    // reflects every change — proving the ops survive the DO persist.
+    it('Scenario 10 — photo reorder/detach/move/revert survive persist()', async () => {
+        const inspectionId = 'insp-photoops-' + crypto.randomUUID().slice(0, 8);
+        await ensureResultsRow(TENANT, inspectionId);
+
+        const stub = b.INSPECTION_DOC.get(b.INSPECTION_DOC.idFromName(`${TENANT}:${inspectionId}`));
+
+        await runInDurableObject(stub, async (instance: InspectionDocDO) => {
+            const io = instance as unknown as DOInternals;
+            io.tenantId          = TENANT;
+            io.inspectionId      = inspectionId;
+            io.identityPersisted = true;
+
+            // Seed two items so move has a target.
+            seedResultsDoc(io.doc, [
+                { findingKey: FINDING_KEY_A },
+                { findingKey: FINDING_KEY_B },
+            ]);
+
+            // Item A starts with three photos; p2 carries derivatives (to revert).
+            appendPhoto(io.doc, FINDING_KEY_A, { key: 'p1' });
+            appendPhoto(io.doc, FINDING_KEY_A, {
+                key: 'p2',
+                croppedKey: 'p2-cropped',
+                annotatedKey: 'p2-annot',
+                annotationsJson: '{"shapes":[]}',
+            });
+            appendPhoto(io.doc, FINDING_KEY_A, { key: 'p3' });
+
+            // Reorder → p3, p2, p1.
+            reorderPhotos(io.doc, FINDING_KEY_A, ['p3', 'p2', 'p1']);
+            // Revert p2 → strips derivatives back to { key: 'p2' }.
+            revertPhoto(io.doc, FINDING_KEY_A, 'p2');
+            // Move p1 → item B.
+            movePhoto(io.doc, FINDING_KEY_A, FINDING_KEY_B, 'p1');
+            // Detach p3 from item A.
+            removePhoto(io.doc, FINDING_KEY_A, 'p3');
+
+            await io.persist();
+        });
+
+        // Verify the PERSISTED D1 projection reflects every op (the clobber gap).
+        const d1Data = await readResultsData(TENANT, inspectionId);
+        const itemA = d1Data[FINDING_KEY_A] as { photos?: PhotoEntry[] } | undefined;
+        const itemB = d1Data[FINDING_KEY_B] as { photos?: PhotoEntry[] } | undefined;
+
+        // Item A: started [p1,p2,p3] → reorder [p3,p2,p1] → move p1 out →
+        // detach p3 → only p2 remains, reverted to key-only.
+        expect((itemA?.photos ?? []).map((p) => p.key)).toEqual(['p2']);
+        expect(itemA?.photos?.[0]).toEqual({ key: 'p2' }); // derivatives gone
+        // Item B: received p1 via move.
+        expect((itemB?.photos ?? []).map((p) => p.key)).toEqual(['p1']);
     });
 });

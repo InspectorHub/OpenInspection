@@ -21,6 +21,10 @@ export interface EditorHeaderProps {
  setSignModalOpen: (open: boolean) => void;
  /** Publish button click handler. */
  handlePublishClick: () => void;
+ /** #181 — whether collab (and thus version history) is available. */
+ collabEditing?: boolean;
+ /** Opens the version-history panel. */
+ onOpenVersionHistory?: () => void;
 }
 
 export function EditorHeader({
@@ -32,6 +36,8 @@ export function EditorHeader({
  tenantSlug,
  setSignModalOpen,
  handlePublishClick,
+ collabEditing,
+ onOpenVersionHistory,
 }: EditorHeaderProps) {
  return (
  <div className="fixed top-0 left-0 right-0 z-50">
@@ -112,6 +118,19 @@ export function EditorHeader({
   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
  </svg>
  </button>
+
+ {/* #181 — Version history (only when collab editing is enabled) */}
+ {collabEditing && (
+ <button
+ onClick={() => onOpenVersionHistory?.()}
+ className="hidden lg:flex w-9 h-9 rounded-md items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
+ title="Version history"
+ >
+ <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+ </svg>
+ </button>
+ )}
 
  {/* Completion progress */}
  {(() => {

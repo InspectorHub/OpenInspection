@@ -8,7 +8,7 @@
  * Frame helpers are ported from tests/workers/collab-multiclient.spec.ts.
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';
 import * as encoding from 'lib0/encoding';
@@ -16,6 +16,8 @@ import * as decoding from 'lib0/decoding';
 import {
     buildCollabWsUrl,
     connectResultsDoc,
+    deleteResultsDb,
+    reconnectDelayMs,
 } from '../../../app/lib/collab/results-doc-connection';
 import {
     seedResultsDoc,
@@ -26,6 +28,16 @@ import {
 
 /** Framing prefix byte for y-protocols/sync messages (mirrors the DO constant). */
 const MSG_SYNC = 0;
+
+/** Framing byte for the restore control frame (mirrors the DO MSG_RESTORE). */
+const MSG_RESTORE = 2;
+
+/** Encode a bare MSG_RESTORE control frame (one varint byte, no body). */
+function encodeRestore(): Uint8Array {
+    const enc = encoding.createEncoder();
+    encoding.writeVarUint(enc, MSG_RESTORE);
+    return encoding.toUint8Array(enc);
+}
 
 /** Encode a framed sync step1 request from `doc`. */
 function encodeSyncStep1(doc: Y.Doc): Uint8Array {
@@ -142,6 +154,25 @@ function collectSyncMessages(sent: Uint8Array[]): number[] {
         if (msgByte !== MSG_SYNC) return -1;
         return decoding.readVarUint(dec); // 0=step1, 1=step2, 2=update
     });
+}
+
+/** Decode the client state vector carried by a MSG_SYNC step1 frame. */
+function readStep1StateVector(frame: Uint8Array): Uint8Array {
+    const dec = decoding.createDecoder(frame);
+    decoding.readVarUint(dec); // outer MSG_SYNC byte
+    decoding.readVarUint(dec); // inner step1 type byte (0)
+    return decoding.readVarUint8Array(dec);
+}
+
+/** Find the last MSG_SYNC step1 frame in the sent queue (newest wins). */
+function lastStep1Frame(sent: Uint8Array[]): Uint8Array | undefined {
+    for (let i = sent.length - 1; i >= 0; i--) {
+        const frame = sent[i];
+        const dec = decoding.createDecoder(frame);
+        if (decoding.readVarUint(dec) !== MSG_SYNC) continue;
+        if (decoding.readVarUint(dec) === syncProtocol.messageYjsSyncStep1) return frame;
+    }
+    return undefined;
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -365,5 +396,328 @@ describe('buildCollabWsUrl — safe without window (SSR guard)', () => {
         // does not reach for window.location.
         const url = buildCollabWsUrl('insp-ssr', { protocol: 'https:', host: 'ssr.host' });
         expect(url).toBe('wss://ssr.host/api/inspections/insp-ssr/collab/ws');
+    });
+});
+
+// ── Test 7: MSG_RESTORE converges a live client (drop + resync) ────────────────
+//
+// This is the whole point of Task 12b. A live client holds the post-restore
+// (V2) edit. Because Yjs updates are additive (union), a plain MSG_SYNC update
+// of the restored (V1) state would MERGE — leaving V2 in place. The MSG_RESTORE
+// control frame instead drops local state + IndexedDB and resyncs the empty doc,
+// so the step2 reply (full V1 state) applies with NO V2 contamination.
+
+describe('connectResultsDoc — MSG_RESTORE drop+resync convergence', () => {
+    it('converges to the restored V1 state, discarding the local V2 edit', async () => {
+        const id = `test-restore-${Date.now()}`;
+        const onChangeDocs: Y.Doc[] = [];
+        const { handle, destroy } = connectResultsDoc(id, {
+            WebSocketImpl: makeCapturingImpl(),
+            location: testLoc,
+            onChange: (h) => { onChangeDocs.push(h.doc); },
+        });
+
+        await flushAsync(10);
+        expect(stubSocket).toBeDefined();
+
+        // ── 1. Drive an inbound step2 so the local doc holds i1 rating 'NI' (V1).
+        const remoteV1 = new Y.Doc();
+        seedResultsDoc(remoteV1, [{ findingKey: '_default:s1:i1' }]);
+        applyItemPatch(remoteV1, '_default:s1:i1', 'rating', 'NI');
+
+        const initialStep1 = lastStep1Frame(stubSocket.sent);
+        expect(initialStep1).toBeDefined();
+        stubSocket.pushInbound(encodeSyncStep2(remoteV1, readStep1StateVector(initialStep1!)));
+        await flushAsync(3);
+
+        const originalDoc = handle.doc;
+        let item = originalDoc.getMap('results').get('_default:s1:i1') as Y.Map<unknown> | undefined;
+        expect(item?.get('rating')).toBe('NI');
+
+        // ── 1b. Locally mutate to 'RR' (V2) — local doc + IndexedDB now hold V2.
+        applyItemPatch(handle.doc, '_default:s1:i1', 'rating', 'RR');
+        await flushAsync(20); // let IndexedDB persist the V2 state
+        item = handle.doc.getMap('results').get('_default:s1:i1') as Y.Map<unknown>;
+        expect(item?.get('rating')).toBe('RR');
+
+        const sentBeforeRestore = stubSocket.sent.length;
+
+        // ── 2. Push a MSG_RESTORE control frame; flush async (DB delete + rebuild).
+        stubSocket.pushInbound(encodeRestore());
+        await flushAsync(25);
+
+        // ── 3a. The rebuilt doc is a NEW Y.Doc instance.
+        expect(handle.doc).not.toBe(originalDoc);
+        expect(onChangeDocs).toContain(handle.doc);
+
+        // ── 3b. A fresh step1 was sent AFTER the restore signal.
+        const sentAfterRestore = stubSocket.sent.slice(sentBeforeRestore);
+        const typesAfter = collectSyncMessages(sentAfterRestore);
+        expect(typesAfter).toContain(syncProtocol.messageYjsSyncStep1); // 0
+
+        // The fresh doc is empty before the resync answers (no leftover items).
+        expect(handle.doc.getMap('results').size).toBe(0);
+        expect(handle.synced).toBe(false);
+
+        // ── 4. Push a step2 carrying the restored V1 state answering the new step1.
+        const freshStep1 = lastStep1Frame(sentAfterRestore);
+        expect(freshStep1).toBeDefined();
+        stubSocket.pushInbound(encodeSyncStep2(remoteV1, readStep1StateVector(freshStep1!)));
+        await flushAsync(3);
+
+        // ── The local doc shows V1 ('NI') and NOT the locally-edited V2 ('RR').
+        // If the code had done an additive apply, 'RR' would have survived.
+        const restored = handle.doc.getMap('results').get('_default:s1:i1') as Y.Map<unknown> | undefined;
+        expect(restored?.get('rating')).toBe('NI');
+        expect(handle.synced).toBe(true);
+
+        destroy();
+    });
+
+    it('is the discriminator: a plain MSG_SYNC update of V1 leaves V2 in place', async () => {
+        // Contrast case — proves the additive-merge failure mode the control frame
+        // fixes. WITHOUT a restore drop, broadcasting V1 as a normal update merges
+        // (union), so the locally-edited V2 rating still wins. This is exactly why
+        // the additive broadcast was replaced by MSG_RESTORE.
+        const id = `test-additive-${Date.now()}`;
+        const { handle, destroy } = connectResultsDoc(id, {
+            WebSocketImpl: makeCapturingImpl(),
+            location: testLoc,
+        });
+
+        await flushAsync(10);
+        expect(stubSocket).toBeDefined();
+
+        // Local doc holds i1 'NI' (V1) via step2.
+        const remoteV1 = new Y.Doc();
+        seedResultsDoc(remoteV1, [{ findingKey: '_default:s1:i1' }]);
+        applyItemPatch(remoteV1, '_default:s1:i1', 'rating', 'NI');
+        const step1 = lastStep1Frame(stubSocket.sent);
+        stubSocket.pushInbound(encodeSyncStep2(remoteV1, readStep1StateVector(step1!)));
+        await flushAsync(3);
+
+        // Locally mutate to 'RR' (V2).
+        applyItemPatch(handle.doc, '_default:s1:i1', 'rating', 'RR');
+        await flushAsync(3);
+
+        // Now the "server" broadcasts the restored V1 state as a PLAIN update
+        // (the additive path). encodeStateAsUpdate(remoteV1) is V1's full state.
+        stubSocket.pushInbound(encodeUpdate(Y.encodeStateAsUpdate(remoteV1)));
+        await flushAsync(3);
+
+        // Additive merge: the local edit (V2 'RR', a later clock) survives.
+        const item = handle.doc.getMap('results').get('_default:s1:i1') as Y.Map<unknown> | undefined;
+        expect(item?.get('rating')).toBe('RR'); // NOT reverted — the failure mode
+
+        destroy();
+    });
+});
+
+// ── Test: reconnectDelayMs exponential backoff with cap ───────────────────────
+
+describe('reconnectDelayMs', () => {
+    it('doubles each attempt and caps at 30s', () => {
+        expect(reconnectDelayMs(0)).toBe(1000);
+        expect(reconnectDelayMs(1)).toBe(2000);
+        expect(reconnectDelayMs(2)).toBe(4000);
+        expect(reconnectDelayMs(3)).toBe(8000);
+        expect(reconnectDelayMs(4)).toBe(16000);
+        // 32000 would exceed the cap → clamped to 30000.
+        expect(reconnectDelayMs(5)).toBe(30000);
+        expect(reconnectDelayMs(20)).toBe(30000);
+    });
+});
+
+// ── Test: a socket close schedules a reopen after the backoff delay ────────────
+//
+// Count the StubWebSocket constructions: the initial connect makes one; an
+// unexpected close should schedule a reopen that constructs a SECOND socket once
+// the backoff timer fires. We drive the timer with vitest fake timers (installed
+// only AFTER the initial real-timer sync so fake-indexeddb is not starved).
+
+describe('connectResultsDoc — auto-reconnect on close', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('reopens the socket (new construction) after the backoff delay', async () => {
+        let constructions = 0;
+        class CountingStub extends StubWebSocket {
+            constructor(url: string) {
+                super(url);
+                constructions += 1;
+                stubSocket = this;
+            }
+        }
+        const id = `test-reconnect-${Date.now()}`;
+        const { destroy } = connectResultsDoc(id, {
+            WebSocketImpl: CountingStub as unknown as typeof WebSocket,
+            location: testLoc,
+        });
+
+        await flushAsync(10);
+        expect(constructions).toBe(1);
+        const first = stubSocket;
+
+        // Switch to fake timers, then close the socket → schedules a reopen.
+        vi.useFakeTimers();
+        first.close();
+
+        // Before the backoff elapses, no new socket exists.
+        expect(constructions).toBe(1);
+
+        // Advance past the first backoff (1s) → the reopen timer fires.
+        vi.advanceTimersByTime(1000);
+        expect(constructions).toBe(2);
+        expect(stubSocket).not.toBe(first);
+
+        vi.useRealTimers();
+        destroy();
+    });
+
+    it('does not reconnect after destroy()', async () => {
+        let constructions = 0;
+        class CountingStub extends StubWebSocket {
+            constructor(url: string) {
+                super(url);
+                constructions += 1;
+                stubSocket = this;
+            }
+        }
+        const id = `test-noreconnect-${Date.now()}`;
+        const { destroy } = connectResultsDoc(id, {
+            WebSocketImpl: CountingStub as unknown as typeof WebSocket,
+            location: testLoc,
+        });
+        await flushAsync(10);
+        expect(constructions).toBe(1);
+
+        vi.useFakeTimers();
+        destroy(); // closes the socket; the close handler must NOT schedule a reopen
+        vi.advanceTimersByTime(5000);
+        expect(constructions).toBe(1);
+        vi.useRealTimers();
+    });
+});
+
+// ── Test: window 'online' reopens immediately + resets backoff ─────────────────
+
+describe('connectResultsDoc — window online event', () => {
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('reopens immediately on the online event after a close', async () => {
+        let constructions = 0;
+        class CountingStub extends StubWebSocket {
+            constructor(url: string) {
+                super(url);
+                constructions += 1;
+                stubSocket = this;
+            }
+        }
+        const id = `test-online-${Date.now()}`;
+        const { destroy } = connectResultsDoc(id, {
+            WebSocketImpl: CountingStub as unknown as typeof WebSocket,
+            location: testLoc,
+        });
+        await flushAsync(10);
+        expect(constructions).toBe(1);
+        const first = stubSocket;
+
+        vi.useFakeTimers();
+        first.close(); // schedules a delayed reopen
+        expect(constructions).toBe(1);
+
+        // The online event reopens NOW (cancelling the pending delayed reopen).
+        window.dispatchEvent(new Event('online'));
+        expect(constructions).toBe(2);
+        const second = stubSocket;
+        expect(second).not.toBe(first);
+
+        // The previously-scheduled delayed reopen must NOT fire a third socket
+        // (online cleared the timer + a live socket exists).
+        vi.advanceTimersByTime(5000);
+        expect(constructions).toBe(2);
+
+        vi.useRealTimers();
+        destroy();
+    });
+});
+
+// ── Test: onSynced fires on the initial connect AND on each reconnect ──────────
+
+describe('connectResultsDoc — onSynced trigger', () => {
+    it('fires onSynced on every step2 (initial + reconnect)', async () => {
+        let syncedCalls = 0;
+        const id = `test-onsynced-${Date.now()}`;
+        const { handle, destroy } = connectResultsDoc(id, {
+            WebSocketImpl: makeCapturingImpl(),
+            location: testLoc,
+            onSynced: () => { syncedCalls += 1; },
+        });
+
+        await flushAsync(10);
+        expect(stubSocket).toBeDefined();
+
+        // Initial step2 → onSynced #1.
+        const remote = new Y.Doc();
+        seedResultsDoc(remote, [{ findingKey: '_default:s1:i1' }]);
+        applyItemPatch(remote, '_default:s1:i1', 'rating', 'NI');
+        const step1a = lastStep1Frame(stubSocket.sent);
+        stubSocket.pushInbound(encodeSyncStep2(remote, readStep1StateVector(step1a!)));
+        await flushAsync(3);
+        expect(handle.synced).toBe(true);
+        expect(syncedCalls).toBe(1);
+
+        // Close + reconnect with real timers (short-circuit via window online).
+        const first = stubSocket;
+        first.close();
+        window.dispatchEvent(new Event('online')); // reopen immediately
+        await flushAsync(5);
+        expect(stubSocket).not.toBe(first);
+
+        // Second step2 on the reconnected socket → onSynced #2 (handle.synced
+        // stays true; the trigger still fires).
+        const step1b = lastStep1Frame(stubSocket.sent);
+        stubSocket.pushInbound(encodeSyncStep2(remote, readStep1StateVector(step1b!)));
+        await flushAsync(3);
+        expect(syncedCalls).toBe(2);
+
+        destroy();
+    });
+});
+
+// ── Test 8: deleteResultsDb resolves and clears stored state ───────────────────
+
+describe('deleteResultsDb', () => {
+    it('clears persisted state so a later connection starts empty', async () => {
+        const id = `test-deldb-${Date.now()}`;
+
+        // First connection: write data and persist to IndexedDB.
+        const { handle: h1, destroy: d1 } = connectResultsDoc(id, {
+            WebSocketImpl: makeCapturingImpl(),
+            location: testLoc,
+        });
+        await flushAsync(10);
+        seedResultsDoc(h1.doc, [{ findingKey: '_default:s1:i9' }]);
+        applyItemPatch(h1.doc, '_default:s1:i9', 'rating', 'IN');
+        await flushAsync(20);
+        d1();
+
+        // Delete the database (the restore-path cleanup helper).
+        await deleteResultsDb(id);
+        await flushAsync(5);
+
+        // Reconnect with the same id — the store is gone, so no data restores.
+        const { handle: h2, destroy: d2 } = connectResultsDoc(id, {
+            WebSocketImpl: makeCapturingImpl(),
+            location: testLoc,
+        });
+        await flushAsync(20);
+        expect(h2.persistenceSynced).toBe(true);
+        expect(h2.doc.getMap('results').size).toBe(0);
+
+        d2();
     });
 });

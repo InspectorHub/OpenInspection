@@ -108,6 +108,31 @@ describe('saveCroppedItemPhoto', () => {
     expect(entry.key).toBe('orig.jpg');           // original preserved
   });
 
+  it('#181 skipResultsWrite: bakes R2 + returns croppedKey but leaves inspection_results.data UNTOUCHED', async () => {
+    const before = await testDb.select().from(schema.inspectionResults)
+      .where(eq(schema.inspectionResults.inspectionId, INSPECTION_ID)).get();
+    const beforeData = JSON.stringify(typeof before!.data === 'string' ? JSON.parse(before!.data) : before!.data);
+
+    const { croppedKey } = await svc.saveCroppedItemPhoto(
+      INSPECTION_ID, TENANT, ITEM_ID, 0, new ArrayBuffer(8), CROP, undefined,
+      { skipResultsWrite: true },
+    );
+
+    // R2 object still written + key returned (authoritative binary).
+    expect(croppedKey).toMatch(/\.cropped\.jpg$/);
+    expect(r2.store.has(croppedKey)).toBe(true);
+
+    // results.data is byte-identical — the seeded annotation is NOT cleared
+    // server-side (the client mirrors the sequential-layering drop into the doc).
+    const after = await testDb.select().from(schema.inspectionResults)
+      .where(eq(schema.inspectionResults.inspectionId, INSPECTION_ID)).get();
+    const afterData = JSON.stringify(typeof after!.data === 'string' ? JSON.parse(after!.data) : after!.data);
+    expect(afterData).toBe(beforeData);
+    const entry = (JSON.parse(afterData) as Record<string, { photos: CropEntry[] }>)[ITEM_ID].photos[0];
+    expect(entry.croppedKey).toBeUndefined();        // never written
+    expect(entry.annotatedKey).toBe('old-ann.png');  // untouched (still present)
+  });
+
   it('throws NotFound when photoIndex is out of range', async () => {
     await expect(svc.saveCroppedItemPhoto(INSPECTION_ID, TENANT, ITEM_ID, 99, new ArrayBuffer(8), CROP, undefined))
       .rejects.toThrow(/Photo not found/);

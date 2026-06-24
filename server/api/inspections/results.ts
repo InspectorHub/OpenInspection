@@ -10,7 +10,6 @@ import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import {
-    PatchResultsSchema,
     PropertyFactsSchema,
     PropertyFactsResponseSchema,
     PropertyFactsAutofillRequestSchema,
@@ -21,7 +20,6 @@ import {
 import { TemplateSchemaV2Schema } from '../../lib/validations/template.schema';
 import { AggregatedRecommendationsResponseSchema } from '../../lib/validations/recommendation.schema';
 import { aggregateAttachedRecommendations } from '../../lib/aggregate-recommendations';
-import { PatchItemFieldSchema } from '../../lib/validations/inspection-patch.schema';
 import { applyResultsBatch } from '../../services/inspection-results.service';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspectionResults } from '../../lib/db/schema';
@@ -136,39 +134,6 @@ export const getResultsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
- * PATCH /api/inspections/:id/results
- */
-export const updateResultsRoute = createRoute(withMcpMetadata({
-    method: 'patch',
-    path: '/{id}/results',
-    tags: ["inspections"],
-    summary: "Patch inspection result for current tenant",
-    request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: {
-            content: {
-                'application/json': {
-                    schema: PatchResultsSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-        },
-    },
-    middleware: [requireRole('owner', 'manager', 'inspector')],
-    responses: {
-        200: {
-            content: {
-                'application/json': {
-                    schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
-            },
-            description: 'Success',
-        },
-    },
-    operationId: "patchInspectionResult",
-    description: "Auto-generated placeholder for patchInspectionResult (PATCH /{id}/results, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
-
-/**
  * PATCH /api/inspections/:id/template-snapshot
  *
  * Feature #20 phase 1 — inline edits to the inspection's frozen template
@@ -251,38 +216,6 @@ export const aggregateRecommendationsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listInspectionRecommendations (GET /{id}/recommendations, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-// -----------------------------------------------------------------------------
-// Design System 0520 subsystem B phase 3 task 3.4 — field-version PATCH item.
-// -----------------------------------------------------------------------------
-// Optimistic concurrency on individual item fields. Body carries the
-// expectedVersion the client thinks it has; server returns 200 + newVersion
-// on match, 409 + current/yours on stale write. The ConflictModal
-// (phase 3 task 3.6) consumes the 409 payload.
-export const patchItemFieldRoute = createRoute(withMcpMetadata({
-    method:     'patch',
-    path:       '/{id}/items/{itemId}',
-    tags: ["inspections"],
-    summary:    'Patch a single item field with optimistic-concurrency version check',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'), itemId: z.string().min(1).describe('TODO describe itemId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: PatchItemFieldSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
-    },
-    responses: {
-        200: {
-            description: 'ok',
-            content: { 'application/json': { schema: z.object({
-                success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-                data:    z.object({ newVersion: z.number().describe('TODO describe newVersion field for the OpenInspection MCP integration'), by: z.string().describe('TODO describe by field for the OpenInspection MCP integration'), at: z.number().describe('TODO describe at field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
-            }) } },
-        },
-        404: { description: 'Inspection or item not found in this tenant' },
-        409: { description: 'expectedVersion stale — body contains current/yours' },
-    },
-    operationId: "patchInspectionItem",
-    description: "Auto-generated placeholder for patchInspectionItem (PATCH /{id}/items/{itemId}, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
-
 // Design System 0520 subsystem E P1.3 — Publish pre-flight gates.
 export const preflightRoute = createRoute(withMcpMetadata({
     method:  'get',
@@ -299,11 +232,12 @@ export const preflightRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------
-// Typed-Hono dead-routes cleanup Task 10 — vectorised result patches.
+// Vectorised result patches (used by the standalone form-renderer "Save").
 // -----------------------------------------------------------------------------
 // POST /{id}/results/batch — accepts an array of `{ itemId, sectionId, field,
 // value }` patches and folds them into inspection_results.data in one
-// round-trip. See inspection-results.service for the upsert semantics.
+// round-trip with forced last-writer-wins semantics (NOT the retired CAS
+// version-check path). See inspection-results.service for the upsert semantics.
 export const resultsBatchRoute = createRoute(withMcpMetadata({
     method:     'post',
     path:       '/{id}/results/batch',
@@ -322,9 +256,8 @@ export const resultsBatchRoute = createRoute(withMcpMetadata({
         404: { description: 'Inspection not found in this tenant' },
     },
     operationId: 'batchPatchInspectionResults',
-    description: 'Folds an array of { itemId, sectionId, field, value } patches into inspection_results.data using the same composite findingKey the single-field PATCH uses.',
+    description: 'Folds an array of { itemId, sectionId, field, value } patches into inspection_results.data using the same composite findingKey, with forced last-writer-wins per field.',
 }, { scopes: ['write'], tier: 'extended' }));
-
 
 const resultsRoutes = createApiRouter()
     .openapi(getPropertyFactsRoute, async (c) => {
@@ -374,13 +307,6 @@ const resultsRoutes = createApiRouter()
         const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
         return c.json({ success: true, data: { results: (results?.data || {}) } }, 200);
     })
-    .openapi(updateResultsRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { data } = c.req.valid('json');
-        const service = c.var.services.inspection;
-        await service.updateResults(id, c.get('tenantId'), data);
-        return c.json({ success: true }, 200);
-    })
     .openapi(updateTemplateSnapshotRoute, async (c) => {
         const { id } = c.req.valid('param');
         const { snapshot } = c.req.valid('json');
@@ -411,26 +337,6 @@ const resultsRoutes = createApiRouter()
         const { items, totals } = aggregateAttachedRecommendations(row?.data as Record<string, unknown> | undefined);
         return c.json({ success: true as const, data: { items, totals } }, 200);
     })
-    .openapi(patchItemFieldRoute, async (c) => {
-        const { id, itemId } = c.req.valid('param');
-        const { field, value, expectedVersion, force, sectionId } = c.req.valid('json');
-        const tenantId = c.get('tenantId');
-        const user     = c.get('user') as { sub?: string } | undefined;
-        const userId   = user?.sub;
-        if (!userId) throw Errors.Unauthorized('Missing user identity');
-
-        const out = await c.var.services.inspection.patchItem(
-            id, tenantId, itemId, field, value, expectedVersion, userId, { force: force ?? false }, sectionId,
-        );
-
-        if (out.kind === 'not_found') {
-            throw Errors.NotFound('Inspection not found');
-        }
-        if (out.kind === 'conflict') {
-            return c.json({ success: false as const, error: { code: 'CONFLICT', current: out.current, yours: out.yours } }, 409);
-        }
-        return c.json({ success: true as const, data: { kind: 'ok', newVersion: out.newVersion, by: out.by, at: out.at } }, 200);
-    })
     .openapi(preflightRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId');
@@ -446,8 +352,8 @@ const resultsRoutes = createApiRouter()
         const userId   = user?.sub;
         if (!userId) throw Errors.Unauthorized('Missing user identity');
 
-        // Ownership guard mirrors the single-field PATCH — 404 on tenant
-        // mismatch keeps the existence-enumeration leak closed.
+        // Ownership guard — 404 on tenant mismatch keeps the existence-
+        // enumeration leak closed.
         try {
             await c.var.services.inspection.getInspection(id, tenantId);
         } catch {

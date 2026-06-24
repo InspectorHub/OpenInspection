@@ -19,7 +19,7 @@ import {
 import {
   bootstrapServiceWorker,
   type SWRegistrarLike,
-} from "~/lib/offline/sw-bootstrap";
+} from "~/lib/sw-bootstrap";
 import { ErrorState } from "~/components/ErrorState";
 
 export function loader({ request }: Route.LoaderArgs): UiPrefs {

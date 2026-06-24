@@ -351,24 +351,6 @@ export class InspectionService {
         return this.annotations.updateMediaAnnotations(inspectionId, mediaId, tenantId, annotations, caption);
     }
 
-    async patchItem(
-        inspectionId: string,
-        tenantId: string,
-        itemId: string,
-        field: 'rating' | 'notes' | 'value' | 'cannedToggle' | 'defectFields' | 'itemAttribute',
-        value: unknown,
-        expectedVersion: number,
-        userId: string,
-        opts?: { force?: boolean },
-        sectionId?: string,
-    ): Promise<
-        | { kind: 'ok'; newVersion: number; by: string; at: number }
-        | { kind: 'conflict'; current: { value: unknown; by?: string; at?: number; v: number }; yours: { value: unknown; expectedVersion: number } }
-        | { kind: 'not_found' }
-    > {
-        return this.photo.patchItem(inspectionId, tenantId, itemId, field, value, expectedVersion, userId, opts, sectionId);
-    }
-
     async deletePoolPhoto(
         inspectionId: string,
         tenantId: string,
@@ -389,8 +371,9 @@ export class InspectionService {
         compositeBytes: ArrayBuffer,
         nodesJson: string,
         sectionId?: string,
+        opts?: { skipResultsWrite?: boolean },
     ): Promise<{ annotatedKey: string }> {
-        return this.annotations.saveAnnotation(inspectionId, tenantId, itemId, photoIndex, compositeBytes, nodesJson, sectionId);
+        return this.annotations.saveAnnotation(inspectionId, tenantId, itemId, photoIndex, compositeBytes, nodesJson, sectionId, opts);
     }
 
     async setCroppedCover(
@@ -411,8 +394,9 @@ export class InspectionService {
         bakedBytes: ArrayBuffer,
         crop: PhotoCrop,
         sectionId?: string,
+        opts?: { skipResultsWrite?: boolean },
     ): Promise<{ croppedKey: string }> {
-        return this.annotations.saveCroppedItemPhoto(inspectionId, tenantId, itemId, photoIndex, bakedBytes, crop, sectionId);
+        return this.annotations.saveCroppedItemPhoto(inspectionId, tenantId, itemId, photoIndex, bakedBytes, crop, sectionId, opts);
     }
 
     /**

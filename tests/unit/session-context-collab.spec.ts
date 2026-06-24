@@ -1,10 +1,13 @@
 /**
  * session-context collabEditing resolution — unit tests.
  *
- * Verifies that GET /api/session/context resolves `collabEditing` correctly:
- * - false when the tenant has no tenant_configs row
- * - false when the column is 0 (the stored default)
- * - true when the column is explicitly set to 1
+ * Verifies that GET /api/session/context resolves `collabEditing` correctly.
+ * Collab is the default (#181 Phase 5) — a tenant is collab-ON unless they have
+ * an EXPLICIT stored `false` opt-out:
+ * - true when the tenant has no tenant_configs row (default ON)
+ * - false when the column is explicitly 0 (operator opt-out — legacy path)
+ * - true when the column is explicitly 1
+ * - false when DB resolution fails (deliberate fail-CLOSED to the legacy path)
  *
  * Mirrors the structure of session-context-video.spec.ts.
  */
@@ -93,17 +96,17 @@ function buildApp() {
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 describe('session-context collabEditing resolution', () => {
-    it('no tenant_configs row → collabEditing=false (default off)', async () => {
+    it('no tenant_configs row → collabEditing=true (default on)', async () => {
         await seedTenant();
-        // No tenantConfigs row seeded — row will be null.
+        // No tenantConfigs row seeded — row will be null → default ON.
 
         const res = await buildApp().request('/api/session/context');
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { collabEditing: boolean } };
-        expect(body.data.collabEditing).toBe(false);
+        expect(body.data.collabEditing).toBe(true);
     });
 
-    it('collabEditing=false in DB → collabEditing=false', async () => {
+    it('collabEditing=false in DB → collabEditing=false (explicit operator opt-out)', async () => {
         await seedTenant();
         await seedCollabEditing(false);
 
@@ -121,5 +124,37 @@ describe('session-context collabEditing resolution', () => {
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { collabEditing: boolean } };
         expect(body.data.collabEditing).toBe(true);
+    });
+
+    it('DB resolution failure → collabEditing=false (fail-closed to legacy path)', async () => {
+        await seedTenant();
+        // Make ONLY the collab-resolution query throw, simulating a transient DB
+        // error on that specific read. The handler calls drizzle() several times
+        // (user lookup, video provider, collab); we proxy the real testDb but make
+        // `.select` of the collabEditing projection throw. Even though the
+        // happy-path default is ON, a failure must NOT silently force a tenant
+        // onto collab — the legacy editor still works without the DO, so OFF is
+        // the safer fallback.
+        (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(
+            new Proxy(testDb, {
+                get(target, prop, receiver) {
+                    if (prop === 'select') {
+                        return (fields?: Record<string, unknown>) => {
+                            const keys = fields ? Object.keys(fields) : [];
+                            if (keys.length === 1 && keys[0] === 'collabEditing') {
+                                throw new Error('simulated DB failure');
+                            }
+                            return (target.select as (f?: unknown) => unknown)(fields);
+                        };
+                    }
+                    return Reflect.get(target, prop, receiver);
+                },
+            }) as unknown as typeof testDb,
+        );
+
+        const res = await buildApp().request('/api/session/context');
+        expect(res.status).toBe(200);
+        const body = await res.json() as { data: { collabEditing: boolean } };
+        expect(body.data.collabEditing).toBe(false);
     });
 });

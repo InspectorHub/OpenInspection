@@ -14,6 +14,12 @@ export interface StripPhoto {
   posterPct?: number;
   /** Plan 7 — duration in seconds, rendered as an m:ss badge. */
   durationSec?: number;
+  /** #181 PR-G — true while the binary is only in the local pending store. */
+  pendingUpload?: boolean;
+  /** #181 PR-G — id into the local media-pending store (resolves to a blob URL). */
+  pendingId?: string;
+  /** #181 PR-G — which offline op produced this pending entry. */
+  pendingKind?: "photo" | "crop" | "annotate";
 }
 
 /** Plan 7 — format a duration in seconds as m:ss (e.g. 75 → "1:15"). */
@@ -63,6 +69,13 @@ export interface ItemPhotoStripProps {
    * strip then shows a neutral video placeholder instead of a broken image.
    */
   videoPosterUrl?: (streamUid: string, posterPct?: number) => string | null;
+  /**
+   * #181 PR-G — resolve the LOCAL blob objectURL for a pending (offline) entry's
+   * `pendingId`. Returns undefined when this client does not own the blob (the
+   * entry was captured on another device) — the strip then shows an "uploading…"
+   * placeholder instead of a broken image.
+   */
+  pendingPhotoUrl?: (pendingId: string) => string | undefined;
 }
 
 /** The visible thumbnail = the edited derivative when present, else the original.
@@ -84,6 +97,7 @@ export function ItemPhotoStrip({
   moveTargets,
   onBulkMove,
   videoPosterUrl,
+  pendingPhotoUrl,
 }: ItemPhotoStripProps) {
   const rowRef = useRef<HTMLDivElement>(null);
   // Task 9 — Drive-style multi-select. `selecting` flips the strip into select
@@ -229,9 +243,15 @@ export function ItemPhotoStrip({
           // play-glyph + an m:ss duration badge; the cover ring is preserved.
           const isVideo = p.mediaType === "video" && !!p.streamUid;
           const posterSrc = isVideo ? (videoPosterUrl?.(p.streamUid!, p.posterPct) ?? null) : null;
+          // #181 PR-G — pending (offline) entry. Prefer the LOCAL blob URL; fall
+          // back to the base key (pending crop/annotate keep their base) or a
+          // placeholder (another device's offline capture — no local blob).
+          const isPending = !!p.pendingId;
+          const localUrl = p.pendingId ? pendingPhotoUrl?.(p.pendingId) : undefined;
+          const pendingSrc = isPending ? (localUrl ?? (dk ? photoUrl(dk) : undefined)) : undefined;
           return (
             <button
-              key={dk}
+              key={dk || p.pendingId || `idx-${i}`}
               type="button"
               data-testid={`thumb-${i}`}
               onClick={() => (selecting ? toggle(i) : onOpen(i))}
@@ -270,6 +290,29 @@ export function ItemPhotoStrip({
                       {formatDuration(p.durationSec)}
                     </span>
                   )}
+                </>
+              ) : isPending ? (
+                <>
+                  {pendingSrc ? (
+                    <img
+                      src={pendingSrc}
+                      alt=""
+                      className="w-full h-full object-cover opacity-70"
+                      loading="lazy"
+                      draggable={false}
+                    />
+                  ) : (
+                    <span
+                      data-testid={`pending-placeholder-${i}`}
+                      className="flex w-full h-full items-center justify-center bg-ih-bg-muted"
+                    />
+                  )}
+                  <span
+                    data-testid={`pending-badge-${i}`}
+                    className="absolute inset-x-0 bottom-0 bg-ih-watch-bg text-ih-watch-fg text-[8px] font-bold text-center py-0.5 uppercase tracking-wide"
+                  >
+                    Uploading
+                  </span>
                 </>
               ) : (
                 <img

@@ -16,10 +16,22 @@
 
 // ─── Leaf types ──────────────────────────────────────────────────────────────
 
+/** Re-editable crop transform (source-pixel coords) baked into a cropped photo. */
+export interface PhotoCropTransform {
+    aspect:      string;
+    orientation: 'landscape' | 'portrait';
+    x:           number;
+    y:           number;
+    width:       number;
+    height:      number;
+}
+
 /** A photo / video attachment stored inside an inspection result. */
 export interface PhotoEntry {
     key:             string;
     croppedKey?:     string;
+    /** Re-editable crop transform recorded alongside `croppedKey`. */
+    crop?:           PhotoCropTransform;
     annotatedKey?:   string;
     annotationsJson?: string;
     mediaType?:      'photo' | 'video';
@@ -29,6 +41,19 @@ export interface PhotoEntry {
     posterKey?:      string;
     posterPct?:      number;
     durationSec?:    number;
+    /** #181 PR-G — true while the binary is only in the local pending store (not yet on R2). */
+    pendingUpload?:  boolean;
+    /** #181 PR-G — id into the local media-pending IndexedDB store; resolves to a local blob URL. */
+    pendingId?:      string;
+    /**
+     * #181 PR-G — which offline operation produced this pending entry. `'photo'`
+     * is a brand-new offline photo (paired with `pendingUpload: true` + an empty
+     * `key`, so the report skips it). `'crop'` / `'annotate'` are offline
+     * derivatives of an EXISTING photo: the base `key` is KEPT (and serves the
+     * report as an honest fallback) and `pendingUpload` is NOT set, while the
+     * editor shows the local derivative preview until the upload drains.
+     */
+    pendingKind?:    'photo' | 'crop' | 'annotate';
 }
 
 /** Toggle-state for a single canned information or limitation comment. */

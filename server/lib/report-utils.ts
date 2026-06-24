@@ -37,7 +37,7 @@ interface CustomDefectInput {
   included?: boolean;
   category?: string;
   location?: string | null;
-  photos?: Array<{ key: string; croppedKey?: string; annotatedKey?: string }>;
+  photos?: Array<{ key: string; croppedKey?: string; annotatedKey?: string; pendingUpload?: boolean }>;
 }
 
 export interface ResolvedCustomDefect {
@@ -70,7 +70,8 @@ export function mapCustomDefectsForReport(
     effectiveComment: d.comment ?? '',
     effectiveCategory: d.category ?? 'recommendation',
     effectiveLocation: typeof d.location === 'string' && d.location.length > 0 ? d.location : null,
-    defectPhotos: (d.photos ?? []).map((p) => {
+    // #181 PR-G: pending uploads have no R2 object yet — skip them.
+    defectPhotos: (d.photos ?? []).filter((p) => !p.pendingUpload).map((p) => {
       const displayKey = p.annotatedKey || p.croppedKey || p.key;
       return { key: displayKey, originalKey: p.key, url: makePhotoUrl(displayKey) };
     }),

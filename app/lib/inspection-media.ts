@@ -25,6 +25,16 @@ export interface GalleryPhoto {
   posterPct?: number;
   /** Plan 7 — video duration in seconds (for the m:ss strip badge). */
   durationSec?: number;
+  /**
+   * #181 PR-G — this photo (or its crop/annotate derivative) is still uploading
+   * from the local offline pending store. The strip/viewer shows an "uploading"
+   * affordance. `url` points at the LOCAL objectURL when this client owns the
+   * blob; when `pendingPlaceholder` is also set the blob lives on ANOTHER device
+   * and there is nothing local to render (show a placeholder, not a broken image).
+   */
+  pending?: boolean;
+  /** #181 PR-G — pending entry whose blob is on another device (no local URL). */
+  pendingPlaceholder?: boolean;
 }
 export interface MediaApiBody {
   data?: {

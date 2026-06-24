@@ -117,7 +117,17 @@ export const sessionContextRoutes = createApiRouter()
         }
 
         // Resolve the collaborative editing flag for this tenant. Plain per-tenant
-        // operator toggle (not plan-gated); default off until collab is GA.
+        // operator toggle (not plan-gated); collab is now the default (#181 Phase 5,
+        // after the photo data-loss gap was closed — every editor write routes
+        // through the Y.Doc under collab). A tenant is collab-ON unless they have an
+        // EXPLICIT stored `false` opt-out (the legacy CAS path stays available until
+        // Tasks 14/15 retire it). So missing row / null / true → ON; only false → OFF.
+        //
+        // Fail mode: a DB error leaves `collabEditing` at its initial `false`
+        // (fail-CLOSED to the legacy path). This is deliberate and intentionally
+        // asymmetric with the happy-path default — a transient resolution failure
+        // should not silently force a tenant onto collab; the legacy editor still
+        // works without the Durable Object, so OFF is the safer fallback.
         let collabEditing = false;
         if (tenantId) {
             try {
@@ -127,7 +137,7 @@ export const sessionContextRoutes = createApiRouter()
                     .from(tenantConfigs)
                     .where(eq(tenantConfigs.tenantId, tenantId))
                     .get();
-                collabEditing = row?.collabEditing === true;
+                collabEditing = row?.collabEditing !== false;
             } catch (e) {
                 logger.warn('[session-context] collabEditing resolution failed', { error: (e as Error).message });
             }
