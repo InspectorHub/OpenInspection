@@ -119,6 +119,22 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  return { ok: res.ok, intent: "annotate" };
  }
 
+ // D8 — structural-edit pipeline: persist the next snapshot + optionally
+ // converge the DO so live collab clients resync.
+ if (intent === "restructure") {
+  const id = params.id;
+  const snapshot = JSON.parse(String(formData.get("snapshot") ?? "{}"));
+  await api.inspections[":id"]["template-snapshot"].$patch({ param: { id }, json: { snapshot } });
+  if (formData.get("collab") === "1") {
+   try {
+    await api.inspections[":id"].collab.restructure.$post({ param: { id } });
+   } catch {
+    // collab off / DO absent — revalidation still refreshes the editor state.
+   }
+  }
+  return { ok: true as const, intent: "restructure" };
+ }
+
  if (intent === "toggle-auto-sign") {
  const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
  const res = await api.inspections[":id"].$patch({

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { SectionDonut } from './SectionDonut';
 import { sectionIconFor } from './section-icons';
 
@@ -12,6 +13,15 @@ interface SectionRailProps {
  overviewActive?: boolean;
  /** Called when the user selects the "Inspection Details" overview entry. */
  onSelectOverview?: () => void;
+ // D8 — structural-edit callbacks (optional; hidden when absent)
+ /** Add a new section at the end. */
+ onAddSection?: () => void;
+ /** Duplicate the section with the given id. */
+ onDuplicateSection?: (id: string) => void;
+ /** Delete the section with the given id. */
+ onDeleteSection?: (id: string) => void;
+ /** Move the section in direction -1 (up) or +1 (down). */
+ onMoveSection?: (id: string, dir: -1 | 1) => void;
 }
 
 /** Clipboard / info glyph for the overview entry (no progress donut). */
@@ -37,7 +47,34 @@ function OverviewIcon() {
  );
 }
 
-export function SectionRail({ sections, activeSection, onSelect, results, sectionProgress, sectionDefectCount, overviewActive = false, onSelectOverview }: SectionRailProps) {
+// Three-dot icon for the section context menu.
+function DotsIcon() {
+ return (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+   <circle cx="12" cy="5" r="2" />
+   <circle cx="12" cy="12" r="2" />
+   <circle cx="12" cy="19" r="2" />
+  </svg>
+ );
+}
+
+export function SectionRail({
+ sections,
+ activeSection,
+ onSelect,
+ results,
+ sectionProgress,
+ sectionDefectCount,
+ overviewActive = false,
+ onSelectOverview,
+ onAddSection,
+ onDuplicateSection,
+ onDeleteSection,
+ onMoveSection,
+}: SectionRailProps) {
+ const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+ const hasStructuralOps = Boolean(onAddSection || onDuplicateSection || onDeleteSection || onMoveSection);
+
  return (
  <aside data-shortcut-scope className="w-[200px] flex-shrink-0 border-r border-ih-border overflow-y-auto bg-ih-bg-app/50">
  <nav className="p-2 space-y-0.5">
@@ -59,7 +96,7 @@ export function SectionRail({ sections, activeSection, onSelect, results, sectio
    </div>
   </button>
   <hr className="my-1 border-ih-border" />
- {sections.map((section) => {
+ {sections.map((section, idx) => {
  // Calculate completion
  const progress = sectionProgress?.(section.id);
  const total = progress?.total ?? (section.items?.length || 0);
@@ -74,29 +111,106 @@ export function SectionRail({ sections, activeSection, onSelect, results, sectio
  const tipParts = [`${rated} of ${total} rated`];
  if (unrated > 0) tipParts.push(`${unrated} unrated`);
  if (defects > 0) tipParts.push(`${defects} defect${defects > 1 ? 's' : ''}`);
+ const menuOpen = openMenuId === section.id;
 
  return (
- <button
- key={section.id}
- onClick={() => onSelect(section.id)}
- title={`${section.title}: ${tipParts.join(', ')}`}
- className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all ${
- activeSection === section.id
- ? "bg-ih-primary-tint text-ih-primary font-bold border-l-2 border-ih-primary"
- : "text-ih-fg-3 hover:bg-ih-bg-muted"
- }`}
- >
- <div className="flex items-center justify-between gap-1">
- <span className="mr-1 shrink-0 text-ih-fg-3">{sectionIconFor(section.title ?? section.id)}</span>
- <span className="truncate">{section.title}</span>
- <span className="ml-1 shrink-0 flex items-center">
- <SectionDonut rated={rated} total={total} hasDefect={hasDefect} />
- </span>
+ <div key={section.id} className="relative group">
+  <button
+  onClick={() => onSelect(section.id)}
+  title={`${section.title}: ${tipParts.join(', ')}`}
+  className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all ${
+  activeSection === section.id
+  ? "bg-ih-primary-tint text-ih-primary font-bold border-l-2 border-ih-primary"
+  : "text-ih-fg-3 hover:bg-ih-bg-muted"
+  }`}
+  >
+  <div className="flex items-center justify-between gap-1">
+  <span className="mr-1 shrink-0 text-ih-fg-3">{sectionIconFor(section.title ?? section.id)}</span>
+  <span className="truncate flex-1">{section.title}</span>
+  <span className="ml-1 shrink-0 flex items-center">
+  <SectionDonut rated={rated} total={total} hasDefect={hasDefect} />
+  </span>
+  </div>
+  </button>
+
+  {/* D8 — per-section ⋯ menu (only when structural ops are wired) */}
+  {hasStructuralOps && (
+  <div className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center">
+   <button
+   onClick={(e) => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : section.id); }}
+   className="w-6 h-6 flex items-center justify-center rounded text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ih-primary"
+   aria-label={`Section options for ${section.title}`}
+   aria-haspopup="true"
+   aria-expanded={menuOpen}
+   >
+   <DotsIcon />
+   </button>
+   {menuOpen && (
+   <div
+    className="absolute right-0 top-full mt-0.5 z-40 w-36 rounded-md shadow-ih-popover bg-ih-bg-card border border-ih-border py-0.5 text-[12px]"
+    role="menu"
+    onMouseLeave={() => setOpenMenuId(null)}
+   >
+    {onDuplicateSection && (
+    <button
+     role="menuitem"
+     className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
+     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onDuplicateSection(section.id); }}
+    >
+     Duplicate
+    </button>
+    )}
+    {onMoveSection && idx > 0 && (
+    <button
+     role="menuitem"
+     className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
+     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onMoveSection(section.id, -1); }}
+    >
+     Move up
+    </button>
+    )}
+    {onMoveSection && idx < sections.length - 1 && (
+    <button
+     role="menuitem"
+     className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
+     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onMoveSection(section.id, 1); }}
+    >
+     Move down
+    </button>
+    )}
+    {onDeleteSection && (
+    <>
+     <hr className="my-0.5 border-ih-border" />
+     <button
+     role="menuitem"
+     className="w-full text-left px-3 py-1.5 text-ih-bad hover:bg-ih-bg-muted font-bold"
+     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onDeleteSection(section.id); }}
+     >
+     Delete
+     </button>
+    </>
+    )}
+   </div>
+   )}
+  </div>
+  )}
  </div>
- </button>
  );
  })}
  </nav>
+
+ {/* D8 — "+ Add section" CTA at the rail bottom (only when structural ops are wired) */}
+ {onAddSection && (
+  <div className="p-2 pt-0">
+  <button
+   onClick={onAddSection}
+   data-testid="add-section-btn"
+   className="w-full text-left px-3 py-2 rounded-md text-[12px] text-ih-fg-4 border border-dashed border-ih-border hover:border-ih-primary hover:text-ih-primary transition-all"
+  >
+   + Add section
+  </button>
+  </div>
+ )}
  </aside>
  );
 }

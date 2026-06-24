@@ -45,6 +45,9 @@ import { preprocessImage } from "~/components/media-studio/preprocessImage";
 import { PublishGateModal } from "~/components/editor/PublishGateModal";
 import { AddMediaChooser } from "~/components/editor/AddMediaChooser";
 import { RecropWarningModal } from "~/components/editor/RecropWarningModal";
+import { StructureDeleteModal } from "~/components/editor/StructureDeleteModal";
+import { addSection, duplicateSection, deleteSection, moveSection } from "~/lib/editor/structure-ops";
+import type { Snapshot } from "~/lib/editor/structure-ops";
 import { UnsavedChangesBlocker } from "~/components/editor/UnsavedChangesBlocker";
 import { PublishModal } from "~/components/editor/PublishModal";
 import { SignModal } from "~/components/editor/SignModal";
@@ -504,6 +507,98 @@ export default function InspectionEditPage() {
  // DB-16 — dedicated fetcher for set/clear report cover (avoids the
  // shared-fetcher abort hazard; the loader revalidates the cover after).
  const coverFetcher = useFetcher();
+
+ /* ---------------------------------------------------------------- */
+ /* D8 — structural editing (section add/dup/delete/move)           */
+ /* ---------------------------------------------------------------- */
+
+ // Hold the RAW snapshot (not the normalized `state.schema`) in a ref so ops
+ // always operate on a clean TemplateSchemaV2 object. Updated when loaderData
+ // refreshes after each applyStructure revalidation.
+ const snapshotRef = useRef<Snapshot>(
+  loaderData.templateSnapshot as unknown as Snapshot,
+ );
+ useEffect(() => {
+  snapshotRef.current = loaderData.templateSnapshot as unknown as Snapshot;
+ }, [loaderData.templateSnapshot]);
+
+ const structureFetcher = useFetcher();
+ const applyStructure = useCallback(
+  (next: Snapshot) => {
+   structureFetcher.submit(
+    {
+     intent: "restructure",
+     snapshot: JSON.stringify(next),
+     collab: loaderData.collabEditing ? "1" : "0",
+    },
+    { method: "post" },
+   );
+  },
+  [structureFetcher, loaderData.collabEditing],
+ );
+
+ // StructureDeleteModal state — opened when onDeleteSection fires.
+ const [structureDeletePending, setStructureDeletePending] = useState<{
+  sectionId: string;
+  title: string;
+  impact: { items: number; ratings: number; notes: number; photos: number };
+ } | null>(null);
+
+ // "Add section" title prompt state (minimal inline modal).
+ const [addSectionPrompt, setAddSectionPrompt] = useState(false);
+ const [addSectionTitle, setAddSectionTitle] = useState("");
+
+ const handleAddSection = useCallback(() => {
+  setAddSectionTitle("");
+  setAddSectionPrompt(true);
+ }, []);
+
+ const handleAddSectionConfirm = useCallback(() => {
+  const title = addSectionTitle.trim() || "New Section";
+  setAddSectionPrompt(false);
+  setAddSectionTitle("");
+  applyStructure(addSection(snapshotRef.current, title));
+ }, [addSectionTitle, applyStructure]);
+
+ const handleDuplicateSection = useCallback(
+  (id: string) => {
+   applyStructure(duplicateSection(snapshotRef.current, id));
+  },
+  [applyStructure],
+ );
+
+ const handleDeleteSection = useCallback(
+  (id: string) => {
+   const sec = snapshotRef.current.sections.find((s) => s.id === id);
+   if (!sec) return;
+   // Compute impact from the snapshot item list + live results.
+   const sectionItems = sec.items as Array<{ id: string }>;
+   let ratings = 0;
+   let notes = 0;
+   let photos = 0;
+   for (const item of sectionItems) {
+    const r = state.results[`_default:${id}:${item.id}`] || state.results[item.id];
+    if (r?.rating) ratings++;
+    const n = (r as Record<string, unknown> | undefined)?.notes;
+    if (typeof n === "string" && n.trim()) notes++;
+    const p = (r as Record<string, unknown> | undefined)?.photos;
+    if (Array.isArray(p)) photos += p.length;
+   }
+   setStructureDeletePending({
+    sectionId: id,
+    title: sec.title,
+    impact: { items: sectionItems.length, ratings, notes, photos },
+   });
+  },
+  [state.results],
+ );
+
+ const handleMoveSection = useCallback(
+  (id: string, dir: -1 | 1) => {
+   applyStructure(moveSection(snapshotRef.current, id, dir));
+  },
+  [applyStructure],
+ );
 
  /* Plan 7 — Stream customer subdomain (from loader env). Null ⇒ fail closed:
   * video posters/players render a graceful "unavailable" state, never a
@@ -1132,6 +1227,10 @@ export default function InspectionEditPage() {
  sectionDefectCount={state.sectionDefectCount}
  overviewActive={state.activeView === "property"}
  onSelectOverview={() => state.setActiveView("property")}
+ onAddSection={handleAddSection}
+ onDuplicateSection={handleDuplicateSection}
+ onDeleteSection={handleDeleteSection}
+ onMoveSection={handleMoveSection}
  />
  );
 
@@ -1565,6 +1664,58 @@ export default function InspectionEditPage() {
  onCancel={() => setRecropWarn(null)}
  onConfirm={() => { const r = recropWarn.run; setRecropWarn(null); r(); }}
  />
+ )}
+
+ {/* D8 — structural delete confirmation modal (NEVER window.confirm). */}
+ <StructureDeleteModal
+  open={Boolean(structureDeletePending)}
+  title={structureDeletePending?.title ?? ""}
+  impact={structureDeletePending?.impact ?? { items: 0, ratings: 0, notes: 0, photos: 0 }}
+  onCancel={() => setStructureDeletePending(null)}
+  onConfirm={() => {
+   const pending = structureDeletePending;
+   setStructureDeletePending(null);
+   if (pending) applyStructure(deleteSection(snapshotRef.current, pending.sectionId));
+  }}
+ />
+
+ {/* D8 — minimal "Add section" title prompt. */}
+ {addSectionPrompt && (
+  <div className="fixed inset-0 z-[300] flex items-center justify-center p-4">
+   <div
+    className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm"
+    onClick={() => setAddSectionPrompt(false)}
+   />
+   <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover p-6 max-w-sm w-full border border-ih-border">
+    <h3 className="text-[15px] font-bold text-ih-fg-1">Add section</h3>
+    <input
+     type="text"
+     autoFocus
+     className="mt-3 w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:ring-2 focus:ring-ih-primary"
+     placeholder="Section title (e.g. Roof)"
+     value={addSectionTitle}
+     onChange={(e) => setAddSectionTitle(e.target.value)}
+     onKeyDown={(e) => {
+      if (e.key === "Enter") { e.preventDefault(); handleAddSectionConfirm(); }
+      if (e.key === "Escape") { e.preventDefault(); setAddSectionPrompt(false); }
+     }}
+    />
+    <div className="flex justify-end gap-2 mt-4">
+     <button
+      onClick={() => setAddSectionPrompt(false)}
+      className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md"
+     >
+      Cancel
+     </button>
+     <button
+      onClick={handleAddSectionConfirm}
+      className="px-4 py-2 text-[13px] font-bold text-white bg-ih-primary hover:bg-ih-primary/90 rounded-md"
+     >
+      Add
+     </button>
+    </div>
+   </div>
+  </div>
  )}
 
  {/* Inspection settings sheet */}
