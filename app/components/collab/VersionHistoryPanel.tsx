@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import type * as Y from "yjs";
 import { Modal } from "@core/shared-ui";
+import { applyItemPatch } from "../../../server/lib/collab/results-doc";
+import type { ResultsProjection } from "../../../server/lib/collab/results-doc.types";
+import { diffProjections, type FindingDiff, type ScalarField } from "~/lib/collab/snapshot-diff";
+import { VersionCompare } from "~/components/collab/VersionCompare";
 
 /**
  * #181 — Version history panel (collab Phase 4 / PR-D, Task 12a).
@@ -16,10 +21,14 @@ import { Modal } from "@core/shared-ui";
  * editor can revalidate; live multi-client convergence is Task 12b.
  */
 
+/** Why a snapshot was captured (mirrors the DO's SnapshotReason). */
+type SnapshotReason = "periodic" | "manual" | "connect";
+
 interface Snapshot {
     seq: number;
     atMs: number;
     byUserId: string | null;
+    reason?: SnapshotReason;
 }
 
 export interface VersionHistoryPanelProps {
@@ -29,9 +38,42 @@ export interface VersionHistoryPanelProps {
     /** Called after a restore succeeds (Task 12b will use this to trigger resync;
      *  for now the editor just revalidates / shows a toast). */
     onRestored?: (seq: number) => void;
+    /**
+     * #181 PR-H — the live Y.Doc (threaded from inspection-edit.tsx). Required for
+     * the Compare → "Recover this value" flow, which writes the recovered scalar
+     * back into the doc. When null the Compare action degrades to whole-version
+     * restore only (single-value recovery is hidden).
+     */
+    doc?: Y.Doc | null;
+    /**
+     * #181 PR-H — the editor's current in-memory results map (the live `to` side
+     * of a compare). A snapshot's projection is the `from` side. When absent the
+     * Compare action is hidden (nothing to diff against).
+     */
+    currentResults?: ResultsProjection | null;
 }
 
 type LoadState = "idle" | "loading" | "ready" | "error";
+
+/** The 8 scalar fields written via `applyItemPatch`; guards the recover write. */
+const SCALAR_FIELD_SET = new Set<ScalarField>([
+    "rating",
+    "notes",
+    "value",
+    "recommendation",
+    "estimateMin",
+    "estimateMax",
+    "followupStatus",
+    "followupNotes",
+]);
+
+/** Human label for a snapshot's capture reason (surfaces the pre-merge boundary). */
+function reasonLabel(reason: SnapshotReason | undefined, byUserId: string | null): string {
+    if (reason === "connect") return "Auto-saved before a reconnect";
+    if (reason === "periodic") return "Auto-saved";
+    // 'manual' (or legacy/no reason): show the actor when known.
+    return byUserId === null ? "Auto-saved" : byUserId;
+}
 
 /**
  * Tiny dependency-free relative-time formatter ("just now", "2 minutes ago",
@@ -61,9 +103,36 @@ function parseSnapshots(raw: unknown): Snapshot[] {
         if (typeof rec.seq !== "number" || typeof rec.atMs !== "number") continue;
         const byUserId =
             typeof rec.byUserId === "string" ? rec.byUserId : null;
-        out.push({ seq: rec.seq, atMs: rec.atMs, byUserId });
+        const reason =
+            rec.reason === "periodic" || rec.reason === "manual" || rec.reason === "connect"
+                ? (rec.reason as SnapshotReason)
+                : undefined;
+        out.push({ seq: rec.seq, atMs: rec.atMs, byUserId, reason });
     }
     return out;
+}
+
+/**
+ * The editor's live ResultMap is DUAL-KEYED (each entry stored under both the
+ * composite `unit:section:item` key AND the bare itemId — see
+ * `results-binding.ts#readResultMap`). For diffing we want ONLY the composite
+ * keys, which match a snapshot projection's keys; the bare-itemId aliases would
+ * otherwise appear as spurious "added" findings.
+ */
+function compositeKeysOnly(results: ResultsProjection): ResultsProjection {
+    const out: ResultsProjection = {};
+    for (const [key, value] of Object.entries(results)) {
+        if (key.split(":").length >= 3) out[key] = value;
+    }
+    return out;
+}
+
+/** Narrow the `:seq` snapshot response to its `projection` map (or null). */
+function parseSnapshotProjection(raw: unknown): ResultsProjection | null {
+    if (typeof raw !== "object" || raw === null) return null;
+    const proj = (raw as Record<string, unknown>).projection;
+    if (typeof proj !== "object" || proj === null) return null;
+    return proj as ResultsProjection;
 }
 
 export function VersionHistoryPanel({
@@ -71,6 +140,8 @@ export function VersionHistoryPanel({
     onClose,
     inspectionId,
     onRestored,
+    doc,
+    currentResults,
 }: VersionHistoryPanelProps) {
     const [loadState, setLoadState] = useState<LoadState>("idle");
     const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
@@ -81,7 +152,86 @@ export function VersionHistoryPanel({
     const [restoring, setRestoring] = useState(false);
     const [restoreError, setRestoreError] = useState<string | null>(null);
 
+    // #181 PR-H — Compare-against-current modal state.
+    const [compareOpen, setCompareOpen] = useState(false);
+    const [compareSeq, setCompareSeq] = useState<number | null>(null);
+    const [compareDiffs, setCompareDiffs] = useState<FindingDiff[]>([]);
+    const [compareBusy, setCompareBusy] = useState(false);
+
+    const canCompare = !!currentResults;
+
     const base = `/api/inspections/${inspectionId}/collab`;
+
+    // #181 PR-H — open Compare for a row: fetch that snapshot's projection (the
+    // `from` side) and diff it against the editor's live results (`to` = current).
+    const handleCompare = useCallback(
+        async (seq: number) => {
+            if (!currentResults) return;
+            setCompareSeq(seq);
+            setCompareBusy(true);
+            setCompareOpen(true);
+            setCompareDiffs([]);
+            try {
+                const res = await fetch(`${base}/snapshots/${seq}`, {
+                    method: "GET",
+                    credentials: "same-origin",
+                    headers: { Accept: "application/json" },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const raw: unknown = await res.json();
+                const projection = parseSnapshotProjection(raw);
+                if (!projection) throw new Error("snapshot has no projection");
+                setCompareDiffs(
+                    diffProjections(projection, compositeKeysOnly(currentResults)),
+                );
+            } catch (e) {
+                console.error("Version compare load failed:", e);
+                setCompareOpen(false);
+                setCompareSeq(null);
+            } finally {
+                setCompareBusy(false);
+            }
+        },
+        [base, currentResults],
+    );
+
+    // #181 PR-H — recover a single OLD scalar into the LIVE doc. The finding key
+    // is the composite `unit:section:item`; `applyItemPatch` writes the scalar
+    // CRDT field directly (one helper covers all 8 scalars). Live doc → DO persist.
+    const handleRecoverField = useCallback(
+        (findingKey: string, field: string, value: unknown) => {
+            if (!doc) return;
+            if (!SCALAR_FIELD_SET.has(field as ScalarField)) return;
+            applyItemPatch(doc, findingKey, field as ScalarField, value);
+            // Reflect the recovery: the recovered field now matches current, so it
+            // drops out of the diff on the next compare. Recompute against live.
+            if (currentResults) {
+                // The live doc bind updates currentResults asynchronously; do a local
+                // optimistic prune so the recovered row disappears immediately.
+                setCompareDiffs((prev) =>
+                    prev
+                        .map((d) =>
+                            d.findingKey === findingKey
+                                ? {
+                                      ...d,
+                                      scalarChanges: d.scalarChanges.filter(
+                                          (c) => c.field !== field,
+                                      ),
+                                  }
+                                : d,
+                        )
+                        .filter(
+                            (d) =>
+                                d.scalarChanges.length > 0 ||
+                                d.nestedChanged ||
+                                d.itemAdded ||
+                                d.itemRemoved,
+                        ),
+                );
+            }
+        },
+        [doc, currentResults],
+    );
 
     const loadSnapshots = useCallback(async () => {
         setLoadState("loading");
@@ -223,19 +373,30 @@ export function VersionHistoryPanel({
                                             {formatRelativeTime(snap.atMs)}
                                         </div>
                                         <div className="text-[11px] text-ih-fg-3 truncate">
-                                            {snap.byUserId === null ? "Auto-saved" : snap.byUserId}
+                                            {reasonLabel(snap.reason, snap.byUserId)}
                                         </div>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setRestoreError(null);
-                                            setConfirmSeq(snap.seq);
-                                        }}
-                                        className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-2 hover:bg-ih-bg-muted"
-                                    >
-                                        Restore
-                                    </button>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        {canCompare && (
+                                            <button
+                                                type="button"
+                                                onClick={() => void handleCompare(snap.seq)}
+                                                className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-2 hover:bg-ih-bg-muted"
+                                            >
+                                                Compare
+                                            </button>
+                                        )}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setRestoreError(null);
+                                                setConfirmSeq(snap.seq);
+                                            }}
+                                            className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-2 hover:bg-ih-bg-muted"
+                                        >
+                                            Restore
+                                        </button>
+                                    </div>
                                 </li>
                             ))}
                         </ul>
@@ -281,6 +442,38 @@ export function VersionHistoryPanel({
                     <p className="mt-3 text-[12px] text-ih-bad">{restoreError}</p>
                 )}
             </Modal>
+
+            {/* #181 PR-H — Compare this snapshot against the CURRENT live state. */}
+            <VersionCompare
+                open={compareOpen}
+                onClose={() => {
+                    if (!compareBusy) {
+                        setCompareOpen(false);
+                        setCompareSeq(null);
+                    }
+                }}
+                fromLabel={
+                    compareSeq === null
+                        ? "Selected version"
+                        : `Version #${compareSeq}`
+                }
+                toLabel="Current"
+                diffs={compareDiffs}
+                busy={compareBusy}
+                // Single-value recovery requires the live doc; hide it otherwise.
+                onRecoverField={doc ? handleRecoverField : undefined}
+                onRestoreWhole={
+                    compareSeq === null
+                        ? undefined
+                        : () => {
+                              const seq = compareSeq;
+                              setCompareOpen(false);
+                              setCompareSeq(null);
+                              setRestoreError(null);
+                              setConfirmSeq(seq);
+                          }
+                }
+            />
         </>
     );
 }

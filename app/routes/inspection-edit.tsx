@@ -17,6 +17,7 @@ import { useMediaDrain } from "~/hooks/useMediaDrain";
 import { bindResultMap, appendPendingPhoto } from "~/lib/collab/results-binding";
 import { enqueueMedia } from "~/lib/collab/media-upload-queue";
 import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
+import type { ResultsProjection } from "../../server/lib/collab/results-doc.types";
 import { SectionRail } from "~/components/editor/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
 import { ItemList } from "~/components/editor/ItemList";
@@ -1630,6 +1631,8 @@ export default function InspectionEditPage() {
  onClose={() => setVersionHistoryOpen(false)}
  inspectionId={String(loaderData.inspection.id)}
  onRestored={() => { revalidator.revalidate(); }}
+ doc={collab?.doc ?? null}
+ currentResults={state.results as unknown as ResultsProjection}
  />
 
  {/* Inspector sign modal */}
