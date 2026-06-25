@@ -53,6 +53,22 @@ export class TwilioClient implements MessagingProvider {
         },
     };
 
+    tollfree = {
+        list: async (): Promise<Array<{ sid: string; status: string; phoneNumber: string }>> => {
+            const r = await this.request('GET', 'messaging', '/v1/Tollfree/Verifications');
+            const v = (r.json as { verifications?: Array<{ sid: string; status: string; tollfree_phone_number_sid?: string }> } | null)?.verifications ?? [];
+            return v.map((x) => ({ sid: x.sid, status: x.status, phoneNumber: x.tollfree_phone_number_sid ?? '' }));
+        },
+    };
+
+    brands = {
+        list: async (): Promise<Array<{ sid: string; status: string }>> => {
+            const r = await this.request('GET', 'messaging', '/v1/a2p/BrandRegistrations');
+            const b = (r.json as { data?: Array<{ sid: string; status: string }> } | null)?.data ?? [];
+            return b.map((x) => ({ sid: x.sid, status: x.status }));
+        },
+    };
+
     /** Implements MessagingProvider.sendMessage — delegates to messages.create. */
     sendMessage(args: {
         from?: string;

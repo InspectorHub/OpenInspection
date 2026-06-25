@@ -26,3 +26,14 @@ describe('TwilioClient.messages.create', () => {
         expect((fetchMock.mock.calls[0][1].body as string)).toContain('MessagingServiceSid=MG9');
     });
 });
+
+describe('TwilioClient.tollfree', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('tollfree.list returns verifications from the messaging API', async () => {
+        const body = JSON.stringify({ verifications: [{ sid: 'HH1', status: 'TWILIO_APPROVED', tollfree_phone_number_sid: 'PN1' }] });
+        vi.stubGlobal('fetch', vi.fn(async () => new Response(body, { status: 200 })));
+        const out = await new TwilioClient({ sid: 'AC1', token: 't' }).tollfree.list();
+        expect(out[0]).toMatchObject({ sid: 'HH1', status: 'TWILIO_APPROVED' });
+    });
+});
