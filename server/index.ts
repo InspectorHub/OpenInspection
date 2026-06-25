@@ -756,7 +756,7 @@ app.get('/api/public/verify/:envelopeId/audit-trail', async (c) => {
     return c.body(JSON.stringify(payload, null, 2));
 });
 
-app.get('/', (c) => c.redirect('/dashboard'));
+app.get('/', (c) => c.redirect('/inspections'));
 
 // Global catch-all 404. API requests get JSON; everything else gets plain text
 // (the React Router v7 frontend handles HTML 404 rendering).

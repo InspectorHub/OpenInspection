@@ -143,7 +143,7 @@ export default function CalendarPage() {
 
   /* ---- Day click (create) ---- */
   const handleDayClick = (dateStr: string) => {
-    navigate(`/dashboard?newInspection=1&date=${encodeURIComponent(dateStr)}`);
+    navigate(`/inspections?newInspection=1&date=${encodeURIComponent(dateStr)}`);
   };
 
   /* ---- Drag reschedule ---- */

@@ -25,7 +25,7 @@ test.describe('TeamStrip live presence (subsystem B M3 + M7)', () => {
         'Set TEST_INSPECTOR_A_* and TEST_INSPECTOR_B_* (same tenant) to run.',
     );
 
-    test('two contexts on /dashboard see each other in TeamStrip roster', async ({ browser }) => {
+    test('two contexts on /inspections see each other in TeamStrip roster', async ({ browser }) => {
         const ctxA = await browser.newContext();
         const ctxB = await browser.newContext();
         const pageA = await ctxA.newPage();
@@ -39,7 +39,7 @@ test.describe('TeamStrip live presence (subsystem B M3 + M7)', () => {
             await page.fill('input[name=email]',    email);
             await page.fill('input[name=password]', password);
             await page.click('button[type=submit]');
-            await page.waitForURL('**/dashboard');
+            await page.waitForURL('**/inspections');
         }
 
         // TeamStrip is conditionally rendered when members.length > 1; both

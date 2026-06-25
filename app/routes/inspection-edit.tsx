@@ -1371,9 +1371,9 @@ export default function InspectionEditPage() {
  sectionTitle={state.currentSection?.title ?? ''}
  itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? 'Select an item'}
  onBack={() => {
-  // B-22: back from item editor → item list; back from list → dashboard
+  // B-22: back from item editor → item list; back from list → inspections
   if (state.activeItemId) { state.setActiveItemId(null); return; }
-  navigate('/dashboard');
+  navigate('/inspections');
  }}
  onMore={() => { /* future: open more menu */ }}
  />

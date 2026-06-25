@@ -35,7 +35,7 @@ async function login(page: Page): Promise<void> {
 test.describe('Spec 3A — Inspection Lifecycle (action menu + cancel modal)', () => {
     test('cancel via action menu → appears in Cancelled section → uncancel', async ({ page }) => {
         await login(page);
-        await page.goto(`${BASE_URL}/dashboard`);
+        await page.goto(`${BASE_URL}/inspections`);
 
         // Find first inspection row (any section). data-test attribute added by T11.
         const firstRow = page.locator('[data-test="inspection-row"]').first();

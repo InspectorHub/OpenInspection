@@ -76,7 +76,7 @@ export class IdentityService {
             role:               linkedUser.role,
         }, ctx.keyring);
 
-        return { kind: 'ok', newToken, redirectUrl: '/dashboard' };
+        return { kind: 'ok', newToken, redirectUrl: '/inspections' };
     }
 
     async link({ primaryUserId, targetEmail }: { primaryUserId: string; targetEmail: string }): Promise<{ id: string }> {

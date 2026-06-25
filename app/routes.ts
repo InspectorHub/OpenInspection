@@ -96,8 +96,9 @@ export default [
     // Loaded via useFetcher; no UI rendered; must be inside the auth layout so
     // requireToken() can redirect to /login when unauthenticated.
     route("resources/schedule-conflicts", "routes/resources/schedule-conflicts.ts"),
-    route("dashboard", "routes/dashboard.tsx"),
-    // Inspections list — dedicated route using the new inspections.tsx component.
+    // Inspections workspace — the primary list/stats/wizard surface (formerly
+    // /dashboard). The thin status-grouped list was retired; this is the one
+    // canonical inspections route.
     route("inspections", "routes/inspections.tsx"),
     route("calendar", "routes/calendar.tsx"),
     route("contacts", "routes/contacts.tsx"),

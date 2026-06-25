@@ -29,14 +29,14 @@ test.skip('P1 — publish-modal Send All button disabled until all 5 pre-flight 
 });
 
 test.skip('P2 — workflow tab AND-filters with time tab + survives URL reload', async ({ page }) => {
-    await page.goto('/dashboard?workflow=drafts');
+    await page.goto('/inspections?workflow=drafts');
     await expect(page.locator('button:has-text("Drafts").bg-indigo-600')).toBeVisible();
     await page.click('text=Awaiting payment');
     await expect(page).toHaveURL(/workflow=awaitingPayment/);
 });
 
 test.skip('P3 — CSV Export downloads visible inspections', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/inspections');
     const downloadPromise = page.waitForEvent('download');
     await page.click('button:has-text("Export")');
     const download = await downloadPromise;
@@ -52,7 +52,7 @@ test.skip('P4 — user with linked identity can switch into the linked tenant', 
     await page.click('[aria-label="User menu"]');
     await expect(page.locator('text=Switch identity')).toBeVisible();
     await page.click('text=branch-b@seed.test');
-    await page.waitForURL('**/dashboard');
+    await page.waitForURL('**/inspections');
 });
 
 test.skip('P6 — IntegrationGrid renders 6 cards with correct connected state', async ({ page }) => {

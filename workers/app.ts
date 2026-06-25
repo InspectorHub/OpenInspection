@@ -85,7 +85,7 @@ app.get("/observe/:token", toApi); // 1-seg observe — RR owns /observe/inspect
 
 // Audited as React Router-owned (the RR migration superseded the API HTML; the API
 // still serves their DATA under /api/public/*): /book /report /r /messages /verify
-// /agreements /login /logout /forgot-password /dashboard and all dashboard pages.
+// /agreements /login /logout /forgot-password /inspections and all app pages.
 
 // --- Everything else → React Router SSR (all pages incl. "/") ---
 // Static assets (/favicon.svg, /styles.css, /vendor/*, /fonts/*) are served by the

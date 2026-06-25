@@ -108,7 +108,7 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
     });
 
     test('M-02: Dashboard shows mobile card list, hides desktop table', async ({ page }) => {
-        await gotoMobile(page, '/dashboard', adminToken);
+        await gotoMobile(page, '/inspections', adminToken);
         // Mobile card list mount node exists and is visible
         const cardList = page.locator('#inspectionsCardList');
         await expect(cardList).toBeVisible();
@@ -118,7 +118,7 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
     });
 
     test('M-03: Sidebar collapses behind hamburger / mobile menu trigger exists', async ({ page }) => {
-        await gotoMobile(page, '/dashboard', adminToken);
+        await gotoMobile(page, '/inspections', adminToken);
         // Desktop sidebar `<aside class="...hidden lg:flex...">` should be hidden at 375px
         const aside = page.locator('aside').first();
         await expect(aside).toBeHidden();
@@ -153,9 +153,9 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
 
     test('M-06: /reports 301-redirects to the dashboard Published tab on mobile', async ({ page }) => {
         // #111: the standalone Reports page is retired. /reports is now a 301 redirect
-        // to /dashboard?workflow=published (the Published tab absorbs the report list).
+        // to /inspections?workflow=published (the Published tab absorbs the report list).
         await gotoMobile(page, '/reports', adminToken);
-        await expect(page).toHaveURL(/\/dashboard\?.*workflow=published/);
+        await expect(page).toHaveURL(/\/inspections\?.*workflow=published/);
     });
 
     test('M-07: Marketplace renders without horizontal overflow on mobile', async ({ page }) => {

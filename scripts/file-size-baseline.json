@@ -4,7 +4,7 @@
   "server/services/inspection/inspection-core.service.ts": 952,
   "server/lib/collab/results-doc.ts": 917,
   "server/durable-objects/inspection-doc.ts": 896,
-  "app/routes/dashboard.tsx": 841,
+  "app/routes/inspections.tsx": 841,
   "server/services/booking.service.ts": 833,
   "server/index.ts": 821,
   "server/services/inspection.service.ts": 728,

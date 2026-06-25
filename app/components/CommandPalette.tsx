@@ -21,8 +21,8 @@ interface PaletteItem {
 /* ------------------------------------------------------------------ */
 
 const PAGES: PaletteItem[] = [
-  { id: "p-dashboard", label: "Dashboard", group: "Pages", icon: "page", to: "/dashboard", hint: "G then I" },
-  { id: "p-reports", label: "Reports", group: "Pages", icon: "page", to: "/dashboard?workflow=published", hint: "G then R" },
+  { id: "p-inspections", label: "Inspections", group: "Pages", icon: "page", to: "/inspections", hint: "G then I" },
+  { id: "p-reports", label: "Reports", group: "Pages", icon: "page", to: "/inspections?workflow=published", hint: "G then R" },
   { id: "p-templates", label: "Templates", group: "Pages", icon: "page", to: "/library/templates", hint: "G then T" },
   { id: "p-marketplace", label: "Marketplace", group: "Pages", icon: "page", to: "/library/marketplace" },
   { id: "p-agreements", label: "Agreements", group: "Pages", icon: "page", to: "/library/agreements" },

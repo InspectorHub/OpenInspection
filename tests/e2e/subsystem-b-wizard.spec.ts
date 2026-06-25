@@ -20,7 +20,7 @@ test.describe('NewInspectionWizard (subsystem B M6)', () => {
         await page.fill('input[name=email]',    EMAIL!);
         await page.fill('input[name=password]', PASSWORD!);
         await page.click('button[type=submit]');
-        await page.waitForURL('**/dashboard');
+        await page.waitForURL('**/inspections');
     });
 
     test('happy path — 4 steps → create → redirect to edit', async ({ page }) => {

@@ -291,7 +291,7 @@ export default function FormRendererPage() {
  </p>
  </div>
  <Link
- to="/dashboard"
+ to="/inspections"
  className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted transition-colors inline-flex items-center gap-1.5"
  >
  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

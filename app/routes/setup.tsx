@@ -13,7 +13,7 @@ export function meta() {
 export async function loader({ request, context }: Route.LoaderArgs) {
   // If already authenticated, skip setup
   const token = await getToken(context, request);
-  if (token) return redirect("/dashboard");
+  if (token) return redirect("/inspections");
 
   // Check if workspace is already set up
   try {
@@ -66,7 +66,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const jwt = tokenMatch?.[1];
 
     if (jwt) {
-      return createSessionWithToken(context, jwt, "/dashboard");
+      return createSessionWithToken(context, jwt, "/inspections");
     }
 
     return submission.reply({ formErrors: ["Setup succeeded but no session was created"] });

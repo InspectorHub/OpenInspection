@@ -103,15 +103,15 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
   // -- Dashboard -------------------------------------------------------------
 
   test('UI-02: Dashboard renders main content', async ({ page }) => {
-    await gotoAuth(page, '/dashboard', adminSession);
+    await gotoAuth(page, '/inspections', adminSession);
     // Sidebar link to dashboard should be active
     await expect(
-      page.locator('aside a[href="/dashboard"], nav a[href="/dashboard"]'),
+      page.locator('aside a[href="/inspections"], nav a[href="/inspections"]'),
     ).toBeVisible({ timeout: 10000 });
   });
 
   test('UI-03: Dashboard shows inspections list', async ({ page }) => {
-    await gotoAuth(page, '/dashboard', adminSession);
+    await gotoAuth(page, '/inspections', adminSession);
     // Wait for inspection rows or "No inspections" empty state
     await page.waitForSelector('[class*="NEEDS ATTENTION"], [class*="THIS WEEK"], [class*="No inspections"], h1', {
       timeout: 10000,
@@ -123,7 +123,7 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
   test('SPA-01: Sidebar navigation does not trigger full page reload', async ({
     page,
   }) => {
-    await gotoAuth(page, '/dashboard', adminSession);
+    await gotoAuth(page, '/inspections', adminSession);
     await page.waitForLoadState('networkidle');
 
     // Record a marker to detect full reload
@@ -152,7 +152,7 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
   test('SPA-02: Browser back/forward works with SPA navigation', async ({
     page,
   }) => {
-    await gotoAuth(page, '/dashboard', adminSession);
+    await gotoAuth(page, '/inspections', adminSession);
     await page.waitForLoadState('networkidle');
 
     const sidebarLink = page.locator(
@@ -169,8 +169,8 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
       expect(page.url()).toContain('/library');
 
       await page.goBack();
-      await page.waitForURL('**/dashboard', { timeout: 10000 }).catch(() => {});
-      expect(page.url()).toContain('/dashboard');
+      await page.waitForURL('**/inspections', { timeout: 10000 }).catch(() => {});
+      expect(page.url()).toContain('/inspections');
     }
   });
 
@@ -179,7 +179,7 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
   test('SHARED-UI-01: PageHeader component renders on pages', async ({
     page,
   }) => {
-    await gotoAuth(page, '/dashboard', adminSession);
+    await gotoAuth(page, '/inspections', adminSession);
     // PageHeader renders an h1 or a header element
     const header = page.locator(
       'h1, [data-testid="page-header"], header h1',
@@ -190,7 +190,7 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
   test('SHARED-UI-02: Sidebar component renders navigation items', async ({
     page,
   }) => {
-    await gotoAuth(page, '/dashboard', adminSession);
+    await gotoAuth(page, '/inspections', adminSession);
     // Verify sidebar has navigation links
     const navLinks = page.locator('aside a, nav[aria-label] a');
     expect(await navLinks.count()).toBeGreaterThan(0);
@@ -230,7 +230,7 @@ test.describe.serial('React Router v7 Frontend Browser Tests', () => {
     page,
   }) => {
     const pagesToCheck = [
-      '/dashboard',
+      '/inspections',
       '/library/templates',
       '/team',
       '/settings',

@@ -189,7 +189,7 @@ export function NewInspectionWizard({
       agentDebounceRef.current = setTimeout(() => {
         agentFetcher.submit(
           { intent: "search-agents", search: value.trim() },
-          { method: "post", action: "/dashboard" },
+          { method: "post", action: "/inspections" },
         );
       }, 300);
     }
@@ -318,7 +318,7 @@ export function NewInspectionWizard({
         newAgentName: !selectedAgent ? newAgentName : "",
         newAgentEmail: !selectedAgent ? newAgentEmail : "",
       },
-      { method: "post", action: "/dashboard" },
+      { method: "post", action: "/inspections" },
     );
     onClose();
   }

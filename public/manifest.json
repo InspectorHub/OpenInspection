@@ -2,7 +2,7 @@
   "name": "OpenInspection",
   "short_name": "OpenInspection",
   "description": "Mobile-first property inspection field data collection",
-  "start_url": "/dashboard",
+  "start_url": "/inspections",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
@@ -24,10 +24,10 @@
   ],
   "shortcuts": [
     {
-      "name": "Dashboard",
-      "short_name": "Dashboard",
-      "url": "/dashboard",
-      "description": "Open inspector dashboard"
+      "name": "Inspections",
+      "short_name": "Inspections",
+      "url": "/inspections",
+      "description": "Open the inspections workspace"
     }
   ],
   "categories": ["business", "productivity", "utilities"]

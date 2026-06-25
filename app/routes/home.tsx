@@ -4,7 +4,7 @@ import { getToken } from "~/lib/session.server";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await getToken(context, request);
-  if (token) throw redirect("/dashboard");
+  if (token) throw redirect("/inspections");
   throw redirect("/login");
 }
 

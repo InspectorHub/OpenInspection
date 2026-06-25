@@ -3,7 +3,7 @@ import { buildCreateInspectionJson, dollarsToCents } from "~/lib/inspection-crea
 
 /**
  * B-8 fix — the New Inspection wizard posts { intent:"create", address,
- * templateId, date, time, inspectorId, ... } to the /dashboard action. The
+ * templateId, date, time, inspectorId, ... } to the /inspections action. The
  * action was missing a "create" branch (silent no-op). This helper maps the
  * wizard fields to the CreateInspectionSchema JSON the POST /api/inspections
  * endpoint expects (notably combining the date + time fields into one ISO).

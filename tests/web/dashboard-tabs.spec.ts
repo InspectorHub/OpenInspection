@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { tabMatches } from '~/routes/dashboard';
+import { tabMatches } from '~/routes/inspections';
 
 function insp(status: string, reportStatus = 'in_progress', paymentStatus?: string) {
   return { id: 'i1', date: null, address: null, clientName: null, status, reportStatus, paymentStatus };

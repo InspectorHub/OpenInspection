@@ -158,7 +158,7 @@ test.describe.serial('Standalone Browser Tests', () => {
     // ── Dashboard ─────────────────────────────────────────────────────────────
 
     test('UI-02: Dashboard renders stat cards', async ({ page }) => {
-        await gotoAuth(page, '/dashboard', adminToken);
+        await gotoAuth(page, '/inspections', adminToken);
         for (const id of ['statActive', 'statProgress', 'statReview', 'statCompleted']) {
             await expect(page.locator(`#${id}`), `Stat card #${id} missing`).toBeVisible({ timeout: 10000 });
         }
@@ -168,14 +168,14 @@ test.describe.serial('Standalone Browser Tests', () => {
     });
 
     test('UI-03: Dashboard shows created inspection', async ({ page }) => {
-        await gotoAuth(page, '/dashboard', adminToken);
+        await gotoAuth(page, '/inspections', adminToken);
         await page.waitForSelector('#inspectionsList tr:not(#loadingRow)', { timeout: 10000 });
         const row = page.locator('#inspectionsList tr', { hasText: '742 Evergreen Terrace' });
         await expect(row.first()).toBeVisible();
     });
 
     test('UI-04: Dashboard create modal has correct field labels', async ({ page }) => {
-        await gotoAuth(page, '/dashboard', adminToken);
+        await gotoAuth(page, '/inspections', adminToken);
         await page.waitForSelector('#inspectionsList', { timeout: 10000 });
         await page.click('button:has-text("New Inspection")');
         await expect(page.locator('#createModal')).toBeVisible({ timeout: 5000 });
@@ -189,7 +189,7 @@ test.describe.serial('Standalone Browser Tests', () => {
     });
 
     test('UI-05: Dashboard search filters inspections', async ({ page }) => {
-        await gotoAuth(page, '/dashboard', adminToken);
+        await gotoAuth(page, '/inspections', adminToken);
         await page.waitForSelector('#inspectionsList tr:not(#loadingRow)', { timeout: 10000 });
 
         await page.fill('#filterSearch', 'Evergreen');
@@ -328,7 +328,7 @@ test.describe.serial('Standalone Browser Tests', () => {
     // ── Full Jargon Scan ──────────────────────────────────────────────────────
 
     test('UI-16: No sci-fi jargon on any authenticated page', async ({ page }) => {
-        const pagesToCheck = ['/dashboard', '/library/templates', '/team', '/settings', '/library/agreements'];
+        const pagesToCheck = ['/inspections', '/library/templates', '/team', '/settings', '/library/agreements'];
 
         for (const path of pagesToCheck) {
             await gotoAuth(page, path, adminToken);
@@ -364,7 +364,7 @@ test.describe.serial('Standalone Browser Tests', () => {
 
     test('UI-NOTIFY: /notifications page renders + dashboard sidebar carries bell badge', async ({ page }) => {
         // 1. Dashboard sidebar contains the unread badge element
-        await gotoAuth(page, '/dashboard', adminToken);
+        await gotoAuth(page, '/inspections', adminToken);
         await expect(page.locator('#notifyUnreadBadge')).toBeAttached();
 
         // 2. /notifications page renders for an authenticated admin

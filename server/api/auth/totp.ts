@@ -278,7 +278,7 @@ export const totpRoutes = createApiRouter()
         }, keyring);
 
         setCookie(c, '__Host-inspector_token', sessionToken, authCookieOptions());
-        return c.json({ success: true, data: { redirect: '/dashboard' } }, 200);
+        return c.json({ success: true, data: { redirect: '/inspections' } }, 200);
     });
 
 export default totpRoutes;

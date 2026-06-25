@@ -34,9 +34,9 @@ test.describe('Branding System E2E', () => {
         // 3. Verify Dashboard (Still Default Branding)
         console.log('Verifying Dashboard defaults...');
         try {
-            await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 });
+            await expect(page).toHaveURL(/\/inspections/, { timeout: 15000 });
         } catch (e) {
-            console.error('Redirection to /dashboard failed. Current URL:', page.url());
+            console.error('Redirection to /inspections failed. Current URL:', page.url());
             await page.screenshot({ path: 'setup-failure.png' });
             throw e;
         }
@@ -77,7 +77,7 @@ test.describe('Branding System E2E', () => {
         
         // 6. Verify Propagation to Dashboard (BareLayout with Nav)
         console.log('Verifying logo presence in Dashboard Navigation...');
-        await page.goto('http://localhost:8789/dashboard');
+        await page.goto('http://localhost:8789/inspections');
         await expect(page.locator('nav img[alt="NitroInspect"]')).toBeVisible();
         
         // 7. Verify Propagation to Public Booking Page (MainLayout with Header)

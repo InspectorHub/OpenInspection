@@ -7,7 +7,7 @@ interface BackButtonProps {
 
 export function BackButton({ items, fallbackHref }: BackButtonProps) {
   const target = items && items.length >= 2 ? items[items.length - 2] : null;
-  const href = target?.href ?? fallbackHref ?? "/dashboard";
+  const href = target?.href ?? fallbackHref ?? "/inspections";
   const label = target?.label ?? "Back";
   return (
     <a

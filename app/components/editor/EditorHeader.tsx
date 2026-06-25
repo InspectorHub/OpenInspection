@@ -41,7 +41,7 @@ export function EditorHeader({
  {/* Left zone: navigation + identity + progress + save status + status badge */}
  <div className="flex items-center gap-3 min-w-0 flex-1">
  <a
-  href="/dashboard"
+  href="/inspections"
   className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
  >
   <svg

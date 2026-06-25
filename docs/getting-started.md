@@ -12,7 +12,7 @@ After deploying (see [`developers/02_deploy.md`](developers/02_deploy.md)), visi
 
 ### Core Workflow
 
-**1. Create an Inspection** — Dashboard (`/dashboard`) → **+ New Inspection**. Enter address, client info, select template, assign inspector, pick a date.
+**1. Create an Inspection** — Inspections (`/inspections`) → **+ New Inspection**. Enter address, client info, select template, assign inspector, pick a date.
 
 **2. Field Collection** — Open inspection → Field Form (`/inspections/:id/form`).
 - Rate items 1-5 via keyboard, `/` for canned comment picker (250+ pre-written)
@@ -127,7 +127,7 @@ Browser → single Worker (Hono entry):
 
 | Page | URL | Purpose |
 |---|---|---|
-| Dashboard | `/dashboard` | Inspection list, stats, filters |
+| Inspections | `/inspections` | Inspection list, stats, filters |
 | Inspection Editor | `/inspections/:id` | 3-pane editor with sections, items, photos |
 | Field Form | `/inspections/:id/form` | Mobile-first field collection |
 | Templates | `/templates` | Manage inspection checklists |
