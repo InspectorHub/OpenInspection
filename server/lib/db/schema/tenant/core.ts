@@ -58,7 +58,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // 'managed_shared' / 'managed_dedicated' = platform-provisioned pool numbers
     // (TCR-registered subaccount, per-tenant or shared). 'platform' is the legacy
     // first-party value; tenants no longer default to it (see #181 provider plan).
-    smsMode: text('sms_mode', { enum: ['platform', 'own', 'managed_shared', 'managed_dedicated'] }).notNull().default('own'),
+    smsMode: text('sms_mode', { enum: ['platform', 'own', 'managed_shared', 'managed_dedicated'] }).notNull().default('platform'),
     senderDisplayName: text('sender_display_name'),
     // 2026-06-14 — Point of Contact (Spectora parity). Single tenant-level
     // switch for who client-facing emails come from. Drives From display name

@@ -40,16 +40,6 @@ const KNOWN_ACCEPTED = {
   // with a cited reason — this list is the audited escape hatch, never a
   // dumping ground.
   colDiffs: {
-    // sms_mode default changed from 'platform' to 'own' (see #181 provider plan)
-    // after the 0003 rebuild baked 'platform' into the physical schema. D1 cannot
-    // ALTER a column default on an FK-referenced table without a full rebuild
-    // (PRAGMA foreign_keys=OFF unavailable on remote D1). Semantically safe:
-    // new tenants get 'own' from the application layer; existing rows keep
-    // 'platform' as their stored value which is still a valid enum member.
-    'tenant_configs': {
-      handOnly:      ["sms_mode:TEXT:nn=1:pk=0:dflt='platform'"],
-      generatedOnly: ["sms_mode:TEXT:nn=1:pk=0:dflt='own'"],
-    },
   },
 };
 
