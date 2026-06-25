@@ -45,6 +45,9 @@ export const INTEGRATION_SECRET_KEYS = [
     'TWILIO_ACCOUNT_SID',
     'TWILIO_AUTH_TOKEN',
     'TWILIO_FROM_NUMBER',
+    // Task 8 (#196) — Telnyx BYO provider credentials.
+    'TELNYX_API_KEY',
+    'TELNYX_FROM_NUMBER',
     'APP_BASE_URL',
 ] as const;
 
@@ -69,6 +72,8 @@ const KEY_FORMATS: Array<{ key: IntegrationSecretKey; re: RegExp; hint: string }
     { key: 'TWILIO_ACCOUNT_SID', re: /^AC[0-9a-fA-F]{32}$/, hint: 'must be an Account SID (starts with AC, 34 chars)' },
     { key: 'TWILIO_FROM_NUMBER', re: /^\+[1-9]\d{6,14}$/, hint: 'must be an E.164 number (e.g. +15551234567)' },
     // TWILIO_AUTH_TOKEN has no stable public prefix — not format-gated.
+    { key: 'TELNYX_FROM_NUMBER', re: /^\+[1-9]\d{6,14}$/, hint: 'must be an E.164 number (e.g. +15551234567)' },
+    // TELNYX_API_KEY has no stable public prefix — not format-gated.
 ];
 
 /** Returns the first format violation among NEW (non-masked) values, or null. */

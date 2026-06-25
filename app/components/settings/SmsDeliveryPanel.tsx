@@ -62,6 +62,7 @@ export function SmsDeliveryPanel({
   inboundUrl,
   smsTestFetcher,
   compliance,
+  byoProvider,
 }: {
   isSaas: boolean;
   smsMode: SmsModeValue;
@@ -73,6 +74,8 @@ export function SmsDeliveryPanel({
     TWILIO_ACCOUNT_SID: string;
     TWILIO_AUTH_TOKEN: string;
     TWILIO_FROM_NUMBER: string;
+    TELNYX_API_KEY: string;
+    TELNYX_FROM_NUMBER: string;
   };
   secretFieldError: (name: string) => string | undefined;
   secretFormError: (intent: string) => string | null;
@@ -81,6 +84,7 @@ export function SmsDeliveryPanel({
   inboundUrl: string;
   smsTestFetcher: SmsTestFetcher;
   compliance: { complianceStatus: ComplianceStatus; rejectionReason: string | null };
+  byoProvider?: "twilio" | "telnyx";
 }) {
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
@@ -209,6 +213,7 @@ export function SmsDeliveryPanel({
           showInboundUrl={showInboundUrl}
           inboundUrl={inboundUrl}
           smsTestFetcher={smsTestFetcher}
+          initialProvider={byoProvider ?? "twilio"}
         />
       </section>
   );

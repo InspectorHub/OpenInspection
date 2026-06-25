@@ -60,8 +60,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     mode: smsCfgBody?.data?.mode ?? "platform",
     effectiveSource: smsCfgBody?.data?.effectiveSource ?? "none",
   };
-  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null } }) : null;
+  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null; byoProvider?: "twilio" | "telnyx" | null } }) : null;
   const companyPhone = tenantCfgBody?.data?.companyPhone ?? "";
+  const byoProvider: "twilio" | "telnyx" = tenantCfgBody?.data?.byoProvider === "telnyx" ? "telnyx" : "twilio";
 
   // SMS compliance status (BYO Twilio toll-free verification). Fails gracefully
   // to not_started so the UI always has a defined value to render.
@@ -94,9 +95,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       TWILIO_ACCOUNT_SID: secrets.TWILIO_ACCOUNT_SID || "",
       TWILIO_AUTH_TOKEN: secrets.TWILIO_AUTH_TOKEN || "",
       TWILIO_FROM_NUMBER: secrets.TWILIO_FROM_NUMBER || "",
+      TELNYX_API_KEY: secrets.TELNYX_API_KEY || "",
+      TELNYX_FROM_NUMBER: secrets.TELNYX_FROM_NUMBER || "",
     },
     smsConfig,
     companyPhone,
+    byoProvider,
     compliance,
   };
 }
@@ -217,12 +221,29 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "save-sms-secrets") {
+    const rawProvider = form.get("byo_provider");
+    const byoProvider: "twilio" | "telnyx" =
+      rawProvider === "telnyx" ? "telnyx" : "twilio";
     const body: Record<string, string> = {};
-    for (const key of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"]) {
-      const v = form.get(key);
-      if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
+    if (byoProvider === "twilio") {
+      for (const key of ["TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_FROM_NUMBER"]) {
+        const v = form.get(key);
+        if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
+      }
+    } else {
+      for (const key of ["TELNYX_API_KEY", "TELNYX_FROM_NUMBER"]) {
+        const v = form.get(key);
+        if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
+      }
     }
-    return saveSecrets(api, intent, body, "Failed to save Twilio credentials.");
+    // Persist byo_provider on the tenant config alongside the secrets save.
+    const cfgRes = await api.admin["tenant-config"].$patch({
+      json: { byoProvider },
+    }).catch(() => null);
+    if (cfgRes && !cfgRes.ok) {
+      return { intent, ok: false, error: "Failed to save provider selection.", field: null, test: null };
+    }
+    return saveSecrets(api, intent, body, "Failed to save SMS credentials.");
   }
 
   if (intent === "test-sms") {
@@ -263,10 +284,11 @@ export default function SettingsCommunication() {
   const icsUrl = denied ? null : loaderResult.icsUrl;
   const googleCalendarConnected = denied ? false : loaderResult.googleCalendarConnected;
   const secrets = denied
-    ? { RESEND_API_KEY: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "" }
+    ? { RESEND_API_KEY: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "", TELNYX_API_KEY: "", TELNYX_FROM_NUMBER: "" }
     : loaderResult.secrets;
   const smsConfig = denied ? { mode: "platform" as const, effectiveSource: "none" as const } : loaderResult.smsConfig as { mode: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource: "platform" | "own" | "none" };
   const companyPhone = denied ? "" : loaderResult.companyPhone;
+  const byoProvider = denied ? ("twilio" as const) : loaderResult.byoProvider;
   const compliance = denied ? { complianceStatus: "not_started" as const, rejectionReason: null } : loaderResult.compliance;
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
@@ -433,6 +455,7 @@ export default function SettingsCommunication() {
         inboundUrl={inboundUrl}
         smsTestFetcher={smsTestFetcher}
         compliance={compliance}
+        byoProvider={byoProvider}
       />
 
       {/* Email templates */}

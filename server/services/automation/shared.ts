@@ -73,7 +73,7 @@ export interface HasDeliverSms {
         db: DrizzleD1Database,
         ctx: { log: typeof import('../../lib/db/schema').automationLogs.$inferSelect; automation: typeof automations.$inferSelect;
                inspection: typeof inspections.$inferSelect; tenant: typeof import('../../lib/db/schema').tenants.$inferSelect },
-        sms: { resolveCreds: (tenantId: string) => Promise<import('../../lib/sms/resolve-twilio').TwilioCreds | null> } | null | undefined,
+        sms: import('./sms').SmsRuntime,
         appName: string, appHost: string,
     ): Promise<void>;
 }

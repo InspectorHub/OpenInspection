@@ -128,6 +128,7 @@ const TenantConfigGetResponseSchema = z.object({
         smsMode: z.enum(['platform', 'own', 'managed_shared', 'managed_dedicated']).describe('Track L (D3) — SMS sender mode.'),
         companyPhone: z.string().nullable().optional().describe('Track L — call-back number rendered as {{company_phone}} in SMS copy.'),
         videoMode: z.enum(['r2', 'stream']).describe('Self-host video backend (default r2). Ignored in SaaS.'),
+        byoProvider: z.enum(['twilio', 'telnyx']).nullable().describe('BYO SMS provider selection (null = default Twilio).'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -163,6 +164,7 @@ const TenantConfigPatchSchema = z.object({
     smsMode: z.enum(['own', 'managed_shared', 'managed_dedicated']).optional().describe('Track L (D3) — Tenant SMS sender mode. "platform" is reserved for first-party use and is rejected when submitted by a tenant.'),
     companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),
     videoMode: z.enum(['r2', 'stream']).optional().describe('Self-host video backend: r2 (default, free) or stream (requires STREAM binding + customer subdomain).'),
+    byoProvider: z.enum(['twilio', 'telnyx']).optional().describe('BYO SMS provider selection — which provider adapter to use when smsMode is "own".'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -408,6 +410,7 @@ export const adminSettingsRoutes = createApiRouter()
                 smsMode: (config?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform',
                 companyPhone: (config?.companyPhone as string | null) ?? null,
                 videoMode: (config?.videoMode as 'r2' | 'stream') ?? 'r2',
+                byoProvider: (config?.byoProvider as 'twilio' | 'telnyx' | null) ?? null,
             },
         }, 200);
     })
@@ -450,6 +453,9 @@ export const adminSettingsRoutes = createApiRouter()
         }
         if (body.videoMode !== undefined) {
             update.videoMode = body.videoMode;
+        }
+        if (body.byoProvider !== undefined) {
+            update.byoProvider = body.byoProvider;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);

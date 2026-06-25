@@ -3,6 +3,7 @@ import { tenantConfigs } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import type { TwilioCreds } from '../messaging/twilio';
+import type { MessagingProvider } from '../messaging/provider';
 
 export type { TwilioCreds } from '../messaging/twilio';
 
@@ -65,6 +66,8 @@ export interface TwilioLoaderEnv {
 /**
  * Async loader for non-request contexts (cron flush): reads the tenant's sms_mode
  * + decrypted TWILIO_* secrets, applies resolveTwilio against the platform env.
+ * This function is Twilio-only and its behavior is byte-for-byte unchanged.
+ * Use loadProviderForTenant for provider-aware dispatch (BYO Twilio or Telnyx).
  */
 export async function loadTwilioForTenant(env: TwilioLoaderEnv, tenantId: string): Promise<TwilioCreds | null> {
     const db = drizzle(env.DB);
@@ -87,4 +90,64 @@ export async function loadTwilioForTenant(env: TwilioLoaderEnv, tenantId: string
             TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
         },
     );
+}
+
+export interface ResolvedProvider {
+    provider: MessagingProvider;
+    /** The from-number to pass to sendMessage. Null for Telnyx (provider uses its own creds internally). */
+    from: string | null;
+}
+
+/**
+ * Provider-aware loader: reads `byo_provider` from the tenant config to select
+ * between Twilio (default) and Telnyx. Returns a ResolvedProvider or null when
+ * no complete credential set is available (fail-closed).
+ *
+ * Twilio path (null | 'twilio'): delegates to resolveTwilio — same logic as
+ * loadTwilioForTenant, ensuring existing Twilio behavior is UNCHANGED.
+ * Telnyx path ('telnyx'): reads TELNYX_API_KEY + TELNYX_FROM_NUMBER from the
+ * tenant's encrypted secrets envelope; from is null (TelnyxProvider reads it).
+ */
+export async function loadProviderForTenant(env: TwilioLoaderEnv, tenantId: string): Promise<ResolvedProvider | null> {
+    const db = drizzle(env.DB);
+    const cfg = await db
+        .select({ smsMode: tenantConfigs.smsMode, byoProvider: tenantConfigs.byoProvider })
+        .from(tenantConfigs)
+        .where(eq(tenantConfigs.tenantId, tenantId))
+        .get()
+        .catch(() => null);
+    const mode = cfg?.smsMode ?? 'platform';
+    const byoProvider = cfg?.byoProvider ?? null;
+
+    const dec = (await loadTenantSecrets(
+        env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
+    ).catch(() => null)) ?? {};
+
+    if (byoProvider === 'telnyx') {
+        // Telnyx BYO path — only available in own mode with complete keys.
+        if (mode !== 'own') return null;
+        const apiKey = dec['TELNYX_API_KEY'];
+        const from = dec['TELNYX_FROM_NUMBER'];
+        if (!apiKey || !from) return null;
+        const { resolveProvider } = await import('../messaging/resolve-provider');
+        return { provider: resolveProvider('telnyx', { apiKey, from }), from: null };
+    }
+
+    // Twilio path (null, undefined, or 'twilio') — delegates to existing resolveTwilio.
+    const creds = resolveTwilio(
+        mode,
+        {
+            TWILIO_ACCOUNT_SID: dec['TWILIO_ACCOUNT_SID'],
+            TWILIO_AUTH_TOKEN: dec['TWILIO_AUTH_TOKEN'],
+            TWILIO_FROM_NUMBER: dec['TWILIO_FROM_NUMBER'],
+        },
+        {
+            TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
+            TWILIO_AUTH_TOKEN: env.TWILIO_AUTH_TOKEN,
+            TWILIO_FROM_NUMBER: env.TWILIO_FROM_NUMBER,
+        },
+    );
+    if (!creds) return null;
+    const { resolveProvider } = await import('../messaging/resolve-provider');
+    return { provider: resolveProvider('twilio', creds), from: creds.from };
 }

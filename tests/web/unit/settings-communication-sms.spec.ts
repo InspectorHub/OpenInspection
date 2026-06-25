@@ -128,9 +128,10 @@ describe('settings-communication action — SMS intents (Part D)', () => {
         expect(patchTenantConfig).toHaveBeenCalledWith({ json: { smsMode: 'own', companyPhone: '+15553334444' } });
     });
 
-    it('intent=save-sms-config clears companyPhone to null when blank', async () => {
+    it('intent=save-sms-config clears companyPhone to null when blank (invalid mode falls back to "own")', async () => {
+        // 'platform' is a first-party-only mode rejected by the action; it normalises to 'own'.
         await action(actionArgs({ intent: 'save-sms-config', smsMode: 'platform', companyPhone: '' }));
-        expect(patchTenantConfig).toHaveBeenCalledWith({ json: { smsMode: 'platform', companyPhone: null } });
+        expect(patchTenantConfig).toHaveBeenCalledWith({ json: { smsMode: 'own', companyPhone: null } });
     });
 
     it('intent=save-sms-secrets PUTs only the non-empty Twilio keys', async () => {
