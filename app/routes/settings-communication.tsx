@@ -13,7 +13,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { EmailDeliveryPanel } from "~/components/settings/EmailDeliveryPanel";
 import { EmailSecretsPanel } from "~/components/settings/EmailSecretsPanel";
-import { SmsDeliveryPanel } from "~/components/settings/SmsDeliveryPanel";
+import { SmsDeliveryPanel, type SmsModeValue } from "~/components/settings/SmsDeliveryPanel";
 import { GoogleCalendarPanel } from "~/components/settings/GoogleCalendarPanel";
 
 export function meta() {
@@ -55,12 +55,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const emailTemplates = (Array.isArray(tplBody.data) ? tplBody.data : []) as Array<{ trigger: string; name: string; category: string; required: boolean; enabled: boolean; isCustomized: boolean; subject: string }>;
 
   // Track L — SMS effective source (no secrets leaked) + tenant SMS config flags.
-  const smsCfgBody = smsCfgRes?.ok ? ((await smsCfgRes.json()) as { data?: { mode?: "platform" | "own"; effectiveSource?: "platform" | "own" | "none" } }) : null;
+  const smsCfgBody = smsCfgRes?.ok ? ((await smsCfgRes.json()) as { data?: { mode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource?: "platform" | "own" | "none" } }) : null;
   const smsConfig = {
     mode: smsCfgBody?.data?.mode ?? "platform",
     effectiveSource: smsCfgBody?.data?.effectiveSource ?? "none",
   };
-  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own"; companyPhone?: string | null } }) : null;
+  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null } }) : null;
   const companyPhone = tenantCfgBody?.data?.companyPhone ?? "";
 
   // SMS compliance status (BYO Twilio toll-free verification). Fails gracefully
@@ -201,7 +201,13 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   // ─── Track L — SMS settings ───────────────────────────────────────────────
   if (intent === "save-sms-config") {
-    const smsMode = form.get("smsMode") === "own" ? "own" : "platform";
+    // Pass through the three valid tenant modes; never submit "platform" (first-party only).
+    const rawMode = form.get("smsMode");
+    const VALID_TENANT_MODES = ["own", "managed_shared", "managed_dedicated"] as const;
+    type TenantSmsMode = typeof VALID_TENANT_MODES[number];
+    const smsMode: TenantSmsMode = (VALID_TENANT_MODES as ReadonlyArray<string>).includes(rawMode as string)
+      ? (rawMode as TenantSmsMode)
+      : "own";
     const companyPhone = String(form.get("companyPhone") ?? "").trim();
     const res = await api.admin["tenant-config"].$patch({
       json: { smsMode, companyPhone: companyPhone || null },
@@ -259,7 +265,7 @@ export default function SettingsCommunication() {
   const secrets = denied
     ? { RESEND_API_KEY: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "" }
     : loaderResult.secrets;
-  const smsConfig = denied ? { mode: "platform" as const, effectiveSource: "none" as const } : loaderResult.smsConfig;
+  const smsConfig = denied ? { mode: "platform" as const, effectiveSource: "none" as const } : loaderResult.smsConfig as { mode: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource: "platform" | "own" | "none" };
   const companyPhone = denied ? "" : loaderResult.companyPhone;
   const compliance = denied ? { complianceStatus: "not_started" as const, rejectionReason: null } : loaderResult.compliance;
   const actionData = useActionData<typeof action>();
@@ -286,7 +292,16 @@ export default function SettingsCommunication() {
   });
 
   const [mode, setMode] = useState<"platform" | "own">(isSaas ? config.emailMode : "own");
-  const [smsMode, setSmsMode] = useState<"platform" | "own">(isSaas ? smsConfig.mode : "own");
+  // SaaS default is managed_shared; standalone is always own (BYO-only).
+  // If the stored value is the legacy "platform" mode (first-party only), treat it
+  // as "managed_shared" for display purposes — tenants cannot select "platform".
+  const resolvedSmsMode: SmsModeValue =
+    !isSaas
+      ? "own"
+      : smsConfig.mode === "own" || smsConfig.mode === "managed_shared" || smsConfig.mode === "managed_dedicated"
+        ? smsConfig.mode
+        : "managed_shared";
+  const [smsMode, setSmsMode] = useState<SmsModeValue>(resolvedSmsMode);
   // Override toggle: ON when senderDisplayName is set AND differs from companyName.
   const [overrideName, setOverrideName] = useState<boolean>(
     !!config.senderDisplayName && config.senderDisplayName !== config.companyName
@@ -304,8 +319,8 @@ export default function SettingsCommunication() {
   const savingSmsConfig =
     nav.state !== "idle" && nav.formData?.get("intent") === "save-sms-config";
 
-  // Inbound webhook URL: own number (or standalone) tenants own STOP/START. The
-  // origin is resolved client-side; SaaS platform-number tenants don't see it.
+  // Inbound webhook URL: BYO tenants (own mode) and standalone deployments own STOP/START.
+  // Managed-number tenants don't set up their own inbound webhook.
   const showInboundUrl = !session?.branding.isSaas || smsMode === "own";
   const tenantSlug = session?.branding.tenantSlug ?? "";
   const inboundUrl =
