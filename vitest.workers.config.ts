@@ -44,6 +44,8 @@ export default defineConfig({
                 // The class is re-exported from test-worker.ts (required: main worker).
                 durableObjects: {
                     INSPECTION_DOC: 'InspectionDocDO',
+                    // Presence DO (WebSocket roster broadcast) — presence-do.spec.ts.
+                    INSPECTION_PRESENCE: 'InspectionPresenceDO',
                 },
             },
         }),

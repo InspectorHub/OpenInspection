@@ -2,10 +2,9 @@
  * Design System 0520 subsystem B phase 2 task 2.8 — Durable Object smoke
  * placeholder.
  *
- * Full DO integration testing requires `@cloudflare/vitest-pool-workers`
- * which is not yet set up in this repo's vitest config (the DOs import
- * `cloudflare:workers` which is unavailable in the default node env).
- * Until that pool lands, the DO behaviour is covered indirectly by:
+ * Real DO-runtime roster-broadcast coverage now lives in the workerd pool:
+ * tests/workers/presence-do.spec.ts (the DO imports `cloudflare:workers`,
+ * unavailable in this node env). The DO behaviour is additionally covered by:
  *
  *   1. The protocol helpers (tests/unit/presence-protocol.spec.ts) which
  *      verify the wire-format contract shared between the DO and the
@@ -14,11 +13,9 @@
  *      two browser windows to the same inspection and asserts roster
  *      synchronisation across them.
  *
- * This file exists so the test report explicitly lists the DO as covered
- * (even if by placeholder) — making the coverage gap visible at a glance
- * rather than silently absent. The static-source assertion below catches
- * regressions where someone refactors the file path / class name without
- * updating wrangler.jsonc's [[durable_objects.bindings]].
+ * This node-env file keeps only the static binding-contract checks below —
+ * they catch regressions where someone refactors the file path / class name
+ * without updating wrangler.jsonc's [[durable_objects.bindings]].
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -44,8 +41,4 @@ describe('Presence Durable Objects — smoke', () => {
         expect(cfg).toMatch(/"class_name":\s*"InspectionPresenceDO"/);
         expect(cfg).toMatch(/"class_name":\s*"TenantPresenceDO"/);
     });
-
-    // TODO(B2): wire @cloudflare/vitest-pool-workers and replace this stub
-    // with real WebSocket roster broadcast assertions.
-    it.skip('roster broadcast on join (placeholder — needs vitest-pool-workers)', () => {});
 });
