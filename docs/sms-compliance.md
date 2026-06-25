@@ -48,7 +48,15 @@ Replace `[Your Company]` with your business name wherever it appears. Remove the
 
 ## Step 3 — Wire up the URLs in OpenInspection
 
-Set two environment variables in your `wrangler.local.jsonc` (or `wrangler.saas.jsonc`) under `[vars]`, or via `wrangler secret put`:
+Set two environment variables in your `wrangler.local.jsonc` (or `wrangler.saas.jsonc`) under the `"vars"` object (these are plain configuration values, not secrets):
+
+```jsonc
+"vars": {
+  "PRIVACY_URL": "https://[your-domain]/privacy",
+  "TERMS_URL": "https://[your-domain]/terms"
+}
+```
+
 
 | Variable | Value |
 |---|---|
