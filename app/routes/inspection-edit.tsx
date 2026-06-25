@@ -47,6 +47,7 @@ import { AddMediaChooser } from "~/components/editor/AddMediaChooser";
 import { RecropWarningModal } from "~/components/editor/RecropWarningModal";
 import { StructureDeleteModal } from "~/components/editor/StructureDeleteModal";
 import { AddSectionPromptModal } from "~/components/editor/AddSectionPromptModal";
+import { AddItemTypeModal } from "~/components/editor/AddItemTypeModal";
 import { useStructureEdit } from "~/hooks/useStructureEdit";
 import { UnsavedChangesBlocker } from "~/components/editor/UnsavedChangesBlocker";
 import { PublishModal } from "~/components/editor/PublishModal";
@@ -1166,6 +1167,10 @@ export default function InspectionEditPage() {
  batchSelected={state.batchSelected}
  onBatchToggle={(id) => state.toggleBatchSelect(id)}
  onBatchRange={(from, to) => state.batchSelectRange(from, to)}
+ onAddItem={() => structure.openAddItemPrompt(state.currentSection?.id || "")}
+ onDuplicateItem={(itemId) => structure.duplicateItem(state.currentSection?.id || "", itemId)}
+ onDeleteItem={(itemId) => structure.deleteItem(state.currentSection?.id || "", itemId)}
+ onMoveItem={(itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir)}
  />
  );
 
@@ -1584,10 +1589,11 @@ export default function InspectionEditPage() {
  />
  )}
 
- {/* D8 — structural delete confirmation modal (NEVER window.confirm). */}
+ {/* D8 — structural delete confirmation modal (section OR item; NEVER window.confirm). */}
  <StructureDeleteModal
   open={Boolean(structure.deletePending)}
   title={structure.deletePending?.title ?? ""}
+  noun={structure.deletePending?.kind ?? "section"}
   impact={structure.deletePending?.impact ?? { items: 0, ratings: 0, notes: 0, photos: 0 }}
   onCancel={structure.cancelDelete}
   onConfirm={structure.confirmDelete}
@@ -1600,6 +1606,13 @@ export default function InspectionEditPage() {
   onChange={structure.setAddSectionTitle}
   onConfirm={structure.submitAddSection}
   onCancel={structure.closeAddSectionPrompt}
+ />
+
+ {/* D8 — "Add item" type-picker. */}
+ <AddItemTypeModal
+  open={Boolean(structure.addItemPending)}
+  onConfirm={structure.submitAddItem}
+  onCancel={structure.closeAddItemPrompt}
  />
 
  {/* Inspection settings sheet */}
