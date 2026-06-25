@@ -14,9 +14,11 @@ type CredBag = Partial<Record<'TWILIO_ACCOUNT_SID' | 'TWILIO_AUTH_TOKEN' | 'TWIL
  * otherwise platform env wins, with tenant creds as a last-resort fallback (so a
  * standalone operator who set keys via the Settings UI without flipping mode still
  * sends). Returns null when no complete credential set is resolvable (fail-closed).
+ * `managed_shared` / `managed_dedicated` fall through to platform creds here until
+ * the managed-pool builder is wired (later plan tasks).
  */
 export function resolveTwilio(
-    mode: 'platform' | 'own',
+    mode: 'platform' | 'own' | 'managed_shared' | 'managed_dedicated',
     tenant: CredBag,
     platform: CredBag,
 ): TwilioCreds | null {
@@ -34,9 +36,11 @@ export function resolveTwilio(
  * the Settings "effective source" line. Mirrors resolveTwilio's decision exactly
  * (own wins only with mode==='own' + complete tenant creds; else platform; else
  * tenant fallback; else none) WITHOUT exposing any secret value.
+ * Return type is the *effective credential source* (own/platform/none) — a different
+ * concept from the tenant's selected mode; do not conflate the two.
  */
 export function resolveTwilioSource(
-    mode: 'platform' | 'own',
+    mode: 'platform' | 'own' | 'managed_shared' | 'managed_dedicated',
     tenant: CredBag,
     platform: CredBag,
 ): 'own' | 'platform' | 'none' {
@@ -66,7 +70,7 @@ export async function loadTwilioForTenant(env: TwilioLoaderEnv, tenantId: string
     const db = drizzle(env.DB);
     const cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId)).get().catch(() => null);
-    const mode = (cfg?.smsMode as 'platform' | 'own') ?? 'platform';
+    const mode = cfg?.smsMode ?? 'own';
     const dec = (await loadTenantSecrets(
         env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
     ).catch(() => null)) ?? {};
