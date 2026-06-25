@@ -119,8 +119,11 @@ describe('RatingSystemService — seed + tenant scope', () => {
     it('makes default flag mutually exclusive within a tenant', async () => {
         await svc.seedDefaults(TENANT_A);
         const seed = (await svc.list(TENANT_A)).find(s => s.slug === 'trec')!;
-        const a = await svc.clone(seed.id, TENANT_A, 'A');
-        const b = await svc.clone(seed.id, TENANT_A, 'B');
+        // Pass explicit slugs: clone()'s default slug is `${src}-copy-${Date.now()}`,
+        // which collides when two clones land in the same millisecond (flaky slug
+        // conflict on the 2nd create). Distinct slugs make this deterministic.
+        const a = await svc.clone(seed.id, TENANT_A, 'A', 'rs-default-a');
+        const b = await svc.clone(seed.id, TENANT_A, 'B', 'rs-default-b');
         await svc.update(a.id, TENANT_A, { isDefault: true });
         await svc.update(b.id, TENANT_A, { isDefault: true });
 
