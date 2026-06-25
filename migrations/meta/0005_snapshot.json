@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e52691e4-c71b-4b3b-8a3c-86ebd7372306",
+  "id": "9eaa7761-2205-4968-a78a-5e67d955aa72",
   "prevId": "b9cd6306-c73c-481e-8e8a-eee1d58b384d",
   "tables": {
     "agreement_requests": {
@@ -6631,13 +6631,6 @@
           "autoincrement": false,
           "default": "'own'"
         },
-        "byo_provider": {
-          "name": "byo_provider",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "sender_display_name": {
           "name": "sender_display_name",
           "type": "text",
@@ -6870,6 +6863,13 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "byo_provider": {
+          "name": "byo_provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         }
       },

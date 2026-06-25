@@ -36,10 +36,21 @@ const KNOWN_ACCEPTED = {
   // schema, so no orphan tables remain. Re-add only with a cited, D1-unfixable
   // reason — this list is the audited escape hatch, never a dumping ground.
   lostTables: new Set([]),
-  // Per-table column-signature diffs accepted as D1-unfixable. Kept EMPTY for
-  // the same reason — frozen defaults were created correct in the fresh
-  // baseline, not ALTERed. Re-add only with a cited reason.
-  colDiffs: {},
+  // Per-table column-signature diffs accepted as D1-unfixable. Re-add only
+  // with a cited reason — this list is the audited escape hatch, never a
+  // dumping ground.
+  colDiffs: {
+    // sms_mode default changed from 'platform' to 'own' (see #181 provider plan)
+    // after the 0003 rebuild baked 'platform' into the physical schema. D1 cannot
+    // ALTER a column default on an FK-referenced table without a full rebuild
+    // (PRAGMA foreign_keys=OFF unavailable on remote D1). Semantically safe:
+    // new tenants get 'own' from the application layer; existing rows keep
+    // 'platform' as their stored value which is still a valid enum member.
+    'tenant_configs': {
+      handOnly:      ["sms_mode:TEXT:nn=1:pk=0:dflt='platform'"],
+      generatedOnly: ["sms_mode:TEXT:nn=1:pk=0:dflt='own'"],
+    },
+  },
 };
 
 // Regenerate the baseline from the CURRENT Drizzle schema so this doubles as a
