@@ -135,6 +135,29 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   return { ok: true as const, intent: "restructure" };
  }
 
+ // D8 — save the inspection's current structure back to its source template,
+ // or fork it into a new template. Reuses the existing template service.
+ if (intent === "save-structure-template") {
+  const snapshot = JSON.parse(String(formData.get("snapshot") ?? "{}"));
+  const mode = formData.get("mode") === "new" ? "new" : "back";
+  if (mode === "new") {
+   const name = String(formData.get("name") ?? "").trim() || "Custom Template";
+   const res = await api.inspections.templates.$post({ json: { name, schema: snapshot } });
+   return { ok: res.ok, intent: "save-structure-template" };
+  }
+  // mode === "back" — update the source template in place (PUT needs its name).
+  const templateId = String(formData.get("templateId") ?? "");
+  if (!templateId) return { ok: false as const, intent: "save-structure-template", error: "No source template" };
+  const tplRes = await api.inspections.templates[":id"].$get({ param: { id: templateId } });
+  let name = "Template";
+  if (tplRes.ok) {
+   const tb = (await tplRes.json()) as { data?: { name?: string } };
+   name = tb.data?.name ?? name;
+  }
+  const res = await api.inspections.templates[":id"].$put({ param: { id: templateId }, json: { name, schema: snapshot } });
+  return { ok: res.ok, intent: "save-structure-template" };
+ }
+
  if (intent === "toggle-auto-sign") {
  const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
  const res = await api.inspections[":id"].$patch({

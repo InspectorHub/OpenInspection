@@ -48,6 +48,7 @@ import { RecropWarningModal } from "~/components/editor/RecropWarningModal";
 import { StructureDeleteModal } from "~/components/editor/StructureDeleteModal";
 import { AddSectionPromptModal } from "~/components/editor/AddSectionPromptModal";
 import { AddItemTypeModal } from "~/components/editor/AddItemTypeModal";
+import { SaveTemplateModal } from "~/components/editor/SaveTemplateModal";
 import { useStructureEdit } from "~/hooks/useStructureEdit";
 import { UnsavedChangesBlocker } from "~/components/editor/UnsavedChangesBlocker";
 import { PublishModal } from "~/components/editor/PublishModal";
@@ -517,6 +518,7 @@ export default function InspectionEditPage() {
   rawSnapshot: loaderData.templateSnapshot,
   collabEditing: loaderData.collabEditing,
   results: state.results,
+  templateId: (state.inspection.templateId as string | null | undefined) ?? null,
  });
 
  /* Plan 7 — Stream customer subdomain (from loader env). Null ⇒ fail closed:
@@ -1150,6 +1152,8 @@ export default function InspectionEditPage() {
  onDuplicateSection={structure.duplicateSection}
  onDeleteSection={structure.deleteSection}
  onMoveSection={structure.moveSection}
+ onSaveToTemplate={structure.openSaveTemplate}
+ canSaveBack={structure.canSaveBack}
  />
  );
 
@@ -1613,6 +1617,15 @@ export default function InspectionEditPage() {
   open={Boolean(structure.addItemPending)}
   onConfirm={structure.submitAddItem}
   onCancel={structure.closeAddItemPrompt}
+ />
+
+ {/* D8 — save structure to template / as new template. */}
+ <SaveTemplateModal
+  mode={structure.saveTemplatePending?.mode ?? null}
+  name={structure.saveTemplateName}
+  onChangeName={structure.setSaveTemplateName}
+  onConfirm={structure.submitSaveTemplate}
+  onCancel={structure.closeSaveTemplate}
  />
 
  {/* Inspection settings sheet */}

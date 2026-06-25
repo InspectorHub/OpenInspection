@@ -16,6 +16,10 @@ interface SectionRailProps {
  // D8 — structural-edit callbacks (optional; hidden when absent)
  /** Add a new section at the end. */
  onAddSection?: () => void;
+ /** D8 — save the current structure to the source template ('back') or a new one ('new'). */
+ onSaveToTemplate?: (mode: "back" | "new") => void;
+ /** Whether the inspection has a source template (enables the 'back' action). */
+ canSaveBack?: boolean;
  /** Duplicate the section with the given id. */
  onDuplicateSection?: (id: string) => void;
  /** Delete the section with the given id. */
@@ -68,6 +72,8 @@ export function SectionRail({
  overviewActive = false,
  onSelectOverview,
  onAddSection,
+ onSaveToTemplate,
+ canSaveBack,
  onDuplicateSection,
  onDeleteSection,
  onMoveSection,
@@ -208,6 +214,28 @@ export function SectionRail({
    className="w-full text-left px-3 py-2 rounded-md text-[12px] text-ih-fg-4 border border-dashed border-ih-border hover:border-ih-primary hover:text-ih-primary transition-all"
   >
    + Add section
+  </button>
+  </div>
+ )}
+
+ {/* D8 — save the inspection's current structure to a template. */}
+ {onSaveToTemplate && (
+  <div className="p-2 pt-0 flex flex-col gap-1 border-t border-ih-border mt-1 pt-2">
+  {canSaveBack && (
+   <button
+    onClick={() => onSaveToTemplate("back")}
+    data-testid="save-template-back-btn"
+    className="w-full text-left px-3 py-1.5 rounded-md text-[11px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
+   >
+    Save structure → template
+   </button>
+  )}
+  <button
+   onClick={() => onSaveToTemplate("new")}
+   data-testid="save-template-new-btn"
+   className="w-full text-left px-3 py-1.5 rounded-md text-[11px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
+  >
+   Save as new template…
   </button>
   </div>
  )}

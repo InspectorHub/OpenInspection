@@ -28,6 +28,13 @@ export interface UseStructureEditOptions {
   collabEditing: boolean;
   /** Live results map from inspection state (used to compute delete impact). */
   results: Record<string, unknown>;
+  /** The inspection's source template id (enables "save structure back to template"). */
+  templateId?: string | null;
+}
+
+/** Open "save structure to template" modal state. */
+export interface SaveTemplatePending {
+  mode: "back" | "new";
 }
 
 export interface UseStructureEditReturn {
@@ -78,6 +85,19 @@ export interface UseStructureEditReturn {
   closeAddItemPrompt: () => void;
   /** Confirm the "Add item" prompt — adds the item (label+type) and closes the prompt. */
   submitAddItem: (label: string, type: ItemType) => void;
+  /** Whether the inspection has a source template (enables "Save → template"). */
+  canSaveBack: boolean;
+  /** Pending save-to-template modal state — non-null while the modal is open. */
+  saveTemplatePending: SaveTemplatePending | null;
+  /** Open the save-to-template modal in 'back' (update source) or 'new' (fork) mode. */
+  openSaveTemplate: (mode: "back" | "new") => void;
+  /** Close the save-to-template modal without saving. */
+  closeSaveTemplate: () => void;
+  /** Controlled name input for the 'new' template mode. */
+  saveTemplateName: string;
+  setSaveTemplateName: (value: string) => void;
+  /** Confirm the save-to-template modal — submits the action and closes. */
+  submitSaveTemplate: () => void;
 }
 
 /**
@@ -94,6 +114,7 @@ export function useStructureEdit({
   rawSnapshot,
   collabEditing,
   results,
+  templateId,
 }: UseStructureEditOptions): UseStructureEditReturn {
   // Hold the RAW snapshot in a ref so ops always operate on a clean
   // TemplateSchemaV2 object. Updated when loaderData refreshes after each
@@ -267,6 +288,36 @@ export function useStructureEdit({
     [addItemPending, applyStructure],
   );
 
+  // ── Save structure → template / as new template ─────────────────────────────
+  const [saveTemplatePending, setSaveTemplatePending] = useState<SaveTemplatePending | null>(null);
+  const [saveTemplateName, setSaveTemplateName] = useState("");
+
+  const openSaveTemplate = useCallback((mode: "back" | "new") => {
+    setSaveTemplateName("");
+    setSaveTemplatePending({ mode });
+  }, []);
+
+  const closeSaveTemplate = useCallback(() => {
+    setSaveTemplatePending(null);
+  }, []);
+
+  const submitSaveTemplate = useCallback(() => {
+    const pending = saveTemplatePending;
+    setSaveTemplatePending(null);
+    if (!pending) return;
+    const fields: Record<string, string> = {
+      intent: "save-structure-template",
+      mode: pending.mode,
+      snapshot: JSON.stringify(snapshotRef.current),
+    };
+    if (pending.mode === "new") {
+      fields.name = saveTemplateName.trim() || "Custom Template";
+    } else {
+      fields.templateId = templateId ?? "";
+    }
+    structureFetcher.submit(fields, { method: "post" });
+  }, [saveTemplatePending, saveTemplateName, templateId, structureFetcher]);
+
   return {
     snapshotRef,
     applyStructure,
@@ -291,5 +342,13 @@ export function useStructureEdit({
     openAddItemPrompt,
     closeAddItemPrompt,
     submitAddItem,
+    // save-to-template
+    canSaveBack: Boolean(templateId),
+    saveTemplatePending,
+    openSaveTemplate,
+    closeSaveTemplate,
+    saveTemplateName,
+    setSaveTemplateName,
+    submitSaveTemplate,
   };
 }
