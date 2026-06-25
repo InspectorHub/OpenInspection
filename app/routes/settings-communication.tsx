@@ -35,13 +35,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
 
-  // Fetch communication config + secrets + email templates + SMS config/tenant-config in parallel
-  const [commRes, secretsRes, tplRes, smsCfgRes, tenantCfgRes] = await Promise.all([
+  // Fetch communication config + secrets + email templates + SMS config/tenant-config/compliance in parallel
+  const [commRes, secretsRes, tplRes, smsCfgRes, tenantCfgRes, smsComplianceRes] = await Promise.all([
     api.admin.communication.$get().catch(() => null),
     api.secrets.secrets.$get().catch(() => null),
     api.emailTemplates["email-templates"].$get().catch(() => null),
     api.smsAdmin.sms.config.$get().catch(() => null),
     api.admin["tenant-config"].$get().catch(() => null),
+    api.smsAdmin.sms.compliance.$get().catch(() => null),
   ]);
 
   const commBody = commRes?.ok ? ((await commRes.json()) as Record<string, unknown>) : {};
@@ -61,6 +62,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   };
   const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own"; companyPhone?: string | null } }) : null;
   const companyPhone = tenantCfgBody?.data?.companyPhone ?? "";
+
+  // SMS compliance status (BYO Twilio toll-free verification). Fails gracefully
+  // to not_started so the UI always has a defined value to render.
+  type ComplianceStatus = "not_started" | "profile_pending" | "brand_pending" | "campaign_pending" | "tfv_pending" | "approved" | "rejected";
+  const smsComplianceBody = smsComplianceRes?.ok
+    ? ((await smsComplianceRes.json()) as { data?: { complianceStatus?: ComplianceStatus | null; rejectionReason?: string | null } })
+    : null;
+  const compliance = {
+    complianceStatus: (smsComplianceBody?.data?.complianceStatus ?? "not_started") as ComplianceStatus,
+    rejectionReason: smsComplianceBody?.data?.rejectionReason ?? null,
+  };
 
   return {
     config: {
@@ -85,6 +97,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     },
     smsConfig,
     companyPhone,
+    compliance,
   };
 }
 
@@ -248,6 +261,7 @@ export default function SettingsCommunication() {
     : loaderResult.secrets;
   const smsConfig = denied ? { mode: "platform" as const, effectiveSource: "none" as const } : loaderResult.smsConfig;
   const companyPhone = denied ? "" : loaderResult.companyPhone;
+  const compliance = denied ? { complianceStatus: "not_started" as const, rejectionReason: null } : loaderResult.compliance;
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const resendTestFetcher = useFetcher<typeof action>();
@@ -403,6 +417,7 @@ export default function SettingsCommunication() {
         showInboundUrl={showInboundUrl}
         inboundUrl={inboundUrl}
         smsTestFetcher={smsTestFetcher}
+        compliance={compliance}
       />
 
       {/* Email templates */}

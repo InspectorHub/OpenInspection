@@ -5,6 +5,32 @@ import type { action } from "~/routes/settings-communication";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
+type ComplianceStatus =
+  | "not_started"
+  | "profile_pending"
+  | "brand_pending"
+  | "campaign_pending"
+  | "tfv_pending"
+  | "approved"
+  | "rejected";
+
+/**
+ * Maps a complianceStatus value to a short human-readable label.
+ * pending-family statuses all collapse to "Pending" (toll-free verification,
+ * brand/campaign registration are all intermediate states).
+ */
+function complianceLabel(status: ComplianceStatus | null): string {
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Rejected";
+  if (
+    status === "profile_pending" ||
+    status === "brand_pending" ||
+    status === "campaign_pending" ||
+    status === "tfv_pending"
+  ) return "Pending";
+  return "Not started";
+}
+
 /**
  * Settings → Communication: "SMS delivery" section (Track L). Presentational —
  * owns the section wrapper, mode/company-phone form, and renders the Twilio
@@ -25,6 +51,7 @@ export function SmsDeliveryPanel({
   showInboundUrl,
   inboundUrl,
   smsTestFetcher,
+  compliance,
 }: {
   isSaas: boolean;
   smsMode: "platform" | "own";
@@ -43,6 +70,7 @@ export function SmsDeliveryPanel({
   showInboundUrl: boolean;
   inboundUrl: string;
   smsTestFetcher: SmsTestFetcher;
+  compliance: { complianceStatus: ComplianceStatus; rejectionReason: string | null };
 }) {
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
@@ -86,6 +114,29 @@ export function SmsDeliveryPanel({
                 ? "Using platform SMS"
                 : "SMS not configured — set your Twilio credentials below"}
           </p>
+
+          {/* BYO Twilio compliance status — only shown when tenant uses own Twilio */}
+          {smsConfig.effectiveSource === "own" && (
+            <div className="space-y-1">
+              <p className="text-[11px] text-ih-fg-3">
+                Toll-free verification:{" "}
+                <span
+                  className={`font-bold ${
+                    compliance.complianceStatus === "approved"
+                      ? "text-ih-ok-fg"
+                      : compliance.complianceStatus === "rejected"
+                        ? "text-ih-bad-fg"
+                        : "text-ih-fg-2"
+                  }`}
+                >
+                  {complianceLabel(compliance.complianceStatus)}
+                </span>
+              </p>
+              {compliance.complianceStatus === "rejected" && compliance.rejectionReason && (
+                <p className="text-[11px] text-ih-bad-fg">{compliance.rejectionReason}</p>
+              )}
+            </div>
+          )}
 
           <div>
             <label htmlFor="companyPhone" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Company phone</label>
