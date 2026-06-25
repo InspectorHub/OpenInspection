@@ -44,5 +44,6 @@
   "app/routes/settings-communication.tsx": 433,
   "app/components/media-studio/VideoCapture.tsx": 432,
   "app/routes/templates.tsx": 414,
-  "server/lib/email-templates/registry.ts": 413
+  "server/lib/email-templates/registry.ts": 413,
+  "server/api/sms.ts": 436
 }
