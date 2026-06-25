@@ -119,6 +119,69 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  return { ok: res.ok, intent: "annotate" };
  }
 
+ // D8 — structural-edit pipeline: persist the next snapshot + optionally
+ // converge the DO so live collab clients resync.
+ // NOTE the two calls below sit behind DIFFERENT authorization surfaces: the
+ // template-snapshot PATCH is tenant-role gated (owner/manager/inspector),
+ // while collab/restructure is assignment-scoped (canAccessInspectionCollab).
+ // They cannot diverge in the common case (the editor only loads for an
+ // authorized user), but if the collab ping is refused we must NOT report a
+ // clean convergence over a drifted doc — see the status check below.
+ if (intent === "restructure") {
+  const id = params.id;
+  const snapshot = JSON.parse(String(formData.get("snapshot") ?? "{}"));
+  await api.inspections[":id"]["template-snapshot"].$patch({ param: { id }, json: { snapshot } });
+  if (formData.get("collab") === "1") {
+   try {
+    const res = await api.inspections[":id"].collab.restructure.$post({ param: { id } });
+    // 501 = DO binding absent / collab off — tolerated (single-client
+    // fallback; revalidation still refreshes this editor). Any OTHER non-ok
+    // (e.g. 403 when this user isn't authorized for collab on this
+    // inspection) means D1 changed but the live DO did NOT converge: surface
+    // it instead of presenting a converged-looking UI over a drifted doc.
+    if (!res.ok && res.status !== 501) {
+     return {
+      ok: false as const,
+      intent: "restructure",
+      error: "Structure saved, but live sync did not converge. Reload to continue editing.",
+     };
+    }
+   } catch {
+    // network / binding exception — revalidation still refreshes editor state.
+   }
+  }
+  return { ok: true as const, intent: "restructure" };
+ }
+
+ // D8 — save the inspection's current structure back to its source template,
+ // or fork it into a new template. Reuses the existing template service.
+ if (intent === "save-structure-template") {
+  const snapshot = JSON.parse(String(formData.get("snapshot") ?? "{}"));
+  const mode = formData.get("mode") === "new" ? "new" : "back";
+  if (mode === "new") {
+   const name = String(formData.get("name") ?? "").trim() || "Custom Template";
+   const res = await api.inspections.templates.$post({ json: { name, schema: snapshot } });
+   return { ok: res.ok, intent: "save-structure-template" };
+  }
+  // mode === "back" — update the source template in place (PUT needs its name).
+  const templateId = String(formData.get("templateId") ?? "");
+  if (!templateId) return { ok: false as const, intent: "save-structure-template", error: "No source template" };
+  // Fetch the source name for the PUT. If we cannot resolve it, FAIL the save
+  // rather than PUT a placeholder name — silently renaming the source template
+  // would be a surprising, hard-to-undo side effect.
+  const tplRes = await api.inspections.templates[":id"].$get({ param: { id: templateId } });
+  if (!tplRes.ok) {
+   return { ok: false as const, intent: "save-structure-template", error: "Could not load the source template to update it." };
+  }
+  const tb = (await tplRes.json()) as { data?: { name?: string } };
+  const name = tb.data?.name?.trim();
+  if (!name) {
+   return { ok: false as const, intent: "save-structure-template", error: "The source template has no name." };
+  }
+  const res = await api.inspections.templates[":id"].$put({ param: { id: templateId }, json: { name, schema: snapshot } });
+  return { ok: res.ok, intent: "save-structure-template" };
+ }
+
  if (intent === "toggle-auto-sign") {
  const autoSignOnPublish = formData.get("autoSignOnPublish") === "true";
  const res = await api.inspections[":id"].$patch({

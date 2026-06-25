@@ -50,12 +50,12 @@ describe('EmailService — concierge templates (A3)', () => {
             clientName: 'Sarah Buyer',
             propertyAddress: '1 Main St',
             date: '2026-06-15',
-            reviewUrl: 'https://acme.example.com/dashboard',
+            reviewUrl: 'https://acme.example.com/inspections',
         });
         expect(captured.body.to).toEqual(['mike@acme.com']);
         expect(captured.body.subject).toMatch(/awaiting your review/i);
         expect(captured.body.html).toContain('Sarah Buyer');
-        expect(captured.body.html).toContain('https://acme.example.com/dashboard');
+        expect(captured.body.html).toContain('https://acme.example.com/inspections');
     });
 
     it('sendConciergeConfirmedToAgent posts a confirmation summary', async () => {

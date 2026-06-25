@@ -597,7 +597,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
             }, zeroCounts());
 
         const defectAggregate = {
-            // Maps to the 4 top cards on /dashboard.
+            // Maps to the 4 top cards on /inspections.
             //   later          → "Upcoming"
             //   thisWeek       → "In Progress"
             //   needsAttention → "Needs Attention"

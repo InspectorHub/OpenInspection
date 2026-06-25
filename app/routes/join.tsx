@@ -70,7 +70,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       const { createSessionWithToken: createSession } = await import(
         "~/lib/session.server"
       );
-      return createSession(context, jwt, "/dashboard");
+      return createSession(context, jwt, "/inspections");
     }
 
     return redirect("/login");

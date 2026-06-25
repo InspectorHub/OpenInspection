@@ -13,6 +13,7 @@ import { Errors } from '../../lib/errors';
 import { getCookie } from 'hono/cookie';
 import { verifyObserverCookie } from '../../lib/observer-cookie';
 import { OBSERVER_COOKIE_NAME } from '../../lib/middleware/observer-cookie';
+import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
@@ -431,15 +432,8 @@ const coreRoutes = createApiRouter()
                 return new Response('not found', { status: 404 });
             }
 
-            let helpers: string[] = [];
-            try {
-                const parsed = JSON.parse(ins.helperInspectorIds ?? '[]');
-                if (Array.isArray(parsed)) helpers = parsed as string[];
-            } catch { /* malformed — treat as no helpers */ }
-
-            const allowed = ins.inspectorId === userId
-                         || ins.leadInspectorId === userId
-                         || helpers.includes(userId);
+            const userRole = c.get('userRole') as string | undefined;
+            const allowed = canAccessInspectionCollab(ins, { id: userId, role: userRole ?? '' });
             if (!allowed) return new Response('forbidden', { status: 403 });
 
             attachUserId = userId;

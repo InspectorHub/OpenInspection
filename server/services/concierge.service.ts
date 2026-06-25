@@ -212,7 +212,7 @@ export class ConciergeService {
                 clientName: params.clientName,
                 propertyAddress: params.propertyAddress,
                 date: params.date,
-                reviewUrl: `${this.appBaseUrl.replace(/\/$/, '')}/dashboard`,
+                reviewUrl: `${this.appBaseUrl.replace(/\/$/, '')}/inspections`,
             });
         } catch (err) {
             logger.warn('concierge.inspectorReviewEmail.failed', {

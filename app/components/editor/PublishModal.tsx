@@ -5,9 +5,13 @@ export interface PublishModalProps {
  isSubmitting: boolean;
  onClose: () => void;
  onPublish: () => void;
+ /** Whether to auto-sign the report on publish. */
+ autoSign: boolean;
+ /** Handler for the auto-sign checkbox. */
+ onAutoSignToggle: (checked: boolean) => void;
 }
 
-export function PublishModal({ progress, status, publishError, isSubmitting, onClose, onPublish }: PublishModalProps) {
+export function PublishModal({ progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle }: PublishModalProps) {
  return (
  <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
  <div className="absolute inset-0 bg-[rgba(15,23,42,0.6)] backdrop-blur-sm" onClick={onClose} />
@@ -31,6 +35,15 @@ export function PublishModal({ progress, status, publishError, isSubmitting, onC
  {publishError}
  </div>
  )}
+ <label className="mt-4 inline-flex items-center gap-2 text-[12px] font-medium text-ih-fg-3 cursor-pointer select-none">
+ <input
+  type="checkbox"
+  checked={autoSign}
+  onChange={(e) => onAutoSignToggle(e.target.checked)}
+  className="h-3.5 w-3.5 rounded border-ih-border-strong text-ih-primary"
+ />
+ Auto-sign this report on publish
+ </label>
  <div className="flex justify-end gap-2 mt-5">
  <button onClick={onClose} className="px-4 py-2 text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted rounded-md">Cancel</button>
  <button

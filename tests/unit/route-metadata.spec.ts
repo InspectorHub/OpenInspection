@@ -41,7 +41,7 @@ const SKIP_MODULES = new Set([
     '/2fa',
     // Misc page routes (HTML pages outside the API surface)
     '/settings',
-    '/dashboard',
+    '/inspections',
     '/agent-dashboard',
     '/book',
     '/auth',

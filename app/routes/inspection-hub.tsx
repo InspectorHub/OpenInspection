@@ -981,7 +981,7 @@ export function ErrorBoundary() {
     <div className="max-w-[1080px] mx-auto pt-16 px-9 flex flex-col items-center gap-3 text-center">
       <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
       <Link
-        to="/dashboard"
+        to="/inspections"
         className="h-9 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600"
       >
         Back to Dashboard

@@ -51,7 +51,7 @@ body:
       label: Steps to reproduce
       description: Numbered steps. Include the URL, role, and any seed data needed.
       placeholder: |
-        1. Go to /dashboard
+        1. Go to /inspections
         2. Open inspection X
         3. Click Publish
         4. ...

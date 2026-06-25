@@ -27,6 +27,8 @@ import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
 import { SideRail } from "~/components/editor/SideRail";
 import { SpeedMode } from "~/components/editor/SpeedMode";
 import { FooterBar } from "~/components/editor/FooterBar";
+import { BatchActionBar } from "~/components/editor/BatchActionBar";
+import { capturePriorRatings } from "~/lib/editor/batch-undo";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
@@ -43,6 +45,11 @@ import { preprocessImage } from "~/components/media-studio/preprocessImage";
 import { PublishGateModal } from "~/components/editor/PublishGateModal";
 import { AddMediaChooser } from "~/components/editor/AddMediaChooser";
 import { RecropWarningModal } from "~/components/editor/RecropWarningModal";
+import { StructureDeleteModal } from "~/components/editor/StructureDeleteModal";
+import { AddSectionPromptModal } from "~/components/editor/AddSectionPromptModal";
+import { AddItemTypeModal } from "~/components/editor/AddItemTypeModal";
+import { SaveTemplateModal } from "~/components/editor/SaveTemplateModal";
+import { useStructureEdit } from "~/hooks/useStructureEdit";
 import { UnsavedChangesBlocker } from "~/components/editor/UnsavedChangesBlocker";
 import { PublishModal } from "~/components/editor/PublishModal";
 import { SignModal } from "~/components/editor/SignModal";
@@ -502,6 +509,17 @@ export default function InspectionEditPage() {
  // DB-16 — dedicated fetcher for set/clear report cover (avoids the
  // shared-fetcher abort hazard; the loader revalidates the cover after).
  const coverFetcher = useFetcher();
+
+ /* ---------------------------------------------------------------- */
+ /* D8 — structural editing (section add/dup/delete/move)           */
+ /* ---------------------------------------------------------------- */
+
+ const structure = useStructureEdit({
+  rawSnapshot: loaderData.templateSnapshot,
+  collabEditing: loaderData.collabEditing,
+  results: state.results,
+  templateId: (state.inspection.templateId as string | null | undefined) ?? null,
+ });
 
  /* Plan 7 — Stream customer subdomain (from loader env). Null ⇒ fail closed:
   * video posters/players render a graceful "unavailable" state, never a
@@ -1078,13 +1096,8 @@ export default function InspectionEditPage() {
  if (!state.activeItemId) return;
  setTagPickerOpen(true);
  },
- onSetViewMode: (mode: "split" | "focus" | "preview") => {
- if (mode === "preview") {
- window.open(`/inspections/${state.inspection.id}/preview`, "_blank");
- return;
- }
- state.setViewMode(mode);
- },
+ onToggleFullscreen: () => state.setItemFullscreen(!state.itemFullscreen),
+ onExitFullscreen: () => { if (state.itemFullscreen) state.setItemFullscreen(false); }, // guard: bare Escape (not fullscreen) = no-op
  }),
  [
  state,
@@ -1127,11 +1140,20 @@ export default function InspectionEditPage() {
  activeSection={state.currentSection?.id || ""}
  onSelect={(id) => {
  state.selectSectionById(id);
+ state.setActiveView("items");
  if (isMobile) setMobileDrawer(null);
  }}
  results={state.results}
  sectionProgress={state.sectionProgress}
  sectionDefectCount={state.sectionDefectCount}
+ overviewActive={state.activeView === "property"}
+ onSelectOverview={() => state.setActiveView("property")}
+ onAddSection={structure.addSection}
+ onDuplicateSection={structure.duplicateSection}
+ onDeleteSection={structure.deleteSection}
+ onMoveSection={structure.moveSection}
+ onSaveToTemplate={structure.openSaveTemplate}
+ canSaveBack={structure.canSaveBack}
  />
  );
 
@@ -1148,6 +1170,11 @@ export default function InspectionEditPage() {
  batchMode={state.batchMode}
  batchSelected={state.batchSelected}
  onBatchToggle={(id) => state.toggleBatchSelect(id)}
+ onBatchRange={(from, to) => state.batchSelectRange(from, to)}
+ onAddItem={() => structure.openAddItemPrompt(state.currentSection?.id || "")}
+ onDuplicateItem={(itemId) => structure.duplicateItem(state.currentSection?.id || "", itemId)}
+ onDeleteItem={(itemId) => structure.deleteItem(state.currentSection?.id || "", itemId)}
+ onMoveItem={(itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir)}
  />
  );
 
@@ -1344,9 +1371,9 @@ export default function InspectionEditPage() {
  sectionTitle={state.currentSection?.title ?? ''}
  itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? 'Select an item'}
  onBack={() => {
-  // B-22: back from item editor → item list; back from list → dashboard
+  // B-22: back from item editor → item list; back from list → inspections
   if (state.activeItemId) { state.setActiveItemId(null); return; }
-  navigate('/dashboard');
+  navigate('/inspections');
  }}
  onMore={() => { /* future: open more menu */ }}
  />
@@ -1566,6 +1593,41 @@ export default function InspectionEditPage() {
  />
  )}
 
+ {/* D8 — structural delete confirmation modal (section OR item; NEVER window.confirm). */}
+ <StructureDeleteModal
+  open={Boolean(structure.deletePending)}
+  title={structure.deletePending?.title ?? ""}
+  noun={structure.deletePending?.kind ?? "section"}
+  impact={structure.deletePending?.impact ?? { items: 0, ratings: 0, notes: 0, photos: 0 }}
+  onCancel={structure.cancelDelete}
+  onConfirm={structure.confirmDelete}
+ />
+
+ {/* D8 — "Add section" title prompt. */}
+ <AddSectionPromptModal
+  open={structure.addSectionPromptOpen}
+  value={structure.addSectionTitle}
+  onChange={structure.setAddSectionTitle}
+  onConfirm={structure.submitAddSection}
+  onCancel={structure.closeAddSectionPrompt}
+ />
+
+ {/* D8 — "Add item" type-picker. */}
+ <AddItemTypeModal
+  open={Boolean(structure.addItemPending)}
+  onConfirm={structure.submitAddItem}
+  onCancel={structure.closeAddItemPrompt}
+ />
+
+ {/* D8 — save structure to template / as new template. */}
+ <SaveTemplateModal
+  mode={structure.saveTemplatePending?.mode ?? null}
+  name={structure.saveTemplateName}
+  onChangeName={structure.setSaveTemplateName}
+  onConfirm={structure.submitSaveTemplate}
+  onCancel={structure.closeSaveTemplate}
+ />
+
  {/* Inspection settings sheet */}
  <InspectionSettingsSheet
  open={state.settingsOpen}
@@ -1617,6 +1679,8 @@ export default function InspectionEditPage() {
  setPublishError(null);
  publishFetcher.submit({ intent: "publish" }, { method: "post" });
  }}
+ autoSign={autoSign}
+ onAutoSignToggle={handleAutoSignToggle}
  />
  )}
 
@@ -1727,8 +1791,6 @@ export default function InspectionEditPage() {
  state={state}
  scheme={scheme}
  setColorScheme={setColorScheme}
- autoSign={autoSign}
- handleAutoSignToggle={handleAutoSignToggle}
  tenantSlug={loaderData.tenantSlug}
  setSignModalOpen={setSignModalOpen}
  handlePublishClick={handlePublishClick}
@@ -1746,36 +1808,12 @@ export default function InspectionEditPage() {
  </div>
  ) : (
  <>
- {/* Column 1: Section Rail (200px) */}
- {sectionRailEl}
+ {/* Column 1: Section Rail (200px) — hidden in fullscreen */}
+ {!state.itemFullscreen && sectionRailEl}
 
- {/* Column 2: Item List (280px) OR Property Info */}
+ {/* Column 2: Item List (280px, items-only) — hidden in fullscreen */}
+ {!state.itemFullscreen && (
  <div className="w-[280px] flex-shrink-0 border-r border-ih-border flex flex-col overflow-hidden relative">
- {/* View toggle (Items / Property) */}
- <div className="flex items-center border-b border-ih-border">
- <button
- onClick={() => state.setActiveView("items")}
- className={`flex-1 py-2 text-[11px] font-bold text-center ${state.activeView === "items" ? "text-ih-primary border-b-2 border-ih-primary" : "text-ih-fg-3"}`}
- >Items</button>
- <button
- onClick={() => state.setActiveView("property")}
- className={`flex-1 py-2 text-[11px] font-bold text-center ${state.activeView === "property" ? "text-ih-primary border-b-2 border-ih-primary" : "text-ih-fg-3"}`}
- >Property</button>
- </div>
- {state.activeView === "property" ? (
- <div className="flex-1 overflow-y-auto">
- <PropertyInfoForm
- inspection={state.inspection}
- onSave={(fieldId, value) => {
- state.setInspection((prev) => ({
- ...prev,
- [fieldId]: value,
- }));
- }}
- />
- </div>
- ) : (
- <>
  {/* Item filter tabs */}
  <div className="flex items-center gap-1 px-3 py-1.5 border-b border-ih-border">
  {(["all", "unrated", "issues", "flagged"] as const).map((f) => (
@@ -1797,60 +1835,93 @@ export default function InspectionEditPage() {
  </button>
  ))}
  </div>
- {state.batchMode && (
- <div className="flex items-center gap-1 px-3 py-1 border-b border-ih-border">
-  <button
-  onClick={() => state.batchSelectAll()}
-  className="px-2 py-0.5 rounded text-[11px] font-bold text-ih-primary hover:bg-ih-primary-tint"
-  >
-  Select All
-  </button>
-  <button
-  onClick={() => state.setBatchSelected({})}
-  className="px-2 py-0.5 rounded text-[11px] font-bold text-ih-fg-3 hover:text-ih-fg-2"
-  >
-  Clear
-  </button>
- </div>
- )}
  {itemListEl}
- {state.batchMode && state.selectedBatchCount > 0 && (
- <div className="absolute bottom-0 left-0 right-0 bg-ih-bg-card border-t border-ih-border p-2 flex items-center gap-2">
-  <span className="text-[11px] font-bold text-ih-fg-2">{state.selectedBatchCount} selected</span>
-  <div className="flex gap-1 ml-auto">
-  {state.ratingLevels.slice(0, 5).map((level, idx) => (
-   <button
-   key={level.id}
-   onClick={() => findings.batchSetRating(state.currentSection?.id || "", state.currentSectionItems, state.batchSelected, level.id)}
-   className="w-7 h-7 rounded text-[10px] font-bold"
-   style={{ background: state.getRatingColor(level.id), color: "white" }}
-   >
-   {idx + 1}
-   </button>
-  ))}
-  </div>
-  <button
-  onClick={() => { state.setBatchMode(false); state.setBatchSelected({}); }}
-  className="text-[11px] text-ih-fg-3 hover:text-ih-fg-1"
-  >
-  Cancel
-  </button>
  </div>
  )}
- </>
- )}
- </div>
 
- {/* Column 3: Item Editor (flex-1, focal) */}
+ {/* Column 3: Item Editor (flex-1, focal) or Inspection Details overview — always rendered */}
  <main className="flex-1 overflow-y-auto border-t-2 border-ih-primary p-6">
- {itemEditorEl}
+ {state.activeView === "property" ? (
+  <PropertyInfoForm
+  inspection={state.inspection}
+  onSave={(fieldId, value) => {
+  state.setInspection((prev) => ({
+   ...prev,
+   [fieldId]: value,
+  }));
+  }}
+  />
+ ) : itemEditorEl}
  </main>
 
- {/* Column 4: SideRail */}
- {sideRailEl}
+ {/* Column 4: SideRail — hidden in fullscreen; collapsible otherwise */}
+ {!state.itemFullscreen && (
+  state.sideRailCollapsed ? (
+  <div className="w-8 flex-shrink-0 border-l border-ih-border flex flex-col items-center pt-3">
+   <button
+   type="button"
+   onClick={() => state.setSideRailCollapsed(false)}
+   className="w-7 h-7 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
+   title="Expand photo rail"
+   >
+   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+   </svg>
+   </button>
+  </div>
+  ) : (
+  <div className="relative flex-shrink-0">
+   <button
+   type="button"
+   onClick={() => state.setSideRailCollapsed(true)}
+   className="absolute top-3 left-1 z-10 w-6 h-6 rounded-md flex items-center justify-center text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-fg-2"
+   title="Collapse photo rail"
+   >
+   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+   </svg>
+   </button>
+   {sideRailEl}
+  </div>
+  )
+ )}
  </>
  )}
  </div>
+
+ {/* ------------------------------------------------------------ */}
+ {/* Batch Action Bar — spans full editor width, shown when items are selected */}
+ {/* ------------------------------------------------------------ */}
+ {state.batchMode && state.selectedBatchCount > 0 && (
+ <BatchActionBar
+  count={state.selectedBatchCount}
+  ratingLevels={state.ratingLevels.slice(0, 5)}
+  getRatingColor={state.getRatingColor}
+  onSelectAll={() => state.batchSelectAll()}
+  onClear={() => state.setBatchSelected({})}
+  onSetRating={(levelId) => {
+   const sectionId = state.currentSection?.id || "";
+   const selectedIds = Object.keys(state.batchSelected).filter((id) => state.batchSelected[id]);
+   const prior = capturePriorRatings(selectedIds, (id) => {
+    const r = state.getResult(id, sectionId);
+    return (r?.rating as string | null) ?? null;
+   });
+   findings.batchSetRating(sectionId, state.currentSectionItems, state.batchSelected, levelId);
+   const label = state.ratingLevels.find((l) => l.id === levelId)?.label ?? levelId;
+   pushToast({
+    message: `Rated ${selectedIds.length} item${selectedIds.length === 1 ? '' : 's'} as ${label}`,
+    actionLabel: 'Undo',
+    durationMs: 6000,
+    onAction: () => {
+     for (const { itemId, prior: p } of prior) {
+      findings.setRating(sectionId, itemId, p);
+     }
+    },
+   });
+  }}
+  onExit={() => { state.setBatchMode(false); state.setBatchSelected({}); }}
+ />
+ )}
 
  {/* ------------------------------------------------------------ */}
  {/* Footer Bar */}

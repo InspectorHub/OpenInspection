@@ -44,6 +44,7 @@ import {
     projectResults,
     seedResultsDoc,
     loadResultsProjection,
+    removeFindingKeys,
 } from '../lib/collab/results-doc';
 import type { ResultsProjection } from '../lib/collab/results-doc.types';
 import { findingKeysFromTemplateSnapshot } from '../lib/finding-key';
@@ -388,6 +389,22 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                 : new Response('snapshot not found', { status: 404 });
         }
 
+        // D8: re-read the already-updated templateSnapshot from D1, diff the
+        // current results keys, seed additions and remove deletions, then persist
+        // + broadcast so all clients resync. The authorized route forwards the same
+        // identity headers as /restore; identity is set below from request headers.
+        if (url.pathname.endsWith('/restructure') && req.method === 'POST') {
+            // Capture identity from headers forwarded by the authorized route,
+            // mirroring the /ws path identity acquisition (the DO trusts the route).
+            const headerTenantId     = req.headers.get('x-tenant-id');
+            const headerInspectionId = req.headers.get('x-inspection-id');
+            if (headerTenantId)     this.tenantId     = headerTenantId;
+            if (headerInspectionId) this.inspectionId = headerInspectionId;
+
+            await this.restructure();
+            return Response.json({ ok: true });
+        }
+
         return new Response('not found', { status: 404 });
     }
 
@@ -653,6 +670,58 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         await this.persist();
 
         return { ok: true };
+    }
+
+    // ── D8: Template restructure ──────────────────────────────────────────────
+
+    /**
+     * Re-read the (already-updated) `templateSnapshot` from D1, diff the current
+     * results keys, seed new findingKeys and remove deleted ones, then persist
+     * + broadcastRestore() so every connected client drops its local state and
+     * resyncs from scratch.
+     *
+     * Called by the authorized `POST /:id/collab/restructure` route after the
+     * templateSnapshot PATCH has already landed in D1. The DO is the sole writer
+     * of `inspection_results.data`; this is the convergence seam.
+     *
+     * Tenant scoping: the D1 read includes eq(inspections.tenantId, …) — keeps
+     * the lint:tenant-scope baseline green.
+     */
+    async restructure(): Promise<void> {
+        const { tenantId, inspectionId } = this;
+        if (!tenantId || !inspectionId) return; // identity unknown — nothing to do
+
+        const db: DrizzleD1Database = drizzle(this.env.DB);
+
+        const inspectionRow = await db
+            .select({ templateSnapshot: inspections.templateSnapshot })
+            .from(inspections)
+            .where(
+                and(
+                    eq(inspections.tenantId, tenantId),
+                    eq(inspections.id,       inspectionId),
+                ),
+            )
+            .get();
+
+        const newKeys = findingKeysFromTemplateSnapshot(
+            inspectionRow?.templateSnapshot ?? null,
+        );
+        const newSet = new Set(newKeys);
+
+        const results = this.doc.getMap<unknown>('results');
+        const current = [...results.keys()];
+
+        const toAdd    = newKeys
+            .filter((k) => !results.has(k))
+            .map((findingKey) => ({ findingKey }));
+        const toRemove = current.filter((k) => !newSet.has(k));
+
+        seedResultsDoc(this.doc, toAdd);
+        removeFindingKeys(this.doc, toRemove);
+
+        await this.persist();
+        this.broadcastRestore();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

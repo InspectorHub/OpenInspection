@@ -17,7 +17,6 @@ export function useInspectionBatch(
     currentSectionItems,
     batchSelected,
     setBatchSelected,
-    lastBatchClickedRef,
     sectionPickerQuery,
     setSectionPickerOpen,
     setSectionPickerQuery,
@@ -26,31 +25,14 @@ export function useInspectionBatch(
 
   /* -------------------------------- batch --------------------------------- */
 
+  // Single-item toggle. Shift-click range-select is the separate canonical
+  // path (`batchSelectRange` / `batch-range.ts`), driven by ItemList's own
+  // last-clicked ref — there is intentionally no range branch here.
   const toggleBatchSelect = useCallback(
-    (itemId: string, shiftKey?: boolean) => {
-      setBatchSelected((prev) => {
-        const next = { ...prev };
-        if (shiftKey && lastBatchClickedRef.current) {
-          const items = currentSectionItems;
-          const startIdx = items.findIndex(
-            (i) => i.id === lastBatchClickedRef.current,
-          );
-          const endIdx = items.findIndex((i) => i.id === itemId);
-          if (startIdx >= 0 && endIdx >= 0) {
-            const lo = Math.min(startIdx, endIdx);
-            const hi = Math.max(startIdx, endIdx);
-            for (let i = lo; i <= hi; i++) {
-              next[items[i].id] = true;
-            }
-          }
-        } else {
-          next[itemId] = !prev[itemId];
-        }
-        lastBatchClickedRef.current = itemId;
-        return next;
-      });
+    (itemId: string) => {
+      setBatchSelected((prev) => ({ ...prev, [itemId]: !prev[itemId] }));
     },
-    [currentSectionItems],
+    [setBatchSelected],
   );
 
   const batchSelectAll = useCallback(() => {

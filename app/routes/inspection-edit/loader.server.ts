@@ -94,5 +94,11 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const streamCustomerSubdomain =
    ((context.cloudflare?.env as { STREAM_CUSTOMER_SUBDOMAIN?: string } | undefined)?.STREAM_CUSTOMER_SUBDOMAIN) ?? null;
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing };
+ // D8 — expose the RAW (un-normalized) snapshot so structural ops (addSection /
+ // duplicateSection / deleteSection / moveSection) can operate on a clean
+ // TemplateSchemaV2 object. The `schema` field above is NORMALIZED (overlaid
+ // with report-data) and must NOT be PATCHed to the template-snapshot endpoint.
+ const templateSnapshot = ((typeof rawSchema === 'string' ? JSON.parse(rawSchema) : rawSchema) ?? { schemaVersion: 2, sections: [] }) as { schemaVersion: 2; sections: unknown[] };
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot };
 }

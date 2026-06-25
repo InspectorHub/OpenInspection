@@ -100,7 +100,7 @@ test.describe.serial('Standalone API Tests', () => {
         expect(res.status(), 'Setup must return 200').toBe(200);
         const body = await res.json();
         expect(body.success).toBe(true);
-        expect(body.data?.redirect).toBe('/dashboard');
+        expect(body.data?.redirect).toBe('/inspections');
     });
 
     test('API-02: POST /api/auth/login returns token in cookie', async ({ request }) => {
@@ -253,23 +253,23 @@ test.describe.serial('Standalone API Tests', () => {
 
     // ── RBAC Guards (API level) ───────────────────────────────────────────────
 
-    test('API-15: Unauthenticated GET /dashboard redirects to /login', async ({ request }) => {
-        const res = await request.get(`${BASE_URL}/dashboard`, { maxRedirects: 0 });
+    test('API-15: Unauthenticated GET /inspections redirects to /login', async ({ request }) => {
+        const res = await request.get(`${BASE_URL}/inspections`, { maxRedirects: 0 });
         expect(res.status(), 'Must redirect (302)').toBe(302);
         expect(res.headers()['location']).toContain('/login');
     });
 
     test('API-16: Inspector GET /library/templates gets redirected (RBAC)', async ({ request }) => {
         const res = await fetchPage(request, '/library/templates', inspectorToken);
-        // Inspector is not in allowedRoles ['owner','admin'] → redirect to /dashboard
+        // Inspector is not in allowedRoles ['owner','admin'] → redirect to /inspections
         expect(res.status(), 'Inspector must be redirected from admin-only page').toBe(302);
-        expect(res.headers()['location']).toContain('/dashboard');
+        expect(res.headers()['location']).toContain('/inspections');
     });
 
     test('API-17: Inspector GET /settings gets redirected (RBAC)', async ({ request }) => {
         const res = await fetchPage(request, '/settings', inspectorToken);
         expect(res.status()).toBe(302);
-        expect(res.headers()['location']).toContain('/dashboard');
+        expect(res.headers()['location']).toContain('/inspections');
     });
 
     test('API-18: Inspector CAN access /inspections/:id/form', async ({ request }) => {

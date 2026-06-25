@@ -39,7 +39,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         );
         if (!res.ok) return { ok: false as const, redirectUrl: null };
         const json = await res.json() as { data?: { redirectUrl?: string } };
-        return { ok: true as const, redirectUrl: json?.data?.redirectUrl ?? "/dashboard" };
+        return { ok: true as const, redirectUrl: json?.data?.redirectUrl ?? "/inspections" };
     } catch {
         return { ok: false as const, redirectUrl: null };
     }

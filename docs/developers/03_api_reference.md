@@ -161,7 +161,7 @@ Verify credentials and set the `inspector_token` httpOnly cookie.
 
 **Response:**
 ```json
-{ "success": true, "token": "eyJ...", "redirect": "/dashboard" }
+{ "success": true, "token": "eyJ...", "redirect": "/inspections" }
 ```
 
 Sets the `inspector_token` httpOnly cookie **and** returns the JWT in the response body so standalone clients can store it in `localStorage` for Bearer-authenticated API calls.
@@ -180,7 +180,7 @@ Accept a team invite token, create the user account, and set the `inspector_toke
 
 **Response:**
 ```json
-{ "success": true, "token": "eyJ...", "redirect": "/dashboard" }
+{ "success": true, "token": "eyJ...", "redirect": "/inspections" }
 ```
 
 Sets the `inspector_token` httpOnly cookie **and** returns the JWT in the response body. Store it in `localStorage` as `tenantToken` for subsequent authenticated API calls.
@@ -602,7 +602,7 @@ Delete a template. Returns `409` if any inspection references it. **Roles:** `ad
 Redirect the inspector's browser to Google OAuth consent. Requires `GOOGLE_CLIENT_ID` to be configured and a valid `inspector_token` cookie. Returns `501` if not configured.
 
 #### `GET /api/calendar/callback`
-Public OAuth redirect from Google. Exchanges the authorization code for tokens, fetches the primary calendar ID, and stores `googleRefreshToken` + `googleCalendarId` on the `users` row. Redirects to `/dashboard?calendar=connected`.
+Public OAuth redirect from Google. Exchanges the authorization code for tokens, fetches the primary calendar ID, and stores `googleRefreshToken` + `googleCalendarId` on the `users` row. Redirects to `/inspections?calendar=connected`.
 
 #### `DELETE /api/calendar/disconnect`
 Clears stored Google tokens from the `users` row. Requires `inspector_token` cookie.

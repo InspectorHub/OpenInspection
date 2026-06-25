@@ -20,7 +20,7 @@ export const LoginSchema = z.object({
  */
 export const AuthResponseSchema = createApiResponseSchema(
     z.object({
-        redirect: z.string().openapi({ example: '/dashboard' }).describe('TODO describe redirect field for the OpenInspection MCP integration'),
+        redirect: z.string().openapi({ example: '/inspections' }).describe('TODO describe redirect field for the OpenInspection MCP integration'),
     })
 );
 

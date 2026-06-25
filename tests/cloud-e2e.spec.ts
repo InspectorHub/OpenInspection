@@ -46,8 +46,8 @@ test.describe.serial('Cloud E2E Tests (HTTPS)', () => {
         await page.click('#submitBtn');
 
         // With HTTPS, __Host- cookie is set properly — should redirect to dashboard
-        await page.waitForURL('**/dashboard', { timeout: NAV_TIMEOUT });
-        expect(page.url()).toContain('/dashboard');
+        await page.waitForURL('**/inspections', { timeout: NAV_TIMEOUT });
+        expect(page.url()).toContain('/inspections');
     });
 
     // ── Login (Real Cookie Flow) ──────────────────────────────────────────────
@@ -58,8 +58,8 @@ test.describe.serial('Cloud E2E Tests (HTTPS)', () => {
         await page.fill('#password', ADMIN_PASSWORD);
         await page.click('#submitBtn');
 
-        await page.waitForURL('**/dashboard', { timeout: NAV_TIMEOUT });
-        expect(page.url()).toContain('/dashboard');
+        await page.waitForURL('**/inspections', { timeout: NAV_TIMEOUT });
+        expect(page.url()).toContain('/inspections');
 
         // Verify cookie is set (HTTPS allows __Host- prefix)
         const cookies = await page.context().cookies();
@@ -77,7 +77,7 @@ test.describe.serial('Cloud E2E Tests (HTTPS)', () => {
         await page.fill('#email', ADMIN_EMAIL);
         await page.fill('#password', ADMIN_PASSWORD);
         await page.click('#submitBtn');
-        await page.waitForURL('**/dashboard', { timeout: NAV_TIMEOUT });
+        await page.waitForURL('**/inspections', { timeout: NAV_TIMEOUT });
 
         // Navigate to multiple pages — should stay authenticated
         const protectedPages = ['/library/templates', '/team', '/settings', '/library/agreements'];
@@ -90,31 +90,31 @@ test.describe.serial('Cloud E2E Tests (HTTPS)', () => {
 
     // ── RBAC Page Redirects (Real Cookie, No Header Workaround) ───────────────
 
-    test('CLOUD-04: Inspector redirected from admin pages to /dashboard', async ({ page }) => {
+    test('CLOUD-04: Inspector redirected from admin pages to /inspections', async ({ page }) => {
         // Login as inspector
         await page.goto(`${BASE_URL}/login`, { timeout: NAV_TIMEOUT });
         await page.fill('#email', INSPECTOR_EMAIL);
         await page.fill('#password', INSPECTOR_PASSWORD);
         await page.click('#submitBtn');
-        await page.waitForURL('**/dashboard', { timeout: NAV_TIMEOUT });
+        await page.waitForURL('**/inspections', { timeout: NAV_TIMEOUT });
 
         // Try to access admin-only page
         await page.goto(`${BASE_URL}/library/templates`, { timeout: NAV_TIMEOUT });
         // With real cookies, the redirect chain works properly:
-        // /library/templates → 302 /dashboard?error=unauthorized_role → renders dashboard
-        expect(page.url(), 'Inspector must be redirected away from /library/templates').toContain('/dashboard');
+        // /library/templates → 302 /inspections?error=unauthorized_role → renders dashboard
+        expect(page.url(), 'Inspector must be redirected away from /library/templates').toContain('/inspections');
         expect(page.url()).not.toContain('/library/templates');
     });
 
-    test('CLOUD-05: Inspector redirected from settings to /dashboard', async ({ page }) => {
+    test('CLOUD-05: Inspector redirected from settings to /inspections', async ({ page }) => {
         await page.goto(`${BASE_URL}/login`, { timeout: NAV_TIMEOUT });
         await page.fill('#email', INSPECTOR_EMAIL);
         await page.fill('#password', INSPECTOR_PASSWORD);
         await page.click('#submitBtn');
-        await page.waitForURL('**/dashboard', { timeout: NAV_TIMEOUT });
+        await page.waitForURL('**/inspections', { timeout: NAV_TIMEOUT });
 
         await page.goto(`${BASE_URL}/settings`, { timeout: NAV_TIMEOUT });
-        expect(page.url(), 'Inspector must be redirected away from /settings').toContain('/dashboard');
+        expect(page.url(), 'Inspector must be redirected away from /settings').toContain('/inspections');
     });
 
     test('CLOUD-06: Inspector CAN access field form', async ({ page }) => {
@@ -122,11 +122,11 @@ test.describe.serial('Cloud E2E Tests (HTTPS)', () => {
         await page.fill('#email', INSPECTOR_EMAIL);
         await page.fill('#password', INSPECTOR_PASSWORD);
         await page.click('#submitBtn');
-        await page.waitForURL('**/dashboard', { timeout: NAV_TIMEOUT });
+        await page.waitForURL('**/inspections', { timeout: NAV_TIMEOUT });
 
         // Inspector should see their inspections — find one and navigate to form
         // For now just verify dashboard loads for inspector
-        expect(page.url()).toContain('/dashboard');
+        expect(page.url()).toContain('/inspections');
     });
 
     // ── Logout (Cookie Cleared) ───────────────────────────────────────────────
@@ -137,7 +137,7 @@ test.describe.serial('Cloud E2E Tests (HTTPS)', () => {
         await page.fill('#email', ADMIN_EMAIL);
         await page.fill('#password', ADMIN_PASSWORD);
         await page.click('#submitBtn');
-        await page.waitForURL('**/dashboard', { timeout: NAV_TIMEOUT });
+        await page.waitForURL('**/inspections', { timeout: NAV_TIMEOUT });
 
         // Click logout button
         const logoutBtn = page.locator('#logoutBtn');

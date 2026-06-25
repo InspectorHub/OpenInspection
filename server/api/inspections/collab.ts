@@ -29,6 +29,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { logger } from '../../lib/logger';
 import { CollabRestoreRequestSchema, CollabSnapshotParamSchema } from '../../lib/validations/collab.schema';
 import type { HonoConfig } from '../../types/hono';
+import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 
 /**
  * Result of the shared fail-closed auth: either an early `Response` (the caller
@@ -81,16 +82,8 @@ async function authorizeCollab(c: Context<HonoConfig>): Promise<AuthResult> {
     }
 
     // ── (5) Edit-permission check (mirrors presence route) ────────────────────
-    let helpers: string[] = [];
-    try {
-        const parsed = JSON.parse(inspection.helperInspectorIds ?? '[]');
-        if (Array.isArray(parsed)) helpers = parsed as string[];
-    } catch { /* malformed — treat as no helpers */ }
-
-    const allowed =
-        inspection.inspectorId     === userId ||
-        inspection.leadInspectorId === userId ||
-        helpers.includes(userId);
+    const userRole = c.get('userRole') as string | undefined;
+    const allowed = canAccessInspectionCollab(inspection, { id: userId, role: userRole ?? '' });
 
     if (!allowed) {
         return { ok: false, response: new Response('forbidden', { status: 403 }) };
@@ -219,6 +212,27 @@ const collabRoutes = createApiRouter()
                 'x-user-id':       auth.userId,
             },
             body: JSON.stringify({ seq: parsed.data.seq }),
+        });
+        return stub.fetch(fwd);
+    })
+    // ── POST /:id/collab/restructure — converge DO doc after templateSnapshot change (D8) ──
+    // Called after the templateSnapshot PATCH has already landed in D1. The DO
+    // re-reads the updated snapshot, diffs the current results keys, seeds
+    // additions, removes deletions, persists, and broadcasts MSG_RESTORE so every
+    // connected client drops its local state and resyncs. Reuses the same
+    // fail-closed auth as /restore (no additional permission check needed).
+    .post('/:id/collab/restructure', async (c) => {
+        const auth = await authorizeCollab(c);
+        if (!auth.ok) return auth.response;
+
+        const stub = collabStub(c, auth.tenantId, auth.inspectionId);
+        const fwd = new Request('https://do.local/restructure', {
+            method:  'POST',
+            headers: {
+                'x-tenant-id':     auth.tenantId,
+                'x-inspection-id': auth.inspectionId,
+                'x-user-id':       auth.userId,
+            },
         });
         return stub.fetch(fwd);
     });

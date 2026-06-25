@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface ItemListProps {
   items: Array<{ id: string; label: string; type: string }>;
@@ -9,6 +9,12 @@ interface ItemListProps {
   batchMode?: boolean;
   batchSelected?: Record<string, boolean>;
   onBatchToggle?: (id: string) => void;
+  onBatchRange?: (fromId: string, toId: string) => void;
+  /** D8 structural editing — when provided, a per-item ⋯ menu + "+ Add item" render. */
+  onAddItem?: () => void;
+  onDuplicateItem?: (itemId: string) => void;
+  onDeleteItem?: (itemId: string) => void;
+  onMoveItem?: (itemId: string, dir: -1 | 1) => void;
 }
 
 /** Map rating to dot color for the item list */
@@ -19,8 +25,11 @@ function ratingDotClass(rating: string): string {
   return "bg-ih-border-strong";
 }
 
-export function ItemList({ items, sectionId, activeItemId, onSelect, results, batchMode, batchSelected, onBatchToggle }: ItemListProps) {
+export function ItemList({ items, sectionId, activeItemId, onSelect, results, batchMode, batchSelected, onBatchToggle, onBatchRange, onAddItem, onDuplicateItem, onDeleteItem, onMoveItem }: ItemListProps) {
   const [filter, setFilter] = useState("all");
+  const lastClickedRef = useRef<string | null>(null);
+  const [menuItemId, setMenuItemId] = useState<string | null>(null);
+  const structuralEditing = Boolean(onDuplicateItem || onDeleteItem || onMoveItem);
 
   const filters = [
     { id: "all", label: "All" },
@@ -60,50 +69,98 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {filteredItems.map((item, idx) => {
           const result = results[`_default:${sectionId}:${item.id}`] || results[item.id] || {};
+          const fullIdx = items.findIndex((i) => i.id === item.id);
           return (
-            <button
-              key={item.id}
-              onClick={() => {
-                if (batchMode && onBatchToggle) {
-                  onBatchToggle(item.id);
-                } else {
-                  onSelect(item.id);
-                }
-              }}
-              className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all flex items-center gap-2 ${
-                activeItemId === item.id
-                  ? "bg-ih-bg-card shadow-ih-card border-l-[3px] border-ih-primary font-medium"
-                  : "text-ih-fg-3 hover:bg-ih-bg-muted"
-              }`}
-            >
-              {batchMode && (
-                <span
-                  className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
-                    batchSelected?.[item.id]
-                      ? "bg-ih-primary border-ih-primary"
-                      : "border-ih-border-strong"
-                  }`}
-                >
-                  {batchSelected?.[item.id] && (
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
+            <div key={item.id} className="group relative flex items-center">
+              <button
+                onClick={(e) => {
+                  if (batchMode && onBatchToggle) {
+                    if (e.shiftKey && lastClickedRef.current && onBatchRange) {
+                      onBatchRange(lastClickedRef.current, item.id);
+                    } else {
+                      onBatchToggle(item.id);
+                    }
+                    lastClickedRef.current = item.id;
+                  } else {
+                    onSelect(item.id);
+                  }
+                }}
+                className={`flex-1 min-w-0 text-left px-3 py-2 rounded-md text-[13px] transition-all flex items-center gap-2 ${
+                  activeItemId === item.id
+                    ? "bg-ih-bg-card shadow-ih-card border-l-[3px] border-ih-primary font-medium"
+                    : "text-ih-fg-3 hover:bg-ih-bg-muted"
+                }`}
+              >
+                {batchMode && (
+                  <span
+                    className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${
+                      batchSelected?.[item.id]
+                        ? "bg-ih-primary border-ih-primary"
+                        : "border-ih-border-strong"
+                    }`}
+                  >
+                    {batchSelected?.[item.id] && (
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </span>
+                )}
+                <span className="text-[10px] text-ih-fg-4 font-mono w-5">
+                  {String(idx + 1).padStart(2, "0")}
                 </span>
+                <span className="flex-1 truncate">{item.label}</span>
+                {Boolean(result.rating) && (
+                  <span
+                    className={`w-2 h-2 rounded-full flex-shrink-0 ${ratingDotClass(result.rating as string)}`}
+                  />
+                )}
+              </button>
+              {structuralEditing && !batchMode && (
+                <div className="relative flex-shrink-0">
+                  <button
+                    onClick={() => setMenuItemId(menuItemId === item.id ? null : item.id)}
+                    className="w-7 h-7 rounded-md flex items-center justify-center text-ih-fg-4 opacity-0 group-hover:opacity-100 hover:bg-ih-bg-muted aria-expanded:opacity-100"
+                    aria-label={`Edit ${item.label}`}
+                    aria-expanded={menuItemId === item.id}
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
+                  </button>
+                  {menuItemId === item.id && (
+                    <>
+                      <div className="fixed inset-0 z-[40]" onClick={() => setMenuItemId(null)} />
+                      <div role="menu" className="absolute right-0 top-7 z-[41] w-36 py-1 bg-ih-bg-card border border-ih-border rounded-md shadow-ih-popover text-[12px]">
+                        {onDuplicateItem && (
+                          <button role="menuitem" onClick={() => { setMenuItemId(null); onDuplicateItem(item.id); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Duplicate</button>
+                        )}
+                        {onMoveItem && fullIdx > 0 && (
+                          <button role="menuitem" onClick={() => { setMenuItemId(null); onMoveItem(item.id, -1); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Move up</button>
+                        )}
+                        {onMoveItem && fullIdx < items.length - 1 && (
+                          <button role="menuitem" onClick={() => { setMenuItemId(null); onMoveItem(item.id, 1); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Move down</button>
+                        )}
+                        {onDeleteItem && (
+                          <button role="menuitem" onClick={() => { setMenuItemId(null); onDeleteItem(item.id); }} className="w-full text-left px-3 py-1.5 text-ih-bad hover:bg-ih-bg-muted">Delete</button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
-              <span className="text-[10px] text-ih-fg-4 font-mono w-5">
-                {String(idx + 1).padStart(2, "0")}
-              </span>
-              <span className="flex-1 truncate">{item.label}</span>
-              {Boolean(result.rating) && (
-                <span
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${ratingDotClass(result.rating as string)}`}
-                />
-              )}
-            </button>
+            </div>
           );
         })}
       </div>
+      {onAddItem && (
+        <div className="p-2 border-t border-ih-border">
+          <button
+            onClick={onAddItem}
+            className="w-full py-2 rounded-md border border-dashed border-ih-border-strong text-[12px] font-bold text-ih-fg-3 hover:text-ih-primary hover:border-ih-primary"
+          >
+            + Add item
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -230,6 +230,93 @@ describe('collab WS route — auth gate', () => {
         expect(mockDo.idFromName).toHaveBeenCalledWith('t1:insp1');
     });
 
+    // ── (d) Role-based access — admin/manager bypass assignment check ────────
+
+    it('(d1) admin user who is NOT assigned to the inspection is authorized', async () => {
+        const mockDo = makeMockDoNamespace();
+        const { app } = buildApp({
+            tenantId:  't1',
+            userId:    'u-admin',
+            userRole:  'admin',
+            doNamespace: mockDo,
+            inspectionOverride: {
+                inspectorId:        'u1',
+                leadInspectorId:    'u1',
+                helperInspectorIds: '[]',
+                tenantId:           't1',
+            },
+        });
+        const res = await app.request(
+            '/api/inspections/insp1/collab/ws',
+            { headers: { Upgrade: 'websocket' } },
+        );
+        // Must NOT be 403 — admin bypasses assignment check.
+        expect(res.status).not.toBe(403);
+        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:insp1');
+    });
+
+    it('(d2) manager user who is NOT assigned to the inspection is authorized', async () => {
+        const mockDo = makeMockDoNamespace();
+        const { app } = buildApp({
+            tenantId:  't1',
+            userId:    'u-manager',
+            userRole:  'manager',
+            doNamespace: mockDo,
+            inspectionOverride: {
+                inspectorId:        'u1',
+                leadInspectorId:    'u1',
+                helperInspectorIds: '[]',
+                tenantId:           't1',
+            },
+        });
+        const res = await app.request(
+            '/api/inspections/insp1/collab/ws',
+            { headers: { Upgrade: 'websocket' } },
+        );
+        expect(res.status).not.toBe(403);
+        expect(mockDo.idFromName).toHaveBeenCalledWith('t1:insp1');
+    });
+
+    it('(d3) inspector user who is NOT assigned is still denied 403', async () => {
+        const { app, mockDo } = buildApp({
+            tenantId:  't1',
+            userId:    'u-stranger',
+            userRole:  'inspector',
+            inspectionOverride: {
+                inspectorId:        'u1',
+                leadInspectorId:    'u1',
+                helperInspectorIds: '[]',
+                tenantId:           't1',
+            },
+        });
+        const res = await app.request(
+            '/api/inspections/insp1/collab/ws',
+            { headers: { Upgrade: 'websocket' } },
+        );
+        expect(res.status).toBe(403);
+        expect(mockDo.idFromName).not.toHaveBeenCalled();
+    });
+
+    it('(d4) unknown/empty role without assignment is denied 403 (fail-closed)', async () => {
+        const { app, mockDo } = buildApp({
+            tenantId:  't1',
+            userId:    'u-stranger',
+            userRole:  '',
+            inspectionOverride: {
+                inspectorId:        'u1',
+                leadInspectorId:    'u1',
+                helperInspectorIds: '[]',
+                tenantId:           't1',
+            },
+        });
+        const res = await app.request(
+            '/api/inspections/insp1/collab/ws',
+            { headers: { Upgrade: 'websocket' } },
+        );
+        expect(res.status).toBe(403);
+        expect(mockDo.idFromName).not.toHaveBeenCalled();
+    });
+
     // ── Protocol checks ───────────────────────────────────────────────────────
 
     it('returns 426 when Upgrade header is missing', async () => {

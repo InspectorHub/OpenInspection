@@ -103,8 +103,8 @@ export interface ConnectOptions {
 
 // ─── Reconnect backoff ──────────────────────────────────────────────────────────
 
-/** First reconnect delay (ms). Doubles each attempt up to RECONNECT_MAX_MS. */
-const RECONNECT_BASE_MS = 1000;
+/** First reconnect delay (ms); doubles each attempt up to RECONNECT_MAX_MS — kept short so a cold DO self-heals before the user notices. */
+const RECONNECT_BASE_MS = 400;
 /** Backoff ceiling (ms): attempts never wait longer than this between reopens. */
 const RECONNECT_MAX_MS = 30_000;
 

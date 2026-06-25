@@ -31,7 +31,7 @@ export default function FeatureDisabledPage() {
           administrator or upgrade your plan.
         </p>
         <Link
-          to="/dashboard"
+          to="/inspections"
           className="inline-flex items-center gap-1.5 mt-6 h-9 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors"
         >
           Back to Dashboard

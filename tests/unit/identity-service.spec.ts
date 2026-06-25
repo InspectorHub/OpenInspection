@@ -91,7 +91,7 @@ describe('IdentityService (subsystem E P4.1)', () => {
         expect(out.kind).toBe('ok');
         if (out.kind === 'ok') {
             expect(out.newToken).toMatch(/^eyJ/);
-            expect(out.redirectUrl).toBe('/dashboard');
+            expect(out.redirectUrl).toBe('/inspections');
         }
     });
 

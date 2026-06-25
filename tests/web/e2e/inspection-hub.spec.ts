@@ -6,7 +6,7 @@
  *
  *   1. A dashboard row's address link opens the hub at /inspections/{id}
  *      (no /edit suffix), rendering the six status blocks + "Open editor".
- *   2. /reports 301-redirects to /dashboard?workflow=published and the
+ *   2. /reports 301-redirects to /inspections?workflow=published and the
  *      TabStrip lands on the active "Published" tab.
  *
  * Auth: POST /api/auth/login with a self-issued CSRF double-submit pair
@@ -183,7 +183,7 @@ test.describe.serial('Inspection Hub (#111)', () => {
   });
 
   test('dashboard row opens hub', async ({ page }) => {
-    await gotoAuth(page, '/dashboard', adminToken);
+    await gotoAuth(page, '/inspections', adminToken);
 
     // The row's address is wrapped in a Link to /inspections/{id} (no /edit) —
     // click the link for the inspection we seeded.
@@ -212,19 +212,19 @@ test.describe.serial('Inspection Hub (#111)', () => {
   test('/reports redirects to published tab', async ({ request, page }) => {
     // (a) /reports issues the retirement redirect. Assert the raw response
     // (the request context re-sends our auth header across the hop, like
-    // curl -L) so we pin the exact 301 → /dashboard?workflow=published target.
+    // curl -L) so we pin the exact 301 → /inspections?workflow=published target.
     const res = await request.get(`${BASE_URL}/reports`, {
       headers: { Cookie: `__Host-inspector_token=${adminToken}` },
       maxRedirects: 0,
     });
     expect(res.status()).toBe(301);
-    expect(res.headers()['location']).toBe('/dashboard?workflow=published');
+    expect(res.headers()['location']).toBe('/inspections?workflow=published');
 
     // (b) The redirect target renders the Published tab as active. (Asserting
     // this on a direct browser nav avoids a Chromium quirk where a header set
     // via setExtraHTTPHeaders is dropped on a server-side-followed redirect.)
-    await gotoAuth(page, '/dashboard?workflow=published', adminToken);
-    expect(page.url()).toMatch(/\/dashboard\?workflow=published$/);
+    await gotoAuth(page, '/inspections?workflow=published', adminToken);
+    expect(page.url()).toMatch(/\/inspections\?workflow=published$/);
 
     // The TabStrip's active tab is the only button styled with the primary
     // border+text tokens (border-ih-primary text-ih-primary).

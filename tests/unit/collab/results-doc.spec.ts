@@ -16,6 +16,7 @@ import {
   upsertCustomComment,
   upsertRecommendation,
   loadResultsProjection,
+  removeFindingKeys,
 } from '../../../server/lib/collab/results-doc';
 import type { ResultsProjection } from '../../../server/lib/collab/results-doc.types';
 
@@ -493,5 +494,48 @@ describe('results-doc', () => {
     const pending = (out[FK].photos ?? []).find((p) => p.pendingUpload === true);
     expect(pending?.pendingId).toBe('p1');
     expect(pending?.key).toBe('');
+  });
+
+  // ── removeFindingKeys (D8 restructure primitive) ─────────────────────────────
+
+  it('removeFindingKeys deletes the named key and leaves others intact', () => {
+    const FK2 = '_default:s1:i2';
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }, { findingKey: FK2 }]);
+    applyItemPatch(doc, FK, 'rating', 'NI');
+    applyItemPatch(doc, FK2, 'rating', 'D');
+
+    removeFindingKeys(doc, [FK]);
+
+    // The deleted key is gone from the results map.
+    expect(doc.getMap('results').get(FK)).toBeUndefined();
+
+    // The surviving key and its data are untouched.
+    expect(doc.getMap('results').get(FK2)).toBeDefined();
+    expect(projectResults(doc)[FK2]?.rating).toBe('D');
+
+    // projectResults no longer includes the removed key.
+    expect(FK in projectResults(doc)).toBe(false);
+  });
+
+  it('removeFindingKeys is a no-op for an empty key list', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    applyItemPatch(doc, FK, 'rating', 'IN');
+    const before = projectResults(doc);
+
+    removeFindingKeys(doc, []);
+
+    expect(projectResults(doc)).toEqual(before);
+  });
+
+  it('removeFindingKeys is a no-op for a key that does not exist', () => {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [{ findingKey: FK }]);
+    applyItemPatch(doc, FK, 'rating', 'IN');
+
+    removeFindingKeys(doc, ['_default:s1:nonexistent']);
+
+    expect(projectResults(doc)[FK]?.rating).toBe('IN');
   });
 });

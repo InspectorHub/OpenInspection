@@ -517,13 +517,25 @@ describe('connectResultsDoc — MSG_RESTORE drop+resync convergence', () => {
 
 describe('reconnectDelayMs', () => {
     it('doubles each attempt and caps at 30s', () => {
-        expect(reconnectDelayMs(0)).toBe(1000);
-        expect(reconnectDelayMs(1)).toBe(2000);
-        expect(reconnectDelayMs(2)).toBe(4000);
-        expect(reconnectDelayMs(3)).toBe(8000);
-        expect(reconnectDelayMs(4)).toBe(16000);
-        // 32000 would exceed the cap → clamped to 30000.
-        expect(reconnectDelayMs(5)).toBe(30000);
+        expect(reconnectDelayMs(0)).toBe(400);
+        expect(reconnectDelayMs(1)).toBe(800);
+        expect(reconnectDelayMs(2)).toBe(1600);
+        expect(reconnectDelayMs(3)).toBe(3200);
+        expect(reconnectDelayMs(4)).toBe(6400);
+        expect(reconnectDelayMs(5)).toBe(12800);
+        expect(reconnectDelayMs(6)).toBe(25600);
+        // 51200 would exceed the cap → clamped to 30000.
+        expect(reconnectDelayMs(7)).toBe(30000);
+        expect(reconnectDelayMs(20)).toBe(30000);
+    });
+
+    it('first retry is fast (400ms) then doubles', () => {
+        expect(reconnectDelayMs(0)).toBe(400);
+        expect(reconnectDelayMs(1)).toBe(800);
+        expect(reconnectDelayMs(2)).toBe(1600);
+    });
+
+    it('caps at 30000ms', () => {
         expect(reconnectDelayMs(20)).toBe(30000);
     });
 });

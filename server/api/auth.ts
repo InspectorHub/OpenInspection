@@ -139,7 +139,7 @@ const ssoConsumeRoute = createRoute(withMcpMetadata({
     path: '/sso',
     operationId: 'ssoConsume',
     summary: 'Consume a portal-issued SSO handoff code',
-    description: 'Reads sso:<code> from KV, issues a session cookie, redirects to /dashboard.',
+    description: 'Reads sso:<code> from KV, issues a session cookie, redirects to /inspections.',
     tags: ['auth', 'public'],
     request: {
         query: z.object({
@@ -147,7 +147,7 @@ const ssoConsumeRoute = createRoute(withMcpMetadata({
         }),
     },
     responses: {
-        302: { description: 'Redirect to /dashboard on success or /login on failure' },
+        302: { description: 'Redirect to /inspections on success or /login on failure' },
     }
 }, { scopes: [], tier: 'excluded' }));
 
@@ -328,7 +328,7 @@ export const coreAuthRoutes = createApiRouter()
         const isBff = c.req.header('x-token-relay') === '1';
         return c.json({
             success: true,
-            data: { redirect: '/dashboard', ...(isBff ? { token } : {}) }
+            data: { redirect: '/inspections', ...(isBff ? { token } : {}) }
         }, 200);
     })
     .openapi(changePasswordRoute, async (c) => {
@@ -360,7 +360,7 @@ export const coreAuthRoutes = createApiRouter()
 
         return c.json({
             success: true,
-            data: { redirect: '/dashboard' }
+            data: { redirect: '/inspections' }
         }, 200);
     })
     .openapi(ssoConsumeRoute, async (c) => {
@@ -399,7 +399,7 @@ export const coreAuthRoutes = createApiRouter()
         }, keyring);
 
         setCookie(c, '__Host-inspector_token', token, authCookieOptions());
-        return c.redirect('/dashboard', 302);
+        return c.redirect('/inspections', 302);
     })
     .openapi(forgotPasswordRoute, async (c) => {
         // SaaS deploys disable the local password form (password reset via
@@ -509,7 +509,7 @@ export const coreAuthRoutes = createApiRouter()
 
         return c.json({
             success: true,
-            data: { redirect: '/dashboard' }
+            data: { redirect: '/inspections' }
         }, 200);
     })
     .route('/', profileRoutes)

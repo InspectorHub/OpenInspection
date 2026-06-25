@@ -22,7 +22,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   const token = await getToken(context, request);
-  if (token) return redirect("/dashboard");
+  if (token) return redirect("/inspections");
   return null;
 }
 
@@ -57,7 +57,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const jwt = body?.data?.token as string | undefined;
 
     if (jwt) {
-      return createSessionWithToken(context, jwt, "/dashboard");
+      return createSessionWithToken(context, jwt, "/inspections");
     }
 
     if (body?.data?.requires2fa) {

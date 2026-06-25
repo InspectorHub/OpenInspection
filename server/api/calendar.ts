@@ -264,7 +264,7 @@ export const calendarRoutes = createApiRouter()
             .set({ googleRefreshToken: refresh_token ?? null, googleCalendarId: calendarId })
             .where(and(eq(users.id, state), eq(users.tenantId, tenantId)));
 
-        return c.redirect('/dashboard?calendar=connected');
+        return c.redirect('/inspections?calendar=connected');
     });
 
 export type CalendarApi = typeof calendarRoutes;

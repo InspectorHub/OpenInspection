@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { backfillLevelDescriptions } from "./inspection/helpers";
 import type { InspectionContext } from "./inspection/helpers";
+import { rangeIds } from "~/lib/editor/batch-range";
 import { useInspectionProgress } from "./inspection/useInspectionProgress";
 import { useInspectionNavigation } from "./inspection/useInspectionNavigation";
 import { useInspectionSearch } from "./inspection/useInspectionSearch";
@@ -154,7 +155,8 @@ export function useInspectionState(opts: UseInspectionOptions) {
   const [currentSectionIdx, setCurrentSectionIdx] = useState(0);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [activeView, setActiveView] = useState<ActiveView>("items");
-  const [viewMode, setViewMode] = useState<ViewMode>("split");
+  const [itemFullscreen, setItemFullscreen] = useState(false);
+  const [sideRailCollapsed, setSideRailCollapsed] = useState(false);
   const [itemFilter, setItemFilter] = useState<ItemFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
@@ -165,7 +167,6 @@ export function useInspectionState(opts: UseInspectionOptions) {
   const [batchSelected, setBatchSelected] = useState<Record<string, boolean>>(
     {},
   );
-  const lastBatchClickedRef = useRef<string | null>(null);
 
   // Speed mode
   const [speedMode, setSpeedMode] = useState(false);
@@ -377,7 +378,6 @@ export function useInspectionState(opts: UseInspectionOptions) {
     batchSelected,
     setBatchSelected,
     setBatchMode,
-    lastBatchClickedRef,
     sectionPickerQuery,
     setSectionPickerOpen,
     setSectionPickerQuery,
@@ -420,6 +420,13 @@ export function useInspectionState(opts: UseInspectionOptions) {
     pickSection,
   } = useInspectionBatch(ctx, selectSection);
 
+  /** Merge every item in the inclusive range [fromId, toId] into batchSelected. */
+  const batchSelectRange = useCallback((fromId: string, toId: string) => {
+    const ids = rangeIds(currentSectionItems.map(it => it.id), fromId, toId);
+    if (ids.length === 0) return;
+    setBatchSelected(prev => { const next = { ...prev }; for (const id of ids) next[id] = true; return next; });
+  }, [currentSectionItems]);
+
   /* ---------------------------------------------------------------- */
   /*  Formatted date                                                   */
   /* ---------------------------------------------------------------- */
@@ -460,8 +467,10 @@ export function useInspectionState(opts: UseInspectionOptions) {
     activeItem,
     activeView,
     setActiveView,
-    viewMode,
-    setViewMode,
+    itemFullscreen,
+    setItemFullscreen,
+    sideRailCollapsed,
+    setSideRailCollapsed,
     itemFilter,
     setItemFilter,
     selectSection,
@@ -487,6 +496,7 @@ export function useInspectionState(opts: UseInspectionOptions) {
     setBatchSelected,
     toggleBatchSelect,
     batchSelectAll,
+    batchSelectRange,
     selectedBatchCount,
 
     // Speed mode

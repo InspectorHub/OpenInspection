@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchesWorkflow } from "~/routes/dashboard";
+import { matchesWorkflow } from "~/routes/inspections";
 
 /**
  * Status-split update: the Published tab now matches on reportStatus=published,
