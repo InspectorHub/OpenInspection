@@ -2,8 +2,10 @@ import { loadTenantSecrets } from '../secrets-cache';
 import { tenantConfigs } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
+import type { TwilioCreds } from '../messaging/twilio';
 
-export interface TwilioCreds { sid: string; token: string; from: string; }
+export type { TwilioCreds } from '../messaging/twilio';
+
 type CredBag = Partial<Record<'TWILIO_ACCOUNT_SID' | 'TWILIO_AUTH_TOKEN' | 'TWILIO_FROM_NUMBER', string | undefined>>;
 
 /**
