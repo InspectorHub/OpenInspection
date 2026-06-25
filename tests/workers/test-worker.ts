@@ -12,6 +12,7 @@
 // Re-export the DO so vitest-pool-workers can bind it as INSPECTION_DOC.
 // runInDurableObject() only works with DOs defined in the `main` worker.
 export { InspectionDocDO } from '../../server/durable-objects/inspection-doc';
+export { InspectionPresenceDO } from '../../server/durable-objects/inspection-presence';
 
 interface TestEnv {
     DB: D1Database;

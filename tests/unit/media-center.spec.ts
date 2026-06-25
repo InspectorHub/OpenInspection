@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InspectionService } from '../../server/services/inspection.service';
+import { ScopedDB, type DrizzleDB } from '../../server/lib/db/scoped';
 import { createTestDb, setupSchema } from './db';
 import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -22,10 +23,10 @@ const INSPECTION_ID = '11111111-1111-1111-1111-111111111111';
  *     deletes the underlying object
  *   - tenant isolation — a pool row owned by a different tenant is invisible
  */
-// Skipped: 5 of 7 cases require ScopedDB session wiring; runtime code works
-// in production (sdb is provided via DI middleware), but the unit fixture
-// mocks at the drizzle layer only. Follow-up: add an sdb mock helper.
-describe.skip('InspectionService — Media Center (Round-2 backlog #9)', () => {
+// The 5 sdb-backed cases need a ScopedDB wired over the test db (the methods
+// run through this.photo → ScopedDB, provided in production via DI). We build
+// one over the same better-sqlite3 fixture the drizzle mock returns.
+describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
     let svc: InspectionService;
     let testDb: BetterSQLite3Database<typeof schema>;
     const r2Mock = {
@@ -39,8 +40,11 @@ describe.skip('InspectionService — Media Center (Round-2 backlog #9)', () => {
         await setupSchema(fixture.sqlite);
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
+        // Wire a ScopedDB over the same fixture db so this.photo's tenant-scoped
+        // reads/writes resolve (mirrors the DI-provided sdb in production).
+        const sdb = new ScopedDB(testDb as unknown as DrizzleDB, TENANT);
         // Cast r2Mock to the R2Bucket shape we use (put/delete only).
-        svc = new InspectionService({} as D1Database, r2Mock as unknown as R2Bucket);
+        svc = new InspectionService({} as D1Database, r2Mock as unknown as R2Bucket, sdb);
         r2Mock.put.mockClear();
         r2Mock.delete.mockClear();
 
@@ -120,7 +124,7 @@ describe.skip('InspectionService — Media Center (Round-2 backlog #9)', () => {
             photoIndex:   0,
             annotated:    false,
         });
-        expect(cover1!.url).toContain('/photos/k-cover-1');
+        expect(cover1!.url).toContain('/photo?key=k-cover-1');
 
         // The annotated copy is preferred for display, the photoIndex still
         // points at index 1 of the photos array (so the editor can resolve
@@ -148,7 +152,7 @@ describe.skip('InspectionService — Media Center (Round-2 backlog #9)', () => {
 
         const out = await svc.getMediaCenter(INSPECTION_ID, TENANT);
         expect(out.pool.map(p => p.id)).toEqual([b.id, a.id]); // newest first
-        expect(out.pool[0]?.url).toContain('/photos/');
+        expect(out.pool[0]?.url).toContain('/photo?key=');
     });
 
     it('attachPoolPhoto moves a pool row into results.data and removes the pool entry', async () => {
