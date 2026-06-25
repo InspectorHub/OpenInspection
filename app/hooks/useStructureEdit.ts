@@ -128,6 +128,13 @@ export function useStructureEdit({
 
   const applyStructure = useCallback(
     (next: Snapshot) => {
+      // Advance the ref optimistically so a second structural op fired before
+      // the action→revalidation round-trip composes on top of this change.
+      // The PATCH replaces the whole snapshot (last-write-wins); without this,
+      // chained edits (e.g. "Add section" then a quick "Move up") would each
+      // recompute from the pre-first-op snapshot and silently drop the first.
+      // The rawSnapshot effect reconciles back to server truth on revalidation.
+      snapshotRef.current = next;
       structureFetcher.submit(
         {
           intent: "restructure",

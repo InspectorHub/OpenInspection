@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 export interface StructureDeleteModalProps {
   open: boolean;
   /** Title of the section/item being deleted. */
@@ -23,6 +25,19 @@ export interface StructureDeleteModalProps {
  * NEVER window.confirm.
  */
 export function StructureDeleteModal({ open, title, noun = 'section', impact, onConfirm, onCancel }: StructureDeleteModalProps) {
+  // Escape cancels the destructive action (matches the custom-modal norm).
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onCancel]);
+
   if (!open) return null;
 
   // For a single-item delete the "items" count is itself (always 1), so skip it.

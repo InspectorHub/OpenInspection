@@ -167,7 +167,6 @@ export function useInspectionState(opts: UseInspectionOptions) {
   const [batchSelected, setBatchSelected] = useState<Record<string, boolean>>(
     {},
   );
-  const lastBatchClickedRef = useRef<string | null>(null);
 
   // Speed mode
   const [speedMode, setSpeedMode] = useState(false);
@@ -379,7 +378,6 @@ export function useInspectionState(opts: UseInspectionOptions) {
     batchSelected,
     setBatchSelected,
     setBatchMode,
-    lastBatchClickedRef,
     sectionPickerQuery,
     setSectionPickerOpen,
     setSectionPickerQuery,

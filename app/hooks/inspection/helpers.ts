@@ -100,7 +100,6 @@ export interface InspectionContext {
       | ((prev: Record<string, boolean>) => Record<string, boolean>),
   ) => void;
   setBatchMode: (v: boolean) => void;
-  lastBatchClickedRef: React.MutableRefObject<string | null>;
 
   // Section picker state
   sectionPickerQuery: string;

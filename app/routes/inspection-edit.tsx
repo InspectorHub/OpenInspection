@@ -1097,7 +1097,7 @@ export default function InspectionEditPage() {
  setTagPickerOpen(true);
  },
  onToggleFullscreen: () => state.setItemFullscreen(!state.itemFullscreen),
- onExitFullscreen: () => state.setItemFullscreen(false),
+ onExitFullscreen: () => { if (state.itemFullscreen) state.setItemFullscreen(false); }, // guard: bare Escape (not fullscreen) = no-op
  }),
  [
  state,
