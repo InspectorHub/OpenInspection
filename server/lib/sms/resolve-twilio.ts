@@ -70,7 +70,7 @@ export async function loadTwilioForTenant(env: TwilioLoaderEnv, tenantId: string
     const db = drizzle(env.DB);
     const cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId)).get().catch(() => null);
-    const mode = cfg?.smsMode ?? 'own';
+    const mode = cfg?.smsMode ?? 'platform';
     const dec = (await loadTenantSecrets(
         env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
     ).catch(() => null)) ?? {};
