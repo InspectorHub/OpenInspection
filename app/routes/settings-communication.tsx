@@ -7,6 +7,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useFlash } from "~/hooks/useFlash";
 import { communicationEmailSchema } from "~/lib/forms/settings-config.schema";
+import { ownEmailProviderConfigured } from "~/lib/email-provider-config";
 import { TemplateList } from "~/components/email-template/TemplateList";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
@@ -444,6 +445,10 @@ export default function SettingsCommunication() {
 
   const resendTest = resendTestFetcher.data;
 
+  // Whether the tenant's OWN selected email provider has its credentials saved
+  // (drives the Email delivery panel's provider-aware guardrail + status copy).
+  const ownProviderConfigured = ownEmailProviderConfigured(emailByoProvider, secrets);
+
   if (denied) return <AccessDenied />;
 
   return (
@@ -471,6 +476,8 @@ export default function SettingsCommunication() {
       <EmailDeliveryPanel
         config={config}
         isSaas={isSaas}
+        emailByoProvider={emailByoProvider}
+        ownProviderConfigured={ownProviderConfigured}
         mode={mode}
         setMode={setMode}
         overrideName={overrideName}
