@@ -31,15 +31,18 @@ import { auditFromContext } from '../lib/audit';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { Errors } from '../lib/errors';
 import { SmsConsentService } from '../services/sms-consent.service';
+import { MessagingComplianceService } from '../services/messaging-compliance.service';
+import { TwilioClient } from '../lib/messaging/twilio';
 import { ensureClientContact } from '../lib/sms/ensure-client-contact';
 import { resolveOptinToken } from '../lib/sms/optin-token';
 import { normalizeE164 } from '../lib/sms/phone';
-import { validateTwilioSignature, sendTwilioSms } from '../lib/sms/send-sms';
-import { loadTwilioForTenant, resolveTwilioSource } from '../lib/sms/resolve-twilio';
+import { validateTwilioSignature } from '../lib/sms/send-sms';
+import { loadProviderForTenant, resolveTwilioSource } from '../lib/sms/resolve-twilio';
 import { loadTenantSecrets } from '../lib/secrets-cache';
 import { maybeMetering } from '../services/metering.service';
 import {
     SmsOptinResolveSchema, SmsOptinConfirmSchema, SmsAttestSchema, SmsTestSendSchema, SmsConsentQuerySchema,
+    SmsComplianceResponseSchema,
 } from '../lib/validations/sms.schema';
 import { getBaseUrl } from '../lib/url';
 import type { Context } from 'hono';
@@ -304,6 +307,19 @@ const consentStatusRoute = createRoute(withMcpMetadata({
     description: 'Returns the latest SMS consent action for the inspection client contact (granted/revoked/none) for the inspection-view status display.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
+const complianceRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/sms/compliance',
+    tags: ['admin', 'sms'],
+    summary: 'BYO Twilio compliance status — toll-free verification + brand registration',
+    middleware: [requireRole('owner', 'manager')],
+    responses: {
+        200: { content: { 'application/json': { schema: SmsComplianceResponseSchema } }, description: 'Compliance status snapshot' },
+    },
+    operationId: 'getSmsCompliance',
+    description: 'Reads the tenant\'s own Twilio account for toll-free verification and brand registration status, upserts the snapshot, and returns the rolled-up compliance gate. Only applies when the tenant is in own SMS mode; degrades gracefully (returns stored status or not_started) when credentials are absent or Twilio is unreachable.',
+}, { scopes: ['read'], tier: 'extended' }));
+
 export const smsAdminRoutes = createApiRouter()
     .openapi(attestRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
@@ -329,10 +345,19 @@ export const smsAdminRoutes = createApiRouter()
         const normalized = normalizeE164(to);
         if (!normalized) return c.json({ success: false, error: 'That phone number could not be parsed. Use an E.164 or US 10-digit format.' }, 200);
 
-        const creds = await loadTwilioForTenant(c.env, tenantId);
-        if (!creds) return c.json({ success: false, error: 'SMS is not configured. Set your Twilio credentials first.' }, 200);
+        // Use the provider-aware loader so BYO Telnyx tenants route to TelnyxProvider.
+        // Twilio tenants: same logic as before (loadProviderForTenant → resolveTwilio).
+        // Returns { provider, from } — `from` is populated for Twilio, null for Telnyx
+        // (TelnyxProvider reads its own from-number internally).
+        const resolved = await loadProviderForTenant(c.env, tenantId);
+        if (!resolved) return c.json({ success: false, error: 'SMS is not configured. Set your credentials first.' }, 200);
 
-        const res = await sendTwilioSms(creds, normalized, 'This is a test message from your inspection company. SMS is configured correctly.');
+        const sendArgs: { from?: string; to: string; body: string } = {
+            to: normalized,
+            body: 'This is a test message from your inspection company. SMS is configured correctly.',
+        };
+        if (resolved.from) sendArgs.from = resolved.from;
+        const res = await resolved.provider.sendMessage(sendArgs);
         if (res.ok) {
             const metering = maybeMetering(c.env);
             if (metering) {
@@ -377,6 +402,42 @@ export const smsAdminRoutes = createApiRouter()
         };
         const effectiveSource = resolveTwilioSource(mode, tenantBag, platformBag);
         return c.json({ success: true as const, data: { mode, effectiveSource } }, 200);
+    })
+    .openapi(complianceRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const db = drizzle(c.env.DB);
+        const cfg = await db.select({ smsMode: tenantConfigs.smsMode }).from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId)).get().catch(() => null);
+        const mode = (cfg?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform';
+
+        const complianceSvc = new MessagingComplianceService(c.env.DB);
+        let tollfree: Array<{ sid: string; status: string; phoneNumber: string }> = [];
+
+        // Only attempt a live Twilio read when the tenant is in own mode AND has credentials.
+        if (mode === 'own') {
+            const dec = (await loadTenantSecrets(
+                c.env.DB, c.env.TENANT_CACHE, tenantId, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+            ).catch(() => null)) ?? {};
+            const sid = dec['TWILIO_ACCOUNT_SID'];
+            const token = dec['TWILIO_AUTH_TOKEN'];
+            if (sid && token) {
+                const client = new TwilioClient({ sid, token });
+                tollfree = await client.tollfree.list().catch(() => []);
+                // Persist the snapshot so getStatus reflects the latest read.
+                await complianceSvc.syncOwnStatus(tenantId, { sid, token }, client).catch(() => {});
+            }
+        }
+
+        const stored = await complianceSvc.getStatus(tenantId);
+        return c.json({
+            success: true as const,
+            data: {
+                mode,
+                complianceStatus: stored?.complianceStatus ?? null,
+                rejectionReason: stored?.rejectionReason ?? null,
+                tollfree,
+            },
+        }, 200);
     });
 
 export type SmsPublicApi = typeof smsPublicRoutes;

@@ -5,11 +5,47 @@ import type { action } from "~/routes/settings-communication";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
+type ComplianceStatus =
+  | "not_started"
+  | "profile_pending"
+  | "brand_pending"
+  | "campaign_pending"
+  | "tfv_pending"
+  | "approved"
+  | "rejected";
+
+export type SmsModeValue = "own" | "managed_shared" | "managed_dedicated";
+
+/**
+ * Maps a complianceStatus value to a short human-readable label.
+ * pending-family statuses all collapse to "Pending" (toll-free verification,
+ * brand/campaign registration are all intermediate states).
+ */
+function complianceLabel(status: ComplianceStatus | null): string {
+  if (status === "approved") return "Approved";
+  if (status === "rejected") return "Rejected";
+  if (
+    status === "profile_pending" ||
+    status === "brand_pending" ||
+    status === "campaign_pending" ||
+    status === "tfv_pending"
+  ) return "Pending";
+  return "Not started";
+}
+
 /**
  * Settings → Communication: "SMS delivery" section (Track L). Presentational —
  * owns the section wrapper, mode/company-phone form, and renders the Twilio
  * secrets + inbound + test sub-panel inside the same <section>. Self-host gating
  * (`isSaas`) is threaded verbatim from the route.
+ *
+ * SaaS tenants select from three modes:
+ *   - "own" (BYO Twilio/Telnyx) — fully wired end-to-end
+ *   - "managed_shared" — managed shared number (default; send path in later plan)
+ *   - "managed_dedicated" — dedicated local number, gated/disabled upgrade
+ * "platform" is a legacy/first-party value stored in DB; it is never offered as
+ * a tenant choice — the server rejects it if submitted.
+ * Standalone deployments show only the BYO option (mode is forced to "own").
  */
 export function SmsDeliveryPanel({
   isSaas,
@@ -25,17 +61,21 @@ export function SmsDeliveryPanel({
   showInboundUrl,
   inboundUrl,
   smsTestFetcher,
+  compliance,
+  byoProvider,
 }: {
   isSaas: boolean;
-  smsMode: "platform" | "own";
-  setSmsMode: (m: "platform" | "own") => void;
-  smsConfig: { mode: "platform" | "own"; effectiveSource: "platform" | "own" | "none" };
+  smsMode: SmsModeValue;
+  setSmsMode: (m: SmsModeValue) => void;
+  smsConfig: { mode: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource: "platform" | "own" | "none" };
   companyPhone: string;
   savingSmsConfig: boolean;
   secrets: {
     TWILIO_ACCOUNT_SID: string;
     TWILIO_AUTH_TOKEN: string;
     TWILIO_FROM_NUMBER: string;
+    TELNYX_API_KEY: string;
+    TELNYX_FROM_NUMBER: string;
   };
   secretFieldError: (name: string) => string | undefined;
   secretFormError: (intent: string) => string | null;
@@ -43,6 +83,8 @@ export function SmsDeliveryPanel({
   showInboundUrl: boolean;
   inboundUrl: string;
   smsTestFetcher: SmsTestFetcher;
+  compliance: { complianceStatus: ComplianceStatus; rejectionReason: string | null };
+  byoProvider?: "twilio" | "telnyx";
 }) {
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
@@ -58,19 +100,54 @@ export function SmsDeliveryPanel({
           <input type="hidden" name="intent" value="save-sms-config" />
           <input type="hidden" name="smsMode" value={smsMode} />
 
-          {/* Mode switch — SaaS only. Self-host has no platform SMS sender, so
-              the mode is forced to `own` (the hidden smsMode input above) and
-              the toggle hides. */}
+          {/* Mode switch — SaaS only. Self-host is BYO-only; the mode is
+              forced to "own" (the hidden smsMode input above) and the selector
+              is hidden. "platform" is a first-party-only value that is never
+              presented as a tenant option. */}
           {isSaas && (
-            <div className="inline-flex rounded-md border border-ih-border overflow-hidden">
-              {(["platform", "own"] as const).map((m) => (
-                <button
-                  type="button" key={m} onClick={() => setSmsMode(m)}
-                  className={`px-3 h-8 flex items-center text-[12px] font-bold ${smsMode === m ? "bg-ih-primary text-white" : "bg-ih-bg-card text-ih-fg-2"}`}
-                >
-                  {m === "platform" ? "Platform SMS" : "My own Twilio"}
-                </button>
-              ))}
+            <div className="space-y-2">
+              <div className="flex flex-col gap-2">
+                {/* BYO */}
+                <label className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${smsMode === "own" ? "border-ih-primary bg-ih-primary/5" : "border-ih-border bg-ih-bg-card hover:border-ih-primary/40"}`}>
+                  <input
+                    type="radio" name="_smsModeRadio" value="own"
+                    checked={smsMode === "own"}
+                    onChange={() => setSmsMode("own")}
+                    className="mt-0.5 accent-ih-primary"
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13px] font-bold text-ih-fg-1">My own Twilio / Telnyx (BYO)</span>
+                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">Bring your own account. You pay provider rates directly and control your numbers.</span>
+                  </span>
+                </label>
+                {/* Managed shared */}
+                <label className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${smsMode === "managed_shared" ? "border-ih-primary bg-ih-primary/5" : "border-ih-border bg-ih-bg-card hover:border-ih-primary/40"}`}>
+                  <input
+                    type="radio" name="_smsModeRadio" value="managed_shared"
+                    checked={smsMode === "managed_shared"}
+                    onChange={() => setSmsMode("managed_shared")}
+                    className="mt-0.5 accent-ih-primary"
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13px] font-bold text-ih-fg-1">Managed — shared number <span className="font-normal text-ih-ok-fg">(included)</span></span>
+                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">Send from a platform-managed shared number. No setup needed.</span>
+                  </span>
+                </label>
+                {/* Managed dedicated — gated/disabled upgrade */}
+                <label className="flex items-start gap-3 p-3 rounded-md border border-ih-border bg-ih-bg-muted opacity-60 cursor-not-allowed" aria-disabled="true">
+                  <input
+                    type="radio" name="_smsModeRadio" value="managed_dedicated"
+                    checked={smsMode === "managed_dedicated"}
+                    onChange={() => setSmsMode("managed_dedicated")}
+                    className="mt-0.5 accent-ih-primary"
+                    disabled
+                  />
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13px] font-bold text-ih-fg-2">Managed — dedicated local number <span className="inline-block ml-1 px-1.5 py-px rounded text-[10px] font-bold uppercase tracking-wide bg-ih-bg-card border border-ih-border text-ih-fg-3">Paid upgrade</span></span>
+                    <span className="block text-[11px] text-ih-fg-4 mt-0.5">Your own local number, managed by the platform. Available on a higher plan.</span>
+                  </span>
+                </label>
+              </div>
             </div>
           )}
           {!isSaas && (
@@ -86,6 +163,29 @@ export function SmsDeliveryPanel({
                 ? "Using platform SMS"
                 : "SMS not configured — set your Twilio credentials below"}
           </p>
+
+          {/* BYO Twilio compliance status — only shown when tenant uses own Twilio */}
+          {smsConfig.effectiveSource === "own" && (
+            <div className="space-y-1">
+              <p className="text-[11px] text-ih-fg-3">
+                Toll-free verification:{" "}
+                <span
+                  className={`font-bold ${
+                    compliance.complianceStatus === "approved"
+                      ? "text-ih-ok-fg"
+                      : compliance.complianceStatus === "rejected"
+                        ? "text-ih-bad-fg"
+                        : "text-ih-fg-2"
+                  }`}
+                >
+                  {complianceLabel(compliance.complianceStatus)}
+                </span>
+              </p>
+              {compliance.complianceStatus === "rejected" && compliance.rejectionReason && (
+                <p className="text-[11px] text-ih-bad-fg">{compliance.rejectionReason}</p>
+              )}
+            </div>
+          )}
 
           <div>
             <label htmlFor="companyPhone" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Company phone</label>
@@ -113,6 +213,7 @@ export function SmsDeliveryPanel({
           showInboundUrl={showInboundUrl}
           inboundUrl={inboundUrl}
           smsTestFetcher={smsTestFetcher}
+          initialProvider={byoProvider ?? "twilio"}
         />
       </section>
   );

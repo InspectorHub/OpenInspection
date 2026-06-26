@@ -21,3 +21,20 @@ export const SmsConsentQuerySchema = z.object({
 }).openapi('SmsConsentQuery');
 
 // Twilio inbound webhook is application/x-www-form-urlencoded; validated by signature, not zod-body.
+
+// GET /api/manager/sms/compliance — response schema (Task 4).
+// `tollfree` is the raw list of TFV records from the tenant's Twilio account;
+// `complianceStatus` is our rolled-up gate value stored in messaging_compliance.
+export const SmsComplianceResponseSchema = z.object({
+    success: z.literal(true),
+    data: z.object({
+        mode: z.enum(['platform', 'own', 'managed_shared', 'managed_dedicated']),
+        complianceStatus: z.string().nullable(),
+        rejectionReason: z.string().nullable(),
+        tollfree: z.array(z.object({
+            sid: z.string(),
+            status: z.string(),
+            phoneNumber: z.string(),
+        })),
+    }),
+}).openapi('SmsComplianceResponse');

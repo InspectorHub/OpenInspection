@@ -36,10 +36,11 @@ const KNOWN_ACCEPTED = {
   // schema, so no orphan tables remain. Re-add only with a cited, D1-unfixable
   // reason — this list is the audited escape hatch, never a dumping ground.
   lostTables: new Set([]),
-  // Per-table column-signature diffs accepted as D1-unfixable. Kept EMPTY for
-  // the same reason — frozen defaults were created correct in the fresh
-  // baseline, not ALTERed. Re-add only with a cited reason.
-  colDiffs: {},
+  // Per-table column-signature diffs accepted as D1-unfixable. Re-add only
+  // with a cited reason — this list is the audited escape hatch, never a
+  // dumping ground.
+  colDiffs: {
+  },
 };
 
 // Regenerate the baseline from the CURRENT Drizzle schema so this doubles as a

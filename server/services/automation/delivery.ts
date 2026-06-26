@@ -5,6 +5,7 @@ import type { EmailService } from '../email.service';
 import { interpolate, type Constructor } from './shared';
 import { buildBaseTemplateVars } from './template-vars';
 import type { AutomationBase, HasEvaluateConditions, HasDeliverSms } from './shared';
+import type { SmsRuntime } from './sms';
 
 /**
  * Delivery mixin: the cron-driven flush() that drains due automation_log rows.
@@ -17,7 +18,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
         async flush(
             emailFor: (tenantId: string) => Promise<EmailService>,
             appName: string, appBaseUrl: string,
-            sms?: { resolveCreds: (tenantId: string) => Promise<import('../../lib/sms/resolve-twilio').TwilioCreds | null> } | null,
+            sms?: SmsRuntime,
             batchSize = 50,
         ): Promise<void> {
             const db = this.getDrizzle();

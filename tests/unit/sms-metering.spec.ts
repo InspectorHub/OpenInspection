@@ -1,12 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AutomationService } from '../../server/services/automation.service';
 
-vi.mock('../../server/lib/sms/send-sms', () => ({
-    sendTwilioSms: vi.fn(),
-    validateTwilioSignature: vi.fn(),
-}));
-import { sendTwilioSms } from '../../server/lib/sms/send-sms';
-
 // Minimal drizzle-like stub: every chained call returns itself, final terminal
 // methods (.get(), .all(), promise-like .then) resolve or return falsy so the
 // tenant-config lookup doesn't crash before reaching the send call.
@@ -93,8 +87,18 @@ function makeCtx(recipientOverride = 'selling_agent') {
     };
 }
 
+// Fake provider-shaped sms runtime. Uses the new resolveProvider seam —
+// the same intent as the old resolveCreds + sendTwilioSms pair:
+// assert that on a successful send, metering records exactly once;
+// on a failed send, metering is NOT called. Provider identity (Twilio vs
+// Telnyx) is irrelevant to the metering logic.
+const fakeProviderSendMessage = vi.fn();
+const fakeProvider = {
+    sendMessage: fakeProviderSendMessage,
+    validateInboundSignature: vi.fn().mockResolvedValue(false),
+};
 const smsMock = {
-    resolveCreds: vi.fn().mockResolvedValue({ sid: 'ACx', token: 'tok', from: '+1999' }),
+    resolveProvider: vi.fn().mockResolvedValue({ provider: fakeProvider, from: '+1999' }),
 };
 
 describe('SMS metering in deliverSms', () => {
@@ -103,14 +107,14 @@ describe('SMS metering in deliverSms', () => {
 
     beforeEach(() => {
         record.mockClear();
-        (sendTwilioSms as ReturnType<typeof vi.fn>).mockClear();
-        smsMock.resolveCreds.mockResolvedValue({ sid: 'ACx', token: 'tok', from: '+1999' });
+        fakeProviderSendMessage.mockClear();
+        smsMock.resolveProvider.mockResolvedValue({ provider: fakeProvider, from: '+1999' });
         // 4th constructor arg is metering
         svc = new AutomationService({} as D1Database, undefined, undefined, { record } as any);
     });
 
-    it('records one sms event after a successful Twilio send', async () => {
-        (sendTwilioSms as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true });
+    it('records one sms event after a successful provider send', async () => {
+        fakeProviderSendMessage.mockResolvedValue({ ok: true });
 
         const db = makeDbStub();
         const ctx = makeCtx('selling_agent');
@@ -121,8 +125,8 @@ describe('SMS metering in deliverSms', () => {
         expect(record).toHaveBeenCalledWith(TENANT_ID, 'sms', expect.stringMatching(/^\d{4}-\d{2}$/));
     });
 
-    it('does NOT record when the Twilio send fails', async () => {
-        (sendTwilioSms as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: false, error: 'twilio 400: bad' });
+    it('does NOT record when the provider send fails', async () => {
+        fakeProviderSendMessage.mockResolvedValue({ ok: false, error: 'provider 400: bad' });
 
         const db = makeDbStub();
         const ctx = makeCtx('selling_agent');

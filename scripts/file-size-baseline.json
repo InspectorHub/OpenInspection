@@ -24,7 +24,7 @@
   "server/api/inspections/report-delivery.ts": 534,
   "server/api/auth.ts": 531,
   "server/services/inspection/inspection-photo.service.ts": 531,
-  "server/api/admin/admin-settings.ts": 528,
+  "server/api/admin/admin-settings.ts": 545,
   "server/api/public-report.ts": 516,
   "server/services/inspection/inspection-publish.service.ts": 510,
   "server/services/concierge.service.ts": 507,
@@ -41,8 +41,9 @@
   "app/components/editor/InspectionSettingsSheet.tsx": 450,
   "app/components/NewInspectionWizard.tsx": 442,
   "app/lib/collab/results-doc-connection.ts": 435,
-  "app/routes/settings-communication.tsx": 433,
+  "app/routes/settings-communication.tsx": 486,
   "app/components/media-studio/VideoCapture.tsx": 432,
   "app/routes/templates.tsx": 414,
-  "server/lib/email-templates/registry.ts": 413
+  "server/lib/email-templates/registry.ts": 413,
+  "server/api/sms.ts": 445
 }

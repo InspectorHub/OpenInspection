@@ -64,7 +64,8 @@ export { inspectionAccessTokens } from './portal-access';
 
 // Track I-a GDPR (spec §4) — append-only DSAR erasure decision log.
 // Track L (D7) — SMS consent ledger + disclosure versions.
-export { erasureLog, smsDisclosureVersions, smsConsentLog } from './compliance';
+// messaging_compliance: per-tenant TCR/provider registration state (#181 provider plan).
+export { erasureLog, smsDisclosureVersions, smsConsentLog, messagingCompliance } from './compliance';
 // Usage metering (Phase 1, SaaS-only).
 export { usageCounters } from './usage';
 // Repair Request Builder — buyer/agent/inspector negotiation lists per inspection.

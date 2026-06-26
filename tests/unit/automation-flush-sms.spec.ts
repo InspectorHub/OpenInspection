@@ -17,8 +17,14 @@ const TENANT = '00000000-0000-0000-0000-000000000001';
 let db: BetterSQLite3Database<typeof schema>;
 let svc: AutomationService;
 
-const CREDS = { sid: 'ACx', token: 'tok', from: '+1999' };
-const smsRuntime = { resolveCreds: vi.fn().mockResolvedValue(CREDS) };
+// Provider-shaped fake: wraps a sendMessage mock — same intent as the old
+// resolveCreds + sendTwilioSms pair. Twilio path assertion changed from
+// "fetch was called with /Accounts/ACx/Messages.json" to "sendMessage was
+// called with the right recipient" because the provider abstraction removes
+// the direct Twilio REST call from this test's scope.
+const fakeSendMessage = vi.fn().mockResolvedValue({ ok: true });
+const fakeProvider = { sendMessage: fakeSendMessage, validateInboundSignature: vi.fn().mockResolvedValue(false) };
+const smsRuntime = { resolveProvider: vi.fn().mockResolvedValue({ provider: fakeProvider, from: '+1999' }) };
 
 beforeEach(async () => {
     const fx = createTestDb();
@@ -30,7 +36,8 @@ beforeEach(async () => {
     } as never);
     svc = new AutomationService({} as D1Database);
     await new SmsConsentService({} as D1Database).publishDisclosure('disclosure');
-    smsRuntime.resolveCreds.mockResolvedValue(CREDS);
+    smsRuntime.resolveProvider.mockResolvedValue({ provider: fakeProvider, from: '+1999' });
+    fakeSendMessage.mockResolvedValue({ ok: true });
 });
 
 async function seedSmsLog(over: { contactId?: string | null } = {}) {
@@ -60,7 +67,12 @@ const statusOf = async (id: string) =>
     (await db.select().from(schema.automationLogs).where(eq(schema.automationLogs.id, id)).get());
 
 describe('flush() — SMS branch (Track L)', () => {
-    beforeEach(() => vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{"sid":"SM1"}', { status: 201 }))));
+    beforeEach(() => {
+        fakeSendMessage.mockClear();
+        smsRuntime.resolveProvider.mockClear();
+        smsRuntime.resolveProvider.mockResolvedValue({ provider: fakeProvider, from: '+1999' });
+        fakeSendMessage.mockResolvedValue({ ok: true });
+    });
 
     it('client SMS without consent → skipped', async () => {
         const { logId } = await seedSmsLog({ contactId: 'c1' });
@@ -68,26 +80,30 @@ describe('flush() — SMS branch (Track L)', () => {
         const r = await statusOf(logId);
         expect(r?.status).toBe('skipped');
         expect(r?.error).toMatch(/consent/);
-        expect(fetch).not.toHaveBeenCalled();
+        // Provider not called (skipped before resolve)
+        expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 
-    it('client SMS with granted consent → sent via Twilio', async () => {
+    it('client SMS with granted consent → sent via provider', async () => {
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
         await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
         expect((await statusOf(logId))?.status).toBe('sent');
-        const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
-        expect(url).toContain('/Accounts/ACx/Messages.json');
+        // Provider's sendMessage must have been called with the log recipient
+        expect(fakeSendMessage).toHaveBeenCalledTimes(1);
+        const call = fakeSendMessage.mock.calls[0][0] as { to: string; body: string; from?: string };
+        expect(call.to).toBe('+15551234567');
+        expect(typeof call.body).toBe('string');
     });
 
-    it('no resolvable creds → skipped (fail-closed), no fetch', async () => {
+    it('no resolvable provider → skipped (fail-closed), no send', async () => {
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
-        smsRuntime.resolveCreds.mockResolvedValueOnce(null);
+        smsRuntime.resolveProvider.mockResolvedValueOnce(null);
         await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
         expect((await statusOf(logId))?.status).toBe('skipped');
         expect((await statusOf(logId))?.error).toMatch(/not configured/);
-        expect(fetch).not.toHaveBeenCalled();
+        expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 });
 

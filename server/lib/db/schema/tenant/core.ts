@@ -55,7 +55,12 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Track L (D3) — SMS sender mode, mirrors email_mode. 'platform' uses the
     // platform Twilio env; 'own' uses the tenant's three TWILIO_* secrets (only
     // when all three are present, else platform fallback — see resolve-twilio.ts).
-    smsMode: text('sms_mode', { enum: ['platform', 'own'] }).notNull().default('platform'),
+    // 'managed_shared' / 'managed_dedicated' = platform-provisioned pool numbers
+    // (TCR-registered subaccount, per-tenant or shared). 'platform' = legacy
+    // first-party value; column default stays 'platform' for D1 safety (changing a
+    // default needs a table rebuild). 'own'/managed modes are selected explicitly
+    // (see #181 provider plan).
+    smsMode: text('sms_mode', { enum: ['platform', 'own', 'managed_shared', 'managed_dedicated'] }).notNull().default('platform'),
     senderDisplayName: text('sender_display_name'),
     // 2026-06-14 — Point of Contact (Spectora parity). Single tenant-level
     // switch for who client-facing emails come from. Drives From display name
@@ -162,6 +167,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Tasks 14/15 retire it.
     collabEditing: integer('collab_editing', { mode: 'boolean' }).notNull().default(true),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    // SMS BYO provider choice — which carrier the tenant's own TWILIO_*/TELNYX_*
+    // secrets belong to. NULL while not in own/managed mode.
+    smsByoProvider: text('sms_byo_provider', { enum: ['twilio', 'telnyx'] }),
 });
 
 /**

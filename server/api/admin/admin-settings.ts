@@ -125,9 +125,10 @@ const TenantConfigGetResponseSchema = z.object({
         allowInspectorChoice: z.boolean().describe('Whether the public booking page offers an inspector dropdown'),
         agreementRetentionYears: z.number().int().describe('Years signed agreements are retained before the GDPR retention sweep destroys them (Track I-a). Default 6.'),
         reviewUrl: z.string().nullable().optional().describe('Track J (#122) — company review link, or null.'),
-        smsMode: z.enum(['platform', 'own']).describe('Track L (D3) — SMS sender mode.'),
+        smsMode: z.enum(['platform', 'own', 'managed_shared', 'managed_dedicated']).describe('Track L (D3) — SMS sender mode.'),
         companyPhone: z.string().nullable().optional().describe('Track L — call-back number rendered as {{company_phone}} in SMS copy.'),
         videoMode: z.enum(['r2', 'stream']).describe('Self-host video backend (default r2). Ignored in SaaS.'),
+        smsByoProvider: z.enum(['twilio', 'telnyx']).nullable().describe('BYO SMS provider selection (null = default Twilio).'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -160,9 +161,10 @@ const TenantConfigPatchSchema = z.object({
     allowInspectorChoice: z.boolean().optional().describe('Toggle the public inspector-choice dropdown (IA-26)'),
     agreementRetentionYears: z.number().int().min(1).max(99).optional().describe('How many years signed agreements / signatures are retained before the GDPR retention sweep destroys them (Track I-a). Integer 1–99; default 6 ≈ UK simple-contract limitation period.'),
     reviewUrl: z.string().url().max(500).nullish().describe('Track J (#122) — company review link (Google/Yelp/Facebook). null/empty clears it.'),
-    smsMode: z.enum(['platform', 'own']).optional().describe('Track L (D3) — SMS sender mode: platform env or tenant-own Twilio.'),
+    smsMode: z.enum(['own', 'managed_shared', 'managed_dedicated']).optional().describe('Track L (D3) — Tenant SMS sender mode. "platform" is reserved for first-party use and is rejected when submitted by a tenant.'),
     companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),
     videoMode: z.enum(['r2', 'stream']).optional().describe('Self-host video backend: r2 (default, free) or stream (requires STREAM binding + customer subdomain).'),
+    smsByoProvider: z.enum(['twilio', 'telnyx']).optional().describe('BYO SMS provider selection — which provider adapter to use when smsMode is "own".'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -405,9 +407,10 @@ export const adminSettingsRoutes = createApiRouter()
                 allowInspectorChoice: config?.allowInspectorChoice ?? false,
                 agreementRetentionYears: config?.agreementRetentionYears ?? 6,
                 reviewUrl: config?.reviewUrl ?? null,
-                smsMode: (config?.smsMode as 'platform' | 'own') ?? 'platform',
+                smsMode: (config?.smsMode as 'platform' | 'own' | 'managed_shared' | 'managed_dedicated') ?? 'platform',
                 companyPhone: (config?.companyPhone as string | null) ?? null,
                 videoMode: (config?.videoMode as 'r2' | 'stream') ?? 'r2',
+                smsByoProvider: (config?.smsByoProvider as 'twilio' | 'telnyx' | null) ?? null,
             },
         }, 200);
     })
@@ -432,13 +435,27 @@ export const adminSettingsRoutes = createApiRouter()
             update.reviewUrl = body.reviewUrl || null;
         }
         if (body.smsMode !== undefined) {
-            update.smsMode = body.smsMode;
+            const profile = c.var.profile;
+            if (profile.mode === 'standalone') {
+                // Standalone is BYO-only; ignore any submitted mode and force own.
+                update.smsMode = 'own';
+            } else {
+                // SaaS: the schema already excludes 'platform' via z.enum(['own','managed_shared','managed_dedicated']).
+                // This guard is the server-side double-check against e.g. a direct API call.
+                if ((body.smsMode as string) === 'platform') {
+                    throw Errors.BadRequest('Platform SMS is reserved for first-party use.', 'platform_mode_not_allowed');
+                }
+                update.smsMode = body.smsMode;
+            }
         }
         if (body.companyPhone !== undefined) {
             update.companyPhone = body.companyPhone || null;
         }
         if (body.videoMode !== undefined) {
             update.videoMode = body.videoMode;
+        }
+        if (body.smsByoProvider !== undefined) {
+            update.smsByoProvider = body.smsByoProvider;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);

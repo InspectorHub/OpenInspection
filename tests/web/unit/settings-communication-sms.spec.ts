@@ -15,6 +15,7 @@ const getSecrets = vi.fn();
 const getTemplates = vi.fn();
 const getSmsConfig = vi.fn();
 const getTenantConfig = vi.fn();
+const getSmsCompliance = vi.fn();
 const patchTenantConfig = vi.fn();
 const putSecrets = vi.fn();
 const postSmsTest = vi.fn();
@@ -36,7 +37,7 @@ vi.mock('~/lib/api-client.server', () => ({
         },
         secrets: { secrets: { $get: getSecrets, $put: putSecrets } },
         emailTemplates: { 'email-templates': { $get: getTemplates } },
-        smsAdmin: { sms: { config: { $get: getSmsConfig }, test: { $post: postSmsTest } } },
+        smsAdmin: { sms: { config: { $get: getSmsConfig }, test: { $post: postSmsTest }, compliance: { $get: getSmsCompliance } } },
         integrations: { resend: { test: { $post: vi.fn() } } },
     })),
 }));
@@ -74,6 +75,7 @@ beforeEach(() => {
     getTemplates.mockReset().mockResolvedValue(jsonRes({ data: [] }));
     getSmsConfig.mockReset().mockResolvedValue(jsonRes({ data: { mode: 'own', effectiveSource: 'own' } }));
     getTenantConfig.mockReset().mockResolvedValue(jsonRes({ data: { smsMode: 'own', companyPhone: '+15551112222' } }));
+    getSmsCompliance.mockReset().mockResolvedValue(jsonRes({ data: { mode: 'own', complianceStatus: 'approved', rejectionReason: null, tollfree: [] } }));
     patchTenantConfig.mockReset().mockResolvedValue(jsonRes({ success: true, data: { ok: true } }));
     putSecrets.mockReset().mockResolvedValue(jsonRes({ success: true }));
     postSmsTest.mockReset().mockResolvedValue(jsonRes({ success: true }));
@@ -98,15 +100,38 @@ describe('settings-communication loader — SMS config (Part D)', () => {
     });
 });
 
+describe('settings-communication loader — SMS compliance status (Task 5)', () => {
+    it('surfaces complianceStatus + rejectionReason from the compliance endpoint', async () => {
+        const data = await loader(loaderArgs());
+        expect(getSmsCompliance).toHaveBeenCalled();
+        expect(data.compliance).toEqual({ complianceStatus: 'approved', rejectionReason: null });
+    });
+
+    it('degrades compliance to not_started when the compliance call fails', async () => {
+        getSmsCompliance.mockResolvedValue(jsonRes(null, false));
+        const data = await loader(loaderArgs());
+        expect(data.compliance).toEqual({ complianceStatus: 'not_started', rejectionReason: null });
+    });
+
+    it('passes rejectionReason through when status is rejected', async () => {
+        getSmsCompliance.mockResolvedValue(jsonRes({
+            data: { mode: 'own', complianceStatus: 'rejected', rejectionReason: 'Website URL does not match business.', tollfree: [] },
+        }));
+        const data = await loader(loaderArgs());
+        expect(data.compliance).toEqual({ complianceStatus: 'rejected', rejectionReason: 'Website URL does not match business.' });
+    });
+});
+
 describe('settings-communication action — SMS intents (Part D)', () => {
     it('intent=save-sms-config PATCHes tenant-config with smsMode + companyPhone (empty → null)', async () => {
         await action(actionArgs({ intent: 'save-sms-config', smsMode: 'own', companyPhone: '+15553334444' }));
         expect(patchTenantConfig).toHaveBeenCalledWith({ json: { smsMode: 'own', companyPhone: '+15553334444' } });
     });
 
-    it('intent=save-sms-config clears companyPhone to null when blank', async () => {
+    it('intent=save-sms-config clears companyPhone to null when blank (invalid mode falls back to "own")', async () => {
+        // 'platform' is a first-party-only mode rejected by the action; it normalises to 'own'.
         await action(actionArgs({ intent: 'save-sms-config', smsMode: 'platform', companyPhone: '' }));
-        expect(patchTenantConfig).toHaveBeenCalledWith({ json: { smsMode: 'platform', companyPhone: null } });
+        expect(patchTenantConfig).toHaveBeenCalledWith({ json: { smsMode: 'own', companyPhone: null } });
     });
 
     it('intent=save-sms-secrets PUTs only the non-empty Twilio keys', async () => {

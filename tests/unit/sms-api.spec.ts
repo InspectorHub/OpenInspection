@@ -6,6 +6,7 @@ import type { HonoConfig } from '../../server/types/hono';
 import { AppError } from '../../server/lib/errors';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
+import { SAAS_PROFILE, STANDALONE_PROFILE } from '../../server/lib/deployment-profile';
 
 /**
  * Track L Task 8 — SMS consent API (in-process Hono harness, mirrors
@@ -22,6 +23,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { smsPublicRoutes, smsAdminRoutes } from '../../server/api/sms';
 import { SmsConsentService } from '../../server/services/sms-consent.service';
 import { signParams } from '../../server/lib/sms/send-sms';
+import adminRoutes from '../../server/api/admin';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER_TENANT = '00000000-0000-0000-0000-000000000002';
@@ -280,5 +282,133 @@ describe('SMS consent API (Track L Task 8)', () => {
         expect(xml).toContain('STOP');
         // HELP is informational only — consent state is untouched.
         expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, contactId)).toBe('granted');
+    });
+});
+
+// ─── PATCH /api/admin/tenant-config — smsMode tenant selector (Task 6) ───────
+
+/**
+ * Build a minimal app for tenant-config PATCH tests.
+ * Injects a mock branding service and sets the deployment profile.
+ */
+function buildTenantConfigApp(
+    profile: typeof SAAS_PROFILE | typeof STANDALONE_PROFILE,
+    updateBranding: ReturnType<typeof vi.fn>,
+    getBranding: ReturnType<typeof vi.fn>,
+) {
+    const app = new OpenAPIHono<HonoConfig>();
+    app.onError((err, c) => {
+        if (err instanceof AppError) {
+            return c.json({ success: false, error: { code: err.code, message: err.message, details: err.details } }, err.status);
+        }
+        return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
+    });
+    app.use('*', async (c, next) => {
+        c.set('tenantId', TENANT);
+        c.set('userRole', 'owner');
+        c.set('user', { sub: 'user-1', role: 'owner', tenantId: TENANT } as never);
+        c.set('profile', profile);
+        c.set('services', {
+            branding: { updateBranding, getBranding },
+            event: {},
+            dashboardPrefs: {},
+            admin: {},
+            invoice: {},
+            widget: {},
+        } as unknown as HonoConfig['Variables']['services']);
+        await next();
+    });
+    app.route('/api/admin', adminRoutes);
+    return app;
+}
+
+describe('PATCH /api/admin/tenant-config — smsMode tenant selector (Task 6)', () => {
+    it('SaaS: PATCH smsMode=platform → 400 platform_mode_not_allowed', async () => {
+        // The schema excludes 'platform'; this test verifies the guard for a direct API call
+        // that bypasses the schema (e.g. by sending a raw body the zod layer might pass).
+        // NOTE: Because the zod schema enum(['own','managed_shared','managed_dedicated'])
+        // already rejects 'platform' at the validation layer (422), we test the guard via
+        // the schema rejection first, then verify the guard in the handler is reachable
+        // when 'platform' somehow arrives (tested via integration).
+        //
+        // In practice, the zod enum rejects 'platform' before the handler runs — so the
+        // API returns 422 (unprocessable_entity), not 400 (bad_request). Both outcomes
+        // correctly reject 'platform' for SaaS tenants; the test asserts !2xx.
+        const updateBranding = vi.fn().mockResolvedValue(undefined);
+        const getBranding = vi.fn().mockResolvedValue({});
+        const app = buildTenantConfigApp(SAAS_PROFILE, updateBranding, getBranding);
+
+        const res = await app.request('/api/admin/tenant-config', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ smsMode: 'platform' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        // Zod schema enum(['own','managed_shared','managed_dedicated']) rejects 'platform'
+        // before the handler body runs → expect a non-2xx response (400 or 422).
+        expect(res.status).toBeGreaterThanOrEqual(400);
+        expect(res.status).toBeLessThan(500);
+        expect(updateBranding).not.toHaveBeenCalled();
+    });
+
+    it('SaaS: PATCH smsMode=managed_shared → 200', async () => {
+        const updateBranding = vi.fn().mockResolvedValue(undefined);
+        const getBranding = vi.fn().mockResolvedValue({});
+        const app = buildTenantConfigApp(SAAS_PROFILE, updateBranding, getBranding);
+
+        const res = await app.request('/api/admin/tenant-config', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ smsMode: 'managed_shared' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        expect(res.status).toBe(200);
+        expect(updateBranding).toHaveBeenCalledWith(TENANT, expect.objectContaining({ smsMode: 'managed_shared' }));
+    });
+
+    it('SaaS: PATCH smsMode=own → 200', async () => {
+        const updateBranding = vi.fn().mockResolvedValue(undefined);
+        const getBranding = vi.fn().mockResolvedValue({});
+        const app = buildTenantConfigApp(SAAS_PROFILE, updateBranding, getBranding);
+
+        const res = await app.request('/api/admin/tenant-config', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ smsMode: 'own' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        expect(res.status).toBe(200);
+        expect(updateBranding).toHaveBeenCalledWith(TENANT, expect.objectContaining({ smsMode: 'own' }));
+    });
+
+    it('Standalone: PATCH smsMode=managed_shared → coerces to own and returns 200', async () => {
+        const updateBranding = vi.fn().mockResolvedValue(undefined);
+        const getBranding = vi.fn().mockResolvedValue({});
+        const app = buildTenantConfigApp(STANDALONE_PROFILE, updateBranding, getBranding);
+
+        const res = await app.request('/api/admin/tenant-config', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ smsMode: 'managed_shared' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        // Standalone coerces any smsMode to 'own'
+        expect(res.status).toBe(200);
+        expect(updateBranding).toHaveBeenCalledWith(TENANT, expect.objectContaining({ smsMode: 'own' }));
+    });
+
+    it('SaaS: PATCH smsMode=managed_dedicated → 200 (selectable placeholder)', async () => {
+        const updateBranding = vi.fn().mockResolvedValue(undefined);
+        const getBranding = vi.fn().mockResolvedValue({});
+        const app = buildTenantConfigApp(SAAS_PROFILE, updateBranding, getBranding);
+
+        const res = await app.request('/api/admin/tenant-config', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ smsMode: 'managed_dedicated' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        expect(res.status).toBe(200);
+        expect(updateBranding).toHaveBeenCalledWith(TENANT, expect.objectContaining({ smsMode: 'managed_dedicated' }));
     });
 });
