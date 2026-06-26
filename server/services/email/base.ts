@@ -5,6 +5,8 @@ import { inspectorSignature, type SignatureUser } from '../../lib/inspector-sign
 import { resolveSenderIdentity, type EmailIdentityConfig, type SenderInspector } from '../../lib/email/sender-identity';
 import { EmailTemplateRenderer } from '../../lib/email-templates/renderer';
 import type { RenderResult } from '../../lib/email-templates/types';
+import { ResendProvider } from '../../lib/email/providers/resend';
+import type { EmailProvider } from '../../lib/email/provider';
 
 /**
  * Sprint B-4 — when callers pass `inspector` + `host`, every customer-facing
@@ -44,6 +46,8 @@ export function arrayBufferToBase64(buf: ArrayBuffer): string {
  * Centralizes all email logic and formatting across the application.
  */
 export class EmailBaseService {
+    protected provider: EmailProvider;
+
     constructor(
         protected apiKey: string,
         protected senderEmail: string,
@@ -51,7 +55,10 @@ export class EmailBaseService {
         protected identity?: EmailIdentityConfig,
         protected renderer?: EmailTemplateRenderer,
         protected meter?: { record: () => Promise<void> },
-    ) {}
+        provider?: EmailProvider,
+    ) {
+        this.provider = provider ?? new ResendProvider({ apiKey: this.apiKey });
+    }
 
     /** Render `trigger` via the template registry when a renderer is injected;
      *  otherwise use the provided fallback (keeps no-renderer unit tests working). */
@@ -127,51 +134,39 @@ export class EmailBaseService {
             ? `${resolved.fromName} <${this.senderEmail}>`
             : this.senderEmail;
 
-        const payload: Record<string, unknown> = {
-            from,
-            to,
-            subject,
-            html,
-        };
-        if (resolved.replyTo) payload.reply_to = resolved.replyTo;
-
-        if (attachments && attachments.length > 0) {
-            payload.attachments = attachments.map(a => {
+        // Build the Resend-shaped attachments (base64 encode) before passing to provider.
+        const providerAttachments = attachments && attachments.length > 0
+            ? attachments.map(a => {
                 const base64 = typeof a.content === 'string'
                     ? btoa(unescape(encodeURIComponent(a.content)))
                     : arrayBufferToBase64(a.content);
-                const out: Record<string, string> = {
+                const out: { filename: string; content: string; content_type?: string } = {
                     filename: a.filename,
                     content: base64,
                 };
                 if (a.contentType) out.content_type = a.contentType;
                 return out;
-            });
+            })
+            : undefined;
+
+        const result = await this.provider.sendEmail({
+            from,
+            to,
+            subject,
+            html,
+            ...(resolved.replyTo ? { replyTo: resolved.replyTo } : {}),
+            ...(providerAttachments ? { attachments: providerAttachments } : {}),
+        });
+
+        if (!result.ok) {
+            logger.error('[email] Delivery failed', { error: result.error });
+            throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email delivery failed');
         }
 
-        try {
-            const res = await fetch('https://api.resend.com/emails', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.apiKey}`
-                },
-                body: JSON.stringify(payload)
-            });
-
-            if (!res.ok) {
-                const text = await res.text();
-                logger.error('[email] Resend delivery failed', { response: text });
-                throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email delivery failed');
-            }
-            // success — meter the send (best-effort; never blocks or breaks delivery).
-            // Awaited (not waitUntil) so it works in scheduled/workflow contexts too.
-            await this.meter?.record().catch(() => {});
-            return { delivered: true };
-        } catch (err) {
-            logger.error('[email] Delivery exception', {}, err instanceof Error ? err : undefined);
-            throw new AppError(502, ErrorCode.SERVICE_UNAVAILABLE, 'Email service unavailable');
-        }
+        // success — meter the send (best-effort; never blocks or breaks delivery).
+        // Awaited (not waitUntil) so it works in scheduled/workflow contexts too.
+        await this.meter?.record().catch(() => {});
+        return { delivered: true };
     }
 
     /**
