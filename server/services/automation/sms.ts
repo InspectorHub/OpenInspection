@@ -1,5 +1,5 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { automationLogs, automations, inspections, tenants, tenantConfigs } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { currentPeriodKey } from '../../lib/usage/period';
@@ -55,7 +55,7 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
         ): Promise<void> {
             const { log, automation, inspection, tenant } = ctx;
             const skip = (reason: string) =>
-                db.update(automationLogs).set({ status: 'skipped', error: reason }).where(eq(automationLogs.id, log.id));
+                db.update(automationLogs).set({ status: 'skipped', error: reason }).where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
 
             if (!automation.smsBody?.trim()) return void (await skip('no sms body'));
             if (!sms) return void (await skip('sms not configured'));
@@ -95,13 +95,13 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
             const res = await provider.sendMessage(sendArgs);
             if (res.ok) {
                 await db.update(automationLogs).set({ status: 'sent', deliveredAt: new Date().toISOString() })
-                    .where(eq(automationLogs.id, log.id));
+                    .where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
                 try {
                     await this.metering?.record(tenant.id, 'sms', currentPeriodKey(new Date()));
                 } catch { /* metering must never break delivery */ }
             } else {
                 await db.update(automationLogs).set({ status: 'failed', error: res.error })
-                    .where(eq(automationLogs.id, log.id));
+                    .where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
                 logger.error('AutomationService.flush: sms send failed', { logId: log.id });
             }
         }
