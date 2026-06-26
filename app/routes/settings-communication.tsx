@@ -221,6 +221,30 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, ok: true, error: null, field: null, test: body.data };
   }
 
+  if (intent === "validate-email-provider") {
+    const VALID_PROVIDERS = ["resend", "sendgrid", "postmark", "mailgun"] as const;
+    type EmailProvider = typeof VALID_PROVIDERS[number];
+    const rawProvider = form.get("provider");
+    if (!rawProvider || !(VALID_PROVIDERS as ReadonlyArray<string>).includes(rawProvider as string)) {
+      return { intent, ok: false, error: "Unknown provider.", field: null, test: null };
+    }
+    const provider = rawProvider as EmailProvider;
+    const res = await api.integrations.email.validate.$post({ json: { provider } });
+    const body = (await res.json().catch(() => null)) as
+      | { data?: { ok: boolean }; error?: { message?: string } }
+      | null;
+    if (!res.ok || !body?.data?.ok) {
+      return {
+        intent,
+        ok: false,
+        error: body?.error?.message ?? "Credential validation failed.",
+        field: null,
+        test: null,
+      };
+    }
+    return { intent, ok: true, error: null, field: null, test: null };
+  }
+
   if (intent === "save-calendar-secrets") {
     const body: Record<string, string> = {};
     const clientId = form.get("GOOGLE_CLIENT_ID");
@@ -321,6 +345,7 @@ export default function SettingsCommunication() {
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const resendTestFetcher = useFetcher<typeof action>();
+  const emailValidateFetcher = useFetcher<typeof action>();
   const smsTestFetcher = useFetcher<typeof action>();
   const session = useSessionContext();
   // Self-host (standalone) deployments have no platform mailbox / SMS number —
@@ -465,6 +490,7 @@ export default function SettingsCommunication() {
         savingEmailSecrets={savingEmailSecrets}
         resendTestFetcher={resendTestFetcher}
         resendTest={resendTest}
+        emailValidateFetcher={emailValidateFetcher}
         initialProvider={emailByoProvider}
       />
 

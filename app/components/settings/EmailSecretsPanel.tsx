@@ -5,7 +5,10 @@ import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
 import type { action } from "~/routes/settings-communication";
 
-type ResendTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
+type ActionFetcher = ReturnType<typeof useFetcher<typeof action>>;
+
+/** @deprecated use ActionFetcher directly */
+type ResendTestFetcher = ActionFetcher;
 
 type EmailByoProvider = "resend" | "sendgrid" | "postmark" | "mailgun";
 
@@ -26,9 +29,9 @@ const PROVIDER_LABELS: Record<EmailByoProvider, string> = {
  * `email_byo_provider` field and the route's `save-email-secrets` action
  * persists it to the tenant-config endpoint alongside the credentials.
  *
- * The "Test connection" button probes the Resend key specifically and is only
- * shown when the Resend provider is selected — per-provider validation for other
- * providers is a follow-up (Task 6).
+ * The "Test connection" button probes the Resend key and is only shown when
+ * the Resend provider is selected. For sendgrid / postmark / mailgun a generic
+ * "Validate credentials" button is shown instead, posting validate-email-provider.
  */
 export function EmailSecretsPanel({
   secrets,
@@ -37,6 +40,7 @@ export function EmailSecretsPanel({
   savingEmailSecrets,
   resendTestFetcher,
   resendTest,
+  emailValidateFetcher,
   initialProvider = "resend",
 }: {
   secrets: {
@@ -51,6 +55,7 @@ export function EmailSecretsPanel({
   savingEmailSecrets: boolean;
   resendTestFetcher: ResendTestFetcher;
   resendTest: ResendTestFetcher["data"];
+  emailValidateFetcher: ActionFetcher;
   initialProvider?: EmailByoProvider;
 }) {
   const [provider, setProvider] = useState<EmailByoProvider>(initialProvider);
@@ -171,7 +176,7 @@ export function EmailSecretsPanel({
         </div>
       </Form>
 
-      {/* Test connection — probes the STORED Resend key; shown for Resend only (other providers: Task 6) */}
+      {/* Test connection — probes the STORED Resend key; shown for Resend only */}
       {provider === "resend" && (
         <TestConnectionButton fetcher={resendTestFetcher} intent="test-resend">
           {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && resendTest.test && "domains" in resendTest.test && (
@@ -182,6 +187,35 @@ export function EmailSecretsPanel({
           {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && "ok" in resendTest && !resendTest.ok && (
             <span className="text-[12px] text-ih-bad-fg">{resendTest.error}</span>
           )}
+        </TestConnectionButton>
+      )}
+
+      {/* Validate credentials — generic probe for sendgrid / postmark / mailgun.
+          The hidden `provider` input is a child of TestConnectionButton so it
+          lands inside the fetcher.Form the component renders. */}
+      {provider !== "resend" && (
+        <TestConnectionButton
+          fetcher={emailValidateFetcher}
+          intent="validate-email-provider"
+          idleLabel="Validate credentials"
+          busyLabel="Validating…"
+        >
+          {/* This input is inside fetcher.Form (TestConnectionButton wraps children in the form) */}
+          <input type="hidden" name="provider" value={provider} />
+          {emailValidateFetcher.data &&
+            "intent" in emailValidateFetcher.data &&
+            emailValidateFetcher.data.intent === "validate-email-provider" &&
+            "ok" in emailValidateFetcher.data &&
+            emailValidateFetcher.data.ok && (
+              <span className="text-[12px] text-ih-ok-fg">Credentials verified.</span>
+            )}
+          {emailValidateFetcher.data &&
+            "intent" in emailValidateFetcher.data &&
+            emailValidateFetcher.data.intent === "validate-email-provider" &&
+            "ok" in emailValidateFetcher.data &&
+            !emailValidateFetcher.data.ok && (
+              <span className="text-[12px] text-ih-bad-fg">{emailValidateFetcher.data.error}</span>
+            )}
         </TestConnectionButton>
       )}
     </section>
