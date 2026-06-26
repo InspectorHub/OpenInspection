@@ -60,9 +60,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     mode: smsCfgBody?.data?.mode ?? "platform",
     effectiveSource: smsCfgBody?.data?.effectiveSource ?? "none",
   };
-  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null; byoProvider?: "twilio" | "telnyx" | null } }) : null;
+  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null; smsByoProvider?: "twilio" | "telnyx" | null } }) : null;
   const companyPhone = tenantCfgBody?.data?.companyPhone ?? "";
-  const byoProvider: "twilio" | "telnyx" = tenantCfgBody?.data?.byoProvider === "telnyx" ? "telnyx" : "twilio";
+  const byoProvider: "twilio" | "telnyx" = tenantCfgBody?.data?.smsByoProvider === "telnyx" ? "telnyx" : "twilio";
 
   // SMS compliance status (BYO Twilio toll-free verification). Fails gracefully
   // to not_started so the UI always has a defined value to render.
@@ -221,7 +221,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "save-sms-secrets") {
-    const rawProvider = form.get("byo_provider");
+    const rawProvider = form.get("sms_byo_provider");
     const byoProvider: "twilio" | "telnyx" =
       rawProvider === "telnyx" ? "telnyx" : "twilio";
     const body: Record<string, string> = {};
@@ -236,9 +236,9 @@ export async function action({ request, context }: Route.ActionArgs) {
         if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
       }
     }
-    // Persist byo_provider on the tenant config alongside the secrets save.
+    // Persist sms_byo_provider on the tenant config alongside the secrets save.
     const cfgRes = await api.admin["tenant-config"].$patch({
-      json: { byoProvider },
+      json: { smsByoProvider: byoProvider },
     }).catch(() => null);
     if (cfgRes && !cfgRes.ok) {
       return { intent, ok: false, error: "Failed to save provider selection.", field: null, test: null };

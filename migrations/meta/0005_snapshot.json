@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9eaa7761-2205-4968-a78a-5e67d955aa72",
+  "id": "524f4cfc-de14-4364-a5f6-42033bab52c8",
   "prevId": "b9cd6306-c73c-481e-8e8a-eee1d58b384d",
   "tables": {
     "agreement_requests": {
@@ -6629,7 +6629,7 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'own'"
+          "default": "'platform'"
         },
         "sender_display_name": {
           "name": "sender_display_name",
@@ -6865,8 +6865,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "byo_provider": {
-          "name": "byo_provider",
+        "sms_byo_provider": {
+          "name": "sms_byo_provider",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

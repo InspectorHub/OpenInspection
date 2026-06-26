@@ -135,7 +135,7 @@ export async function scheduled(
     //    creds (platform env or tenant own) via the runtime built from env below.
     try {
         const svc = new AutomationService(env.DB, undefined, undefined, maybeMetering(env));
-        // Provider-aware: loadProviderForTenant reads byo_provider from tenant_configs
+        // Provider-aware: loadProviderForTenant reads sms_byo_provider from tenant_configs
         // and routes to TwilioClient (default) or TelnyxProvider. The Twilio path is
         // byte-identical — the same resolveTwilio() logic runs inside.
         const sms = (env.TENANT_CACHE && env.JWT_SECRET)

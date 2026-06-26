@@ -15,7 +15,7 @@ type ByoProvider = "twilio" | "telnyx";
  * state, fetcher, and the resolved inbound URL.
  *
  * The provider selector lets tenants choose between Twilio (default) and Telnyx.
- * The selected provider is submitted as a hidden `byo_provider` field, which the
+ * The selected provider is submitted as a hidden `sms_byo_provider` field, which the
  * `save-sms-secrets` action reads to persist the choice and route the credentials.
  */
 export function SmsSecretsPanel({
@@ -51,7 +51,7 @@ export function SmsSecretsPanel({
         <Form method="post" className="space-y-4 pt-4 border-t border-ih-border">
           <input type="hidden" name="intent" value="save-sms-secrets" />
           {/* Hidden field carries the selected provider so the action can read it */}
-          <input type="hidden" name="byo_provider" value={provider} />
+          <input type="hidden" name="sms_byo_provider" value={provider} />
 
           {/* Provider choice */}
           <div className="space-y-1.5">

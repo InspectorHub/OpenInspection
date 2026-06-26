@@ -20,4 +20,4 @@ CREATE TABLE `messaging_compliance` (
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE `tenant_configs` ADD COLUMN `byo_provider` text;
+ALTER TABLE `tenant_configs` ADD `sms_byo_provider` text;

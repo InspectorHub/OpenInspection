@@ -99,7 +99,7 @@ export interface ResolvedProvider {
 }
 
 /**
- * Provider-aware loader: reads `byo_provider` from the tenant config to select
+ * Provider-aware loader: reads `sms_byo_provider` from the tenant config to select
  * between Twilio (default) and Telnyx. Returns a ResolvedProvider or null when
  * no complete credential set is available (fail-closed).
  *
@@ -111,13 +111,13 @@ export interface ResolvedProvider {
 export async function loadProviderForTenant(env: TwilioLoaderEnv, tenantId: string): Promise<ResolvedProvider | null> {
     const db = drizzle(env.DB);
     const cfg = await db
-        .select({ smsMode: tenantConfigs.smsMode, byoProvider: tenantConfigs.byoProvider })
+        .select({ smsMode: tenantConfigs.smsMode, smsByoProvider: tenantConfigs.smsByoProvider })
         .from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId))
         .get()
         .catch(() => null);
     const mode = cfg?.smsMode ?? 'platform';
-    const byoProvider = cfg?.byoProvider ?? null;
+    const byoProvider = cfg?.smsByoProvider ?? null;
 
     const dec = (await loadTenantSecrets(
         env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,

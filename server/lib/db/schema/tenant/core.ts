@@ -167,9 +167,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Tasks 14/15 retire it.
     collabEditing: integer('collab_editing', { mode: 'boolean' }).notNull().default(true),
     updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
-    // BYO provider choice — which carrier the tenant's own TWILIO_*/TELNYX_*
+    // SMS BYO provider choice — which carrier the tenant's own TWILIO_*/TELNYX_*
     // secrets belong to. NULL while not in own/managed mode.
-    byoProvider: text('byo_provider', { enum: ['twilio', 'telnyx'] }),
+    smsByoProvider: text('sms_byo_provider', { enum: ['twilio', 'telnyx'] }),
 });
 
 /**

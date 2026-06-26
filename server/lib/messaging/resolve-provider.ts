@@ -1,5 +1,5 @@
 /**
- * Provider resolution — maps a stored `byo_provider` value to the matching
+ * Provider resolution — maps a stored `sms_byo_provider` value to the matching
  * MessagingProvider adapter instance. The resolver is a pure selection function:
  * it does NOT do I/O; callers supply the already-decrypted creds.
  *
