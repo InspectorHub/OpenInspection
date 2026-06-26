@@ -170,6 +170,11 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // SMS BYO provider choice — which carrier the tenant's own TWILIO_*/TELNYX_*
     // secrets belong to. NULL while not in own/managed mode.
     smsByoProvider: text('sms_byo_provider', { enum: ['twilio', 'telnyx'] }),
+    // Email BYO provider choice (#195) — which transactional email provider the
+    // tenant's own secrets belong to. Default 'resend' matches the platform
+    // default and lets resolution logic fall through to env keys when NULL.
+    // NULL while not in 'own' email mode.
+    emailByoProvider: text('email_byo_provider', { enum: ['resend', 'sendgrid', 'postmark', 'mailgun'] }).notNull().default('resend'),
 });
 
 /**

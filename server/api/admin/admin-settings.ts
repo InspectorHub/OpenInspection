@@ -129,6 +129,7 @@ const TenantConfigGetResponseSchema = z.object({
         companyPhone: z.string().nullable().optional().describe('Track L — call-back number rendered as {{company_phone}} in SMS copy.'),
         videoMode: z.enum(['r2', 'stream']).describe('Self-host video backend (default r2). Ignored in SaaS.'),
         smsByoProvider: z.enum(['twilio', 'telnyx']).nullable().describe('BYO SMS provider selection (null = default Twilio).'),
+        emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).nullable().describe('BYO email provider selection (null = default Resend).'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -165,6 +166,7 @@ const TenantConfigPatchSchema = z.object({
     companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),
     videoMode: z.enum(['r2', 'stream']).optional().describe('Self-host video backend: r2 (default, free) or stream (requires STREAM binding + customer subdomain).'),
     smsByoProvider: z.enum(['twilio', 'telnyx']).optional().describe('BYO SMS provider selection — which provider adapter to use when smsMode is "own".'),
+    emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).optional().describe('BYO email provider — which adapter to use when email mode is "own".'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -411,6 +413,7 @@ export const adminSettingsRoutes = createApiRouter()
                 companyPhone: (config?.companyPhone as string | null) ?? null,
                 videoMode: (config?.videoMode as 'r2' | 'stream') ?? 'r2',
                 smsByoProvider: (config?.smsByoProvider as 'twilio' | 'telnyx' | null) ?? null,
+                emailByoProvider: (config?.emailByoProvider as 'resend' | 'sendgrid' | 'postmark' | 'mailgun' | null) ?? 'resend',
             },
         }, 200);
     })
@@ -456,6 +459,9 @@ export const adminSettingsRoutes = createApiRouter()
         }
         if (body.smsByoProvider !== undefined) {
             update.smsByoProvider = body.smsByoProvider;
+        }
+        if (body.emailByoProvider !== undefined) {
+            update.emailByoProvider = body.emailByoProvider;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);

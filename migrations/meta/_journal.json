@@ -43,6 +43,13 @@
       "when": 1782434762578,
       "tag": "0005_shiny_wonder_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1782441526958,
+      "tag": "0006_friendly_morlocks",
+      "breakpoints": true
     }
   ]
 }

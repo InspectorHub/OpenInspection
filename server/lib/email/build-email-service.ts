@@ -7,6 +7,12 @@ import { maybeMetering } from '../../services/metering.service';
 import { currentPeriodKey } from '../usage/period';
 import type { EmailIdentityConfig } from './sender-identity';
 import type { TemplateOverride } from '../email-templates/types';
+import { resolveEmailProvider, coerceEmailByoProvider, type EmailByoProvider } from './resolve-provider';
+import { logger } from '../logger';
+import { ResendProvider } from './providers/resend';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
+import { tenantConfigs } from '../db/schema';
 
 /**
  * The env bindings an EmailService needs. Both the Hono request env (`c.env`)
@@ -42,8 +48,22 @@ function absoluteLogoUrl(logoUrl: string | null | undefined, baseUrl: string | u
 export interface LoadedEmailConfig {
     emailIdentity?: EmailIdentityConfig | undefined;
     emailBrand?: { companyName: string | null; logoUrl: string | null; primaryColor: string | null } | undefined;
-    dbSecrets: { resendApiKey?: string; senderEmail?: string; geminiApiKey?: string };
+    dbSecrets: {
+        resendApiKey?: string;
+        senderEmail?: string;
+        geminiApiKey?: string;
+        /** SendGrid BYO: SENDGRID_API_KEY from tenant secrets_enc. */
+        sendgridApiKey?: string;
+        /** Postmark BYO: POSTMARK_SERVER_TOKEN from tenant secrets_enc (stored in apiKey field of PostmarkProvider). */
+        postmarkToken?: string;
+        /** Mailgun BYO: MAILGUN_API_KEY from tenant secrets_enc. */
+        mailgunApiKey?: string;
+        /** Mailgun BYO: MAILGUN_DOMAIN from tenant secrets_enc. */
+        mailgunDomain?: string;
+    };
     emailOverrides?: Map<string, TemplateOverride> | undefined;
+    /** Which email provider the tenant has selected for own-mode sends (see #195). Default 'resend'. */
+    emailByoProvider?: EmailByoProvider | undefined;
 }
 
 /**
@@ -53,17 +73,66 @@ export interface LoadedEmailConfig {
  * contexts) both produce identical EmailService instances.
  */
 export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmailConfig, meterTenantId?: string): EmailService {
-    const { emailIdentity, emailBrand, dbSecrets, emailOverrides } = cfg;
+    const { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider } = cfg;
+
+    // Determine whether the selected BYO provider's creds are present.
+    const byoProvider = emailByoProvider ?? 'resend';
+    const selectedProviderCredsPresent = (() => {
+        switch (byoProvider) {
+            case 'sendgrid': return !!dbSecrets.sendgridApiKey;
+            case 'postmark': return !!dbSecrets.postmarkToken;
+            case 'mailgun':  return !!dbSecrets.mailgunApiKey && !!dbSecrets.mailgunDomain;
+            default:         return !!dbSecrets.resendApiKey; // 'resend'
+        }
+    })();
+
     const ownReady =
         emailIdentity?.mode === 'own' &&
-        !!dbSecrets.resendApiKey &&
-        !!emailIdentity.senderEmail;
-    const resendKey = ownReady
-        ? dbSecrets.resendApiKey!
-        : (env.RESEND_API_KEY || dbSecrets.resendApiKey || '');
-    const fromAddress = ownReady
-        ? emailIdentity!.senderEmail!
-        : (env.SENDER_EMAIL || emailIdentity?.senderEmail || '');
+        !!emailIdentity.senderEmail &&
+        selectedProviderCredsPresent;
+
+    let provider;
+    let apiKeySentinel: string;
+    let fromAddress: string;
+
+    if (ownReady) {
+        // Own path: use the tenant's chosen provider + their creds.
+        switch (byoProvider) {
+            case 'sendgrid':
+                provider = resolveEmailProvider('sendgrid', { apiKey: dbSecrets.sendgridApiKey! });
+                apiKeySentinel = dbSecrets.sendgridApiKey!;
+                break;
+            case 'postmark':
+                provider = resolveEmailProvider('postmark', { apiKey: dbSecrets.postmarkToken! });
+                apiKeySentinel = dbSecrets.postmarkToken!;
+                break;
+            case 'mailgun':
+                provider = resolveEmailProvider('mailgun', { apiKey: dbSecrets.mailgunApiKey!, domain: dbSecrets.mailgunDomain! });
+                apiKeySentinel = dbSecrets.mailgunApiKey!;
+                break;
+            default:
+                // 'resend' own path
+                provider = resolveEmailProvider('resend', { apiKey: dbSecrets.resendApiKey! });
+                apiKeySentinel = dbSecrets.resendApiKey!;
+                break;
+        }
+        fromAddress = emailIdentity!.senderEmail!;
+    } else {
+        // A tenant who selected own-mode with a non-Resend provider but whose
+        // credentials are missing/incomplete silently falls back to the platform
+        // Resend path below (different From domain/deliverability). Surface it so
+        // operators can spot a half-finished provider switch in logs; the
+        // Settings validate-on-save flow already flags this at config time.
+        if (emailIdentity?.mode === 'own' && byoProvider !== 'resend' && !selectedProviderCredsPresent) {
+            logger.warn('[email] own-mode provider creds missing — falling back to platform Resend', { provider: byoProvider });
+        }
+        // Platform/default path — byte-for-byte identical to previous behavior.
+        const platformResendKey = env.RESEND_API_KEY || dbSecrets.resendApiKey || '';
+        provider = new ResendProvider({ apiKey: platformResendKey });
+        apiKeySentinel = platformResendKey;
+        fromAddress = env.SENDER_EMAIL || emailIdentity?.senderEmail || '';
+    }
+
     const appName = emailIdentity?.companyName || env.APP_NAME || 'OpenInspection';
     const platformColor = env.PRIMARY_COLOR || '#4f46e5';
     const renderer = new EmailTemplateRenderer({
@@ -83,7 +152,7 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
     const meter = metering && meterTenantId
         ? { record: () => metering.record(meterTenantId, 'email', currentPeriodKey(new Date())) }
         : undefined;
-    return new EmailService(resendKey, fromAddress, appName, emailIdentity, renderer, meter);
+    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider);
 }
 
 /**
@@ -99,26 +168,48 @@ async function loadEmailSecrets(env: EmailServiceEnv, tenantId: string): Promise
         env.DB, env.TENANT_CACHE, tenantId, env.JWT_SECRET, env.JWT_SECRET_PREVIOUS,
     ).catch(() => null)) ?? {};
     return {
-        ...(dec.RESEND_API_KEY ? { resendApiKey: dec.RESEND_API_KEY } : {}),
-        ...(dec.GEMINI_API_KEY ? { geminiApiKey: dec.GEMINI_API_KEY } : {}),
+        ...(dec.RESEND_API_KEY       ? { resendApiKey:   dec.RESEND_API_KEY }       : {}),
+        ...(dec.GEMINI_API_KEY       ? { geminiApiKey:   dec.GEMINI_API_KEY }       : {}),
+        ...(dec.SENDGRID_API_KEY     ? { sendgridApiKey: dec.SENDGRID_API_KEY }     : {}),
+        ...(dec.POSTMARK_SERVER_TOKEN ? { postmarkToken:  dec.POSTMARK_SERVER_TOKEN } : {}),
+        ...(dec.MAILGUN_API_KEY      ? { mailgunApiKey:  dec.MAILGUN_API_KEY }      : {}),
+        ...(dec.MAILGUN_DOMAIN       ? { mailgunDomain:  dec.MAILGUN_DOMAIN }       : {}),
     };
 }
 
 /**
- * Async: load a tenant's email config (identity, brand, secrets, overrides)
- * with all four reads in parallel. Shared by `diMiddleware` (per-request,
- * A-16) and `buildTenantEmailService` (non-request contexts, B-13).
+ * Async: load a tenant's email config (identity, brand, secrets, overrides,
+ * and BYO provider selection) with all reads in parallel.
+ * Shared by `diMiddleware` (per-request, A-16) and `buildTenantEmailService`
+ * (non-request contexts, B-13).
  */
 export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: string): Promise<LoadedEmailConfig> {
     const branding = new BrandingService(env.DB, env.TENANT_CACHE);
-    const [emailIdentity, emailBrand, dbSecrets, overrides] = await Promise.all([
+    const byoProviderReadPromise = (async () => {
+        try {
+            return await drizzle(env.DB)
+                .select({ emailByoProvider: tenantConfigs.emailByoProvider })
+                .from(tenantConfigs)
+                .where(eq(tenantConfigs.tenantId, tenantId))
+                .get();
+        } catch {
+            return null;
+        }
+    })();
+
+    const [emailIdentity, emailBrand, dbSecrets, overrides, byoProviderRow] = await Promise.all([
         branding.getEmailIdentity(tenantId).catch(() => undefined),
         branding.getEmailBrand(tenantId).catch(() => undefined),
         loadEmailSecrets(env, tenantId).catch(() => ({} as LoadedEmailConfig['dbSecrets'])),
         new EmailTemplateService(env.DB).listForTenant(tenantId).catch(() => []),
+        byoProviderReadPromise,
     ]);
     const emailOverrides = overrides.length ? new Map(overrides.map(o => [o.trigger, o])) : undefined;
-    return { emailIdentity, emailBrand, dbSecrets, emailOverrides };
+    // emailByoProvider defaults to 'resend' when the row is absent (new tenant,
+    // no config row yet) or carries an unrecognized value — drizzle's `{ enum }`
+    // is the only write path, but it is not DB-enforced, so guard the read.
+    const emailByoProvider: EmailByoProvider = coerceEmailByoProvider(byoProviderRow?.emailByoProvider);
+    return { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider };
 }
 
 /**

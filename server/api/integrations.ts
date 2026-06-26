@@ -6,12 +6,16 @@
  *
  * `POST /api/integrations/stripe/test` — on-demand "Test connection" diagnostic.
  * `GET  /api/integrations/stripe/webhook-log` — recent delivery log (diagnostics).
+ * `POST /api/integrations/email/validate` — validate stored BYO email provider creds.
  */
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { requireRole } from '../lib/middleware/rbac';
+import { EmailValidateBodySchema, EmailValidateOkSchema } from '../lib/validations/integrations.schema';
+import { resolveEmailProvider } from '../lib/email/resolve-provider';
+import { logger } from '../lib/logger';
 
 const statusRoute = createRoute(withMcpMetadata({
     method:  'get',
@@ -101,6 +105,32 @@ const geminiTestRoute = createRoute(withMcpMetadata({
     description: "Calls the Gemini models list with the tenant's STORED bring-your-own key — the on-demand diagnostic behind the Advanced settings Test connection button.",
 }, { scopes: ['admin'], tier: 'extended' }));
 
+// ─── POST /email/validate ─────────────────────────────────────────────────────
+
+const emailValidateRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/email/validate',
+    tags: ['integrations'],
+    summary: 'Validate stored BYO email provider credentials',
+    middleware: [requireRole('owner', 'manager')],
+    request: {
+        body: { content: { 'application/json': { schema: EmailValidateBodySchema } } },
+    },
+    responses: {
+        200: { content: { 'application/json': { schema: EmailValidateOkSchema } }, description: 'Credentials accepted by the provider' },
+        502: { description: 'Provider rejected the stored credentials' },
+        503: { description: 'Required credentials not configured' },
+    },
+    operationId: 'validateEmailProviderCredentials',
+    description: [
+        "Validates the tenant's stored BYO email provider credentials by calling each",
+        'provider\'s validateCredentials() method. Use for sendgrid / postmark / mailgun;',
+        'Resend keeps its own /resend/test endpoint (send-only key probe). Creds are',
+        'read from c.env after integration-secrets middleware merges them from the',
+        'encrypted tenant store.',
+    ].join(' '),
+}, { scopes: ['admin'], tier: 'extended' }));
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const integrationsRoutes = createApiRouter()
@@ -173,6 +203,77 @@ export const integrationsRoutes = createApiRouter()
             return c.json({ success: false as const, error: { code: 'GEMINI_KEY_INVALID', message: 'Google rejected the stored Gemini API key.' } }, 502);
         }
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(emailValidateRoute, async (c) => {
+        const { provider } = c.req.valid('json');
+        const env = c.env as unknown as Record<string, string | undefined>;
+        const tenantId = c.get('tenantId');
+
+        // Build creds from env (integration-secrets middleware merges the tenant's
+        // stored keys into env before this handler runs — same path as resendTestRoute).
+        let creds: { apiKey: string } | { apiKey: string; domain: string } | null = null;
+
+        switch (provider) {
+            case 'resend': {
+                const key = env.RESEND_API_KEY;
+                if (!key) {
+                    return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
+                }
+                creds = { apiKey: key };
+                break;
+            }
+            case 'sendgrid': {
+                const key = env.SENDGRID_API_KEY;
+                if (!key) {
+                    return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No SendGrid API key is configured.' } }, 503);
+                }
+                creds = { apiKey: key };
+                break;
+            }
+            case 'postmark': {
+                const token = env.POSTMARK_SERVER_TOKEN;
+                if (!token) {
+                    return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No Postmark Server Token is configured.' } }, 503);
+                }
+                creds = { apiKey: token };
+                break;
+            }
+            case 'mailgun': {
+                const key = env.MAILGUN_API_KEY;
+                const domain = env.MAILGUN_DOMAIN;
+                if (!key || !domain) {
+                    return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'Mailgun API key and domain are both required.' } }, 503);
+                }
+                creds = { apiKey: key, domain };
+                break;
+            }
+        }
+
+        try {
+            const adapter = resolveEmailProvider(provider, creds);
+            const result = adapter.validateCredentials
+                ? await adapter.validateCredentials()
+                : { ok: true as const };
+
+            if (result.ok) {
+                return c.json({ success: true as const, data: { ok: true as const } }, 200);
+            }
+            return c.json({
+                success: false as const,
+                error: { code: 'EMAIL_KEY_INVALID', message: (result as { ok: false; error: string }).error },
+            }, 502);
+        } catch (err) {
+            // Never 500 — surface as 502 with a safe message; do NOT log the key.
+            logger.warn('[email-validate] unexpected error during credential check', {
+                tenantId,
+                provider,
+                error: err instanceof Error ? err.message : String(err),
+            });
+            return c.json({
+                success: false as const,
+                error: { code: 'EMAIL_KEY_INVALID', message: 'Credential validation failed unexpectedly.' },
+            }, 502);
+        }
     });
 
 export type IntegrationsApi = typeof integrationsRoutes;

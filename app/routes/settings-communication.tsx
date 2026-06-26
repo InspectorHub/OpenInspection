@@ -60,9 +60,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     mode: smsCfgBody?.data?.mode ?? "platform",
     effectiveSource: smsCfgBody?.data?.effectiveSource ?? "none",
   };
-  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null; smsByoProvider?: "twilio" | "telnyx" | null } }) : null;
+  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null; smsByoProvider?: "twilio" | "telnyx" | null; emailByoProvider?: "resend" | "sendgrid" | "postmark" | "mailgun" | null } }) : null;
   const companyPhone = tenantCfgBody?.data?.companyPhone ?? "";
   const byoProvider: "twilio" | "telnyx" = tenantCfgBody?.data?.smsByoProvider === "telnyx" ? "telnyx" : "twilio";
+  const emailByoProvider: "resend" | "sendgrid" | "postmark" | "mailgun" =
+    (["resend", "sendgrid", "postmark", "mailgun"] as const).includes(
+      tenantCfgBody?.data?.emailByoProvider as "resend" | "sendgrid" | "postmark" | "mailgun"
+    )
+      ? (tenantCfgBody!.data!.emailByoProvider as "resend" | "sendgrid" | "postmark" | "mailgun")
+      : "resend";
 
   // SMS compliance status (BYO Twilio toll-free verification). Fails gracefully
   // to not_started so the UI always has a defined value to render.
@@ -90,6 +96,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     googleCalendarConnected: Boolean(d?.googleCalendarConnected),
     secrets: {
       RESEND_API_KEY: secrets.RESEND_API_KEY || "",
+      SENDGRID_API_KEY: secrets.SENDGRID_API_KEY || "",
+      POSTMARK_SERVER_TOKEN: secrets.POSTMARK_SERVER_TOKEN || "",
+      MAILGUN_API_KEY: secrets.MAILGUN_API_KEY || "",
+      MAILGUN_DOMAIN: secrets.MAILGUN_DOMAIN || "",
       GOOGLE_CLIENT_ID: secrets.GOOGLE_CLIENT_ID || "",
       GOOGLE_CLIENT_SECRET: secrets.GOOGLE_CLIENT_SECRET || "",
       TWILIO_ACCOUNT_SID: secrets.TWILIO_ACCOUNT_SID || "",
@@ -101,6 +111,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     smsConfig,
     companyPhone,
     byoProvider,
+    emailByoProvider,
     compliance,
   };
 }
@@ -171,9 +182,25 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "save-email-secrets") {
+    const VALID_EMAIL_PROVIDERS = ["resend", "sendgrid", "postmark", "mailgun"] as const;
+    type EmailByoProvider = typeof VALID_EMAIL_PROVIDERS[number];
+    const rawProvider = form.get("email_byo_provider");
+    const emailByoProvider: EmailByoProvider = (VALID_EMAIL_PROVIDERS as ReadonlyArray<string>).includes(rawProvider as string)
+      ? (rawProvider as EmailByoProvider)
+      : "resend";
     const body: Record<string, string> = {};
-    const resendKey = form.get("RESEND_API_KEY");
-    if (resendKey && typeof resendKey === "string" && resendKey.trim()) body.RESEND_API_KEY = resendKey;
+    // Collect only the non-empty secret fields relevant to the selected provider.
+    for (const key of ["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_SERVER_TOKEN", "MAILGUN_API_KEY", "MAILGUN_DOMAIN"]) {
+      const v = form.get(key);
+      if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
+    }
+    // Persist the provider selection on the tenant config first, then save secrets.
+    const cfgRes = await api.admin["tenant-config"].$patch({
+      json: { emailByoProvider },
+    }).catch(() => null);
+    if (cfgRes && !cfgRes.ok) {
+      return { intent, ok: false, error: "Failed to save provider selection.", field: null, test: null };
+    }
     return saveSecrets(api, intent, body, "Failed to save email secrets.");
   }
 
@@ -192,6 +219,30 @@ export async function action({ request, context }: Route.ActionArgs) {
       };
     }
     return { intent, ok: true, error: null, field: null, test: body.data };
+  }
+
+  if (intent === "validate-email-provider") {
+    const VALID_PROVIDERS = ["resend", "sendgrid", "postmark", "mailgun"] as const;
+    type EmailProvider = typeof VALID_PROVIDERS[number];
+    const rawProvider = form.get("provider");
+    if (!rawProvider || !(VALID_PROVIDERS as ReadonlyArray<string>).includes(rawProvider as string)) {
+      return { intent, ok: false, error: "Unknown provider.", field: null, test: null };
+    }
+    const provider = rawProvider as EmailProvider;
+    const res = await api.integrations.email.validate.$post({ json: { provider } });
+    const body = (await res.json().catch(() => null)) as
+      | { data?: { ok: boolean }; error?: { message?: string } }
+      | null;
+    if (!res.ok || !body?.data?.ok) {
+      return {
+        intent,
+        ok: false,
+        error: body?.error?.message ?? "Credential validation failed.",
+        field: null,
+        test: null,
+      };
+    }
+    return { intent, ok: true, error: null, field: null, test: null };
   }
 
   if (intent === "save-calendar-secrets") {
@@ -284,15 +335,17 @@ export default function SettingsCommunication() {
   const icsUrl = denied ? null : loaderResult.icsUrl;
   const googleCalendarConnected = denied ? false : loaderResult.googleCalendarConnected;
   const secrets = denied
-    ? { RESEND_API_KEY: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "", TELNYX_API_KEY: "", TELNYX_FROM_NUMBER: "" }
+    ? { RESEND_API_KEY: "", SENDGRID_API_KEY: "", POSTMARK_SERVER_TOKEN: "", MAILGUN_API_KEY: "", MAILGUN_DOMAIN: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "", TELNYX_API_KEY: "", TELNYX_FROM_NUMBER: "" }
     : loaderResult.secrets;
   const smsConfig = denied ? { mode: "platform" as const, effectiveSource: "none" as const } : loaderResult.smsConfig as { mode: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource: "platform" | "own" | "none" };
   const companyPhone = denied ? "" : loaderResult.companyPhone;
   const byoProvider = denied ? ("twilio" as const) : loaderResult.byoProvider;
+  const emailByoProvider = denied ? ("resend" as const) : loaderResult.emailByoProvider;
   const compliance = denied ? { complianceStatus: "not_started" as const, rejectionReason: null } : loaderResult.compliance;
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const resendTestFetcher = useFetcher<typeof action>();
+  const emailValidateFetcher = useFetcher<typeof action>();
   const smsTestFetcher = useFetcher<typeof action>();
   const session = useSessionContext();
   // Self-host (standalone) deployments have no platform mailbox / SMS number —
@@ -437,6 +490,8 @@ export default function SettingsCommunication() {
         savingEmailSecrets={savingEmailSecrets}
         resendTestFetcher={resendTestFetcher}
         resendTest={resendTest}
+        emailValidateFetcher={emailValidateFetcher}
+        initialProvider={emailByoProvider}
       />
 
       {/* SMS delivery (Track L) */}
