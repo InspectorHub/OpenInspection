@@ -7,7 +7,8 @@ import { maybeMetering } from '../../services/metering.service';
 import { currentPeriodKey } from '../usage/period';
 import type { EmailIdentityConfig } from './sender-identity';
 import type { TemplateOverride } from '../email-templates/types';
-import { resolveEmailProvider, type EmailByoProvider } from './resolve-provider';
+import { resolveEmailProvider, coerceEmailByoProvider, type EmailByoProvider } from './resolve-provider';
+import { logger } from '../logger';
 import { ResendProvider } from './providers/resend';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
@@ -117,6 +118,14 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
         }
         fromAddress = emailIdentity!.senderEmail!;
     } else {
+        // A tenant who selected own-mode with a non-Resend provider but whose
+        // credentials are missing/incomplete silently falls back to the platform
+        // Resend path below (different From domain/deliverability). Surface it so
+        // operators can spot a half-finished provider switch in logs; the
+        // Settings validate-on-save flow already flags this at config time.
+        if (emailIdentity?.mode === 'own' && byoProvider !== 'resend' && !selectedProviderCredsPresent) {
+            logger.warn('[email] own-mode provider creds missing — falling back to platform Resend', { provider: byoProvider });
+        }
         // Platform/default path — byte-for-byte identical to previous behavior.
         const platformResendKey = env.RESEND_API_KEY || dbSecrets.resendApiKey || '';
         provider = new ResendProvider({ apiKey: platformResendKey });
@@ -196,8 +205,10 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
         byoProviderReadPromise,
     ]);
     const emailOverrides = overrides.length ? new Map(overrides.map(o => [o.trigger, o])) : undefined;
-    // emailByoProvider defaults to 'resend' when the row is absent (new tenant, no config row yet).
-    const emailByoProvider: EmailByoProvider = (byoProviderRow?.emailByoProvider ?? 'resend') as EmailByoProvider;
+    // emailByoProvider defaults to 'resend' when the row is absent (new tenant,
+    // no config row yet) or carries an unrecognized value — drizzle's `{ enum }`
+    // is the only write path, but it is not DB-enforced, so guard the read.
+    const emailByoProvider: EmailByoProvider = coerceEmailByoProvider(byoProviderRow?.emailByoProvider);
     return { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider };
 }
 

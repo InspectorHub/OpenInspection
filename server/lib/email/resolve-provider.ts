@@ -15,7 +15,17 @@ import { SendgridProvider } from './providers/sendgrid';
 import { PostmarkProvider } from './providers/postmark';
 import { MailgunProvider } from './providers/mailgun';
 
-export type EmailByoProvider = 'resend' | 'sendgrid' | 'postmark' | 'mailgun';
+/** The selectable BYO email providers, in one place so callers can validate
+ *  an untrusted value (e.g. a raw DB read) against the allow-list before use. */
+export const EMAIL_BYO_PROVIDERS = ['resend', 'sendgrid', 'postmark', 'mailgun'] as const;
+export type EmailByoProvider = (typeof EMAIL_BYO_PROVIDERS)[number];
+
+/** Narrow an untrusted value to a known provider, defaulting to 'resend'. */
+export function coerceEmailByoProvider(value: unknown): EmailByoProvider {
+  return (EMAIL_BYO_PROVIDERS as ReadonlyArray<string>).includes(value as string)
+    ? (value as EmailByoProvider)
+    : 'resend';
+}
 
 /**
  * Union of credential shapes accepted by the four providers.

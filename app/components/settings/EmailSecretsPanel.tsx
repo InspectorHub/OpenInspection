@@ -7,9 +7,6 @@ import type { action } from "~/routes/settings-communication";
 
 type ActionFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
-/** @deprecated use ActionFetcher directly */
-type ResendTestFetcher = ActionFetcher;
-
 type EmailByoProvider = "resend" | "sendgrid" | "postmark" | "mailgun";
 
 const PROVIDER_LABELS: Record<EmailByoProvider, string> = {
@@ -53,8 +50,8 @@ export function EmailSecretsPanel({
   secretFieldError: (name: string) => string | undefined;
   secretFormError: (intent: string) => string | null;
   savingEmailSecrets: boolean;
-  resendTestFetcher: ResendTestFetcher;
-  resendTest: ResendTestFetcher["data"];
+  resendTestFetcher: ActionFetcher;
+  resendTest: ActionFetcher["data"];
   emailValidateFetcher: ActionFetcher;
   initialProvider?: EmailByoProvider;
 }) {
