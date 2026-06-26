@@ -48,6 +48,12 @@ export const INTEGRATION_SECRET_KEYS = [
     // Task 8 (#196) — Telnyx BYO provider credentials.
     'TELNYX_API_KEY',
     'TELNYX_FROM_NUMBER',
+    // #195 — email BYO provider credentials (SendGrid / Postmark / Mailgun).
+    // RESEND_API_KEY above covers the Resend path.
+    'SENDGRID_API_KEY',
+    'POSTMARK_SERVER_TOKEN',
+    'MAILGUN_API_KEY',
+    'MAILGUN_DOMAIN',
     'APP_BASE_URL',
 ] as const;
 
@@ -74,6 +80,9 @@ const KEY_FORMATS: Array<{ key: IntegrationSecretKey; re: RegExp; hint: string }
     // TWILIO_AUTH_TOKEN has no stable public prefix — not format-gated.
     { key: 'TELNYX_FROM_NUMBER', re: /^\+[1-9]\d{6,14}$/, hint: 'must be an E.164 number (e.g. +15551234567)' },
     // TELNYX_API_KEY has no stable public prefix — not format-gated.
+    { key: 'SENDGRID_API_KEY', re: /^SG\./, hint: 'must start with SG.' },
+    { key: 'MAILGUN_DOMAIN', re: /^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$/, hint: 'must be a domain, e.g. mg.yourdomain.com' },
+    // POSTMARK_SERVER_TOKEN and MAILGUN_API_KEY have no stable public prefix — not format-gated.
 ];
 
 /** Returns the first format violation among NEW (non-masked) values, or null. */
