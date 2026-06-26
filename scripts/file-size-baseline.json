@@ -41,7 +41,7 @@
   "app/components/editor/InspectionSettingsSheet.tsx": 450,
   "app/components/NewInspectionWizard.tsx": 442,
   "app/lib/collab/results-doc-connection.ts": 435,
-  "app/routes/settings-communication.tsx": 541,
+  "app/routes/settings-communication.tsx": 548,
   "app/components/media-studio/VideoCapture.tsx": 432,
   "app/routes/templates.tsx": 414,
   "server/lib/email-templates/registry.ts": 413,

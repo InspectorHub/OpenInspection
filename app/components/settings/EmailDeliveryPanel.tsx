@@ -24,14 +24,29 @@ type EmailFormShape = {
 type EmailForm = ReturnType<typeof useForm<EmailFormShape>>[0];
 type EmailFields = ReturnType<typeof useForm<EmailFormShape>>[1];
 
+type EmailByoProvider = "resend" | "sendgrid" | "postmark" | "mailgun";
+const EMAIL_PROVIDER_LABELS: Record<EmailByoProvider, string> = {
+  resend: "Resend",
+  sendgrid: "SendGrid",
+  postmark: "Postmark",
+  mailgun: "Mailgun",
+};
+
 /**
  * Settings → Communication: "Email delivery" panel. Presentational — the route
  * owns the Conform form, mode/override/PoC state, and the save action. Self-host
  * gating (`isSaas`) is threaded verbatim from the route.
+ *
+ * The "own" mode is provider-agnostic: the actual provider (Resend / SendGrid /
+ * Postmark / Mailgun) is chosen in the Email API keys panel below. This panel's
+ * own-mode copy + guardrails reflect `emailByoProvider` so they stay accurate
+ * whichever provider the tenant picked.
  */
 export function EmailDeliveryPanel({
   config,
   isSaas,
+  emailByoProvider,
+  ownProviderConfigured,
   mode,
   setMode,
   overrideName,
@@ -44,6 +59,8 @@ export function EmailDeliveryPanel({
 }: {
   config: CommConfig;
   isSaas: boolean;
+  emailByoProvider: EmailByoProvider;
+  ownProviderConfigured: boolean;
   mode: "platform" | "own";
   setMode: (m: "platform" | "own") => void;
   overrideName: boolean;
@@ -54,6 +71,7 @@ export function EmailDeliveryPanel({
   emailFields: EmailFields;
   secretFormError: (intent: string) => string | null;
 }) {
+  const providerLabel = EMAIL_PROVIDER_LABELS[emailByoProvider];
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email delivery</h3>
@@ -74,9 +92,9 @@ export function EmailDeliveryPanel({
           )}
 
           {/* Guardrail banners */}
-          {config.emailMode === "own" && (!config.senderEmail || !config.resendConfigured) ? (
+          {config.emailMode === "own" && (!config.senderEmail || !ownProviderConfigured) ? (
             <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-              Own domain selected but no sender address / Resend key — emails will fail to send.
+              Own provider selected but no sender address / {providerLabel} credentials — emails will fail to send.
             </div>
           ) : null}
           {config.emailMode === "platform" && !config.resendConfigured ? (
@@ -103,14 +121,14 @@ export function EmailDeliveryPanel({
                       onChange={() => setMode(m)}
                       className="sr-only"
                     />
-                    {m === "platform" ? "Platform email" : "My own Resend"}
+                    {m === "platform" ? "Platform email" : "My own provider"}
                   </label>
                 ))}
               </div>
               <p className="text-[11px] text-ih-fg-4">
                 {mode === "platform"
                   ? "Send from the platform mailbox. You can set the display name and reply-to; the address is fixed."
-                  : "Send from your own Resend account. Add your Resend API key below and a verified sender address."}
+                  : "Send from your own email provider. Choose the provider and add its credentials under Email API keys below, plus a verified sender address."}
               </p>
             </>
           ) : (
@@ -119,8 +137,9 @@ export function EmailDeliveryPanel({
                   default `platform` back into self-host config. */}
               <input type="hidden" name={emailFields.emailMode.name} value="own" />
               <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
-                Self-hosted deployments send from your own Resend account. Add your Resend
-                API key and a verified sender address below to enable email.
+                Self-hosted deployments send from your own email provider. Choose a provider
+                (Resend, SendGrid, Postmark, or Mailgun) and add its credentials plus a
+                verified sender address under Email API keys below to enable email.
               </p>
             </>
           )}
@@ -138,7 +157,7 @@ export function EmailDeliveryPanel({
                 {emailFields.senderEmail.errors ? (
                   <p className="mt-1 text-xs text-ih-bad-fg">{emailFields.senderEmail.errors[0]}</p>
                 ) : (
-                  <p className="text-[11px] text-ih-fg-4 mt-1">Must be a domain verified in your Resend account.</p>
+                  <p className="text-[11px] text-ih-fg-4 mt-1">Must be a domain verified in your {providerLabel} account.</p>
                 )}
               </div>
             )}
@@ -237,9 +256,17 @@ export function EmailDeliveryPanel({
             </div>
           )}
           <div className="flex items-center justify-between pt-3 border-t border-ih-border">
-            <span className={`text-[11px] font-bold ${config.resendConfigured ? "text-ih-ok-fg" : "text-ih-watch-fg"}`}>
-              {config.resendConfigured ? "Resend API key configured" : "Resend API key not set"}
-            </span>
+            {(() => {
+              // Status reflects the live mode selection: own → the chosen
+              // provider's creds; platform → the platform Resend key.
+              const activeConfigured = mode === "own" ? ownProviderConfigured : config.resendConfigured;
+              const activeLabel = mode === "own" ? `${providerLabel} credentials` : "Platform email";
+              return (
+                <span className={`text-[11px] font-bold ${activeConfigured ? "text-ih-ok-fg" : "text-ih-watch-fg"}`}>
+                  {activeConfigured ? `${activeLabel} configured` : `${activeLabel} not set`}
+                </span>
+              );
+            })()}
             <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
               Save
             </button>

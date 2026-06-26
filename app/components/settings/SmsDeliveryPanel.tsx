@@ -86,13 +86,16 @@ export function SmsDeliveryPanel({
   compliance: { complianceStatus: ComplianceStatus; rejectionReason: string | null };
   byoProvider?: "twilio" | "telnyx";
 }) {
+  // Toll-free verification is Twilio-specific; Telnyx has a different inbound/
+  // compliance flow, so the compliance block below is gated to Twilio.
+  const smsProviderLabel = byoProvider === "telnyx" ? "Telnyx" : "Twilio";
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">SMS delivery</h3>
         <p className="text-[13px] text-ih-fg-3">
-          Send appointment and report text messages via Twilio. Clients are texted only
-          after they opt in (STOP replies are honored automatically). You pay Twilio&rsquo;s
-          per-message rates directly.
+          Send appointment and report text messages by SMS. Clients are texted only
+          after they opt in — STOP replies are honored automatically. With your own
+          provider you pay the carrier&rsquo;s per-message rates directly.
         </p>
 
         {/* Mode + company phone */}
@@ -152,20 +155,21 @@ export function SmsDeliveryPanel({
           )}
           {!isSaas && (
             <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
-              Self-hosted deployments text from your own Twilio account. Add your Twilio
-              credentials below to enable SMS.
+              Self-hosted deployments text from your own SMS provider (Twilio or Telnyx).
+              Choose a provider and add its credentials below to enable SMS.
             </p>
           )}
           <p className="text-[11px] font-bold text-ih-ok-fg">
             {smsConfig.effectiveSource === "own"
-              ? "Using your Twilio"
+              ? `Using your ${smsProviderLabel}`
               : smsConfig.effectiveSource === "platform"
                 ? "Using platform SMS"
-                : "SMS not configured — set your Twilio credentials below"}
+                : "SMS not configured — set your provider credentials below"}
           </p>
 
-          {/* BYO Twilio compliance status — only shown when tenant uses own Twilio */}
-          {smsConfig.effectiveSource === "own" && (
+          {/* BYO compliance status — toll-free verification is Twilio-specific,
+              so this is gated to own-mode tenants on Twilio. */}
+          {smsConfig.effectiveSource === "own" && byoProvider !== "telnyx" && (
             <div className="space-y-1">
               <p className="text-[11px] text-ih-fg-3">
                 Toll-free verification:{" "}
