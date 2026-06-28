@@ -607,7 +607,7 @@ export const smsAdminRoutes = createApiRouter()
             return c.json({ success: false as const, error: 'managed_provision_unavailable' }, 403);
         }
 
-        // Paid-tier gate: tenant must be on a Managed-eligible paid plan.
+        // Managed-eligibility gate: tenant_configs.managed_eligible must be set.
         // managedEligible is set by portal billing sync or a platform admin.
         // Fail-closed: missing row or false → 403 (not eligible).
         const tenantId = c.get('tenantId') as string;
@@ -623,7 +623,7 @@ export const smsAdminRoutes = createApiRouter()
             cfgEligibility = null;
         }
         if (!cfgEligibility?.managedEligible) {
-            return c.json({ success: false as const, error: 'managed_requires_paid_plan' }, 403);
+            return c.json({ success: false as const, error: 'managed_not_enabled' }, 403);
         }
 
         // The tenant's managed-compliance carrier choice (default 'twilio').
@@ -702,7 +702,7 @@ export const smsAdminRoutes = createApiRouter()
             return c.json({ success: false as const, error: 'managed_provision_unavailable' }, 403);
         }
 
-        // Paid-tier gate: tenant must be on a Managed-eligible paid plan.
+        // Managed-eligibility gate: tenant_configs.managed_eligible must be set.
         // Fail-closed: missing row or false → 403 (not eligible).
         const tenantId = c.get('tenantId') as string;
         const db = drizzle(c.env.DB);
@@ -717,7 +717,7 @@ export const smsAdminRoutes = createApiRouter()
             cfgEligibility = null;
         }
         if (!cfgEligibility?.managedEligible) {
-            return c.json({ success: false as const, error: 'managed_requires_paid_plan' }, 403);
+            return c.json({ success: false as const, error: 'managed_not_enabled' }, 403);
         }
 
         // The tenant's managed-compliance carrier choice (default 'twilio').

@@ -663,7 +663,7 @@ describe('Managed compliance admin endpoints (Task 6)', () => {
     });
 
     it('POST /sms/compliance/provision on SaaS with missing managed keys → 409 and fetch never called', async () => {
-        // Seed managedEligible=true so the paid-tier gate passes and we reach the env-keys check.
+        // Seed managedEligible=true so the managed-eligibility gate passes and we reach the env-keys check.
         await db.insert(schema.tenantConfigs).values({
             tenantId: TENANT, managedEligible: true, updatedAt: new Date(),
         } as never);
@@ -687,7 +687,7 @@ describe('Managed compliance admin endpoints (Task 6)', () => {
     });
 
     it('POST /sms/compliance/provision on SaaS with managed keys → 200 returning current status', async () => {
-        // Seed managedEligible=true so the paid-tier gate passes.
+        // Seed managedEligible=true so the managed-eligibility gate passes.
         await db.insert(schema.tenantConfigs).values({
             tenantId: TENANT, managedEligible: true, updatedAt: new Date(),
         } as never);
@@ -786,7 +786,7 @@ describe('Managed compliance admin endpoints (Task 6)', () => {
         fetchSpy.mockRestore();
     });
 
-    it('POST /sms/compliance/resubmit on SaaS with no tenant_configs row → 403 managed_requires_paid_plan', async () => {
+    it('POST /sms/compliance/resubmit on SaaS with no tenant_configs row → 403 managed_not_enabled', async () => {
         // No tenant_configs row seeded → managedEligible is null (fail-closed → 403).
         const fetchSpy = vi.spyOn(globalThis, 'fetch');
         const app = buildSmsApp(db, SAAS_PROFILE);
@@ -800,7 +800,7 @@ describe('Managed compliance admin endpoints (Task 6)', () => {
         }, MANAGED_ENV, makeExecCtx());
         expect(res.status).toBe(403);
         const body = await res.json() as { error: string };
-        expect(body.error).toBe('managed_requires_paid_plan');
+        expect(body.error).toBe('managed_not_enabled');
         expect(fetchSpy).not.toHaveBeenCalled();
         fetchSpy.mockRestore();
     });
@@ -822,7 +822,7 @@ describe('Managed compliance admin endpoints (Task 6)', () => {
     });
 
     it('POST /sms/compliance/resubmit on SaaS with missing managed keys → 409 and fetch never called', async () => {
-        // Seed managedEligible=true so the paid-tier gate passes and we reach the env-keys check.
+        // Seed managedEligible=true so the managed-eligibility gate passes and we reach the env-keys check.
         await db.insert(schema.tenantConfigs).values({
             tenantId: TENANT, managedEligible: true, updatedAt: new Date(),
         } as never);
@@ -846,7 +846,7 @@ describe('Managed compliance admin endpoints (Task 6)', () => {
     });
 
     it('POST /sms/compliance/resubmit on SaaS with managed keys → 200', async () => {
-        // Seed managedEligible=true so the paid-tier gate passes.
+        // Seed managedEligible=true so the managed-eligibility gate passes.
         await db.insert(schema.tenantConfigs).values({
             tenantId: TENANT, managedEligible: true, updatedAt: new Date(),
         } as never);
@@ -1494,9 +1494,9 @@ describe('POST /sms/test — managed-send compliance gate (Task 8)', () => {
     });
 });
 
-// ─── Paid-tier gate for managed provisioning (Task 10) ───────────────────────
+// ─── Managed-eligibility gate for managed provisioning (Task 10) ───────────────────────
 
-describe('Paid-tier gate — POST /sms/compliance/provision and /resubmit (Task 10)', () => {
+describe('Managed-eligibility gate — POST /sms/compliance/provision and /resubmit (Task 10)', () => {
     /** Seed managedEligible flag into tenant_configs for TENANT. */
     async function seedManagedEligible(eligible: boolean) {
         const existing = await db.select().from(schema.tenantConfigs)
@@ -1511,7 +1511,7 @@ describe('Paid-tier gate — POST /sms/compliance/provision and /resubmit (Task 
         }
     }
 
-    it('provision: managedEligible=false → 403 managed_requires_paid_plan, provision NOT called', async () => {
+    it('provision: managedEligible=false → 403 managed_not_enabled, provision NOT called', async () => {
         await seedManagedEligible(false);
 
         const fetchSpy = vi.spyOn(globalThis, 'fetch');
@@ -1529,7 +1529,7 @@ describe('Paid-tier gate — POST /sms/compliance/provision and /resubmit (Task 
 
         expect(res.status).toBe(403);
         const body = await res.json() as { error: string };
-        expect(body.error).toBe('managed_requires_paid_plan');
+        expect(body.error).toBe('managed_not_enabled');
         // Provision must NOT have been called — no Twilio API calls.
         expect(fetchSpy).not.toHaveBeenCalled();
     });
@@ -1551,11 +1551,11 @@ describe('Paid-tier gate — POST /sms/compliance/provision and /resubmit (Task 
 
         expect(res.status).toBe(403);
         const body = await res.json() as { error: string };
-        expect(body.error).toBe('managed_requires_paid_plan');
+        expect(body.error).toBe('managed_not_enabled');
         expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('provision: managedEligible=true → proceeds past paid-tier gate (200)', async () => {
+    it('provision: managedEligible=true → proceeds past the managed-eligibility gate (200)', async () => {
         await seedManagedEligible(true);
 
         const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -1579,7 +1579,7 @@ describe('Paid-tier gate — POST /sms/compliance/provision and /resubmit (Task 
         expect(body.success).toBe(true);
     });
 
-    it('resubmit: managedEligible=false → 403 managed_requires_paid_plan, provision NOT called', async () => {
+    it('resubmit: managedEligible=false → 403 managed_not_enabled, provision NOT called', async () => {
         await seedManagedEligible(false);
 
         const fetchSpy = vi.spyOn(globalThis, 'fetch');
@@ -1597,11 +1597,11 @@ describe('Paid-tier gate — POST /sms/compliance/provision and /resubmit (Task 
 
         expect(res.status).toBe(403);
         const body = await res.json() as { error: string };
-        expect(body.error).toBe('managed_requires_paid_plan');
+        expect(body.error).toBe('managed_not_enabled');
         expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('resubmit: managedEligible=true → proceeds past paid-tier gate (200)', async () => {
+    it('resubmit: managedEligible=true → proceeds past the managed-eligibility gate (200)', async () => {
         await seedManagedEligible(true);
 
         const now = new Date();

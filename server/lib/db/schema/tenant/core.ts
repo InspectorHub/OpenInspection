@@ -176,7 +176,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // NULL while not in 'own' email mode.
     emailByoProvider: text('email_byo_provider', { enum: ['resend', 'sendgrid', 'postmark', 'mailgun'] }).notNull().default('resend'),
     // Managed SMS eligibility flag — set true by portal billing sync or a platform
-    // admin when the tenant is on a Managed-eligible paid plan. Default false =
+    // admin to enable managed compliance for the tenant. Default false =
     // not eligible; provision routes fail closed until this is explicitly set.
     managedEligible: integer('managed_eligible', { mode: 'boolean' }).notNull().default(false),
     // Managed-compliance carrier choice — which ISV provider runs the tenant's
