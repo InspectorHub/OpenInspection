@@ -18,6 +18,9 @@ interface Env {
   ASSETS?: Fetcher;
   API_URL?: string;
   SESSION_SECRET?: string;
+  /** In-process self-binding injected by the worker so RR loaders can call the
+   *  API directly (no network hop). Set on the load context; never in wrangler. */
+  API_WORKER?: { fetch: typeof fetch };
 }
 
 // The API graph (server/index → every route/service/dep) is imported LAZILY.

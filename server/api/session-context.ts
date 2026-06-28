@@ -143,7 +143,7 @@ export const sessionContextRoutes = createApiRouter()
             }
         }
 
-        const privacyUrl = (c.env as unknown as Record<string, string | undefined>).PRIVACY_URL?.trim() || null;
+        const privacyUrl = c.env.PRIVACY_URL?.trim() || null;
 
         return c.json({
             success: true,

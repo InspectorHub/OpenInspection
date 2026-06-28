@@ -193,7 +193,7 @@ export const integrationsRoutes = createApiRouter()
         return c.json({ success: true as const, data }, 200);
     })
     .openapi(stripeTestRoute, async (c) => {
-        const env = c.env as unknown as Record<string, string | undefined>;
+        const env = c.env;
         const tenantId = c.get('tenantId');
         const uid = c.get('user')?.sub ?? null;
         const secretKey = env.STRIPE_SECRET_KEY;
@@ -220,7 +220,7 @@ export const integrationsRoutes = createApiRouter()
         return c.json({ success: true as const, data: entries }, 200);
     })
     .openapi(resendTestRoute, async (c) => {
-        const env = c.env as unknown as Record<string, string | undefined>;
+        const env = c.env;
         const tenantId = c.get('tenantId');
         const uid = c.get('user')?.sub ?? null;
         const key = env.RESEND_API_KEY;
@@ -253,7 +253,7 @@ export const integrationsRoutes = createApiRouter()
         return c.json({ success: true as const, data: { domains } }, 200);
     })
     .openapi(geminiTestRoute, async (c) => {
-        const env = c.env as unknown as Record<string, string | undefined>;
+        const env = c.env;
         const tenantId = c.get('tenantId');
         const uid = c.get('user')?.sub ?? null;
         const key = env.GEMINI_API_KEY;
@@ -273,7 +273,7 @@ export const integrationsRoutes = createApiRouter()
     })
     .openapi(emailValidateRoute, async (c) => {
         const { provider } = c.req.valid('json');
-        const env = c.env as unknown as Record<string, string | undefined>;
+        const env = c.env;
         const tenantId = c.get('tenantId');
         const uid = c.get('user')?.sub ?? null;
 

@@ -134,8 +134,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // a non-OK response degrades to an empty list.
   let documents: DocumentItem[] = [];
   try {
-    const apiWorker = (context.cloudflare.env as unknown as { API_WORKER?: { fetch: typeof fetch } })
-      .API_WORKER;
+    const apiWorker = context.cloudflare.env.API_WORKER;
     const docsRes = await (apiWorker?.fetch ?? fetch)(
       new Request(`https://internal/api/inspections/${id}/documents`, {
         headers: { cookie: request.headers.get("cookie") ?? "" },

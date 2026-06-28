@@ -171,8 +171,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     // value used for the overview call. Best-effort: a non-OK response → empty.
     documents = [];
     try {
-      const apiWorker = (context.cloudflare.env as unknown as { API_WORKER?: { fetch: typeof fetch } })
-        .API_WORKER;
+      const apiWorker = context.cloudflare.env.API_WORKER;
       const docsRes = await (apiWorker?.fetch ?? fetch)(
         new Request(`https://internal/api/public/inspections/${inspectionId}/documents`, {
           headers: { cookie: cookieForApi },

@@ -87,6 +87,7 @@ export interface AppEnv {
     // Payments
     STRIPE_SECRET_KEY?: string;
     STRIPE_WEBHOOK_SECRET?: string;
+    STRIPE_PUBLISHABLE_KEY?: string;
 
     // Track L — Twilio SMS (platform-default in SaaS; merged from tenant secrets
     // by integrationSecretsMiddleware for BYO/standalone).

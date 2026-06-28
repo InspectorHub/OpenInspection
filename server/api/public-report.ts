@@ -468,7 +468,7 @@ export const publicReportRoutes = createApiRouter()
         // Bring-your-own-keys: the tenant's Stripe secret + publishable key are
         // merged into c.env from their encrypted secrets. No keys → graceful 503
         // (the pay panel shows the "contact your inspector" fallback).
-        const env = c.env as unknown as Record<string, string | undefined>;
+        const env = c.env;
         const secretKey = env.STRIPE_SECRET_KEY;
         const publishableKey = env.STRIPE_PUBLISHABLE_KEY;
         if (!secretKey || !publishableKey) {
