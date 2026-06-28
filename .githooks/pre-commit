@@ -73,6 +73,16 @@ else
     fail "DS token check failed  →  npm run lint:ds"
 fi
 
+# 3a-svg. SVG-dimensions guardrail — every public SVG must declare intrinsic
+#     width + height so an <img src=*.svg> never FOUC-flashes at ~300px before
+#     CSS loads (also gated in CI via npm run lint).
+step "SVG dimensions"
+if node scripts/check-svg-dimensions.mjs > /dev/null 2>&1; then
+    pass "SVG dimensions passed"
+else
+    fail "SVG-dimensions check failed  →  npm run lint:svg"
+fi
+
 # 3b. Migration-reference hygiene — no dangling migration sequence numbers in
 #     comments (fast full-repo scan; also gated in CI via npm run lint).
 step "Migration-reference hygiene"

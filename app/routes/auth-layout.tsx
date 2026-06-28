@@ -4,7 +4,7 @@ import type { Route } from "./+types/auth-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { Sidebar, MobileHeader } from "~/components/Sidebar";
-import { PageLoadingSkeleton } from "~/components/PageLoadingSkeleton";
+import { RouteSkeleton } from "~/components/RouteSkeleton";
 import type { SessionContext } from "~/hooks/useSessionContext";
 
 /**
@@ -81,7 +81,11 @@ export default function AuthLayout() {
         <Sidebar />
         <main className="flex-1 w-full bg-ih-bg-app overflow-y-auto">
           <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9">
-            {showSkeleton ? <PageLoadingSkeleton /> : <Outlet />}
+            {showSkeleton ? (
+              <RouteSkeleton pathname={navigation.location?.pathname ?? location.pathname} />
+            ) : (
+              <Outlet />
+            )}
           </div>
         </main>
       </div>

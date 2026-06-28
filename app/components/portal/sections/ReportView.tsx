@@ -402,7 +402,10 @@ export function ReportView(props: ReportViewProps) {
             <img
               src={`${data.coverPhotoUrl}&w=1600`}
               alt={`Cover photo — ${data.address}`}
-              className="w-full max-h-72 object-cover rounded-xl border border-ih-border"
+              // Fixed height (matching CoverPhotoPlaceholder) reserves the banner
+              // box before the image loads, so it never reflows content downward
+              // on load (no CLS) and the loaded/error states share one layout.
+              className="h-44 w-full sm:h-56 object-cover rounded-xl border border-ih-border"
               loading={data.printMode ? "eager" : "lazy"}
               onError={() => setCoverFailed(true)}
             />

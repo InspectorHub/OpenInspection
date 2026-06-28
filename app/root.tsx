@@ -21,6 +21,7 @@ import {
   type SWRegistrarLike,
 } from "~/lib/sw-bootstrap";
 import { ErrorState } from "~/components/ErrorState";
+import { NavProgress } from "~/components/NavProgress";
 
 export function loader({ request }: Route.LoaderArgs): UiPrefs {
   return parseUiPrefs(request.headers.get("Cookie"));
@@ -109,7 +110,12 @@ export default function Root() {
       window.localStorage,
     );
   }, []);
-  return <Outlet />;
+  return (
+    <>
+      <NavProgress />
+      <Outlet />
+    </>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

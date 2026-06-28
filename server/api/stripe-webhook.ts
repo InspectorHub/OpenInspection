@@ -31,7 +31,7 @@ api.post('/', async (c) => {
     }
 
     const tenantId = (c.get('tenantId') || c.get('resolvedTenantId')) as string | undefined;
-    const env = c.env as unknown as Record<string, string | undefined>;
+    const env = c.env;
     const secretKey = env.STRIPE_SECRET_KEY;
     const webhookSecret = env.STRIPE_WEBHOOK_SECRET;
     if (!tenantId || !secretKey || !webhookSecret) {
