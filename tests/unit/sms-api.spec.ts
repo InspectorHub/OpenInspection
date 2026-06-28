@@ -781,7 +781,10 @@ describe('Managed compliance admin endpoints (Task 6)', () => {
         expect(res.status).toBe(200);
         await Promise.allSettled(pending);
         // Dispatched to Telnyx — at least one outbound call hit the Telnyx API host.
-        const hitTelnyx = fetchSpy.mock.calls.some(([url]) => String(url).includes('api.telnyx.com'));
+        // Parse and compare the host exactly (substring matching on a URL is unsafe).
+        const hitTelnyx = fetchSpy.mock.calls.some(([url]) => {
+            try { return new URL(String(url)).hostname === 'api.telnyx.com'; } catch { return false; }
+        });
         expect(hitTelnyx).toBe(true);
         fetchSpy.mockRestore();
     });
