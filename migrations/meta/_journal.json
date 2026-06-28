@@ -50,6 +50,69 @@
       "when": 1782441526958,
       "tag": "0006_friendly_morlocks",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1782493904133,
+      "tag": "0007_open_young_avengers",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1782532196644,
+      "tag": "0008_flaky_komodo",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1782536414078,
+      "tag": "0009_worried_nehzno",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1782542840422,
+      "tag": "0010_concerned_lady_bullseye",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1782551189905,
+      "tag": "0011_brave_scrambler",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1782556847529,
+      "tag": "0012_steep_silverclaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1782572284539,
+      "tag": "0013_famous_natasha_romanoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1782581361414,
+      "tag": "0014_equal_krista_starr",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1782625639983,
+      "tag": "0015_living_zodiak",
+      "breakpoints": true
     }
   ]
 }

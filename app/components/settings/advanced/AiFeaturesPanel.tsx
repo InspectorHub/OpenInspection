@@ -1,6 +1,7 @@
 import { Form, type useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-advanced";
 
 interface AiFeaturesPanelProps {
@@ -9,9 +10,11 @@ interface AiFeaturesPanelProps {
   fieldError: (name: string) => string | undefined;
   saving: boolean;
   geminiTestFetcher: ReturnType<typeof useFetcher<typeof action>>;
+  /** Persisted "Test connection" history (shared loader list, filtered to gemini). */
+  testResults?: ConnectionTestResult[];
 }
 
-export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, geminiTestFetcher }: AiFeaturesPanelProps) {
+export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, geminiTestFetcher, testResults = [] }: AiFeaturesPanelProps) {
   const geminiTest = geminiTestFetcher.data;
 
   return (
@@ -59,6 +62,9 @@ export function AiFeaturesPanel({ geminiConfigured, value, fieldError, saving, g
           <span className="text-[12px] text-ih-bad-fg">{geminiTest.error}</span>
         )}
       </TestConnectionButton>
+
+      {/* Persisted last-tested status + recent history (survives reloads). */}
+      <ConnectionTestStatus results={testResults} target="gemini" />
     </section>
   );
 }

@@ -9,13 +9,16 @@
  *
  * We assert:
  *   - loader fans out to automations list + services + recent logs + tenant-config
- *     via the BFF (no client fetch) and surfaces rules/services/recentLogs/reviewUrl.
+ *     + email/sms message-templates via the BFF (no client fetch) and surfaces
+ *     rules/services/recentLogs/reviewUrl/emailTemplates/smsTemplates.
  *   - the friendly trigger label map covers report.published + inspection.reminder.
  *   - the conditions assembler turns the Only-if checkboxes/serviceIds into the
  *     JSON gate object (or null when empty), and the save action persists it +
  *     forces channel 'email'.
  *   - the review-url save intent PATCHes tenant-config (empty → null).
  *   - toggle/delete intents hit PATCH/DELETE.
+ *   - SP2 Task 12: save action sends emailTemplateId/smsTemplateId instead of
+ *     embedded body fields (subjectTemplate/bodyTemplate/smsBody are gone).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -28,6 +31,7 @@ const getRecentLogs = vi.fn();
 const getServices = vi.fn();
 const getTenantConfig = vi.fn();
 const patchTenantConfig = vi.fn();
+const getMessageTemplates = vi.fn();
 
 vi.mock('~/lib/session.server', () => ({
     requireToken: vi.fn(async () => 'tok-123'),
@@ -50,6 +54,9 @@ vi.mock('~/lib/api-client.server', () => ({
         },
         admin: {
             'tenant-config': { $get: getTenantConfig, $patch: patchTenantConfig },
+        },
+        messageTemplates: {
+            index: { $get: getMessageTemplates },
         },
     })),
 }));
@@ -89,15 +96,17 @@ function actionArgs(form: Record<string, string | string[]>): ActionArgs {
 
 const RULE = {
     id: 'r1', name: 'Report Ready', trigger: 'report.published', recipient: 'client',
-    delayMinutes: 0, subjectTemplate: 'S', bodyTemplate: 'B', conditions: null,
-    // Track L: rules carry channels[] (parsed on output) + smsBody, not the dead
-    // singular `channel`. Mirrors AutomationSchema after Task 9 Part A.
-    channels: ['email'], smsBody: null, active: true, isDefault: true,
+    delayMinutes: 0, conditions: null,
+    // SP2 Task 10/12: emailTemplateId/smsTemplateId replace embedded body fields.
+    channels: ['email'], emailTemplateId: 'tpl-email-1', smsTemplateId: null,
+    active: true, isDefault: true,
 };
 const LOG = {
     id: 'l1', recipient: 'jane@x.com', channel: 'email', sendAt: '2026-06-01T00:00:00Z',
     status: 'skipped', error: 'review_url not configured',
 };
+const EMAIL_TEMPLATES = [{ id: 'tpl-email-1', name: 'Report Ready Email', channel: 'email' }];
+const SMS_TEMPLATES   = [{ id: 'tpl-sms-1',   name: 'Report Ready SMS',   channel: 'sms'   }];
 
 beforeEach(() => {
     getAutomations.mockReset().mockResolvedValue(jsonRes({ success: true, data: [RULE] }));
@@ -110,6 +119,10 @@ beforeEach(() => {
     );
     getTenantConfig.mockReset().mockResolvedValue(jsonRes({ success: true, data: { reviewUrl: 'https://g.page/r/x' } }));
     patchTenantConfig.mockReset().mockResolvedValue(jsonRes({ success: true, data: { ok: true } }));
+    // SP2 Task 12: loader fetches email + sms templates; mock returns both lists.
+    getMessageTemplates.mockReset()
+        .mockResolvedValueOnce(jsonRes({ success: true, data: EMAIL_TEMPLATES }))
+        .mockResolvedValueOnce(jsonRes({ success: true, data: SMS_TEMPLATES }));
 });
 
 describe('settings-automations trigger labels (#121)', () => {
@@ -133,16 +146,19 @@ describe('settings-automations buildConditions (Only if)', () => {
 });
 
 describe('settings-automations loader (BFF fan-out)', () => {
-    it('surfaces rules, services, recentLogs and reviewUrl', async () => {
+    it('surfaces rules, services, recentLogs, reviewUrl, emailTemplates, smsTemplates', async () => {
         const data = await loader(loaderArgs());
         expect(getAutomations).toHaveBeenCalled();
         expect(getServices).toHaveBeenCalled();
         expect(getRecentLogs).toHaveBeenCalled();
         expect(getTenantConfig).toHaveBeenCalled();
+        expect(getMessageTemplates).toHaveBeenCalledTimes(2);
         expect(data.rules[0].name).toBe('Report Ready');
         expect(data.services[0].name).toBe('Standard Home Inspection');
         expect(data.recentLogs[0].error).toMatch(/review_url not configured/i);
         expect(data.reviewUrl).toBe('https://g.page/r/x');
+        expect(data.emailTemplates[0].id).toBe('tpl-email-1');
+        expect(data.smsTemplates[0].id).toBe('tpl-sms-1');
     });
 
     it('degrades to empty/blank when the calls fail', async () => {
@@ -150,11 +166,14 @@ describe('settings-automations loader (BFF fan-out)', () => {
         getServices.mockResolvedValue(jsonRes(null, false));
         getRecentLogs.mockResolvedValue(jsonRes(null, false));
         getTenantConfig.mockResolvedValue(jsonRes(null, false));
+        getMessageTemplates.mockReset().mockResolvedValue(jsonRes(null, false));
         const data = await loader(loaderArgs());
         expect(data.rules).toEqual([]);
         expect(data.services).toEqual([]);
         expect(data.recentLogs).toEqual([]);
         expect(data.reviewUrl).toBe('');
+        expect(data.emailTemplates).toEqual([]);
+        expect(data.smsTemplates).toEqual([]);
     });
 });
 
@@ -162,15 +181,19 @@ describe('settings-automations action', () => {
     it('intent=save creates a new automation with assembled conditions + channel email', async () => {
         const res = await action(actionArgs({
             intent: 'save', name: 'New', trigger: 'report.published', recipient: 'client',
-            delayMinutes: '0', subjectTemplate: 'S', bodyTemplate: 'B',
+            delayMinutes: '0', emailTemplateId: 'tpl-email-1',
             requirePaid: 'on', serviceIds: ['svc-1', 'svc-2'],
         }));
         expect(postAutomation).toHaveBeenCalledTimes(1);
         const arg = postAutomation.mock.calls[0][0];
-        // Track L: the save payload sends channels[] (email-only) instead of the
-        // retired singular `channel`. Full multi-channel editor lands in Task 9.
+        // Track L: the save payload sends channels[] (email-only when none checked).
         expect(arg.json.channels).toEqual(['email']);
         expect(arg.json.conditions).toEqual({ requirePaid: true, serviceIds: ['svc-1', 'svc-2'] });
+        // SP2 Task 12: template ids in payload, no embedded body fields.
+        expect(arg.json.emailTemplateId).toBe('tpl-email-1');
+        expect(arg.json).not.toHaveProperty('subjectTemplate');
+        expect(arg.json).not.toHaveProperty('bodyTemplate');
+        expect(arg.json).not.toHaveProperty('smsBody');
         expect(res).toEqual({ ok: true, error: undefined });
     });
 
@@ -178,7 +201,7 @@ describe('settings-automations action', () => {
         postAutomation.mockResolvedValue(jsonRes({ success: false }, false));
         const res = await action(actionArgs({
             intent: 'save', name: 'New', trigger: 'report.published', recipient: 'client',
-            delayMinutes: '0', subjectTemplate: 'S', bodyTemplate: 'B',
+            delayMinutes: '0',
         }));
         expect(postAutomation).toHaveBeenCalledTimes(1);
         expect(res.ok).toBe(false);
@@ -187,7 +210,7 @@ describe('settings-automations action', () => {
     it('intent=save with an id PATCHes the existing automation', async () => {
         await action(actionArgs({
             intent: 'save', id: 'r1', name: 'Edited', trigger: 'report.published',
-            recipient: 'client', delayMinutes: '0', subjectTemplate: 'S', bodyTemplate: 'B',
+            recipient: 'client', delayMinutes: '0',
         }));
         expect(patchAutomation).toHaveBeenCalledTimes(1);
         expect(patchAutomation.mock.calls[0][0].param).toEqual({ id: 'r1' });
@@ -209,40 +232,48 @@ describe('settings-automations action', () => {
         expect(patchTenantConfig).toHaveBeenCalledWith({ json: { reviewUrl: null } });
     });
 
-    // ── Track L (Task 9) — multi-channel save serialization ─────────────────────
-    it('intent=save with channels=[email,sms] serializes both channels + smsBody', async () => {
+    // ── SP2 Task 12 — template-id save serialization ─────────────────────────
+    it('intent=save with channels=[email,sms] serializes both channels + template ids', async () => {
         const res = await action(actionArgs({
             intent: 'save', name: 'Multi', trigger: 'report.published', recipient: 'client',
-            delayMinutes: '0', subjectTemplate: 'S', bodyTemplate: 'B',
-            channels: ['email', 'sms'], smsBody: 'Your report is ready {{report_url}}',
+            delayMinutes: '0',
+            channels: ['email', 'sms'],
+            emailTemplateId: 'tpl-email-1',
+            smsTemplateId: 'tpl-sms-1',
         }));
         expect(postAutomation).toHaveBeenCalledTimes(1);
         const arg = postAutomation.mock.calls[0][0];
         expect(arg.json.channels).toEqual(['email', 'sms']);
-        expect(arg.json.smsBody).toBe('Your report is ready {{report_url}}');
+        expect(arg.json.emailTemplateId).toBe('tpl-email-1');
+        expect(arg.json.smsTemplateId).toBe('tpl-sms-1');
         expect(res).toEqual({ ok: true, error: undefined });
     });
 
-    it('intent=save drops smsBody (null) when sms is NOT an enabled channel', async () => {
+    it('intent=save nulls smsTemplateId when sms is NOT an enabled channel', async () => {
         await action(actionArgs({
             intent: 'save', name: 'EmailOnly', trigger: 'report.published', recipient: 'client',
-            delayMinutes: '0', subjectTemplate: 'S', bodyTemplate: 'B',
-            channels: ['email'], smsBody: 'leftover sms text',
+            delayMinutes: '0',
+            channels: ['email'],
+            emailTemplateId: 'tpl-email-1',
+            smsTemplateId: 'tpl-sms-1',
         }));
         const arg = postAutomation.mock.calls[0][0];
         expect(arg.json.channels).toEqual(['email']);
-        // smsBody is nulled because the sms channel is off — never persists stale copy.
-        expect(arg.json.smsBody).toBeNull();
+        // smsTemplateId is nulled because the sms channel is off.
+        expect(arg.json.smsTemplateId).toBeNull();
+        expect(arg.json.emailTemplateId).toBe('tpl-email-1');
     });
 
-    it('intent=save with channels=[sms] sends sms-only + smsBody, no hardcoded email', async () => {
+    it('intent=save with channels=[sms] sends sms-only + smsTemplateId, emailTemplateId null', async () => {
         await action(actionArgs({
             intent: 'save', name: 'SmsOnly', trigger: 'report.published', recipient: 'client',
-            delayMinutes: '0', subjectTemplate: '(no email)', bodyTemplate: '(no email)',
-            channels: ['sms'], smsBody: 'SMS body here',
+            delayMinutes: '0',
+            channels: ['sms'],
+            smsTemplateId: 'tpl-sms-1',
         }));
         const arg = postAutomation.mock.calls[0][0];
         expect(arg.json.channels).toEqual(['sms']);
-        expect(arg.json.smsBody).toBe('SMS body here');
+        expect(arg.json.smsTemplateId).toBe('tpl-sms-1');
+        expect(arg.json.emailTemplateId).toBeNull();
     });
 });

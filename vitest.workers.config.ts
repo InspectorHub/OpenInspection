@@ -24,7 +24,12 @@ export default defineConfig({
         cloudflareTest({
             main: path.resolve(__dirname, 'tests/workers/test-worker.ts'),
             miniflare: {
-                compatibilityDate: '2024-11-01',
+                // Bumped from 2024-11-01 → 2026-04-12 (local workerd binary cap)
+                // so twilio-node's module-load `require('os')` resolves under
+                // nodejs_compat (node:os is compat-date-gated, not force-injected
+                // by the pool). Prod runs 2026-05-22 on CF's newer binary; keep
+                // this at the local cap. See twilio-sdk-fetch.spec.ts.
+                compatibilityDate: '2026-04-12',
                 compatibilityFlags: ['nodejs_compat'],
                 d1Databases: { DB: 'test-sync-db' },
                 // A-21 batch 3 — the offboarding commands stream between real

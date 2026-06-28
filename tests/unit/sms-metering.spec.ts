@@ -1,6 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AutomationService } from '../../server/services/automation.service';
 
+// SP2 — deliverSms now resolves the referenced sms template via the
+// TemplateStore (was the embedded smsBody). This metering test drives deliverSms
+// with a hand-built stub db, so stub the store to return the sms template body;
+// the ctx automation carries an smsTemplateId so resolution is attempted. Keeps
+// this suite focused on the metering contract (records once on success, never on
+// failure) without a real DB.
+vi.mock('../../server/services/automation/template-store', () => ({
+    createOiTemplateStore: () => ({
+        resolve: async () => ({ channel: 'sms' as const, body: 'Hi {{client_name}}', variables: [] }),
+    }),
+}));
+
 // Minimal drizzle-like stub: every chained call returns itself, final terminal
 // methods (.get(), .all(), promise-like .then) resolve or return falsy so the
 // tenant-config lookup doesn't crash before reaching the send call.
@@ -49,6 +61,7 @@ function makeCtx(recipientOverride = 'selling_agent') {
             subjectTemplate: 'S',
             bodyTemplate: 'B',
             smsBody: 'Hi {{client_name}}',  // no {{review_url}} so no fail-closed gate
+            smsTemplateId: 'tpl-sms-1',     // SP2 — deliverSms resolves this via the (mocked) TemplateStore
             channels: '["sms"]',
             channel: 'sms',
             active: true,

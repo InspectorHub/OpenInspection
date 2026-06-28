@@ -40,12 +40,24 @@ describe('AutomationService.trigger — agreement filter', () => {
         vi.spyOn(svc, 'ensureSeeds').mockResolvedValue();
     });
 
-    it('skips rules with {{agreement_sign_url}} when agreementRequired=false', async () => {
+    // SP2: the agreement gate now reads the rule's REFERENCED email template
+    // (emailTemplateId), not the DEAD embedded subject/body columns. These rules
+    // mirror a user-created automation (empty embedded body, content in the
+    // message_template) — the path the trigger filter regressed on before the fix.
+    async function seedTemplate(id: string, body: string, subject = '') {
+        await testDb.insert(schema.messageTemplates).values({
+            id, tenantId: TENANT, name: id, channel: 'email',
+            subject, body, variables: null, isSeeded: false, createdAt: new Date(), updatedAt: new Date(),
+        });
+    }
+
+    it('skips rules whose email template references {{agreement_sign_url}} when agreementRequired=false', async () => {
         await seedFor(testDb, false);
+        await seedTemplate('tpl-agr-1', 'Click {{agreement_sign_url}}', 'Sign here');
         await testDb.insert(schema.automations).values({
             id: 'rule-1', tenantId: TENANT, name: 'Send agreement', trigger: 'inspection.created',
             recipient: 'client', delayMinutes: 0,
-            subjectTemplate: 'Sign here', bodyTemplate: 'Click {{agreement_sign_url}}',
+            subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-agr-1',
             active: true, isDefault: false, createdAt: new Date(),
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T', reportBaseUrl: 'http://localhost' });
@@ -53,12 +65,13 @@ describe('AutomationService.trigger — agreement filter', () => {
         expect(logs.length).toBe(0);
     });
 
-    it('queues rules with {{agreement_sign_url}} when agreementRequired=true', async () => {
+    it('queues rules whose email template references {{agreement_sign_url}} when agreementRequired=true', async () => {
         await seedFor(testDb, true);
+        await seedTemplate('tpl-agr-2', 'Click {{agreement_sign_url}}', 'Sign here');
         await testDb.insert(schema.automations).values({
             id: 'rule-2', tenantId: TENANT, name: 'Send agreement', trigger: 'inspection.created',
             recipient: 'client', delayMinutes: 0,
-            subjectTemplate: 'Sign here', bodyTemplate: 'Click {{agreement_sign_url}}',
+            subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-agr-2',
             active: true, isDefault: false, createdAt: new Date(),
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T', reportBaseUrl: 'http://localhost' });
@@ -66,12 +79,13 @@ describe('AutomationService.trigger — agreement filter', () => {
         expect(logs.length).toBe(1);
     });
 
-    it('does NOT skip ordinary rules without {{agreement_sign_url}}', async () => {
+    it('does NOT skip ordinary rules whose email template lacks {{agreement_sign_url}}', async () => {
         await seedFor(testDb, false);
+        await seedTemplate('tpl-ord-3', 'Confirmed for {{property_address}}', 'Hi');
         await testDb.insert(schema.automations).values({
             id: 'rule-3', tenantId: TENANT, name: 'Booking confirmation', trigger: 'inspection.created',
             recipient: 'client', delayMinutes: 0,
-            subjectTemplate: 'Hi', bodyTemplate: 'Confirmed for {{property_address}}',
+            subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-ord-3',
             active: true, isDefault: false, createdAt: new Date(),
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: INSP, triggerEvent: 'inspection.created', companyName: 'T', reportBaseUrl: 'http://localhost' });

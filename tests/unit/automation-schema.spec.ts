@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { CreateAutomationSchema, UpdateAutomationSchema } from '../../server/lib/validations/automation.schema';
+import { CreateAutomationSchema, UpdateAutomationSchema, AutomationSchema } from '../../server/lib/validations/automation.schema';
 
 describe('CreateAutomationSchema (Track J)', () => {
+    // SP2: subjectTemplate/bodyTemplate removed; emailTemplateId/smsTemplateId replace them.
     const base = {
         name: 'R', trigger: 'report.published', recipient: 'client',
-        subjectTemplate: 's', bodyTemplate: 'b',
     };
 
     it('accepts the new inspection.reminder trigger', () => {
@@ -12,12 +12,12 @@ describe('CreateAutomationSchema (Track J)', () => {
         expect(r.success).toBe(true);
     });
 
-    it('defaults channels to email-only and accepts sms with a body (Track L)', () => {
+    it('defaults channels to email-only; sms channel can be used without a body (SP2: delivery fail-closes)', () => {
         const r = CreateAutomationSchema.safeParse(base);
         expect(r.success && r.data.channels).toEqual(['email']);
-        // sms channel requires a non-empty sms body (superRefine)
-        expect(CreateAutomationSchema.safeParse({ ...base, channels: ['email', 'sms'], smsBody: 'hi' }).success).toBe(true);
-        expect(CreateAutomationSchema.safeParse({ ...base, channels: ['sms'] }).success).toBe(false);
+        // SP2: smsBody is gone — an sms automation no longer requires an inline body.
+        // The delivery layer fail-closes when no template is linked.
+        expect(CreateAutomationSchema.safeParse({ ...base, channels: ['email', 'sms'] }).success).toBe(true);
         // unknown channel value is rejected by the enum
         expect(CreateAutomationSchema.safeParse({ ...base, channels: ['fax'] }).success).toBe(false);
         // empty channels list is rejected (min 1)
@@ -51,15 +51,32 @@ describe('UpdateAutomationSchema (Track L — partial-update channel-drop regres
         expect(r).toEqual({ active: false });
     });
 
-    it('explicit channels are kept and round-trip', () => {
-        const r = UpdateAutomationSchema.parse({ channels: ['email', 'sms'], smsBody: 'x' });
+    it('explicit channels are kept and round-trip; smsTemplateId round-trips (SP2)', () => {
+        const r = UpdateAutomationSchema.parse({ channels: ['email', 'sms'], smsTemplateId: 'tpl-x' });
         expect('channels' in r).toBe(true);
         expect(r.channels).toEqual(['email', 'sms']);
-        expect(r.smsBody).toBe('x');
+        // SP2: smsBody is gone; smsTemplateId round-trips instead.
+        expect(r.smsTemplateId).toBe('tpl-x');
     });
 
-    it('still enforces sms-requires-body and min-1 on update', () => {
-        expect(UpdateAutomationSchema.safeParse({ channels: ['sms'] }).success).toBe(false);
+    it('min-1 channel constraint still enforced on update', () => {
+        // SP2: smsBodyRequiredWhenSms refine is removed; only structural validation remains.
         expect(UpdateAutomationSchema.safeParse({ channels: [] }).success).toBe(false);
+        // sms channel without a body is now ALLOWED (delivery fail-closes, no refine).
+        expect(UpdateAutomationSchema.safeParse({ channels: ['sms'] }).success).toBe(true);
     });
+});
+
+it('SP2: CreateAutomationSchema accepts template ids and no longer requires bodyTemplate', () => {
+    const r = CreateAutomationSchema.safeParse({
+        name: 'R', trigger: 'report.published', recipient: 'client', delayMinutes: 0,
+        channels: ['email'], emailTemplateId: 'tpl-1',
+    });
+    expect(r.success).toBe(true);
+});
+
+it('SP2: AutomationSchema exposes emailTemplateId + smsTemplateId', () => {
+    const shape = AutomationSchema.shape as Record<string, unknown>;
+    expect(shape.emailTemplateId).toBeDefined();
+    expect(shape.smsTemplateId).toBeDefined();
 });

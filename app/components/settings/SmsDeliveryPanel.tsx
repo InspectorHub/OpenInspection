@@ -2,6 +2,8 @@ import { Form } from "react-router";
 import type { useFetcher } from "react-router";
 import { SmsSecretsPanel } from "~/components/settings/SmsSecretsPanel";
 import type { action } from "~/routes/settings-communication";
+import type { ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
+import type { ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
@@ -63,6 +65,7 @@ export function SmsDeliveryPanel({
   smsTestFetcher,
   compliance,
   byoProvider,
+  testResults = [],
 }: {
   isSaas: boolean;
   smsMode: SmsModeValue;
@@ -76,6 +79,7 @@ export function SmsDeliveryPanel({
     TWILIO_FROM_NUMBER: string;
     TELNYX_API_KEY: string;
     TELNYX_FROM_NUMBER: string;
+    TELNYX_PUBLIC_KEY: string;
   };
   secretFieldError: (name: string) => string | undefined;
   secretFormError: (intent: string) => string | null;
@@ -83,8 +87,10 @@ export function SmsDeliveryPanel({
   showInboundUrl: boolean;
   inboundUrl: string;
   smsTestFetcher: SmsTestFetcher;
-  compliance: { complianceStatus: ComplianceStatus; rejectionReason: string | null };
+  compliance: ManagedComplianceData;
   byoProvider?: "twilio" | "telnyx";
+  /** Persisted "Test connection" history (shared loader list, filtered to sms). */
+  testResults?: ConnectionTestResult[];
 }) {
   // Toll-free verification is Twilio-specific; Telnyx has a different inbound/
   // compliance flow, so the compliance block below is gated to Twilio.
@@ -136,18 +142,17 @@ export function SmsDeliveryPanel({
                     <span className="block text-[11px] text-ih-fg-3 mt-0.5">Send from a platform-managed shared number. No setup needed.</span>
                   </span>
                 </label>
-                {/* Managed dedicated — gated/disabled upgrade */}
-                <label className="flex items-start gap-3 p-3 rounded-md border border-ih-border bg-ih-bg-muted opacity-60 cursor-not-allowed" aria-disabled="true">
+                {/* Managed dedicated — selectable; provisioning wizard renders below */}
+                <label className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${smsMode === "managed_dedicated" ? "border-ih-primary bg-ih-primary/5" : "border-ih-border bg-ih-bg-card hover:border-ih-primary/40"}`}>
                   <input
                     type="radio" name="_smsModeRadio" value="managed_dedicated"
                     checked={smsMode === "managed_dedicated"}
                     onChange={() => setSmsMode("managed_dedicated")}
                     className="mt-0.5 accent-ih-primary"
-                    disabled
                   />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-ih-fg-2">Managed — dedicated local number <span className="inline-block ml-1 px-1.5 py-px rounded text-[10px] font-bold uppercase tracking-wide bg-ih-bg-card border border-ih-border text-ih-fg-3">Paid upgrade</span></span>
-                    <span className="block text-[11px] text-ih-fg-4 mt-0.5">Your own local number, managed by the platform. Available on a higher plan.</span>
+                    <span className="block text-[13px] font-bold text-ih-fg-1">Managed — dedicated local number</span>
+                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">Your own local number, managed by the platform. Complete TCR/TFV registration below.</span>
                   </span>
                 </label>
               </div>
@@ -218,6 +223,7 @@ export function SmsDeliveryPanel({
           inboundUrl={inboundUrl}
           smsTestFetcher={smsTestFetcher}
           initialProvider={byoProvider ?? "twilio"}
+          testResults={testResults}
         />
       </section>
   );

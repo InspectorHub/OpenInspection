@@ -28,26 +28,16 @@ export const AutomationSchema = z.object({
     trigger:         z.enum(AUTOMATION_TRIGGERS).describe('TODO describe trigger field for the OpenInspection MCP integration'),
     recipient:       z.enum(AUTOMATION_RECIPIENTS).describe('TODO describe recipient field for the OpenInspection MCP integration'),
     delayMinutes:    z.number().int().describe('TODO describe delayMinutes field for the OpenInspection MCP integration'),
-    subjectTemplate: z.string().describe('TODO describe subjectTemplate field for the OpenInspection MCP integration'),
-    bodyTemplate:    z.string().describe('TODO describe bodyTemplate field for the OpenInspection MCP integration'),
     conditions:      z.string().nullable().describe('JSON-encoded send-time gates, or null. Editor parses it.'),
     // Track L (D2) — enabled delivery channels. Replaces the dead `channel` shadow column.
     channels:        z.array(z.enum(AUTOMATION_CHANNELS)).describe('Enabled delivery channels.'),
-    smsBody:         z.string().nullable().describe('Plain-text SMS template; null when SMS disabled.'),
+    // SP2 — template references; embedded body fields (subjectTemplate/bodyTemplate/smsBody) are dead and dropped.
+    emailTemplateId: z.string().nullable().describe('Referenced email template id, or null.'),
+    smsTemplateId:   z.string().nullable().describe('Referenced SMS template id, or null.'),
     active:          z.boolean().describe('TODO describe active field for the OpenInspection MCP integration'),
     isDefault:       z.boolean().describe('TODO describe isDefault field for the OpenInspection MCP integration'),
     createdAt:       z.string().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }).openapi('Automation');
-
-// Track L — an SMS channel needs a non-empty body to send. Shared by Create + Update.
-const smsBodyRequiredWhenSms = (
-    v: { channels?: readonly string[] | undefined; smsBody?: string | null | undefined },
-    ctx: z.RefinementCtx,
-) => {
-    if (v.channels?.includes('sms') && !v.smsBody?.trim()) {
-        ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['smsBody'], message: 'SMS body is required when SMS is enabled.' });
-    }
-};
 
 const CreateAutomationBase = z.object({
     name:            z.string().min(1).max(200).describe('TODO describe name field for the OpenInspection MCP integration'),
@@ -57,8 +47,6 @@ const CreateAutomationBase = z.object({
     // reset a tenant's configured delay to 0 on every partial PATCH that omits it (the service
     // spreads `...rest` into the patch). Create re-adds the default below.
     delayMinutes:    z.number().int().min(0).describe('TODO describe delayMinutes field for the OpenInspection MCP integration'),
-    subjectTemplate: z.string().min(1).describe('TODO describe subjectTemplate field for the OpenInspection MCP integration'),
-    bodyTemplate:    z.string().min(1).describe('TODO describe bodyTemplate field for the OpenInspection MCP integration'),
     conditions:      ConditionsSchema.nullish().describe('Send-time gates; null/omitted = none.'),
     // Track L (D2) — at least one delivery channel. NOTE: no `.default()` on the base field —
     // Zod's `.partial()` keeps the default and would inject `channels: ['email']` on every
@@ -67,7 +55,10 @@ const CreateAutomationBase = z.object({
     // omit-means-absent. See tests/unit/automation-schema.spec.ts.
     channels:        z.array(z.enum(AUTOMATION_CHANNELS)).min(1)
         .describe('At least one delivery channel.'),
-    smsBody:         z.string().max(1600).nullish().describe('Plain-text SMS body; required when channels includes sms.'),
+    // SP2 — template ids replace embedded body fields. The delivery layer fail-closes when no
+    // template is linked, so no refine is needed here (symmetry: email has no equivalent refine).
+    emailTemplateId: z.string().nullish().describe('Id of the email message_template this automation sends (email channel); null = none.'),
+    smsTemplateId:   z.string().nullish().describe('Id of the SMS message_template this automation sends (sms channel); null = none.'),
 });
 
 export const CreateAutomationSchema = CreateAutomationBase
@@ -78,7 +69,6 @@ export const CreateAutomationSchema = CreateAutomationBase
         channels: z.array(z.enum(AUTOMATION_CHANNELS)).min(1).default(['email'])
             .describe('At least one delivery channel.'),
     })
-    .superRefine(smsBodyRequiredWhenSms)
     .openapi('CreateAutomation');
 
 export const UpdateAutomationSchema = CreateAutomationBase.partial().extend({
@@ -87,7 +77,7 @@ export const UpdateAutomationSchema = CreateAutomationBase.partial().extend({
     channels: z.array(z.enum(AUTOMATION_CHANNELS)).min(1).optional()
         .describe('At least one delivery channel.'),
     active: z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
-}).superRefine(smsBodyRequiredWhenSms).openapi('UpdateAutomation');
+}).openapi('UpdateAutomation');
 
 export const AutomationLogSchema = z.object({
     id:             z.string().describe('TODO describe id field for the OpenInspection MCP integration'),

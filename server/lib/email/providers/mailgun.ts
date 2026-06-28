@@ -1,5 +1,12 @@
 import { logger } from '../../logger';
-import type { EmailProvider, EmailSendArgs } from '../provider';
+import type { EmailProvider, EmailSendArgs, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
+import {
+  bytesToHex,
+  constantTimeEquals,
+  hmacSha256,
+  normalizeEmail,
+  withinReplayWindow,
+} from '../webhook-crypto';
 
 /**
  * MailgunProvider — thin fetch-based adapter over the Mailgun v3 REST API.
@@ -82,5 +89,76 @@ export class MailgunProvider implements EmailProvider {
     }
     if (res.ok) return { ok: true };
     return { ok: false, error: `Mailgun ${res.status}` };
+  }
+
+  /**
+   * Verify a Mailgun webhook signature (HMAC-SHA256 hex).
+   *
+   * The POSTed JSON body carries `signature: { timestamp, token, signature }`.
+   * We compute HMAC-SHA256(`ctx.secret`, `${timestamp}${token}`) as lowercase hex
+   * and constant-time compare it to the body's `signature.signature`. Fails closed
+   * on a missing signature object, an empty secret, or a stale timestamp (±300s).
+   */
+  async verifyWebhookSignature(ctx: EmailWebhookContext): Promise<boolean> {
+    try {
+      if (!ctx.secret) return false;
+      const body = JSON.parse(ctx.rawBody) as {
+        signature?: { timestamp?: string | number; token?: string; signature?: string };
+      };
+      const sigObj = body.signature;
+      if (!sigObj || typeof sigObj.signature !== 'string' || typeof sigObj.token !== 'string') {
+        return false;
+      }
+      const tsRaw = sigObj.timestamp;
+      const tsSeconds = typeof tsRaw === 'number' ? tsRaw : Number(tsRaw);
+      const now = ctx.nowMs ?? Date.now();
+      if (!withinReplayWindow(tsSeconds, now)) return false;
+
+      const keyBytes = new TextEncoder().encode(ctx.secret);
+      const expected = bytesToHex(await hmacSha256(keyBytes, `${sigObj.timestamp}${sigObj.token}`));
+      return constantTimeEquals(sigObj.signature, expected);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Parse a Mailgun webhook body (`{ signature, 'event-data': {...} }`) into a
+   * normalized event. `event-data.event` `failed`→bounced (hard when
+   * `severity === 'permanent'`), `complained`→complaint, `delivered`→delivered.
+   * Guards every access; returns `[]` on malformed input or absent recipient.
+   */
+  parseWebhookEvents(rawBody: string): NormalizedEmailEvent[] {
+    try {
+      const body = JSON.parse(rawBody) as {
+        'event-data'?: {
+          event?: string;
+          severity?: string;
+          recipient?: unknown;
+          id?: string;
+          timestamp?: number;
+        };
+      };
+      const ev = body['event-data'];
+      if (!ev) return [];
+      const email = normalizeEmail(ev.recipient);
+      if (!email) return [];
+
+      const providerEventId = ev.id ?? '';
+      const at = typeof ev.timestamp === 'number' ? ev.timestamp * 1000 : 0;
+
+      if (ev.event === 'failed') {
+        return [{ type: 'bounced', email, hardBounce: ev.severity === 'permanent', providerEventId, at }];
+      }
+      if (ev.event === 'complained') {
+        return [{ type: 'complained', email, providerEventId, at }];
+      }
+      if (ev.event === 'delivered') {
+        return [{ type: 'delivered', email, providerEventId, at }];
+      }
+      return [];
+    } catch {
+      return [];
+    }
   }
 }

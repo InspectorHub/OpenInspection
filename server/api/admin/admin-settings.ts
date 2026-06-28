@@ -129,6 +129,7 @@ const TenantConfigGetResponseSchema = z.object({
         companyPhone: z.string().nullable().optional().describe('Track L — call-back number rendered as {{company_phone}} in SMS copy.'),
         videoMode: z.enum(['r2', 'stream']).describe('Self-host video backend (default r2). Ignored in SaaS.'),
         smsByoProvider: z.enum(['twilio', 'telnyx']).nullable().describe('BYO SMS provider selection (null = default Twilio).'),
+        managedProvider: z.enum(['twilio', 'telnyx']).describe('Managed-compliance carrier (managed_shared/managed_dedicated). Default Twilio.'),
         emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).nullable().describe('BYO email provider selection (null = default Resend).'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
@@ -166,6 +167,7 @@ const TenantConfigPatchSchema = z.object({
     companyPhone: z.string().max(40).nullish().describe('Track L — call-back number shown in SMS copy ({{company_phone}}). null/empty clears it.'),
     videoMode: z.enum(['r2', 'stream']).optional().describe('Self-host video backend: r2 (default, free) or stream (requires STREAM binding + customer subdomain).'),
     smsByoProvider: z.enum(['twilio', 'telnyx']).optional().describe('BYO SMS provider selection — which provider adapter to use when smsMode is "own".'),
+    managedProvider: z.enum(['twilio', 'telnyx']).optional().describe('Managed-compliance carrier — which ISV provider runs managed provisioning/sweep/webhook when smsMode is "managed_shared"/"managed_dedicated". Separate from smsByoProvider.'),
     emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).optional().describe('BYO email provider — which adapter to use when email mode is "own".'),
 }).openapi('TenantConfigPatch');
 
@@ -413,6 +415,7 @@ export const adminSettingsRoutes = createApiRouter()
                 companyPhone: (config?.companyPhone as string | null) ?? null,
                 videoMode: (config?.videoMode as 'r2' | 'stream') ?? 'r2',
                 smsByoProvider: (config?.smsByoProvider as 'twilio' | 'telnyx' | null) ?? null,
+                managedProvider: (config?.managedProvider as 'twilio' | 'telnyx') ?? 'twilio',
                 emailByoProvider: (config?.emailByoProvider as 'resend' | 'sendgrid' | 'postmark' | 'mailgun' | null) ?? 'resend',
             },
         }, 200);
@@ -459,6 +462,9 @@ export const adminSettingsRoutes = createApiRouter()
         }
         if (body.smsByoProvider !== undefined) {
             update.smsByoProvider = body.smsByoProvider;
+        }
+        if (body.managedProvider !== undefined) {
+            update.managedProvider = body.managedProvider;
         }
         if (body.emailByoProvider !== undefined) {
             update.emailByoProvider = body.emailByoProvider;

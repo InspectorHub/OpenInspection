@@ -56,6 +56,14 @@ export class EmailBaseService {
         protected renderer?: EmailTemplateRenderer,
         protected meter?: { record: () => Promise<void> },
         provider?: EmailProvider,
+        /**
+         * WH-3 — optional send-path suppression gate. When injected, `sendEmail`
+         * drops any recipient that has hard-bounced or filed a complaint for this
+         * tenant BEFORE the provider call (mirrors the SMS opt-out gate). Absent
+         * (standalone/legacy callers) ⇒ no gate, behavior unchanged. Wired in
+         * `assembleTenantEmailService` the same way `meter` is.
+         */
+        protected suppression?: { isSuppressed(email: string): Promise<boolean> },
     ) {
         this.provider = provider ?? new ResendProvider({ apiKey: this.apiKey });
     }
@@ -119,6 +127,39 @@ export class EmailBaseService {
         if (!this.apiKey || this.apiKey.includes('your_api_key')) {
             logger.warn(`[email] Skipping delivery (API Key missing) to: ${to.join(', ')}`);
             return { delivered: false };
+        }
+
+        // WH-3 — suppression gate: drop recipients that hard-bounced or complained
+        // for this tenant BEFORE the provider call (mirrors the SMS opt-out gate).
+        // Normalize each recipient EXACTLY as the webhook receiver stores them
+        // (`.trim().toLowerCase()`) or the lookup silently never matches. FAIL-OPEN:
+        // this is a best-effort deliverability guard, NOT a security control — a
+        // lookup error must never block a legitimate send (the recipient stays).
+        if (this.suppression) {
+            const checked = await Promise.all(
+                to.map(async (addr) => {
+                    const normalized = addr.trim().toLowerCase();
+                    try {
+                        return { addr, suppressed: await this.suppression!.isSuppressed(normalized) };
+                    } catch {
+                        return { addr, suppressed: false }; // fail-open on lookup error
+                    }
+                }),
+            );
+            const allowed = checked.filter((r) => !r.suppressed).map((r) => r.addr);
+            const suppressedCount = to.length - allowed.length;
+            if (suppressedCount > 0) {
+                // NO email/PII in the log — count only.
+                logger.warn('[email] recipient(s) suppressed — skipping', { suppressedCount });
+            }
+            if (allowed.length === 0) {
+                // All recipients suppressed: skip the provider entirely and return
+                // the benign skip shape (identical to the missing-API-key skip — a
+                // non-error value existing callers already treat as "not sent").
+                return { delivered: false };
+            }
+            // Some allowed: send to the remaining recipients only.
+            to = allowed;
         }
 
         const resolved = this.identity

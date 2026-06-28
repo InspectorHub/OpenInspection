@@ -3,6 +3,7 @@ import { Form } from "react-router";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-communication";
 
 type ActionFetcher = ReturnType<typeof useFetcher<typeof action>>;
@@ -30,6 +31,35 @@ const PROVIDER_LABELS: Record<EmailByoProvider, string> = {
  * the Resend provider is selected. For sendgrid / postmark / mailgun a generic
  * "Validate credentials" button is shown instead, posting validate-email-provider.
  */
+/**
+ * Per-provider label + hint for the inbound deliverability webhook secret
+ * (WH-3). The hint points at where the user configures the receiver URL; the
+ * URL itself is rendered separately from `webhookUrl` so it can carry the live
+ * origin + tenant slug.
+ */
+const WEBHOOK_FIELDS: Record<EmailByoProvider, { name: string; label: string; hint: string }> = {
+  resend: {
+    name: "RESEND_WEBHOOK_SECRET",
+    label: "Resend Webhook Signing Secret",
+    hint: "Resend → Webhooks → Signing Secret (starts with whsec_). Point the webhook at the URL below.",
+  },
+  sendgrid: {
+    name: "SENDGRID_WEBHOOK_PUBLIC_KEY",
+    label: "SendGrid Event Webhook Verification Key",
+    hint: "SendGrid → Settings → Mail Settings → Event Webhook → Signed Event Webhook (base64 public key). Point the webhook at the URL below.",
+  },
+  postmark: {
+    name: "POSTMARK_WEBHOOK_TOKEN",
+    label: "Postmark Webhook Token",
+    hint: "A shared token you choose. Append it as ?token=… on the webhook URL below (Postmark → Servers → Webhooks).",
+  },
+  mailgun: {
+    name: "MAILGUN_SIGNING_KEY",
+    label: "Mailgun Webhook Signing Key",
+    hint: "Mailgun → Settings → Webhooks → HTTP webhook signing key. Point the webhook at the URL below.",
+  },
+};
+
 export function EmailSecretsPanel({
   secrets,
   secretFieldError,
@@ -39,6 +69,9 @@ export function EmailSecretsPanel({
   resendTest,
   emailValidateFetcher,
   initialProvider = "resend",
+  webhookBaseUrl = "",
+  tenantSlug = "",
+  testResults = [],
 }: {
   secrets: {
     RESEND_API_KEY: string;
@@ -46,6 +79,10 @@ export function EmailSecretsPanel({
     POSTMARK_SERVER_TOKEN: string;
     MAILGUN_API_KEY: string;
     MAILGUN_DOMAIN: string;
+    RESEND_WEBHOOK_SECRET: string;
+    SENDGRID_WEBHOOK_PUBLIC_KEY: string;
+    POSTMARK_WEBHOOK_TOKEN: string;
+    MAILGUN_SIGNING_KEY: string;
   };
   secretFieldError: (name: string) => string | undefined;
   secretFormError: (intent: string) => string | null;
@@ -54,8 +91,19 @@ export function EmailSecretsPanel({
   resendTest: ActionFetcher["data"];
   emailValidateFetcher: ActionFetcher;
   initialProvider?: EmailByoProvider;
+  /** Origin used to build the deliverability webhook URL hint (e.g. https://app…). */
+  webhookBaseUrl?: string;
+  /** Tenant slug appended to the webhook URL path. */
+  tenantSlug?: string;
+  /** Persisted "Test connection" history (shared loader list, filtered to email). */
+  testResults?: ConnectionTestResult[];
 }) {
   const [provider, setProvider] = useState<EmailByoProvider>(initialProvider);
+  const webhookField = WEBHOOK_FIELDS[provider];
+  const webhookUrl =
+    webhookBaseUrl && tenantSlug
+      ? `${webhookBaseUrl}/api/public/email/${provider}/${tenantSlug}`
+      : "";
 
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
@@ -162,6 +210,35 @@ export function EmailSecretsPanel({
           </>
         )}
 
+        {/* Inbound deliverability webhook (WH-3) — verifies bounce/complaint
+            callbacks for the selected provider, feeding the suppression list. */}
+        <div className="space-y-3 pt-3 border-t border-ih-border">
+          <div className="space-y-1">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Deliverability webhook</p>
+            <p className="text-[12px] text-ih-fg-3">
+              Configure {PROVIDER_LABELS[provider]} to send bounce &amp; spam-complaint events here so suppressed
+              addresses are never emailed again.
+            </p>
+          </div>
+          {webhookUrl ? (
+            <div className="space-y-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Webhook URL</p>
+              <code className="block w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-muted text-[12px] font-mono text-ih-fg-2 break-all">
+                {webhookUrl}
+              </code>
+            </div>
+          ) : null}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SecretField
+              name={webhookField.name}
+              label={webhookField.label}
+              value={secrets[webhookField.name as keyof typeof secrets]}
+              error={secretFieldError(webhookField.name)}
+              hint={webhookField.hint}
+            />
+          </div>
+        </div>
+
         {secretFormError("save-email-secrets") && (
           <p className="text-[12px] text-ih-bad-fg">{secretFormError("save-email-secrets")}</p>
         )}
@@ -215,6 +292,9 @@ export function EmailSecretsPanel({
             )}
         </TestConnectionButton>
       )}
+
+      {/* Persisted last-tested status + recent history (survives reloads). */}
+      <ConnectionTestStatus results={testResults} target="email" />
     </section>
   );
 }

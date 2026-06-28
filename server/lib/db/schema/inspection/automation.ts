@@ -24,16 +24,28 @@ export const automations = sqliteTable('automations', {
         enum: ['client', 'buying_agent', 'selling_agent', 'inspector', 'all'],
     }).notNull(),
     delayMinutes: integer('delay_minutes').notNull().default(0),
+    // -- DEAD (2026-06-26, SP2): embedded email subject/body retired. Automations
+    // now reference a message_templates row via email_template_id. Frozen: no
+    // reads/writes; D1 cannot drop an FK-referenced column. Do not reuse.
     subjectTemplate: text('subject_template').notNull(),
+    // -- DEAD (2026-06-26, SP2): see subject_template above.
     bodyTemplate: text('body_template').notNull(),
+    // SP2 — references a message_templates(channel='email') row for the email
+    // channel. Null = no email template selected (channel disabled or unmigrated).
+    emailTemplateId: text('email_template_id'),
     // Track J (D2) — send-time gates, JSON: { requirePaid?: bool, requireSigned?: bool, serviceIds?: string[] }.
     // null = no gates. Evaluated in flush() at delivery, NOT at trigger time.
     conditions: text('conditions'),
     // Track L (D2) — enabled delivery channels, JSON string[] e.g. '["email","sms"]'.
     // A firing emits one automation_logs row per channel. Default email-only.
     channels: text('channels').notNull().default('["email"]'),
-    // Track L (D2) — plain-text SMS template (no HTML, no subject). Null until SMS enabled.
+    // -- DEAD (2026-06-26, SP2): embedded plain-text SMS body retired. Automations
+    // now reference a message_templates(channel='sms') row via sms_template_id.
+    // Frozen: no reads/writes; do not reuse.
     smsBody: text('sms_body'),
+    // SP2 — references a message_templates(channel='sms') row for the SMS channel.
+    // Null = no SMS template selected.
+    smsTemplateId: text('sms_template_id'),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
     isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),

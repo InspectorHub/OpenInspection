@@ -33,6 +33,7 @@ import type {
     IntegrationsApi,
     InvoicesApi,
     MarketplaceApi,
+    MessageTemplatesApi,
     MessagesApi,
     MetricsApi,
     NotificationsApi,
@@ -138,6 +139,7 @@ export interface Api {
     integrations:       ReturnType<typeof hc<IntegrationsApi>>;
     invoices:           ReturnType<typeof hc<InvoicesApi>>;
     marketplace:        ReturnType<typeof hc<MarketplaceApi>>;
+    messageTemplates:   ReturnType<typeof hc<MessageTemplatesApi>>;
     messages:           ReturnType<typeof hc<MessagesApi>>;
     metrics:            ReturnType<typeof hc<MetricsApi>>;
     notifications:      ReturnType<typeof hc<NotificationsApi>>;
@@ -203,6 +205,7 @@ const MOUNT: Record<keyof Api, string> = {
     integrations:       "/api/integrations",
     invoices:           "/api/invoices",
     marketplace:        "/api/templates/marketplace",
+    messageTemplates:   "/api/message-templates",
     messages:           "/api/messages",
     metrics:            "/api/metrics",
     notifications:      "/api/notifications",
@@ -286,6 +289,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         integrations:       mk<IntegrationsApi>(MOUNT.integrations),
         invoices:           mk<InvoicesApi>(MOUNT.invoices),
         marketplace:        mk<MarketplaceApi>(MOUNT.marketplace),
+        messageTemplates:   mk<MessageTemplatesApi>(MOUNT.messageTemplates),
         messages:           mk<MessagesApi>(MOUNT.messages),
         metrics:            mk<MetricsApi>(MOUNT.metrics),
         notifications:      mk<NotificationsApi>(MOUNT.notifications),

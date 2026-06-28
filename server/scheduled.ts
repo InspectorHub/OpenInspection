@@ -30,6 +30,15 @@ export interface ScheduledEnv {
     TWILIO_ACCOUNT_SID?: string;
     TWILIO_AUTH_TOKEN?: string;
     TWILIO_FROM_NUMBER?: string;
+    // Managed-pool ISV credentials (same as in AppEnv). Required for the managed
+    // compliance cron sweep (Task 7). Absent in standalone → sweep skips silently.
+    TWILIO_API_KEY_SID?: string;
+    TWILIO_API_KEY_SECRET?: string;
+    /** Managed-ISV Telnyx API key (Plan 2) — drives the Telnyx managed compliance
+     *  sweep. Absent in standalone / Twilio-only deploys → Telnyx rows skip. */
+    TELNYX_API_KEY?: string;
+    /** Shared Messaging Service SID for managed_shared tenants (Task 8 send gate). */
+    TWILIO_SHARED_MESSAGING_SERVICE_SID?: string;
     TENANT_CACHE?: KVNamespace;
     // Core -> portal user-sync transport (A-13/A-14). Producer binding to the
     // sync queue; the outbox sweeper republishes pending rows through it.
@@ -151,11 +160,20 @@ export async function scheduled(
                         }, tenantId)),
               }
             : null;
+        // Pass the managed-send gate env so managed_shared and managed_dedicated
+        // automation sends are fail-closed until compliance is approved.
+        const gateEnv = {
+            ...(env.TWILIO_SHARED_MESSAGING_SERVICE_SID
+                ? { TWILIO_SHARED_MESSAGING_SERVICE_SID: env.TWILIO_SHARED_MESSAGING_SERVICE_SID }
+                : {}),
+        };
         await svc.flush(
             (tid) => buildTenantEmailService(env as EmailServiceEnv, tid),
             env.APP_NAME || 'OpenInspection',
             env.APP_BASE_URL || '',
             sms,
+            50,
+            gateEnv,
         );
     } catch (e) {
         logger.error('[cron] automation flush failed', {}, e instanceof Error ? e : undefined);
@@ -188,6 +206,36 @@ export async function scheduled(
         }
     } catch (e) {
         logger.error('[cron] orphan GC failed', {}, e instanceof Error ? e : undefined);
+    }
+
+    // 5c. Managed compliance status poll (Task 7 / Plan 2) — re-read brand/campaign/
+    //     TFV status from the carrier for non-terminal managed rows. The sweep builds
+    //     the provider PER ROW by messaging_compliance.provider, so a mixed Twilio +
+    //     Telnyx fleet is reconciled in one pass. Runs when EITHER the Twilio ISV
+    //     triple OR TELNYX_API_KEY is present (so a Telnyx-only deploy still sweeps);
+    //     a row whose carrier has no configured creds is skipped fail-soft. Skipped
+    //     entirely when none are present (standalone / unconfigured saas).
+    const twilioIsvConfigured = !!(env.TWILIO_ACCOUNT_SID && env.TWILIO_API_KEY_SID && env.TWILIO_API_KEY_SECRET);
+    if (twilioIsvConfigured || env.TELNYX_API_KEY) {
+        try {
+            const { MessagingComplianceService } = await import('./services/messaging-compliance.service');
+            const svc = new MessagingComplianceService(env.DB);
+            // Pass an outbox when the sync queue is bound (SaaS) so status transitions
+            // are propagated to portal. Absent in standalone — no-op (outbox = undefined).
+            // Dynamic import keeps portal code out of the standalone bundle by construction.
+            const outbox = env.SYNC_QUEUE
+                ? await import('./portal/integration.module').then(({ buildUserSyncOutbox }) => buildUserSyncOutbox(env))
+                : undefined;
+            const resolverEnv = {
+                TWILIO_ACCOUNT_SID: env.TWILIO_ACCOUNT_SID,
+                TWILIO_API_KEY_SID: env.TWILIO_API_KEY_SID,
+                TWILIO_API_KEY_SECRET: env.TWILIO_API_KEY_SECRET,
+                TELNYX_API_KEY: env.TELNYX_API_KEY,
+            };
+            await svc.sweepManagedStatuses(resolverEnv, outbox);
+        } catch (e) {
+            logger.error('[cron] managed compliance sweep failed', {}, e instanceof Error ? e : undefined);
+        }
     }
 
     // 6. Track I-a GDPR retention sweep (spec §7) — final destruction of

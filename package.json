@@ -94,6 +94,8 @@
     "react-router": "^7.6.0",
     "sortablejs": "^1.15.7",
     "stripe": "^22.2.0",
+    "telnyx": "^7.2.0",
+    "twilio": "^6.0.2",
     "y-indexeddb": "^9.0.12",
     "y-protocols": "^1.0.7",
     "yet-another-react-lightbox": "^3.32.0",

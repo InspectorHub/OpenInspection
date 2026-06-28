@@ -7,7 +7,8 @@
 export type UserSyncEventType =
     | 'user.invited'
     | 'user.password_changed'
-    | 'user.deleted';
+    | 'user.deleted'
+    | 'io.inspectorhub.tenant.compliance_status_updated';
 
 export interface UserSyncEvent {
     type: UserSyncEventType;

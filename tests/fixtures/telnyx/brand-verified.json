@@ -1,0 +1,13 @@
+{
+  "data": {
+    "event_type": "brand.status.updated",
+    "id": "evt-brand-1",
+    "record_type": "event",
+    "occurred_at": "2026-06-28T00:00:00.000Z",
+    "payload": {
+      "brandId": "BR1",
+      "identityStatus": "VERIFIED",
+      "failureReasons": null
+    }
+  }
+}

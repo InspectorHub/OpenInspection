@@ -46,6 +46,9 @@ export default [
     ),
     // Track L (D6, path B) — public SMS double-opt-in confirmation page.
     route("sms-optin/:token", "routes/public/sms-optin.tsx"),
+    // Per-tenant legal pages — privacy/terms URLs for managed compliance (TFV/A2P)
+    // and booking opt-in links. doc ∈ privacy|terms; unknown → 404.
+    route("legal/:tenant/:doc", "routes/public/legal.tsx"),
     route("repair-request/:shareToken", "routes/public/repair-request.$shareToken.tsx"),
     route("repair-builder/:tenant/:id", "routes/public/repair-builder.$tenant.$id.tsx"),
     // Unified client portal (phase ①) — magic-link login, My Inspections, per-inspection Hub.
@@ -116,6 +119,7 @@ export default [
       route("settings/workspace", "routes/settings-workspace.tsx"),
       route("settings/services", "routes/settings-services.tsx"),
       route("settings/communication", "routes/settings-communication.tsx"),
+      route("settings/communication/templates", "routes/settings-communication-templates.tsx"),
       route("settings/communication/templates/:trigger", "routes/settings-communication-template.tsx"),
       route("settings/automations", "routes/settings-automations.tsx"),
       route("settings/data", "routes/settings-data.tsx"),

@@ -1,4 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
+import type { Clock } from '../../lib/automation-core';
 
 /**
  * Shared base + module-level helpers for the AutomationService mixin chain.
@@ -75,6 +76,7 @@ export interface HasDeliverSms {
                inspection: typeof inspections.$inferSelect; tenant: typeof import('../../lib/db/schema').tenants.$inferSelect },
         sms: import('./sms').SmsRuntime,
         appName: string, appHost: string,
+        env?: import('../../lib/sms/managed-send-gate').ManagedSendGateEnv,
     ): Promise<void>;
 }
 
@@ -94,3 +96,7 @@ export class AutomationBase {
 
     protected getDrizzle() { return drizzle(this.db); }
 }
+
+/** OI's real-time Clock for the automation core. Edge-only Date.now() (the core
+ *  itself never calls it). */
+export const oiClock: Clock = { nowMs: () => Date.now() };

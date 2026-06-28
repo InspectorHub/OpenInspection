@@ -1,0 +1,11 @@
+{
+  "data": {
+    "event_type": "message.sent",
+    "id": "evt-unknown-1",
+    "record_type": "event",
+    "occurred_at": "2026-06-28T00:00:00.000Z",
+    "payload": {
+      "to": "redacted"
+    }
+  }
+}

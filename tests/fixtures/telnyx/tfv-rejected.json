@@ -1,0 +1,13 @@
+{
+  "data": {
+    "event_type": "tollfree_verification.updated",
+    "id": "evt-tfv-1",
+    "record_type": "event",
+    "occurred_at": "2026-06-28T00:00:00.000Z",
+    "payload": {
+      "id": "TFV_DB_ID",
+      "verificationStatus": "Rejected",
+      "reason": "Business could not be verified"
+    }
+  }
+}

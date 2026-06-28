@@ -11,6 +11,7 @@ import { AccessDenied } from "~/components/AccessDenied";
 import { StripeConnectPanel } from "~/components/settings/advanced/StripeConnectPanel";
 import { AiFeaturesPanel } from "~/components/settings/advanced/AiFeaturesPanel";
 import { IntegrationKeysPanel } from "~/components/settings/advanced/IntegrationKeysPanel";
+import { parseTestResults } from "~/lib/connection-test";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -33,9 +34,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   // Fetch Stripe connect status + secrets in parallel.
   // ai.status has no server route — omit it and default geminiConfigured to false.
-  const [stripeRes, secretsRes] = await Promise.all([
+  const [stripeRes, secretsRes, testResultsRes] = await Promise.all([
     api.admin["stripe-connect"].$get().catch(() => null),
     api.secrets.secrets.$get().catch(() => null),
+    api.integrations["test-results"].$get().catch(() => null),
   ]);
 
   let stripeConnected = false;
@@ -54,6 +56,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // key in encrypted secrets (no GET /api/ai/status route — derive from presence).
   const geminiConfigured = !!secrets.GEMINI_API_KEY;
 
+  const testResults = await parseTestResults(testResultsRes);
+
   return {
     config: { stripeConnected, stripeAccountId, geminiConfigured } as AdvancedConfig,
     secrets: {
@@ -62,6 +66,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ESTATED_API_KEY: secrets.ESTATED_API_KEY || "",
       APP_BASE_URL: secrets.APP_BASE_URL || "",
     },
+    testResults,
   };
 }
 
@@ -200,7 +205,7 @@ export default function SettingsAdvancedPage() {
   );
 
   if ("forbidden" in loaderResult) return <AccessDenied />;
-  const { config, secrets } = loaderResult;
+  const { config, secrets, testResults } = loaderResult;
 
   // Map a server `field` error back onto the matching SecretField.
   const secretFieldError = (name: string): string | undefined => {
@@ -258,6 +263,7 @@ export default function SettingsAdvancedPage() {
         fieldError={secretFieldError}
         saving={savingAi}
         geminiTestFetcher={geminiTestFetcher}
+        testResults={testResults}
       />
 
       {/* Integration API keys */}

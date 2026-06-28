@@ -93,6 +93,29 @@ export interface AppEnv {
     TWILIO_ACCOUNT_SID?: string;
     TWILIO_AUTH_TOKEN?: string;
     TWILIO_FROM_NUMBER?: string;
+    // Managed-pool send path: API Key SID + API Key Secret (ISV account, not per-tenant).
+    TWILIO_API_KEY_SID?: string;
+    TWILIO_API_KEY_SECRET?: string;
+    /** Shared Messaging Service SID used by all managed_shared tenants. */
+    TWILIO_SHARED_MESSAGING_SERVICE_SID?: string;
+    /**
+     * Dedicated HMAC secret for Twilio compliance-status webhooks (brand/campaign/TFV
+     * callbacks). When set, this takes precedence over TWILIO_AUTH_TOKEN for verifying
+     * POST /api/public/twilio/compliance-status/:tenant. Optional — falls back to
+     * TWILIO_AUTH_TOKEN when absent. If neither is set, the webhook rejects 403.
+     */
+    TWILIO_COMPLIANCE_WEBHOOK_TOKEN?: string;
+    /** Managed-ISV Telnyx API key — drives the Telnyx managed-compliance provision
+     *  path + cron sweep (Plan 2). Absent → Telnyx managed resolution fails closed. */
+    TELNYX_API_KEY?: string;
+    /** Base64 Ed25519 PUBLIC key for verifying Telnyx compliance-status webhooks
+     *  (POST /api/public/telnyx/compliance-status/:tenant). Missing → webhook 403. */
+    TELNYX_PUBLIC_KEY?: string;
+    /** Platform-wide monthly SMS allowance for managed (dedicated/shared) tenants.
+     *  Parsed as an integer; defaults to DEFAULT_MANAGED_SMS_ALLOWANCE (1000) when
+     *  absent or non-numeric. Send quota check reads the current period counter from
+     *  usage_counters and blocks when count >= allowance. */
+    MANAGED_SMS_MONTHLY_ALLOWANCE?: string;
 
     // Rate Limiting
     RATE_LIMITER?: { limit(options: { key: string }): Promise<{ success: boolean }> };

@@ -14,4 +14,17 @@ describe('messaging_compliance table', () => {
     expect(row?.complianceStatus).toBe('not_started');
     fx.sqlite.close();
   });
+
+  it('messaging_compliance has messaging_resource_sid + provider_meta', async () => {
+    const fx = createTestDb();
+    await setupSchema(fx.sqlite);
+    await fx.db.insert(schema.messagingCompliance).values({
+      tenantId: 't1', provider: 'telnyx', mode: 'managed_dedicated', complianceStatus: 'not_started',
+      messagingResourceSid: 'MP1', providerMeta: '{"vettingId":"v1"}', createdAt: new Date(), updatedAt: new Date(),
+    } as never);
+    const row = await fx.db.select().from(schema.messagingCompliance).get();
+    expect(row?.messagingResourceSid).toBe('MP1');
+    expect(row?.providerMeta).toBe('{"vettingId":"v1"}');
+    fx.sqlite.close();
+  });
 });

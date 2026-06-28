@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { sql } from 'drizzle-orm';
+import { sql, eq, and } from 'drizzle-orm';
 import { usageCounters } from '../lib/db/schema/usage';
 import { type UsageMetric } from '../lib/usage/period';
 
@@ -31,6 +31,21 @@ export class MeteringService {
         target: [usageCounters.tenantId, usageCounters.metric, usageCounters.periodKey],
         set: { value, updatedAt: new Date() },
       });
+  }
+
+  /** Read the current counter value for a (tenant, metric, period) bucket.
+   *  Returns 0 when no row exists (safe default for quota comparisons). */
+  async getCount(tenantId: string, metric: UsageMetric, periodKey: string): Promise<number> {
+    const d = drizzle(this.db);
+    const row = await d.select({ value: usageCounters.value })
+      .from(usageCounters)
+      .where(and(
+        eq(usageCounters.tenantId, tenantId),
+        eq(usageCounters.metric, metric),
+        eq(usageCounters.periodKey, periodKey),
+      ))
+      .get();
+    return row?.value ?? 0;
   }
 
   async getAll(): Promise<Array<typeof usageCounters.$inferSelect>> {

@@ -8,6 +8,7 @@ import { currentPeriodKey } from '../usage/period';
 import type { EmailIdentityConfig } from './sender-identity';
 import type { TemplateOverride } from '../email-templates/types';
 import { resolveEmailProvider, coerceEmailByoProvider, type EmailByoProvider } from './resolve-provider';
+import { buildEmailSuppression } from './suppression';
 import { logger } from '../logger';
 import { ResendProvider } from './providers/resend';
 import { drizzle } from 'drizzle-orm/d1';
@@ -152,7 +153,14 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
     const meter = metering && meterTenantId
         ? { record: () => metering.record(meterTenantId, 'email', currentPeriodKey(new Date())) }
         : undefined;
-    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider);
+    // WH-3 — wire the send-path suppression gate under the same guard as `meter`:
+    // only when we have a tenant id to scope the lookup (env.DB is always present
+    // on EmailServiceEnv). Standalone/platform-default sends (no meterTenantId) get
+    // no gate, behavior unchanged.
+    const suppression = meterTenantId
+        ? buildEmailSuppression(env.DB, meterTenantId)
+        : undefined;
+    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression);
 }
 
 /**

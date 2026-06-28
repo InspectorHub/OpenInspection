@@ -30,10 +30,20 @@ import type { UserSyncEvent, UserSyncEventType, UserSyncOutbox } from '../lib/in
 // consumer) on the same queue — widened here, NOT in the user-sync seam
 // (replies are not user-lifecycle events).
 type CmdReplyEventType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged';
-export type OutboxEventType = UserSyncEventType | CmdReplyEventType;
+/** Tenant-lifecycle events that are NOT user events (no user SID involved). */
+export type TenantSyncEventType = 'io.inspectorhub.tenant.compliance_status_updated';
+export type OutboxEventType = UserSyncEventType | CmdReplyEventType | TenantSyncEventType;
 export type OutboxEvent = UserSyncEvent | {
     type: CmdReplyEventType;
     payload: Record<string, unknown>;
+} | {
+    type: TenantSyncEventType;
+    payload: {
+        tenantId: string;
+        complianceStatus: string;
+        rejectionReason: string | null;
+        updatedAt: number;
+    };
 };
 
 export interface OutboxRow {

@@ -79,7 +79,9 @@ export type AuditAction =
     | 'inspection.rating_system.switch'
     | 'admin.migrate_finding_keys'
     | 'sms.consent.attest'
-    | 'sms.test_send';
+    | 'sms.test_send'
+    | 'sms.compliance.provision'
+    | 'sms.compliance.resubmit';
 
 export interface AuditParams {
     db: D1Database;

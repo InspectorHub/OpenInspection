@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form, type useFetcher, type useRevalidator } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import { WebhookStatusBadge } from "./WebhookStatusBadge";
 import type { action } from "~/routes/settings-integrations";
 
@@ -41,6 +42,8 @@ interface StripePaymentsPanelProps {
   serverError: string | null | undefined;
   testFetcher: ReturnType<typeof useFetcher<typeof action>>;
   revalidator: ReturnType<typeof useRevalidator>;
+  /** Persisted "Test connection" history (shared loader list, filtered to stripe). */
+  testResults?: ConnectionTestResult[];
 }
 
 export function StripePaymentsPanel({
@@ -52,6 +55,7 @@ export function StripePaymentsPanel({
   serverError,
   testFetcher,
   revalidator,
+  testResults = [],
 }: StripePaymentsPanelProps) {
   // Eager-after-error client validation: validate on submit; after the first
   // failed submit, re-validate on every change inside the form.
@@ -149,6 +153,9 @@ export function StripePaymentsPanel({
           <span className="text-[12px] text-ih-bad-fg">{testFetcher.data.error}</span>
         )}
       </TestConnectionButton>
+
+      {/* Persisted last-tested status + recent history (survives reloads). */}
+      <ConnectionTestStatus results={testResults} target="stripe" />
 
       {/* Webhook endpoint to register in the Stripe dashboard */}
       <div className="pt-1 space-y-1.5">

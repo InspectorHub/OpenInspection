@@ -16,6 +16,8 @@ import { EmailDeliveryPanel } from "~/components/settings/EmailDeliveryPanel";
 import { EmailSecretsPanel } from "~/components/settings/EmailSecretsPanel";
 import { SmsDeliveryPanel, type SmsModeValue } from "~/components/settings/SmsDeliveryPanel";
 import { GoogleCalendarPanel } from "~/components/settings/GoogleCalendarPanel";
+import { ManagedComplianceWizard, type ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
+import { parseTestResults } from "~/lib/connection-test";
 
 export function meta() {
   return [{ title: "Communication - Settings - OpenInspection" }];
@@ -37,13 +39,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const api = createApi(context, { token });
 
   // Fetch communication config + secrets + email templates + SMS config/tenant-config/compliance in parallel
-  const [commRes, secretsRes, tplRes, smsCfgRes, tenantCfgRes, smsComplianceRes] = await Promise.all([
+  const [commRes, secretsRes, tplRes, smsCfgRes, tenantCfgRes, smsComplianceRes, testResultsRes] = await Promise.all([
     api.admin.communication.$get().catch(() => null),
     api.secrets.secrets.$get().catch(() => null),
     api.emailTemplates["email-templates"].$get().catch(() => null),
     api.smsAdmin.sms.config.$get().catch(() => null),
     api.admin["tenant-config"].$get().catch(() => null),
     api.smsAdmin.sms.compliance.$get().catch(() => null),
+    api.integrations["test-results"].$get().catch(() => null),
   ]);
 
   const commBody = commRes?.ok ? ((await commRes.json()) as Record<string, unknown>) : {};
@@ -61,9 +64,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     mode: smsCfgBody?.data?.mode ?? "platform",
     effectiveSource: smsCfgBody?.data?.effectiveSource ?? "none",
   };
-  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null; smsByoProvider?: "twilio" | "telnyx" | null; emailByoProvider?: "resend" | "sendgrid" | "postmark" | "mailgun" | null } }) : null;
+  const tenantCfgBody = tenantCfgRes?.ok ? ((await tenantCfgRes.json()) as { data?: { smsMode?: "platform" | "own" | "managed_shared" | "managed_dedicated"; companyPhone?: string | null; smsByoProvider?: "twilio" | "telnyx" | null; managedProvider?: "twilio" | "telnyx" | null; emailByoProvider?: "resend" | "sendgrid" | "postmark" | "mailgun" | null } }) : null;
   const companyPhone = tenantCfgBody?.data?.companyPhone ?? "";
   const byoProvider: "twilio" | "telnyx" = tenantCfgBody?.data?.smsByoProvider === "telnyx" ? "telnyx" : "twilio";
+  // managedProvider: which carrier runs MANAGED compliance (managed_dedicated mode).
+  // Separate from smsByoProvider (the BYO send provider shown in 'own' mode).
+  const managedProvider: "twilio" | "telnyx" = tenantCfgBody?.data?.managedProvider === "telnyx" ? "telnyx" : "twilio";
   const emailByoProvider: "resend" | "sendgrid" | "postmark" | "mailgun" =
     (["resend", "sendgrid", "postmark", "mailgun"] as const).includes(
       tenantCfgBody?.data?.emailByoProvider as "resend" | "sendgrid" | "postmark" | "mailgun"
@@ -71,16 +77,37 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ? (tenantCfgBody!.data!.emailByoProvider as "resend" | "sendgrid" | "postmark" | "mailgun")
       : "resend";
 
-  // SMS compliance status (BYO Twilio toll-free verification). Fails gracefully
-  // to not_started so the UI always has a defined value to render.
+  // SMS compliance status (BYO Twilio toll-free verification + managed sub-statuses).
+  // Fails gracefully to not_started so the UI always has a defined value to render.
   type ComplianceStatus = "not_started" | "profile_pending" | "brand_pending" | "campaign_pending" | "tfv_pending" | "approved" | "rejected";
   const smsComplianceBody = smsComplianceRes?.ok
-    ? ((await smsComplianceRes.json()) as { data?: { complianceStatus?: ComplianceStatus | null; rejectionReason?: string | null } })
+    ? ((await smsComplianceRes.json()) as {
+        data?: {
+          complianceStatus?: ComplianceStatus | null;
+          rejectionReason?: string | null;
+          customerProfileStatus?: string | null;
+          brandStatus?: string | null;
+          campaignStatus?: string | null;
+          tfvStatus?: string | null;
+          messagingServiceSid?: string | null;
+          provisionedNumber?: string | null;
+        };
+      })
     : null;
-  const compliance = {
+  const compliance: ManagedComplianceData = {
     complianceStatus: (smsComplianceBody?.data?.complianceStatus ?? "not_started") as ComplianceStatus,
     rejectionReason: smsComplianceBody?.data?.rejectionReason ?? null,
+    customerProfileStatus: smsComplianceBody?.data?.customerProfileStatus ?? null,
+    brandStatus: smsComplianceBody?.data?.brandStatus ?? null,
+    campaignStatus: smsComplianceBody?.data?.campaignStatus ?? null,
+    tfvStatus: smsComplianceBody?.data?.tfvStatus ?? null,
+    messagingServiceSid: smsComplianceBody?.data?.messagingServiceSid ?? null,
+    provisionedNumber: smsComplianceBody?.data?.provisionedNumber ?? null,
   };
+
+  // Persisted "Test connection" history (≤5 per integration). Shared by the SMS
+  // + email panels here; the same endpoint feeds the integrations/advanced pages.
+  const testResults = await parseTestResults(testResultsRes);
 
   return {
     config: {
@@ -101,6 +128,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       POSTMARK_SERVER_TOKEN: secrets.POSTMARK_SERVER_TOKEN || "",
       MAILGUN_API_KEY: secrets.MAILGUN_API_KEY || "",
       MAILGUN_DOMAIN: secrets.MAILGUN_DOMAIN || "",
+      // WH-3 — per-provider inbound webhook verification secrets.
+      RESEND_WEBHOOK_SECRET: secrets.RESEND_WEBHOOK_SECRET || "",
+      SENDGRID_WEBHOOK_PUBLIC_KEY: secrets.SENDGRID_WEBHOOK_PUBLIC_KEY || "",
+      POSTMARK_WEBHOOK_TOKEN: secrets.POSTMARK_WEBHOOK_TOKEN || "",
+      MAILGUN_SIGNING_KEY: secrets.MAILGUN_SIGNING_KEY || "",
       GOOGLE_CLIENT_ID: secrets.GOOGLE_CLIENT_ID || "",
       GOOGLE_CLIENT_SECRET: secrets.GOOGLE_CLIENT_SECRET || "",
       TWILIO_ACCOUNT_SID: secrets.TWILIO_ACCOUNT_SID || "",
@@ -108,12 +140,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       TWILIO_FROM_NUMBER: secrets.TWILIO_FROM_NUMBER || "",
       TELNYX_API_KEY: secrets.TELNYX_API_KEY || "",
       TELNYX_FROM_NUMBER: secrets.TELNYX_FROM_NUMBER || "",
+      TELNYX_PUBLIC_KEY: secrets.TELNYX_PUBLIC_KEY || "",
     },
     smsConfig,
     companyPhone,
     byoProvider,
     emailByoProvider,
     compliance,
+    managedProvider,
+    testResults,
   };
 }
 
@@ -190,8 +225,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       ? (rawProvider as EmailByoProvider)
       : "resend";
     const body: Record<string, string> = {};
-    // Collect only the non-empty secret fields relevant to the selected provider.
-    for (const key of ["RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_SERVER_TOKEN", "MAILGUN_API_KEY", "MAILGUN_DOMAIN"]) {
+    // Collect only the non-empty secret fields relevant to email providers — the
+    // sending credentials AND the per-provider inbound webhook verification
+    // secret (WH-3). Empty/masked values are skipped by the secrets endpoint.
+    for (const key of [
+      "RESEND_API_KEY", "SENDGRID_API_KEY", "POSTMARK_SERVER_TOKEN", "MAILGUN_API_KEY", "MAILGUN_DOMAIN",
+      "RESEND_WEBHOOK_SECRET", "SENDGRID_WEBHOOK_PUBLIC_KEY", "POSTMARK_WEBHOOK_TOKEN", "MAILGUN_SIGNING_KEY",
+    ]) {
       const v = form.get(key);
       if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
     }
@@ -283,7 +323,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
       }
     } else {
-      for (const key of ["TELNYX_API_KEY", "TELNYX_FROM_NUMBER"]) {
+      for (const key of ["TELNYX_API_KEY", "TELNYX_FROM_NUMBER", "TELNYX_PUBLIC_KEY"]) {
         const v = form.get(key);
         if (v && typeof v === "string" && v.trim()) body[key] = v.trim();
       }
@@ -306,6 +346,72 @@ export async function action({ request, context }: Route.ActionArgs) {
       return { intent, ok: false, error: body?.error ?? "Test SMS failed.", field: null, test: null };
     }
     return { intent, ok: true, error: null, field: null, test: { sent: true } };
+  }
+
+  // ─── Managed SMS compliance provisioning (SaaS-only, Task 9) ───────────────
+  if (intent === "sms-compliance-provision" || intent === "sms-compliance-resubmit") {
+    // Gate: SaaS only. The API endpoint also enforces this (403 in standalone),
+    // but we short-circuit a direct POST here so standalone never reaches the API.
+    const isSaasAction =
+      (context as { cloudflare?: { env?: { APP_MODE?: string } } }).cloudflare?.env?.APP_MODE === "saas";
+    if (!isSaasAction) {
+      return { intent, ok: false as const, error: "Managed SMS is only available on the SaaS platform.", field: null, test: null };
+    }
+
+    // Validate required business-info fields.
+    const legalName = String(form.get("legalName") ?? "").trim();
+    const address = String(form.get("address") ?? "").trim();
+    const repName = String(form.get("repName") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim();
+    const areaCode = String(form.get("areaCode") ?? "").trim();
+    const rawChannel = form.get("channel");
+    const channel: "sp10dlc" | "tollfree" = rawChannel === "tollfree" ? "tollfree" : "sp10dlc";
+
+    if (!legalName) return { intent, ok: false as const, error: "Legal name is required.", field: "legalName", test: null };
+    if (!address) return { intent, ok: false as const, error: "Business address is required.", field: "address", test: null };
+    if (!repName) return { intent, ok: false as const, error: "Representative name is required.", field: "repName", test: null };
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return { intent, ok: false as const, error: "Enter a valid email address.", field: "email", test: null };
+    }
+
+    const businessInfo = {
+      legalName,
+      address,
+      repName,
+      ...(email ? { email } : {}),
+      ...(areaCode ? { areaCode } : {}),
+    };
+
+    const endpoint = intent === "sms-compliance-provision"
+      ? api.smsAdmin.sms.compliance.provision.$post({ json: { businessInfo, channel } })
+      : api.smsAdmin.sms.compliance.resubmit.$post({ json: { businessInfo, channel } });
+
+    const res = await endpoint;
+    if (!res.ok) {
+      const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+      const msg = errBody?.error === "managed_provision_unavailable"
+        ? "Managed SMS provisioning is not available in standalone mode."
+        : errBody?.error === "managed_not_configured"
+          ? "Managed Twilio credentials are not configured on this deployment."
+          : errBody?.error ?? (intent === "sms-compliance-provision"
+            ? "Failed to start provisioning."
+            : "Failed to resubmit.");
+      return { intent, ok: false as const, error: msg, field: null, test: null };
+    }
+    return { intent, ok: true as const, error: null, field: null, test: null };
+  }
+
+  // ─── Managed compliance provider selector (Task 5) ───────────────────────
+  if (intent === "save-managed-provider") {
+    const rawProvider = form.get("managedProvider");
+    const managedProvider: "twilio" | "telnyx" = rawProvider === "telnyx" ? "telnyx" : "twilio";
+    const res = await api.admin["tenant-config"].$patch({
+      json: { managedProvider },
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      return { intent, ok: false as const, error: "Failed to save managed provider.", field: null, test: null };
+    }
+    return { intent, ok: true as const, error: null, field: null, test: null };
   }
 
   if (intent === "toggle-template") {
@@ -335,14 +441,27 @@ export default function SettingsCommunication() {
   const emailTemplates = denied ? [] : loaderResult.emailTemplates;
   const icsUrl = denied ? null : loaderResult.icsUrl;
   const googleCalendarConnected = denied ? false : loaderResult.googleCalendarConnected;
+  const testResults = denied ? [] : loaderResult.testResults;
   const secrets = denied
-    ? { RESEND_API_KEY: "", SENDGRID_API_KEY: "", POSTMARK_SERVER_TOKEN: "", MAILGUN_API_KEY: "", MAILGUN_DOMAIN: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "", TELNYX_API_KEY: "", TELNYX_FROM_NUMBER: "" }
+    ? { RESEND_API_KEY: "", SENDGRID_API_KEY: "", POSTMARK_SERVER_TOKEN: "", MAILGUN_API_KEY: "", MAILGUN_DOMAIN: "", RESEND_WEBHOOK_SECRET: "", SENDGRID_WEBHOOK_PUBLIC_KEY: "", POSTMARK_WEBHOOK_TOKEN: "", MAILGUN_SIGNING_KEY: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "", TELNYX_API_KEY: "", TELNYX_FROM_NUMBER: "", TELNYX_PUBLIC_KEY: "" }
     : loaderResult.secrets;
   const smsConfig = denied ? { mode: "platform" as const, effectiveSource: "none" as const } : loaderResult.smsConfig as { mode: "platform" | "own" | "managed_shared" | "managed_dedicated"; effectiveSource: "platform" | "own" | "none" };
   const companyPhone = denied ? "" : loaderResult.companyPhone;
   const byoProvider = denied ? ("twilio" as const) : loaderResult.byoProvider;
   const emailByoProvider = denied ? ("resend" as const) : loaderResult.emailByoProvider;
-  const compliance = denied ? { complianceStatus: "not_started" as const, rejectionReason: null } : loaderResult.compliance;
+  const managedProvider = denied ? ("twilio" as const) : loaderResult.managedProvider;
+  const compliance: ManagedComplianceData = denied
+    ? {
+        complianceStatus: "not_started" as const,
+        rejectionReason: null,
+        customerProfileStatus: null,
+        brandStatus: null,
+        campaignStatus: null,
+        tfvStatus: null,
+        messagingServiceSid: null,
+        provisionedNumber: null,
+      }
+    : loaderResult.compliance;
   const actionData = useActionData<typeof action>();
   const nav = useNavigation();
   const resendTestFetcher = useFetcher<typeof action>();
@@ -394,6 +513,12 @@ export default function SettingsCommunication() {
     nav.state !== "idle" && nav.formData?.get("intent") === "save-sms-secrets";
   const savingSmsConfig =
     nav.state !== "idle" && nav.formData?.get("intent") === "save-sms-config";
+  const savingCompliance =
+    nav.state !== "idle" &&
+    (nav.formData?.get("intent") === "sms-compliance-provision" ||
+      nav.formData?.get("intent") === "sms-compliance-resubmit");
+  const savingManagedProvider =
+    nav.state !== "idle" && nav.formData?.get("intent") === "save-managed-provider";
 
   // Inbound webhook URL: BYO tenants (own mode) and standalone deployments own STOP/START.
   // Managed-number tenants don't set up their own inbound webhook.
@@ -499,6 +624,9 @@ export default function SettingsCommunication() {
         resendTest={resendTest}
         emailValidateFetcher={emailValidateFetcher}
         initialProvider={emailByoProvider}
+        webhookBaseUrl={typeof window !== "undefined" ? window.location.origin : ""}
+        tenantSlug={tenantSlug}
+        testResults={testResults}
       />
 
       {/* SMS delivery (Track L) */}
@@ -518,13 +646,58 @@ export default function SettingsCommunication() {
         smsTestFetcher={smsTestFetcher}
         compliance={compliance}
         byoProvider={byoProvider}
+        testResults={testResults}
       />
+
+      {/* Managed dedicated — onboarding wizard + status timeline (SaaS only) */}
+      {isSaas && smsMode === "managed_dedicated" && (
+        <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Dedicated number setup</h3>
+          <p className="text-[13px] text-ih-fg-3">
+            Provision your own dedicated local or toll-free number managed by the platform.
+            Submit your business information below to begin TCR / TFV registration.
+          </p>
+          <ManagedComplianceWizard
+            compliance={compliance}
+            managedProvider={managedProvider}
+            savingManagedProvider={savingManagedProvider}
+            actionError={
+              actionData &&
+              "intent" in actionData &&
+              (actionData.intent === "sms-compliance-provision" || actionData.intent === "sms-compliance-resubmit") &&
+              "ok" in actionData &&
+              !actionData.ok
+                ? actionData.error ?? null
+                : null
+            }
+            saving={savingCompliance}
+          />
+        </section>
+      )}
+
+      {/* Managed shared — minimal status note (SaaS only, no per-tenant form) */}
+      {isSaas && smsMode === "managed_shared" && (
+        <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5">
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 mb-2">Shared pool status</h3>
+          <p className="text-[13px] text-ih-fg-3">
+            Your messages are sent from a platform-managed shared number. No additional setup is required.
+          </p>
+          {compliance.complianceStatus === "approved" && (
+            <p className="text-[12px] text-ih-ok-fg font-medium mt-2">Platform pool: Active</p>
+          )}
+        </section>
+      )}
 
       {/* Email templates */}
       <section className="space-y-4">
         <div className="flex items-baseline justify-between">
           <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email templates</h3>
-          <span className="text-[11px] text-ih-fg-4">{emailTemplates.length} templates · click to customize</span>
+          <div className="flex items-center gap-3">
+            <Link to="/settings/communication/templates" className="text-[12px] text-ih-primary font-semibold hover:underline">
+              Manage templates &rarr;
+            </Link>
+            <span className="text-[11px] text-ih-fg-4">{emailTemplates.length} templates · click to customize</span>
+          </div>
         </div>
         {emailTemplates.length === 0 ? (
           <div className="bg-ih-bg-card border border-ih-border rounded-lg py-8 text-center text-[13px] text-ih-fg-3">No email templates available.</div>

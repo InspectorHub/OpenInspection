@@ -65,6 +65,7 @@ import contactsImportRoutes from './api/contacts/import';
 import invoiceRoutes from './api/invoices';
 import servicesRoutes from './api/services';
 import automationsRoutes from './api/automations';
+import messageTemplateRoutes from './api/message-templates';
 import metricsRoutes from './api/metrics';
 import marketplaceRoutes from './api/marketplace';
 import templateMigrationRoutes from './api/template-migrations';
@@ -528,6 +529,7 @@ const routes = app
   .route('/api/invoices', invoiceRoutes)
   .route('/api/services', servicesRoutes)
   .route('/api/automations', automationsRoutes)
+  .route('/api/message-templates', messageTemplateRoutes)
   .route('/api/metrics', metricsRoutes)
   .route('/api/templates/marketplace', marketplaceRoutes)
   // Sprint 2 S2-6 — migrate inspections from one template to another.

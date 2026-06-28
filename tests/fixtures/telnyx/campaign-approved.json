@@ -1,0 +1,13 @@
+{
+  "data": {
+    "event_type": "campaign.status.updated",
+    "id": "evt-campaign-1",
+    "record_type": "event",
+    "occurred_at": "2026-06-28T00:00:00.000Z",
+    "payload": {
+      "campaignId": "CAMP1",
+      "campaignStatus": "MNO_PROVISIONED",
+      "failureReasons": null
+    }
+  }
+}

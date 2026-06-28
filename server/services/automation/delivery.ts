@@ -2,10 +2,13 @@ import { eq, and, lte, ne } from 'drizzle-orm';
 import { automations, automationLogs, inspections, tenants, tenantConfigs } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import type { EmailService } from '../email.service';
-import { interpolate, type Constructor } from './shared';
+import { type Constructor, oiClock } from './shared';
+import { deliverAction } from '../../lib/automation-core';
 import { buildBaseTemplateVars } from './template-vars';
+import { createOiTemplateStore } from './template-store';
 import type { AutomationBase, HasEvaluateConditions, HasDeliverSms } from './shared';
 import type { SmsRuntime } from './sms';
+import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 
 /**
  * Delivery mixin: the cron-driven flush() that drains due automation_log rows.
@@ -20,6 +23,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             appName: string, appBaseUrl: string,
             sms?: SmsRuntime,
             batchSize = 50,
+            env?: ManagedSendGateEnv,
         ): Promise<void> {
             const db = this.getDrizzle();
             const now = new Date().toISOString();
@@ -98,9 +102,24 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // creds + consent in deliverSms; the email path delegates to the
                     // per-tenant EmailService (metering + per-tenant key resolution by construction).
                     if (log.channel === 'sms') {
-                        await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost);
+                        await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost, env);
                         continue;
                     }
+
+                    // SP2 — resolve the referenced email template (replaces the
+                    // embedded subject_template / body_template, now frozen DEAD).
+                    // Skip fail-closed when the rule has no resolvable email template.
+                    const store = createOiTemplateStore(this.db);
+                    const tpl = automation.emailTemplateId
+                        ? await store.resolve(inspection.tenantId, automation.emailTemplateId)
+                        : null;
+                    if (!tpl || tpl.channel !== 'email') {
+                        await db.update(automationLogs).set({ status: 'skipped', error: 'no email template' })
+                            .where(eq(automationLogs.id, log.id));
+                        continue;
+                    }
+                    const subjectSource = tpl.subject ?? '';
+                    const bodySource = tpl.body;
 
                     const vars: Record<string, string> = {
                         ...buildBaseTemplateVars(inspection, tenant, appName, appHost),
@@ -132,8 +151,8 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     }
 
                     // Lazy: only create agreement_request when this rule actually needs it
-                    const needsAgreementUrl = automation.bodyTemplate.includes('{{agreement_sign_url}}') ||
-                                              automation.subjectTemplate.includes('{{agreement_sign_url}}');
+                    const needsAgreementUrl = bodySource.includes('{{agreement_sign_url}}') ||
+                                              subjectSource.includes('{{agreement_sign_url}}');
                     if (needsAgreementUrl) {
                         if (!this.agreementService) {
                             await db.update(automationLogs).set({ status: 'failed', error: 'AgreementService not configured' })
@@ -151,8 +170,8 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                         }
                     }
 
-                    const needsReviewUrl = automation.bodyTemplate.includes('{{review_url}}') ||
-                                           automation.subjectTemplate.includes('{{review_url}}');
+                    const needsReviewUrl = bodySource.includes('{{review_url}}') ||
+                                           subjectSource.includes('{{review_url}}');
                     if (needsReviewUrl) {
                         const cfg = await db.select({ reviewUrl: tenantConfigs.reviewUrl }).from(tenantConfigs)
                             .where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
@@ -164,20 +183,69 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                         vars.review_url = cfg.reviewUrl;
                     }
 
-                    const subject = interpolate(automation.subjectTemplate, vars);
-                    const html    = interpolate(automation.bodyTemplate, vars);
-
-                    // Route through the per-tenant EmailService so metering and
-                    // per-tenant Resend key resolution happen by construction.
+                    // Build the OI adapters for this log and delegate the
+                    // email send + log write to the shared automation core.
+                    // SP2: the subject/body come from the referenced message_template
+                    // (resolved above into subjectSource/bodySource), so the inline
+                    // TemplateStore returns those resolved strings. requiredVars
+                    // carries the fail-closed review_url value resolved above
+                    // (undefined → core skips with "review_url not configured",
+                    //  byte-identical to the former hardcoded guard).
                     const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
-                    const { delivered } = await emailSvc.sendEmail([log.recipient], subject, html);
-                    if (delivered) {
-                        await db.update(automationLogs).set({ status: 'sent', deliveredAt: new Date().toISOString() })
-                            .where(eq(automationLogs.id, log.id));
-                    } else {
-                        await db.update(automationLogs).set({ status: 'skipped', error: 'email not configured' })
-                            .where(eq(automationLogs.id, log.id));
-                    }
+
+                    const templateStore = {
+                        resolve: async () => ({
+                            channel: 'email' as const,
+                            subject: subjectSource,
+                            body: bodySource,
+                            variables: tpl.variables,
+                        }),
+                    };
+                    const transport = {
+                        sendEmail: async (a: { to: string; subject: string; html: string }) => {
+                            const { delivered } = await emailSvc.sendEmail([a.to], a.subject, a.html);
+                            // OI maps "not delivered" (e.g. email not configured) to a
+                            // SKIPPED log, not a failure. Encode that as a sentinel the
+                            // logger adapter below translates.
+                            return delivered
+                                ? { ok: true as const }
+                                : { ok: false as const, error: '__email_not_configured__' };
+                        },
+                        sendSms: async () => ({ ok: false as const, error: 'sms not routed here' }),
+                    };
+                    const loggerAdapter = {
+                        record: async (row: { logId: string; status: 'sent' | 'failed' | 'skipped'; error?: string; deliveredAtMs?: number }) => {
+                            // Translate the email-not-configured sentinel back to OI's
+                            // historical "skipped / email not configured" outcome.
+                            if (row.status === 'failed' && row.error === '__email_not_configured__') {
+                                await db.update(automationLogs).set({ status: 'skipped', error: 'email not configured' })
+                                    .where(eq(automationLogs.id, log.id));
+                                return;
+                            }
+                            if (row.status === 'sent') {
+                                await db.update(automationLogs).set({
+                                    status: 'sent',
+                                    deliveredAt: new Date(row.deliveredAtMs ?? Date.now()).toISOString(),
+                                }).where(eq(automationLogs.id, log.id));
+                                return;
+                            }
+                            await db.update(automationLogs).set({ status: row.status, ...(row.error !== undefined ? { error: row.error } : {}) })
+                                .where(eq(automationLogs.id, log.id));
+                        },
+                    };
+
+                    await deliverAction({
+                        tenantId: inspection.tenantId,
+                        logId: log.id,
+                        to: log.recipient,
+                        action: { channel: 'email', templateId: automation.id },
+                        vars,
+                        // Fail-closed vars: review_url was either resolved into `vars`
+                        // above or the rule didn't reference it. Pass the resolved value
+                        // (or undefined) so the core's requiredVars reproduces the skip.
+                        requiredVars: { review_url: vars.review_url },
+                        deps: { templates: templateStore, transport, logger: loggerAdapter, clock: oiClock },
+                    });
                 } catch (err) {
                     await db.update(automationLogs).set({
                         status: 'failed',

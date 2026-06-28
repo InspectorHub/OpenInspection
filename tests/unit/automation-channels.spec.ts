@@ -25,36 +25,38 @@ beforeEach(async () => {
 });
 
 describe('AutomationService — channels + sms_body (Track L)', () => {
-    it('create persists channels and sms_body', async () => {
+    it('create persists channels and smsTemplateId (SP2: embedded body fields replaced by template ids)', async () => {
         const row = await svc.create(TENANT, {
             name: 'Multi', trigger: 'report.published', recipient: 'client',
-            delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
-            channels: ['email', 'sms'], smsBody: 'Your report is ready',
+            delayMinutes: 0,
+            channels: ['email', 'sms'], smsTemplateId: 'tpl-sms-1',
         });
         // Track L (Part A) — create/update parse channels on output (array, not JSON string).
         expect(row.channels).toEqual(['email', 'sms']);
-        expect(row.smsBody).toBe('Your report is ready');
+        // SP2: smsBody is a dead column (null); template id round-trips instead.
+        expect(row.smsTemplateId).toBe('tpl-sms-1');
     });
 
     it('create defaults to email-only channels when omitted', async () => {
         const row = await svc.create(TENANT, {
             name: 'Default', trigger: 'report.published', recipient: 'client',
-            delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
+            delayMinutes: 0,
         });
         expect(row.channels).toEqual(['email']);
-        expect(row.smsBody).toBeNull();
+        // SP2: smsBody column is written null by create(); smsTemplateId is also null by default.
+        expect(row.smsTemplateId).toBeNull();
     });
 
-    it('update can change channels and sms_body', async () => {
+    it('update can change channels and smsTemplateId (SP2)', async () => {
         const created = await svc.create(TENANT, {
             name: 'U', trigger: 'report.published', recipient: 'client',
-            delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
+            delayMinutes: 0,
         });
         const updated = await svc.update(TENANT, created.id, {
-            channels: ['email', 'sms'], smsBody: 'hi',
+            channels: ['email', 'sms'], smsTemplateId: 'tpl-upd',
         });
         expect(updated.channels).toEqual(['email', 'sms']);
-        expect(updated.smsBody).toBe('hi');
+        expect(updated.smsTemplateId).toBe('tpl-upd');
     });
 
     it('trigger fans out one log per channel for a client with email + phone', async () => {
@@ -67,8 +69,8 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         } as never);
         const created = await svc.create(TENANT, {
             name: 'R', trigger: 'report.published', recipient: 'client',
-            delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
-            channels: ['email', 'sms'], smsBody: 'sms',
+            delayMinutes: 0,
+            channels: ['email', 'sms'], smsTemplateId: 'tpl-sms',
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: inspId, triggerEvent: 'report.published',
             companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
@@ -91,8 +93,8 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         } as never);
         const created = await svc.create(TENANT, {
             name: 'R2', trigger: 'report.published', recipient: 'client',
-            delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
-            channels: ['email', 'sms'], smsBody: 'sms',
+            delayMinutes: 0,
+            channels: ['email', 'sms'], smsTemplateId: 'tpl-sms',
         });
         await svc.trigger({ tenantId: TENANT, inspectionId: inspId, triggerEvent: 'report.published',
             companyName: 'Acme', reportBaseUrl: 'https://acme.example.com' });
@@ -105,8 +107,8 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
     it('list() parses the JSON channels column to a string[] on output (Part A)', async () => {
         await svc.create(TENANT, {
             name: 'L1', trigger: 'report.published', recipient: 'client',
-            delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
-            channels: ['email', 'sms'], smsBody: 'sms',
+            delayMinutes: 0,
+            channels: ['email', 'sms'],
         });
         const rows = await svc.list(TENANT);
         const row = rows.find((r) => r.name === 'L1');
@@ -125,8 +127,8 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         } as never);
         const created = await svc.create(TENANT, {
             name: 'Reminder', trigger: 'inspection.reminder', recipient: 'client',
-            delayMinutes: 1440, subjectTemplate: 's', bodyTemplate: 'b',
-            channels: ['email', 'sms'], smsBody: 'reminder',
+            delayMinutes: 1440,
+            channels: ['email', 'sms'], smsTemplateId: 'tpl-reminder',
         });
         const n = await svc.enqueueReminders(Date.now());
         expect(n).toBe(2);

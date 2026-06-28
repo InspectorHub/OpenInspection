@@ -6,6 +6,7 @@
 import type { OpenAPIHono } from '@hono/zod-openapi';
 import type { HonoConfig } from '../types/hono';
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
+import type { UserSyncOutbox } from '../lib/integration/user-sync';
 import integrationRoutes from './integration.routes';
 import { flushOutboxOnce, OutboxService } from './outbox.service';
 import { logger } from '../lib/logger';
@@ -21,6 +22,26 @@ interface PortalDrainEnv {
 /** Mount the portal->core M2M integration routes on the API app. */
 export function registerPortalIntegration(app: OpenAPIHono<HonoConfig>): void {
     app.route('/api/integration', integrationRoutes);
+}
+
+/**
+ * Build a concrete UserSyncOutbox (OutboxService) when SYNC_QUEUE is present,
+ * or return undefined in standalone mode.
+ *
+ * Callers outside server/portal/ MUST reach the concrete OutboxService only
+ * through this builder (or through di.ts) — never by importing OutboxService
+ * directly. The builder is loaded via dynamic import inside an
+ * `if (env.SYNC_QUEUE)` guard so standalone never pulls portal code.
+ *
+ * The returned instance uses no inline-publish hook (no executionCtx available
+ * in cron/webhook non-request contexts); the cron outbox sweeper handles
+ * republication. For request-scoped construction with inline publish see di.ts.
+ */
+export function buildUserSyncOutbox(
+    env: { DB: D1Database; SYNC_QUEUE?: Queue },
+): UserSyncOutbox | undefined {
+    if (!env.SYNC_QUEUE) return undefined;
+    return new OutboxService(env.DB);
 }
 
 /** Sweeper pass: republish any `pending` outbox rows (older than the inline

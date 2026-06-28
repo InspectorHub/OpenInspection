@@ -3,6 +3,7 @@ import { eq, and } from 'drizzle-orm';
 import { automations, automationLogs, inspections } from '../../lib/db/schema';
 import { nanoid } from 'nanoid';
 import { logger } from '../../lib/logger';
+import { createOiTemplateStore } from './template-store';
 import { type Constructor, type TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 
@@ -50,15 +51,27 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 return;
             }
 
-            // Skip rules whose template requires {{agreement_sign_url}} but this
-            // inspection didn't opt-in to agreements (agreementRequired = false)
-            const filteredRules = rules.filter(rule => {
-                if (rule.bodyTemplate.includes('{{agreement_sign_url}}') ||
-                    rule.subjectTemplate.includes('{{agreement_sign_url}}')) {
-                    return insp.agreementRequired === true;
+            // Skip rules whose EMAIL template references {{agreement_sign_url}} but
+            // this inspection didn't opt-in to agreements (agreementRequired = false).
+            // SP2: the message body lives in the referenced message_template now (the
+            // embedded subject/body columns are DEAD), so resolve the template and test
+            // its content — same gate, content-aware. agreement_sign_url is an email-only
+            // var (the SMS path never resolves it), so only the email template matters; a
+            // rule with no email template can't reference it.
+            const store = createOiTemplateStore(this.db);
+            const filteredRules: typeof rules = [];
+            for (const rule of rules) {
+                let referencesAgreementUrl = false;
+                if (rule.emailTemplateId) {
+                    const tpl = await store.resolve(ctx.tenantId, rule.emailTemplateId);
+                    if (tpl && (tpl.body.includes('{{agreement_sign_url}}') ||
+                                (tpl.subject ?? '').includes('{{agreement_sign_url}}'))) {
+                        referencesAgreementUrl = true;
+                    }
                 }
-                return true;
-            });
+                if (referencesAgreementUrl && insp.agreementRequired !== true) continue;
+                filteredRules.push(rule);
+            }
             logger.info('AutomationService.trigger: rules after filter',
                 { event: ctx.triggerEvent, before: rules.length, after: filteredRules.length });
             if (filteredRules.length === 0) return;
