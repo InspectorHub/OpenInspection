@@ -16,6 +16,28 @@ import { requireRole } from '../lib/middleware/rbac';
 import { EmailValidateBodySchema, EmailValidateOkSchema } from '../lib/validations/integrations.schema';
 import { resolveEmailProvider } from '../lib/email/resolve-provider';
 import { logger } from '../lib/logger';
+import { drizzle } from 'drizzle-orm/d1';
+import { recordIntegrationTest, listIntegrationTestResults, type IntegrationTarget } from '../lib/integration-test-results';
+
+/**
+ * Single write point for the four "Test connection" probes in this file — keeps
+ * the insert+prune logic out of every handler. Best-effort: a logging failure
+ * must never change the probe's own HTTP response.
+ */
+async function logTest(
+    env: { DB: D1Database },
+    tenantId: string | undefined,
+    testedByUserId: string | null,
+    target: IntegrationTarget,
+    ok: boolean,
+    detail: string | null,
+    provider?: string | null,
+): Promise<void> {
+    if (!tenantId) return;
+    await recordIntegrationTest(drizzle(env.DB), {
+        tenantId, target, ok, detail, provider: provider ?? null, testedByUserId,
+    }).catch(() => {});
+}
 
 const statusRoute = createRoute(withMcpMetadata({
     method:  'get',
@@ -131,6 +153,30 @@ const emailValidateRoute = createRoute(withMcpMetadata({
     ].join(' '),
 }, { scopes: ['admin'], tier: 'extended' }));
 
+// ─── GET /test-results ────────────────────────────────────────────────────────
+
+const TestResultSchema = z.object({
+    target: z.enum(['sms', 'email', 'stripe', 'gemini']).describe('Which integration was probed.'),
+    provider: z.string().nullable().describe('Provider variant within the target (e.g. twilio/resend); null for single-provider targets.'),
+    ok: z.boolean().describe('Whether the probe succeeded.'),
+    detail: z.string().nullable().describe('Non-sensitive outcome summary or provider error message.'),
+    testedByUserId: z.string().nullable().describe('JWT sub of the user who ran the probe.'),
+    testedAt: z.number().describe('Epoch milliseconds when the probe ran.'),
+}).openapi('IntegrationTestResult');
+
+const testResultsRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/test-results',
+    tags: ['integrations'],
+    summary: 'Recent "Test connection" outcomes for every integration',
+    middleware: [requireRole('owner', 'manager')],
+    responses: {
+        200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.array(TestResultSchema) }).openapi('IntegrationTestResultsResponse') } }, description: 'Up to 5 recent results per integration, newest first' },
+    },
+    operationId: 'listIntegrationTestResults',
+    description: 'Returns the retained "Test connection" history for the active tenant (≤5 per integration, newest first). Backs the persisted "Last tested …" status shown next to each Test connection button.',
+}, { scopes: ['read'], tier: 'extended' }));
+
 // ─── Router ───────────────────────────────────────────────────────────────────
 
 export const integrationsRoutes = createApiRouter()
@@ -140,18 +186,29 @@ export const integrationsRoutes = createApiRouter()
         const out = await c.var.services.integrations.status(tenantId);
         return c.json({ success: true as const, data: out }, 200);
     })
+    .openapi(testResultsRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');
+        const data = await listIntegrationTestResults(drizzle(c.env.DB), tenantId);
+        return c.json({ success: true as const, data }, 200);
+    })
     .openapi(stripeTestRoute, async (c) => {
         const env = c.env as unknown as Record<string, string | undefined>;
+        const tenantId = c.get('tenantId');
+        const uid = c.get('user')?.sub ?? null;
         const secretKey = env.STRIPE_SECRET_KEY;
         if (!secretKey) {
+            await logTest(c.env, tenantId, uid, 'stripe', false, 'No Stripe secret key is configured.');
             return c.json({ success: false as const, error: { code: 'STRIPE_NOT_CONFIGURED', message: 'No Stripe secret key is configured.' } }, 503);
         }
         try {
             const { StripeService } = await import('../services/stripe.service');
             const { accountName } = await new StripeService(secretKey).getAccount();
             const livemode = secretKey.startsWith('sk_live_') || secretKey.startsWith('rk_live_');
+            await logTest(c.env, tenantId, uid, 'stripe', true, `Connected to ${accountName}${livemode ? ' (live mode)' : ' (test mode)'}.`);
             return c.json({ success: true as const, data: { accountName, livemode } }, 200);
         } catch {
+            await logTest(c.env, tenantId, uid, 'stripe', false, 'Stripe rejected the stored secret key.');
             return c.json({ success: false as const, error: { code: 'STRIPE_KEY_INVALID', message: 'Stripe rejected the stored secret key.' } }, 502);
         }
     })
@@ -164,8 +221,11 @@ export const integrationsRoutes = createApiRouter()
     })
     .openapi(resendTestRoute, async (c) => {
         const env = c.env as unknown as Record<string, string | undefined>;
+        const tenantId = c.get('tenantId');
+        const uid = c.get('user')?.sub ?? null;
         const key = env.RESEND_API_KEY;
         if (!key) {
+            await logTest(c.env, tenantId, uid, 'email', false, 'No Resend API key is configured.', 'resend');
             return c.json({ success: false as const, error: { code: 'RESEND_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
         }
         // Auth-only probe: an EMPTY send. A bad key → 401/403; a valid key
@@ -177,6 +237,7 @@ export const integrationsRoutes = createApiRouter()
             body: '{}',
         }).catch(() => null);
         if (!probe || probe.status === 401 || probe.status === 403) {
+            await logTest(c.env, tenantId, uid, 'email', false, 'Resend rejected the stored API key.', 'resend');
             return c.json({ success: false as const, error: { code: 'RESEND_KEY_INVALID', message: 'Resend rejected the stored API key.' } }, 502);
         }
         // Bonus signal when the key has full access: count verified domains.
@@ -188,26 +249,33 @@ export const integrationsRoutes = createApiRouter()
             const body = (await domRes.json().catch(() => null)) as { data?: unknown[] } | null;
             domains = Array.isArray(body?.data) ? body.data.length : 0;
         }
+        await logTest(c.env, tenantId, uid, 'email', true, `Resend key valid${domains > 0 ? ` · ${domains} verified domain${domains === 1 ? '' : 's'}` : ''}.`, 'resend');
         return c.json({ success: true as const, data: { domains } }, 200);
     })
     .openapi(geminiTestRoute, async (c) => {
         const env = c.env as unknown as Record<string, string | undefined>;
+        const tenantId = c.get('tenantId');
+        const uid = c.get('user')?.sub ?? null;
         const key = env.GEMINI_API_KEY;
         if (!key) {
+            await logTest(c.env, tenantId, uid, 'gemini', false, 'No Gemini API key is configured.');
             return c.json({ success: false as const, error: { code: 'GEMINI_NOT_CONFIGURED', message: 'No Gemini API key is configured.' } }, 503);
         }
         const probe = await fetch(
             `https://generativelanguage.googleapis.com/v1/models?pageSize=1&key=${encodeURIComponent(key)}`,
         ).catch(() => null);
         if (!probe || !probe.ok) {
+            await logTest(c.env, tenantId, uid, 'gemini', false, 'Google rejected the stored Gemini API key.');
             return c.json({ success: false as const, error: { code: 'GEMINI_KEY_INVALID', message: 'Google rejected the stored Gemini API key.' } }, 502);
         }
+        await logTest(c.env, tenantId, uid, 'gemini', true, 'Gemini API key valid.');
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     })
     .openapi(emailValidateRoute, async (c) => {
         const { provider } = c.req.valid('json');
         const env = c.env as unknown as Record<string, string | undefined>;
         const tenantId = c.get('tenantId');
+        const uid = c.get('user')?.sub ?? null;
 
         // Build creds from env (integration-secrets middleware merges the tenant's
         // stored keys into env before this handler runs — same path as resendTestRoute).
@@ -217,6 +285,7 @@ export const integrationsRoutes = createApiRouter()
             case 'resend': {
                 const key = env.RESEND_API_KEY;
                 if (!key) {
+                    await logTest(c.env, tenantId, uid, 'email', false, 'No Resend API key is configured.', provider);
                     return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No Resend API key is configured.' } }, 503);
                 }
                 creds = { apiKey: key };
@@ -225,6 +294,7 @@ export const integrationsRoutes = createApiRouter()
             case 'sendgrid': {
                 const key = env.SENDGRID_API_KEY;
                 if (!key) {
+                    await logTest(c.env, tenantId, uid, 'email', false, 'No SendGrid API key is configured.', provider);
                     return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No SendGrid API key is configured.' } }, 503);
                 }
                 creds = { apiKey: key };
@@ -233,6 +303,7 @@ export const integrationsRoutes = createApiRouter()
             case 'postmark': {
                 const token = env.POSTMARK_SERVER_TOKEN;
                 if (!token) {
+                    await logTest(c.env, tenantId, uid, 'email', false, 'No Postmark Server Token is configured.', provider);
                     return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'No Postmark Server Token is configured.' } }, 503);
                 }
                 creds = { apiKey: token };
@@ -242,6 +313,7 @@ export const integrationsRoutes = createApiRouter()
                 const key = env.MAILGUN_API_KEY;
                 const domain = env.MAILGUN_DOMAIN;
                 if (!key || !domain) {
+                    await logTest(c.env, tenantId, uid, 'email', false, 'Mailgun API key and domain are both required.', provider);
                     return c.json({ success: false as const, error: { code: 'EMAIL_NOT_CONFIGURED', message: 'Mailgun API key and domain are both required.' } }, 503);
                 }
                 creds = { apiKey: key, domain };
@@ -256,8 +328,10 @@ export const integrationsRoutes = createApiRouter()
                 : { ok: true as const };
 
             if (result.ok) {
+                await logTest(c.env, tenantId, uid, 'email', true, `${provider} credentials valid.`, provider);
                 return c.json({ success: true as const, data: { ok: true as const } }, 200);
             }
+            await logTest(c.env, tenantId, uid, 'email', false, (result as { ok: false; error: string }).error, provider);
             return c.json({
                 success: false as const,
                 error: { code: 'EMAIL_KEY_INVALID', message: (result as { ok: false; error: string }).error },
@@ -269,6 +343,7 @@ export const integrationsRoutes = createApiRouter()
                 provider,
                 error: err instanceof Error ? err.message : String(err),
             });
+            await logTest(c.env, tenantId, uid, 'email', false, 'Credential validation failed unexpectedly.', provider);
             return c.json({
                 success: false as const,
                 error: { code: 'EMAIL_KEY_INVALID', message: 'Credential validation failed unexpectedly.' },

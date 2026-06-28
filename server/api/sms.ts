@@ -38,6 +38,7 @@ import { resolveOptinToken } from '../lib/sms/optin-token';
 import { normalizeE164 } from '../lib/sms/phone';
 import { loadProviderForTenant, resolveTwilioSource } from '../lib/sms/resolve-twilio';
 import { resolveComplianceProvider } from '../lib/sms/resolve-compliance-provider';
+import { recordIntegrationTest } from '../lib/integration-test-results';
 import { managedSendAllowed } from '../lib/sms/managed-send-gate';
 import { complianceWebhookUrl } from '../lib/sms/compliance-webhook';
 import { getBaseUrl } from '../lib/url';
@@ -472,14 +473,17 @@ export const smsAdminRoutes = createApiRouter()
         // Must run BEFORE the provider call so a blocked managed send makes NO Twilio call.
         // own/platform tenants are always allowed (gate returns immediately).
         const db = drizzle(c.env.DB);
-        let cfgRow: { smsMode: string } | null | undefined;
+        const testedByUserId = c.get('user')?.sub ?? null;
+        let cfgRow: { smsMode: string; smsByoProvider: string | null } | null | undefined;
         try {
-            cfgRow = await db.select({ smsMode: tenantConfigs.smsMode })
+            cfgRow = await db.select({ smsMode: tenantConfigs.smsMode, smsByoProvider: tenantConfigs.smsByoProvider })
                 .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
         } catch { cfgRow = null; }
+        const smsProvider = cfgRow?.smsByoProvider ?? 'twilio';
         const gate = await managedSendAllowed(db, c.env, tenantId, cfgRow?.smsMode ?? 'platform');
         if (!gate.allowed) {
             logger.info('sms.test_send: blocked by managed compliance gate', { tenantId, reason: gate.reason });
+            await recordIntegrationTest(db, { tenantId, target: 'sms', provider: smsProvider, ok: false, detail: gate.reason ?? 'managed_not_approved', testedByUserId }).catch(() => {});
             return c.json({ success: false, error: gate.reason ?? 'managed_not_approved' }, 200);
         }
 
@@ -488,7 +492,10 @@ export const smsAdminRoutes = createApiRouter()
         // Returns { provider, from } — `from` is populated for Twilio, null for Telnyx
         // (TelnyxProvider reads its own from-number internally).
         const resolved = await loadProviderForTenant(c.env, tenantId);
-        if (!resolved) return c.json({ success: false, error: 'SMS is not configured. Set your credentials first.' }, 200);
+        if (!resolved) {
+            await recordIntegrationTest(db, { tenantId, target: 'sms', provider: smsProvider, ok: false, detail: 'SMS is not configured.', testedByUserId }).catch(() => {});
+            return c.json({ success: false, error: 'SMS is not configured. Set your credentials first.' }, 200);
+        }
 
         const sendArgs: { from?: string; to: string; body: string; messagingServiceSid?: string } = {
             to: normalized,
@@ -508,6 +515,10 @@ export const smsAdminRoutes = createApiRouter()
             }
         }
         auditFromContext(c, 'sms.test_send', 'tenant', { metadata: { ok: res.ok } });
+        await recordIntegrationTest(db, {
+            tenantId, target: 'sms', provider: smsProvider, ok: res.ok,
+            detail: res.ok ? `Test message sent to ${normalized}.` : res.error, testedByUserId,
+        }).catch(() => {});
         return res.ok ? c.json({ success: true }, 200) : c.json({ success: false, error: res.error }, 200);
     })
     .openapi(consentStatusRoute, async (c) => {

@@ -142,3 +142,33 @@ export const parkedCmdEvents = sqliteTable('parked_cmd_events', {
 }, (t) => [
     index('idx_parked_cmd_events_received_at').on(t.receivedAt),
 ]);
+
+/**
+ * Settings "Test connection" history. Each on-demand provider probe (SMS,
+ * email, Stripe, Gemini) appends one row so the settings panels can show the
+ * LAST tested time + outcome without re-probing on every page load — and a
+ * short recent history (the helper prunes to the newest N per (tenant, target)).
+ *
+ * `detail` carries a human-readable, NON-SENSITIVE summary (success blurb or
+ * the provider's rejection message) — never a key, token, or full response.
+ * No FK (Schema Rules): tenant scope is enforced by the always-present
+ * `tenant_id` filter, and the row is cheap diagnostic state, not a referenced
+ * parent. `tested_at` is epoch-ms per the timestamp rule.
+ */
+export const integrationTestResults = sqliteTable('integration_test_results', {
+    id:             text('id').primaryKey(),
+    tenantId:       text('tenant_id').notNull(),
+    // Which integration was probed. Schema Rules: state/category column declares its enum.
+    target:         text('target', { enum: ['sms', 'email', 'stripe', 'gemini'] }).notNull(),
+    // Optional provider variant within a target (e.g. twilio/telnyx, resend/sendgrid/
+    // postmark/mailgun). NULL for single-provider targets (stripe, gemini).
+    provider:       text('provider'),
+    ok:             integer('ok', { mode: 'boolean' }).notNull(),
+    // Non-sensitive outcome summary (success blurb or provider error message).
+    detail:         text('detail'),
+    // User who ran the probe (JWT sub); NULL if unknown.
+    testedByUserId: text('tested_by_user_id'),
+    testedAt:       integer('tested_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    index('idx_integration_test_tenant_target').on(t.tenantId, t.target, t.testedAt),
+]);

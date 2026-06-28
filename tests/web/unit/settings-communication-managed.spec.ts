@@ -60,7 +60,11 @@ vi.mock('~/lib/api-client.server', () => ({
                 },
             },
         },
-        integrations: { resend: { test: { $post: vi.fn() } }, email: { validate: { $post: vi.fn() } } },
+        integrations: {
+            resend: { test: { $post: vi.fn() } },
+            email: { validate: { $post: vi.fn() } },
+            'test-results': { $get: () => Promise.resolve({ ok: true, json: async () => ({ success: true, data: [] }) }) },
+        },
     })),
 }));
 

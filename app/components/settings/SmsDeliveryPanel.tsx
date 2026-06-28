@@ -3,6 +3,7 @@ import type { useFetcher } from "react-router";
 import { SmsSecretsPanel } from "~/components/settings/SmsSecretsPanel";
 import type { action } from "~/routes/settings-communication";
 import type { ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
+import type { ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
@@ -64,6 +65,7 @@ export function SmsDeliveryPanel({
   smsTestFetcher,
   compliance,
   byoProvider,
+  testResults = [],
 }: {
   isSaas: boolean;
   smsMode: SmsModeValue;
@@ -87,6 +89,8 @@ export function SmsDeliveryPanel({
   smsTestFetcher: SmsTestFetcher;
   compliance: ManagedComplianceData;
   byoProvider?: "twilio" | "telnyx";
+  /** Persisted "Test connection" history (shared loader list, filtered to sms). */
+  testResults?: ConnectionTestResult[];
 }) {
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
@@ -215,6 +219,7 @@ export function SmsDeliveryPanel({
           inboundUrl={inboundUrl}
           smsTestFetcher={smsTestFetcher}
           initialProvider={byoProvider ?? "twilio"}
+          testResults={testResults}
         />
       </section>
   );

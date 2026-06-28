@@ -35,6 +35,7 @@ vi.mock('~/lib/api-client.server', () => ({
                 'webhook-log': { $get: getStripeWebhookLog },
                 test: { $post: postStripeTest },
             },
+            'test-results': { $get: () => Promise.resolve({ ok: true, json: async () => ({ success: true, data: [] }) }) },
         },
         admin: {
             config: { $get: getAdminConfig, $post: postAdminConfig },

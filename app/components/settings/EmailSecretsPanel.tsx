@@ -3,6 +3,7 @@ import { Form } from "react-router";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
+import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-communication";
 
 type ActionFetcher = ReturnType<typeof useFetcher<typeof action>>;
@@ -70,6 +71,7 @@ export function EmailSecretsPanel({
   initialProvider = "resend",
   webhookBaseUrl = "",
   tenantSlug = "",
+  testResults = [],
 }: {
   secrets: {
     RESEND_API_KEY: string;
@@ -93,6 +95,8 @@ export function EmailSecretsPanel({
   webhookBaseUrl?: string;
   /** Tenant slug appended to the webhook URL path. */
   tenantSlug?: string;
+  /** Persisted "Test connection" history (shared loader list, filtered to email). */
+  testResults?: ConnectionTestResult[];
 }) {
   const [provider, setProvider] = useState<EmailByoProvider>(initialProvider);
   const webhookField = WEBHOOK_FIELDS[provider];
@@ -288,6 +292,9 @@ export function EmailSecretsPanel({
             )}
         </TestConnectionButton>
       )}
+
+      {/* Persisted last-tested status + recent history (survives reloads). */}
+      <ConnectionTestStatus results={testResults} target="email" />
     </section>
   );
 }

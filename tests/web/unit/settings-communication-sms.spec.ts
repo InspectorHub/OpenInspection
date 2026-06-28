@@ -38,7 +38,10 @@ vi.mock('~/lib/api-client.server', () => ({
         secrets: { secrets: { $get: getSecrets, $put: putSecrets } },
         emailTemplates: { 'email-templates': { $get: getTemplates } },
         smsAdmin: { sms: { config: { $get: getSmsConfig }, test: { $post: postSmsTest }, compliance: { $get: getSmsCompliance } } },
-        integrations: { resend: { test: { $post: vi.fn() } } },
+        integrations: {
+            resend: { test: { $post: vi.fn() } },
+            'test-results': { $get: () => Promise.resolve({ ok: true, json: async () => ({ success: true, data: [] }) }) },
+        },
     })),
 }));
 

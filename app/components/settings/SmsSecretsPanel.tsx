@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Form } from "react-router";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
+import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-communication";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
@@ -27,6 +28,7 @@ export function SmsSecretsPanel({
   inboundUrl,
   smsTestFetcher,
   initialProvider = "twilio",
+  testResults = [],
 }: {
   secrets: {
     TWILIO_ACCOUNT_SID: string;
@@ -43,6 +45,8 @@ export function SmsSecretsPanel({
   inboundUrl: string;
   smsTestFetcher: SmsTestFetcher;
   initialProvider?: ByoProvider;
+  /** Persisted "Test connection" history (shared loader list, filtered to sms). */
+  testResults?: ConnectionTestResult[];
 }) {
   const [provider, setProvider] = useState<ByoProvider>(initialProvider);
 
@@ -182,6 +186,10 @@ export function SmsSecretsPanel({
               : <span className="text-[12px] text-ih-bad-fg">{smsTestFetcher.data.error}</span>
           )}
         </smsTestFetcher.Form>
+        {/* Persisted last-tested status + recent history (survives reloads). */}
+        <div className="pt-2">
+          <ConnectionTestStatus results={testResults} target="sms" />
+        </div>
     </>
   );
 }

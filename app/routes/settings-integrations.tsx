@@ -16,6 +16,7 @@ import { AccessDenied } from "~/components/AccessDenied";
 import { StripePaymentsPanel } from "~/components/settings/integrations/StripePaymentsPanel";
 import { VideoIntegrationPanel } from "~/components/settings/integrations/VideoIntegrationPanel";
 import { IntegrationCardsGrid } from "~/components/settings/integrations/IntegrationCardsGrid";
+import { parseTestResults } from "~/lib/connection-test";
 import { SaveVideoSchema } from "../../server/lib/validations/video.schema";
 
 export function meta() {
@@ -28,7 +29,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const { forbidden, token } = await requireAdminLoader(context, request);
   if (forbidden) return { forbidden: true as const };
   const api = createApi(context, { token });
-  const [secretsRes, logRes, configRes, tcRes] = await Promise.all([
+  const [secretsRes, logRes, configRes, tcRes, testResultsRes] = await Promise.all([
     api.secrets.secrets.$get().catch(() => null),
     api.integrations.stripe["webhook-log"].$get().catch(() => null),
     // Integration config — plaintext JSON: appBaseUrl, turnstileSiteKey,
@@ -36,6 +37,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     api.admin.config.$get().catch(() => null),
     // Tenant config flags — includes videoMode (default 'r2').
     api.admin["tenant-config"].$get().catch(() => null),
+    api.integrations["test-results"].$get().catch(() => null),
   ]);
   const secretsBody = secretsRes?.ok ? ((await secretsRes.json()) as Record<string, unknown>) : {};
   const secrets = (secretsBody.data ?? {}) as Record<string, string>;
@@ -53,9 +55,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const tcBody = tcRes?.ok ? ((await tcRes.json()) as Record<string, unknown>) : {};
   const tcData = (tcBody.data ?? {}) as Record<string, unknown>;
 
+  const testResults = await parseTestResults(testResultsRes);
+
   return {
     webhookBase,
     webhookLog,
+    testResults,
     secrets: {
       STRIPE_PUBLISHABLE_KEY: secrets.STRIPE_PUBLISHABLE_KEY || "",
       STRIPE_SECRET_KEY: secrets.STRIPE_SECRET_KEY || "",
@@ -231,7 +236,7 @@ export default function SettingsIntegrations() {
   );
 
   if ("forbidden" in data) return <AccessDenied />;
-  const { secrets, webhookBase, webhookLog, videoMode, streamCustomerSubdomain } = data;
+  const { secrets, webhookBase, webhookLog, videoMode, streamCustomerSubdomain, testResults } = data;
 
   const tenantSlug = ctx?.branding?.tenantSlug ?? null;
   const webhookUrl = tenantSlug ? `${webhookBase}/${tenantSlug}` : webhookBase;
@@ -298,6 +303,7 @@ export default function SettingsIntegrations() {
         serverError={actionData?.error}
         testFetcher={testFetcher}
         revalidator={revalidator}
+        testResults={testResults}
       />
 
       {/* Video backend — self-host only; hidden in SaaS (backend is plan-gated) */}

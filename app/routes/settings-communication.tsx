@@ -16,6 +16,7 @@ import { EmailSecretsPanel } from "~/components/settings/EmailSecretsPanel";
 import { SmsDeliveryPanel, type SmsModeValue } from "~/components/settings/SmsDeliveryPanel";
 import { GoogleCalendarPanel } from "~/components/settings/GoogleCalendarPanel";
 import { ManagedComplianceWizard, type ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
+import { parseTestResults } from "~/lib/connection-test";
 
 export function meta() {
   return [{ title: "Communication - Settings - OpenInspection" }];
@@ -37,13 +38,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const api = createApi(context, { token });
 
   // Fetch communication config + secrets + email templates + SMS config/tenant-config/compliance in parallel
-  const [commRes, secretsRes, tplRes, smsCfgRes, tenantCfgRes, smsComplianceRes] = await Promise.all([
+  const [commRes, secretsRes, tplRes, smsCfgRes, tenantCfgRes, smsComplianceRes, testResultsRes] = await Promise.all([
     api.admin.communication.$get().catch(() => null),
     api.secrets.secrets.$get().catch(() => null),
     api.emailTemplates["email-templates"].$get().catch(() => null),
     api.smsAdmin.sms.config.$get().catch(() => null),
     api.admin["tenant-config"].$get().catch(() => null),
     api.smsAdmin.sms.compliance.$get().catch(() => null),
+    api.integrations["test-results"].$get().catch(() => null),
   ]);
 
   const commBody = commRes?.ok ? ((await commRes.json()) as Record<string, unknown>) : {};
@@ -102,6 +104,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     provisionedNumber: smsComplianceBody?.data?.provisionedNumber ?? null,
   };
 
+  // Persisted "Test connection" history (≤5 per integration). Shared by the SMS
+  // + email panels here; the same endpoint feeds the integrations/advanced pages.
+  const testResults = await parseTestResults(testResultsRes);
+
   return {
     config: {
       senderEmail: (d?.senderEmail as string) || null,
@@ -141,6 +147,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     emailByoProvider,
     compliance,
     managedProvider,
+    testResults,
   };
 }
 
@@ -433,6 +440,7 @@ export default function SettingsCommunication() {
   const emailTemplates = denied ? [] : loaderResult.emailTemplates;
   const icsUrl = denied ? null : loaderResult.icsUrl;
   const googleCalendarConnected = denied ? false : loaderResult.googleCalendarConnected;
+  const testResults = denied ? [] : loaderResult.testResults;
   const secrets = denied
     ? { RESEND_API_KEY: "", SENDGRID_API_KEY: "", POSTMARK_SERVER_TOKEN: "", MAILGUN_API_KEY: "", MAILGUN_DOMAIN: "", RESEND_WEBHOOK_SECRET: "", SENDGRID_WEBHOOK_PUBLIC_KEY: "", POSTMARK_WEBHOOK_TOKEN: "", MAILGUN_SIGNING_KEY: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", TWILIO_ACCOUNT_SID: "", TWILIO_AUTH_TOKEN: "", TWILIO_FROM_NUMBER: "", TELNYX_API_KEY: "", TELNYX_FROM_NUMBER: "", TELNYX_PUBLIC_KEY: "" }
     : loaderResult.secrets;
@@ -611,6 +619,7 @@ export default function SettingsCommunication() {
         initialProvider={emailByoProvider}
         webhookBaseUrl={typeof window !== "undefined" ? window.location.origin : ""}
         tenantSlug={tenantSlug}
+        testResults={testResults}
       />
 
       {/* SMS delivery (Track L) */}
@@ -630,6 +639,7 @@ export default function SettingsCommunication() {
         smsTestFetcher={smsTestFetcher}
         compliance={compliance}
         byoProvider={byoProvider}
+        testResults={testResults}
       />
 
       {/* Managed dedicated — onboarding wizard + status timeline (SaaS only) */}
