@@ -199,13 +199,13 @@ describe('DELETE /api/mcp/grants/:id (self revoke)', () => {
     });
 
     it('(c) returns 404 for an id NOT in the caller\'s own grants', async () => {
-        const app = buildApp();
+        const mockProvider = makeOAuthProvider();
+        const app = buildApp({ oauthProvider: mockProvider });
         // 'grant-member-1' is owned by MEMBER_ID, not CALLER_ID
         const res = await app.request('/api/mcp/grants/grant-member-1', { method: 'DELETE' });
         expect(res.status).toBe(404);
         // revokeGrant must NOT have been called
-        const { oauthProvider } = { oauthProvider: makeOAuthProvider() };
-        expect(oauthProvider.revokeGrant).not.toHaveBeenCalled();
+        expect(mockProvider.revokeGrant).not.toHaveBeenCalled();
     });
 
     it('returns 404 when MCP is disabled', async () => {
