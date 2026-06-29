@@ -18,6 +18,7 @@
  */
 
 import { z } from 'zod';
+import { logger } from '../logger';
 
 type JsonObject = Record<string, unknown>;
 
@@ -157,7 +158,7 @@ function dereferenceTop(schema: unknown, components: Record<string, unknown>): u
  * validates the payload). A permissive object is the last-resort fallback so a
  * single unrepresentable schema never takes the whole MCP server down.
  */
-export function toZodInputSchema(jsonSchema: JsonObject): z.ZodType {
+export function toZodInputSchema(jsonSchema: JsonObject, operationId?: string): z.ZodType {
     const input = jsonSchema as Parameters<typeof z.fromJSONSchema>[0];
     for (const defaultTarget of ['openapi-3.0', 'draft-2020-12'] as const) {
         try {
@@ -166,6 +167,8 @@ export function toZodInputSchema(jsonSchema: JsonObject): z.ZodType {
             // try the next target
         }
     }
+    // Both targets failed: the tool stays callable but loses its typed schema.
+    logger.warn('MCP tool input schema unrepresentable; using permissive fallback', { operationId });
     return z.object({}).loose();
 }
 

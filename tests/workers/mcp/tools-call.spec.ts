@@ -20,7 +20,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
 const bridge = vi.hoisted(() => ({
-    calls: [] as Array<{ method: string; url: string; body: string; authHeader: string | null }>,
+    calls: [] as Array<{ method: string; url: string; body: string }>,
     response: () =>
         new Response(JSON.stringify({ inspections: [{ id: 'i1' }], cursor: null }), {
             status: 200,
@@ -33,11 +33,12 @@ vi.mock('../../../server/lib/mcp/identity-bridge', async (importOriginal) => {
     return {
         ...actual,
         callApiAsUser: vi.fn(async (_env: unknown, _props: unknown, request: Request) => {
+            // NB: the stub bypasses signing, so there is no Authorization header to
+            // assert here — that seam belongs to a real-bridge integration test.
             bridge.calls.push({
                 method: request.method,
                 url: request.url,
                 body: await request.clone().text(),
-                authHeader: request.headers.get('Authorization'),
             });
             return bridge.response();
         }),

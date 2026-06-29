@@ -46,9 +46,12 @@ export function assertTenantMatches(expectedTenantId: string, props: McpProps): 
  * as the lazy-import pattern in workers/app.ts.
  *
  * Testing: the two pure helpers above (internalJwtPayload, assertTenantMatches)
- * are unit-tested. callApiAsUser is covered end-to-end by Task C4's tool
- * handlers in the workers runtime — a focused unit test here would require a
- * full D1 + keyring + Hono harness that belongs at the integration layer.
+ * are unit-tested (C3). The full buildKeyring → signJwt → app.fetch path in this
+ * function is NOT yet exercised by any automated test — C4's workers test STUBS
+ * callApiAsUser to assert tool-handler wiring, so the JWT-mint → in-process
+ * dispatch seam is currently verified only by manual MCP-Inspector E2E. A seeded
+ * D1 + keyring + Hono integration test that drives this path end-to-end is
+ * deferred (belongs at the integration layer).
  */
 export async function callApiAsUser(
     env: AppEnv,

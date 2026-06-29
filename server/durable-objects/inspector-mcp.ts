@@ -135,7 +135,7 @@ export async function registerGrantedTools(
         const name = toolNameFromOperationId(entry.operationId);
         const description = `${entry.summary ?? ''}. ${entry.description ?? ''}`.trim();
         const input = buildToolInput(entry.inputSchema as never, components);
-        const inputSchema = toZodInputSchema(input.jsonSchema);
+        const inputSchema = toZodInputSchema(input.jsonSchema, entry.operationId);
 
         server.registerTool(name, { description, inputSchema }, async (rawArgs: unknown) => {
             const args = (rawArgs ?? {}) as Record<string, unknown>;
