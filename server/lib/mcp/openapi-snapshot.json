@@ -7645,6 +7645,22 @@
     "description": "Lists the signed-in agent's referred inspections across every tenant they have an active agent_tenant_link with, newest first, for the agent-portal dashboard."
   },
   {
+    "operationId": "listAllTenantMcpGrants",
+    "method": "GET",
+    "pathTemplate": "/api/mcp/grants/all",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List all tenant member OAuth grants",
+    "description": "Returns all active OAuth grants across all members of the current tenant. Requires owner or manager role. Each grant includes user identity fields for audit visibility."
+  },
+  {
     "operationId": "listAnalyticFindingsHeatmap",
     "method": "GET",
     "pathTemplate": "/api/analytics/findings-heatmap",
@@ -9206,6 +9222,22 @@
     },
     "summary": "List recurring weekly availability",
     "description": "Returns the recurring weekly availability slots for an inspector. Defaults to the caller; admins can query any inspector via the inspectorId query parameter."
+  },
+  {
+    "operationId": "listSelfMcpGrants",
+    "method": "GET",
+    "pathTemplate": "/api/mcp/grants",
+    "scopes": [
+      "read"
+    ],
+    "tag": "admin",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List current user OAuth grants",
+    "description": "Returns all active OAuth grants for the currently authenticated user, enabling visibility into which MCP clients have been authorized."
   },
   {
     "operationId": "listServiceDiscountCodes",
@@ -13651,6 +13683,43 @@
     },
     "summary": "Revoke a partner-agent link",
     "description": "Auto-generated placeholder for revokeAgent (POST /{linkId}/revoke, agents domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "revokeMcpGrant",
+    "method": "DELETE",
+    "pathTemplate": "/api/mcp/grants/:id",
+    "scopes": [
+      "write"
+    ],
+    "tag": "admin",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Unique grant identifier to be revoked by this operation",
+          "schema": {
+            "type": "string",
+            "description": "Unique grant identifier to be revoked by this operation"
+          }
+        },
+        {
+          "name": "admin",
+          "in": "query",
+          "required": false,
+          "description": "Pass 1 to use admin revocation path for any tenant member grant",
+          "schema": {
+            "type": "string",
+            "description": "Pass 1 to use admin revocation path for any tenant member grant"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Revoke an OAuth grant by ID",
+    "description": "Revokes an OAuth grant. Self-path revokes the caller's own grant; admin path (?admin=1) allows owner or manager to revoke any tenant member's grant with full audit logging."
   },
   {
     "operationId": "saveEmailTemplate",
