@@ -13,6 +13,7 @@
     "**/build/**",
     "**/.react-router/**",
     "**/drizzle-tmp/**",
-    "**/public/**"
+    "**/public/**",
+    "server/lib/mcp/openapi-snapshot.json"
   ]
 }
