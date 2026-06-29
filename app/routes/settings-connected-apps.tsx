@@ -316,15 +316,33 @@ export default function SettingsConnectedApps() {
               </p>
             </div>
           ) : (
-            <div className="bg-ih-bg-card border border-ih-border rounded-lg divide-y divide-ih-border">
-              {all!.map((grant) => (
-                <AdminGrantRow
-                  key={grant.id}
-                  grant={grant}
-                  onRequestRevoke={() =>
-                    setPendingRevoke({ grant, intent: "revoke-admin" })
-                  }
-                />
+            <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
+              {Object.entries(
+                all!.reduce<Record<string, McpGrant[]>>((acc, grant) => {
+                  const key = grant.userEmail ?? grant.userId ?? "Unknown user";
+                  if (!acc[key]) acc[key] = [];
+                  acc[key].push(grant);
+                  return acc;
+                }, {}),
+              ).map(([email, grants], idx) => (
+                <div key={email} className={idx > 0 ? "border-t border-ih-border" : undefined}>
+                  <div className="px-4 py-2 bg-ih-bg-muted">
+                    <p className="text-[11px] font-semibold text-ih-fg-3 uppercase tracking-wide">
+                      {email}
+                    </p>
+                  </div>
+                  <div className="divide-y divide-ih-border">
+                    {grants.map((grant) => (
+                      <AdminGrantRow
+                        key={grant.id}
+                        grant={grant}
+                        onRequestRevoke={() =>
+                          setPendingRevoke({ grant, intent: "revoke-admin" })
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}

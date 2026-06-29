@@ -29,10 +29,6 @@ vi.mock('~/lib/session.server', () => ({
     requireToken: vi.fn(async () => 'tok-test'),
 }));
 
-vi.mock('~/lib/access.server', () => ({
-    requireAdminLoader: vi.fn(async () => ({ forbidden: false, token: 'tok-test' })),
-}));
-
 vi.mock('~/lib/api-client.server', () => ({
     createApi: vi.fn(() => ({
         mcpGrants: {
@@ -77,6 +73,7 @@ import { loader, action } from '~/routes/settings-connected-apps';
 import SettingsConnectedApps from '~/routes/settings-connected-apps';
 import { useLoaderData, useFetcher } from 'react-router';
 import { useSessionContext } from '~/hooks/useSessionContext';
+import { createApi } from '~/lib/api-client.server';
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -157,23 +154,38 @@ describe('settings-connected-apps loader', () => {
     });
 
     it('does NOT fetch all-grants for a non-admin role', async () => {
-        // requireAdminLoader returns forbidden=false but role from session is inspector
-        // We simulate a non-admin by making role resolve as inspector in the loader
+        // Default mock has no sessionContext, so the loader's try/catch defaults role to "inspector".
+        // isAdminRole("inspector") is false, so all stays null and getAllGrants is never called.
         const data = await loader(loaderArgs());
-        // getAllGrants may or may not be called depending on role check in loader
-        // The key assertion: all is either null OR empty for non-admin (no data leak)
-        expect(data.all === null || (Array.isArray(data.all) && data.all.length === 0) || data.all === undefined).toBe(true);
+        expect(getAllGrants).not.toHaveBeenCalled();
+        expect(data.all).toBeNull();
     });
 
     it('fetches all-grants for an owner role and returns them', async () => {
-        // Simulate admin loader path — override the role returned
-        // We'll test action path because loader role depends on session context call
-        // which is part of requireAdminLoader; simplest: check getAllGrants called
-        // when we pass admin token (mock returns forbidden=false always in these tests)
+        // Provide a sessionContext stub that resolves role=owner so the loader enters the admin branch.
+        vi.mocked(createApi).mockImplementationOnce(() => ({
+            sessionContext: {
+                context: {
+                    $get: vi.fn().mockResolvedValue(
+                        jsonRes({ data: { user: { role: 'owner' }, branding: { isSaas: false } } }),
+                    ),
+                },
+            },
+            mcpGrants: {
+                grants: {
+                    $get: getSelfGrants,
+                    all: { $get: getAllGrants },
+                    ':id': { $delete: deleteGrant },
+                },
+            },
+        } as never));
+
         const data = await loader(loaderArgs());
-        // data.all could be populated if loader detects admin role via session
-        // Since our mock doesn't distinguish, just ensure loader completes without error
-        expect(Array.isArray(data.self)).toBe(true);
+        // The admin branch was reached: getAllGrants was called and data.all contains the stub data.
+        expect(getAllGrants).toHaveBeenCalled();
+        expect(Array.isArray(data.all)).toBe(true);
+        expect(data.all).toHaveLength(1);
+        expect(data.all![0].id).toBe(ADMIN_GRANT.id);
     });
 });
 
@@ -268,6 +280,33 @@ describe('SettingsConnectedApps component render', () => {
         const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
         expect(html).toContain('Tenant-wide');
         expect(html).toContain('bob@example.com');
+    });
+
+    it('groups tenant-wide admin rows by userEmail', () => {
+        const CAROL_GRANT = {
+            id: 'g3',
+            clientId: 'tool-client',
+            clientName: 'ToolApp',
+            scopes: ['read:inspections'],
+            createdAt: 1_700_000_300,
+            expiresAt: null,
+            userId: 'u3',
+            userEmail: 'carol@example.com',
+            userRole: 'inspector',
+        };
+        vi.mocked(useLoaderData).mockReturnValue({
+            self: [],
+            all: [ADMIN_GRANT, CAROL_GRANT],
+            role: 'owner',
+            isSaas: false,
+        } as never);
+        const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
+        // Both user emails appear — at minimum as group headings.
+        expect(html).toContain('bob@example.com');
+        expect(html).toContain('carol@example.com');
+        // Each email appears at least twice: once as group header, once inside AdminGrantRow.
+        expect((html.match(/bob@example\.com/g) ?? []).length).toBeGreaterThanOrEqual(2);
+        expect((html.match(/carol@example\.com/g) ?? []).length).toBeGreaterThanOrEqual(2);
     });
 
     it('renders empty-state when self grants list is empty', () => {
