@@ -1,7 +1,7 @@
 /**
  * Route metadata standards — shared constants + helper for the MCP/Skill
- * integration described in
- * docs/superpowers/specs/2026-05-21-core-skill-mcp-integration-design.md
+ * integration. See docs/developers/07_route_metadata.md (conventions) and
+ * docs/developers/mcp-oauth-notes.md (server architecture).
  *
  * Every createRoute() call in server/api/ must wrap its config with
  * withMcpMetadata(...) so the OpenAPI doc carries `x-scopes` and `x-tier`
