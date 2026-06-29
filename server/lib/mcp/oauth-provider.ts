@@ -1,6 +1,8 @@
 import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
+import type { McpProps } from '../../durable-objects/inspector-mcp';
 import { mcpEnabled } from './flag';
+import { assertCompanySlugMatches, companySlugFromMcpPath } from './identity-bridge';
 
 /**
  * Loose fetch signature used for both the app handler and the returned handler.
@@ -40,17 +42,43 @@ export function buildOAuthHandler(
     if (!mcpEnabled(env)) return { fetch: appFetch };
 
     // '/company/' is a broad literal prefix — all /company/* requests go through
-    // token auth. Slug validation against ctx.props.tenantSlug is deferred to
-    // Phase C (Task C4).
+    // token auth. Slug validation (spec §6) is applied in the saas wrapper below.
     const apiRoute = env.APP_MODE === 'saas' ? '/company/' : '/mcp';
+
+    // McpAgent.serve() internal path is always '/mcp'; 'INSPECTOR_MCP' overrides
+    // McpAgent's default MCP_OBJECT binding name (see wrangler.jsonc DO bindings).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const baseServeHandler = InspectorMcp.serve('/mcp', { binding: 'INSPECTOR_MCP' }) as any;
+
+    // Saas only: wrap with spec §6 slug guard. Standalone path is byte-identical
+    // (no /company/ prefix, so companySlugFromMcpPath always returns null there).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const apiHandler: any = env.APP_MODE === 'saas'
+        ? {
+            fetch(
+                req: Request,
+                e: unknown,
+                ctx: ExecutionContext & { props?: McpProps },
+            ): Response | Promise<Response> {
+                const urlSlug = companySlugFromMcpPath(new URL(req.url).pathname);
+                if (urlSlug !== null) {
+                    const props = ctx.props;
+                    if (!props || !assertCompanySlugMatches(urlSlug, props)) {
+                        return new Response(JSON.stringify({ error: 'tenant_mismatch' }), {
+                            status: 403,
+                            headers: { 'content-type': 'application/json' },
+                        });
+                    }
+                }
+                return baseServeHandler.fetch(req, e, ctx);
+            },
+        }
+        : baseServeHandler;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const provider = new OAuthProvider<any>({
         apiRoute,
-        // McpAgent.serve() internal path is always '/mcp'; 'INSPECTOR_MCP' overrides
-        // McpAgent's default MCP_OBJECT binding name (see wrangler.jsonc DO bindings).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        apiHandler: InspectorMcp.serve('/mcp', { binding: 'INSPECTOR_MCP' }) as any,
+        apiHandler,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         defaultHandler: { fetch: appFetch } as any,
         authorizeEndpoint: '/oauth/authorize',

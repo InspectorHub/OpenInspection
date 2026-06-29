@@ -18,20 +18,31 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
 
-  // Resolve session role to gate the admin-wide fetch.
+  // Resolve session role to gate the admin-wide fetch, and mcpEnabled to short-circuit
+  // when the feature flag is off.
   let role = "inspector";
   let isSaas = false;
+  let mcpEnabledFlag = true; // fail-open: if the call throws, proceed normally
   try {
     const ctxRes = await api.sessionContext.context.$get();
     if (ctxRes.ok) {
       const body = (await ctxRes.json()) as {
-        data?: { user?: { role?: string }; branding?: { isSaas?: boolean } };
+        data?: {
+          user?: { role?: string };
+          branding?: { isSaas?: boolean };
+          deployment?: { mcpEnabled?: boolean };
+        };
       };
       role = body.data?.user?.role ?? "inspector";
       isSaas = body.data?.branding?.isSaas ?? false;
+      mcpEnabledFlag = body.data?.deployment?.mcpEnabled ?? true;
     }
   } catch {
     // fall through with defaults — fail open on role so we still show self grants
+  }
+
+  if (!mcpEnabledFlag) {
+    return { mcpEnabled: false, self: [], all: null, role, isSaas };
   }
 
   // Fetch own grants.
@@ -63,7 +74,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     }
   }
 
-  return { self, all, role, isSaas };
+  return { mcpEnabled: true, self, all, role, isSaas };
 }
 
 // ─── Action ──────────────────────────────────────────────────────────────────
@@ -248,6 +259,16 @@ export default function SettingsConnectedApps() {
     grant: McpGrant;
     intent: "revoke" | "revoke-admin";
   } | null>(null);
+
+  // Feature-off: MCP not enabled on this deployment.
+  if (data.mcpEnabled === false) {
+    return (
+      <div className="text-center py-16 bg-ih-bg-card border border-ih-border rounded-lg">
+        <p className="font-bold text-[14px] text-ih-fg-2">MCP is not enabled on this deployment.</p>
+        <p className="text-[12px] text-ih-fg-4 mt-1">Contact your administrator to enable remote MCP access.</p>
+      </div>
+    );
+  }
 
   const { self, all } = data;
   const showAdmin = all !== null;

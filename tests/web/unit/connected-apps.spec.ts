@@ -29,8 +29,13 @@ vi.mock('~/lib/session.server', () => ({
     requireToken: vi.fn(async () => 'tok-test'),
 }));
 
+const getSessionContext = vi.fn();
+
 vi.mock('~/lib/api-client.server', () => ({
     createApi: vi.fn(() => ({
+        sessionContext: {
+            context: { $get: getSessionContext },
+        },
         mcpGrants: {
             grants: {
                 $get: getSelfGrants,
@@ -128,11 +133,14 @@ beforeEach(() => {
     getSelfGrants.mockReset().mockResolvedValue(jsonRes({ data: [SAMPLE_GRANT] }));
     getAllGrants.mockReset().mockResolvedValue(jsonRes({ data: [ADMIN_GRANT] }));
     deleteGrant.mockReset().mockResolvedValue(jsonRes({ success: true }));
-    vi.mocked(useLoaderData).mockReturnValue({ self: [SAMPLE_GRANT], all: null, role: 'inspector', isSaas: false } as never);
+    getSessionContext.mockReset().mockResolvedValue(
+        jsonRes({ data: { user: { role: 'inspector' }, branding: { isSaas: false }, deployment: { mcpEnabled: true } } }),
+    );
+    vi.mocked(useLoaderData).mockReturnValue({ mcpEnabled: true, self: [SAMPLE_GRANT], all: null, role: 'inspector', isSaas: false } as never);
     vi.mocked(useSessionContext).mockReturnValue({
         user: { role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A' },
         branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, reportTheme: 'default', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null },
-        deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false },
+        deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true },
         seatUsage: null,
     });
 });
@@ -154,8 +162,8 @@ describe('settings-connected-apps loader', () => {
     });
 
     it('does NOT fetch all-grants for a non-admin role', async () => {
-        // Default mock has no sessionContext, so the loader's try/catch defaults role to "inspector".
-        // isAdminRole("inspector") is false, so all stays null and getAllGrants is never called.
+        // Default mock returns role="inspector". isAdminRole("inspector") is false,
+        // so all stays null and getAllGrants is never called.
         const data = await loader(loaderArgs());
         expect(getAllGrants).not.toHaveBeenCalled();
         expect(data.all).toBeNull();
@@ -167,7 +175,7 @@ describe('settings-connected-apps loader', () => {
             sessionContext: {
                 context: {
                     $get: vi.fn().mockResolvedValue(
-                        jsonRes({ data: { user: { role: 'owner' }, branding: { isSaas: false } } }),
+                        jsonRes({ data: { user: { role: 'owner' }, branding: { isSaas: false }, deployment: { mcpEnabled: true } } }),
                     ),
                 },
             },
@@ -274,7 +282,7 @@ describe('SettingsConnectedApps component render', () => {
         vi.mocked(useSessionContext).mockReturnValue({
             user: { role: 'owner', name: 'Admin', email: 'admin@example.com', initials: 'A' },
             branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, reportTheme: 'default', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null },
-            deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false },
+            deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true },
             seatUsage: null,
         });
         const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
@@ -344,5 +352,36 @@ describe('SettingsConnectedApps component render', () => {
         // (Modal controls visibility via CSS; confirm via plain DOM is never invoked).
         expect(mockConfirm).not.toHaveBeenCalled();
         delete (globalThis as Record<string, unknown>)['confirm'];
+    });
+
+    it('renders the feature-off empty state when loader returns mcpEnabled=false', () => {
+        vi.mocked(useLoaderData).mockReturnValue({
+            mcpEnabled: false,
+            self: [],
+            all: null,
+            role: 'inspector',
+            isSaas: false,
+        } as never);
+        const html = renderToStaticMarkup(createElement(SettingsConnectedApps));
+        expect(html).toContain('MCP is not enabled');
+        // Grants UI must NOT be rendered.
+        expect(html).not.toContain('Your applications');
+    });
+});
+
+// ─── Loader feature-off test ──────────────────────────────────────────────────
+
+describe('settings-connected-apps loader (feature-off)', () => {
+    it('returns mcpEnabled=false and empty grants when deployment.mcpEnabled is false', async () => {
+        getSessionContext.mockResolvedValue(
+            jsonRes({ data: { user: { role: 'inspector' }, branding: { isSaas: false }, deployment: { mcpEnabled: false } } }),
+        );
+        const data = await loader(loaderArgs());
+        expect(data.mcpEnabled).toBe(false);
+        expect(data.self).toEqual([]);
+        expect(data.all).toBeNull();
+        // No grants fetches should happen.
+        expect(getSelfGrants).not.toHaveBeenCalled();
+        expect(getAllGrants).not.toHaveBeenCalled();
     });
 });

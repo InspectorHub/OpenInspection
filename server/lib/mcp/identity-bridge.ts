@@ -22,15 +22,19 @@ export function internalJwtPayload(props: McpProps): Record<string, unknown> {
     };
 }
 
-/**
- * Guards against cross-tenant calls. Throws if the props tenant differs from
- * the tenant resolved from the URL / route (e.g. tenantSlug → tenantId
- * lookup). No-op on match.
- */
-export function assertTenantMatches(expectedTenantId: string, props: McpProps): void {
-    if (props.tenantId !== expectedTenantId) {
-        throw new Error('tenant mismatch');
-    }
+/** Spec §6 defense-in-depth: the company slug in the saas MCP URL
+ * (/company/{slug}/mcp) MUST equal the slug baked into the OAuth grant.
+ * A token issued for one company presented at another company's URL is
+ * rejected here (tenant isolation also holds downstream via the
+ * props.tenantId → internal JWT → ScopedDB chain; this fails loud at the edge). */
+export function assertCompanySlugMatches(urlSlug: string, props: McpProps): boolean {
+    return urlSlug === props.tenantSlug;
+}
+
+/** Extract the company slug from a saas MCP path: /company/{slug}/mcp → slug. Null if absent. */
+export function companySlugFromMcpPath(pathname: string): string | null {
+    const m = pathname.match(/^\/company\/([^/]+)\/mcp(?:\/|$)/);
+    return m ? decodeURIComponent(m[1]) : null;
 }
 
 /**
@@ -45,8 +49,8 @@ export function assertTenantMatches(expectedTenantId: string, props: McpProps): 
  * The dynamic import keeps the DO's top-level graph light — same rationale
  * as the lazy-import pattern in workers/app.ts.
  *
- * Testing: the two pure helpers above (internalJwtPayload, assertTenantMatches)
- * are unit-tested (C3). The full buildKeyring → signJwt → app.fetch path in this
+ * Testing: the pure helpers above (internalJwtPayload, assertCompanySlugMatches,
+ * companySlugFromMcpPath) are unit-tested (C3). The full buildKeyring → signJwt → app.fetch path in this
  * function is NOT yet exercised by any automated test — C4's workers test STUBS
  * callApiAsUser to assert tool-handler wiring, so the JWT-mint → in-process
  * dispatch seam is currently verified only by manual MCP-Inspector E2E. A seeded

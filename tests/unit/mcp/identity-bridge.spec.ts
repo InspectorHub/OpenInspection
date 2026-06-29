@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { internalJwtPayload, assertTenantMatches } from '../../../server/lib/mcp/identity-bridge';
+import {
+    internalJwtPayload,
+    assertCompanySlugMatches,
+    companySlugFromMcpPath,
+} from '../../../server/lib/mcp/identity-bridge';
 import type { McpProps } from '../../../server/durable-objects/inspector-mcp';
 
 const sample: McpProps = {
@@ -57,16 +61,42 @@ describe('internalJwtPayload', () => {
     });
 });
 
-describe('assertTenantMatches', () => {
-    it('does not throw when tenantId matches', () => {
-        expect(() => assertTenantMatches('t-456', sample)).not.toThrow();
+describe('assertCompanySlugMatches', () => {
+    it('returns true when urlSlug matches props.tenantSlug', () => {
+        expect(assertCompanySlugMatches('acme-inspections', sample)).toBe(true);
     });
 
-    it('throws "tenant mismatch" when tenantId differs', () => {
-        expect(() => assertTenantMatches('t-OTHER', sample)).toThrow('tenant mismatch');
+    it('returns false when urlSlug differs from props.tenantSlug', () => {
+        expect(assertCompanySlugMatches('other-company', sample)).toBe(false);
     });
 
-    it('is case-sensitive', () => {
-        expect(() => assertTenantMatches('T-456', sample)).toThrow('tenant mismatch');
+    it('is case-sensitive (uppercase slug does not match lowercase tenantSlug)', () => {
+        expect(assertCompanySlugMatches('Acme-Inspections', sample)).toBe(false);
+    });
+});
+
+describe('companySlugFromMcpPath', () => {
+    it('extracts slug from /company/{slug}/mcp', () => {
+        expect(companySlugFromMcpPath('/company/acme/mcp')).toBe('acme');
+    });
+
+    it('returns null for a standalone /mcp path (no company prefix)', () => {
+        expect(companySlugFromMcpPath('/mcp')).toBeNull();
+    });
+
+    it('extracts slug when path has a trailing slash', () => {
+        expect(companySlugFromMcpPath('/company/acme/mcp/')).toBe('acme');
+    });
+
+    it('extracts slug when path continues after /mcp/', () => {
+        expect(companySlugFromMcpPath('/company/acme/mcp/sse')).toBe('acme');
+    });
+
+    it('decodes a percent-encoded slug', () => {
+        expect(companySlugFromMcpPath('/company/acme%2Dco/mcp')).toBe('acme-co');
+    });
+
+    it('returns null for unrelated paths', () => {
+        expect(companySlugFromMcpPath('/api/inspections')).toBeNull();
     });
 });

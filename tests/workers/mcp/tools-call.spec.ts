@@ -11,7 +11,7 @@
 //
 // The identity bridge (callApiAsUser) is stubbed to capture the request and
 // return a canned response — the bridge's pure pieces (internalJwtPayload,
-// assertTenantMatches) are unit-tested in tests/unit/mcp/identity-bridge.spec.ts;
+// assertCompanySlugMatches, companySlugFromMcpPath) are unit-tested in tests/unit/mcp/identity-bridge.spec.ts;
 // its full JWT-signing + in-process-app dispatch needs a seeded D1 + keyring
 // that belongs at the integration layer.
 import { describe, it, expect, vi, beforeEach } from 'vitest';
