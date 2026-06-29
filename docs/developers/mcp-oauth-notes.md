@@ -195,7 +195,7 @@ RFC 9728 §3.1:
 ```
 /.well-known/oauth-protected-resource         → resource: https://host.com
 /.well-known/oauth-protected-resource/mcp     → resource: https://host.com/mcp
-/.well-known/oauth-protected-resource/t/acme/mcp → resource: https://host.com/t/acme/mcp
+/.well-known/oauth-protected-resource/company/acme/mcp → resource: https://host.com/company/acme/mcp
 ```
 
 Source: `deriveResourceIdentifier(requestUrl)` in `oauth-provider.js` (line ~978):
@@ -215,30 +215,34 @@ PRM response are the same for all path variants — only the `resource` identifi
 ### §11.3 — SaaS apiRoute strategy
 
 **Conclusion: standalone uses `apiRoute: '/mcp'`; SaaS uses the path-based
-`apiRoute: '/t/'` prefix with per-workspace endpoint URLs `/t/{slug}/mcp`. The tenant slug is
+`apiRoute: '/company/'` prefix with per-workspace endpoint URLs `/company/{slug}/mcp`. The tenant slug is
 present in BOTH the URL path (for per-workspace URLs + per-workspace RFC 8707 resource binding)
 AND the OAuth grant `props` (the authoritative value the DO trusts for tenant scoping).**
 
+> **URL token note:** the path segment is the full word `company` (not an abbreviation) per the
+> project URL-clarity rule; it aligns with product terminology (Company) and with competitor
+> Spectora (Company). An earlier draft used the abbreviated `/t/` prefix — superseded.
+
 This matches the approved design spec
 (`docs/superpowers/specs/2026-06-29-openinspection-remote-mcp-oauth-design.md` §4.2 / §11.3),
-which deliberately chose **tenant-in-URL `/t/{slug}/mcp` + RFC 8707 resource indicator**. The
+which deliberately chose **tenant-in-URL `/company/{slug}/mcp` + RFC 8707 resource indicator**. The
 path-based approach is REQUIRED — not merely cosmetic — because the spec mandates two things a
 query-string approach cannot provide:
 
 1. **Per-workspace distinct URLs** — each workspace gets its own canonical MCP endpoint
-   (`https://host.com/t/acme/mcp`), so MCP clients register and store one URL per workspace.
+   (`https://host.com/company/acme/mcp`), so MCP clients register and store one URL per workspace.
 2. **Per-workspace RFC 8707 resource binding** — path-scoped RFC 9728 PRM derives a *distinct*
-   resource identifier per workspace (`/.well-known/oauth-protected-resource/t/acme/mcp` →
-   `resource: 'https://host.com/t/acme/mcp'`). Access tokens are then bound (via the RFC 8707
+   resource identifier per workspace (`/.well-known/oauth-protected-resource/company/acme/mcp` →
+   `resource: 'https://host.com/company/acme/mcp'`). Access tokens are then bound (via the RFC 8707
    `resource` indicator) to that specific workspace's resource, so a token minted for `acme`
    cannot be replayed against `globex`'s endpoint.
 
 How `apiRoute` matching works (mechanical facts that shape the implementation):
 
 - `apiRoute` is a **literal string prefix match** — no patterns, no wildcards, no `:slug`
-  expansion. `apiRoute: '/t/:slug/mcp'` would only match URLs literally starting with the
-  characters `/t/:slug/mcp` (the colon is literal), so it CANNOT be used. Instead register the
-  broad prefix `apiRoute: '/t/'` and let the MCP handler match the precise `/t/{slug}/mcp` shape.
+  expansion. `apiRoute: '/company/:slug/mcp'` would only match URLs literally starting with the
+  characters `/company/:slug/mcp` (the colon is literal), so it CANNOT be used. Instead register the
+  broad prefix `apiRoute: '/company/'` and let the MCP handler match the precise `/company/{slug}/mcp` shape.
 - The tenant slug is parsed from the URL path segment to select the workspace endpoint, but the
   DO trusts `this.props.tenantSlug` (encrypted in the OAuth grant) as the authoritative tenant
   for all data access. The URL slug and the props slug MUST agree — Task A3 should reject any
@@ -251,19 +255,19 @@ How `apiRoute` matching works (mechanical facts that shape the implementation):
 - PRM auto-served at `/.well-known/oauth-protected-resource/mcp` → `resource: 'https://host.com/mcp'`
 - `this.props.tenantSlug` carries the tenant from the OAuth grant (SINGLE_TENANT_ID is the only tenant)
 
-**SaaS:** `apiRoute: '/t/'`
-- Register the broad literal prefix `apiRoute: '/t/'`; expose endpoint URLs as `/t/{slug}/mcp`
-- Per-workspace PRM is auto-derived: `/.well-known/oauth-protected-resource/t/acme/mcp` →
-  `resource: 'https://host.com/t/acme/mcp'` (distinct resource id per workspace = RFC 8707 binding)
+**SaaS:** `apiRoute: '/company/'`
+- Register the broad literal prefix `apiRoute: '/company/'`; expose endpoint URLs as `/company/{slug}/mcp`
+- Per-workspace PRM is auto-derived: `/.well-known/oauth-protected-resource/company/acme/mcp` →
+  `resource: 'https://host.com/company/acme/mcp'` (distinct resource id per workspace = RFC 8707 binding)
 - The MCP agent (DO) reads `this.props.tenantSlug` for tenant scoping; path slug is validated against it
 
-> **⚠️ Safety caveat — `/t/` is a broad literal prefix.** It is collision-free in OI today
+> **⚠️ Safety caveat — `/company/` is a broad literal prefix.** It is collision-free in OI today
 > (verified: existing slug routes are `/book/` `/inspector/` `/portal/` `/report/` `/sign/`
-> `/observe/` — none under `/t/`). **Task A3 MUST scope MCP handling strictly to the
-> `/t/{slug}/mcp` shape and MUST NOT gate any future non-MCP `/t/*` route.** Re-verify
-> collision-freeness if new `/t/*` routes are ever added — registering `apiRoute: '/t/'` makes
-> the OAuth provider treat EVERY `/t/*` request as an authenticated API request, so an
-> unintended `/t/...` page route would be hijacked into the token-required path.
+> `/observe/` — none under `/company/`). **Task A3 MUST scope MCP handling strictly to the
+> `/company/{slug}/mcp` shape and MUST NOT gate any future non-MCP `/company/*` route.** Re-verify
+> collision-freeness if new `/company/*` routes are ever added — registering `apiRoute: '/company/'` makes
+> the OAuth provider treat EVERY `/company/*` request as an authenticated API request, so an
+> unintended `/company/...` page route would be hijacked into the token-required path.
 
 **Rejected alternative — `apiRoute: '/mcp'` + `?workspace={slug}` query param.** Simpler to
 route, but it FAILS the spec's requirements: all workspaces would share the single endpoint URL
@@ -271,7 +275,7 @@ route, but it FAILS the spec's requirements: all workspaces would share the sing
 That collapses the per-workspace RFC 8707 resource binding — one token would be valid for the
 shared resource regardless of workspace, losing the per-workspace token isolation §4.2 requires.
 
-**Rejected alternative — slug-parameterized `apiRoute: '/t/:slug/mcp'`.** `apiRoute` has no
+**Rejected alternative — slug-parameterized `apiRoute: '/company/:slug/mcp'`.** `apiRoute` has no
 pattern support; `:slug` would be matched literally, not as a capture group.
 
 ---
