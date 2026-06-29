@@ -116,4 +116,5 @@ export default {
 export { InspectionPresenceDO } from "../server/durable-objects/inspection-presence";
 export { TenantPresenceDO } from "../server/durable-objects/tenant-presence";
 export { InspectionDocDO } from "../server/durable-objects/inspection-doc";
+export { InspectorMcp } from "../server/durable-objects/inspector-mcp";
 export { SignCompletionWorkflow } from "../server/workflows/sign-completion-workflow";
