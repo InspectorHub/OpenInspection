@@ -112,9 +112,7 @@ function mapGrant(g: RawGrant, extra?: { userId?: string; userEmail?: string; us
 
 // ─── Router ─────────────────────────────────────────────────────────────────
 
-const router = createApiRouter();
-
-export default router
+const mcpGrantsRoutes = createApiRouter()
     // GET /grants — self: list caller's own grants only
     .openapi(listSelfGrantsRoute, async (c) => {
         const oauth = (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER;
@@ -220,3 +218,6 @@ export default router
 
         return c.json({ data: grants }, 200);
     });
+
+export type McpGrantsApi = typeof mcpGrantsRoutes;
+export default mcpGrantsRoutes;

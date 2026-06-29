@@ -141,6 +141,7 @@ export default [
       route("settings/billing", "routes/settings-billing.tsx"),
       route("settings/usage", "routes/settings-usage.tsx"),
       route("settings/security", "routes/settings-security.tsx"),
+      route("settings/connected-apps", "routes/settings-connected-apps.tsx"),
     ]),
     route("recommendations", "routes/recommendations-redirect.tsx"),
     layout("routes/library-layout.tsx", [
