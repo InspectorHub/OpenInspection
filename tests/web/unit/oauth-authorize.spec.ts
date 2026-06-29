@@ -7,7 +7,21 @@ import {
   roleCanWrite,
   selectedScopesFromForm,
 } from "../../../server/lib/mcp/tag-catalog";
-import { ConsentForm } from "~/routes/oauth/authorize";
+import { ConsentForm, isRegisteredRedirectUri } from "~/routes/oauth/authorize";
+
+// The tags MODULE_GROUPS is allowed to use: the controlled vocabulary from
+// docs/developers/07_route_metadata.md plus the two real route tags that
+// predate that prose list (verified present in server/api/** metadata).
+const KNOWN_TAGS = new Set<string>([
+  // primary vocabulary (07_route_metadata.md)
+  "auth", "inspections", "bookings", "templates", "team", "agents", "ai",
+  "invoices", "services", "messages", "notifications", "contacts", "metrics",
+  "admin", "sysadmin", "audit", "marketplace", "recommendations", "agreements",
+  "webhooks", "public", "calendar", "tags", "ratings", "guest", "profile",
+  "identity", "automations", "integrations", "qbo",
+  // real route tags not yet in the prose vocabulary list
+  "sms", "contractor-types",
+]);
 
 function render(role: "inspector" | "manager" | "agent"): string {
   return renderToStaticMarkup(
@@ -22,12 +36,14 @@ function render(role: "inspector" | "manager" | "agent"): string {
 }
 
 describe("tag-catalog module groups", () => {
-  it("only contains tags that exist in the route metadata vocabulary", () => {
-    // Every group has at least one tag and a stable key/label.
+  it("have a non-empty key, label and tags, with every tag in the controlled vocabulary", () => {
     for (const g of MODULE_GROUPS) {
       expect(g.key).toBeTruthy();
       expect(g.label).toBeTruthy();
       expect(g.tags.length).toBeGreaterThan(0);
+      for (const tag of g.tags) {
+        expect(KNOWN_TAGS, `tag "${tag}" in group "${g.key}"`).toContain(tag);
+      }
     }
   });
 
@@ -106,5 +122,28 @@ describe("ConsentForm", () => {
     expect(out).toContain('name="oauthReq"');
     expect(out).toContain('data-testid="oauth-authorize-submit"');
     expect(out).toContain('Claude'); // client name shown
+  });
+});
+
+describe("isRegisteredRedirectUri (cancel-path open-redirect guard)", () => {
+  const client = {
+    clientId: "c",
+    redirectUris: ["https://app.example.com/callback", "https://app.example.com/cb2"],
+    tokenEndpointAuthMethod: "none",
+  };
+
+  it("accepts a redirect URI that is registered to the client", () => {
+    expect(isRegisteredRedirectUri(client, "https://app.example.com/callback")).toBe(true);
+  });
+
+  it("rejects a tampered/unregistered redirect URI", () => {
+    expect(isRegisteredRedirectUri(client, "https://evil.test/steal")).toBe(false);
+    // exact match only — no prefix / substring escape
+    expect(isRegisteredRedirectUri(client, "https://app.example.com/callback.evil.test")).toBe(false);
+  });
+
+  it("rejects when the client is missing (unknown clientId)", () => {
+    expect(isRegisteredRedirectUri(null, "https://app.example.com/callback")).toBe(false);
+    expect(isRegisteredRedirectUri(undefined, "https://app.example.com/callback")).toBe(false);
   });
 });

@@ -1,10 +1,11 @@
-import { Form, useActionData, useNavigation, redirect } from "react-router";
+import { Form, useActionData, useLoaderData, useNavigation, redirect } from "react-router";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/login";
 import { getToken, createSessionWithToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { loginSchema } from "~/lib/forms/auth.schema";
+import { safeReturnTo } from "../../server/lib/mcp/safe-return-to";
 
 export function meta() {
   return [{ title: "Log In - OpenInspection" }];
@@ -21,9 +22,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     return redirect(`${env.PORTAL_API_URL.replace(/\/$/, "")}/login`);
   }
 
+  // Preserve a post-login destination (e.g. the OAuth consent loader bounces
+  // here with ?returnTo=<same-origin /oauth/authorize URL>). safeReturnTo gates
+  // it to same-origin paths, so an attacker can't turn this into an open
+  // redirect. Absent/invalid → /inspections (unchanged behavior).
+  const returnTo = new URL(request.url).searchParams.get("returnTo");
   const token = await getToken(context, request);
-  if (token) return redirect("/inspections");
-  return null;
+  if (token) return redirect(safeReturnTo(returnTo, "/inspections"));
+  return { returnTo };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -57,7 +63,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     const jwt = body?.data?.token as string | undefined;
 
     if (jwt) {
-      return createSessionWithToken(context, jwt, "/inspections");
+      // Honor a same-origin returnTo carried by the form's hidden field (the
+      // OAuth consent flow relies on this to resume after login).
+      const returnTo = formData.get("returnTo");
+      const dest = safeReturnTo(typeof returnTo === "string" ? returnTo : null, "/inspections");
+      return createSessionWithToken(context, jwt, dest);
     }
 
     if (body?.data?.requires2fa) {
@@ -72,6 +82,8 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 export default function LoginPage() {
   const lastResult = useActionData<typeof action>();
+  const data = useLoaderData<typeof loader>();
+  const returnTo = data && "returnTo" in data ? (data.returnTo ?? "") : "";
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
 
@@ -111,6 +123,9 @@ export default function LoginPage() {
           noValidate
           className="space-y-4"
         >
+          {returnTo ? (
+            <input type="hidden" name="returnTo" value={returnTo} />
+          ) : null}
           <div>
             <label htmlFor={fields.email.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
               Email address

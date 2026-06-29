@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { redirect, useLoaderData, useNavigation } from "react-router";
-import type { AuthRequest, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
+import type { AuthRequest, ClientInfo, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
 import type { Route } from "./+types/authorize";
 import { getToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -92,6 +92,24 @@ async function resolveIdentity(
   return { userId: sub, tenantId, tenantSlug, role };
 }
 
+/**
+ * True only when `redirectUri` is one of the client's REGISTERED redirect URIs.
+ * The cancel path bounces to `redirectUri`, which is deserialized from the
+ * user-submitted `oauthReq` hidden field — an attacker could tamper it into an
+ * open redirect. The Authorize path is safe because `completeAuthorization`
+ * validates the redirect URI internally; the cancel path must validate it here.
+ */
+export function isRegisteredRedirectUri(
+  client: ClientInfo | null | undefined,
+  redirectUri: string,
+): boolean {
+  return (
+    !!client &&
+    Array.isArray(client.redirectUris) &&
+    client.redirectUris.includes(redirectUri)
+  );
+}
+
 /** Build the login redirect that preserves the in-flight authorize request. */
 function loginRedirect(env: AuthorizeEnv, request: Request): Response {
   const url = new URL(request.url);
@@ -156,9 +174,19 @@ export async function action({ request, context }: Route.ActionArgs) {
     throw new Response("Bad Request", { status: 400 });
   }
 
+  // The clientName/redirectUri both derive from the (untrusted) hidden field, so
+  // resolve the REGISTERED client once and validate against it.
+  const client = await env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
+  const clientName = client?.clientName?.trim() || "An application";
+
   // Cancel => bounce back to the client's redirect_uri with an OAuth error
-  // (RFC 6749 §4.1.2.1). redirectUri came from the provider-parsed request.
+  // (RFC 6749 §4.1.2.1) — but ONLY if that redirect_uri is registered to the
+  // client. A tampered/unregistered URI would be an open redirect; fall back to
+  // a safe in-app destination instead of redirecting off to it.
   if (formData.get("cancel") != null) {
+    if (!isRegisteredRedirectUri(client, authReq.redirectUri)) {
+      return redirect("/inspections");
+    }
     const u = new URL(authReq.redirectUri);
     u.searchParams.set("error", "access_denied");
     if (authReq.state) u.searchParams.set("state", authReq.state);
@@ -172,9 +200,6 @@ export async function action({ request, context }: Route.ActionArgs) {
     selected,
     role: identity.role,
   });
-
-  const client = await env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
-  const clientName = client?.clientName?.trim() || "An application";
 
   const props: McpProps = {
     userId: identity.userId,
