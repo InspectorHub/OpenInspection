@@ -81,7 +81,9 @@ export type AuditAction =
     | 'sms.consent.attest'
     | 'sms.test_send'
     | 'sms.compliance.provision'
-    | 'sms.compliance.resubmit';
+    | 'sms.compliance.resubmit'
+    | 'mcp.grant.created'
+    | 'mcp.grant.revoked';
 
 export interface AuditParams {
     db: D1Database;

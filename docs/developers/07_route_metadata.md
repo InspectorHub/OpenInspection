@@ -5,9 +5,9 @@ MCP server + Skill generator. The vitest gate at
 `tests/unit/route-metadata.spec.ts` enforces this on CI; missing or
 malformed metadata fails the build.
 
-This document codifies the standard. See the design spec at
-`[redacted]` §5.5
-for the broader integration architecture.
+This document codifies the standard. For the broader integration architecture
+see [mcp-oauth-notes.md](mcp-oauth-notes.md) (server internals) and
+[connecting-claude-mcp.md](connecting-claude-mcp.md) (how a user connects Claude).
 
 ## Required fields
 

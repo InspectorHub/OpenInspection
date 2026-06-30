@@ -98,6 +98,7 @@ import stripeWebhookRoutes from './api/stripe-webhook';
 import agreementsRenderRoutes from './api/agreements-render';
 import evidenceRoutes from './api/evidence';
 import wellKnownRoutes from './api/well-known';
+import mcpGrantsRoutes from './api/mcp-grants';
 
 const app = new OpenAPIHono<HonoConfig>({
     // Intercept Zod validation failures so the response body carries a readable
@@ -553,6 +554,9 @@ const routes = app
   // Stripe webhook (bring-your-own-keys) — public, verified via the tenant's
   // own stripe-signature secret. Added to isPublic allowlist below.
   .route('/api/integrations/stripe/webhook', stripeWebhookRoutes)
+  // Remote MCP OAuth — grant management API (self list/revoke + admin oversight).
+  // Mounted at /api/mcp so paths become /api/mcp/grants*.
+  .route('/api/mcp', mcpGrantsRoutes)
   // Spec 5H — signed agreement render for Browser-Run PDF export (token-in-URL, no JWT).
   .route('/m2m', agreementsRenderRoutes)
   // Spec 5H — public key discovery for independent verification of tenant signing keys.

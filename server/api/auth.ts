@@ -22,6 +22,7 @@ import {
 import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validations/shared.schema';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { authCookieOptions } from '../lib/auth-helpers';
+import { safeReturnTo } from '../lib/mcp/safe-return-to';
 import totpRoutes from './auth/totp';
 import profileRoutes from './auth/profile';
 
@@ -144,6 +145,7 @@ const ssoConsumeRoute = createRoute(withMcpMetadata({
     request: {
         query: z.object({
             code: z.string().min(8).describe('One-time SSO handoff code minted by the portal at POST /api/integration/sso-handoff. Single-use, expires after 60 seconds, deleted from KV on successful consume.'),
+            return_to: z.string().optional().describe('Same-origin path to redirect to after the SSO handoff completes (e.g. /oauth/authorize?...); rejected if not a single-slash path — open-redirect guard.'),
         }),
     },
     responses: {
@@ -364,7 +366,7 @@ export const coreAuthRoutes = createApiRouter()
         }, 200);
     })
     .openapi(ssoConsumeRoute, async (c) => {
-        const { code } = c.req.valid('query');
+        const { code, return_to } = c.req.valid('query');
         if (!c.env.TENANT_CACHE) return c.redirect('/login?sso=unavailable', 302);
 
         const raw = await c.env.TENANT_CACHE.get(`sso:${code}`);
@@ -399,7 +401,7 @@ export const coreAuthRoutes = createApiRouter()
         }, keyring);
 
         setCookie(c, '__Host-inspector_token', token, authCookieOptions());
-        return c.redirect('/inspections', 302);
+        return c.redirect(safeReturnTo(return_to, '/inspections'), 302);
     })
     .openapi(forgotPasswordRoute, async (c) => {
         // SaaS deploys disable the local password form (password reset via

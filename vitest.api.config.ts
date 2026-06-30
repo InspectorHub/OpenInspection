@@ -7,6 +7,17 @@ export default defineConfig({
       // `cloudflare:workers` is only available in the Workers runtime; stub
       // it out so route-metadata tests can import server/index.ts in Node.
       'cloudflare:workers': path.resolve(__dirname, 'tests/unit/stubs/cloudflare-workers.ts'),
+      // The remote-MCP feature pulls two Workers-runtime-only packages into the
+      // worker-entry graph (workers/app.ts → oauth-provider.ts and the
+      // re-exported InspectorMcp → inspector-mcp.ts). Both packages' dist code
+      // does `import ... from "cloudflare:workers" | "cloudflare:email"` at
+      // module load, which Node's ESM loader rejects. They're external
+      // node_modules (native-loaded), so the `cloudflare:*` aliases above can't
+      // reach inside them — instead alias each package to a local stub so the
+      // real ones are never loaded in Node. The real packages run in the
+      // Workers-runtime tests (tests/workers/mcp/*) and production.
+      '@cloudflare/workers-oauth-provider': path.resolve(__dirname, 'tests/unit/stubs/workers-oauth-provider.ts'),
+      'agents/mcp': path.resolve(__dirname, 'tests/unit/stubs/agents-mcp.ts'),
     },
   },
   test: {

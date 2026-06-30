@@ -69,14 +69,18 @@
     "rotate:jwt": "node scripts/rotate-jwt-keys.js",
     "bootstrap": "node scripts/gen-version.js && npm run vendor:copy",
     "prepare": "node -e \"const{execSync}=require('child_process');try{execSync('git config core.hooksPath .githooks',{stdio:'ignore'})}catch(e){};try{execSync('node scripts/gen-version.js',{stdio:'ignore'})}catch(e){}\"",
-    "check:bundle": "node scripts/check-bundle-size.mjs"
+    "check:bundle": "node scripts/check-bundle-size.mjs",
+    "mcp:snapshot": "node scripts/snapshot-openapi.mjs"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "^0.8.1",
     "@conform-to/react": "^1.19.3",
     "@conform-to/zod": "^1.19.3",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@stripe/react-stripe-js": "^6.5.0",
     "@stripe/stripe-js": "^9.7.0",
     "@types/sortablejs": "^1.15.9",
+    "agents": "^0.17.1",
     "dompurify": "^3.4.9",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",
@@ -106,6 +110,7 @@
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.0.0",
     "@cloudflare/vitest-pool-workers": "^0.14.2",
+    "@cloudflare/workers-types": "^4.20260629.1",
     "@eslint/js": "^9.39.4",
     "@fontsource/bricolage-grotesque": "^5.2.10",
     "@fontsource/dm-sans": "^5.2.8",

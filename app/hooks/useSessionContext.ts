@@ -30,6 +30,7 @@ export interface SessionContext {
     mode: string;
     hasBilling: boolean;
     hasSeatQuota: boolean;
+    mcpEnabled: boolean;
   };
   seatUsage: { used: number; limit: number } | null;
 }

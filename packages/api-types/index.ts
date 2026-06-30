@@ -61,3 +61,4 @@ export type { TenantPresenceApi }     from '../../server/api/tenant-presence';
 export type { UsageApi }              from '../../server/api/usage';
 export type { UsersApi }              from '../../server/api/users';
 export type { WidgetApi }             from '../../server/api/widget';
+export type { McpGrantsApi }          from '../../server/api/mcp-grants';

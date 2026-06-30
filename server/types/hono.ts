@@ -146,6 +146,16 @@ export interface AppEnv {
     // feature-detects before forwarding the WS upgrade.
     INSPECTION_DOC?: DurableObjectNamespace;
 
+    // Remote MCP server (Phase A) — one DO instance per authenticated MCP session.
+    // Optional so standalone builds without the binding boot cleanly; Task A3
+    // routes feature-detect before forwarding to McpAgent.serve().
+    INSPECTOR_MCP?: DurableObjectNamespace;
+
+    // KV store for the @cloudflare/workers-oauth-provider OAuth token/grant state.
+    // The binding name OAUTH_KV is hardcoded in that library — do not rename.
+    // Optional so builds without a provisioned KV namespace boot cleanly.
+    OAUTH_KV?: KVNamespace;
+
     // Spec 5H — Public verifier base URL embedded in Certificate of Completion
     ESIGN_PUBLIC_VERIFY_BASE?: string;
 

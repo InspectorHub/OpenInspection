@@ -4,6 +4,7 @@
 // (API worker + web worker + Service Binding) topology with one deployable.
 import { Hono } from "hono";
 import { createRequestHandler } from "react-router";
+import { buildOAuthHandler } from "../server/lib/mcp/oauth-provider";
 
 declare module "react-router" {
   export interface AppLoadContext {
@@ -99,8 +100,14 @@ app.all("*", ssr);
 // reused from the API handler. The queue handler is defined in server/index.ts
 // (the allowed portal-import composition point) so this entry never imports
 // server/portal/* statically — it just forwards the runtime invocation.
+//
+// buildOAuthHandler wraps app.fetch with an OAuthProvider when MCP_ENABLED is
+// set, mounting the OAuth token endpoints and Bearer-protecting the MCP API
+// route. When the flag is off the call is a no-op pass-through.
 export default {
-  fetch: app.fetch,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fetch: (req: Request, env: any, ctx: ExecutionContext) =>
+    buildOAuthHandler(app.fetch as never, env).fetch(req, env, ctx),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   scheduled: async (controller: any, env: any, ctx: any) =>
     (await getApi()).default.scheduled(controller, env, ctx),
@@ -116,4 +123,5 @@ export default {
 export { InspectionPresenceDO } from "../server/durable-objects/inspection-presence";
 export { TenantPresenceDO } from "../server/durable-objects/tenant-presence";
 export { InspectionDocDO } from "../server/durable-objects/inspection-doc";
+export { InspectorMcp } from "../server/durable-objects/inspector-mcp";
 export { SignCompletionWorkflow } from "../server/workflows/sign-completion-workflow";

@@ -9,6 +9,10 @@ export default [
   index("routes/home.tsx"),
   route("login", "routes/login.tsx"),
   route("logout", "routes/logout.tsx"),
+  // Remote MCP OAuth consent screen (B3). Bare route (own chrome, own auth
+  // handling); the OAuthProvider wrapper routes /oauth/authorize here via the
+  // defaultHandler, injecting env.OAUTH_PROVIDER for the loader/action.
+  route("oauth/authorize", "routes/oauth/authorize.tsx"),
   // Issue #111 — read-only inspection hub ("where does this job stand?").
   route("inspections/:id", "routes/inspection-hub.tsx"),
   // Full-screen editor (own chrome, no sidebar)
@@ -137,6 +141,7 @@ export default [
       route("settings/billing", "routes/settings-billing.tsx"),
       route("settings/usage", "routes/settings-usage.tsx"),
       route("settings/security", "routes/settings-security.tsx"),
+      route("settings/connected-apps", "routes/settings-connected-apps.tsx"),
     ]),
     route("recommendations", "routes/recommendations-redirect.tsx"),
     layout("routes/library-layout.tsx", [

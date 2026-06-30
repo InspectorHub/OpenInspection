@@ -28,7 +28,12 @@
     // graph into this program too, so server-side ambient declarations the
     // graph relies on must be visible here (they live under the api config's
     // server/** include).
-    "server/types/qrcode-internals.d.ts"
+    "server/types/qrcode-internals.d.ts",
+    // Needed so the global `Env` type (declared here as `interface Env extends Cloudflare.Env {}`)
+    // is visible when the worker entry re-exports DOs that use it (e.g. InspectorMcp
+    // extends McpAgent<Env>). McpAgent constrains its Env param to `extends Cloudflare.Env`,
+    // and only the global `Env` satisfies that after Cloudflare.Env is augmented by this file.
+    "worker-configuration.d.ts"
   ],
   "exclude": ["node_modules", "build", "dist"]
 }

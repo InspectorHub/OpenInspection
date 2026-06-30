@@ -6,6 +6,7 @@ import { users, tenantConfigs, tenants } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
+import { mcpEnabled } from '../lib/mcp/flag';
 
 /**
  * Session context endpoint for the React Router v7 frontend layout.
@@ -171,6 +172,7 @@ export const sessionContextRoutes = createApiRouter()
                     mode: profile.mode || 'standalone',
                     hasBilling: profile.hasBilling || false,
                     hasSeatQuota: profile.hasSeatQuota || false,
+                    mcpEnabled: mcpEnabled(c.env as { MCP_ENABLED?: string }),
                 },
                 seatUsage,
                 videoProvider,
