@@ -3,6 +3,7 @@ import {
     internalJwtPayload,
     assertCompanySlugMatches,
     companySlugFromMcpPath,
+    stripCompanyPrefix,
 } from '../../../server/lib/mcp/identity-bridge';
 import type { McpProps } from '../../../server/durable-objects/inspector-mcp';
 
@@ -98,5 +99,29 @@ describe('companySlugFromMcpPath', () => {
 
     it('returns null for unrelated paths', () => {
         expect(companySlugFromMcpPath('/api/inspections')).toBeNull();
+    });
+});
+
+describe('stripCompanyPrefix', () => {
+    it('reduces the saas MCP path to the agent mount path', () => {
+        // Regression: McpAgent.serve("/mcp") matches the literal mount via
+        // URLPattern, so /company/{slug}/mcp must be reduced or it 404s.
+        expect(stripCompanyPrefix('/company/acme/mcp')).toBe('/mcp');
+    });
+
+    it('preserves any sub-path after /mcp (e.g. legacy SSE /message)', () => {
+        expect(stripCompanyPrefix('/company/acme/mcp/message')).toBe('/mcp/message');
+    });
+
+    it('handles a slug with encoded characters', () => {
+        expect(stripCompanyPrefix('/company/acme%2Dco/mcp')).toBe('/mcp');
+    });
+
+    it('leaves a standalone /mcp path unchanged', () => {
+        expect(stripCompanyPrefix('/mcp')).toBe('/mcp');
+    });
+
+    it('leaves unrelated paths unchanged', () => {
+        expect(stripCompanyPrefix('/api/inspections')).toBe('/api/inspections');
     });
 });

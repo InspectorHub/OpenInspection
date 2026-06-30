@@ -2,7 +2,7 @@ import { OAuthProvider } from '@cloudflare/workers-oauth-provider';
 import { InspectorMcp } from '../../durable-objects/inspector-mcp';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
 import { mcpEnabled } from './flag';
-import { assertCompanySlugMatches, companySlugFromMcpPath } from './identity-bridge';
+import { assertCompanySlugMatches, companySlugFromMcpPath, stripCompanyPrefix } from './identity-bridge';
 
 /**
  * Loose fetch signature used for both the app handler and the returned handler.
@@ -60,7 +60,8 @@ export function buildOAuthHandler(
                 e: unknown,
                 ctx: ExecutionContext & { props?: McpProps },
             ): Response | Promise<Response> {
-                const urlSlug = companySlugFromMcpPath(new URL(req.url).pathname);
+                const url = new URL(req.url);
+                const urlSlug = companySlugFromMcpPath(url.pathname);
                 if (urlSlug !== null) {
                     const props = ctx.props;
                     if (!props || !assertCompanySlugMatches(urlSlug, props)) {
@@ -69,6 +70,15 @@ export function buildOAuthHandler(
                             headers: { 'content-type': 'application/json' },
                         });
                     }
+                    // McpAgent.serve('/mcp') matches the literal mount path via
+                    // URLPattern; the saas endpoint is /company/{slug}/mcp, which
+                    // would never match and 404s ("Not found"). Strip the
+                    // /company/{slug} prefix so the agent sees its mount path.
+                    // Tenant identity travels in ctx.props (verified above), and
+                    // the DO instance is keyed by session id — not the URL — so
+                    // this rewrite preserves tenant isolation.
+                    url.pathname = stripCompanyPrefix(url.pathname);
+                    return baseServeHandler.fetch(new Request(url, req), e, ctx);
                 }
                 return baseServeHandler.fetch(req, e, ctx);
             },

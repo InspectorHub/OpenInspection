@@ -38,6 +38,17 @@ export function companySlugFromMcpPath(pathname: string): string | null {
 }
 
 /**
+ * Strip the `/company/{slug}` prefix from a saas MCP path so it matches the
+ * McpAgent mount path: `/company/acme/mcp` → `/mcp`, `/company/acme/mcp/message`
+ * → `/mcp/message`. McpAgent.serve('/mcp') matches the literal mount via
+ * URLPattern, so the saas tenant-in-URL path must be reduced before delegating.
+ * Paths without the prefix (standalone `/mcp`) are returned unchanged.
+ */
+export function stripCompanyPrefix(pathname: string): string {
+    return pathname.replace(/^\/company\/[^/]+/, '');
+}
+
+/**
  * Calls the in-process API app on behalf of the authenticated MCP user.
  *
  * Steps:
