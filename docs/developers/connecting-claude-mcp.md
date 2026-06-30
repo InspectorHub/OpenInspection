@@ -140,7 +140,27 @@ Each connection has its own consent and its own revocable grant.
 Tools are generated from the API's OpenAPI metadata: every route marked as a
 `primary`-tier MCP route becomes a tool named `openinspection_<operation>`, and a
 tool is only offered to a connection when the connection's granted scope covers
-that route's required scope and module tag. Routes tagged `extended` or
-`excluded` are never exposed as tools. See
-[Route Metadata Conventions](07_route_metadata.md) for how routes opt in, and
-[mcp-oauth-notes.md](mcp-oauth-notes.md) for the server's internal architecture.
+that route's required scope and module tag. Routes tagged `excluded` are never
+exposed. Routes tagged `extended` are off by default; an operator can expose
+them by setting `MCP_EXTENDED_TOOLS=true` in the deployment env (they stay
+scope-gated). See [Route Metadata Conventions](07_route_metadata.md) for how
+routes opt in, and [mcp-oauth-notes.md](mcp-oauth-notes.md) for the server's
+internal architecture.
+
+---
+
+## 8. Resources and prompts
+
+Beyond tools, the connection also exposes:
+
+- **Resources** — read-only views of your data the client can pull into context
+  without invoking a tool. Every granted read (`GET`) route is available as a
+  resource: collections at `openinspection:///api/<thing>` and single records at
+  `openinspection:///api/<thing>/{id}`. They honor the same scope grant as
+  tools, and reads run as you through the same tenant-scoped API.
+- **Prompts** — ready-made templates the client can offer you, such as
+  *Summarize inspection*, *Draft repair request*, *Review findings*, and
+  *Client follow-up email*. Each prompt only appears when your grant covers the
+  data it needs (e.g. the follow-up-email prompt requires the Contacts module).
+  Prompts carry no data themselves — they hand the model a starting instruction
+  that uses the tools and resources above.
