@@ -3,11 +3,14 @@
 // registered as MCP tools; each tool handler reconstructs the HTTP request and
 // executes it in-process as the authenticated user via the identity bridge.
 import { McpAgent } from 'agents/mcp';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import snapshot from '../lib/mcp/openapi-snapshot.json';
 import { selectTools, toolNameFromOperationId, type SnapshotEntry } from '../lib/mcp/tools';
+import { selectResources, buildResourceRequest } from '../lib/mcp/resources';
 import { buildToolInput, toZodInputSchema, type ToolInput } from '../lib/mcp/resolve-schema';
+import { registerGrantedPrompts } from '../lib/mcp/prompts';
 import { callApiAsUser } from '../lib/mcp/identity-bridge';
+import { extendedToolsEnabled } from '../lib/mcp/flag';
 import type { AppEnv } from '../types/hono';
 
 // `Env` is the global interface from worker-configuration.d.ts (extends Cloudflare.Env),
@@ -123,7 +126,8 @@ export async function registerGrantedTools(
     makeCtx: () => ExecutionContext = makeExecutionContext,
 ): Promise<void> {
     const all = snapshot as SnapshotEntry[];
-    const granted = selectTools(all, props.scopes);
+    const includeExtended = extendedToolsEnabled(env as unknown as { MCP_EXTENDED_TOOLS?: string });
+    const granted = selectTools(all, props.scopes, { includeExtended });
 
     // Only pay the OpenAPI-document cost when a granted operation actually
     // references a named component schema (`$ref`); read-only param-only tools
@@ -142,7 +146,7 @@ export async function registerGrantedTools(
             // Defense-in-depth: re-assert the scope grant at call time. The
             // authoritative tenant scoping happens downstream via
             // props.tenantId → internal JWT → in-process API tenant filtering.
-            if (selectTools([entry], props.scopes).length === 0) {
+            if (selectTools([entry], props.scopes, { includeExtended }).length === 0) {
                 return {
                     isError: true,
                     content: [{ type: 'text' as const, text: JSON.stringify({ error: 'forbidden', operationId: entry.operationId }) }],
@@ -160,13 +164,62 @@ export async function registerGrantedTools(
     }
 }
 
+/**
+ * Register every granted read-only (GET) operation as an MCP resource (Phase E).
+ * Collection operations (no path param) become static resources; get-by-id
+ * operations become resource templates. Reads run through the same identity
+ * bridge as tools, so tenant scoping + RBAC are unchanged. Extracted from
+ * `init()` for direct testing against a bare `McpServer`.
+ */
+export async function registerGrantedResources(
+    server: McpServer,
+    env: AppEnv,
+    props: McpProps,
+    makeCtx: () => ExecutionContext = makeExecutionContext,
+): Promise<void> {
+    const includeExtended = extendedToolsEnabled(env as unknown as { MCP_EXTENDED_TOOLS?: string });
+    const resources = selectResources(snapshot as SnapshotEntry[], props.scopes, { includeExtended });
+
+    const read = async (entry: SnapshotEntry, vars: Record<string, string>, uri: URL) => {
+        // Defense-in-depth: re-assert the read grant before dispatching.
+        if (selectTools([entry], props.scopes, { includeExtended }).length === 0) {
+            throw new Error(`forbidden: ${entry.operationId}`);
+        }
+        const res = await callApiAsUser(env, props, buildResourceRequest(entry, vars), makeCtx());
+        const text = await readTruncated(res);
+        return { contents: [{ uri: uri.href, mimeType: 'application/json', text }] };
+    };
+
+    for (const r of resources) {
+        const config = {
+            title: (r.entry.summary || r.name).trim(),
+            description: `${r.entry.summary ?? ''}. ${r.entry.description ?? ''}`.trim(),
+            mimeType: 'application/json',
+        };
+        if (r.pathParam === null) {
+            server.registerResource(r.name, r.uri, config, (uri) => read(r.entry, {}, uri));
+        } else {
+            const param = r.pathParam;
+            const template = new ResourceTemplate(r.uri, { list: undefined });
+            server.registerResource(r.name, template, config, (uri, variables) => {
+                const raw = variables[param];
+                const value = Array.isArray(raw) ? raw[0] : raw;
+                return read(r.entry, { [param]: String(value ?? '') }, uri);
+            });
+        }
+    }
+}
+
 export class InspectorMcp extends McpAgent<Env, unknown, McpProps> {
     server = new McpServer({ name: 'OpenInspection', version: '1.0.0' });
 
     async init(): Promise<void> {
         // `this.props` is populated from the OAuth grant before init() runs.
-        // Guard defensively: with no grant there are no tools to expose.
+        // Guard defensively: with no grant there is nothing to expose.
         if (!this.props) return;
-        await registerGrantedTools(this.server, this.env as unknown as AppEnv, this.props);
+        const env = this.env as unknown as AppEnv;
+        await registerGrantedTools(this.server, env, this.props);
+        await registerGrantedResources(this.server, env, this.props);
+        registerGrantedPrompts(this.server, this.props);
     }
 }

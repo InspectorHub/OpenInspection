@@ -5,6 +5,7 @@ const snap = [
   { operationId: 'listInspections', method: 'get',  pathTemplate: '/api/inspections',     scopes: ['read'],  tag: 'inspections', tier: 'primary',  inputSchema: {} },
   { operationId: 'createInspection',method: 'post', pathTemplate: '/api/inspections',     scopes: ['write'], tag: 'inspections', tier: 'primary',  inputSchema: {} },
   { operationId: 'listInvoices',    method: 'get',  pathTemplate: '/api/invoices',         scopes: ['read'],  tag: 'invoices',    tier: 'primary',  inputSchema: {} },
+  { operationId: 'approveInspection',method:'post', pathTemplate: '/api/inspections/{id}/approve', scopes: ['write'], tag: 'inspections', tier: 'extended', inputSchema: {} },
   { operationId: 'sysadminWipe',    method: 'post', pathTemplate: '/api/sysadmin/wipe',    scopes: ['admin'], tag: 'sysadmin',    tier: 'excluded', inputSchema: {} },
 ] as const;
 
@@ -18,4 +19,18 @@ it('keeps only granted tag+scope, never excluded tier', () => {
 it('read grant excludes write tools', () => {
   const out = selectTools(snap as never, ['read:inspections','read:invoices']);
   expect(out.map(t => t.operationId).sort()).toEqual(['listInspections','listInvoices']);
+});
+it('excludes extended-tier tools by default', () => {
+  const out = selectTools(snap as never, ['read:inspections','write:inspections']);
+  expect(out.map(t => t.operationId)).not.toContain('approveInspection');
+});
+it('includes extended-tier tools when opted in (still scope-gated, never excluded)', () => {
+  const out = selectTools(snap as never, ['read:inspections','write:inspections'], { includeExtended: true });
+  expect(out.map(t => t.operationId)).toContain('approveInspection');
+  expect(out.map(t => t.operationId)).not.toContain('sysadminWipe'); // excluded tier never
+});
+it('extended opt-in still requires the granted scope', () => {
+  const out = selectTools(snap as never, ['read:inspections'], { includeExtended: true });
+  // approveInspection needs write:inspections, not granted here
+  expect(out.map(t => t.operationId)).not.toContain('approveInspection');
 });
