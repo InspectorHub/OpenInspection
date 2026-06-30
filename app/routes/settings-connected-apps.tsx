@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/settings-connected-apps";
 import { requireToken } from "~/lib/session.server";
@@ -91,19 +91,19 @@ export async function action({ request, context }: Route.ActionArgs) {
         param: { id },
         query: {},
       });
-      return { ok: res.ok, intent };
+      return { ok: res.ok, intent, id };
     }
     if (intent === "revoke-admin") {
       const res = await api.mcpGrants.grants[":id"].$delete({
         param: { id },
         query: { admin: "1" },
       });
-      return { ok: res.ok, intent };
+      return { ok: res.ok, intent, id };
     }
   } catch {
-    return { ok: false, intent };
+    return { ok: false, intent, id };
   }
-  return { ok: false, intent };
+  return { ok: false, intent, id };
 }
 
 // ─── Scope display helper ─────────────────────────────────────────────────────
@@ -172,13 +172,16 @@ function formatUnixDate(ts: number): string {
   });
 }
 
-// ─── Grant row (self) ─────────────────────────────────────────────────────────
+// ─── Grant row ────────────────────────────────────────────────────────────────
+// One row for both lists; `showUser` adds the owner line for the admin view.
 
 function GrantRow({
   grant,
+  showUser = false,
   onRequestRevoke,
 }: {
   grant: McpGrant;
+  showUser?: boolean;
   onRequestRevoke: () => void;
 }) {
   return (
@@ -187,48 +190,12 @@ function GrantRow({
         <p className="font-bold text-[13px] text-ih-fg-1 truncate">
           {grant.clientName ?? grant.clientId}
         </p>
-        <div className="mt-0.5">
-          <ScopesSummary scopes={grant.scopes} />
-        </div>
-        <p className="text-[11px] text-ih-fg-4 mt-1">
-          Created {formatUnixDate(grant.createdAt)}{" "}
-          {grant.expiresAt != null
-            ? `· Expires ${formatUnixDate(grant.expiresAt)}`
-            : "· No expiry"}
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={onRequestRevoke}
-        className="text-[12px] text-ih-bad-fg hover:underline font-bold shrink-0"
-      >
-        Revoke
-      </button>
-    </div>
-  );
-}
-
-// ─── Admin grant row ─────────────────────────────────────────────────────────
-
-function AdminGrantRow({
-  grant,
-  onRequestRevoke,
-}: {
-  grant: McpGrant;
-  onRequestRevoke: () => void;
-}) {
-  return (
-    <div className="flex items-start gap-4 px-4 py-3">
-      <div className="flex-1 min-w-0">
-        <p className="font-bold text-[13px] text-ih-fg-1 truncate">
-          {grant.clientName ?? grant.clientId}
-        </p>
-        <p className="text-[12px] text-ih-fg-3">
-          {grant.userEmail ?? grant.userId ?? "Unknown user"}{" "}
-          {grant.userRole ? (
-            <span className="text-ih-fg-4">({grant.userRole})</span>
-          ) : null}
-        </p>
+        {showUser && (
+          <p className="text-[12px] text-ih-fg-3">
+            {grant.userEmail ?? grant.userId ?? "Unknown user"}{" "}
+            {grant.userRole ? <span className="text-ih-fg-4">({grant.userRole})</span> : null}
+          </p>
+        )}
         <div className="mt-0.5">
           <ScopesSummary scopes={grant.scopes} />
         </div>
@@ -259,6 +226,21 @@ export default function SettingsConnectedApps() {
     grant: McpGrant;
     intent: "revoke" | "revoke-admin";
   } | null>(null);
+  // Optimistically hide a grant the moment its revoke is submitted, so the row
+  // disappears immediately instead of waiting on the loader revalidation.
+  const [revokedIds, setRevokedIds] = useState<Set<string>>(new Set());
+
+  // If a revoke fails server-side, restore the row (un-hide it).
+  useEffect(() => {
+    const result = revokeFetcher.data;
+    if (revokeFetcher.state === "idle" && result && result.ok === false && result.id) {
+      setRevokedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(result.id);
+        return next;
+      });
+    }
+  }, [revokeFetcher.state, revokeFetcher.data]);
 
   // Feature-off: MCP not enabled on this deployment.
   if (data.mcpEnabled === false) {
@@ -270,8 +252,10 @@ export default function SettingsConnectedApps() {
     );
   }
 
-  const { self, all } = data;
-  const showAdmin = all !== null;
+  const showAdmin = data.all !== null;
+  // Hide optimistically-revoked grants from both lists.
+  const self = data.self.filter((g) => !revokedIds.has(g.id));
+  const all = data.all ? data.all.filter((g) => !revokedIds.has(g.id)) : null;
 
   return (
     <div className="space-y-[18px]">
@@ -354,9 +338,10 @@ export default function SettingsConnectedApps() {
                   </div>
                   <div className="divide-y divide-ih-border">
                     {grants.map((grant) => (
-                      <AdminGrantRow
+                      <GrantRow
                         key={grant.id}
                         grant={grant}
+                        showUser
                         onRequestRevoke={() =>
                           setPendingRevoke({ grant, intent: "revoke-admin" })
                         }
@@ -383,8 +368,10 @@ export default function SettingsConnectedApps() {
         busy={revokeFetcher.state !== "idle"}
         onConfirm={() => {
           if (pendingRevoke) {
+            const id = pendingRevoke.grant.id;
+            setRevokedIds((prev) => new Set(prev).add(id));
             revokeFetcher.submit(
-              { intent: pendingRevoke.intent, id: pendingRevoke.grant.id },
+              { intent: pendingRevoke.intent, id },
               { method: "POST" },
             );
           }
