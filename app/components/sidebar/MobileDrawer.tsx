@@ -71,7 +71,7 @@ export function MobileDrawer({ open, onClose }: { open: boolean; onClose: () => 
             </NavLink>
 
             {showSwitchWorkspace && ctx?.branding?.portalBaseUrl && (
-              <a href={`${ctx.branding.portalBaseUrl}/workspace/switch`} onClick={onClose} className="flex items-center gap-3 px-3 py-2 rounded-[6px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary transition-all">
+              <a href={`${ctx.branding.portalBaseUrl}/company/switch`} onClick={onClose} className="flex items-center gap-3 px-3 py-2 rounded-[6px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary transition-all">
                 <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                 <span>Switch workspace…</span>
               </a>

@@ -66,7 +66,7 @@ export function UserMenuPopover({
       {/* Switch workspace — SaaS only */}
       {showSwitchWorkspace && portalBaseUrl && (
         <a
-          href={`${portalBaseUrl}/workspace/switch`}
+          href={`${portalBaseUrl}/company/switch`}
           role="menuitem"
           className="flex items-center gap-2 px-3 py-[7px] text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary transition-colors focus:outline-none focus:bg-ih-bg-muted"
           onClick={onClose}
