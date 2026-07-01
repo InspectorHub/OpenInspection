@@ -26,6 +26,7 @@ import { ReportDefectCard } from "./report/ReportDefectCard";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
 import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
 import { ReportRepairPanel } from "./report/ReportRepairPanel";
+import { BuildingProfile } from "./report/BuildingProfile";
 import {
   PRINT_CARD_CLASS,
   PRINT_SECTION_HEADING_CLASS,
@@ -428,6 +429,11 @@ export function ReportView(props: ReportViewProps) {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Building Profile — Commercial PCA Phase F */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+        <BuildingProfile rows={data.buildingProfile ?? []} />
       </div>
 
       {/* Filter chips */}
