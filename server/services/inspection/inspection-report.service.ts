@@ -13,6 +13,7 @@ import { sha256Hex } from '../signing-key.service';
 import { RENDER_VERSION } from '../../lib/pdf';
 import { resolvePdfSettings, type PdfSettings } from '../../lib/pdf-settings';
 import { isReportPublished } from '../../lib/status/report-status';
+import { resolveBuildingProfile } from '../../lib/building-profile';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
 import { InspectionSubService } from './base';
@@ -399,6 +400,13 @@ export class InspectionReportService extends InspectionSubService {
             bathrooms:      (inspection as { bathrooms?: number | null }).bathrooms           ?? null,
         };
 
+        // Commercial PCA Phase F — server-resolved Building Profile rows (presets
+        // stay server-only). Renders only when propertyType is set + a field is
+        // populated; the report layer decides visibility.
+        const buildingProfile = resolveBuildingProfile(
+            inspection as Parameters<typeof resolveBuildingProfile>[0],
+        );
+
         // #120 — amendment trail. Surfaced to the client report page so a
         // re-published report shows "Amended on …" + per-version reasons.
         // Only meaningful when there is more than one published version; live
@@ -508,6 +516,12 @@ export class InspectionReportService extends InspectionSubService {
             enableRepairList,
             enableCustomerRepairExport,
             propertyFacts,
+            propertyType:        (inspection as { propertyType?: string | null }).propertyType ?? null,
+            commercialSubtype:   (inspection as { commercialSubtype?: string | null }).commercialSubtype ?? null,
+            buildingProfile,
+            // Surfaced (unrendered) for the Phase S walk-through narrative.
+            unitInspectionMode:  (inspection as { unitInspectionMode?: 'tagged' | 'per_unit' | null }).unitInspectionMode ?? 'tagged',
+            samplingDeclaration: (inspection as { samplingDeclaration?: unknown }).samplingDeclaration ?? null,
             // Layer-2 report signature + verification (see docs/superpowers/specs/report-signature).
             isPublished,
             signature,
