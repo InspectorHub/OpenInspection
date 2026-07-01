@@ -16,7 +16,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
     // Deployment-mode flags ride along with branding so layouts and login
     // handlers can read them without taking a second middleware dependency.
     // `portalBaseUrl` deliberately drops any trailing slash so consumers can
-    // freely append paths like `${portalBaseUrl}/workspace/switch`.
+    // freely append paths like `${portalBaseUrl}/company/switch`.
     const profile = c.var.profile;
     const isSaas = profile?.mode === 'saas';
     const portalBaseUrl = c.var.profile.loginRedirectBase;
