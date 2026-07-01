@@ -121,6 +121,28 @@ export function getRatingBucket(
 }
 
 /**
+ * Commercial PCA Phase F (F1) — distinguish "Not Inspected" (NI) from
+ * "Not Present" (NP). Both seed levels map to bucket 'na' → severity 'minor'
+ * (see server/data/rating-system-seeds.ts + map-rating-levels.ts), so they are
+ * otherwise indistinguishable in the report / Systems Summary. Derived from the
+ * level's abbreviation, falling back to its label; returns null for any level
+ * that is not a non-defect 'minor' (na) level. No rating-level model change.
+ */
+export function getNaKind(
+  ratingId: string | null | undefined,
+  levels: RatingLevel[],
+): 'not_inspected' | 'not_present' | null {
+  if (!ratingId || levels.length === 0) return null;
+  const level = levels.find((l) => l.id === ratingId);
+  if (!level || level.isDefect || level.severity !== 'minor') return null;
+  const abbr = level.abbreviation.trim().toUpperCase();
+  const label = level.label.trim().toLowerCase();
+  if (abbr === 'NP' || /not\s*present/.test(label)) return 'not_present';
+  if (abbr === 'NI' || /not\s*inspected/.test(label)) return 'not_inspected';
+  return null;
+}
+
+/**
  * Returns the hex color for a rating ID. Falls back to gray (#9ca3af) for unknown/null ratings.
  */
 export function getRatingColor(
