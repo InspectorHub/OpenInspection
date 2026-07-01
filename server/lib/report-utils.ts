@@ -137,8 +137,11 @@ export function getNaKind(
   if (!level || level.isDefect || level.severity !== 'minor') return null;
   const abbr = level.abbreviation.trim().toUpperCase();
   const label = level.label.trim().toLowerCase();
-  if (abbr === 'NP' || /not\s*present/.test(label)) return 'not_present';
-  if (abbr === 'NI' || /not\s*inspected/.test(label)) return 'not_inspected';
+  if (abbr === 'NP') return 'not_present';
+  if (abbr === 'NI') return 'not_inspected';
+  // Neither standard abbreviation — fall back to the label text.
+  if (/not\s*present/.test(label)) return 'not_present';
+  if (/not\s*inspected/.test(label)) return 'not_inspected';
   return null;
 }
 

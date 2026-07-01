@@ -20,6 +20,7 @@ describe('getNaKind', () => {
   it('returns null for a missing rating or empty level set', () => {
     expect(getNaKind(null, levels)).toBeNull();
     expect(getNaKind('ni', [])).toBeNull();
+    expect(getNaKind('unknown-id', levels)).toBeNull();
   });
   it('falls back to the label when the abbreviation is nonstandard', () => {
     const custom: RatingLevel[] = [
