@@ -110,6 +110,9 @@ export async function loadReportSection(
       verification: (raw?.verification as ReportLoaderResult["verification"] | undefined) ?? null,
       ownerPreview: false,
       baseUrl,
+      propertyType: (raw?.propertyType as string | undefined) ?? null,
+      commercialSubtype: (raw?.commercialSubtype as string | undefined) ?? null,
+      buildingProfile: (raw?.buildingProfile as ReportLoaderResult["buildingProfile"] | undefined) ?? [],
     } satisfies ReportLoaderResult;
   } catch {
     return {
@@ -134,6 +137,9 @@ export async function loadReportSection(
       verification: null,
       ownerPreview: false,
       baseUrl,
+      propertyType: null,
+      commercialSubtype: null,
+      buildingProfile: [],
     } satisfies ReportLoaderResult;
   }
 }

@@ -115,6 +115,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  verification: (raw?.verification as LoaderResult["verification"] | undefined) ?? null,
  ownerPreview,
  baseUrl,
+ propertyType: (raw?.propertyType as string | undefined) ?? null,
+ commercialSubtype: (raw?.commercialSubtype as string | undefined) ?? null,
+ buildingProfile: (raw?.buildingProfile as LoaderResult["buildingProfile"] | undefined) ?? [],
  } satisfies LoaderResult;
  } catch {
  return {
@@ -139,6 +142,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  verification: null,
  ownerPreview: false,
  baseUrl,
+ propertyType: null,
+ commercialSubtype: null,
+ buildingProfile: [],
  } satisfies LoaderResult;
  }
 }
