@@ -3,7 +3,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { parseReinspectionStatuses } from '../../lib/reinspection-status';
-import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
+import { computeReportStats, getRatingColor, getRatingBucket, getNaKind, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
 import { renderTemplate } from '../../lib/mustache';
 import { mapRepairItems } from '../../lib/report-repair-items';
@@ -301,6 +301,8 @@ export class InspectionReportService extends InspectionSubService {
                     ratingColor: getRatingColor(ratingId, levels),
                     ratingLabel: level?.label ?? ratingId,
                     severityBucket: bucket,
+                    naKind: getNaKind(ratingId, levels),
+                    notInspectedReason: (res as { notInspectedReason?: string | null }).notInspectedReason ?? null,
                     notes: res.notes ?? null,
                     photos,
                     recommendation: itemRecommendation,

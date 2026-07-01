@@ -40,6 +40,10 @@ export interface ReportItem {
   ratingColor: string;
   ratingLabel: string | null;
   severityBucket: string;
+  /** Commercial PCA Phase F (F1) — NI/NP distinction (null for non-na items). */
+  naKind?: 'not_inspected' | 'not_present' | null;
+  /** Commercial PCA Phase F (F1) — optional limitation reason captured against an NI rating (Phase S renders it). */
+  notInspectedReason?: string | null;
   notes: string | null;
   photos: ReportPhoto[];
   recommendation?: string | null;

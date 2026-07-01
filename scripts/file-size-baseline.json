@@ -17,7 +17,7 @@
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "app/hooks/usePhotoOps.ts": 639,
   "server/services/inspection/inspection-analytics.service.ts": 623,
-  "server/services/inspection/inspection-report.service.ts": 604,
+  "server/services/inspection/inspection-report.service.ts": 606,
   "app/components/editor/ItemEditor.tsx": 597,
   "app/components/portal/sections/RepairBuilderSection.tsx": 596,
   "server/services/marketplace.service.ts": 587,
