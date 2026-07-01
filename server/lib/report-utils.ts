@@ -24,6 +24,11 @@ export interface ReportStats {
   other: number;
   sectionDefects: Record<string, number>;
   completionPercent: number;
+  /** Commercial PCA Phase F (F1) — priority (defect category) roll-up for the Phase S Systems Summary. */
+  byCategory: { safety: number; recommendation: number; maintenance: number };
+  /** Commercial PCA Phase F (F1) — items whose rating resolves to na_kind 'not_inspected' / 'not_present'. */
+  notInspected: number;
+  notPresent: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -184,6 +189,9 @@ export function computeReportStats(
     other: 0,
     sectionDefects: {},
     completionPercent: 0,
+    byCategory: { safety: 0, recommendation: 0, maintenance: 0 },
+    notInspected: 0,
+    notPresent: 0,
   };
 
   let completedCount = 0;
@@ -201,6 +209,23 @@ export function computeReportStats(
       const bucket = getRatingBucket(ratingId, levels);
       stats[bucket]++;
       if (bucket === 'defect') sectionDefects++;
+      // Commercial PCA Phase F (F1) — NI/NP roll-up. `result` is the same
+      // per-item lookup used above; reuse it (do not re-fetch).
+      const naKind = getNaKind(ratingId, levels);
+      if (naKind === 'not_inspected') stats.notInspected++;
+      else if (naKind === 'not_present') stats.notPresent++;
+      // Per-priority defect counts. Counts INCLUDED defects across canned tabs
+      // and inspector custom defects; a missing category defaults to
+      // 'recommendation' (matching mapCustomDefectsForReport's effectiveCategory).
+      const rr = result as {
+        tabs?: { defects?: Array<{ included?: boolean; category?: string }> };
+        customComments?: { defects?: Array<{ included?: boolean; category?: string }> };
+      };
+      for (const d of [...(rr?.tabs?.defects ?? []), ...(rr?.customComments?.defects ?? [])]) {
+        if (d.included === false) continue;
+        const cat = d.category === 'safety' || d.category === 'maintenance' ? d.category : 'recommendation';
+        stats.byCategory[cat]++;
+      }
       // Mirror inspection-edit.js: an item counts toward completion when a
       // rating is set OR a non-empty value is captured (non-rich types
       // boolean / number / text / textarea / date / select / multi_select
