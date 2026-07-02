@@ -14,9 +14,8 @@ import { RENDER_VERSION } from '../../lib/pdf';
 import { resolvePdfSettings, type PdfSettings } from '../../lib/pdf-settings';
 import { isReportPublished } from '../../lib/status/report-status';
 import { resolveBuildingProfile } from '../../lib/building-profile';
-import { PCA_SECTION_REGISTRY } from '../../lib/pca-section-registry';
-import { resolvePcaNarrative } from '../../lib/pca-narrative';
 import { buildSystemsSummary } from '../../lib/pca-systems-summary';
+import { buildPcaReportBlock } from '../../lib/pca-report-block';
 import type { Deviation } from '../../lib/pca-deviations';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
@@ -413,17 +412,19 @@ export class InspectionReportService extends InspectionSubService {
             inspection as Parameters<typeof resolveBuildingProfile>[0],
         );
 
-        // Commercial PCA Phase S — the report skeleton block. The section
-        // registry is the canonical ASTM §11 order (Phase O projects a TOC over
-        // it). Narrative falls back to ASTM seed copy; the systems summary reads
-        // the Phase F severity + category axes already resolved on `sections`.
-        // The cost seam (§1.3 + PCA Summary numbers) is left empty for Phase C.
-        const pcaReport = {
-            sectionRegistry: [...PCA_SECTION_REGISTRY],
-            narrative: resolvePcaNarrative((inspection as { pcaNarrative?: unknown }).pcaNarrative),
-            systemsSummary: buildSystemsSummary(sections as Parameters<typeof buildSystemsSummary>[0]),
-            deviations: ((inspection as { deviations?: Deviation[] | null }).deviations ?? []),
-        };
+        // Commercial PCA Phase S — the report skeleton block, GATED to commercial
+        // reports so residential home inspections never render the ASTM PCA front
+        // matter. buildPcaReportBlock returns null for non-commercial reports; the
+        // report layer renders whatever it is handed (null → PcaSkeleton renders
+        // nothing), mirroring the Phase F visibility pattern. The registry is the
+        // canonical ASTM §11 order (Phase O projects a TOC over it); the cost seam
+        // (§1.3 + PCA Summary numbers) is left empty for Phase C.
+        const pcaReport = buildPcaReportBlock({
+            propertyType: (inspection as { propertyType?: string | null }).propertyType ?? null,
+            pcaNarrative: (inspection as { pcaNarrative?: unknown }).pcaNarrative ?? null,
+            deviations: (inspection as { deviations?: Deviation[] | null }).deviations ?? null,
+            sections: sections as Parameters<typeof buildSystemsSummary>[0],
+        });
 
         // #120 — amendment trail. Surfaced to the client report page so a
         // re-published report shows "Amended on …" + per-version reasons.

@@ -460,7 +460,9 @@ export function ReportView(props: ReportViewProps) {
 
       {/* Sections */}
       <div className={`max-w-4xl mx-auto px-4 sm:px-6 ${repairPanel ? "pb-[65vh]" : "pb-32"}`}>
-        {/* PCA Skeleton — Commercial PCA Phase S front matter (renders null for non-PCA reports) */}
+        {/* PCA Skeleton — Commercial PCA Phase S front matter. data.pcaReport is
+            null for non-commercial reports (server gates it in getReportData), so
+            PcaSkeleton renders nothing on residential home inspections. */}
         <PcaSkeleton data={data.pcaReport ?? null} />
         {filteredSections.map((section, sectionIdx) => {
           if (filter === "defects" && section.items.length === 0) return null;
