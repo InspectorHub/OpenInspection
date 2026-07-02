@@ -223,6 +223,14 @@ export class InspectionService {
         return this.results.updatePropertyFacts(id, tenantId, facts);
     }
 
+    /**
+     * Commercial PCA Phase S — persist the merged PCA report narrative
+     * blocks. See InspectionResultsService.updatePcaNarrative.
+     */
+    async updatePcaNarrative(id: string, tenantId: string, value: Record<string, string>): Promise<void> {
+        return this.results.updatePcaNarrative(id, tenantId, value);
+    }
+
     async updateResults(id: string, tenantId: string, data: Record<string, unknown>) {
         return this.results.updateResults(id, tenantId, data);
     }

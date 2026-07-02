@@ -10239,6 +10239,64 @@
     "description": "Partially update an inspection record. (PATCH /{id}, inspections domain)."
   },
   {
+    "operationId": "patchInspectionPcaNarrative",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/pca-narrative",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "transmittalLetter": {
+            "type": "string"
+          },
+          "summaryGeneralDescription": {
+            "type": "string"
+          },
+          "summaryPhysicalCondition": {
+            "type": "string"
+          },
+          "summaryRecommendations": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "scopeOfWork": {
+            "type": "string"
+          },
+          "limitationsExceptions": {
+            "type": "string"
+          },
+          "reconnaissance": {
+            "type": "string"
+          },
+          "additionalConsiderations": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "summary": "Patch inspection PCA report narrative",
+    "description": "Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render."
+  },
+  {
     "operationId": "patchInspectionPropertyFact",
     "method": "PATCH",
     "pathTemplate": "/api/inspections/{id}/property-facts",
