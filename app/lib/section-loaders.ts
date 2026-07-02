@@ -113,6 +113,7 @@ export async function loadReportSection(
       propertyType: (raw?.propertyType as string | undefined) ?? null,
       commercialSubtype: (raw?.commercialSubtype as string | undefined) ?? null,
       buildingProfile: (raw?.buildingProfile as ReportLoaderResult["buildingProfile"] | undefined) ?? [],
+      pcaReport: (raw?.pcaReport as ReportLoaderResult["pcaReport"] | undefined) ?? null,
     } satisfies ReportLoaderResult;
   } catch {
     return {
@@ -140,6 +141,7 @@ export async function loadReportSection(
       propertyType: null,
       commercialSubtype: null,
       buildingProfile: [],
+      pcaReport: null,
     } satisfies ReportLoaderResult;
   }
 }

@@ -118,6 +118,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  propertyType: (raw?.propertyType as string | undefined) ?? null,
  commercialSubtype: (raw?.commercialSubtype as string | undefined) ?? null,
  buildingProfile: (raw?.buildingProfile as LoaderResult["buildingProfile"] | undefined) ?? [],
+ pcaReport: (raw?.pcaReport as LoaderResult["pcaReport"] | undefined) ?? null,
  } satisfies LoaderResult;
  } catch {
  return {
@@ -145,6 +146,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  propertyType: null,
  commercialSubtype: null,
  buildingProfile: [],
+ pcaReport: null,
  } satisfies LoaderResult;
  }
 }

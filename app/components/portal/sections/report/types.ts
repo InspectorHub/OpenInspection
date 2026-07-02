@@ -103,6 +103,47 @@ export interface ReportSignature {
   inspectorLicense: string | null;
 }
 
+/* Commercial PCA Phase S — report-skeleton types re-declared across the
+   server/app boundary (app/ cannot import server/lib/). Shapes mirror
+   server/lib/pca-section-registry.ts, pca-narrative.ts, pca-systems-summary.ts,
+   pca-deviations.ts exactly. */
+export interface PcaSectionEntry {
+  id: string;
+  level: number;
+  title: string;
+  tiers: ('light' | 'full')[];
+}
+export interface PcaNarrativeData {
+  transmittalLetter: string;
+  summaryGeneralDescription: string;
+  summaryPhysicalCondition: string;
+  summaryRecommendations: string;
+  purpose: string;
+  scopeOfWork: string;
+  limitationsExceptions: string;
+  reconnaissance: string;
+  additionalConsiderations: string;
+}
+export interface SystemsSummaryRow {
+  systemId: string;
+  systemTitle: string;
+  worstSeverity: 'good' | 'marginal' | 'significant' | 'minor';
+  counts: { safety: number; recommendation: number; maintenance: number };
+}
+export interface Deviation {
+  id: string;
+  area: string;
+  baselineRequirement: string;
+  deviation: string;
+  reason: string;
+}
+export interface PcaReportData {
+  sectionRegistry: PcaSectionEntry[];
+  narrative: PcaNarrativeData;
+  systemsSummary: SystemsSummaryRow[];
+  deviations: Deviation[];
+}
+
 export interface ReportVerification {
   versionNumber: number;
   contentHash: string;
@@ -141,4 +182,5 @@ export interface ReportLoaderResult {
   propertyType: string | null;
   commercialSubtype: string | null;
   buildingProfile: ProfileRow[];
+  pcaReport: PcaReportData | null;
 }

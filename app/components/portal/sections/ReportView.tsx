@@ -129,6 +129,7 @@ export function reportViewProps(
     propertyType: data.propertyType ?? null,
     commercialSubtype: data.commercialSubtype ?? null,
     buildingProfile: data.buildingProfile ?? [],
+    pcaReport: data.pcaReport ?? null,
     tenant: data.tenant ?? "",
     reportId,
     token: data.token,
