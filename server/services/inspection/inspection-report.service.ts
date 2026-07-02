@@ -14,6 +14,10 @@ import { RENDER_VERSION } from '../../lib/pdf';
 import { resolvePdfSettings, type PdfSettings } from '../../lib/pdf-settings';
 import { isReportPublished } from '../../lib/status/report-status';
 import { resolveBuildingProfile } from '../../lib/building-profile';
+import { PCA_SECTION_REGISTRY } from '../../lib/pca-section-registry';
+import { resolvePcaNarrative } from '../../lib/pca-narrative';
+import { buildSystemsSummary } from '../../lib/pca-systems-summary';
+import type { Deviation } from '../../lib/pca-deviations';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
 import { InspectionSubService } from './base';
@@ -409,6 +413,18 @@ export class InspectionReportService extends InspectionSubService {
             inspection as Parameters<typeof resolveBuildingProfile>[0],
         );
 
+        // Commercial PCA Phase S — the report skeleton block. The section
+        // registry is the canonical ASTM §11 order (Phase O projects a TOC over
+        // it). Narrative falls back to ASTM seed copy; the systems summary reads
+        // the Phase F severity + category axes already resolved on `sections`.
+        // The cost seam (§1.3 + PCA Summary numbers) is left empty for Phase C.
+        const pcaReport = {
+            sectionRegistry: [...PCA_SECTION_REGISTRY],
+            narrative: resolvePcaNarrative((inspection as { pcaNarrative?: unknown }).pcaNarrative),
+            systemsSummary: buildSystemsSummary(sections as Parameters<typeof buildSystemsSummary>[0]),
+            deviations: ((inspection as { deviations?: Deviation[] | null }).deviations ?? []),
+        };
+
         // #120 — amendment trail. Surfaced to the client report page so a
         // re-published report shows "Amended on …" + per-version reasons.
         // Only meaningful when there is more than one published version; live
@@ -521,6 +537,7 @@ export class InspectionReportService extends InspectionSubService {
             propertyType:        (inspection as { propertyType?: string | null }).propertyType ?? null,
             commercialSubtype:   (inspection as { commercialSubtype?: string | null }).commercialSubtype ?? null,
             buildingProfile,
+            pcaReport,
             // Surfaced (unrendered) for the Phase S walk-through narrative.
             unitInspectionMode:  (inspection as { unitInspectionMode?: 'tagged' | 'per_unit' | null }).unitInspectionMode ?? 'tagged',
             samplingDeclaration: (inspection as { samplingDeclaration?: unknown }).samplingDeclaration ?? null,
