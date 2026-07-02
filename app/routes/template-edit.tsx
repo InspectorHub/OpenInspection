@@ -11,6 +11,9 @@ import { ItemCommentsPanel } from "~/components/template/ItemCommentsPanel";
 import { ItemPreviewPanel } from "~/components/template/ItemPreviewPanel";
 import { SectionsList } from "~/components/template/SectionsList";
 import { SectionRail } from "~/components/template/SectionRail";
+import { TemplatePropertyTypePanel } from "~/components/template/TemplatePropertyTypePanel";
+import { serializeTemplateMeta } from "~/lib/editor/template-meta";
+import type { PropertyType } from "~/components/template/types";
 
 export function meta() {
   return [{ title: "Edit Template - OpenInspection" }];
@@ -111,6 +114,8 @@ export default function TemplateEditPage() {
 
   const [templateName, setTemplateName] = useState(initialName);
   const [sections, setSections] = useState<TemplateSection[]>(initial.sections || []);
+  const [propertyType, setPropertyType] = useState<PropertyType | undefined>(initial.propertyType);
+  const [commercialSubtype, setCommercialSubtype] = useState<string | undefined>(initial.commercialSubtype);
   const [ratingSystem, setRatingSystem] = useState<RatingSystem>(
     initial.ratingSystem || { name: "Standard 5-Level", defaultLevelId: "S", levels: RATING_PRESETS[1].levels },
   );
@@ -259,6 +264,7 @@ export default function TemplateEditPage() {
   function toV2Payload(): Record<string, unknown> {
     return {
       schemaVersion: 2,
+      ...serializeTemplateMeta(propertyType, commercialSubtype),
       sections: sections.map((s) => ({
         id: s.id,
         title: s.title,
@@ -362,6 +368,14 @@ export default function TemplateEditPage() {
           </button>
         </div>
       </header>
+
+      <div className="flex items-center h-10 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
+        <TemplatePropertyTypePanel
+          propertyType={propertyType}
+          commercialSubtype={commercialSubtype}
+          onChange={(patch) => { setPropertyType(patch.propertyType); setCommercialSubtype(patch.commercialSubtype); }}
+        />
+      </div>
 
       {fetcherData?.error && (
         <div className="px-4 py-2 bg-ih-bad-bg text-ih-bad-fg text-[12px] font-medium">
