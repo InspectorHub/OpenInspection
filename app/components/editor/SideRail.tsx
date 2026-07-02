@@ -3,6 +3,8 @@ import { renderTemplate } from "../../lib/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../lib/defect-fields";
 import { photoDisplayName, withDownload } from "../../lib/photo-name";
 import { PhotoGallery } from "~/components/media-studio/PhotoGallery";
+import { CommentLibraryList } from "./CommentLibraryList";
+import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 
 interface SideRailProps {
   activeItem?: { id: string; label: string; type?: string } | null;
@@ -14,6 +16,13 @@ interface SideRailProps {
   photoCount?: number;
   onGallerySetCover?: (photo: { key: string; url: string }) => void;
   onGalleryAnnotate?: (photo: { key: string; url: string }) => void;
+  serverComments?: Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>;
+  librarySort?: string;
+  onLibrarySearch?: (q: string) => void;
+  onLibraryInsert?: (text: string, id: string) => void;
+  onLibraryTabChange?: (open: boolean) => void;
+  /** Initial open state — used only in server-rendered tests (defaults false). */
+  initialOpen?: boolean;
 }
 
 type TabId = "preview" | "library" | "photos";
@@ -24,17 +33,27 @@ const TABS: Array<{ id: TabId; label: string; icon: string }> = [
   { id: "photos", label: "Photos", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" },
 ];
 
-export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate }: SideRailProps) {
+export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen }: SideRailProps) {
   const [activeTab, setActiveTab] = useState<TabId>("preview");
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(initialOpen ?? false);
 
   const toggle = (tabId: TabId) => {
     if (activeTab === tabId && open) {
       setOpen(false);
+      if (tabId === "library") onLibraryTabChange?.(false);
     } else {
+      if (open && activeTab === "library" && tabId !== "library") {
+        onLibraryTabChange?.(false);
+      }
       setActiveTab(tabId);
       setOpen(true);
+      if (tabId === "library") onLibraryTabChange?.(true);
     }
+  };
+
+  const closePanel = () => {
+    if (activeTab === "library") onLibraryTabChange?.(false);
+    setOpen(false);
   };
 
   return (
@@ -44,7 +63,7 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
         <div className="w-64 border-l border-ih-border bg-ih-bg-card flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-ih-border">
             <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-4 capitalize">{activeTab}</span>
-            <button onClick={() => setOpen(false)} className="w-6 h-6 flex items-center justify-center rounded text-ih-fg-4 hover:text-ih-fg-2">&#x2715;</button>
+            <button onClick={closePanel} className="w-6 h-6 flex items-center justify-center rounded text-ih-fg-4 hover:text-ih-fg-2">&#x2715;</button>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
             {activeTab === "preview" && (
@@ -92,7 +111,7 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
                     return included.length > 0 ? (
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">Comments</span>
-                        <ul className="mt-1 space-y-1">
+                        <div className="mt-1 space-y-1">
                           {included.map((c, i) => {
                             const isDefect = c.tabName === "defects";
                             const text = (c.text as string) || "";
@@ -104,10 +123,18 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
                               ...attrVars,
                             }) : text;
                             return (
-                              <li key={i} className="text-[11px] text-ih-fg-2 pl-2 border-l-2 border-ih-border">{rendered}</li>
+                              <CannedCommentRow
+                                key={i}
+                                as="div"
+                                interactive={false}
+                                selected={false}
+                                title={(c.title as string | undefined) ?? undefined}
+                                category={isDefect ? (c.category as string | undefined) : undefined}
+                                bodySlot={<p className="text-[11px] leading-relaxed text-ih-fg-2">{rendered}</p>}
+                              />
                             );
                           })}
-                        </ul>
+                        </div>
                       </div>
                     ) : null;
                   })()}
@@ -146,8 +173,21 @@ export function SideRail({ activeItem, activeResult, getRatingColor, getRatingLa
             )}
             {activeTab === "library" && (
               <div>
-                <input type="text" placeholder="Search comments..." className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-app text-[12px] mb-2" />
-                <p className="text-[13px] text-ih-fg-3 text-center py-8">Type <kbd className="px-1 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">/</kbd> in the note field to search.</p>
+                <input
+                  type="text"
+                  placeholder="Search comments…"
+                  onChange={(e) => onLibrarySearch?.(e.target.value)}
+                  className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-app text-[12px] mb-2"
+                />
+                {activeItem && (
+                  <p className="text-[10px] text-ih-fg-4 mb-1.5">Filtered to: {activeItem.label}</p>
+                )}
+                <CommentLibraryList
+                  serverComments={serverComments ?? []}
+                  selectedIndex={-1}
+                  sort={librarySort ?? "relevance"}
+                  onInsertText={(text, id) => onLibraryInsert?.(text, id)}
+                />
               </div>
             )}
             {activeTab === "photos" && (

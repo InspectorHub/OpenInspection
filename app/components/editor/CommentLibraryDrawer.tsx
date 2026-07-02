@@ -1,4 +1,4 @@
-import { formatRelativeTime } from "../../lib/format-relative-time";
+import { CommentLibraryList } from "./CommentLibraryList";
 
 export interface CommentLibraryDrawerProps {
  comments: {
@@ -144,43 +144,17 @@ export function CommentLibraryDrawer({ comments, state, serverComments, onInsert
 
  {/* Comment list (server-fetched, sort/filter aware) */}
  <div className="flex-1 overflow-y-auto pb-2">
- <ul className="divide-y divide-ih-border">
- {serverComments.map((c, idx) => (
- <li
- key={c.id}
- onClick={() => {
+ <CommentLibraryList
+ serverComments={serverComments}
+ selectedIndex={state.commentLibrarySelectedIdx}
+ sort={comments.sort}
+ onInsertText={(text, id) => {
  if (!state.currentSection || !state.activeItemId) return;
- onInsert(
- state.currentSection.id,
- state.activeItemId,
- c.text,
- );
- comments.touchSnippet(c.id);
+ onInsert(state.currentSection.id, state.activeItemId, text);
+ comments.touchSnippet(id);
  state.setShowCommentLibrary(false);
  }}
- className={`cursor-pointer ${
- idx === state.commentLibrarySelectedIdx
- ? "bg-ih-primary-tint ring-1 ring-inset ring-ih-primary/30"
- : ""
- }`}
- >
- <div className="flex items-start gap-2 p-2.5 hover:bg-ih-bg-muted">
- <p className="flex-1 text-[12px] text-ih-fg-2 leading-relaxed">
- {c.text}
- </p>
- <span className="text-[10px] text-ih-fg-4 tabular-nums whitespace-nowrap">
- {comments.sort === 'recent'   && c.lastUsedAt ? formatRelativeTime(c.lastUsedAt) : ''}
- {comments.sort === 'frequent' && c.useCount   ? `${c.useCount}×`               : ''}
- </span>
- </div>
- </li>
- ))}
- </ul>
- {serverComments.length === 0 && (
- <p className="text-[13px] text-ih-fg-3 text-center py-8">
- No comments match the current filter.
- </p>
- )}
+ />
  </div>
  </div>
  </div>

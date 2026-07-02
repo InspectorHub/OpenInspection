@@ -1524,6 +1524,11 @@
                                             "default": {
                                               "type": "boolean",
                                               "description": "TODO describe default field for the OpenInspection MCP integration"
+                                            },
+                                            "abbrev": {
+                                              "type": "string",
+                                              "maxLength": 12,
+                                              "description": "TODO describe abbrev field for the OpenInspection MCP integration"
                                             }
                                           },
                                           "required": [
@@ -1558,6 +1563,11 @@
                                             "default": {
                                               "type": "boolean",
                                               "description": "TODO describe default field for the OpenInspection MCP integration"
+                                            },
+                                            "abbrev": {
+                                              "type": "string",
+                                              "maxLength": 12,
+                                              "description": "TODO describe abbrev field for the OpenInspection MCP integration"
                                             }
                                           },
                                           "required": [
@@ -1612,6 +1622,11 @@
                                             "default": {
                                               "type": "boolean",
                                               "description": "TODO describe default field for the OpenInspection MCP integration"
+                                            },
+                                            "abbrev": {
+                                              "type": "string",
+                                              "maxLength": 12,
+                                              "description": "TODO describe abbrev field for the OpenInspection MCP integration"
                                             }
                                           },
                                           "required": [
@@ -10510,6 +10525,11 @@
                                         "default": {
                                           "type": "boolean",
                                           "description": "TODO describe default field for the OpenInspection MCP integration"
+                                        },
+                                        "abbrev": {
+                                          "type": "string",
+                                          "maxLength": 12,
+                                          "description": "TODO describe abbrev field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -10544,6 +10564,11 @@
                                         "default": {
                                           "type": "boolean",
                                           "description": "TODO describe default field for the OpenInspection MCP integration"
+                                        },
+                                        "abbrev": {
+                                          "type": "string",
+                                          "maxLength": 12,
+                                          "description": "TODO describe abbrev field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -10598,6 +10623,11 @@
                                         "default": {
                                           "type": "boolean",
                                           "description": "TODO describe default field for the OpenInspection MCP integration"
+                                        },
+                                        "abbrev": {
+                                          "type": "string",
+                                          "maxLength": 12,
+                                          "description": "TODO describe abbrev field for the OpenInspection MCP integration"
                                         }
                                       },
                                       "required": [
@@ -14832,6 +14862,11 @@
                                             "default": {
                                               "type": "boolean",
                                               "description": "TODO describe default field for the OpenInspection MCP integration"
+                                            },
+                                            "abbrev": {
+                                              "type": "string",
+                                              "maxLength": 12,
+                                              "description": "TODO describe abbrev field for the OpenInspection MCP integration"
                                             }
                                           },
                                           "required": [
@@ -14866,6 +14901,11 @@
                                             "default": {
                                               "type": "boolean",
                                               "description": "TODO describe default field for the OpenInspection MCP integration"
+                                            },
+                                            "abbrev": {
+                                              "type": "string",
+                                              "maxLength": 12,
+                                              "description": "TODO describe abbrev field for the OpenInspection MCP integration"
                                             }
                                           },
                                           "required": [
@@ -14920,6 +14960,11 @@
                                             "default": {
                                               "type": "boolean",
                                               "description": "TODO describe default field for the OpenInspection MCP integration"
+                                            },
+                                            "abbrev": {
+                                              "type": "string",
+                                              "maxLength": 12,
+                                              "description": "TODO describe abbrev field for the OpenInspection MCP integration"
                                             }
                                           },
                                           "required": [

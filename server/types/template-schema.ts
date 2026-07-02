@@ -26,6 +26,8 @@ export interface CannedInfoComment {
     comment: string;
     /** When true, this entry is auto-included on new inspections. */
     default: boolean;
+    /** Optional shortcode typed in the editor to fill this comment (≤ 12 chars). */
+    abbrev?: string;
 }
 
 /** Defect canned entry — adds category + per-defect location and photos. */
@@ -40,6 +42,8 @@ export interface CannedDefect {
      *  store their own photos in InspectionItemState. */
     photos: string[];
     default: boolean;
+    /** Optional shortcode typed in the editor to fill this comment (≤ 12 chars). */
+    abbrev?: string;
 }
 
 /** Three-tab canned comment buckets attached to each item. */

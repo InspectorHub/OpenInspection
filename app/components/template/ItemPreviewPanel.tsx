@@ -1,4 +1,5 @@
 import type { TemplateItem } from "./types";
+import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 
 export interface ItemPreviewPanelProps {
   selectedItem: TemplateItem;
@@ -26,7 +27,15 @@ export function ItemPreviewPanel({ selectedItem }: ItemPreviewPanelProps) {
               <div key={tab}>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1 capitalize">{tab}</p>
                 {entries.map((c) => (
-                  <p key={c.id} className="text-[11px] text-ih-fg-3 ml-2">- {c.title}: {c.comment}</p>
+                  <CannedCommentRow
+                    key={c.id}
+                    as="div"
+                    interactive={false}
+                    selected={false}
+                    title={c.title}
+                    category={tab === "defects" ? c.category : undefined}
+                    bodySlot={c.comment ? <p className="text-[11px] mt-0.5 leading-relaxed text-ih-fg-3">{c.comment}</p> : null}
+                  />
                 ))}
               </div>
             );

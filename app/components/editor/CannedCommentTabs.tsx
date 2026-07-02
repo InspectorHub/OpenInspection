@@ -1,4 +1,5 @@
 import { TabStrip } from "@core/shared-ui";
+import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
 import { RepairItemsPanel } from "./RepairItemsPanel";
 import { CustomDefectForm } from "./CustomDefectForm";
@@ -180,88 +181,61 @@ export function CannedCommentTabs({
         ) : (
           currentTabEntries.map((entry) => {
             const isIncluded = includedSet.has(entry.id);
+            const isDefectIncluded = activeTab === "defects" && isIncluded;
+            const st = isDefectIncluded ? (defectStates?.get(entry.id) ?? {}) : null;
+            const attrEntries = resultAttributes && typeof resultAttributes === "object"
+              ? Object.entries(resultAttributes as Record<string, unknown>) : [];
+            const attrVars: Record<string, string | null> = {};
+            for (const [k, v] of attrEntries) {
+              if (v === null || v === undefined) attrVars[k] = null;
+              else if (typeof v === "string") attrVars[k] = v.length > 0 ? v : null;
+              else if (typeof v === "number" && Number.isFinite(v)) attrVars[k] = String(v);
+              else if (typeof v === "boolean") attrVars[k] = v ? "yes" : "no";
+              else attrVars[k] = null;
+            }
+            const vars = st ? {
+              location:  st.location ?? null,
+              trade:     st.trade     ? DEFECT_TRADE_LABELS[st.trade]         : null,
+              deadline:  st.deadline  ? DEFECT_DEADLINE_LABELS[st.deadline]   : null,
+              timeframe: st.timeframe ? DEFECT_TIMEFRAME_LABELS[st.timeframe] : null,
+              ...attrVars,
+            } : null;
             return (
-              <label
+              <CannedCommentRow
                 key={entry.id}
-                className={`flex items-start gap-2.5 p-2.5 min-h-11 rounded-lg cursor-pointer transition-colors ${
-                  isIncluded
-                    ? "bg-ih-primary-tint ring-1 ring-ih-primary/30"
-                    : "bg-ih-bg-app/50 hover:bg-ih-bg-muted"
-                }`}
+                as="label"
+                selected={isIncluded}
+                title={entry.title}
+                category={"category" in entry ? (entry as CannedDefect).category || undefined : undefined}
+                leading={
+                  <input
+                    type="checkbox"
+                    checked={isIncluded}
+                    onChange={() => onToggleCanned?.(activeTab, entry.id, !isIncluded)}
+                    className="mt-0.5 w-4 h-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
+                  />
+                }
+                bodySlot={
+                  <p className={`text-[11px] mt-0.5 leading-relaxed ${isIncluded ? "text-ih-fg-3" : "text-ih-fg-4"}`}>
+                    {vars ? renderTemplate(entry.comment, vars) : entry.comment}
+                  </p>
+                }
               >
-                <input
-                  type="checkbox"
-                  checked={isIncluded}
-                  onChange={() => {
-                    onToggleCanned?.(activeTab, entry.id, !isIncluded);
-                  }}
-                  className="mt-0.5 w-4 h-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-bold text-ih-fg-2">
-                    {entry.title}
-                    {"category" in entry && (entry as CannedDefect).category && (
-                      <span className={`ml-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
-                        (entry as CannedDefect).category === "safety"
-                          ? "bg-ih-bad-bg text-ih-bad-fg"
-                          : (entry as CannedDefect).category === "recommendation"
-                          ? "bg-ih-watch-bg text-ih-watch-fg"
-                          : "bg-ih-bg-muted text-ih-fg-3"
-                      }`}>
-                        {(entry as CannedDefect).category}
-                      </span>
-                    )}
-                  </div>
-                  {(() => {
-                    const isDefectIncluded = activeTab === "defects" && isIncluded;
-                    const st = isDefectIncluded ? (defectStates?.get(entry.id) ?? {}) : null;
-                    // Mustache vars: defect-level fields plus the item's attribute values
-                    // (brand, year, etc.) so canned-comment prose like "{{brand}} water heater"
-                    // renders the inspector's filled-in value.
-                    const attrEntries = resultAttributes && typeof resultAttributes === "object"
-                      ? Object.entries(resultAttributes as Record<string, unknown>)
-                      : [];
-                    const attrVars: Record<string, string | null> = {};
-                    for (const [k, v] of attrEntries) {
-                      if (v === null || v === undefined) attrVars[k] = null;
-                      else if (typeof v === "string") attrVars[k] = v.length > 0 ? v : null;
-                      else if (typeof v === "number" && Number.isFinite(v)) attrVars[k] = String(v);
-                      else if (typeof v === "boolean") attrVars[k] = v ? "yes" : "no";
-                      else attrVars[k] = null;
-                    }
-                    const vars = st ? {
-                      location:  st.location ?? null,
-                      trade:     st.trade     ? DEFECT_TRADE_LABELS[st.trade]         : null,
-                      deadline:  st.deadline  ? DEFECT_DEADLINE_LABELS[st.deadline]   : null,
-                      timeframe: st.timeframe ? DEFECT_TIMEFRAME_LABELS[st.timeframe] : null,
-                      ...attrVars,
-                    } : null;
-                    return (
-                      <>
-                        <p className={`text-[11px] mt-0.5 leading-relaxed ${
-                          isIncluded ? "text-ih-fg-3" : "text-ih-fg-4"
-                        }`}>
-                          {vars ? renderTemplate(entry.comment, vars) : entry.comment}
-                        </p>
-                        {isDefectIncluded && (
-                          <>
-                            <DefectFieldsRow
-                              cannedId={entry.id}
-                              value={st!}
-                              locationSuggestions={locationSuggestions ?? []}
-                              onChange={onDefectFields ?? (() => {})}
-                              locationRequired={(requiredDefectFields?.location ?? false) || missingFields?.get(entry.id)?.location}
-                              tradeRequired={(requiredDefectFields?.trade ?? false) || missingFields?.get(entry.id)?.trade}
-                            />
-                            {/* FE-3 — photo pinned to THIS defect, not the item */}
-                            {defectPhotoChip({ kind: "canned", id: entry.id }, cannedDefectPhotoCount(entry.id))}
-                          </>
-                        )}
-                      </>
-                    );
-                  })()}
-                </div>
-              </label>
+                {isDefectIncluded && (
+                  <>
+                    <DefectFieldsRow
+                      cannedId={entry.id}
+                      value={st!}
+                      locationSuggestions={locationSuggestions ?? []}
+                      onChange={onDefectFields ?? (() => {})}
+                      locationRequired={(requiredDefectFields?.location ?? false) || missingFields?.get(entry.id)?.location}
+                      tradeRequired={(requiredDefectFields?.trade ?? false) || missingFields?.get(entry.id)?.trade}
+                    />
+                    {/* FE-3 — photo pinned to THIS defect, not the item */}
+                    {defectPhotoChip({ kind: "canned", id: entry.id }, cannedDefectPhotoCount(entry.id))}
+                  </>
+                )}
+              </CannedCommentRow>
             );
           })
         )}
@@ -298,44 +272,35 @@ export function CannedCommentTabs({
         {activeTab === "defects" && (
           <>
             {customDefects.map((cd) => (
-              <label
+              <CannedCommentRow
                 key={cd.id}
-                className={`flex items-start gap-2.5 p-2.5 min-h-11 rounded-lg cursor-pointer transition-colors ${
-                  cd.included !== false
-                    ? "bg-ih-primary-tint ring-1 ring-ih-primary/30"
-                    : "bg-ih-bg-app/50 hover:bg-ih-bg-muted"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={cd.included !== false}
-                  onChange={() => onToggleCustomDefect?.(cd.id, !(cd.included !== false))}
-                  className="mt-0.5 w-4 h-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[12px] font-bold text-ih-fg-2">
-                    {cd.title}
-                    <span className={`ml-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
-                      cd.category === "safety"
-                        ? "bg-ih-bad-bg text-ih-bad-fg"
-                        : cd.category === "recommendation"
-                        ? "bg-ih-watch-bg text-ih-watch-fg"
-                        : "bg-ih-bg-muted text-ih-fg-2"
-                    }`}>
-                      {cd.category}
-                    </span>
-                    <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary">
-                      custom
-                    </span>
-                  </div>
-                  {cd.comment && (
+                as="label"
+                selected={cd.included !== false}
+                title={cd.title}
+                category={cd.category}
+                extraBadge={
+                  <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary">
+                    custom
+                  </span>
+                }
+                leading={
+                  <input
+                    type="checkbox"
+                    checked={cd.included !== false}
+                    onChange={() => onToggleCustomDefect?.(cd.id, !(cd.included !== false))}
+                    className="mt-0.5 w-4 h-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
+                  />
+                }
+                bodySlot={
+                  cd.comment ? (
                     <p className="text-[12px] mt-0.5 leading-relaxed text-ih-fg-3">{cd.comment}</p>
-                  )}
-                  {/* FE-3 — photo pinned to this custom defect */}
-                  {cd.included !== false &&
-                    defectPhotoChip({ kind: "custom", id: cd.id }, Array.isArray(cd.photos) ? cd.photos.length : 0)}
-                </div>
-              </label>
+                  ) : null
+                }
+              >
+                {/* FE-3 — photo pinned to this custom defect */}
+                {cd.included !== false &&
+                  defectPhotoChip({ kind: "custom", id: cd.id }, Array.isArray(cd.photos) ? cd.photos.length : 0)}
+              </CannedCommentRow>
             ))}
 
             {onAddCustomDefect && (

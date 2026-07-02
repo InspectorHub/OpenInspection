@@ -1,5 +1,6 @@
 import { ITEM_TYPES } from "./types";
 import type { TemplateItem, TemplateSection } from "./types";
+import { ItemHeader } from "../editor-shared/ItemHeader";
 
 export interface SectionsListProps {
   section: TemplateSection | null;
@@ -71,7 +72,6 @@ export function SectionsList({ section, activeSection, previewMode, editingItem,
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <span className="text-[10px] font-mono text-ih-fg-4 w-5 cursor-grab" title="Drag to reorder">&#9776;</span>
-                      <span className="text-[10px] font-mono text-ih-fg-4 w-5">{String(idx + 1).padStart(2, "0")}</span>
                       {editingItem === item.id ? (
                         <input
                           value={item.label}
@@ -82,9 +82,9 @@ export function SectionsList({ section, activeSection, previewMode, editingItem,
                       ) : (
                         <button
                           onClick={() => { setEditingItem(item.id); setRightRail("properties"); }}
-                          className="flex-1 text-left text-[13px] font-medium text-ih-fg-1 truncate hover:text-ih-primary"
+                          className="flex-1 text-left text-ih-fg-1 hover:text-ih-primary"
                         >
-                          {item.label}
+                          <ItemHeader number={String(idx + 1).padStart(2, "0")} label={item.label} />
                         </button>
                       )}
                     </div>

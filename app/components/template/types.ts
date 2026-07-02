@@ -10,6 +10,8 @@ export interface CannedComment {
   category?: string;
   location?: string;
   photos?: string[];
+  /** Optional shortcode typed in the editor to fill this comment (≤ 12 chars). */
+  abbrev?: string;
 }
 
 export interface ItemOptions {

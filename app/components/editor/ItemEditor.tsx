@@ -1,4 +1,9 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { CommentTypeahead } from "./CommentTypeahead";
+import { useCommentTypeahead } from "../../hooks/useCommentTypeahead";
+import {
+  flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
+} from "../../lib/comment-typeahead";
 import { CloneLastButton } from "./CloneLastButton";
 import { type DefectFieldsValue } from "./DefectFieldsRow";
 import { ItemAttributesPanel } from "./ItemAttributesPanel";
@@ -17,6 +22,7 @@ import { shouldTriggerSlash } from "../../lib/slash-trigger";
 import { findRatingLevel, type EditorRatingLevel } from "../../lib/rating-levels";
 import { findRatingContradictions } from "../../lib/contradiction-lint";
 import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
+import { ItemHeader } from "../editor-shared/ItemHeader";
 
 export type { LibraryMatch };
 
@@ -175,6 +181,26 @@ export function ItemEditor({
  const [customCategory, setCustomCategory] = useState<CustomDefectCategory>("recommendation");
  const [saveToLibrary, setSaveToLibrary] = useState(false);
 
+ // Task 4 — inline comment typeahead on the notes textarea (Tier 1 item.tabs).
+ const notesRef = useRef<HTMLTextAreaElement | null>(null);
+ const [taOpen, setTaOpen] = useState(false);
+ const [taQuery, setTaQuery] = useState("");
+ const taEntries = useMemo(() => flattenItemTabs(item?.tabs as never), [item?.tabs]);
+ const ta = useCommentTypeahead(taEntries, taQuery, { max: 8 });
+
+ const insertPick = (commentText: string) => {
+  const el = notesRef.current;
+  const value = (result.notes as string) || "";
+  const caret = el?.selectionStart ?? value.length;
+  const next = replaceFragmentBeforeCaret(value, caret, commentText);
+  onNotes(next.value);
+  setTaOpen(false);
+  setTaQuery("");
+  requestAnimationFrame(() => {
+   if (el) { el.focus(); el.setSelectionRange(next.caret, next.caret); }
+  });
+ };
+
  // Track H (IA-5/迁移③) — debounced whole-library search behind the Defects
  // tab search box. Defect-bucket hits sort first; imported-library rows
  // participate (that's the migration selling point — years of accumulated
@@ -332,7 +358,7 @@ export function ItemEditor({
  <div className="text-[11px] text-ih-primary font-bold uppercase tracking-wide">
  {sectionTitle}
  </div>
- <h2 className="text-[19px] font-bold mt-1">{item.label}</h2>
+ <ItemHeader label={item.label} size="lg" className="mt-1 text-ih-fg-1" as="h2" />
  </div>
 
  {/* Item attributes (equipment fields: brand, year, model, etc.) */}
@@ -399,24 +425,57 @@ export function ItemEditor({
  {((result.notes as string) || "").length} chars
  </span>
  </div>
+ <div className="relative">
  <textarea
- id="notes-textarea"
- value={(result.notes as string) || ""}
- onChange={(e) => onNotes(e.target.value)}
- onBlur={(e) => onNotesBlur(e.target.value)}
- onKeyDown={(e) => {
-  if (
-   e.key === '/' &&
-   !e.nativeEvent.isComposing &&
-   shouldTriggerSlash(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)
-  ) {
-   e.preventDefault();
-   onOpenSnippets?.();
-  }
- }}
- placeholder="Add notes — type / for snippets"
- className="w-full h-28 px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] resize-none focus:shadow-ih-focus focus:border-ih-primary outline-none"
+  id="notes-textarea"
+  ref={notesRef}
+  value={(result.notes as string) || ""}
+  onChange={(e) => {
+   onNotes(e.target.value);
+   const frag = fragmentBeforeCaret(e.target.value, e.target.selectionStart ?? 0);
+   setTaQuery(frag);
+   setTaOpen(frag.trim().length >= 2);
+  }}
+  onBlur={(e) => { onNotesBlur(e.target.value); setTaOpen(false); }}
+  onKeyDown={(e) => {
+   if (taOpen && ta.matches.length > 0) {
+    if (e.key === "ArrowDown") { e.preventDefault(); ta.move(1); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); ta.move(-1); return; }
+    if (e.key === "Enter" || e.key === "Tab") {
+     const pick = ta.current(); if (pick) { e.preventDefault(); insertPick(pick.comment); return; }
+    }
+    if (e.key === "Escape") { e.preventDefault(); setTaOpen(false); return; }
+   }
+   if (
+    e.key === '/' &&
+    !e.nativeEvent.isComposing &&
+    shouldTriggerSlash(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)
+   ) {
+    e.preventDefault();
+    onOpenSnippets?.();
+   }
+  }}
+  placeholder="Add notes — type to see recommended comments, / for library"
+  className="w-full h-28 px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] resize-none focus:shadow-ih-focus focus:border-ih-primary outline-none"
  />
+ <button
+  type="button"
+  onClick={() => { setTaQuery(""); setTaOpen(true); notesRef.current?.focus(); }}
+  className="absolute right-2 top-2 text-[10px] font-bold text-ih-primary hover:text-ih-primary"
+ >
+  Recommended ▾
+ </button>
+ <CommentTypeahead
+  entries={taEntries}
+  matches={ta.matches}
+  query={taQuery}
+  open={taOpen}
+  selectedIndex={ta.selectedIndex}
+  onHoverIndex={ta.setSelectedIndex}
+  onPick={insertPick}
+  onClose={() => setTaOpen(false)}
+ />
+ </div>
  {tagChipRow}
  </div>
 

@@ -328,15 +328,19 @@ export default function InspectionEditPage() {
  });
 
  /* ---------------------------------------------------------------- */
- /* Server-fetched comments for the library drawer (sort/filter aware) */
+ /* Server-fetched comments for the library drawer + SideRail tab   */
  /* ---------------------------------------------------------------- */
 
  const [serverComments, setServerComments] = useState<Array<{
  id: string; text: string; useCount?: number; lastUsedAt?: number | null;
  }>>([]);
 
+ // Tracks whether the SideRail library tab is open; combined with
+ // showCommentLibrary to decide when to fetch server comments.
+ const [librarySideOpen, setLibrarySideOpen] = useState(false);
+
  useEffect(() => {
- if (!state.showCommentLibrary) { setServerComments([]); return; }
+ if (!state.showCommentLibrary && !librarySideOpen) { setServerComments([]); return; }
  const ctx: { itemLabel?: string; section?: string; ratingBucket?: string; search?: string } = {};
  if (comments.filterMode === 'auto' && state.activeItem) {
  ctx.itemLabel = (state.activeItem.label || state.activeItem.name || '') as string;
@@ -364,6 +368,7 @@ export default function InspectionEditPage() {
  return () => { cancelled = true; clearTimeout(t); };
  }, [
  state.showCommentLibrary,
+ librarySideOpen,
  state.commentLibrarySearch,
  state.commentLibraryFilter,
  comments.sort,
@@ -975,6 +980,12 @@ export default function InspectionEditPage() {
  state.setShowCommentLibrary(true);
  }, [state]);
 
+ // Shared insert handler used by both the CommentLibraryDrawer and the
+ // SideRail library tab — keeps the insert logic in one place (DRY).
+ const onInsert = useCallback((sectionId: string, itemId: string, text: string) => {
+ findings.insertComment(sectionId, itemId, text);
+ }, [findings]);
+
  /* ---------------------------------------------------------------- */
  /* Keyboard shortcuts */
  /* ---------------------------------------------------------------- */
@@ -1329,6 +1340,15 @@ export default function InspectionEditPage() {
  photoCount={inspectionPhotoCount}
  onGallerySetCover={(p) => setGalleryCropSource(p)}
  onGalleryAnnotate={(p) => openPhotoStudio({ url: p.url, key: p.key, index: 0, total: 0 })}
+ serverComments={serverComments}
+ librarySort={comments.sort}
+ onLibrarySearch={(q) => state.setCommentLibrarySearch(q)}
+ onLibraryInsert={(text, id) => {
+ if (!state.activeItemId || !state.currentSection) return;
+ onInsert(state.currentSection.id, state.activeItemId, text);
+ comments.touchSnippet(id);
+ }}
+ onLibraryTabChange={(isOpen) => setLibrarySideOpen(isOpen)}
  />
  );
 
@@ -1733,7 +1753,7 @@ export default function InspectionEditPage() {
  setShowCommentLibrary: state.setShowCommentLibrary,
  }}
  serverComments={serverComments}
- onInsert={(sectionId, itemId, text) => findings.insertComment(sectionId, itemId, text)}
+ onInsert={onInsert}
  onClose={() => state.setShowCommentLibrary(false)}
  />
  )}
