@@ -12,6 +12,15 @@ import type { ReportMedia } from "../../../../../server/lib/report-video";
 /** Plan 7 — a report photo object may carry a resolved media kind (video). */
 export type ReportPhoto = { key: string; url: string; media?: ReportMedia };
 
+/** Commercial PCA Phase F — a resolved Building Profile display row (server produces these). */
+export interface ProfileRow {
+  id: string;
+  group: string;
+  label: string;
+  value: string | number | null;
+  unit: string | null;
+}
+
 export interface ResolvedDefect {
   id: string;
   title: string;
@@ -31,6 +40,10 @@ export interface ReportItem {
   ratingColor: string;
   ratingLabel: string | null;
   severityBucket: string;
+  /** Commercial PCA Phase F (F1) — NI/NP distinction (null for non-na items). */
+  naKind?: 'not_inspected' | 'not_present' | null;
+  /** Commercial PCA Phase F (F1) — optional limitation reason captured against an NI rating (Phase S renders it). */
+  notInspectedReason?: string | null;
   notes: string | null;
   photos: ReportPhoto[];
   recommendation?: string | null;
@@ -125,4 +138,7 @@ export interface ReportLoaderResult {
   verification: ReportVerification | null;
   ownerPreview: boolean;
   baseUrl: string;
+  propertyType: string | null;
+  commercialSubtype: string | null;
+  buildingProfile: ProfileRow[];
 }

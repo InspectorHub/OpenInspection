@@ -24,6 +24,11 @@ export interface ReportStats {
   other: number;
   sectionDefects: Record<string, number>;
   completionPercent: number;
+  /** Commercial PCA Phase F (F1) — priority (defect category) roll-up for the Phase S Systems Summary. */
+  byCategory: { safety: number; recommendation: number; maintenance: number };
+  /** Commercial PCA Phase F (F1) — items whose rating resolves to na_kind 'not_inspected' / 'not_present'. */
+  notInspected: number;
+  notPresent: number;
 }
 
 /* ------------------------------------------------------------------ */
@@ -121,6 +126,31 @@ export function getRatingBucket(
 }
 
 /**
+ * Commercial PCA Phase F (F1) — distinguish "Not Inspected" (NI) from
+ * "Not Present" (NP). Both seed levels map to bucket 'na' → severity 'minor'
+ * (see server/data/rating-system-seeds.ts + map-rating-levels.ts), so they are
+ * otherwise indistinguishable in the report / Systems Summary. Derived from the
+ * level's abbreviation, falling back to its label; returns null for any level
+ * that is not a non-defect 'minor' (na) level. No rating-level model change.
+ */
+export function getNaKind(
+  ratingId: string | null | undefined,
+  levels: RatingLevel[],
+): 'not_inspected' | 'not_present' | null {
+  if (!ratingId || levels.length === 0) return null;
+  const level = levels.find((l) => l.id === ratingId);
+  if (!level || level.isDefect || level.severity !== 'minor') return null;
+  const abbr = level.abbreviation.trim().toUpperCase();
+  const label = level.label.trim().toLowerCase();
+  if (abbr === 'NP') return 'not_present';
+  if (abbr === 'NI') return 'not_inspected';
+  // Neither standard abbreviation — fall back to the label text.
+  if (/not\s*present/.test(label)) return 'not_present';
+  if (/not\s*inspected/.test(label)) return 'not_inspected';
+  return null;
+}
+
+/**
  * Returns the hex color for a rating ID. Falls back to gray (#9ca3af) for unknown/null ratings.
  */
 export function getRatingColor(
@@ -159,6 +189,9 @@ export function computeReportStats(
     other: 0,
     sectionDefects: {},
     completionPercent: 0,
+    byCategory: { safety: 0, recommendation: 0, maintenance: 0 },
+    notInspected: 0,
+    notPresent: 0,
   };
 
   let completedCount = 0;
@@ -176,6 +209,23 @@ export function computeReportStats(
       const bucket = getRatingBucket(ratingId, levels);
       stats[bucket]++;
       if (bucket === 'defect') sectionDefects++;
+      // Commercial PCA Phase F (F1) — NI/NP roll-up. `result` is the same
+      // per-item lookup used above; reuse it (do not re-fetch).
+      const naKind = getNaKind(ratingId, levels);
+      if (naKind === 'not_inspected') stats.notInspected++;
+      else if (naKind === 'not_present') stats.notPresent++;
+      // Per-priority defect counts. Counts INCLUDED defects across canned tabs
+      // and inspector custom defects; a missing category defaults to
+      // 'recommendation' (matching mapCustomDefectsForReport's effectiveCategory).
+      const rr = result as {
+        tabs?: { defects?: Array<{ included?: boolean; category?: string }> };
+        customComments?: { defects?: Array<{ included?: boolean; category?: string }> };
+      };
+      for (const d of [...(rr?.tabs?.defects ?? []), ...(rr?.customComments?.defects ?? [])]) {
+        if (d.included === false) continue;
+        const cat = d.category === 'safety' || d.category === 'maintenance' ? d.category : 'recommendation';
+        stats.byCategory[cat]++;
+      }
       // Mirror inspection-edit.js: an item counts toward completion when a
       // rating is set OR a non-empty value is captured (non-rich types
       // boolean / number / text / textarea / date / select / multi_select

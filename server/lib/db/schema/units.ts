@@ -23,6 +23,12 @@ export const inspectionUnits = sqliteTable('inspection_units', {
     name:         text('name').notNull(),
     sortOrder:    integer('sort_order').notNull().default(0),
     createdAt:    text('created_at').notNull().default(sql`(datetime('now'))`),
+    // Commercial PCA Phase F — optional building/floor/unit-level attributes
+    // (e.g. primaryUse, yearBuilt, area, areaUom, stories for a 'building'
+    // node). Rides here instead of a parallel `buildings` table: the building_id
+    // referenced by later phases (cost items, multi-instance systems) is this
+    // row's id. See the commercial-pca-report-foundation design spec §3.1.
+    attrs:        text('attrs', { mode: 'json' }).$type<Record<string, unknown>>(),
 }, (t) => [
     index('idx_inspection_units_tenant_inspection').on(t.tenantId, t.inspectionId),
     index('idx_inspection_units_parent').on(t.parentUnitId),

@@ -123,6 +123,28 @@ export const inspections = sqliteTable('inspections', {
     sourceInspectionId: text('source_inspection_id'),
     rootInspectionId:   text('root_inspection_id'),
     reinspectionRound:  integer('reinspection_round'),
+    // Commercial PCA Phase F — multi-unit inspection mode. 'tagged' (default,
+    // Spectora-parity): the section/item checklist stays fixed and each defect
+    // is optionally tagged with a location drawn from locationOptions — this
+    // reuses DefectState.location + the finding key, so there is no location_tag
+    // column. 'per_unit' (Phase U): every unit is a first-class inspection_units
+    // row and a full sub-inspection. See the commercial-pca-report-foundation
+    // design spec §3.3.
+    unitInspectionMode:  text('unit_inspection_mode', { enum: ['tagged', 'per_unit'] }).notNull().default('tagged'),
+    // Structured location picklist for the 'tagged' mode (floors / zones /
+    // units). The inspector defines or bulk-generates it; DefectState.location
+    // selects from it (free text still allowed). JSON array of labels.
+    locationOptions:     text('location_options', { mode: 'json' }).$type<string[]>(),
+    // Representative-sampling declaration (ASTM E2018 §4.3.4): what was sampled
+    // and what was not. Consumed by the Phase S walk-through narrative; surfaced
+    // (unrendered) in the report payload here. Quantities are approximate /
+    // representative, never "exact" (§10.3.4).
+    samplingDeclaration: text('sampling_declaration', { mode: 'json' }).$type<{
+        samplingMethod: 'exhaustive' | 'representative';
+        unitsTotal?: number;
+        unitsInspected?: number;
+        basis?: string;
+    }>(),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),

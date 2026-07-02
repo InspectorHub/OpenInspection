@@ -3,7 +3,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { parseReinspectionStatuses } from '../../lib/reinspection-status';
-import { computeReportStats, getRatingColor, getRatingBucket, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
+import { computeReportStats, getRatingColor, getRatingBucket, getNaKind, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
 import { renderTemplate } from '../../lib/mustache';
 import { mapRepairItems } from '../../lib/report-repair-items';
@@ -13,6 +13,7 @@ import { sha256Hex } from '../signing-key.service';
 import { RENDER_VERSION } from '../../lib/pdf';
 import { resolvePdfSettings, type PdfSettings } from '../../lib/pdf-settings';
 import { isReportPublished } from '../../lib/status/report-status';
+import { resolveBuildingProfile } from '../../lib/building-profile';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
 import { InspectionSubService } from './base';
@@ -300,6 +301,8 @@ export class InspectionReportService extends InspectionSubService {
                     ratingColor: getRatingColor(ratingId, levels),
                     ratingLabel: level?.label ?? ratingId,
                     severityBucket: bucket,
+                    naKind: getNaKind(ratingId, levels),
+                    notInspectedReason: (res as { notInspectedReason?: string | null }).notInspectedReason ?? null,
                     notes: res.notes ?? null,
                     photos,
                     recommendation: itemRecommendation,
@@ -398,6 +401,13 @@ export class InspectionReportService extends InspectionSubService {
             bedrooms:       (inspection as { bedrooms?: number | null }).bedrooms             ?? null,
             bathrooms:      (inspection as { bathrooms?: number | null }).bathrooms           ?? null,
         };
+
+        // Commercial PCA Phase F — server-resolved Building Profile rows (presets
+        // stay server-only). Renders only when propertyType is set + a field is
+        // populated; the report layer decides visibility.
+        const buildingProfile = resolveBuildingProfile(
+            inspection as Parameters<typeof resolveBuildingProfile>[0],
+        );
 
         // #120 — amendment trail. Surfaced to the client report page so a
         // re-published report shows "Amended on …" + per-version reasons.
@@ -508,6 +518,12 @@ export class InspectionReportService extends InspectionSubService {
             enableRepairList,
             enableCustomerRepairExport,
             propertyFacts,
+            propertyType:        (inspection as { propertyType?: string | null }).propertyType ?? null,
+            commercialSubtype:   (inspection as { commercialSubtype?: string | null }).commercialSubtype ?? null,
+            buildingProfile,
+            // Surfaced (unrendered) for the Phase S walk-through narrative.
+            unitInspectionMode:  (inspection as { unitInspectionMode?: 'tagged' | 'per_unit' | null }).unitInspectionMode ?? 'tagged',
+            samplingDeclaration: (inspection as { samplingDeclaration?: unknown }).samplingDeclaration ?? null,
             // Layer-2 report signature + verification (see [redacted]).
             isPublished,
             signature,
