@@ -15,6 +15,15 @@ import { z } from '@hono/zod-openapi';
 
 const DefectCategoryEnum = z.enum(['maintenance', 'recommendation', 'safety']);
 
+const PropertyTypeEnum = z.enum(['single-family', 'multi-unit', 'commercial']);
+
+/** Section applicability — gates a section by property type and (for commercial)
+ *  by subtype. Empty/absent arrays mean "applies to all" (see sectionApplies). */
+const SectionApplicabilitySchema = z.object({
+    propertyTypes:      z.array(PropertyTypeEnum).optional().describe('Property types this section applies to; empty = all'),
+    commercialSubtypes: z.array(z.string().min(1)).optional().describe('Commercial subtype ids this section applies to; empty = all commercial'),
+}).strict();
+
 const CannedInfoCommentSchema = z.object({
     id:      z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
     title:   z.string().min(1).describe('TODO describe title field for the OpenInspection MCP integration'),
@@ -175,6 +184,13 @@ const TemplateSectionSchema = z.object({
     // surfaces this as a small colored dot next to the section title so
     // imported sections are visually distinguishable.
     source:          ItemSourceSchema.nullable().optional().describe('TODO describe source field for the OpenInspection MCP integration'),
+    // PCA / multi-unit — gates a section by (propertyType, commercialSubtype)
+    // via server/lib/section-applicability.ts sectionApplies(). Absent = applies
+    // to every property type.
+    applicableTo: SectionApplicabilitySchema.optional().describe('Property-type / commercial-subtype gating for this section'),
+    // PCA / multi-unit — 'unit' sections repeat per unit in per-unit inspections
+    // (Phase U). Absent defaults to 'common'.
+    defaultScope: z.enum(['common', 'unit']).optional().describe('common (once) or unit (repeats per unit)'),
 }).strict();
 
 const RatingLevelSchema = z.object({
@@ -202,6 +218,10 @@ export const TemplateSchemaV2Schema = z.object({
     schemaVersion: z.literal(2).describe('TODO describe schemaVersion field for the OpenInspection MCP integration'),
     sections:      z.array(TemplateSectionSchema).describe('TODO describe sections field for the OpenInspection MCP integration'),
     ratingSystem:  RatingSystemSchema.optional().describe('TODO describe ratingSystem field for the OpenInspection MCP integration'),
+    // PCA / multi-unit — template-level property classification. Mirrored to the
+    // templates.property_type / commercial_subtype columns server-side on save.
+    propertyType:      PropertyTypeEnum.optional().describe('single-family | multi-unit | commercial'),
+    commercialSubtype: z.string().min(1).optional().describe('Commercial subtype id; only meaningful when propertyType = commercial'),
 }).strict();
 
 /**

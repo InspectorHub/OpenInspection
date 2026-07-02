@@ -2,6 +2,19 @@
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+export type PropertyType = 'single-family' | 'multi-unit' | 'commercial';
+
+export interface SectionApplicability {
+  propertyTypes?: PropertyType[];
+  commercialSubtypes?: string[];
+}
+
+export const PROPERTY_TYPE_OPTIONS: { value: PropertyType; label: string }[] = [
+  { value: 'single-family', label: 'Single-family' },
+  { value: 'multi-unit',    label: 'Multi-unit' },
+  { value: 'commercial',    label: 'Commercial' },
+];
+
 export interface CannedComment {
   id: string;
   title: string;
@@ -67,6 +80,8 @@ export interface TemplateSection {
   alwaysPageBreak?: boolean;
   items: TemplateItem[];
   source?: { platform: string; externalId: string } | null;
+  defaultScope?: 'common' | 'unit';
+  applicableTo?: SectionApplicability;
 }
 
 export interface RatingLevel {
@@ -91,6 +106,8 @@ export interface TemplateSchema {
   schemaVersion: number;
   sections: TemplateSection[];
   ratingSystem?: RatingSystem;
+  propertyType?: PropertyType;
+  commercialSubtype?: string;
 }
 
 /* ------------------------------------------------------------------ */
