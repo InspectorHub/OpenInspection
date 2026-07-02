@@ -27,6 +27,7 @@ import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
 import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
 import { ReportRepairPanel } from "./report/ReportRepairPanel";
 import { BuildingProfile } from "./report/BuildingProfile";
+import { PcaSkeleton } from "./report/PcaSkeleton";
 import {
   PRINT_CARD_CLASS,
   PRINT_SECTION_HEADING_CLASS,
@@ -459,6 +460,8 @@ export function ReportView(props: ReportViewProps) {
 
       {/* Sections */}
       <div className={`max-w-4xl mx-auto px-4 sm:px-6 ${repairPanel ? "pb-[65vh]" : "pb-32"}`}>
+        {/* PCA Skeleton — Commercial PCA Phase S front matter (renders null for non-PCA reports) */}
+        <PcaSkeleton data={data.pcaReport ?? null} />
         {filteredSections.map((section, sectionIdx) => {
           if (filter === "defects" && section.items.length === 0) return null;
           return (
