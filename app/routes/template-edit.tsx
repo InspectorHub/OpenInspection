@@ -13,6 +13,8 @@ import { SectionsList } from "~/components/template/SectionsList";
 import { SectionRail } from "~/components/template/SectionRail";
 import { TemplatePropertyTypePanel } from "~/components/template/TemplatePropertyTypePanel";
 import { SectionPropertiesPanel } from "~/components/template/SectionPropertiesPanel";
+import { SectionApplicabilityPreview } from "~/components/template/SectionApplicabilityPreview";
+import type { TemplateSection as ServerTemplateSection } from "../../server/types/template-schema";
 import { serializeTemplateMeta, serializeSectionMeta } from "~/lib/editor/template-meta";
 import type { PropertyType } from "~/components/template/types";
 
@@ -477,6 +479,14 @@ export default function TemplateEditPage() {
                 section={section}
                 templatePropertyType={propertyType}
                 updateSection={updateSection}
+              />
+            </div>
+            <div className="p-3 border-t border-ih-border">
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4 mb-2">Preview</h3>
+              <SectionApplicabilityPreview
+                sections={sections as unknown as ServerTemplateSection[]}
+                initialPropertyType={propertyType}
+                initialCommercialSubtype={commercialSubtype}
               />
             </div>
           </aside>
