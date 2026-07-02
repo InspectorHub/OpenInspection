@@ -33,7 +33,7 @@
   "app/components/settings/ManagedComplianceWizard.tsx": 514,
   "server/services/inspection/inspection-publish.service.ts": 510,
   "server/services/concierge.service.ts": 507,
-  "app/routes/template-edit.tsx": 503,
+  "app/routes/template-edit.tsx": 528,
   "server/api/repair-builder.ts": 496,
   "server/api/portal.ts": 486,
   "app/routes/form-renderer.tsx": 485,
