@@ -51,6 +51,16 @@ export class MeteringService {
   async getAll(): Promise<Array<typeof usageCounters.$inferSelect>> {
     return drizzle(this.db).select().from(usageCounters).all();
   }
+
+  /** Lifetime total for a (tenant, metric) across every period bucket. */
+  async lifetimeTotal(tenantId: string, metric: UsageMetric): Promise<number> {
+    const d = drizzle(this.db);
+    const row = await d.select({ total: sql<number>`coalesce(sum(${usageCounters.value}), 0)` })
+      .from(usageCounters)
+      .where(and(eq(usageCounters.tenantId, tenantId), eq(usageCounters.metric, metric)))
+      .get();
+    return row?.total ?? 0;
+  }
 }
 
 /** Construct the usage meter. Metering runs in every mode: the usage_counters
