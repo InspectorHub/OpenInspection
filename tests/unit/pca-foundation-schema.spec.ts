@@ -15,12 +15,19 @@ describe('Commercial PCA Phase F foundation columns', () => {
     expect(byName.get('unit_inspection_mode')?.notNull).toBe(true);
   });
 
-  it('the three inspections columns are appended at the end (OI #196 — no mid-list insert)', () => {
+  it('additive PCA columns are appended at the end in order (OI #196 — no mid-list insert)', () => {
+    // Phase F appended unit_inspection_mode/location_options/sampling_declaration;
+    // Phase S then appended pca_narrative/deviations after them. Both appended at
+    // the tail (never mid-list) so db:generate emits ALTER ADD COLUMN, not a rebuild.
     const names = getTableConfig(inspections).columns.map((c) => c.name);
-    const tail = names.slice(-3);
-    expect(new Set(tail)).toEqual(
-      new Set(['unit_inspection_mode', 'location_options', 'sampling_declaration']),
-    );
+    const tail = names.slice(-5);
+    expect(tail).toEqual([
+      'unit_inspection_mode',
+      'location_options',
+      'sampling_declaration',
+      'pca_narrative',
+      'deviations',
+    ]);
   });
 
   it('inspection_units gains an attrs JSON column at the end (building-level attributes)', () => {

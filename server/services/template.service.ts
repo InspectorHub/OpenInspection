@@ -5,6 +5,23 @@ import { Errors } from '../lib/errors';
 import { TemplateSchemaV2Schema } from '../lib/validations/template.schema';
 
 /**
+ * Derive the mirror columns from a validated v2 schema. Single source of truth:
+ * the editor writes schema.propertyType / commercialSubtype; the templates row
+ * columns are always recomputed from the schema on save. commercialSubtype is
+ * only meaningful for commercial property types.
+ */
+export function deriveTemplateMirrorColumns(schema: Record<string, unknown>): {
+    propertyType: string | null;
+    commercialSubtype: string | null;
+} {
+    const pt = schema.propertyType;
+    const cs = schema.commercialSubtype;
+    const propertyType = typeof pt === 'string' && pt.length > 0 ? pt : null;
+    const commercialSubtype = propertyType === 'commercial' && typeof cs === 'string' && cs.length > 0 ? cs : null;
+    return { propertyType, commercialSubtype };
+}
+
+/**
  * Service to manage inspection templates.
  */
 export class TemplateService {
@@ -181,12 +198,15 @@ export class TemplateService {
     async createTemplate(tenantId: string, name: string, schema: string | Record<string, unknown>) {
         const db = this.getDrizzle();
         const validated = this.validateSchema(schema);
+        const mirror = deriveTemplateMirrorColumns(validated);
         const newTemplate = {
             id: crypto.randomUUID(),
             tenantId,
             name,
             version: 1,
             schema: JSON.stringify(validated),
+            propertyType: mirror.propertyType,
+            commercialSubtype: mirror.commercialSubtype,
             createdAt: new Date(),
         };
 
@@ -202,15 +222,29 @@ export class TemplateService {
         const db = this.getDrizzle();
         const existing = await this.getTemplate(id, tenantId);
 
-        const nextSchema = schema !== undefined
-            ? JSON.stringify(this.validateSchema(schema))
-            : existing.schema;
+        let nextSchema = existing.schema as string;
+        let mirror: { propertyType: string | null; commercialSubtype: string | null } | null = null;
+        if (schema !== undefined) {
+            const validated = this.validateSchema(schema);
+            nextSchema = JSON.stringify(validated);
+            mirror = deriveTemplateMirrorColumns(validated);
+        }
 
-        const updateData = {
-            name: name ??  existing.name,
+        const updateData: {
+            name: string;
+            schema: string;
+            version: number;
+            propertyType?: string | null;
+            commercialSubtype?: string | null;
+        } = {
+            name: name ?? (existing.name as string),
             schema: nextSchema,
             version: (existing.version as number) + 1,
         };
+        if (mirror) {
+            updateData.propertyType = mirror.propertyType;
+            updateData.commercialSubtype = mirror.commercialSubtype;
+        }
 
         await db.update(templates).set(updateData).where(eq(templates.id, id));
         return { ...existing, ...updateData };

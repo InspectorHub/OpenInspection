@@ -64,8 +64,8 @@
   "server/services/inspection/inspection-core.service.ts:544",
   "server/services/inspection/inspection-photo.service.ts:72",
   "server/services/inspection/inspection-publish.service.ts:420",
-  "server/services/inspection/inspection-results.service.ts:110",
-  "server/services/inspection/inspection-results.service.ts:292",
+  "server/services/inspection/inspection-results.service.ts:128",
+  "server/services/inspection/inspection-results.service.ts:310",
   "server/services/marketplace.service.ts:189",
   "server/services/marketplace.service.ts:239",
   "server/services/marketplace.service.ts:276",
@@ -92,6 +92,6 @@
   "server/services/service.service.ts:42",
   "server/services/service.service.ts:57",
   "server/services/template-migration.service.ts:245",
-  "server/services/template.service.ts:215",
-  "server/services/template.service.ts:237"
+  "server/services/template.service.ts:249",
+  "server/services/template.service.ts:271"
 ]

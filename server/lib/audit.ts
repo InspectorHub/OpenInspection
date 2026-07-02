@@ -22,6 +22,7 @@ export type AuditAction =
     | 'inspection.conflicts_resolved'
     | 'inspection.share_agent'
     | 'inspection.property_facts.update'
+    | 'inspection.pca_narrative.update'
     | 'inspection.media.attach'
     | 'inspection.media.video.finalize'
     | 'inspection.media.video.delete'

@@ -17,6 +17,8 @@ import {
     ResultsBatchSchema,
     ResultsBatchResponseSchema,
 } from '../../lib/validations/inspection.schema';
+import { PcaNarrativePatchSchema } from '../../lib/validations/pca-narrative.schema';
+import { resolvePcaNarrative } from '../../lib/pca-narrative';
 import { TemplateSchemaV2Schema } from '../../lib/validations/template.schema';
 import { AggregatedRecommendationsResponseSchema } from '../../lib/validations/recommendation.schema';
 import { aggregateAttachedRecommendations } from '../../lib/aggregate-recommendations';
@@ -72,6 +74,28 @@ export const updatePropertyFactsRoute = createRoute(withMcpMetadata({
         },
     },
     operationId: "patchInspectionPropertyFact"
+}, { scopes: ['write'], tier: 'extended' }));
+
+/**
+ * Commercial PCA Phase S — PATCH /api/inspections/:id/pca-narrative
+ * Partial-patch handler for the report narrative panel. Omitted keys are
+ * unchanged. Returns the resolved narrative (seed fallbacks applied).
+ */
+export const updatePcaNarrativeRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/{id}/pca-narrative',
+    tags: ["inspections"],
+    summary: "Patch inspection PCA report narrative",
+    description: 'Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render.',
+    request: {
+        params: z.object({ id: z.string().uuid().describe('Inspection id whose PCA narrative is patched') }),
+        body: { content: { 'application/json': { schema: PcaNarrativePatchSchema } } },
+    },
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    responses: {
+        200: { content: { 'application/json': { schema: createApiResponseSchema(z.record(z.string(), z.string())) } }, description: 'Resolved narrative' },
+    },
+    operationId: "patchInspectionPcaNarrative"
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -276,6 +300,28 @@ const resultsRoutes = createApiRouter()
             metadata: { fields: Object.keys(body) },
         });
         return c.json({ success: true, data: facts }, 200);
+    })
+    .openapi(updatePcaNarrativeRoute, async (c) => {
+        const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId');
+        const patch = c.req.valid('json');
+
+        // Tenant-scoped lookup — mirrors the property-facts handler's
+        // ownership guard, and gives us the stored pca_narrative object to
+        // merge the patch onto.
+        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+        const stored = ((inspection as { pcaNarrative?: Record<string, string> | null }).pcaNarrative ?? {}) as Record<string, string>;
+        const merged: Record<string, string> = { ...stored };
+        for (const [k, v] of Object.entries(patch)) {
+            if (typeof v === 'string') merged[k] = v;
+        }
+
+        await c.var.services.inspection.updatePcaNarrative(id, tenantId, merged);
+        auditFromContext(c, 'inspection.pca_narrative.update', 'inspection', {
+            entityId: id,
+            metadata: { fields: Object.keys(patch) },
+        });
+        return c.json({ success: true, data: resolvePcaNarrative(merged) }, 200);
     })
     .openapi(autofillPropertyFactsRoute, async (c) => {
         const { id } = c.req.valid('param');

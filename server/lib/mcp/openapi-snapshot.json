@@ -3258,6 +3258,41 @@
                           ],
                           "additionalProperties": false,
                           "description": "TODO describe source field for the OpenInspection MCP integration"
+                        },
+                        "applicableTo": {
+                          "type": "object",
+                          "properties": {
+                            "propertyTypes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "single-family",
+                                  "multi-unit",
+                                  "commercial"
+                                ]
+                              },
+                              "description": "Property types this section applies to; empty = all"
+                            },
+                            "commercialSubtypes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "description": "Commercial subtype ids this section applies to; empty = all commercial"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "Property-type / commercial-subtype gating for this section"
+                        },
+                        "defaultScope": {
+                          "type": "string",
+                          "enum": [
+                            "common",
+                            "unit"
+                          ],
+                          "description": "common (once) or unit (repeats per unit)"
                         }
                       },
                       "required": [
@@ -3345,6 +3380,20 @@
                     ],
                     "additionalProperties": false,
                     "description": "TODO describe ratingSystem field for the OpenInspection MCP integration"
+                  },
+                  "propertyType": {
+                    "type": "string",
+                    "enum": [
+                      "single-family",
+                      "multi-unit",
+                      "commercial"
+                    ],
+                    "description": "single-family | multi-unit | commercial"
+                  },
+                  "commercialSubtype": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Commercial subtype id; only meaningful when propertyType = commercial"
                   }
                 },
                 "required": [
@@ -10239,6 +10288,74 @@
     "description": "Partially update an inspection record. (PATCH /{id}, inspections domain)."
   },
   {
+    "operationId": "patchInspectionPcaNarrative",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/pca-narrative",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id whose PCA narrative is patched",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Inspection id whose PCA narrative is patched"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "transmittalLetter": {
+            "type": "string",
+            "description": "Transmittal Letter narrative block"
+          },
+          "summaryGeneralDescription": {
+            "type": "string",
+            "description": "Executive Summary 1.1 General Description block"
+          },
+          "summaryPhysicalCondition": {
+            "type": "string",
+            "description": "Executive Summary 1.2 General Physical Condition block"
+          },
+          "summaryRecommendations": {
+            "type": "string",
+            "description": "Executive Summary 1.5 Recommendations block"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Introduction 2.1 Purpose narrative block"
+          },
+          "scopeOfWork": {
+            "type": "string",
+            "description": "Introduction 2.2 Scope of Work block (methodology folds in)"
+          },
+          "limitationsExceptions": {
+            "type": "string",
+            "description": "Introduction 2.3 Limitations and Exceptions block"
+          },
+          "reconnaissance": {
+            "type": "string",
+            "description": "Introduction 2.4 General Property Reconnaissance block"
+          },
+          "additionalConsiderations": {
+            "type": "string",
+            "description": "Additional Considerations narrative block"
+          }
+        }
+      }
+    },
+    "summary": "Patch inspection PCA report narrative",
+    "description": "Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render."
+  },
+  {
     "operationId": "patchInspectionPropertyFact",
     "method": "PATCH",
     "pathTemplate": "/api/inspections/{id}/property-facts",
@@ -12259,6 +12376,41 @@
                       ],
                       "additionalProperties": false,
                       "description": "TODO describe source field for the OpenInspection MCP integration"
+                    },
+                    "applicableTo": {
+                      "type": "object",
+                      "properties": {
+                        "propertyTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "single-family",
+                              "multi-unit",
+                              "commercial"
+                            ]
+                          },
+                          "description": "Property types this section applies to; empty = all"
+                        },
+                        "commercialSubtypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "description": "Commercial subtype ids this section applies to; empty = all commercial"
+                        }
+                      },
+                      "additionalProperties": false,
+                      "description": "Property-type / commercial-subtype gating for this section"
+                    },
+                    "defaultScope": {
+                      "type": "string",
+                      "enum": [
+                        "common",
+                        "unit"
+                      ],
+                      "description": "common (once) or unit (repeats per unit)"
                     }
                   },
                   "required": [
@@ -12346,6 +12498,20 @@
                 ],
                 "additionalProperties": false,
                 "description": "TODO describe ratingSystem field for the OpenInspection MCP integration"
+              },
+              "propertyType": {
+                "type": "string",
+                "enum": [
+                  "single-family",
+                  "multi-unit",
+                  "commercial"
+                ],
+                "description": "single-family | multi-unit | commercial"
+              },
+              "commercialSubtype": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Commercial subtype id; only meaningful when propertyType = commercial"
               }
             },
             "required": [
@@ -16596,6 +16762,41 @@
                           ],
                           "additionalProperties": false,
                           "description": "TODO describe source field for the OpenInspection MCP integration"
+                        },
+                        "applicableTo": {
+                          "type": "object",
+                          "properties": {
+                            "propertyTypes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "single-family",
+                                  "multi-unit",
+                                  "commercial"
+                                ]
+                              },
+                              "description": "Property types this section applies to; empty = all"
+                            },
+                            "commercialSubtypes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "description": "Commercial subtype ids this section applies to; empty = all commercial"
+                            }
+                          },
+                          "additionalProperties": false,
+                          "description": "Property-type / commercial-subtype gating for this section"
+                        },
+                        "defaultScope": {
+                          "type": "string",
+                          "enum": [
+                            "common",
+                            "unit"
+                          ],
+                          "description": "common (once) or unit (repeats per unit)"
                         }
                       },
                       "required": [
@@ -16683,6 +16884,20 @@
                     ],
                     "additionalProperties": false,
                     "description": "TODO describe ratingSystem field for the OpenInspection MCP integration"
+                  },
+                  "propertyType": {
+                    "type": "string",
+                    "enum": [
+                      "single-family",
+                      "multi-unit",
+                      "commercial"
+                    ],
+                    "description": "single-family | multi-unit | commercial"
+                  },
+                  "commercialSubtype": {
+                    "type": "string",
+                    "minLength": 1,
+                    "description": "Commercial subtype id; only meaningful when propertyType = commercial"
                   }
                 },
                 "required": [
