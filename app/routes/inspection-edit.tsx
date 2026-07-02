@@ -34,6 +34,8 @@ import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
 import { PhotoAnnotator } from "~/components/media-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
+import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
+import type { PcaNarrativeData } from "~/components/portal/sections/report/types";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 import { CoverCropper } from "~/components/media-studio/CoverCropper";
 import { PhotoCropper } from "~/components/media-studio/PhotoCropper";
@@ -143,6 +145,14 @@ export default function InspectionEditPage() {
  // message is surfaced inline in the publish modal instead.
  const publishFetcher = useFetcher<{ ok: boolean; intent?: string; error?: string }>();
  const [publishError, setPublishError] = useState<string | null>(null);
+ // Commercial PCA Phase S — narrative editor panel. Own fetcher (mirrors the
+ // notes/upload isolation reasoning above) so a per-block blur save cannot be
+ // aborted by an unrelated in-flight mutation. Dispatches the "save-pca-narrative"
+ // intent through the route action (BFF pattern) — never a client fetch to /api/...
+ const narrativeFetcher = useFetcher();
+ const saveNarrative = useCallback((key: keyof PcaNarrativeData, value: string) => {
+  narrativeFetcher.submit({ intent: "save-pca-narrative", key, value }, { method: "POST" });
+ }, [narrativeFetcher]);
  const navigate = useNavigate();
  const photoInputRef = useRef<HTMLInputElement>(null);
  const { scheme, setColorScheme } = useTheme();
@@ -1862,6 +1872,7 @@ export default function InspectionEditPage() {
  {/* Column 3: Item Editor (flex-1, focal) or Inspection Details overview — always rendered */}
  <main className="flex-1 overflow-y-auto border-t-2 border-ih-primary p-6">
  {state.activeView === "property" ? (
+  <>
   <PropertyInfoForm
   inspection={state.inspection}
   onSave={(fieldId, value) => {
@@ -1871,6 +1882,19 @@ export default function InspectionEditPage() {
   }));
   }}
   />
+  {/* Commercial PCA Phase S — narrative editor panel. Gated on the same
+     propertyType === 'commercial' flag section-applicability.ts uses to
+     decide PCA-only sections apply. */}
+  {(state.inspection as Record<string, unknown>).propertyType === "commercial" ? (
+   <div className="mt-8 border-t border-ih-border pt-6">
+    <PcaNarrativePanel
+     narrative={loaderData.pcaNarrative}
+     onSave={saveNarrative}
+     saving={narrativeFetcher.state !== "idle"}
+    />
+   </div>
+  ) : null}
+  </>
  ) : itemEditorEl}
  </main>
 

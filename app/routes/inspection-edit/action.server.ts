@@ -57,6 +57,22 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  return { ok: res.ok, intent: "save-settings" };
  }
 
+ // Commercial PCA Phase S — narrative editor panel saves one block per blur.
+ // Rides the BFF relay like every other mutation (no raw client fetch to
+ // /api/... — see feedback_core_bff_no_client_fetch): the route action holds
+ // the authed tenant context and calls the same service method the Task 9
+ // /api/inspections/:id/pca-narrative endpoint uses.
+ if (intent === "save-pca-narrative") {
+ const key = String(formData.get("key") ?? "");
+ const value = String(formData.get("value") ?? "");
+ if (!key) return { ok: false as const, intent: "save-pca-narrative" };
+ const res = await api.inspections[":id"]["pca-narrative"].$patch({
+ param: { id: params.id },
+ json: { [key]: value },
+ });
+ return { ok: res.ok, intent: "save-pca-narrative" };
+ }
+
  if (intent === "set-cover") {
  // DB-16 — set/clear the report cover photo. The value is the R2 key of a
  // photo belonging to this inspection (validated server-side); empty clears.
