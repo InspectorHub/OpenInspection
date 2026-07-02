@@ -30,12 +30,15 @@ step() { printf '\n  →  %b\n' "$1"; }
 printf '%b\n' "${BOLD}── OpenInspection (Pre-commit Checks) ───────────────────────────${NC}"
 
 # 1. Type check — SCOPED to what the staged changes can actually affect.
-#    CI's required "verify" check is the authoritative full gate; this hook is
-#    a fast local guard. Tiers:
-#      - no staged .ts/.tsx or ts-config files  → skip tsc entirely
-#        (docs, assets, hooks, fixtures — a markdown edit must not cost minutes)
-#      - staged TS confined to server/          → api pass only (type-check:api)
-#      - anything touching app/ workers/ packages/ or ts-config files → full
+#    CI's required "verify" check runs tsc and is the authoritative full gate;
+#    this hook is a fast LOCAL guard and uses tsgo (@typescript/native-preview),
+#    which is ~5-10x faster than tsc so a commit does not cost minutes. tsgo is a
+#    preview compiler and can differ subtly from tsc — CI's tsc remains the truth.
+#    Tiers:
+#      - no staged .ts/.tsx or ts-config files  → skip type check entirely
+#        (docs, assets, hooks, fixtures — a markdown edit must not cost seconds)
+#      - staged TS confined to server/          → api pass only (type-check:api:fast)
+#      - anything touching app/ workers/ packages/ or ts-config files → full (type-check:fast)
 STAGED=$(git diff --cached --name-only --diff-filter=ACMRD)
 TS_STAGED=$(echo "$STAGED" | grep -E '\.(ts|tsx)$' || true)
 CONFIG_STAGED=$(echo "$STAGED" | grep -E '^(tsconfig|package\.json|package-lock\.json|vite\.config|react-router\.config|worker-configuration)' || true)
@@ -44,16 +47,16 @@ step "Type check"
 if [ -z "$TS_STAGED" ] && [ -z "$CONFIG_STAGED" ]; then
     pass "Skipped — no staged TypeScript/config changes (CI verify remains the full gate)"
 elif [ -z "$CONFIG_STAGED" ] && [ -z "$(echo "$TS_STAGED" | grep -vE '^(server|tests)/')" ]; then
-    if npm run type-check:api > /dev/null 2>&1; then
-        pass "Type check passed (api pass only — staged TS confined to server/ and tests/)"
+    if npm run type-check:api:fast > /dev/null 2>&1; then
+        pass "Type check passed (tsgo, api pass only — staged TS confined to server/ and tests/)"
     else
-        fail "Type check failed  →  npm run type-check:api"
+        fail "Type check failed  →  npm run type-check:api:fast (authoritative: npm run type-check:api)"
     fi
 else
-    if npm run type-check > /dev/null 2>&1; then
-        pass "Type check passed"
+    if npm run type-check:fast > /dev/null 2>&1; then
+        pass "Type check passed (tsgo)"
     else
-        fail "Type check failed  →  npm run type-check"
+        fail "Type check failed  →  npm run type-check:fast (authoritative: npm run type-check)"
     fi
 fi
 
