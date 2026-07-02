@@ -85,6 +85,24 @@ export class InspectionResultsService extends InspectionSubService {
     }
 
     /**
+     * Commercial PCA Phase S — persist the PCA report narrative blocks.
+     * Mirrors updatePropertyFacts: raw drizzle write scoped by id + tenantId.
+     * The caller (the PATCH /pca-narrative handler) has already merged the
+     * provided keys onto the stored object, so this is a whole-column
+     * overwrite of `pca_narrative`.
+     */
+    async updatePcaNarrative(id: string, tenantId: string, value: Record<string, string>): Promise<void> {
+        const db = this.getDrizzle();
+        const existing = await db.select({ id: inspections.id }).from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!existing) throw Errors.NotFound('Inspection not found');
+
+        await db.update(inspections).set({ pcaNarrative: value })
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+    }
+
+    /**
      * Updates an inspection's results.
      */
     async updateResults(id: string, tenantId: string, data: Record<string, unknown>) {

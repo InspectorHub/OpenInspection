@@ -145,6 +145,12 @@ export const inspections = sqliteTable('inspections', {
         unitsInspected?: number;
         basis?: string;
     }>(),
+    // Commercial PCA Phase S — editable report narrative blocks (8-key prose
+    // shape; see server/lib/pca-narrative.ts). NULL = use seed defaults.
+    pcaNarrative:        text('pca_narrative', { mode: 'json' }).$type<Record<string, string>>(),
+    // Commercial PCA Phase S — structured Deviations-from-the-Guide store
+    // (ASTM §11.4.3). S owns it; C/T/M append via appendDeviation(). NULL = none.
+    deviations:          text('deviations', { mode: 'json' }).$type<{ id: string; area: string; baselineRequirement: string; deviation: string; reason: string }[]>(),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),

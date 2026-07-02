@@ -3,6 +3,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { unwrapResultsResponse } from "~/lib/results";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
+import { resolvePcaNarrative } from "../../../server/lib/pca-narrative";
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
  const token = await requireToken(context, request);
@@ -100,5 +101,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // with report-data) and must NOT be PATCHed to the template-snapshot endpoint.
  const templateSnapshot = ((typeof rawSchema === 'string' ? JSON.parse(rawSchema) : rawSchema) ?? { schemaVersion: 2, sections: [] }) as { schemaVersion: 2; sections: unknown[] };
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot };
+ // Commercial PCA Phase S — seed-resolved narrative for the editor panel.
+ const pcaNarrative = resolvePcaNarrative((inspection as { pcaNarrative?: unknown }).pcaNarrative);
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative };
 }

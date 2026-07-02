@@ -10239,6 +10239,74 @@
     "description": "Partially update an inspection record. (PATCH /{id}, inspections domain)."
   },
   {
+    "operationId": "patchInspectionPcaNarrative",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/pca-narrative",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id whose PCA narrative is patched",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Inspection id whose PCA narrative is patched"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "transmittalLetter": {
+            "type": "string",
+            "description": "Transmittal Letter narrative block"
+          },
+          "summaryGeneralDescription": {
+            "type": "string",
+            "description": "Executive Summary 1.1 General Description block"
+          },
+          "summaryPhysicalCondition": {
+            "type": "string",
+            "description": "Executive Summary 1.2 General Physical Condition block"
+          },
+          "summaryRecommendations": {
+            "type": "string",
+            "description": "Executive Summary 1.5 Recommendations block"
+          },
+          "purpose": {
+            "type": "string",
+            "description": "Introduction 2.1 Purpose narrative block"
+          },
+          "scopeOfWork": {
+            "type": "string",
+            "description": "Introduction 2.2 Scope of Work block (methodology folds in)"
+          },
+          "limitationsExceptions": {
+            "type": "string",
+            "description": "Introduction 2.3 Limitations and Exceptions block"
+          },
+          "reconnaissance": {
+            "type": "string",
+            "description": "Introduction 2.4 General Property Reconnaissance block"
+          },
+          "additionalConsiderations": {
+            "type": "string",
+            "description": "Additional Considerations narrative block"
+          }
+        }
+      }
+    },
+    "summary": "Patch inspection PCA report narrative",
+    "description": "Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render."
+  },
+  {
     "operationId": "patchInspectionPropertyFact",
     "method": "PATCH",
     "pathTemplate": "/api/inspections/{id}/property-facts",
