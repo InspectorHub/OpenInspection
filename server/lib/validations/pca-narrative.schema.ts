@@ -7,15 +7,15 @@ import { z } from '@hono/zod-openapi';
  * object behavior) so the pre-launch reset is tolerant.
  */
 export const PcaNarrativePatchSchema = z.object({
-  transmittalLetter: z.string().optional(),
-  summaryGeneralDescription: z.string().optional(),
-  summaryPhysicalCondition: z.string().optional(),
-  summaryRecommendations: z.string().optional(),
-  purpose: z.string().optional(),
-  scopeOfWork: z.string().optional(),
-  limitationsExceptions: z.string().optional(),
-  reconnaissance: z.string().optional(),
-  additionalConsiderations: z.string().optional(),
+  transmittalLetter: z.string().optional().describe('Transmittal Letter narrative block'),
+  summaryGeneralDescription: z.string().optional().describe('Executive Summary 1.1 General Description block'),
+  summaryPhysicalCondition: z.string().optional().describe('Executive Summary 1.2 General Physical Condition block'),
+  summaryRecommendations: z.string().optional().describe('Executive Summary 1.5 Recommendations block'),
+  purpose: z.string().optional().describe('Introduction 2.1 Purpose narrative block'),
+  scopeOfWork: z.string().optional().describe('Introduction 2.2 Scope of Work block (methodology folds in)'),
+  limitationsExceptions: z.string().optional().describe('Introduction 2.3 Limitations and Exceptions block'),
+  reconnaissance: z.string().optional().describe('Introduction 2.4 General Property Reconnaissance block'),
+  additionalConsiderations: z.string().optional().describe('Additional Considerations narrative block'),
 });
 
 export type PcaNarrativePatch = z.infer<typeof PcaNarrativePatchSchema>;

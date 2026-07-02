@@ -10253,10 +10253,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "",
+          "description": "Inspection id whose PCA narrative is patched",
           "schema": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "description": "Inspection id whose PCA narrative is patched"
           }
         }
       ],
@@ -10264,31 +10265,40 @@
         "type": "object",
         "properties": {
           "transmittalLetter": {
-            "type": "string"
+            "type": "string",
+            "description": "Transmittal Letter narrative block"
           },
           "summaryGeneralDescription": {
-            "type": "string"
+            "type": "string",
+            "description": "Executive Summary 1.1 General Description block"
           },
           "summaryPhysicalCondition": {
-            "type": "string"
+            "type": "string",
+            "description": "Executive Summary 1.2 General Physical Condition block"
           },
           "summaryRecommendations": {
-            "type": "string"
+            "type": "string",
+            "description": "Executive Summary 1.5 Recommendations block"
           },
           "purpose": {
-            "type": "string"
+            "type": "string",
+            "description": "Introduction 2.1 Purpose narrative block"
           },
           "scopeOfWork": {
-            "type": "string"
+            "type": "string",
+            "description": "Introduction 2.2 Scope of Work block (methodology folds in)"
           },
           "limitationsExceptions": {
-            "type": "string"
+            "type": "string",
+            "description": "Introduction 2.3 Limitations and Exceptions block"
           },
           "reconnaissance": {
-            "type": "string"
+            "type": "string",
+            "description": "Introduction 2.4 General Property Reconnaissance block"
           },
           "additionalConsiderations": {
-            "type": "string"
+            "type": "string",
+            "description": "Additional Considerations narrative block"
           }
         }
       }

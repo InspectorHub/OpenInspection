@@ -88,7 +88,7 @@ export const updatePcaNarrativeRoute = createRoute(withMcpMetadata({
     summary: "Patch inspection PCA report narrative",
     description: 'Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render.',
     request: {
-        params: z.object({ id: z.string().uuid() }),
+        params: z.object({ id: z.string().uuid().describe('Inspection id whose PCA narrative is patched') }),
         body: { content: { 'application/json': { schema: PcaNarrativePatchSchema } } },
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
