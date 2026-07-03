@@ -88,12 +88,20 @@ export default function SettingsUsagePage() {
       <p className="text-[13px] text-ih-fg-3">
         {caps
           ? "What this account has used on the free plan. Storage is measured once a day."
-          : "What this account has consumed. Inspections/SMS/email are cumulative totals; storage is measured once a day."}
+          : isSaas
+            ? "What this account has consumed. Inspections/SMS/email are cumulative totals; storage is measured once a day."
+            : "What this account has consumed. SMS/email are cumulative totals; storage is measured once a day."}
       </p>
 
-      {/* Metric cards — four meters: inspections, SMS, email, storage */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {caps ? (
+      {/* Metric cards — inspections (SaaS only) + SMS, email, storage.
+          `inspections` is only ever written by the SaaS free-tier consume path
+          (see PlanQuotaGuard.consumeInspection) — a standalone deploy never
+          populates it, so the meter would otherwise show a permanently-0 card.
+          `caps` alone can't distinguish standalone from a paid SaaS tenant
+          (both are null), so gate on `isSaas` from session context instead;
+          paid SaaS tenants still see the lifetime-analytics count. */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isSaas ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+        {isSaas && (caps ? (
           <CappedMetricCard label="Inspections" used={u.inspections ?? 0} cap={caps.inspections} />
         ) : (
           <MetricCard
@@ -101,7 +109,7 @@ export default function SettingsUsagePage() {
             value={(u.inspections ?? 0).toLocaleString()}
             sub="Inspections created — cumulative"
           />
-        )}
+        ))}
         {caps ? (
           <CappedMetricCard label="SMS sent" used={u.sms ?? 0} cap={caps.sms} byo={u.smsByo ?? 0} />
         ) : (
