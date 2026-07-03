@@ -1,6 +1,9 @@
+import { drizzle } from 'drizzle-orm/d1';
+import { eq, and, isNull } from 'drizzle-orm';
 import type { AppEnv } from '../../types/hono';
 import type { McpProps } from '../../durable-objects/inspector-mcp';
 import { buildKeyring, signJwt } from '../jwt-keyring';
+import { users } from '../db/schema';
 
 /**
  * Maps McpProps to the internal JWT claim set consumed by classifyJwtPayload.
@@ -49,9 +52,30 @@ export function stripCompanyPrefix(pathname: string): string {
 }
 
 /**
+ * Defense-in-depth: is the grant's user still an active (non-removed) member
+ * of the grant's tenant? Grant `props` are baked in once at authorize time and
+ * never re-checked against the `users` row per MCP call — this narrows the
+ * window between a removal/self-delete landing and the corresponding OAuth
+ * grant revocation (team.service.ts removeMember / mcp/grants.ts) actually
+ * completing, and also covers the case where that revocation itself fails.
+ * The revocation is still the PRIMARY control — once a grant is gone, calls
+ * with its access token are rejected before ctx.props is ever populated, so
+ * this check never even runs for a fully-revoked grant.
+ */
+export async function isGrantUserActive(env: AppEnv, props: McpProps): Promise<boolean> {
+    const db = drizzle(env.DB);
+    const row = await db.select({ id: users.id }).from(users)
+        .where(and(eq(users.id, props.userId), eq(users.tenantId, props.tenantId), isNull(users.deletedAt)))
+        .get();
+    return !!row;
+}
+
+/**
  * Calls the in-process API app on behalf of the authenticated MCP user.
  *
  * Steps:
+ *  0. Verify the grant's user is still active (see isGrantUserActive) —
+ *     fails closed with a 401 when the user was removed/self-deleted.
  *  1. Build the ES256 keyring from env.
  *  2. Sign an internal JWT from props claims.
  *  3. Clone the incoming request, injecting `Authorization: Bearer <jwt>`.
@@ -61,12 +85,13 @@ export function stripCompanyPrefix(pathname: string): string {
  * as the lazy-import pattern in workers/app.ts.
  *
  * Testing: the pure helpers above (internalJwtPayload, assertCompanySlugMatches,
- * companySlugFromMcpPath) are unit-tested (C3). The full buildKeyring → signJwt → app.fetch path in this
- * function is NOT yet exercised by any automated test — C4's workers test STUBS
- * callApiAsUser to assert tool-handler wiring, so the JWT-mint → in-process
- * dispatch seam is currently verified only by manual MCP-Inspector E2E. A seeded
- * D1 + keyring + Hono integration test that drives this path end-to-end is
- * deferred (belongs at the integration layer).
+ * companySlugFromMcpPath) and isGrantUserActive are unit-tested (C3 / Fix 1).
+ * The full buildKeyring → signJwt → app.fetch path in this function is NOT yet
+ * exercised by any automated test — C4's workers test STUBS callApiAsUser to
+ * assert tool-handler wiring, so the JWT-mint → in-process dispatch seam is
+ * currently verified only by manual MCP-Inspector E2E. A seeded D1 + keyring +
+ * Hono integration test that drives this path end-to-end is deferred (belongs
+ * at the integration layer).
  */
 export async function callApiAsUser(
     env: AppEnv,
@@ -74,6 +99,13 @@ export async function callApiAsUser(
     request: Request,
     ctx: ExecutionContext,
 ): Promise<Response> {
+    if (!(await isGrantUserActive(env, props))) {
+        return new Response(JSON.stringify({ error: 'user_not_found' }), {
+            status: 401,
+            headers: { 'content-type': 'application/json' },
+        });
+    }
+
     const keyring = await buildKeyring(env as never);
     const jwt = await signJwt(internalJwtPayload(props), keyring);
 

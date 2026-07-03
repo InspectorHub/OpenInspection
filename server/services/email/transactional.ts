@@ -107,12 +107,11 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
 
             const { drizzle } = await import('drizzle-orm/d1');
             const { users } = await import('../../lib/db/schema');
-            const { eq, and } = await import('drizzle-orm');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const db = drizzle(deps.db as any);
+            const { eq, and, isNull } = await import('drizzle-orm');
+            const db = drizzle(deps.db);
             const owner = await db.select({ email: users.email })
                 .from(users)
-                .where(and(eq(users.tenantId, deps.tenantId), eq(users.role, 'owner')))
+                .where(and(eq(users.tenantId, deps.tenantId), eq(users.role, 'owner'), isNull(users.deletedAt)))
                 .get();
             if (!owner?.email) return;
 

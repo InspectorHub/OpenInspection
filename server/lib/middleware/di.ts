@@ -1,4 +1,5 @@
 import { Context, Next } from 'hono';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { HonoConfig, AppServices } from '../../types/hono';
 import { AdminService } from '../../services/admin.service';
 import { UnitService } from '../../services/unit.service';
@@ -203,11 +204,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.portal = new PortalService(c.env.DB, target.inspection);
                     break;
                 case 'team':
-                    // Member removal emits `user.deleted` through the same
-                    // SaaS-only outbox sink (undefined in standalone → no-op),
-                    // and writes a `pwchanged` session-invalidation marker to
-                    // the same KV binding AuthService uses.
-                    target.team = new TeamService(c.env.DB, buildOutbox(), c.env.TENANT_CACHE);
+                    // Removal emits `user.deleted`, writes a `pwchanged` marker,
+                    // and revokes MCP grants (OAUTH_PROVIDER is only on env when
+                    // MCP_ENABLED — lib/mcp/oauth-provider.ts).
+                    target.team = new TeamService(c.env.DB, buildOutbox(), c.env.TENANT_CACHE, (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER);
                     break;
                 case 'template':
                     target.template = new TemplateService(c.env.DB);

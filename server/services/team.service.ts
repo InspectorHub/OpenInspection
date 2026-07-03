@@ -1,11 +1,13 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { UserRole } from '../types/auth';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
 import { getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
+import { revokeAllUserGrants } from '../lib/mcp/grants';
 
 /**
  * Loose shape accepted from the validated invite body. Zod under
@@ -28,8 +30,19 @@ export class TeamService {
      *   is rejected on the next request instead of surviving up to its
      *   24h expiry — jwtAuthMiddleware checks this key but never re-reads
      *   the user row. Guarded by `if (this.kv)`.
+     * @param oauth Optional MCP OAuth provider helper (present only when
+     *   MCP_ENABLED — see di.ts). Used by `removeMember` to revoke every
+     *   outstanding MCP grant the removed member holds: grant `props` are
+     *   baked in at authorize time and never re-checked against the `users`
+     *   row per MCP call, so the `pwchanged` marker above has no effect on
+     *   MCP traffic (see identity-bridge.ts). Guarded by `if (this.oauth)`.
      */
-    constructor(private db: D1Database, private outbox?: UserSyncOutbox, private kv?: KVNamespace) {}
+    constructor(
+        private db: D1Database,
+        private outbox?: UserSyncOutbox,
+        private kv?: KVNamespace,
+        private oauth?: OAuthHelpers,
+    ) {}
 
     private getDB() {
         return drizzle(this.db);
@@ -153,6 +166,26 @@ export class TeamService {
         // D1 failure there must not be able to skip this security-critical
         // KV write.
         await this.writeSessionInvalidation(userId);
+
+        // Revoke every outstanding MCP OAuth grant the removed member holds —
+        // BEFORE the (unguarded) outbox append below, same security-first
+        // ordering as the KV write above. Without this, a removed member with
+        // a live MCP grant keeps full tenant API access indefinitely: MCP
+        // mints a fresh internal JWT (iat = now) on every call, so the
+        // pwchanged marker never trips for that path (see identity-bridge.ts).
+        // Fail-open like writeSessionInvalidation — an OAuth-storage hiccup
+        // must not abort the removal itself; isGrantUserActive in
+        // identity-bridge.ts is the defense-in-depth backstop for this window.
+        if (this.oauth) {
+            try {
+                await revokeAllUserGrants(this.oauth, userId);
+            } catch (err) {
+                logger.warn('Failed to revoke MCP OAuth grants after member removal; outstanding grants may remain usable', {
+                    userId,
+                    error: err instanceof Error ? err.message : String(err),
+                });
+            }
+        }
 
         // Mirror the removal to portal so the matching identity loses its
         // membership for this workspace. Email is captured from the row read

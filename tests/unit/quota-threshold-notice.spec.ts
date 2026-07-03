@@ -139,4 +139,20 @@ describe('sendQuotaThresholdNotice', () => {
     await expect(svc.sendQuotaThresholdNotice(4, { db: testD1, tenantId: 'tenant-no-owner', billingPortalUrl: null })).resolves.toBeUndefined();
     expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   });
+
+  it('is a no-op when the only owner row is soft-deleted (Fix 5)', async () => {
+    const { eq } = await import('drizzle-orm');
+    await seedOwner('tenant-deleted-owner', 'gone@example.com');
+    // Soft-delete the owner we just seeded — a removed/self-deleted owner
+    // must never receive a quota notice.
+    await testDb.update(schema.users)
+      .set({ deletedAt: new Date() })
+      .where(eq(schema.users.email, 'gone@example.com'));
+
+    const env: EmailServiceEnv = { ...baseEnv, DB: testD1 };
+    const svc = assembleTenantEmailService(env, { dbSecrets: {} });
+
+    await expect(svc.sendQuotaThresholdNotice(4, { db: testD1, tenantId: 'tenant-deleted-owner', billingPortalUrl: null })).resolves.toBeUndefined();
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
 });

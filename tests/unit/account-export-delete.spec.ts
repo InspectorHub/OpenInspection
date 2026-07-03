@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { exportAccount, softDeleteAccount } from '../../server/services/account.service';
 import { createTestDb, setupSchema } from './db';
+import { MockKV } from './mocks';
 import * as schema from '../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -113,5 +114,36 @@ describe('softDeleteAccount', () => {
     it('throws when identity does not exist', async () => {
         await expect(softDeleteAccount(testDb as any, 'nonexistent-id', 'a@x.com'))
             .rejects.toThrow(/not found/i);
+    });
+
+    it('writes a pwchanged:{userId} KV invalidation marker on self-delete (Fix 2)', async () => {
+        const kv = new MockKV();
+        await softDeleteAccount(testDb as any, USER_ID, 'a@x.com', kv as any);
+
+        expect(kv.put).toHaveBeenCalledWith(
+            `pwchanged:${USER_ID}`,
+            expect.any(String),
+            expect.objectContaining({ expirationTtl: 90000 }),
+        );
+    });
+
+    it('does not write a KV marker when no kv binding is supplied (standalone-safe)', async () => {
+        // Must not throw when kv is omitted — the call is optional-chained.
+        await expect(softDeleteAccount(testDb as any, USER_ID, 'a@x.com')).resolves.toBeDefined();
+    });
+
+    it('still soft-deletes even when the KV write fails (fail-open, same discipline as team.service)', async () => {
+        const throwingKv = {
+            put: vi.fn().mockRejectedValue(new Error('KV unavailable')),
+        };
+        await expect(softDeleteAccount(testDb as any, USER_ID, 'a@x.com', throwingKv as any)).resolves.toBeDefined();
+        const row = await testDb.select().from(schema.users).where(eq(schema.users.id, USER_ID)).get();
+        expect(row?.deletedAt).toBeTruthy();
+    });
+
+    it('does not write the KV marker when confirmEmail mismatches (delete never happened)', async () => {
+        const kv = new MockKV();
+        await expect(softDeleteAccount(testDb as any, USER_ID, 'wrong@x.com', kv as any)).rejects.toThrow();
+        expect(kv.put).not.toHaveBeenCalled();
     });
 });

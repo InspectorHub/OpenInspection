@@ -217,6 +217,57 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         await expect(team.removeMember(TENANT, MEMBER, ADMIN)).rejects.toThrow('Member not found');
     });
 
+    it('revokes every MCP OAuth grant held by the removed member (Fix 1)', async () => {
+        const oauth = {
+            listUserGrants: vi.fn(async (userId: string) => ({
+                items: userId === MEMBER
+                    ? [{ id: 'grant-1', clientId: 'c1', scope: ['read'], createdAt: 0 }, { id: 'grant-2', clientId: 'c2', scope: ['read'], createdAt: 0 }]
+                    : [],
+            })),
+            revokeGrant: vi.fn(async () => {}),
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any, oauth as any);
+        await team.removeMember(TENANT, MEMBER, ADMIN);
+
+        expect(oauth.listUserGrants).toHaveBeenCalledWith(MEMBER);
+        expect(oauth.revokeGrant).toHaveBeenCalledWith('grant-1', MEMBER);
+        expect(oauth.revokeGrant).toHaveBeenCalledWith('grant-2', MEMBER);
+    });
+
+    it('does not touch OAuth grants when no oauth helper is wired (standalone / MCP off)', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any, undefined);
+        await expect(team.removeMember(TENANT, MEMBER, ADMIN)).resolves.toBeDefined();
+    });
+
+    it('grant revocation failure does not abort the removal (fail-open, same discipline as the KV write)', async () => {
+        const oauth = {
+            listUserGrants: vi.fn(async () => { throw new Error('OAUTH_KV unavailable'); }),
+            revokeGrant: vi.fn(async () => {}),
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any, oauth as any);
+        await expect(team.removeMember(TENANT, MEMBER, ADMIN)).resolves.toBeDefined();
+
+        const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
+        expect(row!.deletedAt).not.toBeNull();
+    });
+
+    it('revokes grants BEFORE the (unguarded) outbox append', async () => {
+        const order: string[] = [];
+        const oauth = {
+            listUserGrants: vi.fn(async () => { order.push('grants'); return { items: [] }; }),
+            revokeGrant: vi.fn(async () => {}),
+        };
+        const outbox = { append: vi.fn(async () => { order.push('outbox'); }) };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, outbox as any, kv as any, oauth as any);
+        await team.removeMember(TENANT, MEMBER, ADMIN);
+
+        expect(order).toEqual(['grants', 'outbox']);
+    });
+
     it('writes the KV invalidation marker even when the outbox append throws', async () => {
         const throwingOutbox = {
             append: vi.fn().mockRejectedValue(new Error('D1 outbox insert failed')),
