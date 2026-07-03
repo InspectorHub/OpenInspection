@@ -55,6 +55,7 @@ import { RepairRequestService } from '../../services/repair-request.service';
 import { ClientDocumentService } from '../../services/client-document.service';
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
+import { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
 /**
  * Middleware that injects a lazy-loaded service registry into the Hono context.
@@ -107,6 +108,15 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                 }),
             );
         });
+    };
+
+    // Free-tier usage-quota guard, gated on the deployment profile (SaaS only —
+    // see hasUsageQuota in deployment-profile.ts). Standalone gets `undefined`,
+    // so InspectionCoreService's `this.planQuota?.` optional-chain calls no-op
+    // and creation stays unlimited by construction, not by a branch here.
+    const buildPlanQuota = (): PlanQuotaGuard | undefined => {
+        if (!c.var.profile.hasUsageQuota) return undefined;
+        return new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl });
     };
 
     const services = {} as AppServices;
@@ -168,13 +178,13 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.email = buildEmailService();
                     break;
                 case 'inspection':
-                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES);
+                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota());
                     break;
                 case 'portal':
                     // PortalService depends on InspectionService — resolve it via the
                     // proxy target the same way auditLog resolves signingKey.
                     if (!target.inspection) {
-                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES);
+                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota());
                     }
                     target.portal = new PortalService(c.env.DB, target.inspection);
                     break;

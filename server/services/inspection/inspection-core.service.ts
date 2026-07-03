@@ -16,6 +16,9 @@ import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation, type Inspection, type InspectionListParams, type CreateInspectionData } from './shared';
 import { InspectionSubService } from './base';
 import { ServiceService } from '../service.service';
+import type { ScopedDB } from '../../lib/db/scoped';
+import type { ImagesBinding } from '../../lib/media/strip-exif';
+import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
 /** Internal — one Publish-modal recipient row (client or agent). Not exported:
  *  the public `getRecipientList` signature keeps its inline structural type. */
@@ -42,6 +45,27 @@ function parseSnapshotData(snapshotJson: string): { data?: Record<string, Record
  * internally on this service).
  */
 export class InspectionCoreService extends InspectionSubService {
+    /**
+     * Free-tier usage-quota guard (optional). Present only in SaaS deploys
+     * with `hasUsageQuota` (see deployment-profile.ts); undefined in
+     * standalone, where inspection creation stays unlimited. See the three
+     * `consumeInspection` call sites in createInspection / createReinspection
+     * / cloneInspection.
+     */
+    private readonly planQuota: PlanQuotaGuard | undefined;
+
+    constructor(
+        db: D1Database,
+        r2?: R2Bucket,
+        sdb?: ScopedDB,
+        kv?: KVNamespace,
+        images?: ImagesBinding,
+        planQuota?: PlanQuotaGuard,
+    ) {
+        super(db, r2, sdb, kv, images);
+        this.planQuota = planQuota;
+    }
+
     /**
      * Fetch the contact rows for an inspection's buyer/listing agents, keyed by
      * id. Tenant-scoped. Shared by getRecipientList + getPeopleCard, which both
@@ -264,6 +288,7 @@ export class InspectionCoreService extends InspectionSubService {
      * Creates a new inspection.
      */
     async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
+        await this.planQuota?.consumeInspection(tenantId);
         if (!this.sdb) throw new Error('ScopedDB session missing');
         const id = crypto.randomUUID();
         const createdAt = new Date();
@@ -454,6 +479,7 @@ export class InspectionCoreService extends InspectionSubService {
         baselineId: string,
         opts: { selectedItemIds: string[]; inspectorId?: string },
     ): Promise<Inspection> {
+        await this.planQuota?.consumeInspection(tenantId);
         const db = this.getDrizzle();
 
         const baseline = await db.select().from(inspections)
@@ -772,6 +798,7 @@ export class InspectionCoreService extends InspectionSubService {
      * Clones an existing inspection.
      */
     async cloneInspection(id: string, tenantId: string): Promise<Inspection> {
+        await this.planQuota?.consumeInspection(tenantId);
         const { inspection: source } = await this.getInspection(id, tenantId);
 
         const clone = {
