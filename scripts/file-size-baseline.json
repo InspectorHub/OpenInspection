@@ -50,5 +50,6 @@
   "server/api/inspections/results.ts": 418,
   "app/routes/templates.tsx": 414,
   "server/lib/email-templates/registry.ts": 413,
+  "server/portal/integration.routes.ts": 408,
   "server/api/secrets.ts": 401
 }
