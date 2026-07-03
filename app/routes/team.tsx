@@ -64,11 +64,23 @@ export default function TeamPage() {
     return true;
   });
 
+  // Reuse the same sessionCtx.seatUsage the SeatBanner below already consumes
+  // (no extra API call) to gate the invite modal at open — see
+  // InviteSeatModal's `seatLimitAtOpen` doc comment. `seatUsage` is null for
+  // unlimited deployments, so `atCapSeatUsage` stays undefined (normal
+  // invite form) in that case; the server's 402 SEAT_LIMIT_REACHED remains
+  // the authoritative backstop for races.
+  const billingUrl = sessionCtx?.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined;
+  const atCapSeatUsage =
+    sessionCtx?.seatUsage && sessionCtx.seatUsage.used >= sessionCtx.seatUsage.limit
+      ? { used: sessionCtx.seatUsage.used, max: sessionCtx.seatUsage.limit, billingUrl }
+      : undefined;
+
   return (
     <div className="space-y-[18px]">
       {/* F3 — Seat quota banner */}
       {sessionCtx?.seatUsage && (
-        <SeatBanner usage={sessionCtx.seatUsage} billingUrl={sessionCtx.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined} />
+        <SeatBanner usage={sessionCtx.seatUsage} billingUrl={billingUrl} />
       )}
 
       <Breadcrumb
@@ -88,7 +100,7 @@ export default function TeamPage() {
         }
       />
 
-      <InviteSeatModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
+      <InviteSeatModal open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />
 
       <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
 

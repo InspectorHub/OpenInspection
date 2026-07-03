@@ -14,6 +14,7 @@ import { ResendProvider } from './providers/resend';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../db/schema';
+import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
 /**
  * The env bindings an EmailService needs. Both the Hono request env (`c.env`)
@@ -73,7 +74,13 @@ export interface LoadedEmailConfig {
  * config in its async body) and `buildTenantEmailService` (non-request
  * contexts) both produce identical EmailService instances.
  */
-export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmailConfig, meterTenantId?: string): EmailService {
+export function assembleTenantEmailService(
+    env: EmailServiceEnv,
+    cfg: LoadedEmailConfig,
+    meterTenantId?: string,
+    quotaGuard?: PlanQuotaGuard,
+    tenantTier?: string,
+): EmailService {
     const { emailIdentity, emailBrand, dbSecrets, emailOverrides, emailByoProvider } = cfg;
 
     // Determine whether the selected BYO provider's creds are present.
@@ -149,9 +156,24 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
         },
         ...(emailOverrides ? { overrides: emailOverrides } : {}),
     });
+    // `ownReady` already captures "the resolved config is own-mode with usable
+    // creds" — reuse it both to tag the meter (email vs email_byo) and to gate
+    // the quota pre-flight (BYO volume is uncapped; only platform-mode sends
+    // count against the free-tier cap — see FREE_TIER_CAPS).
+    const isByo = ownReady;
+    const metric = isByo ? 'email_byo' as const : 'email' as const;
     const metering = maybeMetering(env);
     const meter = metering && meterTenantId
-        ? { record: () => metering.record(meterTenantId, 'email', currentPeriodKey(new Date())) }
+        ? { record: () => metering.record(meterTenantId, metric, currentPeriodKey(new Date())) }
+        : undefined;
+    // Free-tier pre-flight quota gate — platform-mode only, and only when the
+    // caller supplied a guard + a resolved tenant tier (undefined on
+    // standalone/non-quota deployments, and on any call site that couldn't
+    // resolve a tier — see PlanQuotaGuard.readTenantTier callers). Read-only:
+    // the actual counter increment stays at `meter.record` above so a quota
+    // block never gets counted as a send that didn't happen.
+    const quota = !isByo && meterTenantId && quotaGuard && tenantTier
+        ? { preflight: () => quotaGuard.checkMessagingQuota(meterTenantId, tenantTier, 'email') }
         : undefined;
     // WH-3 — wire the send-path suppression gate under the same guard as `meter`:
     // only when we have a tenant id to scope the lookup (env.DB is always present
@@ -160,7 +182,7 @@ export function assembleTenantEmailService(env: EmailServiceEnv, cfg: LoadedEmai
     const suppression = meterTenantId
         ? buildEmailSuppression(env.DB, meterTenantId)
         : undefined;
-    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression);
+    return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota);
 }
 
 /**
@@ -227,9 +249,14 @@ export async function loadTenantEmailConfig(env: EmailServiceEnv, tenantId: stri
  * identity + branded templates (B-13). Pass `undefined` tenantId for platform
  * defaults (no overrides).
  */
-export async function buildTenantEmailService(env: EmailServiceEnv, tenantId: string | undefined): Promise<EmailService> {
+export async function buildTenantEmailService(
+    env: EmailServiceEnv,
+    tenantId: string | undefined,
+    quotaGuard?: PlanQuotaGuard,
+    tenantTier?: string,
+): Promise<EmailService> {
     if (!tenantId) {
         return assembleTenantEmailService(env, { dbSecrets: {} });
     }
-    return assembleTenantEmailService(env, await loadTenantEmailConfig(env, tenantId), tenantId);
+    return assembleTenantEmailService(env, await loadTenantEmailConfig(env, tenantId), tenantId, quotaGuard, tenantTier);
 }

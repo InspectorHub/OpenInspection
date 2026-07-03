@@ -1,4 +1,5 @@
 import { Context, Next } from 'hono';
+import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { HonoConfig, AppServices } from '../../types/hono';
 import { AdminService } from '../../services/admin.service';
 import { UnitService } from '../../services/unit.service';
@@ -55,6 +56,7 @@ import { RepairRequestService } from '../../services/repair-request.service';
 import { ClientDocumentService } from '../../services/client-document.service';
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
+import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
 
 /**
  * Middleware that injects a lazy-loaded service registry into the Hono context.
@@ -77,13 +79,23 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
     // root-mounted auth duplicates (/forgot-password) send platform-branded
     // mail by design, so the /api/ gate loses nothing there.
     let emailCfg: LoadedEmailConfig = { dbSecrets: {} };
+    // The email free-tier pre-flight (below) needs the tenant's plan tier.
+    // `tenantTier` is only populated in session-context by the public/
+    // fixed-tenant tenant-routing resolvers (server/features/tenant-routing) —
+    // JWT-authenticated saas API requests never set it (see jwtAuthMiddleware
+    // in server/index.ts), so resolve it here once per request, under the same
+    // /api/ gate as emailCfg, whenever the usage-quota guard is active.
+    let tenantTierForQuota: string | undefined = c.get('tenantTier');
     if (tenantId && c.req.path.startsWith('/api/')) {
         emailCfg = await loadTenantEmailConfig(c.env, tenantId);
+        if (!tenantTierForQuota && c.var.profile.hasUsageQuota) {
+            tenantTierForQuota = await readTenantTier(c.env.DB, tenantId).catch(() => undefined);
+        }
     }
 
     // One place decides own-vs-platform Resend + branded renderer, shared with
     // non-request contexts (workflows/scheduled) via assembleTenantEmailService.
-    const buildEmailService = () => assembleTenantEmailService(c.env, emailCfg, c.get('tenantId'));
+    const buildEmailService = () => assembleTenantEmailService(c.env, emailCfg, c.get('tenantId'), buildPlanQuota(), tenantTierForQuota);
 
     // Build the core->portal outbox sink, gated on the SYNC_QUEUE producer
     // binding — the transport itself. No queue → no sink → append() no-ops:
@@ -107,6 +119,19 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                 }),
             );
         });
+    };
+
+    // Free-tier usage-quota guard, gated on the deployment profile (SaaS only —
+    // see hasUsageQuota in deployment-profile.ts). Standalone gets `undefined`,
+    // so every consuming service's `this.planQuota?.` optional-chain calls
+    // no-op and creation stays unlimited by construction, not by a branch
+    // here. Every inspection-creation path is guarded: InspectionCoreService
+    // (create/clone/reinspection), BookingService (public self-serve
+    // booking), ConciergeService (agent-submitted booking), and
+    // InspectionRequestService (multi-service request + append-a-sub-inspection).
+    const buildPlanQuota = (): PlanQuotaGuard | undefined => {
+        if (!c.var.profile.hasUsageQuota) return undefined;
+        return new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl });
     };
 
     const services = {} as AppServices;
@@ -159,7 +184,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.outbox = buildOutbox();
                     break;
                 case 'booking':
-                    target.booking = new BookingService(c.env.DB);
+                    target.booking = new BookingService(c.env.DB, buildPlanQuota());
                     break;
                 case 'branding':
                     target.branding = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
@@ -168,20 +193,21 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.email = buildEmailService();
                     break;
                 case 'inspection':
-                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES);
+                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota());
                     break;
                 case 'portal':
                     // PortalService depends on InspectionService — resolve it via the
                     // proxy target the same way auditLog resolves signingKey.
                     if (!target.inspection) {
-                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES);
+                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota());
                     }
                     target.portal = new PortalService(c.env.DB, target.inspection);
                     break;
                 case 'team':
-                    // Member removal emits `user.deleted` through the same
-                    // SaaS-only outbox sink (undefined in standalone → no-op).
-                    target.team = new TeamService(c.env.DB, buildOutbox());
+                    // Removal emits `user.deleted`, writes a `pwchanged` marker,
+                    // and revokes MCP grants (OAUTH_PROVIDER is only on env when
+                    // MCP_ENABLED — lib/mcp/oauth-provider.ts).
+                    target.team = new TeamService(c.env.DB, buildOutbox(), c.env.TENANT_CACHE, (c.env as { OAUTH_PROVIDER?: OAuthHelpers }).OAUTH_PROVIDER);
                     break;
                 case 'template':
                     target.template = new TemplateService(c.env.DB);
@@ -268,7 +294,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.importHistory = new ImportHistoryService(c.env.DB, c.get('tenantId'));
                     break;
                 case 'inspectionRequest':
-                    target.inspectionRequest = new InspectionRequestService(c.env.DB);
+                    target.inspectionRequest = new InspectionRequestService(c.env.DB, buildPlanQuota());
                     break;
                 case 'ratingSystem':
                     target.ratingSystem = new RatingSystemService(c.env.DB);
@@ -324,6 +350,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                             c.env.DB,
                             target.email,
                             c.env.APP_BASE_URL || '',
+                            buildPlanQuota(),
                         );
                     }
                     break;

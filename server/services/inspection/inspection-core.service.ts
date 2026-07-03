@@ -16,6 +16,9 @@ import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation, type Inspection, type InspectionListParams, type CreateInspectionData } from './shared';
 import { InspectionSubService } from './base';
 import { ServiceService } from '../service.service';
+import type { ScopedDB } from '../../lib/db/scoped';
+import type { ImagesBinding } from '../../lib/media/strip-exif';
+import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
 /** Internal — one Publish-modal recipient row (client or agent). Not exported:
  *  the public `getRecipientList` signature keeps its inline structural type. */
@@ -42,6 +45,27 @@ function parseSnapshotData(snapshotJson: string): { data?: Record<string, Record
  * internally on this service).
  */
 export class InspectionCoreService extends InspectionSubService {
+    /**
+     * Free-tier usage-quota guard (optional). Present only in SaaS deploys
+     * with `hasUsageQuota` (see deployment-profile.ts); undefined in
+     * standalone, where inspection creation stays unlimited. See the three
+     * `consumeInspection` call sites in createInspection / createReinspection
+     * / cloneInspection.
+     */
+    private readonly planQuota: PlanQuotaGuard | undefined;
+
+    constructor(
+        db: D1Database,
+        r2?: R2Bucket,
+        sdb?: ScopedDB,
+        kv?: KVNamespace,
+        images?: ImagesBinding,
+        planQuota?: PlanQuotaGuard,
+    ) {
+        super(db, r2, sdb, kv, images);
+        this.planQuota = planQuota;
+    }
+
     /**
      * Fetch the contact rows for an inspection's buyer/listing agents, keyed by
      * id. Tenant-scoped. Shared by getRecipientList + getPeopleCard, which both
@@ -365,6 +389,11 @@ export class InspectionCoreService extends InspectionSubService {
         };
 
         await this.assertContactsBelongToTenant(tenantId, [data.referredByAgentId, data.sellingAgentId, data.clientContactId]);
+        // Quota is consumed only after every precondition check above has
+        // passed and immediately before the row that actually creates the
+        // inspection — a failed validation (e.g. a bad contact reference)
+        // must never burn a free tenant's lifetime slot.
+        await this.planQuota?.consumeInspection(tenantId);
         await this.sdb.insert(inspections, newInspection);
         // DB-8: mirror assignment into inspection_inspectors link table.
         // Non-fatal — a sync failure must not roll back a committed inspection row.
@@ -499,6 +528,12 @@ export class InspectionCoreService extends InspectionSubService {
 
         const id = crypto.randomUUID();
         const createdAt = new Date();
+        // Quota is consumed only after every precondition check above (baseline
+        // existence, published-baseline gate, inspector ownership) has passed
+        // and immediately before the insert that actually creates the
+        // re-inspection — a failed validation must never burn a free tenant's
+        // lifetime slot.
+        await this.planQuota?.consumeInspection(tenantId);
         await db.insert(inspections).values({
             id,
             tenantId,
@@ -772,7 +807,11 @@ export class InspectionCoreService extends InspectionSubService {
      * Clones an existing inspection.
      */
     async cloneInspection(id: string, tenantId: string): Promise<Inspection> {
+        // getInspection throws NotFound for a bad id — that precondition check
+        // must run BEFORE quota is consumed, so cloning a nonexistent
+        // inspection never burns a free tenant's lifetime slot.
         const { inspection: source } = await this.getInspection(id, tenantId);
+        await this.planQuota?.consumeInspection(tenantId);
 
         const clone = {
             ...source,

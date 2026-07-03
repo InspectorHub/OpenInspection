@@ -64,6 +64,16 @@ export class EmailBaseService {
          * `assembleTenantEmailService` the same way `meter` is.
          */
         protected suppression?: { isSuppressed(email: string): Promise<boolean> },
+        /**
+         * Free-tier usage-quota pre-flight (2026-07 spec). When injected,
+         * `sendEmail` awaits `quota.preflight()` BEFORE building or sending any
+         * provider request — a quota block throws (402 QUOTA_EXHAUSTED) and the
+         * send never reaches the provider and is never metered. Absent (BYO
+         * sends, standalone/non-quota deployments, legacy callers) ⇒ no gate,
+         * behavior unchanged. Wired in `assembleTenantEmailService` the same way
+         * `meter` is.
+         */
+        protected quota?: { preflight: () => Promise<void> },
     ) {
         this.provider = provider ?? new ResendProvider({ apiKey: this.apiKey });
     }
@@ -124,6 +134,11 @@ export class EmailBaseService {
         attachments?: Array<{ filename: string; content: ArrayBuffer | string; contentType?: string }>,
         opts?: { inspector?: SenderInspector | undefined },
     ): Promise<{ delivered: boolean }> {
+        // Free-tier pre-flight quota gate — runs BEFORE any provider request is
+        // built. A quota block throws here, so no provider HTTP call is made
+        // and no meter record happens for a send that never went out.
+        await this.quota?.preflight();
+
         if (!this.apiKey || this.apiKey.includes('your_api_key')) {
             logger.warn(`[email] Skipping delivery (API Key missing) to: ${to.join(', ')}`);
             return { delivered: false };

@@ -14,6 +14,8 @@ import { OutboxService } from './outbox.service';
 import { requireServiceBinding } from './service-binding-guard';
 import { aggregateUsage } from '../lib/usage/aggregate';
 import { usageCounters } from '../lib/db/schema/usage';
+import { FREE_TIER_CAPS } from '../features/plan-quota/policy';
+import { getSeatUsage } from '../features/seat-quota/usage';
 
 const api = new Hono<HonoConfig>();
 
@@ -185,6 +187,24 @@ api.post('/sync-quota', requireServiceBinding, async (c) => {
 });
 
 /**
+ * GET /api/integration/tenants/:slug/seat-usage
+ * Reverse seat-sync read: lets the portal reconcile a tenant's Stripe seat
+ * quantity against the ACTUAL count of active (non-soft-deleted) members,
+ * rather than trusting portal's own last-written value. Thin wrapper around
+ * getSeatUsage (server/features/seat-quota/usage.ts) — same active-member
+ * definition (`deleted_at IS NULL`) used by the invite/seat-guard middleware.
+ */
+api.get('/tenants/:slug/seat-usage', requireServiceBinding, async (c) => {
+    const slug = c.req.param('slug');
+    const d = drizzle(c.env.DB);
+    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug as string)).get();
+    if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
+
+    const usage = await getSeatUsage(t.id as string, c.env.DB);
+    return c.json({ success: true, data: { used: usage.used, max: usage.max } });
+});
+
+/**
  * POST /api/integration/seed-starter-content
  * Invoked by the portal's OnboardingWorkflow once a tenant is provisioned.
  * Seeds initial templates, agreements, rating-systems, and marketplace
@@ -319,14 +339,42 @@ api.post('/secrets/reencrypt', requireServiceBinding, async (c) => {
 
 /**
  * GET /api/integration/usage
- * Platform monitoring: aggregated usage counters across all tenants.
- * Returns raw sms/email cumulative sums and r2_bytes gauge per tenant.
+ * Platform monitoring: aggregated usage counters across all tenants, for the
+ * portal console's usage dashboard. Per tenant: lifetime sums for every
+ * metered dimension (platform + bring-your-own sms/email, inspections),
+ * the r2_bytes gauge, the tenant's plan tier, and — for a free tenant only —
+ * the free-tier caps those platform metrics are measured against (`null`
+ * for pro/enterprise, since the cap never applies to them).
  * M2M-guarded by the router mount (requireServiceBinding inherited).
  */
 api.get('/usage', requireServiceBinding, async (c) => {
     try {
-        const rows = await drizzle(c.env.DB).select().from(usageCounters).all();
-        return c.json({ success: true, data: aggregateUsage(rows) });
+        const db = drizzle(c.env.DB);
+        const rows = await db.select().from(usageCounters).all();
+        const usage = aggregateUsage(rows);
+
+        const tenantIds = usage.map((u) => u.tenantId);
+        const tierRows = tenantIds.length
+            ? await db.select({ id: tenants.id, tier: tenants.tier }).from(tenants).where(inArray(tenants.id, tenantIds)).all()
+            : [];
+        const tierByTenant = new Map(tierRows.map((t) => [t.id as string, t.tier as string]));
+
+        const data = usage.map((u) => {
+            const tier = tierByTenant.get(u.tenantId) ?? 'free';
+            return {
+                tenantId:    u.tenantId,
+                tier,
+                inspections: u.inspections,
+                sms:         u.sms,
+                smsByo:      u.smsByo,
+                email:       u.email,
+                emailByo:    u.emailByo,
+                r2Bytes:     u.r2Bytes,
+                caps:        tier === 'free' ? FREE_TIER_CAPS : null,
+            };
+        });
+
+        return c.json({ success: true, data });
     } catch (error: unknown) {
         logger.error('usage aggregation failed', {}, error instanceof Error ? error : undefined);
         return c.json({ success: false, error: { message: 'Internal server error' } }, 500);

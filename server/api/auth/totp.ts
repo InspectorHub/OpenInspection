@@ -11,7 +11,7 @@ import type { Context } from 'hono';
 import { createApiRouter } from '../../lib/openapi-router';
 import type { HonoConfig } from '../../types/hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { users } from '../../lib/db/schema';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../../lib/errors';
@@ -246,7 +246,10 @@ export const totpRoutes = createApiRouter()
         const userId = payload['sub'] as string;
 
         const db = drizzle(c.env.DB);
-        const me = await db.select().from(users).where(eq(users.id, userId)).get();
+        // Excludes soft-deleted (removed member) rows — this is the second
+        // half of the login flow, so it must honor the same active-user gate
+        // as validateCredentials.
+        const me = await db.select().from(users).where(and(eq(users.id, userId), isNull(users.deletedAt))).get();
         if (!me || !me.totpEnabled || !me.totpSecret) {
             throw Errors.Unauthorized('Invalid challenge token');
         }

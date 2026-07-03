@@ -9,6 +9,7 @@ import { createOiTemplateStore } from './template-store';
 import type { AutomationBase, HasEvaluateConditions, HasDeliverSms } from './shared';
 import type { SmsRuntime } from './sms';
 import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
+import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
 /**
  * Delivery mixin: the cron-driven flush() that drains due automation_log rows.
@@ -24,6 +25,9 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             sms?: SmsRuntime,
             batchSize = 50,
             env?: ManagedSendGateEnv,
+            /** Free-tier pre-flight (2026-07) — undefined on deployments with no
+             *  usage-quota capability (standalone); see scheduled.ts wiring. */
+            quotaGuard?: PlanQuotaGuard,
         ): Promise<void> {
             const db = this.getDrizzle();
             const now = new Date().toISOString();
@@ -102,7 +106,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // creds + consent in deliverSms; the email path delegates to the
                     // per-tenant EmailService (metering + per-tenant key resolution by construction).
                     if (log.channel === 'sms') {
-                        await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost, env);
+                        await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost, env, quotaGuard);
                         continue;
                     }
 

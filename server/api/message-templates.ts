@@ -1,4 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
+import { drizzle } from 'drizzle-orm/d1';
+import { eq } from 'drizzle-orm';
 import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
@@ -6,8 +8,13 @@ import { MessageTemplateService } from '../services/message-template.service';
 import { smsSegmentInfo } from '../lib/sms/segments';
 import { interpolate } from '../services/automation/shared';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
+import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
 import { loadProviderForTenant } from '../lib/sms/resolve-twilio';
 import { normalizeE164 } from '../lib/sms/phone';
+import { managedSendAllowed } from '../lib/sms/managed-send-gate';
+import { maybeMetering } from '../services/metering.service';
+import { currentPeriodKey } from '../lib/usage/period';
+import { tenantConfigs } from '../lib/db/schema';
 import {
     CreateMessageTemplateSchema, UpdateMessageTemplateSchema, PreviewMessageTemplateSchema,
     TestSendMessageTemplateSchema, MessageTemplateSchema, MessageTemplateListResponseSchema,
@@ -148,21 +155,68 @@ export const messageTemplateRoutes = createApiRouter()
         if (channel === 'sms') {
             const normalized = normalizeE164(to);
             if (!normalized) return c.json({ success: false, error: 'That phone number could not be parsed.' }, 200);
+
+            // Mirrors server/api/sms.ts POST /sms/test exactly: managed-compliance
+            // gate, then free-tier pre-flight, both BEFORE any provider call — a
+            // template test-send is a real send and must not bypass either the
+            // compliance gate or the quota cap the standalone SMS test endpoint
+            // already enforces.
+            const db = drizzle(c.env.DB);
+            let cfgRow: { smsMode: string; smsByoProvider: string | null } | null | undefined;
+            try {
+                cfgRow = await db.select({ smsMode: tenantConfigs.smsMode, smsByoProvider: tenantConfigs.smsByoProvider })
+                    .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+            } catch { cfgRow = null; }
+            const smsMode = cfgRow?.smsMode ?? 'platform';
+
+            const gate = await managedSendAllowed(db, c.env, tenantId, smsMode);
+            if (!gate.allowed) {
+                return c.json({ success: false, error: gate.reason ?? 'managed_not_approved' }, 200);
+            }
+
+            // Free-tier pre-flight (2026-07) — platform-mode sends count against
+            // the lifetime sms cap; 'own' is BYO and uncapped. `tenantTier` is not
+            // populated by session-context on this JWT-authenticated route, so
+            // fall back to a one-shot tier lookup (mirrors sms.ts / di.ts).
+            if (c.var.profile.hasUsageQuota && smsMode !== 'own') {
+                const quotaGuard = new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl });
+                const tier = c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId);
+                await quotaGuard.checkMessagingQuota(tenantId, tier, 'sms');
+            }
+
             const resolved = await loadProviderForTenant(c.env, tenantId);
             if (!resolved) return c.json({ success: false, error: 'SMS is not configured.' }, 200);
-            const sendArgs: { from?: string; to: string; body: string } = { to: normalized, body: interpolate(body, vars) };
+            const sendArgs: { from?: string; to: string; body: string; messagingServiceSid?: string } = { to: normalized, body: interpolate(body, vars) };
             if (resolved.from) sendArgs.from = resolved.from;
+            if (resolved.messagingServiceSid) sendArgs.messagingServiceSid = resolved.messagingServiceSid;
             const res = await resolved.provider.sendMessage(sendArgs);
             if (res.ok) {
                 // WH-2 — seed a 'sent' delivery-status row for the returned id (non-fatal).
-                const { drizzle } = await import('drizzle-orm/d1');
                 const { recordSentStatus } = await import('./sms');
-                await recordSentStatus(drizzle(c.env.DB), tenantId, res.id, Date.now());
+                await recordSentStatus(db, tenantId, res.id, Date.now());
+                // Source tagging (2026-07): 'own' mode is BYO — tag its own counter
+                // ('sms_byo') so free-cap enforcement never counts a tenant's own
+                // Twilio/Telnyx credentials against the platform cap.
+                const metering = maybeMetering(c.env);
+                if (metering) {
+                    await metering.record(tenantId, smsMode === 'own' ? 'sms_byo' : 'sms', currentPeriodKey(new Date())).catch(() => {});
+                }
             }
             return res.ok ? c.json({ success: true }, 200) : c.json({ success: false, error: res.error }, 200);
         }
         // Per-tenant email transport (resolves the tenant's own provider/keys).
-        const emailSvc = await buildTenantEmailService(c.env, tenantId);
+        // Free-tier pre-flight (2026-07): a manual "test send" spends real
+        // platform-mode quota just like any other send, so gate it the same way
+        // — session-context `tenantTier` is unset on this JWT-authed route, so
+        // fall back to the one-shot tier lookup (mirrors di.ts's request-context
+        // resolution).
+        const quotaGuard = c.var.profile.hasUsageQuota
+            ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl })
+            : undefined;
+        const tenantTier = quotaGuard
+            ? (c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId))
+            : undefined;
+        const emailSvc = await buildTenantEmailService(c.env, tenantId, quotaGuard, tenantTier);
         const { delivered } = await emailSvc.sendEmail([to], interpolate(subject ?? '', vars), interpolate(body, vars));
         return delivered ? c.json({ success: true }, 200) : c.json({ success: false, error: 'Email is not configured.' }, 200);
     });

@@ -34,3 +34,35 @@ export async function setupSchema(sqlite: any) {
         }
     }
 }
+
+/**
+ * Wraps a better-sqlite3 instance in a minimal D1Database-shaped adapter,
+ * for tests exercising code that calls `db.prepare(sql).bind(...).run()`
+ * directly (raw D1 API) rather than through Drizzle. Only `prepare/bind/run`
+ * are implemented — enough to cover D1's `?1`/`?2`/... numbered-parameter
+ * SQL and the `res.meta.changes` result shape.
+ *
+ * better-sqlite3 binds numbered params (`?NNN`) via an object keyed by the
+ * parameter index as a string, not by positional array — this adapter does
+ * that translation so the same SQL text runs unmodified against D1 in
+ * production and against better-sqlite3 in unit tests.
+ */
+export function toRawD1(sqlite: any): D1Database {
+    return {
+        prepare(query: string) {
+            const stmt = sqlite.prepare(query);
+            return {
+                bind(...args: unknown[]) {
+                    const indexed: Record<number, unknown> = {};
+                    args.forEach((v, i) => { indexed[i + 1] = v; });
+                    return {
+                        run: async () => {
+                            const info = stmt.run(indexed);
+                            return { meta: { changes: info.changes } };
+                        },
+                    };
+                },
+            };
+        },
+    } as unknown as D1Database;
+}

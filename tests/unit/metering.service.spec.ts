@@ -35,3 +35,31 @@ describe('MeteringService', () => {
     expect(maybeMetering({ APP_MODE: 'saas', DB: {} as any })).toBeInstanceOf(MeteringService);
   });
 });
+
+describe('MeteringService.lifetimeTotal', () => {
+  let svc: MeteringService;
+  beforeEach(async () => {
+    const s = createTestDb();
+    await setupSchema(s.sqlite);
+    (drizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(s.db);
+    svc = new MeteringService({} as any); // db arg unused — drizzle() is mocked to return the test db
+  });
+
+  it('sums a metric across all period rows for one tenant', async () => {
+    await svc.record('t1', 'sms', '2026-06', 30);
+    await svc.record('t1', 'sms', '2026-07', 15);
+    await svc.record('t2', 'sms', '2026-07', 99);      // other tenant ignored
+    await svc.record('t1', 'sms_byo', '2026-07', 40);  // other metric ignored
+    expect(await svc.lifetimeTotal('t1', 'sms')).toBe(45);
+  });
+
+  it('returns 0 when no rows exist', async () => {
+    expect(await svc.lifetimeTotal('t1', 'email')).toBe(0);
+  });
+
+  it('accepts the new metric values (inspections uses the lifetime period)', async () => {
+    await svc.record('t1', 'inspections', 'lifetime', 1);
+    await svc.record('t1', 'inspections', 'lifetime', 1);
+    expect(await svc.lifetimeTotal('t1', 'inspections')).toBe(2);
+  });
+});

@@ -6,6 +6,7 @@ import { PeopleStep } from "./new-inspection/PeopleStep";
 import { ServicesStep } from "./new-inspection/ServicesStep";
 import { ScheduleStep } from "./new-inspection/ScheduleStep";
 import { TeamStep } from "./new-inspection/TeamStep";
+import { QuotaExceededPanel } from "./new-inspection/QuotaExceededPanel";
 
 const STEP_LABELS: Record<WizardStepId, string> = {
   property: "Property",
@@ -49,6 +50,7 @@ export function NewInspectionWizard({
   templates = [],
   services: serviceCatalog = [],
   teamMembers = [],
+  quotaExceededAtOpen,
 }: {
   open: boolean;
   onClose: () => void;
@@ -56,6 +58,20 @@ export function NewInspectionWizard({
   services?: WizardService[];
   /** B-21 — when empty (solo workspace) the Team step is skipped entirely. */
   teamMembers?: WizardTeamMember[];
+  /**
+   * Optional at-open free-tier quota gate. Callers that already load usage
+   * data (the `/inspections` route, which mounts the QuotaBanner from the
+   * same loader payload) pass this so a tenant already at the inspection cap
+   * sees the upgrade panel the instant the wizard opens, instead of walking
+   * all four steps and hitting the 402 QUOTA_EXHAUSTED on Create. Mirrors the
+   * tri-state shape of the internal 402-driven `quotaExceeded` state below:
+   * `undefined` = no gate (under cap, standalone/paid-saas caps==null, or a
+   * mount with no quota context, e.g. a future command-palette-only entry
+   * point) → normal wizard, server 402 remains the authoritative backstop;
+   * `null` = at cap with no configured billing portal (CTA hidden); a string
+   * is the billingPortalUrl for the "Subscribe" CTA.
+   */
+  quotaExceededAtOpen?: string | null;
 }) {
   const fetcher = useFetcher();
   // IA-1 — dedicated fetcher for agent typeahead (B-17: per-intent convention,
@@ -94,6 +110,12 @@ export function NewInspectionWizard({
   const [newAgentMode, setNewAgentMode] = useState(false);
   const [newAgentName, setNewAgentName] = useState("");
   const [newAgentEmail, setNewAgentEmail] = useState("");
+
+  // Free-tier usage quotas — when the create POST comes back 402
+  // QUOTA_EXHAUSTED, the wizard stays open and shows an upgrade panel instead
+  // of silently closing. `undefined` = not exceeded; `null` = exceeded with no
+  // configured billing portal (CTA hidden); a string is the billingPortalUrl.
+  const [quotaExceeded, setQuotaExceeded] = useState<string | null | undefined>(undefined);
 
   // Drop a service's price override (used when unselecting, clearing the input,
   // or when the entered price matches the catalog price = "no override").
@@ -139,29 +161,66 @@ export function NewInspectionWizard({
   }, [templateQuery, filteredTemplates]);
 
   useEffect(() => {
-    if (open) return;
-    setStepIdx(0);
-    setPropertyType("single_family");
-    setAddress("");
-    setTemplateId("");
-    setTemplateQuery("");
-    setServices(new Set());
-    setPriceOverrides(new Map());
-    setDate(todayLocalISO());
-    setTime("09:00");
-    setSoloMode(true);
-    setInspectorId("");
-    // IA-1 People step reset
-    setClientName("");
-    setClientEmail("");
-    setClientPhone("");
-    setAgentSearch("");
-    setAgentDropdownOpen(false);
-    setSelectedAgent(null);
-    setNewAgentMode(false);
-    setNewAgentName("");
-    setNewAgentEmail("");
+    if (!open) {
+      setStepIdx(0);
+      setPropertyType("single_family");
+      setAddress("");
+      setTemplateId("");
+      setTemplateQuery("");
+      setServices(new Set());
+      setPriceOverrides(new Map());
+      setDate(todayLocalISO());
+      setTime("09:00");
+      setSoloMode(true);
+      setInspectorId("");
+      // IA-1 People step reset
+      setClientName("");
+      setClientEmail("");
+      setClientPhone("");
+      setAgentSearch("");
+      setAgentDropdownOpen(false);
+      setSelectedAgent(null);
+      setNewAgentMode(false);
+      setNewAgentName("");
+      setNewAgentEmail("");
+      setQuotaExceeded(undefined);
+      return;
+    }
+    // At-open quota gate — seed quotaExceeded from the caller-supplied prop
+    // every time the modal opens, so a tenant already at cap sees the
+    // upgrade panel immediately instead of the property step. Deliberately
+    // NOT keyed on quotaExceededAtOpen (only on `open`): re-evaluating on
+    // every parent re-render while the modal is already open would let a
+    // background loader revalidation stomp on a 402 that just set
+    // quotaExceeded to a different value via the submit-fetcher effect below.
+    setQuotaExceeded(quotaExceededAtOpen);
   }, [open]);
+
+  // Watch the create-submit fetcher for a QUOTA_EXHAUSTED (402) rejection.
+  // A successful create returns a redirect from the action, which React
+  // Router follows directly — fetcher.data never populates on that path, so
+  // this effect only ever fires for a completed (non-redirect) response:
+  // either the free-tier cap panel below, or the pre-existing close-on-any-
+  // other-outcome behavior (unchanged from before this quota feature).
+  useEffect(() => {
+    if (fetcher.state !== "idle" || !fetcher.data) return;
+    const data = fetcher.data as {
+      intent?: string;
+      ok?: boolean;
+      error?: { code?: string; details?: { billingPortalUrl?: string | null } };
+    };
+    if (data.intent !== "create") return;
+    if (data.ok === false && data.error?.code === "QUOTA_EXHAUSTED") {
+      setQuotaExceeded(data.error.details?.billingPortalUrl ?? null);
+      return;
+    }
+    onClose();
+  // onClose is re-created every render (inline arrow at the call site) but is
+  // always functionally equivalent (`() => setWizardOpen(false)`, and setState
+  // setters are referentially stable) — intentionally omitted to avoid
+  // re-running this effect on every parent render, mirroring the
+  // conflictFetcher effect above.
+  }, [fetcher.state, fetcher.data]);
 
   // IA-6 — debounced schedule conflict check: fires 400 ms after either
   // inspectorId or date/time changes. With no explicit inspector chosen
@@ -320,7 +379,9 @@ export function NewInspectionWizard({
       },
       { method: "post", action: "/inspections" },
     );
-    onClose();
+    // Closing happens once the fetcher settles (see the effect above) — a
+    // QUOTA_EXHAUSTED rejection keeps the wizard open to show the upgrade
+    // panel instead of closing immediately on submit.
   }
 
   return (
@@ -332,6 +393,10 @@ export function NewInspectionWizard({
           <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none">&times;</button>
         </div>
 
+        {quotaExceeded !== undefined ? (
+          <QuotaExceededPanel billingPortalUrl={quotaExceeded} onClose={onClose} />
+        ) : (
+        <>
         {/* Step indicator */}
         <div className="flex items-center gap-1 px-6 pt-4">
           {steps.map((s, i) => (
@@ -435,6 +500,8 @@ export function NewInspectionWizard({
             </button>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );

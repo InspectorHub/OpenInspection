@@ -9,6 +9,7 @@ import { NewInspectionWizard, type WizardTeamMember } from "~/components/NewInsp
 import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist";
 import { CommandPalette } from "~/components/CommandPalette";
 import { SeatBanner } from "~/components/SeatBanner";
+import { QuotaBanner } from "~/components/QuotaBanner";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
 import { INSPECTION_STATUS, isReportPublished } from "~/lib/status";
@@ -66,6 +67,8 @@ function emptyDashboard() {
     checklistDismissed: false,
     templateCount: 0,
     serviceCount: 0,
+    quotaCaps: null as { inspections: number; sms: number; email: number } | null,
+    quotaUsage: null as { inspections: number; sms: number; email: number } | null,
   };
 }
 
@@ -80,13 +83,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // The TODO(C-10) cast mirrors settings-account.tsx — hono/client collapses
     // the typed union; assertion is localized here and does not affect safety.
     const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
-    const [dashRes, tagsRes, templatesRes, servicesRes, meRes, membersRes] = await Promise.all([
+    const [dashRes, tagsRes, templatesRes, servicesRes, meRes, membersRes, usageRes] = await Promise.all([
       api.inspections.dashboard.$get(),
       api.tags.index.$get().catch(() => null),
       api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
       api.services.index.$get().catch(() => null),
       meGet().catch(() => null),
       api.admin.members.$get().catch(() => null),
+      // Free-tier quota banner — best-effort, same pattern as the other
+      // Promise.all entries above. `caps` comes back null for non-free
+      // tenants and for standalone deploys, so QuotaBanner renders nothing.
+      api.usage.summary.$get().catch(() => null),
     ]);
     const json = dashRes.ok ? ((await dashRes.json()) as Record<string, unknown>) : {};
     const d = (json.data ?? {}) as unknown as DashboardData | undefined;
@@ -123,6 +130,24 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       };
       checklistDismissed = meBody.data?.user?.onboardingState?.checklistDismissed === true;
     }
+    let quotaCaps: { inspections: number; sms: number; email: number } | null = null;
+    let quotaUsage: { inspections: number; sms: number; email: number } | null = null;
+    if (usageRes && usageRes.ok) {
+      const ub = (await usageRes.json().catch(() => ({}))) as {
+        data?: {
+          caps?: { inspections: number; sms: number; email: number } | null;
+          usage?: { inspections?: number; sms?: number; email?: number };
+        };
+      };
+      quotaCaps = ub.data?.caps ?? null;
+      if (quotaCaps) {
+        quotaUsage = {
+          inspections: ub.data?.usage?.inspections ?? 0,
+          sms: ub.data?.usage?.sms ?? 0,
+          email: ub.data?.usage?.email ?? 0,
+        };
+      }
+    }
     return {
       buckets: {
         needsAttention: d?.needsAttention ?? [],
@@ -143,6 +168,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       // dashboard buckets already have the inspection counts we need.
       templateCount: templates.length,
       serviceCount: svcOptions.length,
+      quotaCaps,
+      quotaUsage,
     };
   } catch {
     return emptyDashboard();
@@ -181,8 +208,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
     // Surface the API rejection in the worker log — silent { ok:false }
     // responses have repeatedly cost full debugging rounds (see save-settings).
-    console.error("[create] POST /api/inspections failed", res.status, await res.text().catch(() => ""));
-    return { ok: false, intent: "create" };
+    // Also propagate the structured error (code + details) so the wizard can
+    // branch on QUOTA_EXHAUSTED (402) and show the upgrade panel instead of
+    // silently closing — see NewInspectionWizard's post-submit effect.
+    const errBody = (await res.json().catch(() => ({}))) as {
+      error?: { code?: string; message?: string; details?: { billingPortalUrl?: string | null } };
+    };
+    console.error("[create] POST /api/inspections failed", res.status, errBody);
+    return { ok: false, intent: "create", error: errBody.error };
   }
   if (intent === "search-agents") {
     // IA-1 People step — agent typeahead. Posted by a dedicated useFetcher in
@@ -235,7 +268,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function InspectionsPage() {
-  const { buckets, conciergePending, greeting: _ssrGreeting, tags, templates, services, teamMembers, checklistDismissed: loaderDismissed, templateCount, serviceCount } = useLoaderData<typeof loader>();
+  const { buckets, conciergePending, greeting: _ssrGreeting, tags, templates, services, teamMembers, checklistDismissed: loaderDismissed, templateCount, serviceCount, quotaCaps, quotaUsage } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   const [greeting, setGreeting] = useState(_ssrGreeting);
   useEffect(() => { setGreeting(getGreeting()); }, []);
@@ -550,6 +583,17 @@ export default function InspectionsPage() {
   // from the auth-layout session context the dashboard already consumes.
   const tenantSlug = sessionCtx?.branding?.tenantSlug ?? null;
 
+  // Free-tier at-open quota gate — reuses the same quotaCaps/quotaUsage the
+  // QuotaBanner below already consumes (no extra API call). `caps` is null
+  // for standalone and paid-saas tenants, so this stays undefined (normal
+  // wizard) for both. `inspections` cap of 0 is the "unlimited" sentinel
+  // (mirrors QuotaBanner's `cap <= 0` guard) and never gates.
+  const billingUrl = sessionCtx?.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined;
+  const quotaExceededAtOpen: string | null | undefined =
+    quotaCaps && quotaUsage && quotaCaps.inspections > 0 && quotaUsage.inspections >= quotaCaps.inspections
+      ? billingUrl ?? null
+      : undefined;
+
   // A row's props are identical in both the grouped and flat views; this keeps
   // the two render sites in sync.
   const renderRow = (insp: Inspection) => (
@@ -569,7 +613,23 @@ export default function InspectionsPage() {
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
       {/* F3 — Seat quota banner */}
       {sessionCtx?.seatUsage && (
-        <SeatBanner usage={sessionCtx.seatUsage} billingUrl={sessionCtx.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined} />
+        <SeatBanner usage={sessionCtx.seatUsage} billingUrl={billingUrl} />
+      )}
+
+      {/* Free-tier usage quota banners — one per capped metric, each hides
+          itself below 80% usage (see QuotaBanner). */}
+      {quotaCaps && quotaUsage && (
+        <>
+          {(["inspections", "sms", "email"] as const).map((metric) => (
+            <QuotaBanner
+              key={metric}
+              metric={metric}
+              used={quotaUsage[metric]}
+              cap={quotaCaps[metric]}
+              billingUrl={billingUrl}
+            />
+          ))}
+        </>
       )}
 
       {/* PageHeader */}
@@ -807,6 +867,7 @@ export default function InspectionsPage() {
         templates={templates}
         services={services}
         teamMembers={teamMembers}
+        quotaExceededAtOpen={quotaExceededAtOpen}
       />
 
       {/* Command Palette */}

@@ -7,6 +7,7 @@ import { interpolate, type Constructor } from './shared';
 import { buildBaseTemplateVars } from './template-vars';
 import type { AutomationBase } from './shared';
 import { managedSendAllowed, type ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
+import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
 /**
  * The SMS seam injected into deliverSms/flush: resolves a MessagingProvider and
@@ -60,6 +61,7 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
             sms: SmsRuntime,
             appName: string, appHost: string,
             env?: ManagedSendGateEnv,
+            quotaGuard?: PlanQuotaGuard,
         ): Promise<void> {
             const { log, automation, inspection, tenant } = ctx;
             const skip = (reason: string) =>
@@ -105,6 +107,17 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
             const gate = await managedSendAllowed(db, gateEnv, inspection.tenantId, cfg?.smsMode ?? 'platform');
             if (!gate.allowed) return void (await skip(gate.reason ?? 'managed_not_approved'));
 
+            // Free-tier pre-flight (2026-07) — alongside the managed-compliance gate
+            // above, blocks a free tenant's platform-mode automation sends against the
+            // lifetime sms cap BEFORE any provider call. 'own' mode (BYO) is uncapped.
+            // `quotaGuard` is undefined on deployments with no usage-quota capability
+            // (standalone) — see scheduled.ts wiring. A block throws; the caller's
+            // try/catch (AutomationDelivery.flush) marks the log failed with the
+            // QuotaExhausted message, mirroring the email path's deliverAction throw.
+            if (quotaGuard && cfg?.smsMode !== 'own') {
+                await quotaGuard.checkMessagingQuota(inspection.tenantId, tenant.tier, 'sms');
+            }
+
             const vars: Record<string, string> = {
                 ...buildBaseTemplateVars(inspection, tenant, appName, appHost),
                 company_phone:    cfg?.companyPhone ?? '',
@@ -128,7 +141,9 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
                 const { recordSentStatus } = await import('../../api/sms');
                 await recordSentStatus(db, inspection.tenantId, res.id, Date.now());
                 try {
-                    await this.metering?.record(tenant.id, 'sms', currentPeriodKey(new Date()));
+                    // Source tagging (2026-07) — 'own' mode is BYO, tagged 'sms_byo' so
+                    // it never counts against the platform free-tier cap.
+                    await this.metering?.record(tenant.id, cfg?.smsMode === 'own' ? 'sms_byo' : 'sms', currentPeriodKey(new Date()));
                 } catch { /* metering must never break delivery */ }
             } else {
                 await db.update(automationLogs).set({ status: 'failed', error: res.error })

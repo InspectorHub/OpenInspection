@@ -36,6 +36,7 @@ import { InspectionResultsService } from './inspection/inspection-results.servic
 import { InspectionReportService } from './inspection/inspection-report.service';
 import { InspectionPublishService } from './inspection/inspection-publish.service';
 import { InspectionCoreService } from './inspection/inspection-core.service';
+import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 export {
     resolveCoverUrl,
     sanitizeDefectStates,
@@ -71,7 +72,7 @@ export class InspectionService {
     private readonly publish: InspectionPublishService;
     private readonly core: InspectionCoreService;
 
-    constructor(db: D1Database, r2?: R2Bucket, sdb?: ScopedDB, kv?: KVNamespace, images?: ImagesBinding) {
+    constructor(db: D1Database, r2?: R2Bucket, sdb?: ScopedDB, kv?: KVNamespace, images?: ImagesBinding, planQuota?: PlanQuotaGuard) {
         this.sharing = new InspectionSharingService(db, r2, sdb, kv, images);
         this.analytics = new InspectionAnalyticsService(db, r2, sdb, kv, images, this);
         this.status = new InspectionStatusService(db, r2, sdb, kv, images);
@@ -80,7 +81,9 @@ export class InspectionService {
         this.results = new InspectionResultsService(db, r2, sdb, kv, images);
         this.report = new InspectionReportService(db, r2, sdb, kv, images);
         this.publish = new InspectionPublishService(db, r2, sdb, kv, images, this);
-        this.core = new InspectionCoreService(db, r2, sdb, kv, images);
+        // Only the create/clone/reinspection paths (owned by InspectionCoreService)
+        // consume the free-tier quota — no other sub-service needs the guard.
+        this.core = new InspectionCoreService(db, r2, sdb, kv, images, planQuota);
     }
 
     /**

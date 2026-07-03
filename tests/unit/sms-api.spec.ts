@@ -21,6 +21,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // Imported AFTER the mock is registered.
 // eslint-disable-next-line import/order
 import { smsPublicRoutes, smsAdminRoutes } from '../../server/api/sms';
+import * as resolveTwilioModule from '../../server/lib/sms/resolve-twilio';
 import { SmsConsentService } from '../../server/services/sms-consent.service';
 import { signParams } from '../../server/lib/sms/send-sms';
 import { sealSecrets } from '../../server/lib/config-crypto';
@@ -44,7 +45,7 @@ function makeExecCtx() {
     return ctx;
 }
 
-function buildApp(db: BetterSQLite3Database<typeof schema>) {
+function buildApp(db: BetterSQLite3Database<typeof schema>, profile: typeof SAAS_PROFILE | typeof STANDALONE_PROFILE = STANDALONE_PROFILE) {
     const app = new OpenAPIHono<HonoConfig>();
     app.onError((err, c) => {
         if (err instanceof AppError) {
@@ -53,10 +54,14 @@ function buildApp(db: BetterSQLite3Database<typeof schema>) {
         return c.json({ success: false, error: { code: 'internal_error', message: String(err) } }, 500);
     });
     // Inject an owner identity so requireRole('owner','admin') passes for admin routes.
+    // `profile` defaults to STANDALONE_PROFILE (hasUsageQuota=false) so pre-existing
+    // tests that don't care about the quota gate are unaffected; free-tier pre-flight
+    // tests pass SAAS_PROFILE explicitly.
     app.use('*', async (c, next) => {
         c.set('tenantId', TENANT);
         c.set('userRole', 'owner');
         c.set('user', { sub: 'user-1', role: 'owner', tenantId: TENANT } as never);
+        c.set('profile', profile);
         await next();
     });
     app.route('/api/public', smsPublicRoutes);
@@ -1494,6 +1499,109 @@ describe('POST /sms/test — managed-send compliance gate (Task 8)', () => {
         const body = await res.json() as { success: boolean; error?: string };
         // Gate must not return managed_not_approved for platform/own mode.
         expect(body.error).not.toBe('managed_not_approved');
+    });
+});
+
+// ─── Free-tier pre-flight + source tagging (Task 5) ──────────────────────────
+
+describe('POST /sms/test — free-tier pre-flight + source tagging (Task 5)', () => {
+    /**
+     * Stub the provider-aware loader itself rather than real Twilio creds +
+     * fetch. `loadProviderForTenant`'s own tenant_configs lookup chains
+     * `.get().catch()` directly (no `await` in between), which only resolves
+     * to a real Promise against D1 — the in-memory better-sqlite3 double this
+     * suite runs against executes `.get()` synchronously and returns the row
+     * (or undefined) directly, so chaining `.catch()` on it throws. That
+     * pre-existing incompatibility is orthogonal to the quota/tagging logic
+     * under test here, so bypass it entirely by resolving the provider directly.
+     */
+    function stubResolvedProvider(id = 'SM_1') {
+        const sendMessage = vi.fn().mockResolvedValue({ ok: true, id });
+        const loadProviderSpy = vi.spyOn(resolveTwilioModule, 'loadProviderForTenant').mockResolvedValue({
+            provider: { sendMessage, validateInboundSignature: vi.fn().mockResolvedValue(false) },
+            from: '+15550009999',
+        });
+        return { sendMessage, loadProviderSpy };
+    }
+
+    afterEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    it('free tenant at 50 lifetime sms (platform mode) → 402 QUOTA_EXHAUSTED, no provider send', async () => {
+        // TENANT was seeded with tier='free' in the outer beforeEach; no tenant_configs
+        // row → smsMode defaults to 'platform', which counts against the cap.
+        await new MeteringService(db as unknown as D1Database).record(TENANT, 'sms', '2026-06', 50);
+        const { sendMessage } = stubResolvedProvider();
+
+        const app = buildApp(db, SAAS_PROFILE);
+        const res = await app.request('/api/admin/sms/test', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ to: '+15559991234' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        expect(res.status).toBe(402);
+        const body = await res.json() as { error: { code: string } };
+        expect(body.error.code).toBe('QUOTA_EXHAUSTED');
+        expect(sendMessage).not.toHaveBeenCalled();
+    });
+
+    it("'own' mode tenant at 50 seeded platform sms → send proceeds and records 'sms_byo'", async () => {
+        // Own-mode sends are uncapped and tagged on their own counter — the 50
+        // pre-existing 'sms' (platform) rows must not block this send.
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT, smsMode: 'own', updatedAt: new Date(),
+        } as never);
+        await new MeteringService(db as unknown as D1Database).record(TENANT, 'sms', '2026-06', 50);
+        const record = vi.spyOn(MeteringService.prototype, 'record');
+        const { sendMessage } = stubResolvedProvider('SM_own_1');
+
+        const app = buildApp(db, SAAS_PROFILE);
+        const res = await app.request('/api/admin/sms/test', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ to: '+15559991234' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        const body = await res.json() as { success: boolean };
+        expect(body.success).toBe(true);
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+        expect(record).toHaveBeenCalledWith(TENANT, 'sms_byo', expect.stringMatching(/^\d{4}-\d{2}$/));
+    });
+
+    it('platform-mode send under the cap → records plain \'sms\'', async () => {
+        const record = vi.spyOn(MeteringService.prototype, 'record');
+        const { sendMessage } = stubResolvedProvider('SM_plat_1');
+
+        const app = buildApp(db, SAAS_PROFILE);
+        const res = await app.request('/api/admin/sms/test', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ to: '+15559991234' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        const body = await res.json() as { success: boolean };
+        expect(body.success).toBe(true);
+        expect(sendMessage).toHaveBeenCalledTimes(1);
+        expect(record).toHaveBeenCalledWith(TENANT, 'sms', expect.stringMatching(/^\d{4}-\d{2}$/));
+    });
+
+    it('standalone profile (hasUsageQuota=false) → cap never enforced even at 50', async () => {
+        await new MeteringService(db as unknown as D1Database).record(TENANT, 'sms', '2026-06', 50);
+        const { sendMessage } = stubResolvedProvider('SM_standalone_1');
+
+        const app = buildApp(db, STANDALONE_PROFILE);
+        const res = await app.request('/api/admin/sms/test', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ to: '+15559991234' }),
+        }, FAKE_ENV, makeExecCtx());
+
+        expect(res.status).toBe(200);
+        const body = await res.json() as { success: boolean };
+        expect(body.success).toBe(true);
+        expect(sendMessage).toHaveBeenCalledTimes(1);
     });
 });
 

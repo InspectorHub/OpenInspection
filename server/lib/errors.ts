@@ -21,6 +21,9 @@ export enum ErrorCode {
     // generic 503.
     AI_NOT_CONFIGURED = 'ai_not_configured',
     TENANT_SUSPENDED = 'tenant_suspended',
+    // Free-tier usage-quota exhaustion (inspections / sms / email). Contract:
+    // payload carries metric/used/cap/billingPortalUrl — see Errors.QuotaExhausted.
+    QUOTA_EXHAUSTED = 'QUOTA_EXHAUSTED',
 }
 
 /**
@@ -65,4 +68,11 @@ export const Errors = {
         new AppError(503, ErrorCode.AI_NOT_CONFIGURED, msg),
     TenantSuspended: (msg: string = 'This workspace has been suspended. Existing content remains accessible in read-only mode. Contact your administrator to restore full access.') =>
         new AppError(403, ErrorCode.TENANT_SUSPENDED, msg),
+    QuotaExhausted: (details: { metric: string; used: number; cap: number; billingPortalUrl: string | null }) =>
+        new AppError(
+            402,
+            ErrorCode.QUOTA_EXHAUSTED,
+            `Free plan limit reached: ${details.used}/${details.cap} ${details.metric}. Subscribe to continue.`,
+            details,
+        ),
 };

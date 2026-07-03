@@ -78,6 +78,58 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
         }
 
         /**
+         * Free-tier usage quotas (2026-07), Task 8 — threshold notice when a free
+         * tenant's lifetime inspection count crosses 4/5 ("one free inspection
+         * left") or 5/5 (cap reached; existing inspections stay usable, new ones
+         * require a subscription). Recipient is the tenant owner (same
+         * `role: 'owner'` lookup used by autoLinkSameEmail in agent/signup.ts).
+         *
+         * Copy is inline (unlike the registry-driven methods above) — this is a
+         * platform system notice, not a tenant-customizable transactional email,
+         * so there is no tenant-override surface to wire it into.
+         *
+         * Deduplicated via `quota-notice:{tenantId}:{n}` in KV so a retried
+         * request — or the benign race of two concurrent creates both reading
+         * the lifetime counter at the same threshold — never double-sends.
+         *
+         * IMPORTANT: the caller MUST assemble this EmailService instance
+         * WITHOUT a `meterTenantId` (see `assembleTenantEmailService`) — both
+         * `meter` and `quota` are gated on that argument, so an unmetered
+         * instance guarantees this send never counts against (or gets blocked
+         * by) the tenant's own free-tier email quota.
+         */
+        async sendQuotaThresholdNotice(
+            n: 4 | 5,
+            deps: { db: D1Database; kv?: KVNamespace; tenantId: string; billingPortalUrl?: string | null },
+        ): Promise<void> {
+            const dedupeKey = `quota-notice:${deps.tenantId}:${n}`;
+            if (deps.kv && await deps.kv.get(dedupeKey)) return;
+
+            const { drizzle } = await import('drizzle-orm/d1');
+            const { users } = await import('../../lib/db/schema');
+            const { eq, and, isNull } = await import('drizzle-orm');
+            const db = drizzle(deps.db);
+            const owner = await db.select({ email: users.email })
+                .from(users)
+                .where(and(eq(users.tenantId, deps.tenantId), eq(users.role, 'owner'), isNull(users.deletedAt)))
+                .get();
+            if (!owner?.email) return;
+
+            const appName = escapeHtml(this.appName);
+            const cta = deps.billingPortalUrl
+                ? `<p><a href="${deps.billingPortalUrl}" style="background:#4f46e5;color:#fff;padding:10px 20px;text-decoration:none;border-radius:6px;">Manage subscription</a></p>`
+                : '';
+            const subject = n === 4 ? 'One free inspection left' : "You've used your 5 free inspections";
+            const html = n === 4
+                ? `<p>Your ${appName} workspace has used 4 of your 5 free inspections. You have one free inspection left.</p>${cta}`
+                : `<p>Your ${appName} workspace has used your 5 free inspections — everything stays usable; subscribe to create new ones.</p>${cta}`;
+
+            await this.sendEmail([owner.email], subject, html);
+
+            if (deps.kv) await deps.kv.put(dedupeKey, '1');
+        }
+
+        /**
          * Phase T (T22): Send a notification email to the other party when a new message arrives.
          * Throttled per inspection per direction via TENANT_CACHE KV (5 min window).
          * recipient: 'client' = email client; 'inspector' = email inspector

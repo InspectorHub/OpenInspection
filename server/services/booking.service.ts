@@ -14,12 +14,21 @@ import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { buildSlotGrid } from '../lib/booking/slot-grid';
 import { computeBusyTimes } from '../lib/booking/busy-times';
+import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
 /**
  * Service to handle public booking flow and availability lookups.
  */
 export class BookingService {
-    constructor(private db: D1Database) {}
+    /**
+     * Free-tier usage-quota guard (optional). Present only in SaaS deploys
+     * with `hasUsageQuota` (see deployment-profile.ts); undefined in
+     * standalone, where booking creation stays unlimited. Only the
+     * legacy single-service branch of `fulfillBooking` consumes directly —
+     * the multi-service branch delegates to InspectionRequestService.create,
+     * which carries its own guard and consumes once per sub-inspection.
+     */
+    constructor(private db: D1Database, private planQuota?: PlanQuotaGuard) {}
 
     private getDrizzle() {
         return drizzle(this.db);
@@ -513,6 +522,12 @@ export class BookingService {
             primaryInspectionId = crypto.randomUUID();
             createdRequestId = `req-${primaryInspectionId}`;
             const now = new Date();
+            // Quota is consumed AFTER every precondition check above (bot
+            // protection, widget origin, inspector ownership, booking-open,
+            // slot availability) and BEFORE either row below is inserted —
+            // the request row must never be orphaned (created with no
+            // inspection behind it) because the tenant hit the cap.
+            await this.planQuota?.consumeInspection(tenantId);
             // Insert one-inspection request first so the FK is satisfied.
             await db.insert(inspectionRequests).values({
                 id:              createdRequestId,

@@ -160,7 +160,7 @@ export const identityRoutes = createApiRouter()
         const { confirmEmail } = c.req.valid('json');
         const db = drizzle(c.env.DB);
         try {
-            const data = await softDeleteAccount(db, userId, confirmEmail);
+            const data = await softDeleteAccount(db, userId, confirmEmail, c.env.TENANT_CACHE);
             return c.json({ success: true as const, data }, 200);
         } catch (e) {
             if (e instanceof Error && /not found/i.test(e.message)) {

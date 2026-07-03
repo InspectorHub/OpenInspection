@@ -7279,8 +7279,8 @@
       "parameters": [],
       "body": null
     },
-    "summary": "Get the current tenant's usage summary (sms/email/storage)",
-    "description": "Returns the calling tenant's cumulative SMS and email counts plus the latest measured storage bytes."
+    "summary": "Get the current tenant's usage summary (inspections/sms/email/storage/seats + free-tier caps)",
+    "description": "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against."
   },
   {
     "operationId": "importContacts",

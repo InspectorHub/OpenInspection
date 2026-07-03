@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, sql, isNull } from 'drizzle-orm';
 import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
@@ -53,7 +53,10 @@ export class AuthService {
      */
     async validateCredentials(email: string, password: string) {
         const db = this.getDrizzle();
-        const user = await db.select().from(users).where(eq(users.email, email)).get();
+        // Soft-deleted (removed member / self-deleted account) rows are
+        // excluded — a matching row that isn't NULL-deleted-at must never
+        // authenticate, even if the caller somehow still knows the password.
+        const user = await db.select().from(users).where(and(eq(users.email, email), isNull(users.deletedAt))).get();
 
         if (!user) {
             // Perform a throwaway verification against a fixed hash so the response time
@@ -109,7 +112,16 @@ export class AuthService {
      *
      * Post-multi-workspace: same email can already exist in another
      * tenant — we only reject when it already exists within THIS tenant.
-     * UNIQUE(tenant_id, email) at the DB layer is the hard backstop.
+     * UNIQUE(tenant_id, email) at the DB layer is the hard backstop (the
+     * unique index is partial — `WHERE deleted_at IS NULL` — so it only
+     * guards active rows).
+     *
+     * A soft-deleted row for this (tenantId, email) — i.e. a previously
+     * removed member (TeamService.removeMember) — is REACTIVATED in place
+     * rather than inserted as a new row: `deletedAt` is cleared and the
+     * invited role/credentials are applied. This reattaches the member's
+     * inspection history under their original id and avoids a UNIQUE(email)
+     * conflict with the still-present soft-deleted row.
      */
     async joinTeam(token: string, password: string, name?: string) {
         const db = this.getDrizzle();
@@ -122,29 +134,59 @@ export class AuthService {
         const existing = await db.select().from(users)
             .where(and(eq(users.tenantId, invite.tenantId), eq(users.email, invite.email)))
             .get();
-        if (existing) throw Errors.Conflict('An account with this email already exists in this workspace');
+        if (existing && !existing.deletedAt) {
+            throw Errors.Conflict('An account with this email already exists in this workspace');
+        }
 
         const passwordHash = await hashPassword(password);
-        const userId = crypto.randomUUID();
         const trimmedName = name?.trim();
+        let userId: string;
 
-        await db.insert(users).values({
-            id: userId,
-            tenantId: invite.tenantId,
-            email: invite.email,
-            passwordHash,
-            role: invite.role,
-            // Carry the inviter's chosen permission-template overrides onto the
-            // new member row (null when the invite used the pure role template).
-            permissionOverrides: invite.permissionOverrides ?? null,
-            ...(trimmedName ? { name: trimmedName } : {}),
-            createdAt: new Date(),
-        });
+        if (existing) {
+            userId = existing.id;
+            await db.update(users).set({
+                deletedAt: null,
+                passwordHash,
+                role: invite.role,
+                // Carry the inviter's chosen permission-template overrides onto
+                // the reactivated row (null when the invite used the pure role
+                // template) — replaces whatever the removed member had before.
+                permissionOverrides: invite.permissionOverrides ?? null,
+                // Reset TOTP enrollment to its never-enrolled defaults (see
+                // schema/tenant/user.ts). The invited person accepting this
+                // invite may be a different individual than whoever previously
+                // held this row — reactivating with the old secret intact
+                // would 2FA-challenge them against a code they never set up,
+                // with no admin endpoint to disable it. The new occupant
+                // re-enrolls 2FA themselves if they want it.
+                totpSecret: null,
+                totpEnabled: false,
+                totpRecoveryCodes: null,
+                totpVerifiedAt: null,
+                ...(trimmedName ? { name: trimmedName } : {}),
+            }).where(eq(users.id, existing.id));
+        } else {
+            userId = crypto.randomUUID();
+            await db.insert(users).values({
+                id: userId,
+                tenantId: invite.tenantId,
+                email: invite.email,
+                passwordHash,
+                role: invite.role,
+                // Carry the inviter's chosen permission-template overrides onto the
+                // new member row (null when the invite used the pure role template).
+                permissionOverrides: invite.permissionOverrides ?? null,
+                ...(trimmedName ? { name: trimmedName } : {}),
+                createdAt: new Date(),
+            });
+        }
 
         await db.update(tenantInvites).set({ status: 'accepted' }).where(eq(tenantInvites.id, token));
 
         // Tell portal about the new membership so its `/company/switch`
-        // picker shows this company next time the identity signs in.
+        // picker shows this company next time the identity signs in. Fires
+        // the same way for reactivation as for a brand-new join — the
+        // reverse seat sync on the portal side bumps quantity back up either way.
         if (this.outbox) {
             await this.outbox.append({
                 type: 'user.invited',

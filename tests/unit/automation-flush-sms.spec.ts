@@ -9,6 +9,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../server/services/automation.service';
 import { SmsConsentService } from '../../server/services/sms-consent.service';
 import type { EmailService } from '../../server/services/email.service';
+import { PlanQuotaGuard } from '../../server/features/plan-quota/guard';
 
 // Stub emailFor factory: returns a no-op EmailService (SMS tests don't exercise the email path).
 const stubEmailFor = async (_tid: string) => ({ sendEmail: async () => ({ delivered: true }) } as unknown as EmailService);
@@ -326,6 +327,76 @@ describe('flush() — managed-send compliance gate (Task 8)', () => {
         const { logId } = await seedSmsLog({ contactId: 'c1' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
         await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+        expect((await statusOf(logId))?.status).toBe('sent');
+        expect(fakeSendMessage).toHaveBeenCalledTimes(1);
+    });
+});
+
+// ─── Free-tier pre-flight + source tagging (Task 5) ──────────────────────────
+// A second independent SMS send site: automations flush through deliverSms
+// (not server/api/sms.ts), so the same pre-flight + tagging is wired here too
+// (scheduled.ts threads its quotaGuard into flush()'s new trailing param).
+
+describe('flush() — SMS free-tier pre-flight + source tagging (Task 5)', () => {
+    beforeEach(() => {
+        fakeSendMessage.mockClear();
+        fakeSendMessage.mockResolvedValue({ ok: true });
+        smsRuntime.resolveProvider.mockClear();
+        smsRuntime.resolveProvider.mockResolvedValue({ provider: fakeProvider, from: '+1999' });
+    });
+
+    it('free tenant (platform mode) at 50 lifetime sms → log failed (quota exceeded), no provider send', async () => {
+        const quotaGuard = new PlanQuotaGuard({} as D1Database, { enforced: true, billingPortalUrl: null });
+        await new MeteringService({} as D1Database).record(TENANT, 'sms', '2026-06', 50);
+        const { logId } = await seedSmsLog({ contactId: 'c1' });
+        await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
+
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime, 50, undefined, quotaGuard);
+
+        const r = await statusOf(logId);
+        expect(r?.status).toBe('failed');
+        expect(r?.error).toMatch(/Free plan limit reached/);
+        expect(fakeSendMessage).not.toHaveBeenCalled();
+    });
+
+    it("'own' mode tenant at 50 seeded platform sms → send proceeds and records 'sms_byo'", async () => {
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT, smsMode: 'own', updatedAt: new Date(),
+        } as never);
+        const quotaGuard = new PlanQuotaGuard({} as D1Database, { enforced: true, billingPortalUrl: null });
+        await new MeteringService({} as D1Database).record(TENANT, 'sms', '2026-06', 50);
+        const record = vi.fn().mockResolvedValue(undefined);
+        svc = new AutomationService({} as D1Database, undefined, undefined, { record } as never);
+        const { logId } = await seedSmsLog({ contactId: 'c1' });
+        await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
+
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime, 50, undefined, quotaGuard);
+
+        expect((await statusOf(logId))?.status).toBe('sent');
+        expect(fakeSendMessage).toHaveBeenCalledTimes(1);
+        expect(record).toHaveBeenCalledWith(TENANT, 'sms_byo', expect.stringMatching(/^\d{4}-\d{2}$/));
+    });
+
+    it('platform-mode send under the cap → records plain \'sms\'', async () => {
+        const quotaGuard = new PlanQuotaGuard({} as D1Database, { enforced: true, billingPortalUrl: null });
+        const record = vi.fn().mockResolvedValue(undefined);
+        svc = new AutomationService({} as D1Database, undefined, undefined, { record } as never);
+        const { logId } = await seedSmsLog({ contactId: 'c1' });
+        await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
+
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime, 50, undefined, quotaGuard);
+
+        expect((await statusOf(logId))?.status).toBe('sent');
+        expect(record).toHaveBeenCalledWith(TENANT, 'sms', expect.stringMatching(/^\d{4}-\d{2}$/));
+    });
+
+    it('no quotaGuard supplied (standalone) → cap never enforced even at 50', async () => {
+        await new MeteringService({} as D1Database).record(TENANT, 'sms', '2026-06', 50);
+        const { logId } = await seedSmsLog({ contactId: 'c1' });
+        await new SmsConsentService({} as D1Database).record(TENANT, 'c1', 'granted', 'admin', {});
+
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+
         expect((await statusOf(logId))?.status).toBe('sent');
         expect(fakeSendMessage).toHaveBeenCalledTimes(1);
     });

@@ -16,7 +16,7 @@
  * time so the dropdown can render without per-row joins.
  */
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { userIdentityLinks } from '../lib/db/schema/identity-links';
 import { users } from '../lib/db/schema';
 import { signJwt } from '../lib/jwt-keyring';
@@ -64,8 +64,11 @@ export class IdentityService {
             .get();
         if (!link) return { kind: 'forbidden' };
 
+        // Excludes soft-deleted (removed member) rows — switching mints a
+        // fresh JWT without a password check, so it must honor the same
+        // active-user gate as login.
         const linkedUser = await db.select().from(users)
-            .where(eq(users.id, linkedUserId)).get();
+            .where(and(eq(users.id, linkedUserId), isNull(users.deletedAt))).get();
         if (!linkedUser) return { kind: 'not_found' };
 
         const newToken = await signJwt({

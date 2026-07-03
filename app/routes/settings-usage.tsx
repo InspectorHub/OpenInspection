@@ -13,11 +13,28 @@ export function meta() {
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+/** Free-tier caps mirror server/features/plan-quota/policy.ts (FREE_TIER_CAPS).
+ *  Null for every non-free tenant and for standalone deploys — the UI hides
+ *  progress bars and falls back to a plain cumulative count. */
+interface UsageCaps {
+  inspections: number;
+  sms: number;
+  email: number;
+}
+
 interface UsageSummary {
-  tenantId?: string;
-  sms?: number;
-  email?: number;
-  r2Bytes?: number;
+  tier?: string;
+  caps?: UsageCaps | null;
+  usage?: {
+    inspections?: number;
+    sms?: number;
+    email?: number;
+    smsByo?: number;
+    emailByo?: number;
+    seatsUsed?: number;
+    seatsMax?: number | null;
+    r2Bytes?: number;
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -55,6 +72,8 @@ export default function SettingsUsagePage() {
   if ("forbidden" in data) return <AccessDenied />;
   const { usage } = data;
   const isSaas = session?.branding?.isSaas ?? false;
+  const caps = usage.caps ?? null;
+  const u = usage.usage ?? {};
 
   return (
     <div className="space-y-[18px]">
@@ -67,24 +86,51 @@ export default function SettingsUsagePage() {
 
       <h2 className="text-[19px] font-bold text-ih-fg-1">Usage</h2>
       <p className="text-[13px] text-ih-fg-3">
-        What this account has consumed. SMS and email are cumulative totals; storage is measured once a day.
+        {caps
+          ? "What this account has used on the free plan. Storage is measured once a day."
+          : isSaas
+            ? "What this account has consumed. Inspections/SMS/email are cumulative totals; storage is measured once a day."
+            : "What this account has consumed. SMS/email are cumulative totals; storage is measured once a day."}
       </p>
 
-      {/* Metric cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <MetricCard
-          label="SMS sent"
-          value={(usage.sms ?? 0).toLocaleString()}
-          sub="Text messages sent — cumulative"
-        />
-        <MetricCard
-          label="Emails sent"
-          value={(usage.email ?? 0).toLocaleString()}
-          sub="Emails delivered — cumulative"
-        />
+      {/* Metric cards — inspections (SaaS only) + SMS, email, storage.
+          `inspections` is only ever written by the SaaS free-tier consume path
+          (see PlanQuotaGuard.consumeInspection) — a standalone deploy never
+          populates it, so the meter would otherwise show a permanently-0 card.
+          `caps` alone can't distinguish standalone from a paid SaaS tenant
+          (both are null), so gate on `isSaas` from session context instead;
+          paid SaaS tenants still see the lifetime-analytics count. */}
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isSaas ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+        {isSaas && (caps ? (
+          <CappedMetricCard label="Inspections" used={u.inspections ?? 0} cap={caps.inspections} />
+        ) : (
+          <MetricCard
+            label="Inspections"
+            value={(u.inspections ?? 0).toLocaleString()}
+            sub="Inspections created — cumulative"
+          />
+        ))}
+        {caps ? (
+          <CappedMetricCard label="SMS sent" used={u.sms ?? 0} cap={caps.sms} byo={u.smsByo ?? 0} />
+        ) : (
+          <MetricCard
+            label="SMS sent"
+            value={(u.sms ?? 0).toLocaleString()}
+            sub="Text messages sent — cumulative"
+          />
+        )}
+        {caps ? (
+          <CappedMetricCard label="Emails sent" used={u.email ?? 0} cap={caps.email} byo={u.emailByo ?? 0} />
+        ) : (
+          <MetricCard
+            label="Emails sent"
+            value={(u.email ?? 0).toLocaleString()}
+            sub="Emails delivered — cumulative"
+          />
+        )}
         <MetricCard
           label="Storage used"
-          value={fmtBytes(usage.r2Bytes ?? 0)}
+          value={fmtBytes(u.r2Bytes ?? 0)}
           sub="Photos & documents — measured daily"
         />
       </div>
@@ -112,6 +158,50 @@ function MetricCard({ label, value, sub }: { label: string; value: string; sub: 
       <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{label}</div>
       <div className="text-[28px] font-bold text-ih-fg-1 mt-1 tabular-nums">{value}</div>
       <div className="text-[12px] text-ih-fg-3 mt-1">{sub}</div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Capped metric card (free tier) — used/cap progress, red at 100%,   */
+/*  plus an uncapped BYO line for sms/email when `byo` is passed.      */
+/* ------------------------------------------------------------------ */
+
+function CappedMetricCard({
+  label,
+  used,
+  cap,
+  byo,
+}: {
+  label: string;
+  used: number;
+  cap: number;
+  /** Bring-your-own volume for this metric (sms_byo/email_byo) — uncapped,
+   *  metered separately, does not count against the free-plan limit. */
+  byo?: number;
+}) {
+  const atCap = used >= cap;
+  const pct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
+
+  return (
+    <div className="bg-ih-bg-card border border-ih-border rounded-lg p-5">
+      <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{label}</div>
+      <div className="text-[28px] font-bold text-ih-fg-1 mt-1 tabular-nums">
+        {used.toLocaleString()}
+        <span className="text-[14px] font-medium text-ih-fg-4"> / {cap.toLocaleString()}</span>
+      </div>
+      <div className="mt-2 h-1.5 rounded-full bg-ih-bg-muted overflow-hidden">
+        <div
+          className={`h-full rounded-full ${atCap ? "bg-ih-bad" : "bg-ih-primary"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className={`text-[12px] mt-1 ${atCap ? "text-ih-bad-fg font-semibold" : "text-ih-fg-3"}`}>
+        {atCap ? "Free plan limit reached" : `${cap - used} left on the free plan`}
+      </div>
+      {byo !== undefined && (
+        <div className="text-[11px] text-ih-fg-4 mt-1">via your own account: {byo.toLocaleString()}</div>
+      )}
     </div>
   );
 }
