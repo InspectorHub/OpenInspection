@@ -5,6 +5,8 @@ import { AuditLogService } from '../services/audit-log.service';
 import { m2mAgreementRenderUrl } from '../lib/public-urls';
 import { buildEvidencePack } from '../services/evidence-pack.service';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
+import { getDeploymentProfile } from '../lib/deployment-profile';
+import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
@@ -221,7 +223,15 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                 // B-13: resolve the tenant's sender identity + branded renderer
                 // (own/platform Resend, display name, reply-to, template overrides)
                 // even though Workflows run outside diMiddleware.
-                const email = await buildTenantEmailService(env, req.tenantId);
+                // Free-tier pre-flight (2026-07): Workflows have no Hono context, so
+                // build the guard from the pure deployment profile + a one-shot tier
+                // lookup (mirrors PlanQuotaGuard.consumeInspection's own pattern).
+                const profile = getDeploymentProfile(env);
+                const quotaGuard = profile.hasUsageQuota
+                    ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl })
+                    : undefined;
+                const tenantTier = quotaGuard ? await readTenantTier(env.DB, req.tenantId) : undefined;
+                const email = await buildTenantEmailService(env, req.tenantId, quotaGuard, tenantTier);
                 await email.sendEvidencePack({
                     to: req.clientEmail,
                     clientName: req.clientName ?? 'Customer',

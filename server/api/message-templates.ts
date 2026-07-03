@@ -6,6 +6,7 @@ import { MessageTemplateService } from '../services/message-template.service';
 import { smsSegmentInfo } from '../lib/sms/segments';
 import { interpolate } from '../services/automation/shared';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
+import { PlanQuotaGuard, readTenantTier } from '../features/plan-quota/guard';
 import { loadProviderForTenant } from '../lib/sms/resolve-twilio';
 import { normalizeE164 } from '../lib/sms/phone';
 import {
@@ -162,7 +163,18 @@ export const messageTemplateRoutes = createApiRouter()
             return res.ok ? c.json({ success: true }, 200) : c.json({ success: false, error: res.error }, 200);
         }
         // Per-tenant email transport (resolves the tenant's own provider/keys).
-        const emailSvc = await buildTenantEmailService(c.env, tenantId);
+        // Free-tier pre-flight (2026-07): a manual "test send" spends real
+        // platform-mode quota just like any other send, so gate it the same way
+        // — session-context `tenantTier` is unset on this JWT-authed route, so
+        // fall back to the one-shot tier lookup (mirrors di.ts's request-context
+        // resolution).
+        const quotaGuard = c.var.profile.hasUsageQuota
+            ? new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl })
+            : undefined;
+        const tenantTier = quotaGuard
+            ? (c.get('tenantTier') ?? await readTenantTier(c.env.DB, tenantId))
+            : undefined;
+        const emailSvc = await buildTenantEmailService(c.env, tenantId, quotaGuard, tenantTier);
         const { delivered } = await emailSvc.sendEmail([to], interpolate(subject ?? '', vars), interpolate(body, vars));
         return delivered ? c.json({ success: true }, 200) : c.json({ success: false, error: 'Email is not configured.' }, 200);
     });

@@ -55,7 +55,7 @@ import { RepairRequestService } from '../../services/repair-request.service';
 import { ClientDocumentService } from '../../services/client-document.service';
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
-import { PlanQuotaGuard } from '../../features/plan-quota/guard';
+import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
 
 /**
  * Middleware that injects a lazy-loaded service registry into the Hono context.
@@ -78,13 +78,23 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
     // root-mounted auth duplicates (/forgot-password) send platform-branded
     // mail by design, so the /api/ gate loses nothing there.
     let emailCfg: LoadedEmailConfig = { dbSecrets: {} };
+    // The email free-tier pre-flight (below) needs the tenant's plan tier.
+    // `tenantTier` is only populated in session-context by the public/
+    // fixed-tenant tenant-routing resolvers (server/features/tenant-routing) —
+    // JWT-authenticated saas API requests never set it (see jwtAuthMiddleware
+    // in server/index.ts), so resolve it here once per request, under the same
+    // /api/ gate as emailCfg, whenever the usage-quota guard is active.
+    let tenantTierForQuota: string | undefined = c.get('tenantTier');
     if (tenantId && c.req.path.startsWith('/api/')) {
         emailCfg = await loadTenantEmailConfig(c.env, tenantId);
+        if (!tenantTierForQuota && c.var.profile.hasUsageQuota) {
+            tenantTierForQuota = await readTenantTier(c.env.DB, tenantId).catch(() => undefined);
+        }
     }
 
     // One place decides own-vs-platform Resend + branded renderer, shared with
     // non-request contexts (workflows/scheduled) via assembleTenantEmailService.
-    const buildEmailService = () => assembleTenantEmailService(c.env, emailCfg, c.get('tenantId'));
+    const buildEmailService = () => assembleTenantEmailService(c.env, emailCfg, c.get('tenantId'), buildPlanQuota(), tenantTierForQuota);
 
     // Build the core->portal outbox sink, gated on the SYNC_QUEUE producer
     // binding — the transport itself. No queue → no sink → append() no-ops:

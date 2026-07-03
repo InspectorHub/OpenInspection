@@ -17,6 +17,20 @@ import { FREE_TIER_CAPS } from './policy';
  *    MeteringService.record in the sms/email pipelines) so a provider failure
  *    never consumes quota it didn't actually spend.
  */
+/**
+ * One-line tenant-tier lookup, defaulting to 'free' when the row is missing
+ * or the query fails. Shared by `consumeInspection` (below) and every
+ * `assembleTenantEmailService`/`buildTenantEmailService` caller that has no
+ * session-context `tenantTier` to read (JWT-authenticated saas API requests
+ * never populate it — only the public/fixed-tenant tenant-routing resolvers
+ * do — and non-request contexts like Workflows/cron have no context at all).
+ */
+export async function readTenantTier(db: D1Database, tenantId: string): Promise<string> {
+  const row = await drizzle(db).select({ tier: tenants.tier }).from(tenants)
+    .where(eq(tenants.id, tenantId)).get();
+  return row?.tier ?? 'free';
+}
+
 export class PlanQuotaGuard {
   constructor(
     private db: D1Database,
@@ -27,10 +41,7 @@ export class PlanQuotaGuard {
    *  (throws QuotaExhausted at the cap). Other tiers / standalone: plain increment
    *  (lifetime analytics). Counter is monotonic — deletes never refund. */
   async consumeInspection(tenantId: string): Promise<void> {
-    const d = drizzle(this.db);
-    const row = await d.select({ tier: tenants.tier }).from(tenants)
-      .where(eq(tenants.id, tenantId)).get();
-    const tier = row?.tier ?? 'free';
+    const tier = await readTenantTier(this.db, tenantId);
 
     if (!this.opts.enforced || tier !== 'free') {
       await new MeteringService(this.db).record(tenantId, 'inspections', STOCK_PERIOD);
