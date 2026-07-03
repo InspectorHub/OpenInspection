@@ -15,6 +15,7 @@ import { requireServiceBinding } from './service-binding-guard';
 import { aggregateUsage } from '../lib/usage/aggregate';
 import { usageCounters } from '../lib/db/schema/usage';
 import { FREE_TIER_CAPS } from '../features/plan-quota/policy';
+import { getSeatUsage } from '../features/seat-quota/usage';
 
 const api = new Hono<HonoConfig>();
 
@@ -183,6 +184,24 @@ api.post('/sync-quota', requireServiceBinding, async (c) => {
         return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
     }
     return c.json({ success: true });
+});
+
+/**
+ * GET /api/integration/tenants/:slug/seat-usage
+ * Reverse seat-sync read: lets the portal reconcile a tenant's Stripe seat
+ * quantity against the ACTUAL count of active (non-soft-deleted) members,
+ * rather than trusting portal's own last-written value. Thin wrapper around
+ * getSeatUsage (server/features/seat-quota/usage.ts) — same active-member
+ * definition (`deleted_at IS NULL`) used by the invite/seat-guard middleware.
+ */
+api.get('/tenants/:slug/seat-usage', requireServiceBinding, async (c) => {
+    const slug = c.req.param('slug');
+    const d = drizzle(c.env.DB);
+    const t = await d.select({ id: tenants.id }).from(tenants).where(eq(tenants.slug, slug as string)).get();
+    if (!t) return c.json({ success: false, error: { message: 'Tenant not found' } }, 404);
+
+    const usage = await getSeatUsage(t.id as string, c.env.DB);
+    return c.json({ success: true, data: { used: usage.used, max: usage.max } });
 });
 
 /**
