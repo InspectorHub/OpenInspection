@@ -113,6 +113,31 @@ describe('Inspection creation consumes the free-tier quota (Task 3)', () => {
         expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(1);
     });
 
+    it('cloneInspection of a nonexistent id rejects and does not consume quota', async () => {
+        const guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
+        const svc = makeService(guard);
+
+        await svc.createInspection(TENANT, minimalCreateData()); // 1 — establishes a nonzero baseline
+        await expect(svc.cloneInspection('does-not-exist', TENANT)).rejects.toMatchObject({
+            status: 404,
+        });
+
+        // The failed lookup must not have burned a lifetime slot.
+        expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(1);
+    });
+
+    it('createReinspection with a nonexistent baseline rejects and does not consume quota', async () => {
+        const guard = new PlanQuotaGuard(testD1, { enforced: true, billingPortalUrl: null });
+        const svc = makeService(guard);
+
+        await svc.createInspection(TENANT, minimalCreateData()); // 1 — establishes a nonzero baseline
+        await expect(svc.createReinspection(TENANT, 'does-not-exist', { selectedItemIds: [] }))
+            .rejects.toThrow(/baseline inspection not found/i);
+
+        // The failed lookup must not have burned a lifetime slot.
+        expect(await new MeteringService(testD1).lifetimeTotal(TENANT, 'inspections')).toBe(1);
+    });
+
     it('without a guard (standalone DI), creates are unlimited', async () => {
         const bare = makeService(undefined);
 

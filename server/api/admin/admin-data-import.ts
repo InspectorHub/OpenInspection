@@ -144,6 +144,7 @@ export const adminDataImportRoutes = createApiRouter()
         const importAssignments: Array<{ inspectionId: string; inspectorId: string | null }> = [];
         for (const ins of importedInspections as unknown as InspectionImport[]) {
             if (!ins.id || !ins.propertyAddress) continue;
+            // Imported historical inspections deliberately do not consume plan quota.
             await db.insert(inspections).values({
                 id: ins.id, tenantId, propertyAddress: ins.propertyAddress,
                 inspectorId: ins.inspectorId || null, clientName: ins.clientName || null,

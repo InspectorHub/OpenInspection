@@ -288,7 +288,6 @@ export class InspectionCoreService extends InspectionSubService {
      * Creates a new inspection.
      */
     async createInspection(tenantId: string, data: CreateInspectionData & { inspectorId?: string; clientContactId?: string }): Promise<Inspection> {
-        await this.planQuota?.consumeInspection(tenantId);
         if (!this.sdb) throw new Error('ScopedDB session missing');
         const id = crypto.randomUUID();
         const createdAt = new Date();
@@ -390,6 +389,11 @@ export class InspectionCoreService extends InspectionSubService {
         };
 
         await this.assertContactsBelongToTenant(tenantId, [data.referredByAgentId, data.sellingAgentId, data.clientContactId]);
+        // Quota is consumed only after every precondition check above has
+        // passed and immediately before the row that actually creates the
+        // inspection — a failed validation (e.g. a bad contact reference)
+        // must never burn a free tenant's lifetime slot.
+        await this.planQuota?.consumeInspection(tenantId);
         await this.sdb.insert(inspections, newInspection);
         // DB-8: mirror assignment into inspection_inspectors link table.
         // Non-fatal — a sync failure must not roll back a committed inspection row.
@@ -479,7 +483,6 @@ export class InspectionCoreService extends InspectionSubService {
         baselineId: string,
         opts: { selectedItemIds: string[]; inspectorId?: string },
     ): Promise<Inspection> {
-        await this.planQuota?.consumeInspection(tenantId);
         const db = this.getDrizzle();
 
         const baseline = await db.select().from(inspections)
@@ -525,6 +528,12 @@ export class InspectionCoreService extends InspectionSubService {
 
         const id = crypto.randomUUID();
         const createdAt = new Date();
+        // Quota is consumed only after every precondition check above (baseline
+        // existence, published-baseline gate, inspector ownership) has passed
+        // and immediately before the insert that actually creates the
+        // re-inspection — a failed validation must never burn a free tenant's
+        // lifetime slot.
+        await this.planQuota?.consumeInspection(tenantId);
         await db.insert(inspections).values({
             id,
             tenantId,
@@ -798,8 +807,11 @@ export class InspectionCoreService extends InspectionSubService {
      * Clones an existing inspection.
      */
     async cloneInspection(id: string, tenantId: string): Promise<Inspection> {
-        await this.planQuota?.consumeInspection(tenantId);
+        // getInspection throws NotFound for a bad id — that precondition check
+        // must run BEFORE quota is consumed, so cloning a nonexistent
+        // inspection never burns a free tenant's lifetime slot.
         const { inspection: source } = await this.getInspection(id, tenantId);
+        await this.planQuota?.consumeInspection(tenantId);
 
         const clone = {
             ...source,

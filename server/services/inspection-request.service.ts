@@ -18,6 +18,7 @@ import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
+import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
 export interface CreateRequestInput {
     clientName:      string;
@@ -80,7 +81,14 @@ type SubInspectionRow = {
 type RequestRow = typeof inspectionRequests.$inferSelect;
 
 export class InspectionRequestService {
-    constructor(private db: D1Database) {}
+    /**
+     * Free-tier usage-quota guard (optional). Present only in SaaS deploys
+     * with `hasUsageQuota` (see deployment-profile.ts); undefined in
+     * standalone, where request creation stays unlimited. `create` consumes
+     * once per sub-inspection (a request can bundle up to 10); addSubInspection
+     * consumes once for its single new row.
+     */
+    constructor(private db: D1Database, private planQuota?: PlanQuotaGuard) {}
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private getDrizzle() { return drizzle(this.db as any); }
@@ -205,6 +213,15 @@ export class InspectionRequestService {
 
         const totalAmount = subs.reduce((sum, s) => sum + (s.price ?? 0), 0);
 
+        // Quota is consumed once per sub-inspection, after every precondition
+        // check above (bounds, template ownership) and BEFORE the parent
+        // request row is inserted — a request row must never be orphaned
+        // (created with zero children) because the tenant hit the cap
+        // partway through.
+        for (let i = 0; i < subs.length; i++) {
+            await this.planQuota?.consumeInspection(tenantId);
+        }
+
         await db.insert(inspectionRequests).values({
             id:              requestId,
             tenantId,
@@ -274,6 +291,11 @@ export class InspectionRequestService {
             .where(and(eq(templates.id, sub.templateId), eq(templates.tenantId, tenantId)))
             .get();
         if (!tpl) throw Errors.BadRequest(`Template not found: ${sub.templateId}`);
+
+        // Quota is consumed only after both precondition checks above (request
+        // exists, template exists) and immediately before the insert that
+        // actually creates the new sub-inspection.
+        await this.planQuota?.consumeInspection(tenantId);
 
         const id = crypto.randomUUID();
         const now = new Date();

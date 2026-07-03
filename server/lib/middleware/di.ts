@@ -112,8 +112,12 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
 
     // Free-tier usage-quota guard, gated on the deployment profile (SaaS only —
     // see hasUsageQuota in deployment-profile.ts). Standalone gets `undefined`,
-    // so InspectionCoreService's `this.planQuota?.` optional-chain calls no-op
-    // and creation stays unlimited by construction, not by a branch here.
+    // so every consuming service's `this.planQuota?.` optional-chain calls
+    // no-op and creation stays unlimited by construction, not by a branch
+    // here. Every inspection-creation path is guarded: InspectionCoreService
+    // (create/clone/reinspection), BookingService (public self-serve
+    // booking), ConciergeService (agent-submitted booking), and
+    // InspectionRequestService (multi-service request + append-a-sub-inspection).
     const buildPlanQuota = (): PlanQuotaGuard | undefined => {
         if (!c.var.profile.hasUsageQuota) return undefined;
         return new PlanQuotaGuard(c.env.DB, { enforced: true, billingPortalUrl: c.var.profile.billingPortalUrl });
@@ -169,7 +173,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.outbox = buildOutbox();
                     break;
                 case 'booking':
-                    target.booking = new BookingService(c.env.DB);
+                    target.booking = new BookingService(c.env.DB, buildPlanQuota());
                     break;
                 case 'branding':
                     target.branding = new BrandingService(c.env.DB, c.env.TENANT_CACHE);
@@ -278,7 +282,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.importHistory = new ImportHistoryService(c.env.DB, c.get('tenantId'));
                     break;
                 case 'inspectionRequest':
-                    target.inspectionRequest = new InspectionRequestService(c.env.DB);
+                    target.inspectionRequest = new InspectionRequestService(c.env.DB, buildPlanQuota());
                     break;
                 case 'ratingSystem':
                     target.ratingSystem = new RatingSystemService(c.env.DB);
@@ -334,6 +338,7 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                             c.env.DB,
                             target.email,
                             c.env.APP_BASE_URL || '',
+                            buildPlanQuota(),
                         );
                     }
                     break;

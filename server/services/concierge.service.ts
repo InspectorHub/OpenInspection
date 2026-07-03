@@ -14,6 +14,7 @@ import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
 import type { EmailService } from './email.service';
+import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
 /**
  * Agent Accounts A3 — Concierge state machine service.
@@ -88,10 +89,17 @@ function toMs(value: Date | number | null | undefined): number {
 }
 
 export class ConciergeService {
+    /**
+     * Free-tier usage-quota guard (optional). Present only in SaaS deploys
+     * with `hasUsageQuota` (see deployment-profile.ts); undefined in
+     * standalone, where concierge booking stays unlimited. See the
+     * `consumeInspection` call site in createBooking.
+     */
     constructor(
         private db: D1Database,
         private email: EmailService,
         private appBaseUrl: string,
+        private planQuota?: PlanQuotaGuard,
     ) {}
 
     private getDrizzle() {
@@ -166,6 +174,12 @@ export class ConciergeService {
         const inspectionId = crypto.randomUUID();
         const conciergeStatus: 'awaiting_inspector' | 'awaiting_client' =
             reviewRequired ? 'awaiting_inspector' : 'awaiting_client';
+        // Quota is consumed only after every precondition check above (agent
+        // link active, inspector contact resolved, inspector user resolved)
+        // has passed and immediately before the insert that actually creates
+        // the inspection — a failed validation must never burn a free
+        // tenant's lifetime slot.
+        await this.planQuota?.consumeInspection(params.tenantId);
         await db.insert(inspections).values({
             id: inspectionId,
             tenantId: params.tenantId,
