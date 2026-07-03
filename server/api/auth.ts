@@ -1,7 +1,7 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { users } from '../lib/db/schema';
 import { setCookie } from 'hono/cookie';
 import { Errors } from '../lib/errors';
@@ -380,8 +380,11 @@ export const coreAuthRoutes = createApiRouter()
         if (!parsed.userId || !parsed.tenantId) return c.redirect('/login?sso=invalid', 302);
 
         const d = drizzle(c.env.DB);
+        // Excludes soft-deleted (removed member) rows — a portal handoff must
+        // not mint a session cookie for a member who has been removed from
+        // this workspace.
         const user = await d.select().from(users)
-            .where(and(eq(users.id, parsed.userId), eq(users.tenantId, parsed.tenantId)))
+            .where(and(eq(users.id, parsed.userId), eq(users.tenantId, parsed.tenantId), isNull(users.deletedAt)))
             .get();
         if (!user) return c.redirect('/login?sso=invalid', 302);
 

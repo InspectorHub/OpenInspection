@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { tenants, users } from '../../lib/db/schema';
 import { computeSeatsUsed } from '../../lib/middleware/seat-guard';
 
@@ -30,11 +30,11 @@ export interface SeatUsage {
  * the usage snapshot. No DI, no env access — callers (services, middleware)
  * are responsible for resolving the DB and tenant id.
  *
- * Note on "active" filter: this codebase does NOT track per-user status on
- * `users` (no `users.status` / `users.deletedAt` column at time of writing).
- * Membership is implied by an existing `users` row carrying `tenant_id`.
- * If a future migration introduces a status column, update the WHERE clause
- * here and in the matching test.
+ * Note on "active" filter: membership is an existing `users` row carrying
+ * `tenant_id` with `deleted_at IS NULL`. Removed members (see
+ * TeamService.removeMember, which soft-deletes rather than hard-deletes so
+ * `inspections.inspector_id` FK attribution survives) are excluded from the
+ * count — a freed seat becomes available again immediately.
  */
 export async function getSeatUsage(
     tenantId: string,
@@ -59,7 +59,7 @@ export async function getSeatUsage(
     const rows = await drizzleDb
         .select({ id: users.id })
         .from(users)
-        .where(eq(users.tenantId, tenantId));
+        .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt)));
     const used = computeSeatsUsed(rows);
 
     const remaining = max === null ? Number.POSITIVE_INFINITY : Math.max(0, max - used);

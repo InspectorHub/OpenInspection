@@ -164,7 +164,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         expect(row!.status).toBe('pending'); // hook is fire-and-forget; status moves in publishRow
     });
 
-    it('TeamService.removeMember emits user.deleted with the pre-delete email', async () => {
+    it('TeamService.removeMember emits user.deleted with the pre-removal email and soft-deletes the row', async () => {
         await testDb.insert(tenants).values({ id: 't1', name: 'T1', slug: 't1', createdAt: new Date() } as typeof tenants.$inferInsert);
         await testDb.insert(users).values({
             id: 'u-victim', tenantId: 't1', email: 'victim@example.com',
@@ -180,7 +180,10 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
         const rows = await testDb.select().from(syncOutbox).where(eq(syncOutbox.eventType, 'user.deleted')).all();
         expect(rows).toHaveLength(1);
         expect(JSON.parse(rows[0]!.payload)).toEqual({ tenantId: 't1', email: 'victim@example.com' });
-        const gone = await testDb.select().from(users).where(eq(users.id, 'u-victim')).get();
-        expect(gone).toBeUndefined();
+        // Soft-delete, not hard-delete: the row stays (attribution intact),
+        // marked via `deletedAt`.
+        const stillThere = await testDb.select().from(users).where(eq(users.id, 'u-victim')).get();
+        expect(stillThere).toBeDefined();
+        expect(stillThere!.deletedAt).not.toBeNull();
     });
 });

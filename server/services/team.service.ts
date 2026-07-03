@@ -1,8 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { users, tenantInvites, tenants } from '../lib/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { UserRole } from '../types/auth';
 import { Errors } from '../lib/errors';
+import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
 import { getCapabilities, TOGGLEABLE, type Capability, type PermissionOverrides } from '../lib/auth/capabilities';
 
@@ -21,11 +22,31 @@ export class TeamService {
      *   to emit `user.deleted` when a member is removed so the portal identity's
      *   membership for this workspace is dropped. Guarded by `if (this.outbox)`,
      *   so standalone never touches portal code.
+     * @param kv Optional session-invalidation KV (same binding as
+     *   AuthService's `TENANT_CACHE`). Used by `removeMember` to write a
+     *   `pwchanged:{userId}` marker so the removed member's outstanding JWT
+     *   is rejected on the next request instead of surviving up to its
+     *   24h expiry — jwtAuthMiddleware checks this key but never re-reads
+     *   the user row. Guarded by `if (this.kv)`.
      */
-    constructor(private db: D1Database, private outbox?: UserSyncOutbox) {}
+    constructor(private db: D1Database, private outbox?: UserSyncOutbox, private kv?: KVNamespace) {}
 
     private getDB() {
         return drizzle(this.db);
+    }
+
+    /** Write a session-invalidation marker for a user. Same key format/semantics as AuthService.writeInvalidation. */
+    private async writeSessionInvalidation(userId: string) {
+        if (!this.kv) return;
+        const ts = Math.floor(Date.now() / 1000).toString();
+        try {
+            await this.kv.put(`pwchanged:${userId}`, ts, { expirationTtl: 90000 });
+        } catch (err) {
+            logger.warn('Failed to write session-invalidation key after member removal; outstanding tokens may remain valid until exp', {
+                userId,
+                error: err instanceof Error ? err.message : String(err),
+            });
+        }
     }
 
     async getMembers(tenantId: string) {
@@ -36,7 +57,7 @@ export class TeamService {
                 email: users.email,
                 role: users.role,
                 createdAt: users.createdAt
-            }).from(users).where(eq(users.tenantId, tenantId)),
+            }).from(users).where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt))),
             db.select().from(tenantInvites)
                 .where(and(eq(tenantInvites.tenantId, tenantId), eq(tenantInvites.status, 'pending'))),
             db.select({ maxUsers: tenants.maxUsers })
@@ -57,9 +78,11 @@ export class TeamService {
 
         // Seat-quota enforcement now lives in features/seat-quota/middleware
         // (mounted on POST /api/team/invite). The service only needs to
-        // verify the invitee is not already a workspace member.
+        // verify the invitee is not already an ACTIVE workspace member — a
+        // soft-deleted (removed) row must not block a re-invite, since
+        // AuthService.joinTeam reactivates it rather than inserting a new one.
         const existing = await db.select({ id: users.id }).from(users)
-            .where(and(eq(users.tenantId, params.tenantId), eq(users.email, params.email))).limit(1);
+            .where(and(eq(users.tenantId, params.tenantId), eq(users.email, params.email), isNull(users.deletedAt))).limit(1);
 
         if (existing.length > 0) throw Errors.Conflict('User is already a member');
 
@@ -112,17 +135,31 @@ export class TeamService {
             .get();
         if (!user) throw Errors.NotFound('Member not found');
 
-        await db.delete(users).where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
+        // Soft-delete rather than hard-delete: `inspections.inspector_id`
+        // FK-references `users.id`, so a member with inspections can't be
+        // hard-deleted under D1 FK enforcement, and hard-deleting would orphan
+        // report attribution. `deletedAt` gives deactivate/reactivate
+        // semantics (see AuthService.joinTeam reactivation) while keeping the
+        // row — and any inspections it is attributed to — intact.
+        await db.update(users).set({ deletedAt: new Date() })
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
 
         // Mirror the removal to portal so the matching identity loses its
         // membership for this workspace. Email is captured from the row read
-        // above (before the delete). SaaS-only — no-op when outbox is undefined.
+        // above (before the update). SaaS-only — no-op when outbox is undefined.
         if (this.outbox) {
             await this.outbox.append({
                 type: 'user.deleted',
                 payload: { tenantId, email: user.email },
             });
         }
+
+        // Invalidate the removed member's live sessions immediately.
+        // jwtAuthMiddleware only checks this KV key per request — it never
+        // re-reads the user row — so without this write a removed member's
+        // JWT would stay valid for up to its full 24h expiry.
+        await this.writeSessionInvalidation(userId);
+
         return user;
     }
 

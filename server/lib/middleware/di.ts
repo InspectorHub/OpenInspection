@@ -204,8 +204,10 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'team':
                     // Member removal emits `user.deleted` through the same
-                    // SaaS-only outbox sink (undefined in standalone → no-op).
-                    target.team = new TeamService(c.env.DB, buildOutbox());
+                    // SaaS-only outbox sink (undefined in standalone → no-op),
+                    // and writes a `pwchanged` session-invalidation marker to
+                    // the same KV binding AuthService uses.
+                    target.team = new TeamService(c.env.DB, buildOutbox(), c.env.TENANT_CACHE);
                     break;
                 case 'template':
                     target.template = new TemplateService(c.env.DB);

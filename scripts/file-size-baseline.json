@@ -28,7 +28,7 @@
   "app/routes/template-edit.tsx": 538,
   "server/api/inspections/media-studio.ts": 534,
   "server/api/inspections/report-delivery.ts": 534,
-  "server/api/auth.ts": 533,
+  "server/api/auth.ts": 536,
   "server/services/inspection/inspection-photo.service.ts": 531,
   "server/api/inspections/core.ts": 527,
   "server/services/concierge.service.ts": 521,
