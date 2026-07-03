@@ -77,6 +77,7 @@ export interface HasDeliverSms {
         sms: import('./sms').SmsRuntime,
         appName: string, appHost: string,
         env?: import('../../lib/sms/managed-send-gate').ManagedSendGateEnv,
+        quotaGuard?: import('../../features/plan-quota/guard').PlanQuotaGuard,
     ): Promise<void>;
 }
 

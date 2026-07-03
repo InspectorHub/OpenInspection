@@ -178,7 +178,9 @@ export async function scheduled(
         // base-url binding here directly (see tests/portal-isolation.spec.ts).
         // The per-tenant tier is resolved inside the flush() email factory,
         // which memoizes one EmailService per tenantId per flush() call, so
-        // this is one lookup per tenant per tick, not per log row.
+        // this is one lookup per tenant per tick, not per log row. The SMS
+        // branch (deliverSms) reads tier straight off the already-joined
+        // `tenant.tier` column — no extra lookup needed there.
         const profile = getDeploymentProfile(env as unknown as AppEnv);
         const quotaGuard = profile.hasUsageQuota
             ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl })
@@ -193,6 +195,7 @@ export async function scheduled(
             sms,
             50,
             gateEnv,
+            quotaGuard,
         );
     } catch (e) {
         logger.error('[cron] automation flush failed', {}, e instanceof Error ? e : undefined);
