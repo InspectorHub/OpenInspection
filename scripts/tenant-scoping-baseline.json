@@ -54,7 +54,7 @@
   "server/services/concierge.service.ts:336",
   "server/services/concierge.service.ts:409",
   "server/services/contact.service.ts:226",
-  "server/services/email/transactional.ts:103",
+  "server/services/email/transactional.ts:156",
   "server/services/event.service.ts:127",
   "server/services/event.service.ts:142",
   "server/services/event.service.ts:163",

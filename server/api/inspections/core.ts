@@ -5,6 +5,7 @@
 // The per-inspection results/editing routes (property facts, results, rating
 // system, recommendations, item-field patch, preflight) live alongside in
 // ./results.ts to keep both files under the size ceiling.
+import type { Context } from 'hono';
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -23,6 +24,57 @@ import { deleteInspectionCascade } from '../../services/inspection/inspection-ca
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { eq, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import type { HonoConfig } from '../../types/hono';
+import { logger } from '../../lib/logger';
+import { MeteringService } from '../../services/metering.service';
+import { readTenantTier } from '../../features/plan-quota/guard';
+import { noticeFor } from '../../features/plan-quota/notice';
+import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
+
+/**
+ * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
+ * create/clone/wizard call, check whether the tenant's lifetime inspection
+ * counter just crossed the 4/5 or 5/5 notice threshold and, if so, fire a
+ * best-effort email. Gated on `hasUsageQuota` (SaaS only — standalone has no
+ * DB reads added here beyond the one profile-flag check) and on the tenant's
+ * plan tier ('free' only). The email itself is unmetered (see
+ * `sendQuotaThresholdNotice` — no `meterTenantId` is passed to
+ * `assembleTenantEmailService`) so it can never itself consume or be blocked
+ * by the tenant's free-tier email quota.
+ */
+async function maybeSendQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string): Promise<void> {
+    if (!c.var.profile.hasUsageQuota) return;
+    const tier = await readTenantTier(c.env.DB, tenantId);
+    if (tier !== 'free') return;
+
+    const count = await new MeteringService(c.env.DB).lifetimeTotal(tenantId, 'inspections');
+    const n = noticeFor(count);
+    if (!n) return;
+
+    const cfg = await loadTenantEmailConfig(c.env, tenantId);
+    const email = assembleTenantEmailService(c.env, cfg);
+    await email.sendQuotaThresholdNotice(n, {
+        db: c.env.DB,
+        kv: c.env.TENANT_CACHE,
+        tenantId,
+        billingPortalUrl: c.var.profile.billingPortalUrl,
+    });
+}
+
+/**
+ * Fire-and-forget wrapper: runs `maybeSendQuotaThresholdNotice` through
+ * `c.executionCtx.waitUntil` so it adds zero latency to the response, and
+ * never lets a failure (email provider down, KV unavailable, ...) surface as
+ * an unhandled rejection. `c.executionCtx` throws when no execution context
+ * is present (some unit-test harnesses) — degrade to a no-op there, mirroring
+ * the guard in server/api/sms.ts.
+ */
+function fireQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string): void {
+    const run = maybeSendQuotaThresholdNotice(c, tenantId).catch((err) => {
+        logger.error('quota threshold notice failed', { tenantId }, err instanceof Error ? err : new Error(String(err)));
+    });
+    try { c.executionCtx.waitUntil(run); } catch { /* no execution context available (unit tests) */ }
+}
 
 /**
  * GET /api/inspections/:id
@@ -352,6 +404,7 @@ const coreRoutes = createApiRouter()
             entityId: inspection.id,
             metadata: { propertyAddress: inspection.propertyAddress },
         });
+        fireQuotaThresholdNotice(c, tenantId);
 
         return c.json({
             success: true,
@@ -360,13 +413,15 @@ const coreRoutes = createApiRouter()
     })
     .openapi(cloneInspectionRoute, async (c) => {
         const { id } = c.req.valid('param');
+        const tenantId = c.get('tenantId');
         const service = c.var.services.inspection;
-        const clone = await service.cloneInspection(id, c.get('tenantId'));
+        const clone = await service.cloneInspection(id, tenantId);
 
         auditFromContext(c, 'inspection.create', 'inspection', {
             entityId: clone.id,
             metadata: { clonedFrom: id, propertyAddress: clone.propertyAddress },
         });
+        fireQuotaThresholdNotice(c, tenantId);
         return c.json({ success: true, data: { inspection: clone } }, 201);
     })
     .openapi(createFromWizardRoute, async (c) => {
@@ -377,6 +432,7 @@ const coreRoutes = createApiRouter()
         if (!userId) throw Errors.Unauthorized('Missing user identity');
 
         const out = await c.var.services.inspection.createFromWizard(tenantId, userId, input);
+        fireQuotaThresholdNotice(c, tenantId);
         return c.json({ success: true as const, data: out }, 200);
     })
     // Typed-Hono dead-routes cleanup Task 12 — list persisted sync conflicts.
