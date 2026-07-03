@@ -583,6 +583,17 @@ export default function InspectionsPage() {
   // from the auth-layout session context the dashboard already consumes.
   const tenantSlug = sessionCtx?.branding?.tenantSlug ?? null;
 
+  // Free-tier at-open quota gate — reuses the same quotaCaps/quotaUsage the
+  // QuotaBanner below already consumes (no extra API call). `caps` is null
+  // for standalone and paid-saas tenants, so this stays undefined (normal
+  // wizard) for both. `inspections` cap of 0 is the "unlimited" sentinel
+  // (mirrors QuotaBanner's `cap <= 0` guard) and never gates.
+  const billingUrl = sessionCtx?.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined;
+  const quotaExceededAtOpen: string | null | undefined =
+    quotaCaps && quotaUsage && quotaCaps.inspections > 0 && quotaUsage.inspections >= quotaCaps.inspections
+      ? billingUrl ?? null
+      : undefined;
+
   // A row's props are identical in both the grouped and flat views; this keeps
   // the two render sites in sync.
   const renderRow = (insp: Inspection) => (
@@ -602,7 +613,7 @@ export default function InspectionsPage() {
     <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
       {/* F3 — Seat quota banner */}
       {sessionCtx?.seatUsage && (
-        <SeatBanner usage={sessionCtx.seatUsage} billingUrl={sessionCtx.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined} />
+        <SeatBanner usage={sessionCtx.seatUsage} billingUrl={billingUrl} />
       )}
 
       {/* Free-tier usage quota banners — one per capped metric, each hides
@@ -615,7 +626,7 @@ export default function InspectionsPage() {
               metric={metric}
               used={quotaUsage[metric]}
               cap={quotaCaps[metric]}
-              billingUrl={sessionCtx?.branding?.portalBaseUrl ? `${sessionCtx.branding.portalBaseUrl}/billing` : undefined}
+              billingUrl={billingUrl}
             />
           ))}
         </>
@@ -856,6 +867,7 @@ export default function InspectionsPage() {
         templates={templates}
         services={services}
         teamMembers={teamMembers}
+        quotaExceededAtOpen={quotaExceededAtOpen}
       />
 
       {/* Command Palette */}

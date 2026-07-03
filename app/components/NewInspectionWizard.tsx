@@ -50,6 +50,7 @@ export function NewInspectionWizard({
   templates = [],
   services: serviceCatalog = [],
   teamMembers = [],
+  quotaExceededAtOpen,
 }: {
   open: boolean;
   onClose: () => void;
@@ -57,6 +58,20 @@ export function NewInspectionWizard({
   services?: WizardService[];
   /** B-21 — when empty (solo workspace) the Team step is skipped entirely. */
   teamMembers?: WizardTeamMember[];
+  /**
+   * Optional at-open free-tier quota gate. Callers that already load usage
+   * data (the `/inspections` route, which mounts the QuotaBanner from the
+   * same loader payload) pass this so a tenant already at the inspection cap
+   * sees the upgrade panel the instant the wizard opens, instead of walking
+   * all four steps and hitting the 402 QUOTA_EXHAUSTED on Create. Mirrors the
+   * tri-state shape of the internal 402-driven `quotaExceeded` state below:
+   * `undefined` = no gate (under cap, standalone/paid-saas caps==null, or a
+   * mount with no quota context, e.g. a future command-palette-only entry
+   * point) → normal wizard, server 402 remains the authoritative backstop;
+   * `null` = at cap with no configured billing portal (CTA hidden); a string
+   * is the billingPortalUrl for the "Subscribe" CTA.
+   */
+  quotaExceededAtOpen?: string | null;
 }) {
   const fetcher = useFetcher();
   // IA-1 — dedicated fetcher for agent typeahead (B-17: per-intent convention,
@@ -146,29 +161,39 @@ export function NewInspectionWizard({
   }, [templateQuery, filteredTemplates]);
 
   useEffect(() => {
-    if (open) return;
-    setStepIdx(0);
-    setPropertyType("single_family");
-    setAddress("");
-    setTemplateId("");
-    setTemplateQuery("");
-    setServices(new Set());
-    setPriceOverrides(new Map());
-    setDate(todayLocalISO());
-    setTime("09:00");
-    setSoloMode(true);
-    setInspectorId("");
-    // IA-1 People step reset
-    setClientName("");
-    setClientEmail("");
-    setClientPhone("");
-    setAgentSearch("");
-    setAgentDropdownOpen(false);
-    setSelectedAgent(null);
-    setNewAgentMode(false);
-    setNewAgentName("");
-    setNewAgentEmail("");
-    setQuotaExceeded(undefined);
+    if (!open) {
+      setStepIdx(0);
+      setPropertyType("single_family");
+      setAddress("");
+      setTemplateId("");
+      setTemplateQuery("");
+      setServices(new Set());
+      setPriceOverrides(new Map());
+      setDate(todayLocalISO());
+      setTime("09:00");
+      setSoloMode(true);
+      setInspectorId("");
+      // IA-1 People step reset
+      setClientName("");
+      setClientEmail("");
+      setClientPhone("");
+      setAgentSearch("");
+      setAgentDropdownOpen(false);
+      setSelectedAgent(null);
+      setNewAgentMode(false);
+      setNewAgentName("");
+      setNewAgentEmail("");
+      setQuotaExceeded(undefined);
+      return;
+    }
+    // At-open quota gate — seed quotaExceeded from the caller-supplied prop
+    // every time the modal opens, so a tenant already at cap sees the
+    // upgrade panel immediately instead of the property step. Deliberately
+    // NOT keyed on quotaExceededAtOpen (only on `open`): re-evaluating on
+    // every parent re-render while the modal is already open would let a
+    // background loader revalidation stomp on a 402 that just set
+    // quotaExceeded to a different value via the submit-fetcher effect below.
+    setQuotaExceeded(quotaExceededAtOpen);
   }, [open]);
 
   // Watch the create-submit fetcher for a QUOTA_EXHAUSTED (402) rejection.
