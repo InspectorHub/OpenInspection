@@ -131,7 +131,7 @@ export class TeamService {
         }
         const db = this.getDB();
         const user = await db.select({ id: users.id, email: users.email, role: users.role }).from(users)
-            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
+            .where(and(eq(users.id, userId), eq(users.tenantId, tenantId), isNull(users.deletedAt)))
             .get();
         if (!user) throw Errors.NotFound('Member not found');
 
@@ -144,6 +144,16 @@ export class TeamService {
         await db.update(users).set({ deletedAt: new Date() })
             .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)));
 
+        // Invalidate the removed member's live sessions immediately, and do
+        // it BEFORE the (unguarded) outbox append below. jwtAuthMiddleware
+        // only checks this KV key per request — it never re-reads the user
+        // row — so without this write a removed member's JWT would stay
+        // valid for up to its full 24h expiry. This write has its own
+        // fail-open try/catch; the outbox append does not, and a transient
+        // D1 failure there must not be able to skip this security-critical
+        // KV write.
+        await this.writeSessionInvalidation(userId);
+
         // Mirror the removal to portal so the matching identity loses its
         // membership for this workspace. Email is captured from the row read
         // above (before the update). SaaS-only — no-op when outbox is undefined.
@@ -153,12 +163,6 @@ export class TeamService {
                 payload: { tenantId, email: user.email },
             });
         }
-
-        // Invalidate the removed member's live sessions immediately.
-        // jwtAuthMiddleware only checks this KV key per request — it never
-        // re-reads the user row — so without this write a removed member's
-        // JWT would stay valid for up to its full 24h expiry.
-        await this.writeSessionInvalidation(userId);
 
         return user;
     }

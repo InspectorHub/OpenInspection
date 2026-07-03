@@ -174,4 +174,67 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         const { activeUsers } = await team.getMembers(TENANT);
         expect(activeUsers.map(u => u.id).sort()).toEqual([ADMIN, MEMBER].sort());
     });
+
+    it('reactivation on re-invite resets TOTP enrollment to never-enrolled defaults', async () => {
+        // Simulate the removed member having had 2FA enabled before removal.
+        await testDb.update(schema.users).set({
+            totpSecret: 'JBSWY3DPEHPK3PXP',
+            totpEnabled: true,
+            totpRecoveryCodes: JSON.stringify(['code1', 'code2']),
+            totpVerifiedAt: new Date(),
+        }).where(eq(schema.users.id, MEMBER));
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const auth = new AuthService({} as any, kv as any);
+
+        await team.removeMember(TENANT, MEMBER, ADMIN);
+
+        const invite = await team.createInvite({
+            tenantId: TENANT,
+            email: MEMBER_EMAIL,
+            role: 'inspector',
+        });
+        await auth.joinTeam(invite.token, 'new-password-123');
+
+        const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
+        expect(row).toBeDefined();
+        // A re-invited person (possibly a different individual on the same
+        // mailbox) must not inherit the previous occupant's 2FA secret —
+        // that would hard-lock them at login with no self-serve recovery.
+        expect(row!.totpSecret).toBeNull();
+        expect(row!.totpEnabled).toBe(false);
+        expect(row!.totpRecoveryCodes).toBeNull();
+        expect(row!.totpVerifiedAt).toBeNull();
+    });
+
+    it('removing an already-removed member returns not-found instead of re-running the soft-delete path', async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, undefined, kv as any);
+        await team.removeMember(TENANT, MEMBER, ADMIN);
+
+        await expect(team.removeMember(TENANT, MEMBER, ADMIN)).rejects.toThrow('Member not found');
+    });
+
+    it('writes the KV invalidation marker even when the outbox append throws', async () => {
+        const throwingOutbox = {
+            append: vi.fn().mockRejectedValue(new Error('D1 outbox insert failed')),
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const team = new TeamService({} as any, throwingOutbox as any, kv as any);
+
+        // The outbox append is unguarded by design (task 8a decision) — an
+        // outbox failure surfaces as a rejection — but the KV write must have
+        // already landed by the time it throws, since it now runs first.
+        await expect(team.removeMember(TENANT, MEMBER, ADMIN)).rejects.toThrow('D1 outbox insert failed');
+
+        expect(kv.put).toHaveBeenCalledWith(
+            `pwchanged:${MEMBER}`,
+            expect.any(String),
+            expect.objectContaining({ expirationTtl: 90000 }),
+        );
+        const row = await testDb.select().from(schema.users).where(eq(schema.users.id, MEMBER)).get();
+        expect(row!.deletedAt).not.toBeNull(); // the soft-delete itself still committed
+    });
 });

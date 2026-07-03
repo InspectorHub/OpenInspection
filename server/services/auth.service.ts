@@ -152,6 +152,17 @@ export class AuthService {
                 // the reactivated row (null when the invite used the pure role
                 // template) — replaces whatever the removed member had before.
                 permissionOverrides: invite.permissionOverrides ?? null,
+                // Reset TOTP enrollment to its never-enrolled defaults (see
+                // schema/tenant/user.ts). The invited person accepting this
+                // invite may be a different individual than whoever previously
+                // held this row — reactivating with the old secret intact
+                // would 2FA-challenge them against a code they never set up,
+                // with no admin endpoint to disable it. The new occupant
+                // re-enrolls 2FA themselves if they want it.
+                totpSecret: null,
+                totpEnabled: false,
+                totpRecoveryCodes: null,
+                totpVerifiedAt: null,
                 ...(trimmedName ? { name: trimmedName } : {}),
             }).where(eq(users.id, existing.id));
         } else {
