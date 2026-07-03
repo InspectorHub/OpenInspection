@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useFetcher } from "react-router";
 import { getCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
+import { SeatLimitPanel } from "./SeatLimitPanel";
 
 type Role = "owner" | "manager" | "inspector" | "agent";
 
@@ -36,9 +37,22 @@ export function computeOverrideDiff(role: Role, caps: CapabilitySet): Permission
 interface InviteSeatModalProps {
  open: boolean;
  onClose: () => void;
+ /**
+  * Optional at-open seat-limit gate. The caller (the `/team` route, which
+  * already loads `sessionCtx.seatUsage` for the SeatBanner above the page)
+  * passes this so a tenant already at its seat cap sees the upgrade panel
+  * the instant the invite modal opens, instead of filling in email/role/
+  * permissions and only finding out on submit (the server's 402
+  * SEAT_LIMIT_REACHED, caught by the existing error state below, remains the
+  * authoritative backstop for races). `undefined` (the default) = no gate —
+  * under the seat limit, unlimited (`sessionCtx.seatUsage` null), or any
+  * future mount with no quota context. `billingUrl` is omitted when no
+  * billing portal is configured (the CTA is hidden in that case).
+  */
+ seatLimitAtOpen?: { used: number; max: number; billingUrl?: string };
 }
 
-export function InviteSeatModal({ open, onClose }: InviteSeatModalProps) {
+export function InviteSeatModal({ open, onClose, seatLimitAtOpen }: InviteSeatModalProps) {
  const [email, setEmail] = useState("");
  const [notify, setNotify] = useState(true);
  const [role, setRole] = useState<Role>("inspector");
@@ -48,10 +62,20 @@ export function InviteSeatModal({ open, onClose }: InviteSeatModalProps) {
  // selected role's defaults until the inviter edits them).
  const [caps, setCaps] = useState(() => getCapabilities("inspector", null));
  const [error, setError] = useState("");
+ // At-open seat-limit gate — seeded from the caller-supplied prop every time
+ // the modal opens (not on every re-render) so a tenant already at cap sees
+ // the panel immediately. Deliberately keyed only on `open`: re-evaluating
+ // whenever the parent re-renders while the modal is already open would let
+ // a background loader revalidation flip this mid-fill.
+ const [seatLimit, setSeatLimit] = useState<{ used: number; max: number; billingUrl?: string } | undefined>(seatLimitAtOpen);
 
  useEffect(() => {
   setCaps(getCapabilities(role, null));
  }, [role]);
+
+ useEffect(() => {
+  if (open) setSeatLimit(seatLimitAtOpen);
+ }, [open]);
 
  const inviteFetcher = useFetcher<{ ok: boolean; intent?: string | null; error: string | null; url: string | null }>();
  const submitting = inviteFetcher.state !== "idle";
@@ -91,6 +115,10 @@ export function InviteSeatModal({ open, onClose }: InviteSeatModalProps) {
  <h2 className="text-lg font-bold flex-1 text-ih-fg-1">Invite</h2>
  </header>
 
+ {seatLimit ? (
+ <SeatLimitPanel used={seatLimit.used} max={seatLimit.max} billingUrl={seatLimit.billingUrl} onClose={onClose} />
+ ) : (
+ <>
  <div className="p-6 space-y-4">
  <div className="space-y-3">
  <label className="block">
@@ -146,6 +174,8 @@ export function InviteSeatModal({ open, onClose }: InviteSeatModalProps) {
  <button onClick={onClose} className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted">Cancel</button>
  <button onClick={submitPermanent} disabled={submitting} className="px-4 h-10 rounded-xl bg-ih-primary text-white text-sm font-semibold hover:bg-ih-primary-600 disabled:opacity-50">Send invite</button>
  </footer>
+ </>
+ )}
  </div>
  </div>
  );
