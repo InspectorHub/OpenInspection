@@ -4,22 +4,22 @@
 
 <h1 align="center">OpenInspection</h1>
 
-<p align="center">The first open-source SaaS-grade home inspection app. Self-host on Cloudflare for ~$0/month.</p>
+<p align="center"><strong>Open source home inspection software.</strong> Self-host the full SaaS-grade inspection stack on Cloudflare for ~$0/month.</p>
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/InspectorHub/OpenInspection)
 [![GitHub Discussions](https://img.shields.io/github/discussions/InspectorHub/OpenInspection)](https://github.com/InspectorHub/OpenInspection/discussions)
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%203.0-blue.svg)](LICENSE)
 
 > 🧪 **Try it in 60 seconds — no install, no credit card.**
-> [**Start a free 30-day trial on inspectorhub.io →**](https://inspectorhub.io/register)
+> [**Start free on inspectorhub.io →**](https://inspectorhub.io/register)
 >
-> Magic-link signup. Your trial workspace ships pre-loaded with starter templates + canned comments so you can click through a real inspection immediately. Decide to self-host later? Your data exports cleanly — same codebase, same schema.
+> Activation-link signup, and your first 5 inspections are free — no card, no clock. Your workspace ships pre-loaded with starter templates + canned comments so you can click through a real inspection immediately. Decide to self-host later? Your data exports cleanly — same codebase, same schema.
 
 ---
 
 ## What it is
 
-A complete home inspection software stack: inspector dashboard, public booking widget, mobile field form, professional HTML reports with e-signatures, AI assistance, and PWA offline support — all running on Cloudflare's edge, self-hosted on a single Worker.
+OpenInspection is [open source home inspection software](https://inspectorhub.io/open-source) — a complete inspection stack: inspector dashboard, public booking widget, mobile field form, professional HTML reports with e-signatures, AI assistance, and PWA offline support, all running on Cloudflare's edge and self-hosted on a single Worker.
 
 ### Architecture
 
@@ -64,7 +64,7 @@ There are three ways to run OpenInspection, from zero effort to full control. Pi
 
 ### 1. Try the hosted service (no deployment)
 
-Want to evaluate the product without running any infrastructure? Register at [**inspectorhub.io/register**](https://inspectorhub.io/register) with your email, click the activation link, and a workspace is created for you — the app lives at `app.inspectorhub.io`. This is the managed edition of this exact codebase (30-day free trial, no card), pre-loaded with starter templates so you can click through a real inspection immediately. You can export your data and switch to a self-hosted deploy at any time.
+Want to evaluate the product without running any infrastructure? Register at [**inspectorhub.io/register**](https://inspectorhub.io/register) with your email, click the activation link, and a workspace is created for you — the app lives at `app.inspectorhub.io`. This is the managed edition of this exact codebase (first 5 inspections free, no card), pre-loaded with starter templates so you can click through a real inspection immediately. You can export your data and switch to a self-hosted deploy at any time.
 
 ### 2. Deploy to Cloudflare (one-click)
 
@@ -118,9 +118,9 @@ Deep dive: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). Archi
 
 If you'd rather skip the infrastructure work, **[InspectorHub](https://inspectorhub.io/)** offers a fully-hosted version of this software — same codebase, managed for you.
 
-- 30-day free trial, no credit card required
+- First 5 inspections free — no credit card required
 - Simple per-seat pricing
-- 30-day money-back guarantee
+- Any-month money-back guarantee
 - Upgrade to self-hosted at any time — your data, your choice
 
 [Try InspectorHub free →](https://inspectorhub.io/)
