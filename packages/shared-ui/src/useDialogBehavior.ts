@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -14,13 +14,23 @@ export function useDialogBehavior(
   onClose: () => void,
   ref: React.RefObject<HTMLElement | null>,
 ): void {
+  // Stash onClose in a ref so the focus effect never depends on its identity.
+  // Real callers pass an inline arrow fn, whose identity changes on every parent
+  // re-render; if the focus effect re-ran on those renders it would restore focus
+  // to the trigger and then steal it to the first focusable, dropping the caret
+  // out of a field the user is typing in. The effect must run on open-toggle only.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
 
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -55,7 +65,9 @@ export function useDialogBehavior(
       document.removeEventListener("keydown", handler);
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose, ref]);
+    // Intentionally keyed on [open] only: onClose is read through onCloseRef and
+    // ref identity is stable, so the trap/focus lifecycle runs on open-toggle only.
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

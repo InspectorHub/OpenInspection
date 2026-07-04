@@ -69,6 +69,33 @@ describe("Modal", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps focus stable when the parent re-renders with a new onClose identity", () => {
+    // Real callers pass an inline arrow fn as onClose, so its identity changes on
+    // every parent re-render. The focus effect must NOT re-run on those renders —
+    // otherwise it yanks focus back to the trigger then to the first focusable,
+    // dropping the caret out of a field the user is typing in.
+    const { rerender } = render(
+      <Modal open title="Test dialog" onClose={() => {}}>
+        <button type="button">first</button>
+        <button type="button">second</button>
+      </Modal>,
+    );
+    const second = screen.getByText("second") as HTMLElement;
+    second.focus();
+    expect(document.activeElement).toBe(second);
+
+    // Parent re-renders passing a brand-new onClose identity.
+    rerender(
+      <Modal open title="Test dialog" onClose={() => {}}>
+        <button type="button">first</button>
+        <button type="button">second</button>
+      </Modal>,
+    );
+
+    // Focus must stay exactly where the user left it — not jump to first/trigger.
+    expect(document.activeElement).toBe(second);
+  });
+
   it("uses the backdrop token, not a hardcoded rgba scrim", () => {
     renderModal();
     const overlay = screen.getByRole("dialog").parentElement as HTMLElement;
