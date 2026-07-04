@@ -1,3 +1,5 @@
+import { Button } from "@core/shared-ui";
+
 type BannerKind = "clean" | "conflicts" | "reconnecting";
 
 interface ReconnectBannerProps {
@@ -38,7 +40,7 @@ export function ReconnectBanner({ kind, visible, mergedCount = 0, conflictCount 
           </span>
           <span><strong>Reconnected</strong> · {mergedCount} auto-merged · {conflictCount} conflicts to resolve</span>
         </div>
-        <button type="button" className="ih-btn ih-btn--sm" style={{ background: "var(--ih-status-bad)", color: "white" }} onClick={onReviewConflicts}>Review</button>
+        <Button variant="danger" size="sm" onClick={onReviewConflicts}>Review</Button>
       </div>
     );
   }

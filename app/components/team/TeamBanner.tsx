@@ -1,3 +1,5 @@
+import { Button } from "@core/shared-ui";
+
 interface TeamMember {
   id: string;
   name?: string;
@@ -24,7 +26,7 @@ export function TeamBanner({ show, members, onManage }: TeamBannerProps) {
         ))}
         {members.length === 0 && <div className="ih-meta">No roster set</div>}
       </div>
-      <button type="button" className="ih-btn ih-btn--sm ih-btn--ghost ml-auto" onClick={onManage} aria-label="Open team roster">Manage</button>
+      <Button variant="ghost" size="sm" className="ml-auto" onClick={onManage} aria-label="Open team roster">Manage</Button>
     </div>
   );
 }
