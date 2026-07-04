@@ -94,6 +94,7 @@ Deep dive: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). Archi
 
 - [Deploy](docs/developers/02_deploy.md) — first-time setup on Cloudflare
 - [Architecture](docs/developers/01_architecture.md) — module map, request flow, cost model
+- [Design System](docs/developers/11_design_system.md) — tokens, shared-ui components, dark mode, `lint:ds`
 - [Contributing](CONTRIBUTING.md) — code conventions and PR process
 - [Community](docs/community.md) — Discussions categories and where to talk
 

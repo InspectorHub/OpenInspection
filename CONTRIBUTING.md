@@ -31,7 +31,7 @@ These are summarized from `CLAUDE.md` — read that file for the canonical, exha
 - **Auth**: HS256 JWT in HttpOnly cookie, PBKDF2 password hashing. Never use a fallback secret. Read `CLAUDE.md` § JWT & Auth Security Rules.
 - **Multi-tenant**: Every D1 table includes `tenant_id`. Use `c.var.services.xxx` (DI proxy) — services auto-scope to the tenant.
 - **Logging**: Server-side code uses `import { logger } from '../lib/logger'`. Browser-side `console.*` is fine.
-- **CSS**: Tailwind utilities + canonical v3 tokens defined in `server/styles/input.css`. No `font-black` outside stat numbers, no `rounded-2xl`, no `tracking-tightest`. The design system reference is at `docs/superpowers/plans/2026-05-08-sprint1-design-system-reference.md`.
+- **CSS**: Tailwind v4 utilities + the Design System 0523 token layer defined in `app/styles/tailwind.css` (`bg-ih-*`, `text-ih-*`, `shadow-ih-*`). No raw palette classes (`bg-slate-200`, `shadow-lg`, ...) — enforced by `npm run lint:ds`. Full reference: [`docs/developers/11_design_system.md`](docs/developers/11_design_system.md).
 
 ## Commit style
 
