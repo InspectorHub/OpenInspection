@@ -110,8 +110,8 @@ flat until a family reaches ~5 specs, then gets a domain dir (`mcp/` is the
 example). `tests/e2e/` stays flat: one spec file = one playwright project. Every
 spec must be collected by exactly one config (playwright projects must resolve).
 Fully-skipped specs need a `TODO(...)` naming their blocker. Name new specs after
-behavior, not sprints. Full rationale + the cross-repo convention:
-`docs/superpowers/plans/2026-07-03-tests-layout-convention.md`.
+behavior, not sprints. Full rules for classification, writing, and run
+initialization: `docs/developers/05_testing.md`.
 
 ## Core Architecture
 

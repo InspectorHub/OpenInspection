@@ -1,191 +1,284 @@
 # Testing — apps/openinspection
 
-The single Worker serves both the API and the React Router v7 UI, so tests cover both surfaces against one running worker. API tests live in `tests/`; web tests live in `tests/web/`.
+The single Worker serves both the typed JSON API and the React Router v7 UI, so
+tests cover both surfaces. There are four suites, each pinned to a **location**:
+a spec's directory alone decides which config runs it. This document is the
+canonical reference for the three things you need to get right: **where a spec
+lives**, **how to write it**, and **how the run is initialized**.
 
-## Quick Start
+The layout is enforced — `npm run lint:tests` (`scripts/check-test-layout.mjs`)
+fails the build on a misplaced spec, and it runs in `npm run lint` + pre-commit.
 
-### API E2E Tests
+---
 
-End-to-end tests use [Playwright](https://playwright.dev/). Tests run against a live local dev server — no mocking, no test database. Hits real Worker endpoints backed by Wrangler's local D1 and R2 emulation.
+## 1. Directory classification (`directory = suite`)
+
+| Location | Suite | Command | Config | Runtime |
+|---|---|---|---|---|
+| `app/**/*.test.{ts,tsx}` (co-located) | web unit | `test:web` | `vitest.config.ts` | happy-dom |
+| `tests/unit/<domain>/**/*.spec.ts` | api/service unit | `test:unit` | `vitest.api.config.ts` | node (+ better-sqlite3) |
+| `tests/workers/**/*.spec.ts` | worker-runtime | `test:workers` | `vitest.workers.config.ts` | real `workerd` |
+| `tests/e2e/*.spec.ts` | end-to-end | `test:e2e` | `playwright.config.ts` (seeds real D1) | built worker + browser |
+| `tests/**/*.spec-d.ts` | type-level | `test:types` | `vitest.typecheck.config.ts` | tsc typecheck |
+
+### Choosing a home for a new spec
+
+1. **Frontend component / loader / hook test?** → **co-locate** it beside the
+   thing it tests as `Foo.test.tsx` (or `__tests__/Foo.test.tsx`) under `app/`.
+   Never put a web test in `tests/`. The retired `tests/web/` tree does not come
+   back.
+2. **Server-side, no browser.** Does it depend on real Cloudflare runtime
+   semantics — Queue delivery, Durable Objects, `workerd`-only APIs?
+   - **Yes** → `tests/workers/` (real `workerd` via
+     `@cloudflare/vitest-pool-workers`; miniflare bindings are declared inline in
+     the config, no wrangler file needed).
+   - **No** → `tests/unit/<domain>/` (node env, stubs + `better-sqlite3`).
+3. **Full-stack / browser / anything that hits a running worker** →
+   `tests/e2e/`. One flat directory; `globalSetup` seeds real D1 so every E2E
+   exercises the actual database.
+
+### The rules the gate enforces
+
+- **No flat specs.** `tests/*.spec.ts`, `tests/web/*.spec.ts`, and
+  `tests/unit/*.spec.ts` are rejected — a unit spec must live in a **domain
+  directory** named after the `server/api/` module or service family it
+  exercises (`tests/unit/auth/`, `tests/unit/inspections/`, …).
+- **These directories must not exist:** `tests/web/unit`, `tests/web/e2e`,
+  `tests/integration`. Frontend co-locates under `app/`; E2E is the single
+  `tests/e2e/`.
+- **`tests/workers/` stays flat** until a family reaches ~5 specs, then gets a
+  domain dir (`tests/workers/mcp/` is the precedent).
+- **`tests/e2e/` stays flat:** one spec file = one Playwright project, and every
+  project's `testMatch` string literal must resolve to a real file in
+  `tests/e2e/` (the gate checks this too).
+- **Name specs after behavior, not sprints** (`estimate-range.spec.ts`, not
+  `sprint2-s4.spec.ts`). Legacy sprint-named specs are grandfathered.
+
+### Where shared infrastructure lives (NOT spec files)
+
+```
+tests/
+  global-setup.ts        # E2E: wipe + migrate local D1 (Playwright globalSetup)
+  seed-fixtures.ts       # E2E: optional multi-user seed (SEED_E2E=1)
+  setup-web.ts           # web-unit hermeticity guard (setupFiles for vitest.config.ts)
+  helpers/               # cross-suite helpers (e.g. dev-vars.ts)
+  fixtures/              # payloads grouped by event family, versioned filenames
+  unit/
+    setup-client.ts      # setupFiles for vitest.api.config.ts
+    db.ts, mocks.ts      # shared unit infra (better-sqlite3 harness, stubs)
+    stubs/, helpers/
+    <domain>/*.spec.ts   # ← the only place unit specs go
+  workers/*.spec.ts
+  e2e/
+    *.spec.ts
+    helpers/             # e2e-only helpers (csrf.ts, …)
+```
+
+---
+
+## 2. Writing tests
+
+### Web unit (`app/**/*.test.tsx`)
+
+- Runs in **happy-dom**, hermetic — **no live worker**. The `tests/setup-web.ts`
+  guard **fails any test that makes a real `fetch`**. A loader/action test must
+  stub the network: `vi.stubGlobal('fetch', …)` (a stub replaces
+  `globalThis.fetch`, so the guard is bypassed for hermetic tests). This exists
+  because `getApiUrl()` falls back to `localhost:8788` and the BFF's
+  graceful-degradation `catch` would otherwise swallow a real ECONNREFUSED and
+  let the test pass while only ever exercising the error path.
+
+### API / service unit (`tests/unit/<domain>/*.spec.ts`)
+
+- Node env, `better-sqlite3` in-memory DB — no worker, no network. Use the shared
+  `tests/unit/db.ts` harness and `tests/unit/mocks.ts` stubs.
+- A file that needs a DOM opts in per-file with `// @vitest-environment happy-dom`
+  (vitest v4 replacement for `environmentMatchGlobs`).
+- Prefer asserting **service-layer** behavior directly over reconstructing HTTP.
+
+### Worker-runtime (`tests/workers/*.spec.ts`)
+
+- Runs in real `workerd` via `@cloudflare/vitest-pool-workers`. Reserve this for
+  behavior that only reproduces on the real runtime: Queue publish/consume,
+  sweeper republish, DLQ writeback, Durable Objects. Bindings are declared inline
+  in `vitest.workers.config.ts`.
+- When a workers spec hand-maintains DDL (e.g. a `tenant_configs` table), assert
+  it against the Drizzle schema instead of trusting a "keep in sync" comment —
+  `tests/unit/inline-ddl-schema-sync.spec.ts` is the pattern.
+
+### E2E (`tests/e2e/*.spec.ts`)
+
+- **One spec = one Playwright project.** Register the project in
+  `playwright.config.ts` with a `testMatch` pointing at the file. `workers: 1` —
+  every project shares ONE `wrangler dev` worker and ONE mutable D1, so specs
+  must not assume isolation.
+- **Ordering & dependencies.** The `api` project runs **first**: it asserts
+  `POST /api/auth/setup` returns a fresh 200 and creates the shared admin
+  (`admin@autotest.com` / `Password123!`). Any project that logs in as that admin
+  must declare `dependencies: ['api']` so it is runnable in isolation (otherwise
+  login 401s — no workspace).
+- **Auth is cookie-based.** Page loaders authenticate via the
+  `__Host-inspector_token` HttpOnly cookie, not a Bearer header. RBAC is enforced
+  on the API, not by page-level role redirects.
+- **Serial-block masking.** A `test.describe.serial` block skips the rest of the
+  block on the first failure — a later failure can hide behind an earlier one. When
+  greening the suite, re-run the **full** suite on a **fresh build** (see below),
+  not just the spec you touched.
+- **Known-unwritable surfaces.** Some paths can't be driven end-to-end locally
+  (e.g. Download-PDF needs a Browser Rendering binding that crashes the isolate
+  when absent). Verify the reachable leg (the public-report render path) and keep
+  the rest unit-covered; leave a comment saying why.
+- **Skips must be honest.** A fully-skipped spec needs a `TODO(...)` naming its
+  blocker. Do **not** silently `test.skip(!seededId)` on a seed that always
+  400s — that reads as green while testing nothing (`report-gate.spec.ts` is a
+  `describe.skip` with a TODO for exactly this reason).
+
+### Type-level (`tests/**/*.spec-d.ts`)
+
+- `expectTypeOf` / `assertType` checks. Collected only by `test:types`; the
+  runtime configs ignore `.spec-d.ts`.
+
+---
+
+## 3. Initialization
+
+### `.dev.vars` — `scripts/gen-e2e-dev-vars.mjs`
+
+`wrangler dev` reads secrets from `.dev.vars`, and the specs read `SETUP_CODE`
+from it via `tests/helpers/dev-vars.ts`. A fresh checkout has none, so the worker
+boots without JWT keys and `/api/auth/setup` fails. The script provisions a
+throwaway file and is **idempotent — it never overwrites an existing
+`.dev.vars`** (your real local one is respected). Every value is freshly
+generated; nothing is hard-coded:
+
+| Key | Value | Why |
+|---|---|---|
+| `SETUP_CODE` | `000000` | The specs post a fixed `verificationCode: '000000'`; a **documented test fixture**, not a secret. |
+| `DISABLE_RATE_LIMIT` | `1` | The suite drives many logins from ONE IP; the limiter is 10/60s per IP and would flakily 429. Honored only by `checkRateLimit` when set; **defaults to enforced**, so no real deploy is affected. |
+| `JWT_SECRET` | random 32 bytes | KDF input. |
+| `JWT_PRIVATE_KEY_V1` / `JWT_PUBLIC_KEY_V1` | fresh ES256 (P-256) keypair | Single-line PEM (the keyring strips whitespace; `.dev.vars` is parsed line-by-line). |
+
+### `globalSetup` — `tests/global-setup.ts` (E2E only)
+
+Runs once before the Playwright suite. It:
+
+1. `npm run db:migrate` (idempotent) so the schema is current.
+2. Enumerates **every** table from `sqlite_master` and wipes them in one batch
+   under `PRAGMA defer_foreign_keys = ON` (never a hand-maintained table list —
+   that can't stay complete as the schema grows). `d1_migrations` and `_cf_*`
+   bookkeeping are preserved so migrations stay applied.
+3. Clears all local KV keys (setup codes, `pwchanged:*`, cached tenants).
+4. If `SEED_E2E=1`, runs `seedFixtures()` (`tests/seed-fixtures.ts`) — a
+   multi-user/multi-tenant seed the subsystem-C/D/E specs need. **Off by
+   default** so the self-seeding `api`/`browser` specs still see a clean
+   workspace.
+
+It resolves the **same** wrangler config the `webServer` builds against
+(`WRANGLER_CONFIG` > `wrangler.local.jsonc` > `wrangler.jsonc`) and targets the
+`DB` **binding** (not a database name) via `-c` — an earlier bug executed against
+a name absent from the config, so every DELETE errored silently and the DB was
+never cleared.
+
+### The E2E worker — `playwright.config.ts`
+
+- `webServer`: `npm run build && wrangler dev -c build/server/wrangler.json
+  --port 8789`, `reuseExistingServer: true`.
+- **Stale-build trap:** because `reuseExistingServer` is true, a local run serves
+  whatever `build/` already exists. To replicate CI's fresh run, clear state
+  first:
+  ```bash
+  rm -rf build .wrangler/state && npm run test:e2e
+  ```
+- `retries: CI ? 2 : 0` — a backstop for transient WebSocket/Durable-Object blips
+  in the collab specs. Locally 0, for fast honest feedback.
+
+### CI (`.github/workflows/ci.yml`)
+
+Two parallel jobs:
+
+- **`verify`** — `npm ci` → `gen-version` → `type-check` → `lint` (eslint +
+  `lint:ds` + `lint:erasure` + `lint:migrefs` + `lint:tests`) → `db:check` →
+  `test:unit` → `test:workers` → `test:web` → `build` → bundle-size.
+- **`e2e`** — `npm ci` → `gen-version` → `node scripts/gen-e2e-dev-vars.mjs` →
+  `playwright install chromium` → `npm run test:e2e`. Playwright's `webServer`
+  builds + boots the worker; `globalSetup` seeds D1.
+
+CodeQL runs separately (`codeql.yml`).
+
+---
+
+## 4. Gotchas & anti-patterns (hard-won)
+
+**Fake-green tests are the suite's worst failure mode.** A test that never
+asserts, swallows the path it claims to cover, or skips itself silently reports
+green while testing nothing. Three shapes to reject in review:
+
+- **Silent conditional skip.** `test.skip(!seededId, …)` on a seed that always
+  400s → every case skips forever, invisibly. If a precondition genuinely can't
+  be met, that's a `TODO(...)`-annotated `describe.skip`, not a runtime skip that
+  masquerades as a pass (this is why `report-gate.spec.ts` is a `describe.skip`).
+- **Swallowed error path.** A web-unit test whose real `fetch` ECONNREFUSEs and
+  is caught by the BFF's graceful-degradation `catch` passes while only ever
+  exercising the error branch. The `tests/setup-web.ts` guard fails these — do
+  not stub around it just to make it pass.
+- **No-assert body.** A test that runs code but asserts nothing (or asserts a
+  tautology). Every test must assert an observable outcome.
+
+**Assert against the REAL contract, not a remembered one.** Specs rot when the
+API moves under them and the symptom is a silent 400/404, not a red assertion:
+
+- E-05 patched a nonexistent `PATCH /:id/results`; the real write path is
+  `POST /:id/results/batch`. When a **seed step** returns 400/404, verify the
+  route still exists before trusting the green further down — a dead route turns
+  the whole spec into a no-op.
+- Public-report status codes are contract and they differ: an **unpublished**
+  inspection → **404** `Report not found`; a **published-then-unpublished** one →
+  **403** `NOT_PUBLISHED`. Assert the exact code your setup produces; use a
+  tolerant matcher only when both are legitimately reachable.
+
+**Flake-retry discipline — retries hide real bugs if applied bluntly.**
+
+- Retry **only** transient socket errors (`ECONNRESET`, `ECONNREFUSED`,
+  `socket hang up`, `EPIPE`). A `401`, `429`, or assertion failure MUST throw
+  immediately — retrying it converts a real regression into a slow flake. The
+  collab login helper does exactly this (4 attempts, connection-error-only,
+  backoff).
+- The collab root cause was a **stale keep-alive socket** left after the
+  WebSocket/Durable-Object-heavy editing spec; the next login reused the dead
+  socket and ECONNRESET once. `retries: CI ? 2 : 0` is the backstop, not the fix.
+- One shared runner IP trips the login limiter (10/60s) as a `429` — that is what
+  `DISABLE_RATE_LIMIT` exists for, not something to paper over with retries.
+
+**Publish crashes the isolate without a Browser Rendering binding.**
+`POST /:id/publish` enqueues a PDF via `env.BROWSER.quickAction`; with no
+`BROWSER` binding the worker dies with a 503 and
+`The RPC receiver does not implement quickAction` / `worker restarted`. The
+publish→PDF leg cannot be driven end-to-end locally — verify the public-report
+render path instead and keep the Download-PDF FAB unit-covered.
+
+---
+
+## Quick reference
 
 ```bash
-# Terminal 1
-npm run dev          # build-based; http://localhost:8788
+npm run test:web                       # web unit (happy-dom, hermetic)
+npm run test:unit                      # api/service unit (node + better-sqlite3)
+npm run test:workers                   # real workerd (queues, DOs)
+npm run test:e2e                       # Playwright, seeds real D1
+npm run test:types                     # type-level (*.spec-d.ts)
+npm run lint:tests                     # layout gate
 
-# Terminal 2
-npx playwright test --config playwright.api.config.ts
+# fresh full E2E (what CI does):
+rm -rf build .wrangler/state && npm run test:e2e
+
+# single E2E project / grep:
+npx playwright test --project=browser
+npx playwright test --grep "estimate range"
+
+# also seed the C/D/E multi-user fixtures:
+SEED_E2E=1 npm run test:e2e
 ```
 
-API unit tests run with `npm run test:unit` (vitest, `vitest.api.config.ts`).
-
-### Worker-runtime tests (queues)
-
-`npm run test:workers` runs `tests/workers/**` against real workerd via
-`@cloudflare/vitest-pool-workers` (`vitest.workers.config.ts` — the vitest-v4
-`cloudflareTest` Vite-plugin shape; miniflare bindings are declared inline, so no
-wrangler config is needed). It covers the sync-outbox queue paths: publish,
-sweeper republish, and DLQ writeback, including a real queue traversal to a test
-consumer. CI runs this after the unit suites.
-
-### Web Tests
-
-Web unit + E2E tests live in `tests/web/`. They test the React Router v7 React UI against the same running worker.
-
-```bash
-# Terminal 1: Start the worker (build-based)
-npm run dev          # http://localhost:8788
-
-# Terminal 2: Run web unit tests
-npm run test:web     # vitest, vitest.config.ts
-```
-
-## Test Results
-
-Tests pass on a **fresh database**. Tests that require known credentials skip gracefully when run against a pre-existing database.
-
-## Fresh DB vs Pre-existing DB
-
-`beforeAll` runs `POST /setup` to initialise the workspace:
-
-- **200 (first run)** — `setupToken` is stored and shared across all authenticated blocks. All 128 tests execute.
-- **409 (already seeded)** — `setupToken` stays empty. Tests that depend on known credentials or a specific DB state skip gracefully with a clear message.
-
-**To run the full suite against a fresh database:**
-
-```bash
-rm -rf .wrangler/state/v3/d1
-npm run db:migrate
-npm run dev
-
-# In another terminal:
-npx playwright test --config playwright.api.config.ts
-```
-
-## Test Structure
-
-| Section | What it covers |
-|---|---|
-| API Health | `GET /status` |
-| Public API | Booking profile, availability, demo report endpoints |
-| Login Page | HTML render, field validation, credential check, cookie set |
-| Dashboard Auth Guard | Unauthenticated access redirects to `/login` |
-| Bot Protection | Turnstile script present; dev-tenant bypass documented |
-| Public Booking API | `GET /inspectors`, `GET /availability/:id`, `POST /book` |
-| Protected API Enforcement | All protected routes return 401 without a token |
-| Agreement & Signing | Demo agreement fetch and e-signature POST |
-| Checkout & Stripe | Mock checkout URL, webhook signature validation, payment-success redirect |
-| Join Page | HTML render |
-| Setup Wizard | Field validation, subdomain format, 409 on re-run |
-| Field-Level Merge | PATCH results merges fields; last-write-wins per item key |
-| Availability CRUD | Auth enforcement + full CRUD (PUT schedule, POST/GET/DELETE overrides) |
-| Template CRUD | Auth enforcement + create/update/version-bump/delete + 409 when in use |
-| Invite & Join Flow | `POST /api/admin/invite` → token → `POST /api/auth/join` → login |
-| Password Change | Auth enforcement, wrong-password rejection, success, old/new login checks |
-| Password Reset | `POST /forgot-password` (no-enumeration, 200 for unknown email) + `POST /reset-password` (invalid token, short password) |
-| Inspection CRUD | Create, list, get with template, complete, status reflects update |
-| DELETE Inspection | Auth enforcement, removal, 404 after deletion |
-| Admin Export | Full tenant data export for admin/owner |
-| Team Members | `GET /api/admin/members` returns members + pending invites |
-| Agreement CRUD | Auth enforcement + create/list/update (version bump)/delete + 404 lifecycle |
-| Agent Referral Booking | Create inspection with `referredByAgentId`, verify in `my-reports` and leaderboard |
-| Agent CRM | `GET /api/agent/my-reports` (agent-scoped), `GET /api/agent/leaderboard` (admin-scoped) |
-| Google Calendar | Auth enforcement on connect/disconnect/sync |
-| AI Comment Assist | Auth enforcement; 500 without `GEMINI_API_KEY` |
-
-## Key Flows
-
-### Invite & Join Flow
-
-1. Admin calls `POST /api/admin/invite` → `inviteLink` returned with `token` query param
-2. New user POSTs `{ token, password }` to `POST /api/auth/join`
-3. httpOnly `inspector_token` cookie is set; user can log in immediately
-4. Re-using the same token returns **400** `already been used`
-
-### Password Reset Flow
-
-1. `POST /api/auth/forgot-password` — always returns **200** (no email enumeration)
-2. KV-backed one-time token stored with 1-hour TTL
-3. `POST /api/auth/reset-password` — validates token, updates password hash, deletes token
-4. Invalid/expired token returns **400**; password under 8 chars returns **400**
-
-### Agent Referral Flow
-
-1. Admin creates inspection with `referredByAgentId` via `POST /api/inspections`
-2. Agent calls `GET /api/agent/my-reports` — sees inspections where `referredByAgentId` matches their JWT `sub`
-3. Admin calls `GET /api/agent/leaderboard` — referral counts grouped by agent
-4. Public booking via `POST /public/book` with `agentId` body field also stores the referral
-   (Note: dev-mode tenantId is the subdomain string `'dev'`, not the UUID — verified separately via authenticated endpoint)
-
-### Password Change Flow
-
-1. Wrong `currentPassword` → **401**
-2. `newPassword` shorter than 8 chars → **400**
-3. Correct `currentPassword` + valid `newPassword` → **200**
-4. Old password rejected by `POST /api/auth/login` → **401**
-5. New password accepted → **200**
-
-## Graceful Skip Pattern
-
-Tests that need a real tenantId use `setupToken` from `beforeAll`:
-
-```typescript
-test('protected action', async ({ request }) => {
-  test.skip(!setupToken, 'Skipping: requires fresh DB');
-  // ...
-});
-```
-
-Tests with inter-test state dependencies (create → update → delete) use a shared variable in a `test.describe` block:
-
-```typescript
-test.describe('agreement CRUD (authenticated)', () => {
-  let agreementId = '';
-
-  test('POST creates agreement', async ({ request }) => {
-    // ...stores agreementId
-  });
-
-  test('DELETE removes agreement', async ({ request }) => {
-    test.skip(!agreementId, 'Skipping: requires agreement from previous test');
-    // ...
-  });
-});
-```
-
-## Playwright Config
-
-API E2E config lives at `playwright.api.config.ts` (web E2E uses `playwright.config.ts`). Tests run serially (1 worker) — some describe blocks have stateful dependencies (create → update → delete).
-
-## Useful Commands
-
-```bash
-npx playwright test --config playwright.api.config.ts --grep "availability"
-npx playwright test --config playwright.api.config.ts --grep "agent referral"
-npx playwright test --config playwright.api.config.ts --reporter=list
-```
-
-## CI Notes
-
-- Dev server must be running before tests.
-- `npm run db:migrate` must run at least once before `npm run dev`.
-- Local D1 state: `.wrangler/state/v3/d1/` — delete to reset.
-- Real API keys (Resend, Stripe, Gemini) are not required. Calls are skipped or use mock fallbacks when keys are absent.
-- **Turnstile is required** — `TURNSTILE_SECRET_KEY` must be set even for local dev and CI. Use Cloudflare's always-pass test secret (`1x0000000000000000000000000000000AA`). If absent, `POST /api/book` throws a 500 error.
-- The Cloudflare Turnstile test keys in `.dev.vars.example` always pass validation — safe for CI.
-
-## Web Tests
-
-Web tests live in `tests/web/` and cover the React Router v7 React UI.
-
-### Running
-
-```bash
-npm run test:web                          # run all web unit tests (vitest.config.ts)
-npm run test:web -- --grep "dashboard"    # filter by name
-```
-
-### Requirements
-
-- The single Worker (`npm run dev` in root, port 8788) must be running for E2E flows.
-- The worker must have a seeded database (run `npm run db:migrate` first).
-- Same `.dev.vars` / Turnstile key requirements as the API E2E tests.
+The cross-repo rationale for `directory = suite` (shared with the portal and CMS
+repos) lives in the private superproject at
+`docs/superpowers/plans/2026-07-03-tests-layout-convention.md`.
