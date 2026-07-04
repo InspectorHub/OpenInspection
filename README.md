@@ -64,7 +64,7 @@ There are three ways to run OpenInspection, from zero effort to full control. Pi
 
 ### 1. Try the hosted service (no deployment)
 
-Want to evaluate the product without running any infrastructure? Register at [**inspectorhub.io/register**](https://inspectorhub.io/register) with your email, click the activation link, and a workspace is created for you — the app lives at `app.inspectorhub.io`. This is the managed edition of this exact codebase (30-day free trial, no card), pre-loaded with starter templates so you can click through a real inspection immediately. You can export your data and switch to a self-hosted deploy at any time.
+Want to evaluate the product without running any infrastructure? Register at [**inspectorhub.io/register**](https://inspectorhub.io/register) with your email, click the activation link, and a workspace is created for you — the app lives at `app.inspectorhub.io`. This is the managed edition of this exact codebase (first 5 inspections free, no card), pre-loaded with starter templates so you can click through a real inspection immediately. You can export your data and switch to a self-hosted deploy at any time.
 
 ### 2. Deploy to Cloudflare (one-click)
 
@@ -118,9 +118,9 @@ Deep dive: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). Archi
 
 If you'd rather skip the infrastructure work, **[InspectorHub](https://inspectorhub.io/)** offers a fully-hosted version of this software — same codebase, managed for you.
 
-- 30-day free trial, no credit card required
+- First 5 inspections free — no credit card required
 - Simple per-seat pricing
-- 30-day money-back guarantee
+- Any-month money-back guarantee
 - Upgrade to self-hosted at any time — your data, your choice
 
 [Try InspectorHub free →](https://inspectorhub.io/)
