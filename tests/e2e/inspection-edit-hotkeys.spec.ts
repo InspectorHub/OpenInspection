@@ -37,7 +37,13 @@ test.describe('Inspection Edit hotkeys (Sprint 1 A-1..A-9)', () => {
 
     test('? opens keyboard HUD with all 5 rating rows', async ({ page }) => {
         await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        await page.waitForSelector('[x-data*=inspectionEditor]');
+        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
+        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
+        // [x-data*=inspectionEditor] root. TODO(tests-reorg): the inner rating/
+        // Comment Library/Active Item text assertions below still need
+        // live-verification against the RR editor before this env-gated suite
+        // is exercised.
+        await page.getByRole('main').waitFor({ state: 'visible' });
         await page.keyboard.press('?');
         // KeyboardHUD shows the canonical rating ladder.
         await expect(page.locator('text=Satisfactory').first()).toBeVisible();
@@ -49,9 +55,15 @@ test.describe('Inspection Edit hotkeys (Sprint 1 A-1..A-9)', () => {
 
     test('press 4 sets the active item rating to Not Inspected', async ({ page }) => {
         await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        await page.waitForSelector('[x-data*=inspectionEditor]');
+        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
+        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
+        // [x-data*=inspectionEditor] root. TODO(tests-reorg): the inner rating/
+        // Comment Library/Active Item text assertions below still need
+        // live-verification against the RR editor before this env-gated suite
+        // is exercised.
+        await page.getByRole('main').waitFor({ state: 'visible' });
         // Activate the first item by clicking its row title.
-        const firstItem = page.locator('[x-data*=inspectionEditor]').locator('button, [role=button]').first();
+        const firstItem = page.getByRole('main').locator('button, [role=button]').first();
         await firstItem.click().catch(() => { /* tolerate non-button rows */ });
         await page.keyboard.press('4');
         // The shape of the rating UI varies, so we just confirm a rating
@@ -62,7 +74,13 @@ test.describe('Inspection Edit hotkeys (Sprint 1 A-1..A-9)', () => {
 
     test('press / opens Comment Library and ACTIVE ITEM right pane hides', async ({ page }) => {
         await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        await page.waitForSelector('[x-data*=inspectionEditor]');
+        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
+        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
+        // [x-data*=inspectionEditor] root. TODO(tests-reorg): the inner rating/
+        // Comment Library/Active Item text assertions below still need
+        // live-verification against the RR editor before this env-gated suite
+        // is exercised.
+        await page.getByRole('main').waitFor({ state: 'visible' });
         // Click into the first textarea so the slash trigger fires inside a field.
         const ta = page.locator('textarea').first();
         await ta.focus();
@@ -75,7 +93,13 @@ test.describe('Inspection Edit hotkeys (Sprint 1 A-1..A-9)', () => {
 
     test('Esc closes Library and right pane returns', async ({ page }) => {
         await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        await page.waitForSelector('[x-data*=inspectionEditor]');
+        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
+        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
+        // [x-data*=inspectionEditor] root. TODO(tests-reorg): the inner rating/
+        // Comment Library/Active Item text assertions below still need
+        // live-verification against the RR editor before this env-gated suite
+        // is exercised.
+        await page.getByRole('main').waitFor({ state: 'visible' });
         const ta = page.locator('textarea').first();
         await ta.focus();
         await page.keyboard.press('/');

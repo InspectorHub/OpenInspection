@@ -49,8 +49,11 @@ test.describe('TeamStrip live presence (subsystem B M3 + M7)', () => {
         await expect(pageB.locator('text=Team today')).toBeVisible({ timeout: 5_000 });
 
         // After the WS broadcasts the join roster (~2s budget), at least one
-        // "Online" tile should be visible on each side.
-        await expect(pageA.locator('[x-data*=teamStrip] >> text=Online').first()).toBeVisible({ timeout: 10_000 });
-        await expect(pageB.locator('[x-data*=teamStrip] >> text=Online').first()).toBeVisible({ timeout: 10_000 });
+        // "Online" tile should be visible on each side. De-stale (2026-07
+        // tests-reorg): the RR v7 TeamStrip renders online members as
+        // <span class="text-ih-ok-fg">Online</span> (app/components/dashboard/
+        // TeamStrip.tsx:59) — was the Alpine [x-data*=teamStrip] root.
+        await expect(pageA.getByText('Online', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+        await expect(pageB.getByText('Online', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
     });
 });

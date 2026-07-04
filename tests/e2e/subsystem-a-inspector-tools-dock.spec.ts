@@ -28,7 +28,10 @@ test.describe('InspectorTools FAB dock (subsystem A M15)', () => {
         await page.click('button[type=submit]');
         await page.waitForURL('**/inspections');
         await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        await page.waitForSelector('[x-data*=inspectionEditor]');
+        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
+        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
+        // [x-data*=inspectionEditor] root.
+        await page.getByRole('main').waitFor({ state: 'visible' });
     });
 
     test('FAB visible at page load', async ({ page }) => {
