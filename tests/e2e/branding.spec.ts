@@ -16,20 +16,23 @@
  */
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
+import { makeCsrfToken } from './helpers/csrf';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 const NAV_TIMEOUT = 20000;
 
-const ADMIN_EMAIL = 'brandingadmin@autotest.com';
+// Single-tenant standalone allows exactly one workspace, initialized by the
+// `api` project's SETUP (admin@autotest.com). Branding logs in as that shared
+// admin — a second admin can't be created — and asserts the live company
+// settings + design-system token surface.
+const ADMIN_EMAIL = 'admin@autotest.com';
 const ADMIN_PASSWORD = 'Password123!';
 const COMPANY_NAME = 'Branding Corp';
 
-async function getCsrfToken(request: APIRequestContext): Promise<string> {
-    const res = await request.get(`${BASE_URL}/login`);
-    const setCookie = res.headers()['set-cookie'] ?? '';
-    const match = setCookie.match(/__Host-csrf_token=([^;]+)/);
-    return match?.[1] ?? '';
-}
+// CSRF here is a stateless double-submit (server/lib/middleware/csrf.ts): the
+// client mints its own token and echoes it as both cookie + header. The server
+// never issues the cookie, so there is nothing to fetch — see helpers/csrf.ts.
+const getCsrfToken = (_request?: APIRequestContext): string => makeCsrfToken();
 
 async function loginApi(request: APIRequestContext, email: string, password: string): Promise<string> {
     const csrf = await getCsrfToken(request);
@@ -57,7 +60,7 @@ test.describe.serial('Branding System E2E', () => {
     test('SETUP: ensure workspace + admin', async ({ request }) => {
         const csrf = await getCsrfToken(request);
         await request.post(`${BASE_URL}/api/auth/setup`, {
-            data: { companyName: COMPANY_NAME, email: ADMIN_EMAIL, password: ADMIN_PASSWORD, verificationCode: '000000' },
+            data: { companyName: COMPANY_NAME, adminName: 'Test Admin', email: ADMIN_EMAIL, password: ADMIN_PASSWORD, verificationCode: '000000' },
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, Cookie: `__Host-csrf_token=${csrf}` },
         });
         adminToken = await loginApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);

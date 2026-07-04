@@ -1,11 +1,21 @@
-// tests/web/unit/report-card-stack.summary.spec.ts
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loader } from '../../../app/routes/public/report-card-stack';
 
 function fakeCtx() {
-  // Minimal context: createApi(context) will throw → loader catches → defaults returned.
+  // Bare context: getApiUrl() falls back to a real http://localhost:8788 base,
+  // so the loader's brand/report fetches would otherwise hit the network.
   return {} as any;
 }
+
+beforeEach(() => {
+  // initialFilter is derived purely from the request URL; the loader's
+  // brand/report fetches are irrelevant to it. Stub fetch to fail fast so the
+  // loader takes its graceful-default path hermetically — no real request.
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('no API in unit test')));
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('report-card-stack loader summary mode', () => {
   it('defaults initialFilter to "summary" when ?summary=1', async () => {

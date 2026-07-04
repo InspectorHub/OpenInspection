@@ -31,11 +31,11 @@ import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
 
-const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:8787';
+const BASE_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:8789';
 const NAV_TIMEOUT = 30000;
 
-const ADMIN_EMAIL = process.env.TEST_EMAIL || 'admin@example.com';
-const ADMIN_PASSWORD = process.env.TEST_PASSWORD || 'testpassword123';
+const ADMIN_EMAIL = process.env.TEST_EMAIL || 'admin@autotest.com';
+const ADMIN_PASSWORD = process.env.TEST_PASSWORD || 'Password123!';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(__dirname, '..', '..');

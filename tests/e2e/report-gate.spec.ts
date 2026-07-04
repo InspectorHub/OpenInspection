@@ -14,6 +14,7 @@
  * preview without paying themselves.
  */
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { makeCsrfToken } from './helpers/csrf';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 
@@ -25,12 +26,10 @@ const TENANT_SLUG = 'automation-test-corp';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-async function getCsrf(request: APIRequestContext): Promise<string> {
-    const res = await request.get(`${BASE_URL}/login`);
-    const setCookie = res.headers()['set-cookie'] ?? '';
-    const match = setCookie.match(/__Host-csrf_token=([^;]+)/);
-    return match?.[1] ?? '';
-}
+// CSRF here is a stateless double-submit (server/lib/middleware/csrf.ts): the
+// client mints its own token and echoes it as both cookie + header. The server
+// never issues the cookie, so there is nothing to fetch — see helpers/csrf.ts.
+const getCsrf = (_request?: APIRequestContext): string => makeCsrfToken();
 
 async function loginApi(request: APIRequestContext, email: string, password: string): Promise<string> {
     const csrf = await getCsrf(request);
@@ -82,7 +81,20 @@ async function createTestInspection(
 
 // ── Specs ───────────────────────────────────────────────────────────────────
 
-test.describe('Report gate (Sprint 1 C-7)', () => {
+// TODO(tests-reorg): these 3 gate specs were SILENTLY no-op'ing — a false
+// green. `createTestInspection` posts a stale flat payload
+// (propertyAddress/clientName/date, no `templateId`/`scheduledAt`/
+// `subInspections`), so `POST /api/inspections` 400s and every case hit the
+// `test.skip(id === null)` guard and reported "skipped" while advertising gate
+// coverage. It never verified the payment/agreement gate at all. Made the skip
+// EXPLICIT (describe.skip) so the gap is visible in the report, not hidden
+// behind a failing seed. Rebind blocker: (1) seed a real inspection with the
+// current CreateInspectionSchema shape (templateId from the api project +
+// scheduledAt + subInspections), and (2) drive the gate state through the real
+// surfaces — paymentRequired/agreementRequired/paymentStatus are NOT create-time
+// inputs, so force them via the publish options / payment-status update rather
+// than the create payload. Until then this is honestly skipped, not fake-green.
+test.describe.skip('Report gate (Sprint 1 C-7)', () => {
     let adminToken = '';
     let setupOk = false;
 

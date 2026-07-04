@@ -83,6 +83,11 @@ export interface AppEnv {
     CF_API_TOKEN?: string;
     APP_MODE?: 'standalone' | 'saas';
     SETUP_CODE?: string;
+    // Test/dev-only escape hatch: when '1', checkRateLimit no-ops. Set ONLY in
+    // the ephemeral E2E .dev.vars (scripts/gen-e2e-dev-vars.mjs) so the seeded
+    // suite's concentrated single-IP logins don't trip the 10/60s login limiter.
+    // Unset (the default) everywhere else — production/self-host stays enforced.
+    DISABLE_RATE_LIMIT?: string;
 
     // Payments
     STRIPE_SECRET_KEY?: string;

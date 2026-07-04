@@ -32,11 +32,14 @@ import { fileURLToPath } from 'node:url';
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, BrowserContext, Page } from '@playwright/test';
 
-const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:8787';
+// Must be `localhost` (not 127.0.0.1): the auth cookie is added with
+// domain 'localhost', and Chromium only treats http://localhost as a secure
+// context — required for the Secure `__Host-` cookie to ride the ws:// upgrade.
+const BASE_URL = process.env.FRONTEND_URL || 'http://localhost:8789';
 const NAV_TIMEOUT = 30000;
 
-const ADMIN_EMAIL = process.env.TEST_EMAIL || 'admin@example.com';
-const ADMIN_PASSWORD = process.env.TEST_PASSWORD || 'testpassword123';
+const ADMIN_EMAIL = process.env.TEST_EMAIL || 'admin@autotest.com';
+const ADMIN_PASSWORD = process.env.TEST_PASSWORD || 'Password123!';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.resolve(__dirname, '..', '..');
@@ -86,20 +89,35 @@ async function loginApi(
   password: string,
 ): Promise<string> {
   const csrf = 'deadbeefdeadbeefdeadbeefdeadbeef';
-  const res = await request.post(`${BASE_URL}/api/auth/login`, {
-    data: { email, password },
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRF-Token': csrf,
-      Cookie: `__Host-csrf_token=${csrf}`,
-    },
-  });
-  expect(res.status(), `Login failed for ${email}: expected 200`).toBe(200);
-  const setCookie = res.headers()['set-cookie'] ?? '';
-  const match = setCookie.match(/__Host-inspector_token=([^;]+)/);
-  const token = match?.[1] ?? '';
-  expect(token, `No session cookie returned for ${email}`).toBeTruthy();
-  return token;
+  // The collab specs churn WebSocket + Durable Object connections; a stale
+  // keep-alive socket to the shared wrangler-dev worker can be reset
+  // (read ECONNRESET) on the next HTTP request, flaking this beforeAll login.
+  // Retry ONLY on transient connection errors — a real 401/429/assertion still
+  // throws immediately, so we never mask a genuine auth break.
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const res = await request.post(`${BASE_URL}/api/auth/login`, {
+        data: { email, password },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrf,
+          Cookie: `__Host-csrf_token=${csrf}`,
+        },
+      });
+      expect(res.status(), `Login failed for ${email}: expected 200`).toBe(200);
+      const setCookie = res.headers()['set-cookie'] ?? '';
+      const match = setCookie.match(/__Host-inspector_token=([^;]+)/);
+      const token = match?.[1] ?? '';
+      expect(token, `No session cookie returned for ${email}`).toBeTruthy();
+      return token;
+    } catch (err) {
+      lastErr = err;
+      if (!/ECONNRESET|ECONNREFUSED|socket hang up|EPIPE/i.test(String((err as Error)?.message ?? err))) throw err;
+      await new Promise((r) => setTimeout(r, 250 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
 }
 
 async function apiPost(

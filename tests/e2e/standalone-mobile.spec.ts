@@ -10,6 +10,7 @@
  */
 import { test, expect } from '@playwright/test';
 import type { APIRequestContext, Page } from '@playwright/test';
+import { makeCsrfToken } from './helpers/csrf';
 
 const BASE_URL = 'http://127.0.0.1:8789';
 const NAV_TIMEOUT = 15000;
@@ -17,12 +18,10 @@ const NAV_TIMEOUT = 15000;
 const ADMIN_EMAIL = 'admin@autotest.com';
 const ADMIN_PASSWORD = 'Password123!';
 
-async function getCsrfToken(request: APIRequestContext): Promise<string> {
-    const res = await request.get(`${BASE_URL}/login`);
-    const setCookie = res.headers()['set-cookie'] ?? '';
-    const match = setCookie.match(/__Host-csrf_token=([^;]+)/);
-    return match?.[1] ?? '';
-}
+// CSRF here is a stateless double-submit (server/lib/middleware/csrf.ts): the
+// client mints its own token and echoes it as both cookie + header. The server
+// never issues the cookie, so there is nothing to fetch — see helpers/csrf.ts.
+const getCsrfToken = (_request?: APIRequestContext): string => makeCsrfToken();
 
 async function loginApi(request: APIRequestContext, email: string, password: string): Promise<string> {
     const csrf = await getCsrfToken(request);
@@ -55,7 +54,7 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
         // the api project's SETUP test).
         const csrf = await getCsrfToken(request);
         await request.post(`${BASE_URL}/api/auth/setup`, {
-            data: { companyName: 'Mobile Test Corp', email: ADMIN_EMAIL, password: ADMIN_PASSWORD, verificationCode: '000000' },
+            data: { companyName: 'Mobile Test Corp', adminName: 'Test Admin', email: ADMIN_EMAIL, password: ADMIN_PASSWORD, verificationCode: '000000' },
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, 'Cookie': `__Host-csrf_token=${csrf}` },
         });
         adminToken = await loginApi(request, ADMIN_EMAIL, ADMIN_PASSWORD);
@@ -139,6 +138,8 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
         expect(overflow, 'no horizontal overflow').toBeLessThanOrEqual(1);
         await expect(page.locator('h1:has-text("Marketplace")')).toBeVisible();
-        await expect(page.locator('input[placeholder*="Search" i]').first()).toBeVisible();
+        // (The former search-box assertion was removed in the 2026-07 de-stale:
+        // marketplace.tsx was redesigned to a PageHeader + TabStrip + card grid
+        // with no search input — server-side pagination via ?page/?pageSize.)
     });
 });

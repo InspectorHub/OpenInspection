@@ -28,26 +28,26 @@ test.describe('Sprint 2 S2-5 — inspection sub-routes', () => {
         expect(location).toMatch(/\/(login|report)/);
     });
 
-    test('/settings 302s to /report (or to /login when unauthed)', async ({ request }) => {
+    // The Photos/Summary/Signatures/Settings sub-nav and the standalone /report
+    // deep-link were retired in the design-alignment rollback (the editor is now
+    // single-view at /edit with slide-over sheets; the report is reached via the
+    // editor Preview link or the public /report/:tenant/:id share URL). routes.ts
+    // mounts only /inspections/:id, /:id/edit, and /:id/form — so these legacy
+    // deep-links no longer resolve and return 404. Pin that retirement.
+    test('/settings legacy deep-link is retired (404 — folded into the /edit slide-over)', async ({ request }) => {
         const res = await request.get(`${BASE_URL}/inspections/${FAKE_ID}/settings`, {
             maxRedirects: 0,
             failOnStatusCode: false,
         });
-        expect([301, 302, 303, 307, 308]).toContain(res.status());
-        const location = res.headers()['location'] || '';
-        expect(location).toMatch(/\/(login|report)/);
+        expect(res.status()).toBe(404);
     });
 
-    test('/report editor route is mounted', async ({ request }) => {
+    test('/report legacy deep-link is retired (404 — use /edit Preview or /report/:tenant/:id)', async ({ request }) => {
         const res = await request.get(`${BASE_URL}/inspections/${FAKE_ID}/report`, {
             maxRedirects: 0,
             failOnStatusCode: false,
         });
-        expect([200, 301, 302, 303, 307, 308]).toContain(res.status());
-        if ([301, 302, 303, 307, 308].includes(res.status())) {
-            const location = res.headers()['location'] || '';
-            expect(location).toMatch(/\/login/);
-        }
+        expect(res.status()).toBe(404);
     });
 
     test('responsive sweep — /report editor renders without horizontal scroll across 5 viewports', async ({ page }) => {

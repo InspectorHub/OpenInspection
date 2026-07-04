@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, rmSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { seedFixtures } from './seed-fixtures';
@@ -20,45 +20,64 @@ const __dirname = path.dirname(__filename);
  */
 export default function globalSetup() {
     const appDir = path.resolve(__dirname, '..');
-    // Delete in FK-safe order (child tables first)
-    // Use --command per table because wrangler --file doesn't persist PRAGMA across statements
-    const tables = [
-        'audit_logs',
-        'erasure_log',
-        'agreement_signers',
-        'inspection_results',
-        'inspections',
-        'availability_overrides',
-        'availability',
-        'tenant_invites',
-        'agreements',
-        'templates',
-        'users',
-        'tenant_configs',
-        'tenants',
-    ];
+
+    // Resolve the SAME wrangler config the webServer builds/runs against
+    // (vite `configPath`: WRANGLER_CONFIG > wrangler.local.jsonc > wrangler.jsonc)
+    // so `d1 execute --local` targets the exact persisted SQLite the worker reads.
+    // Pass it explicitly via -c; also target the `DB` BINDING (not a database
+    // NAME) — wrangler auto-discovers only wrangler.jsonc, and the old code
+    // executed against a database name that isn't in the config at all, so every
+    // DELETE errored and was silently swallowed → the DB was never cleared → the
+    // next run's POST /api/auth/setup saw last run's workspace and 409'd.
+    const cfg =
+        process.env.WRANGLER_CONFIG ||
+        (existsSync(path.join(appDir, 'wrangler.local.jsonc')) ? 'wrangler.local.jsonc' : 'wrangler.jsonc');
+    const d1File = (file: string, extra = '') =>
+        `npx wrangler d1 execute DB --local -c ${cfg} --file "${file}" ${extra}`.trim();
+    const tmp = (name: string) => path.join(appDir, name);
 
     try {
         // Ensure all schema migrations are applied (idempotent)
         execSync('npm run db:migrate', { cwd: appDir, stdio: 'pipe' });
 
-        // Clear all data rows one table at a time (schema stays intact)
-        for (const table of tables) {
-            try {
-                execSync(
-                    `npx wrangler d1 execute openinspection-standalone-db --local --command "DELETE FROM ${table}" --yes`,
-                    { cwd: appDir, stdio: 'pipe' },
-                );
-            } catch {
-                // Table may not exist in older migrations — skip
+        // Wipe every data table, not a hand-maintained subset. The old 13-table
+        // list missed the many child tables that reference inspections/tenants
+        // (invoices, services, documents, messages, …); with D1's FK enforcement
+        // ON (PRAGMA foreign_keys = 1) a DELETE FROM tenants then fails — and the
+        // curated "FK-safe order" can never stay complete as the schema grows.
+        // Instead: enumerate all tables from sqlite_master and delete them in one
+        // batch with `PRAGMA defer_foreign_keys = ON`, which holds FK checks until
+        // the batch commits (all rows gone → no violations). d1_migrations and the
+        // internal _cf_* bookkeeping tables are preserved so migrations stay applied.
+        const listSql = tmp('.gs-list.sql');
+        const wipeSql = tmp('.gs-wipe.sql');
+        try {
+            writeFileSync(
+                listSql,
+                "SELECT name FROM sqlite_master WHERE type='table' " +
+                    "AND name NOT LIKE 'sqlite_%' AND name NOT GLOB '_cf_*' " +
+                    "AND name <> 'd1_migrations' ORDER BY name;\n",
+            );
+            const out = execSync(d1File(listSql, '--json'), { cwd: appDir, encoding: 'utf8' });
+            const parsed = JSON.parse(out.slice(out.indexOf('['))) as { results: { name: string }[] }[];
+            const tables = parsed[0]?.results?.map((r) => r.name) ?? [];
+            if (tables.length > 0) {
+                const wipe =
+                    'PRAGMA defer_foreign_keys = ON;\n' +
+                    tables.map((t) => `DELETE FROM "${t}";`).join('\n') +
+                    '\n';
+                writeFileSync(wipeSql, wipe);
+                execSync(d1File(wipeSql, '--yes'), { cwd: appDir, stdio: 'pipe' });
             }
+        } finally {
+            rmSync(listSql, { force: true });
+            rmSync(wipeSql, { force: true });
         }
 
         // Clear all KV keys (setup codes, pwchanged tokens, cached tenants)
         try {
-            const cfgFile = existsSync(path.join(appDir, 'wrangler.local.jsonc')) ? 'wrangler.local.jsonc' : 'wrangler.jsonc';
-            const cfg = readFileSync(path.join(appDir, cfgFile), 'utf8');
-            const nsMatch = cfg.match(/"kv_namespaces"[^\]]*?"id":\s*"([^"]+)"/);
+            const cfgRaw = readFileSync(path.join(appDir, cfg), 'utf8');
+            const nsMatch = cfgRaw.match(/"kv_namespaces"[^\]]*?"id":\s*"([^"]+)"/);
             const nsId = nsMatch?.[1];
             if (nsId) {
                 const listOutput = execSync(
@@ -99,7 +118,7 @@ export default function globalSetup() {
         const msg = err instanceof Error ? err.message : String(err);
         console.warn(
             `\n[globalSetup] WARNING: Could not reset local D1 (${msg.split('\n')[0]}).\n` +
-            '  Ensure wrangler is installed and the DB was created: npx wrangler d1 create openinspection-standalone-db\n',
+            '  Ensure wrangler is installed and the DB was created: npx wrangler d1 create openinspection-db\n',
         );
     }
 }
