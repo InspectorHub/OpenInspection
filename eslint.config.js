@@ -10,13 +10,14 @@ export default tseslint.config(
         // type-aware parser can't resolve them. They don't need type-aware
         // linting — ignore them rather than widen the tsconfig projects.
         //
-        // `app/**/*.test.{ts,tsx}` are the co-located frontend tests (tests-reorg
-        // R2). They are excluded from tsconfig.json (no vitest/@testing-library
-        // types in the app tsc program), so the type-aware parser can't place them
-        // in any TS project — and they carry no product code. Ignoring them here
-        // preserves the pre-move state: they lived under `tests/**` (also ignored
-        // below) and were never linted.
-        ignores: ['dist/**', 'dist-check/**', 'build/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'app/**/*.test.ts', 'app/**/*.test.tsx', 'scripts/**'],
+        // `app/**/*.test.{ts,tsx}` and `packages/shared-ui/src/**/*.test.{ts,tsx}`
+        // are the co-located frontend tests (tests-reorg R2). They are excluded
+        // from tsconfig.json (no vitest/@testing-library types in the app tsc
+        // program), so the type-aware parser can't place them in any TS project —
+        // and they carry no product code. Ignoring them here preserves the
+        // pre-move state: they lived under `tests/**` (also ignored below) and
+        // were never linted.
+        ignores: ['dist/**', 'dist-check/**', 'build/**', '.react-router/**', 'node_modules/**', '.wrangler/**', '.worktrees/**', 'eslint.config.js', '*.config.ts', 'drizzle.config.trial.ts', 'public/**', 'tests/**', 'app/**/*.test.ts', 'app/**/*.test.tsx', 'packages/shared-ui/src/**/*.test.ts', 'packages/shared-ui/src/**/*.test.tsx', 'scripts/**'],
     },
     {
         files: ['**/*.ts', '**/*.tsx'],
