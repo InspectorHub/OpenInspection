@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Button } from "@core/shared-ui";
 
 interface RosterMember {
   userId: string;
@@ -32,7 +33,7 @@ export function RosterPopover({ open, roster, onClose, onInvitePermanent }: Rost
       <div className="ih-card w-80 max-w-full p-4 bg-ih-bg-card" ref={ref}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="ih-eyebrow">Inspectors on this inspection</h3>
-          <button type="button" className="ih-btn ih-btn--sm ih-btn--ghost" onClick={onClose} aria-label="Close">&times;</button>
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">&times;</Button>
         </div>
 
         <ul className="space-y-2">
@@ -57,7 +58,7 @@ export function RosterPopover({ open, roster, onClose, onInvitePermanent }: Rost
         </ul>
 
         <div className="mt-4 pt-3 border-t border-ih-border flex gap-2">
-          <button type="button" className="ih-btn ih-btn--sm ih-btn--secondary" onClick={onInvitePermanent} title="Send an email invite to a new permanent inspector">Add inspector</button>
+          <Button variant="secondary" size="sm" onClick={onInvitePermanent} title="Send an email invite to a new permanent inspector">Add inspector</Button>
         </div>
       </div>
     </div>
