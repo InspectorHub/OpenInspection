@@ -35,5 +35,14 @@
     // and only the global `Env` satisfies that after Cloudflare.Env is augmented by this file.
     "worker-configuration.d.ts"
   ],
-  "exclude": ["node_modules", "build", "dist"]
+  "exclude": [
+    "node_modules",
+    "build",
+    "dist",
+    // Co-located frontend tests (tests-reorg R2) — no vitest/@testing-library
+    // types in this tsc program; keep them out of the app tsc pass (they were
+    // never type-checked pre-move, when they lived under tests/web/unit/).
+    "app/**/*.test.ts",
+    "app/**/*.test.tsx"
+  ]
 }

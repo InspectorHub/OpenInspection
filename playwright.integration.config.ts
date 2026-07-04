@@ -6,9 +6,10 @@ import { defineConfig } from '@playwright/test';
  *
  * - No globalSetup: the spec itself resets the DB in beforeAll.
  * - 30s timeout: real API calls can be slow.
- * - Only matches *.integration.spec.ts files.
+ * - Only matches *.integration.spec.ts files (now merged into tests/e2e).
  */
 export default defineConfig({
+    testDir: './tests/e2e',
     testMatch: '**/*.integration.spec.ts',
     timeout: 30_000,
     use: { headless: true },

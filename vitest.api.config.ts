@@ -33,7 +33,7 @@ export default defineConfig({
     // that need a DOM environment. This is the vitest v4 equivalent of the
     // v1 `environmentMatchGlobs` option (removed in v2+).
     setupFiles: ['tests/unit/setup-client.ts'],
-    include: ['tests/unit/**/*.spec.ts', 'tests/portal-isolation.spec.ts'],
+    include: ['tests/unit/**/*.spec.ts'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

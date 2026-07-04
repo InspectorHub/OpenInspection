@@ -62,16 +62,56 @@ applies the same config resolution to direct wrangler commands (db:migrate).
 | `server/lib/validations/` | Zod schemas per module |
 | `server/services/` | Business logic, DB queries (Drizzle) |
 | `migrations/` | D1 migration SQL (drizzle-kit schema-first: `0000_baseline.sql` + forward) |
-| `tests/` | API unit + integration + E2E tests |
+| `tests/` | See "Test Layout" below |
 | `app/routes/` | React Router v7 route files |
 | `app/components/` | React components |
 | `app/hooks/` | React hooks (useInspection, useFindings, useKeyboard, etc.) |
 | `app/lib/` | API client (hono/client over the in-process binding), session management, helpers |
 | `app/styles/tailwind.css` | Design System 0523 token layer (Tailwind v4) |
 | `public/` | Static assets (fonts, logo, service worker, widget) |
-| `tests/web/` | Web E2E + unit tests |
 | `packages/shared-ui/src/` | shared React components (Button, Pill, Card, etc.) |
 | `packages/api-types/` | CoreApiType re-export for hono/client |
+
+### Test Layout
+
+Directory = suite; a spec's location alone decides which config runs it
+(gated by `npm run lint:tests`):
+
+| Location | Suite | Config |
+|---|---|---|
+| `app/**/*.test.{ts,tsx}` (co-located) | `test:web` (CI) | `vitest.config.ts` |
+| `tests/unit/<domain>/` | `test:unit` (CI) | `vitest.api.config.ts` |
+| `tests/workers/` | `test:workers` (CI) | `vitest.workers.config.ts` |
+| `tests/e2e/` | `test:e2e` (+ integration/remote modes) | `playwright.config.ts` (local, seeds D1) / `.integration` / `.remote` |
+
+Choosing a home for a new spec:
+1. Frontend component/unit test? → **co-locate** it beside the component as
+   `Foo.test.tsx` (or `__tests__/Foo.test.tsx`) under `app/` (R2). Never in
+   `tests/`.
+2. Server-side, no browser: depends on real CF runtime semantics (Queue
+   delivery, Durable Objects, workerd-only APIs)? Yes → `tests/workers/`
+   (real workerd via vitest-pool-workers); no → `tests/unit/<domain>/`
+   (node env, stubs + better-sqlite3).
+3. Full-stack / browser / anything hitting a running worker → `tests/e2e/`
+   (R8). One directory; the default `playwright.config.ts` seeds real D1 via
+   `globalSetup` so every E2E exercises the actual database. `*.integration.spec.ts`
+   (self-resetting, serial) and remote/staging runs are just other configs
+   over the same dir — not separate directories.
+
+Rules: `tests/unit/<domain>/` dirs are named after the `server/api/` module (or
+service family) the specs exercise — never flat specs at the root. Frontend
+tests co-locate under `app/` (do not recreate `tests/web/unit/`). E2E is the
+single `tests/e2e/` (do not recreate `tests/web/e2e/` or `tests/integration/`).
+Domain dirs contain ONLY spec files; shared infra stays at
+`tests/unit/{db,mocks,setup-client}.ts` + `helpers/` + `stubs/` and
+`tests/{global-setup,seed-fixtures}.ts` + `helpers/` + `fixtures/` (fixtures
+group payloads by event family, versioned filenames). `tests/workers/` stays
+flat until a family reaches ~5 specs, then gets a domain dir (`mcp/` is the
+example). `tests/e2e/` stays flat: one spec file = one playwright project. Every
+spec must be collected by exactly one config (playwright projects must resolve).
+Fully-skipped specs need a `TODO(...)` naming their blocker. Name new specs after
+behavior, not sprints. Full rationale + the cross-repo convention:
+`docs/superpowers/plans/2026-07-03-tests-layout-convention.md`.
 
 ## Core Architecture
 

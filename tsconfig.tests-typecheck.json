@@ -1,0 +1,28 @@
+{
+  // Dedicated program for the `*.spec-d.ts` type-only test project
+  // (tests-reorg Task 6a, Decision 1). `tests/**` is not part of either
+  // app (tsconfig.json) or api (tsconfig.api.json) tsc program, so
+  // expectTypeOf(...) assertions in tests/ were a runtime no-op under
+  // `vitest run` — nothing ever type-checked them, and this program is
+  // what finally does.
+  //
+  // Extends the API config: audit-actions.spec-d.ts checks a server-only
+  // type (server/lib/audit) and the hc<...> client-shape specs check types
+  // re-exported from server/api/* via packages/api-types — both are
+  // API-surface concerns. Files reached via relative import (e.g.
+  // packages/api-types/index.ts, which itself pulls in most of server/**)
+  // are pulled into the program even though they aren't listed in
+  // `include` — same as any node_modules import.
+  "extends": "./tsconfig.api.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./.tsbuildinfo.tests-typecheck"
+  },
+  "include": [
+    "server/**/*.ts",
+    "server/**/*.tsx",
+    "worker-configuration.d.ts",
+    "packages/api-types/**/*.ts",
+    "tests/**/*.spec-d.ts"
+  ],
+  "exclude": ["node_modules", "dist"]
+}

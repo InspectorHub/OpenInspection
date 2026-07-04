@@ -46,6 +46,13 @@ jobs:
       - name: Type-check (react-router typegen + tsc app + api)
         run: npm run type-check
 
+      # Type-only test project: expectTypeOf(...) assertions in tests/**/*.spec-d.ts
+      # are a runtime no-op under plain vitest run — this is the only thing that
+      # actually type-checks them. tsc needs a larger heap for this codebase's
+      # AdminApi-scale intersection types (mirrors type-check:api's own bump).
+      - name: Type-only tests (vitest --typecheck)
+        run: npm run test:types
+
       - name: Lint
         run: npm run lint
 
