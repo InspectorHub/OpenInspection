@@ -22,9 +22,13 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: "h-11 px-5 text-sm gap-2",
 };
 
-export function Button({ variant = "secondary", size = "md", icon, children, className = "", ...props }: ButtonProps) {
+export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { variant = "secondary", size = "md", icon, children, className = "", ...props },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       className={`inline-flex items-center justify-center font-bold rounded-ih-button transition-all focus:outline-none focus:shadow-ih-focus disabled:opacity-50 disabled:cursor-not-allowed ${variantClasses[variant]} ${sizeClasses[size]} ${className}`}
       {...props}
     >
@@ -32,4 +36,4 @@ export function Button({ variant = "secondary", size = "md", icon, children, cla
       {children}
     </button>
   );
-}
+});

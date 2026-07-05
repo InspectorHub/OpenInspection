@@ -1,0 +1,58 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "workers/app.ts",
+    "server/index.ts",
+    "app/routes.ts",
+    "app/root.tsx",
+    "app/entry.server.tsx",
+    "app/routes/**/*.{ts,tsx}",
+    "scripts/**/*.{js,mjs,ts}",
+    "*.config.{ts,js,mjs}",
+    "react-router.config.ts",
+    "drizzle.config.ts",
+    "drizzle.config.trial.ts",
+    "playwright.config.ts",
+    "playwright.integration.config.ts",
+    "playwright.remote.config.ts",
+    "vitest.api.config.ts",
+    "vitest.config.ts",
+    "vitest.typecheck.config.ts",
+    "vitest.workers.config.ts",
+    "vite.config.ts",
+    "**/*.test.{ts,tsx}",
+    "**/*.spec.{ts,tsx}",
+    "tests/**/*.ts",
+    "packages/shared-ui/src/index.ts",
+    "packages/api-types/index.ts"
+  ],
+  "project": [
+    "app/**/*.{ts,tsx}",
+    "server/**/*.{ts,tsx}",
+    "workers/**/*.ts",
+    "packages/**/*.{ts,tsx}",
+    "scripts/**/*.{js,mjs,ts}"
+  ],
+  "ignore": [
+    "build/**",
+    ".react-router/**",
+    "public/vendor/**",
+    "public/fonts/**",
+    "node_modules/**",
+    ".worktrees/**",
+    "server/generated/**",
+    "worker-configuration.d.ts",
+    "**/*.d.ts"
+  ],
+  "ignoreBinaries": [
+    "tsgo"
+  ],
+  "ignoreDependencies": [
+    "@fontsource/.+",
+    "swagger-ui-dist",
+    "tailwindcss",
+    "miniflare",
+    "lint-staged",
+    "cloudflare"
+  ]
+}

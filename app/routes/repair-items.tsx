@@ -114,7 +114,7 @@ export default function RepairItemsPage() {
   }
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Repair Items" }]} />
       <PageHeader
         title="Repair Items"
@@ -162,7 +162,7 @@ export default function RepairItemsPage() {
 
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-[rgba(15,23,42,0.4)]" onClick={() => setModalOpen(false)} />
+          <div className="absolute inset-0 bg-ih-backdrop" onClick={() => setModalOpen(false)} />
           <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover w-full max-w-md mx-4 p-6 space-y-4">
             <h3 className="text-[16px] font-bold text-ih-fg-1">{form.id ? "Edit repair item" : "New repair item"}</h3>
             <div className="space-y-3">

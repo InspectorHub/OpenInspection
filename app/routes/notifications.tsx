@@ -27,7 +27,7 @@ export default function NotificationsPage() {
   const notificationList = notifications as unknown[];
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       <PageHeader
         title="Notifications"
         meta={`${notificationList.length} notifications`}

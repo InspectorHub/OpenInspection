@@ -50,6 +50,32 @@ export const setupSchema = z.object({
 export type SetupInput = z.infer<typeof setupSchema>;
 
 /**
+ * Human-readable strong-password requirement, shown next to password inputs on
+ * the reset and join pages. Kept as ONE constant so both surfaces stay in sync
+ * with `strongPassword` above.
+ */
+export const PASSWORD_HINT =
+  'At least 8 characters, with an uppercase letter, a number, and a special character.';
+
+/**
+ * Forgot-password request (`/forgot-password`). Only the email is user-entered;
+ * the backend answers 200 unconditionally (anti-enumeration).
+ */
+export const forgotPasswordSchema = z.object({
+  email: z.string().min(1, 'Email is required').email('Invalid email address'),
+});
+
+/**
+ * Reset-password submit (`/reset-password`). The token rides as a hidden field
+ * (sourced from the URL via the loader), NOT a schema field — the schema only
+ * validates the new password. Field name is `newPassword`, matching the API's
+ * `ResetPasswordSchema` (server/lib/validations/auth.schema.ts).
+ */
+export const resetPasswordSchema = z.object({
+  newPassword: strongPassword,
+});
+
+/**
  * Team-invite accept (`/join`). Token comes from the URL, NOT the form — the
  * schema only validates the user-entered name + password. Mirrors the API's
  * `JoinTeamSchema` password strength.

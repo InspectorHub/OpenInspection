@@ -1,14 +1,14 @@
 {
   "server/**/*.{ts,tsx}": [
-    "eslint --fix"
+    "eslint --fix --cache"
   ],
   "app/**/*.{ts,tsx}": [
-    "eslint --fix"
+    "eslint --fix --cache"
   ],
   "workers/**/*.ts": [
-    "eslint --fix"
+    "eslint --fix --cache"
   ],
   "packages/**/*.{ts,tsx}": [
-    "eslint --fix"
+    "eslint --fix --cache"
   ]
 }

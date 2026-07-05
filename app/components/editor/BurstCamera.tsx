@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { Icon } from "@core/shared-ui";
 
 interface Capture {
   id: string;
@@ -129,7 +130,7 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
       {/* ds-allow: fixed-dark camera overlay chrome (light-on-dark) */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-4">
         <button type="button" onClick={onClose} className="w-10 h-10 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60" aria-label="Close camera">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          <Icon name="x" className="w-5 h-5" />
         </button>
         {captures.length > 0 && (
           <div className="text-white text-xs font-mono px-3 py-1 rounded-full bg-black/40">{captures.length} captured</div>

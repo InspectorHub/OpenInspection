@@ -185,7 +185,7 @@ export function SpeedMode({
       {showCoach && (
         // ds-allow: fixed-dark surface
         <div
-          className="absolute inset-0 z-10 bg-slate-900/80 backdrop-blur-[2px] flex items-center justify-center cursor-pointer"
+          className="absolute inset-0 z-10 bg-slate-900/80 flex items-center justify-center cursor-pointer"
           onPointerDown={dismissCoach}
           data-testid="speedmode-coach"
           role="dialog"

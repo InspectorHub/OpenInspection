@@ -5,6 +5,7 @@ import type { Route } from "./+types/login";
 import { getToken, createSessionWithToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { loginSchema } from "~/lib/forms/auth.schema";
+import { AuthShell } from "~/components/AuthShell";
 import { safeReturnTo } from "../../server/lib/mcp/safe-return-to";
 
 export function meta() {
@@ -100,22 +101,10 @@ export default function LoginPage() {
   });
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-ih-bg-app">
-      <div className="w-full max-w-md p-8">
-        <div className="flex items-center gap-3 mb-8">
-          <img src="/logo.svg" alt="" className="w-8 h-8" width={32} height={32} />
-          <span className="text-lg font-bold text-ih-fg-1">
-            OpenInspection
-          </span>
-        </div>
-
-        <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">
-          Log in to your workspace
-        </h1>
-        <p className="text-sm text-ih-fg-3 mb-6">
-          Enter your credentials to access inspections, reports, and team tools.
-        </p>
-
+    <AuthShell
+      heading="Log in to your workspace"
+      subtitle="Enter your credentials to access inspections, reports, and team tools."
+    >
         <Form
           method="post"
           id={form.id}
@@ -143,9 +132,14 @@ export default function LoginPage() {
             )}
           </div>
           <div>
-            <label htmlFor={fields.password.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              Password
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label htmlFor={fields.password.id} className="block text-xs font-bold text-ih-fg-3">
+                Password
+              </label>
+              <a href="/forgot-password" className="text-xs font-bold text-ih-primary hover:underline">
+                Forgot password?
+              </a>
+            </div>
             <input
               id={fields.password.id}
               name={fields.password.name}
@@ -172,7 +166,6 @@ export default function LoginPage() {
             {isSubmitting ? "Logging in…" : "Log In"}
           </button>
         </Form>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

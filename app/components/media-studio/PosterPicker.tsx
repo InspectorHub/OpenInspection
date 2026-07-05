@@ -73,7 +73,7 @@ export function PosterPicker({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Choose poster frame">
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-[rgba(15,23,42,0.4)]" onClick={onClose} />
+      <button type="button" aria-label="Close" className="absolute inset-0 bg-ih-backdrop" onClick={onClose} />
       <div
         data-testid="poster-picker"
         className="relative w-full max-w-2xl rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover"

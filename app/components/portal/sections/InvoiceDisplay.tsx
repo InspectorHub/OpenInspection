@@ -4,8 +4,9 @@
  * <PaymentSection>. Pure presentation keyed off the mapped invoice (dollars);
  * the Stripe pay flow is delegated to <StripePayPanel>. lint:ds — only `ih-*`.
  */
-import { money, STATUS_PILL, Field, Row, type InvoiceData } from "./payment-helpers";
+import { money, STATUS_TONE, Field, Row, type InvoiceData } from "./payment-helpers";
 import { StripePayPanel } from "./StripePayPanel";
+import { Pill } from "@core/shared-ui";
 import type { TenantBrand } from "~/lib/brand";
 
 interface InvoiceDisplayProps {
@@ -50,9 +51,9 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
               {invoice.number}
             </h1>
           </div>
-          <span className={`shrink-0 text-[11px] font-bold uppercase tracking-wide px-2.5 py-1 rounded ${STATUS_PILL[invoice.status] ?? STATUS_PILL.draft}`}>
+          <Pill tone={STATUS_TONE[invoice.status] ?? "neutral"} className="shrink-0 uppercase tracking-wide">
             {invoice.status}
-          </span>
+          </Pill>
         </div>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-5 text-[13px]">

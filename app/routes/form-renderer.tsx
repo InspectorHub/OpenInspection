@@ -7,6 +7,7 @@ import { unwrapResultsResponse } from "~/lib/results";
 import { FormField } from "~/components/form/FormField";
 import type { ItemResult, TemplateItem } from "~/components/form/FormField";
 import { RichItemRenderer } from "~/components/form/RichItemRenderer";
+import { Icon } from "@core/shared-ui";
 
 export function meta() {
  return [{ title: "Inspection Form - OpenInspection" }];
@@ -373,12 +374,10 @@ export default function FormRendererPage() {
  {section.items.length} {section.items.length === 1 ? "item" : "items"}
  </span>
  </div>
- <svg
+ <Icon
+ name="chevD"
  className={`w-4 h-4 text-ih-fg-4 transition-transform ${openSections.has(section.id) ? "rotate-180" : ""}`}
- fill="none" stroke="currentColor" viewBox="0 0 24 24"
- >
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
- </svg>
+ />
  </button>
 
  {section.disclaimerText && openSections.has(section.id) && (

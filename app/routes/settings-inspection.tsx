@@ -1,4 +1,5 @@
 import { useLoaderData } from 'react-router';
+import { SettingsCrumb } from '~/components/SettingsCrumb';
 import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
 import { createApi } from '~/lib/api-client.server';
@@ -31,11 +32,9 @@ export default function SettingsInspectionPage() {
     if (!loaded) return <div className="p-6 text-[13px] text-ih-fg-3">Loading...</div>;
 
     return (
-        <div className="max-w-2xl mx-auto p-6 space-y-8">
-            <div>
-                <h1 className="text-[19px] font-bold">Inspection Workflow</h1>
-                <p className="text-[13px] text-ih-fg-3 mt-1">Defaults that apply to every inspector on this workspace.</p>
-            </div>
+        <div className="space-y-8">
+            <SettingsCrumb items={[{ label: 'Settings', href: '/settings' }, { label: 'Inspection Workflow' }]} />
+            <p className="text-[13px] text-ih-fg-3">Defaults that apply to every inspector on this workspace.</p>
 
             <section>
                 <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">Clone last (R key) default</h2>

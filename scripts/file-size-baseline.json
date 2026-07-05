@@ -13,7 +13,7 @@
   "app/routes/settings-communication.tsx": 721,
   "app/components/media-studio/PhotoAnnotator.tsx": 692,
   "app/components/editor/PhotoStudio.tsx": 688,
-  "app/components/portal/sections/ReportView.tsx": 676,
+  "app/components/portal/sections/ReportView.tsx": 677,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "app/hooks/usePhotoOps.ts": 639,
   "server/services/inspection/inspection-report.service.ts": 624,

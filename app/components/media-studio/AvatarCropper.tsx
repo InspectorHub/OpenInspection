@@ -20,6 +20,7 @@ export function AvatarCropper({ sourceUrl, onCancel, onSave }: AvatarCropperProp
     try { onSave(await bakeCrop(sourceUrl, pixels, AVATAR_EDGE)); } finally { setBusy(false); }
   }
   return (
+    // ds-allow: full-bleed media studio chrome, intentional fixed-dark backdrop
     <div className="fixed inset-0 z-[80] bg-[rgba(15,23,42,0.7)] flex flex-col" role="dialog" aria-modal="true" aria-label="Crop avatar">
       <div className="relative flex-1">
         <Cropper image={sourceUrl} crop={crop} zoom={zoom} aspect={1} cropShape="round" showGrid={false} restrictPosition

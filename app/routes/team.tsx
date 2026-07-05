@@ -4,10 +4,10 @@ import type { Route } from "./+types/team";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SeatBanner } from "~/components/SeatBanner";
-import { InviteSeatModal } from "~/components/modals/InviteSeatModal";
+import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, TabStrip, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Team - OpenInspection" }];
@@ -66,7 +66,7 @@ export default function TeamPage() {
 
   // Reuse the same sessionCtx.seatUsage the SeatBanner below already consumes
   // (no extra API call) to gate the invite modal at open — see
-  // InviteSeatModal's `seatLimitAtOpen` doc comment. `seatUsage` is null for
+  // InviteSeatDrawer's `seatLimitAtOpen` doc comment. `seatUsage` is null for
   // unlimited deployments, so `atCapSeatUsage` stays undefined (normal
   // invite form) in that case; the server's 402 SEAT_LIMIT_REACHED remains
   // the authoritative backstop for races.
@@ -77,7 +77,7 @@ export default function TeamPage() {
       : undefined;
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       {/* F3 — Seat quota banner */}
       {sessionCtx?.seatUsage && (
         <SeatBanner usage={sessionCtx.seatUsage} billingUrl={billingUrl} />
@@ -100,7 +100,7 @@ export default function TeamPage() {
         }
       />
 
-      <InviteSeatModal open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />
+      <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />
 
       <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
 
@@ -113,46 +113,43 @@ export default function TeamPage() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-ih-border">
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Name</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Role</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Status</th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Last Active</th>
-                <th className="py-3 px-4" />
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((m) => (
-                <tr key={m.id} className="border-b border-ih-border hover:bg-ih-bg-muted/50">
-                  <td className="py-3 px-4">
+          <Table<Member>
+            rows={filtered}
+            getRowKey={(m) => m.id}
+            columns={[
+              {
+                label: "Name",
+                cell: (m) => (
+                  <>
                     <p className="text-[13px] font-medium text-ih-fg-1">{m.name || "Unnamed"}</p>
                     <p className="text-[11px] text-ih-fg-3">{m.email}</p>
-                  </td>
-                  <td className="py-3 px-4">
-                    <Pill tone={ROLE_TONES[m.role] || "gen"}>{m.role}</Pill>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${
-                      m.status === "active" ? "text-ih-ok-fg" : "text-ih-watch-fg"
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${m.status === "active" ? "bg-ih-ok" : "bg-ih-watch"}`} />
-                      {m.status === "active" ? "Active" : "Pending"}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-[13px] text-ih-fg-3">
-                    {m.lastActiveAt || "—"}
-                  </td>
-                  <td className="py-3 px-4 text-right">
-                    <button className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1">
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </>
+                ),
+              },
+              { label: "Role", cell: (m) => <Pill tone={ROLE_TONES[m.role] || "gen"}>{m.role}</Pill> },
+              {
+                label: "Status",
+                cell: (m) => (
+                  <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${
+                    m.status === "active" ? "text-ih-ok-fg" : "text-ih-watch-fg"
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${m.status === "active" ? "bg-ih-ok" : "bg-ih-watch"}`} />
+                    {m.status === "active" ? "Active" : "Pending"}
+                  </span>
+                ),
+              },
+              { label: "Last Active", cell: (m) => <span className="text-ih-fg-3">{m.lastActiveAt || "—"}</span> },
+              {
+                label: "",
+                align: "right",
+                cell: () => (
+                  <button className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1">
+                    Edit
+                  </button>
+                ),
+              },
+            ]}
+          />
         </Card>
       )}
 

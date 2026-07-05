@@ -2,7 +2,7 @@ import { useFetcher } from "react-router";
 import { useForm, type SubmissionResult } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import { addContactSchema } from "~/lib/forms/contacts.schema";
-import { Button } from "@core/shared-ui";
+import { Modal, Button } from "@core/shared-ui";
 import type { Contact } from "./contacts-helpers";
 
 export function ContactModal({
@@ -40,29 +40,31 @@ export function ContactModal({
   // Close after a successful submission (fetcher.data has ok:true).
   const fetcherOk = (fetcher.data as { ok?: boolean } | undefined)?.ok;
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.5)] flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-ih-bg-card rounded-md shadow-ih-popover max-w-lg w-full">
-        <header className="px-4 py-3 border-b border-ih-border flex items-center justify-between">
-          <h3 className="text-lg font-bold text-ih-fg-1">{isEdit ? "Edit Contact" : "Add Contact"}</h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-ih-bg-muted hover:opacity-80 flex items-center justify-center text-ih-fg-3">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </header>
-        <fetcher.Form
-          method="post"
-          id={form.id}
-          onSubmit={(e) => {
-            form.onSubmit(e);
-            if (fetcherOk) setTimeout(onClose, 200);
-          }}
-          noValidate
-          className="p-4 space-y-4"
-        >
-          <input type="hidden" name="intent" value={isEdit ? "update" : "create"} />
-          {isEdit && <input type="hidden" name="id" value={contact.id} />}
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={isEdit ? "Edit Contact" : "Add Contact"}
+      size="lg"
+      footer={
+        <>
+          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" type="submit" form={form.id}>Save</Button>
+        </>
+      }
+    >
+      <fetcher.Form
+        method="post"
+        id={form.id}
+        onSubmit={(e) => {
+          form.onSubmit(e);
+          if (fetcherOk) setTimeout(onClose, 200);
+        }}
+        noValidate
+        className="space-y-4"
+      >
+        <input type="hidden" name="intent" value={isEdit ? "update" : "create"} />
+        {isEdit && <input type="hidden" name="id" value={contact.id} />}
 
           <div>
             <label htmlFor={fields.type.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">Type</label>
@@ -134,18 +136,12 @@ export function ContactModal({
             />
           </div>
 
-          {form.errors && (
-            <div className="px-3 py-2 rounded-md bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
-              {form.errors[0]}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
-            <Button variant="primary" type="submit">Save</Button>
+        {form.errors && (
+          <div className="px-3 py-2 rounded-md bg-ih-bad-bg border border-ih-bad text-sm text-ih-bad-fg">
+            {form.errors[0]}
           </div>
-        </fetcher.Form>
-      </div>
-    </div>
+        )}
+      </fetcher.Form>
+    </Modal>
   );
 }

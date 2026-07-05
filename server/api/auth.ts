@@ -430,7 +430,7 @@ export const coreAuthRoutes = createApiRouter()
         if (!resetToken) return c.json({ success: true }, 200);
 
         const baseUrl = getBaseUrl(c);
-        const resetLink = `${baseUrl}/login?reset_token=${resetToken}`;
+        const resetLink = `${baseUrl}/reset-password?token=${resetToken}`;
 
         await c.var.services.email.sendPasswordReset(body.email, resetLink)
             .catch(() => { /* email delivery is best-effort */ });

@@ -8,15 +8,20 @@ interface ModalProps {
   size?: "sm" | "md" | "lg" | "xl";
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /**
+   * Element to receive initial focus on open (e.g. a search/text input).
+   * Without it the first focusable — the header close button — is focused.
+   */
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 const sizeClasses = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-lg", xl: "max-w-xl" };
 
-export function Modal({ open, onClose, title, size = "md", children, footer }: ModalProps) {
+export function Modal({ open, onClose, title, size = "md", children, footer, initialFocusRef }: ModalProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
-  useDialogBehavior(open, onClose, ref);
+  useDialogBehavior(open, onClose, ref, initialFocusRef);
 
   if (!open) return null;
 

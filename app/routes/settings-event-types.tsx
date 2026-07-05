@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { useLoaderData, Link } from "react-router";
+import { useState, useRef } from "react";
+import { useLoaderData } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-event-types";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
+import { Table, Modal } from "@core/shared-ui";
 
 interface EventType {
   id: string;
@@ -50,6 +52,7 @@ export default function SettingsEventTypes() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   if ("forbidden" in data) return <AccessDenied />;
 
@@ -117,28 +120,14 @@ export default function SettingsEventTypes() {
   }
 
   return (
-    <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link
-          to="/settings"
-          className="hover:text-ih-primary transition-colors"
-        >
-          Settings
-        </Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Event types</span>
-      </div>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Event types" }]} />
 
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[19px] font-bold text-ih-fg-1">
-            Event types
-          </h2>
-          <p className="text-[13px] text-ih-fg-3 mt-1">
-            Define ancillary inspection events that can be attached to an
-            inspection.
-          </p>
-        </div>
+        <p className="text-[13px] text-ih-fg-3">
+          Define ancillary inspection events that can be attached to an
+          inspection.
+        </p>
         <button
           onClick={openCreate}
           className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
@@ -158,64 +147,38 @@ export default function SettingsEventTypes() {
         </div>
       ) : (
         <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-ih-border">
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
-                  Name
-                </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
-                  Slug
-                </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
-                  Duration
-                </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
-                  Price
-                </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
-                  Color
-                </th>
-                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 text-right">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-ih-border">
-              {types.map((t) => (
-                <tr
-                  key={t.id}
-                  className="hover:bg-ih-bg-muted/50"
-                >
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="w-3 h-3 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: t.color ?? "#4a72ff" }}
-                      />
-                      <span className="font-bold text-[13px] text-ih-fg-1">
-                        {t.name}
+          <Table<EventType>
+            rows={types}
+            getRowKey={(t) => t.id}
+            columns={[
+              {
+                label: "Name",
+                cell: (t) => (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-3 h-3 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: t.color ?? "#4a72ff" }}
+                    />
+                    <span className="font-bold text-ih-fg-1">
+                      {t.name}
+                    </span>
+                    {!t.active && (
+                      <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-3">
+                        Inactive
                       </span>
-                      {!t.active && (
-                        <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-3">
-                          Inactive
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-[12px] text-ih-fg-3">
-                    {t.slug}
-                  </td>
-                  <td className="px-4 py-3 text-[13px] text-ih-fg-2">
-                    {t.defaultDurationMin ?? 0} min
-                  </td>
-                  <td className="px-4 py-3 text-[13px] text-ih-fg-2">
-                    ${((t.defaultPriceCents ?? 0) / 100).toFixed(2)}
-                  </td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-ih-fg-3">
-                    {t.color}
-                  </td>
-                  <td className="px-4 py-3 text-right">
+                    )}
+                  </div>
+                ),
+              },
+              { label: "Slug", cell: (t) => <span className="font-mono text-[12px] text-ih-fg-3">{t.slug}</span> },
+              { label: "Duration", cell: (t) => <span className="text-ih-fg-2">{t.defaultDurationMin ?? 0} min</span> },
+              { label: "Price", cell: (t) => <span className="text-ih-fg-2">${((t.defaultPriceCents ?? 0) / 100).toFixed(2)}</span> },
+              { label: "Color", cell: (t) => <span className="font-mono text-[11px] text-ih-fg-3">{t.color}</span> },
+              {
+                label: "Actions",
+                align: "right",
+                cell: (t) => (
+                  <>
                     <button
                       onClick={() => openEdit(t)}
                       className="text-[12px] text-ih-primary hover:underline mr-3 font-bold"
@@ -228,31 +191,45 @@ export default function SettingsEventTypes() {
                     >
                       Delete
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </>
+                ),
+              },
+            ]}
+          />
         </div>
       )}
 
       {/* Create / Edit modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-[rgba(15,23,42,0.4)]"
-            onClick={() => setModalOpen(false)}
-          />
-          <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover w-full max-w-md mx-4 p-6 space-y-4">
-            <h3 className="text-[16px] font-bold text-ih-fg-1">
-              {editingId ? "Edit event type" : "New event type"}
-            </h3>
-            <div className="space-y-3">
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingId ? "Edit event type" : "New event type"}
+        initialFocusRef={nameRef}
+        footer={
+          <>
+            <button
+              onClick={() => setModalOpen(false)}
+              className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
               <div>
                 <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                   Name
                 </label>
                 <input
+                  ref={nameRef}
                   type="text"
                   value={form.name}
                   onChange={(e) =>
@@ -355,25 +332,8 @@ export default function SettingsEventTypes() {
                   />
                 </div>
               </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

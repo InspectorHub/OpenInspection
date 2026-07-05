@@ -110,7 +110,7 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     status: text('status', { enum: ['pending', 'accepted'] }).notNull().default('pending'),
     expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
     // Design System 0520 subsystem C P5 — carry role-extension fields from the
-    // InviteSeatModal into the eventual users row at accept time.
+    // InviteSeatDrawer into the eventual users row at accept time.
     // DEAD (2026-06-13, apprentice subsystem removed) — written on invite but
     // never replayed onto the users row; no behavior depends on it.
     mentorId:           text('mentor_id'),

@@ -3,6 +3,7 @@
  * No router / window — safe to import from tests and from the section's
  * sub-components (InvoiceDisplay / StripePayPanel).
  */
+import type { PillTone } from "@core/shared-ui";
 
 export interface InvoiceData {
   number: string;
@@ -52,12 +53,12 @@ export function money(n: number): string {
   }).format(n);
 }
 
-export const STATUS_PILL: Record<string, string> = {
-  paid: "bg-ih-ok-bg text-ih-ok-fg",
-  sent: "bg-ih-info-bg text-ih-info-fg",
-  overdue: "bg-ih-bad-bg text-ih-bad-fg",
-  draft: "bg-ih-bg-muted text-ih-fg-3",
-  void: "bg-ih-bg-muted text-ih-fg-3",
+export const STATUS_TONE: Record<InvoiceData["status"], PillTone> = {
+  paid: "sat",
+  sent: "info",
+  overdue: "defect",
+  draft: "neutral",
+  void: "neutral",
 };
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {

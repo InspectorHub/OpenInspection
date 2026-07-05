@@ -3,7 +3,7 @@ import { useLoaderData, useFetcher, useRevalidator } from "react-router";
 import type { Route } from "./+types/agreements";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, TabStrip, Card, Button, EmptyState } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Button, EmptyState, Modal } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { SignaturePad } from "~/components/SignaturePad";
 import { type SignerRow } from "~/components/agreements/SignerList";
@@ -205,7 +205,7 @@ export default function AgreementsPage() {
   const rows = showingTemplates ? templates : requests;
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Agreements" }]} />
       <PageHeader
         title="Agreements"
@@ -270,6 +270,11 @@ export default function AgreementsPage() {
         </Card>
       ) : (
         <Card className="overflow-hidden">
+          {/* TODO(ds-table): not migrated to the shared <Table> primitive — the
+              Signing tab's RequestRow renders expandable detail rows (a second
+              <tr colSpan> per row driven by expandedId), which the flat
+              columns/rows primitive does not model. Migrate once the primitive
+              grows an expandable-row slot. */}
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-ih-border">
@@ -300,28 +305,27 @@ export default function AgreementsPage() {
         </Card>
       )}
 
-      {sendOpen && (
-        <SendAgreementModal
-          onSend={submitSend}
-          onClose={() => setSendOpen(false)}
-          busy={sendBusy}
-        />
-      )}
+      <SendAgreementModal
+        open={sendOpen}
+        onSend={submitSend}
+        onClose={() => setSendOpen(false)}
+        busy={sendBusy}
+      />
 
-      {signingId && (
-        <div className="fixed inset-0 bg-[rgba(15,23,42,0.4)] flex items-center justify-center z-50">
-          <div className="bg-ih-bg-card rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold mb-3">Inspector signature</h3>
-            <p className="text-sm text-ih-fg-3 mb-4">
-              Draw your signature below. This will pre-sign the agreement; the client signs separately after you send it.
-            </p>
-            <SignaturePad onSubmit={submitSignature} onCancel={() => setSigningId(null)} label="Save signature" />
-            {fetcher.data?.ok === false && fetcher.data.intent === "inspector-sign" && (
-              <p className="text-sm text-ih-bad-fg mt-3">{fetcher.data.error}</p>
-            )}
-          </div>
-        </div>
-      )}
+
+      <Modal
+        open={!!signingId}
+        onClose={() => setSigningId(null)}
+        title="Inspector signature"
+      >
+        <p className="text-sm text-ih-fg-3 mb-4">
+          Draw your signature below. This will pre-sign the agreement; the client signs separately after you send it.
+        </p>
+        <SignaturePad onSubmit={submitSignature} onCancel={() => setSigningId(null)} label="Save signature" />
+        {fetcher.data?.ok === false && fetcher.data.intent === "inspector-sign" && (
+          <p className="text-sm text-ih-bad-fg mt-3">{fetcher.data.error}</p>
+        )}
+      </Modal>
     </div>
   );
 }

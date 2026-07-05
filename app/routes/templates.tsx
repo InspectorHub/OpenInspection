@@ -277,7 +277,7 @@ export default function TemplatesPage() {
   if (withUpdates > 0) metaParts.push(`${withUpdates} with updates available`);
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       {/* PageHeader */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -374,40 +374,35 @@ export default function TemplatesPage() {
       />
 
       {/* Create modal */}
-      {createOpen && (
-        <CreateTemplateModal
-          setCreateOpen={setCreateOpen}
-          newName={newName}
-          setNewName={setNewName}
-          handleCreate={handleCreate}
-          error={fetcherData?.error}
-        />
-      )}
+      <CreateTemplateModal
+        open={createOpen}
+        setCreateOpen={setCreateOpen}
+        newName={newName}
+        setNewName={setNewName}
+        handleCreate={handleCreate}
+        error={fetcherData?.error}
+      />
 
       {/* Import Spectora modal */}
-      {importOpen && (
-        <ImportSpectoraModal
-          setImportOpen={setImportOpen}
-          importName={importName}
-          setImportName={setImportName}
-          importPayload={importPayload}
-          setImportPayload={setImportPayload}
-          handleImport={handleImport}
-        />
-      )}
+      <ImportSpectoraModal
+        open={importOpen}
+        setImportOpen={setImportOpen}
+        importName={importName}
+        setImportName={setImportName}
+        importPayload={importPayload}
+        setImportPayload={setImportPayload}
+        handleImport={handleImport}
+      />
 
       {/* Delete confirmation modal */}
-      {deleteConfirm && (
-        <DeleteTemplateModal
-          setDeleteConfirm={setDeleteConfirm}
-          handleDelete={handleDelete}
-        />
-      )}
+      <DeleteTemplateModal
+        open={deleteConfirm !== null}
+        setDeleteConfirm={setDeleteConfirm}
+        handleDelete={handleDelete}
+      />
 
       {/* Concept-mapping modal — shown once after first Spectora import */}
-      {mappingModalOpen && (
-        <SpectoraMappingModal handleMappingDismiss={handleMappingDismiss} />
-      )}
+      <SpectoraMappingModal open={mappingModalOpen} handleMappingDismiss={handleMappingDismiss} />
     </div>
   );
 }

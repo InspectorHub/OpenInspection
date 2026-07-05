@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Link, useLoaderData, useFetcher } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-connected-apps";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -258,20 +259,10 @@ export default function SettingsConnectedApps() {
   const all = data.all ? data.all.filter((g) => !revokedIds.has(g.id)) : null;
 
   return (
-    <div className="space-y-[18px]">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">
-          Settings
-        </Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Connected applications</span>
-      </div>
-
-      {/* Heading */}
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Connected applications" }]} />
       <div>
-        <h2 className="text-[19px] font-bold text-ih-fg-1">Connected applications</h2>
-        <p className="text-[13px] text-ih-fg-3 mt-1">
+        <p className="text-[13px] text-ih-fg-3">
           MCP clients (e.g. Claude) you&apos;ve authorized to access your data. Revoke
           access at any time.
         </p>

@@ -3,7 +3,7 @@ import { useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/metrics";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, Card } from "@core/shared-ui";
+import { PageHeader, Card, Table } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Metrics - OpenInspection" }];
@@ -57,7 +57,7 @@ export default function MetricsPage() {
   ];
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       <PageHeader
         title="Metrics"
         meta={data ? `${data.totalInspections} inspections` : "Loading..."}
@@ -145,26 +145,16 @@ export default function MetricsPage() {
         <p className="text-sm font-bold text-ih-fg-1 mb-4">Findings Heatmap</p>
         {data && data.heatmap?.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr>
-                  <th className="py-2 px-3 text-[11px] uppercase tracking-wide font-bold text-ih-fg-4">Section</th>
-                  <th className="py-2 px-3 text-[11px] uppercase tracking-wide font-bold text-ih-ok-fg text-center">Satisfactory</th>
-                  <th className="py-2 px-3 text-[11px] uppercase tracking-wide font-bold text-ih-watch-fg text-center">Monitor</th>
-                  <th className="py-2 px-3 text-[11px] uppercase tracking-wide font-bold text-ih-bad-fg text-center">Defect</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.heatmap.map((row) => (
-                  <tr key={row.section} className="border-t border-ih-border">
-                    <td className="py-2 px-3 text-[13px] font-medium text-ih-fg-1">{row.section}</td>
-                    <td className="py-2 px-3 text-[13px] text-center text-ih-ok-fg">{row.satisfactory}</td>
-                    <td className="py-2 px-3 text-[13px] text-center text-ih-watch-fg">{row.monitor}</td>
-                    <td className="py-2 px-3 text-[13px] text-center text-ih-bad-fg">{row.defect}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <Table<MetricsData["heatmap"][number]>
+              rows={data.heatmap}
+              getRowKey={(row) => row.section}
+              columns={[
+                { label: "Section", cell: (row) => <span className="font-medium text-ih-fg-1">{row.section}</span> },
+                { label: <span className="text-ih-ok-fg">Satisfactory</span>, align: "center", cell: (row) => <span className="text-ih-ok-fg">{row.satisfactory}</span> },
+                { label: <span className="text-ih-watch-fg">Monitor</span>, align: "center", cell: (row) => <span className="text-ih-watch-fg">{row.monitor}</span> },
+                { label: <span className="text-ih-bad-fg">Defect</span>, align: "center", cell: (row) => <span className="text-ih-bad-fg">{row.defect}</span> },
+              ]}
+            />
           </div>
         ) : (
           <p className="text-[13px] text-ih-fg-3 text-center py-8">No findings data yet.</p>

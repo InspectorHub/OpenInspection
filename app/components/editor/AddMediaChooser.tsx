@@ -10,7 +10,7 @@ export function AddMediaChooser({ onClose, onPickPhoto, onPickVideo }: AddMediaC
   <button
    type="button"
    aria-label="Close"
-   className="absolute inset-0 bg-[rgba(15,23,42,0.4)]"
+   className="absolute inset-0 bg-ih-backdrop"
    onClick={onClose}
   />
   <div className="relative w-full max-w-md rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover">

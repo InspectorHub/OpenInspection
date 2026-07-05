@@ -9,6 +9,11 @@ interface DrawerProps {
   footer?: React.ReactNode;
   /** 480px panel for dense forms; default is 360px. Mobile is always full-width. */
   wide?: boolean;
+  /**
+   * Element to receive initial focus on open (e.g. a search/text input).
+   * Without it the first focusable — the header close button — is focused.
+   */
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -16,11 +21,11 @@ interface DrawerProps {
  * flows (filters, long side forms) — NOT for confirm/decision moments,
  * which stay in Modal. Reuses Modal's dialog chrome behavior and tokens.
  */
-export function Drawer({ open, onClose, title, children, footer, wide = false }: DrawerProps) {
+export function Drawer({ open, onClose, title, children, footer, wide = false, initialFocusRef }: DrawerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
-  useDialogBehavior(open, onClose, ref);
+  useDialogBehavior(open, onClose, ref, initialFocusRef);
 
   if (!open) return null;
 

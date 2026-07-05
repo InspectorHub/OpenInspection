@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { Link, useLoaderData, Form, useNavigation, useFetcher } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-automations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
+import { Modal } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Automations - Settings - OpenInspection" }];
@@ -141,18 +143,11 @@ export default function SettingsAutomations() {
   const { rules, services, recentLogs, reviewUrl, emailTemplates, smsTemplates } = data;
 
   return (
-    <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Automations</span>
-      </div>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Automations" }]} />
 
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h2 className="text-[19px] font-bold text-ih-fg-1">Automations</h2>
-          <p className="text-[13px] text-ih-fg-3 mt-0.5">Emails sent automatically when inspection events occur.</p>
-        </div>
+        <p className="text-[13px] text-ih-fg-3">Emails sent automatically when inspection events occur.</p>
         <button onClick={() => setEditing("new")}
           className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
           + New automation
@@ -264,11 +259,34 @@ function AutomationEditor({
   }, [fetcher.state, fetcher.data, onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] p-4" onClick={onClose}>
-      <fetcher.Form method="post" role="dialog" aria-modal="true" aria-label="Automation editor" onClick={(e) => e.stopPropagation()} className="bg-ih-bg-card border border-ih-border rounded-xl w-full max-w-lg max-h-[90vh] overflow-auto p-5 space-y-5">
+    <Modal
+      open
+      onClose={onClose}
+      title={rule ? "Edit automation" : "New automation"}
+      size="lg"
+      footer={
+        <>
+          {rule && !rule.isDefault && (
+            <button type="button" disabled={submitting}
+              onClick={() => {
+                if (!confirmDelete) { setConfirmDelete(true); return; }
+                fetcher.submit({ intent: "delete", id: rule.id }, { method: "post" });
+              }}
+              className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-bad-fg disabled:opacity-50">
+              {confirmDelete ? "Confirm delete?" : "Delete"}
+            </button>
+          )}
+          <div className="flex-1" />
+          <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-fg-2">Cancel</button>
+          <button type="submit" form="automation-editor-form" disabled={submitting || saveBlocked}
+            title={noChannel ? "Pick at least one delivery channel" : undefined}
+            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] disabled:opacity-50">Save</button>
+        </>
+      }
+    >
+      <fetcher.Form id="automation-editor-form" method="post" className="space-y-5">
         <input type="hidden" name="intent" value="save" />
         {rule && <input type="hidden" name="id" value={rule.id} />}
-        <h3 className="text-[16px] font-bold text-ih-fg-1">{rule ? "Edit automation" : "New automation"}</h3>
 
         <input name="name" required defaultValue={rule?.name ?? ""} placeholder="Automation name"
           className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]" />
@@ -365,25 +383,7 @@ function AutomationEditor({
         {fetcher.data && fetcher.data.ok === false && (
           <p className="text-[12px] text-ih-bad-fg">Could not save — please try again.</p>
         )}
-
-        <div className="flex items-center gap-2">
-          {rule && !rule.isDefault && (
-            <button type="button" disabled={submitting}
-              onClick={() => {
-                if (!confirmDelete) { setConfirmDelete(true); return; }
-                fetcher.submit({ intent: "delete", id: rule.id }, { method: "post" });
-              }}
-              className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-bad-fg disabled:opacity-50">
-              {confirmDelete ? "Confirm delete?" : "Delete"}
-            </button>
-          )}
-          <div className="flex-1" />
-          <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-fg-2">Cancel</button>
-          <button type="submit" disabled={submitting || saveBlocked}
-            title={noChannel ? "Pick at least one delivery channel" : undefined}
-            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] disabled:opacity-50">Save</button>
-        </div>
       </fetcher.Form>
-    </div>
+    </Modal>
   );
 }

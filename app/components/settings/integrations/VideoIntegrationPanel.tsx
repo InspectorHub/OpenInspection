@@ -125,6 +125,7 @@ export function VideoIntegrationPanel({
 
         {/* Stream customer subdomain — shown only when Stream is ON */}
         {useStream && (
+          /* ds-allow: indent aligns the field under the toggle label (52px), bespoke offset with no spacing token */
           <div className="space-y-1.5 pl-[52px]">
             <label htmlFor="streamCustomerSubdomain" className="block text-[12px] font-bold text-ih-fg-2">
               Stream customer subdomain

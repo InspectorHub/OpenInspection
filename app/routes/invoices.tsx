@@ -3,7 +3,7 @@ import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/invoices";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, Card, Button, EmptyState, Modal } from "@core/shared-ui";
+import { PageHeader, Card, StatCard, Button, EmptyState, Modal, Table, Pill, type PillTone } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Invoices - OpenInspection" }];
@@ -103,12 +103,12 @@ function money(cents: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((cents || 0) / 100);
 }
 
-const STATUS_PILL: Record<string, string> = {
-  paid: "bg-ih-ok-bg text-ih-ok-fg",
-  partial: "bg-ih-watch-bg text-ih-watch-fg",
-  sent: "bg-ih-info-bg text-ih-info-fg",
-  draft: "bg-ih-bg-muted text-ih-fg-3",
-  void: "bg-ih-bg-muted text-ih-fg-3",
+const STATUS_TONE: Record<InvoiceRow["status"], PillTone> = {
+  paid: "sat",
+  partial: "monitor",
+  sent: "info",
+  draft: "neutral",
+  void: "neutral",
 };
 
 const METHOD_LABEL: Record<string, string> = {
@@ -227,7 +227,7 @@ export default function InvoicesPage() {
   }
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       <PageHeader
         title={`${total} ${total === 1 ? "Invoice" : "Invoices"}`}
         meta={`${total} ${total === 1 ? "invoice" : "invoices"}`}
@@ -244,88 +244,77 @@ export default function InvoicesPage() {
           { label: "PAID", value: String(paid) },
           { label: "REVENUE", value: money(revenue) },
         ].map((s) => (
-          <Card key={s.label} className="p-[14px]">
-            <div className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{s.label}</div>
-            <div className="text-xl font-bold mt-1 text-ih-fg-1">{s.value}</div>
-          </Card>
+          <StatCard key={s.label} label={s.label} value={s.value} />
         ))}
       </div>
 
       {/* Table */}
       <Card className="overflow-hidden">
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-ih-border">
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Client</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Amount</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Due Date</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Status</th>
-              <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {invoices.length === 0 ? (
-              <tr>
-                <td colSpan={5}>
-                  <EmptyState title="No invoices yet" />
-                </td>
-              </tr>
-            ) : (
-              invoices.map((invoice) => {
+        <Table<InvoiceRow>
+          rows={invoices}
+          getRowKey={(invoice) => invoice.id}
+          empty={<EmptyState title="No invoices yet" />}
+          columns={[
+            { label: "Client", cell: (invoice) => <span className="font-medium text-ih-fg-1">{invoice.clientName || "—"}</span> },
+            { label: "Amount", cell: (invoice) => <span className="font-mono text-ih-fg-1">{money(invoice.amountCents)}</span> },
+            { label: "Due Date", cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate || "—"}</span> },
+            {
+              label: "Status",
+              cell: (invoice) => {
+                const isPaid = invoice.status === "paid";
+                return (
+                  <Pill tone={STATUS_TONE[invoice.status] ?? "neutral"} className="uppercase tracking-wide">
+                    {invoice.status}
+                    {isPaid && invoice.paymentMethod && (
+                      <span className="font-medium normal-case tracking-normal opacity-80">· {METHOD_LABEL[invoice.paymentMethod]}</span>
+                    )}
+                  </Pill>
+                );
+              },
+            },
+            {
+              label: "Action",
+              align: "right",
+              cell: (invoice) => {
                 const isPaid = invoice.status === "paid";
                 const busy = submittingId === invoice.id;
-                return (
-                  <tr key={invoice.id} className="border-b border-ih-border hover:bg-ih-bg-muted/50 align-middle">
-                    <td className="py-3 px-4 text-[13px] font-medium text-ih-fg-1">{invoice.clientName || "—"}</td>
-                    <td className="py-3 px-4 text-[13px] font-mono text-ih-fg-1">{money(invoice.amountCents)}</td>
-                    <td className="py-3 px-4 text-[13px] text-ih-fg-3">{invoice.dueDate || "—"}</td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded ${STATUS_PILL[invoice.status] ?? STATUS_PILL.draft}`}>
-                        {invoice.status}
-                        {isPaid && invoice.paymentMethod && (
-                          <span className="font-medium normal-case tracking-normal opacity-80">· {METHOD_LABEL[invoice.paymentMethod]}</span>
-                        )}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      {isPaid ? (
-                        <span className="text-[12px] text-ih-fg-4">—</span>
-                      ) : pickerFor === invoice.id ? (
-                        <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                          <span className="text-[11px] text-ih-fg-3 mr-1">Paid by:</span>
-                          {PAY_METHODS.map((m) => (
-                            <button
-                              key={m.value}
-                              onClick={() => markPaid(invoice.id, m.value)}
-                              disabled={busy}
-                              className="px-2 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:border-ih-ok-fg hover:text-ih-ok-fg transition-colors disabled:opacity-50"
-                            >
-                              {m.label}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => setPickerFor(null)}
-                            disabled={busy}
-                            className="px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-50"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
+                if (isPaid) return <span className="text-[12px] text-ih-fg-4">—</span>;
+                if (pickerFor === invoice.id) {
+                  return (
+                    <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
+                      <span className="text-[11px] text-ih-fg-3 mr-1">Paid by:</span>
+                      {PAY_METHODS.map((m) => (
                         <button
-                          onClick={() => setPickerFor(invoice.id)}
-                          className="px-3 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
+                          key={m.value}
+                          onClick={() => markPaid(invoice.id, m.value)}
+                          disabled={busy}
+                          className="px-2 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:border-ih-ok-fg hover:text-ih-ok-fg transition-colors disabled:opacity-50"
                         >
-                          Mark paid
+                          {m.label}
                         </button>
-                      )}
-                    </td>
-                  </tr>
+                      ))}
+                      <button
+                        onClick={() => setPickerFor(null)}
+                        disabled={busy}
+                        className="px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    onClick={() => setPickerFor(invoice.id)}
+                    className="px-3 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
+                  >
+                    Mark paid
+                  </button>
                 );
-              })
-            )}
-          </tbody>
-        </table>
+              },
+            },
+          ]}
+        />
       </Card>
 
       <p className="text-[12px] text-ih-fg-4">

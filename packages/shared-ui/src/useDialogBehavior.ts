@@ -13,6 +13,15 @@ export function useDialogBehavior(
   open: boolean,
   onClose: () => void,
   ref: React.RefObject<HTMLElement | null>,
+  /**
+   * Optional element to receive initial focus on open. When provided and the
+   * element is inside the dialog, it wins over the first-focusable default
+   * (used by input-first dialogs so the caret lands in the field, not on the
+   * header close button). Read through `.current` inside the effect so a ref —
+   * which is stable — never enters the dep array; the effect stays keyed on
+   * [open] only, preserving the focus-stability invariant below.
+   */
+  initialFocusRef?: React.RefObject<HTMLElement | null>,
 ): void {
   // Stash onClose in a ref so the focus effect never depends on its identity.
   // Real callers pass an inline arrow fn, whose identity changes on every parent
@@ -58,7 +67,13 @@ export function useDialogBehavior(
     document.addEventListener("keydown", handler);
 
     const root = ref.current;
-    const initial = root?.querySelector<HTMLElement>(FOCUSABLE);
+    // Prefer an explicit initial-focus target when it lives inside the dialog;
+    // otherwise fall back to the first focusable (default behavior).
+    const preferred = initialFocusRef?.current;
+    const initial =
+      preferred && root?.contains(preferred)
+        ? preferred
+        : root?.querySelector<HTMLElement>(FOCUSABLE);
     (initial ?? root)?.focus();
 
     return () => {

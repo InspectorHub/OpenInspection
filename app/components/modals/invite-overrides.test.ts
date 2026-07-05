@@ -5,7 +5,7 @@
  * disclosure is Chrome-verified.
  */
 import { describe, it, expect } from "vitest";
-import { computeOverrideDiff, CAP_LABELS } from "~/components/modals/InviteSeatModal";
+import { computeOverrideDiff, CAP_LABELS } from "~/components/modals/InviteSeatDrawer";
 import { getCapabilities, TOGGLEABLE } from "../../../server/lib/auth/capabilities";
 
 describe("CAP_LABELS — the four advanced-permission toggles", () => {

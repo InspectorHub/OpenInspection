@@ -5,7 +5,7 @@ export default function SettingsLayout() {
   return (
     <div>
       <PageHeader title="Settings" />
-      <div className="mt-[18px]">
+      <div className="mt-ih-list max-w-3xl">
         <Outlet />
       </div>
     </div>

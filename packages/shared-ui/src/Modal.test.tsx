@@ -1,4 +1,4 @@
-import type React from "react";
+import React, { useRef } from "react";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup, fireEvent, screen } from "@testing-library/react";
 import { Modal } from "@core/shared-ui";
@@ -50,6 +50,25 @@ describe("Modal", () => {
     renderModal();
     const dialog = screen.getByRole("dialog");
     expect(dialog.contains(document.activeElement)).toBe(true);
+  });
+
+  it("focuses the header close button by default (no initialFocusRef)", () => {
+    renderModal();
+    expect(document.activeElement).toBe(screen.getByLabelText("Close"));
+  });
+
+  it("focuses initialFocusRef target on open when provided", () => {
+    function Harness() {
+      const inputRef = useRef<HTMLInputElement>(null);
+      return (
+        <Modal open title="Search dialog" onClose={() => {}} initialFocusRef={inputRef}>
+          <input ref={inputRef} aria-label="search" />
+          <button type="button">other</button>
+        </Modal>
+      );
+    }
+    render(<Harness />);
+    expect(document.activeElement).toBe(screen.getByLabelText("search"));
   });
 
   it("wraps Tab focus from last to first focusable", () => {

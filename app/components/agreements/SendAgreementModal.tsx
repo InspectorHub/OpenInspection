@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Button } from "@core/shared-ui";
+import { Modal, Button } from "@core/shared-ui";
 
 /**
  * Track I-a Task 9 — shared multi-signer send modal. Self-contained (no route
@@ -78,25 +78,39 @@ export function buildSendPayload(
 }
 
 export function SendAgreementModal({
+    open,
     onSend,
     onClose,
     busy,
     initialSigners,
 }: {
+    open: boolean;
     onSend: (payload: SendAgreementPayload) => void;
     onClose: () => void;
     busy?: boolean;
     initialSigners?: SignerDraft[];
 }) {
-    const [signers, setSigners] = useState<SignerDraftRow[]>(() => {
+    const seed = (): SignerDraftRow[] => {
         if (initialSigners && initialSigners.length > 0) {
             // Attach stable keys to any externally-supplied initial rows.
             return initialSigners.map((s) => ({ ...s, key: crypto.randomUUID() }));
         }
         return [emptySigner()];
-    });
+    };
+
+    const [signers, setSigners] = useState<SignerDraftRow[]>(seed);
     const [completionPolicy, setCompletionPolicy] = useState<"all" | "one">("all");
     const [error, setError] = useState<string | null>(null);
+
+    // The modal stays mounted (Modal renders null when closed), so reseed the
+    // draft each time it opens — a reopened modal must start fresh, not resume
+    // the previous run's rows/policy/error.
+    useEffect(() => {
+        if (!open) return;
+        setSigners(seed());
+        setCompletionPolicy("all");
+        setError(null);
+    }, [open]);
 
     const update = (i: number, patch: Partial<SignerDraft>) =>
         setSigners((prev) => prev.map((s, idx) => (idx === i ? { ...s, ...patch } : s)));
@@ -110,114 +124,110 @@ export function SendAgreementModal({
         onSend(buildSendPayload(signers, completionPolicy));
     };
 
-    // Escape to close — repo idiom: document listener, clean up on unmount.
-    useEffect(() => {
-        const fn = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-        document.addEventListener('keydown', fn);
-        return () => document.removeEventListener('keydown', fn);
-    }, [onClose]);
-
     return (
-        <div className="fixed inset-0 bg-[rgba(15,23,42,0.4)] flex items-center justify-center z-50 p-4">
-            <div className="bg-ih-bg-card rounded-lg p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto">
-                <h3 className="text-lg font-semibold text-ih-fg-1 mb-1">Send for signing</h3>
-                <p className="text-[13px] text-ih-fg-3 mb-4">
-                    Add each person who must sign. They each receive their own private link.
-                </p>
-
-                <div className="space-y-3">
-                    {signers.map((s, i) => (
-                        <div key={s.key} className="flex items-start gap-2">
-                            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <input
-                                    type="text"
-                                    value={s.name}
-                                    placeholder="Full name"
-                                    aria-label="Signer name"
-                                    disabled={busy}
-                                    onChange={(e) => update(i, { name: e.target.value })}
-                                    className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
-                                />
-                                <input
-                                    type="email"
-                                    value={s.email}
-                                    placeholder="email@example.com"
-                                    aria-label="Signer email"
-                                    disabled={busy}
-                                    onChange={(e) => update(i, { email: e.target.value })}
-                                    className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
-                                />
-                            </div>
-                            <select
-                                value={s.role}
-                                disabled={busy}
-                                onChange={(e) => update(i, { role: e.target.value as SignerRole })}
-                                className="px-2 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
-                                aria-label="Signer role"
-                            >
-                                {ROLE_OPTIONS.map((o) => (
-                                    <option key={o.value} value={o.value}>{o.label}</option>
-                                ))}
-                            </select>
-                            <button
-                                type="button"
-                                onClick={() => removeRow(i)}
-                                disabled={busy || signers.length === 1}
-                                aria-label="Remove signer"
-                                className="px-2 py-2 text-ih-fg-3 hover:text-ih-bad-fg disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    ))}
-                </div>
-
-                <button
-                    type="button"
-                    onClick={addRow}
-                    disabled={busy}
-                    className="mt-3 text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:opacity-40"
-                >
-                    + Add signer
-                </button>
-
-                <fieldset className="mt-5">
-                    <legend className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-2">Completion</legend>
-                    <div className="space-y-2">
-                        <label className="flex items-start gap-2.5 cursor-pointer">
-                            <input
-                                type="radio"
-                                name="completionPolicy"
-                                checked={completionPolicy === "all"}
-                                disabled={busy}
-                                onChange={() => setCompletionPolicy("all")}
-                                className="mt-0.5 h-4 w-4 text-ih-primary focus:ring-ih-primary/30"
-                            />
-                            <span className="text-[13px] text-ih-fg-2">Everyone must sign</span>
-                        </label>
-                        <label className="flex items-start gap-2.5 cursor-pointer">
-                            <input
-                                type="radio"
-                                name="completionPolicy"
-                                checked={completionPolicy === "one"}
-                                disabled={busy}
-                                onChange={() => setCompletionPolicy("one")}
-                                className="mt-0.5 h-4 w-4 text-ih-primary focus:ring-ih-primary/30"
-                            />
-                            <span className="text-[13px] text-ih-fg-2">Any one signature completes it</span>
-                        </label>
-                    </div>
-                </fieldset>
-
-                {error && <p className="text-[13px] text-ih-bad-fg mt-3">{error}</p>}
-
-                <div className="flex justify-end gap-3 mt-6">
+        <Modal
+            open={open}
+            onClose={onClose}
+            title="Send for signing"
+            size="lg"
+            footer={
+                <>
                     <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
                     <Button variant="primary" onClick={submit} disabled={busy}>
                         {busy ? "Sending…" : "Send"}
                     </Button>
-                </div>
+                </>
+            }
+        >
+            <p className="text-[13px] text-ih-fg-3 mb-4">
+                Add each person who must sign. They each receive their own private link.
+            </p>
+
+            <div className="space-y-3">
+                {signers.map((s, i) => (
+                    <div key={s.key} className="flex items-start gap-2">
+                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                                type="text"
+                                value={s.name}
+                                placeholder="Full name"
+                                aria-label="Signer name"
+                                disabled={busy}
+                                onChange={(e) => update(i, { name: e.target.value })}
+                                className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
+                            />
+                            <input
+                                type="email"
+                                value={s.email}
+                                placeholder="email@example.com"
+                                aria-label="Signer email"
+                                disabled={busy}
+                                onChange={(e) => update(i, { email: e.target.value })}
+                                className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
+                            />
+                        </div>
+                        <select
+                            value={s.role}
+                            disabled={busy}
+                            onChange={(e) => update(i, { role: e.target.value as SignerRole })}
+                            className="px-2 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
+                            aria-label="Signer role"
+                        >
+                            {ROLE_OPTIONS.map((o) => (
+                                <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => removeRow(i)}
+                            disabled={busy || signers.length === 1}
+                            aria-label="Remove signer"
+                            className="px-2 py-2 text-ih-fg-3 hover:text-ih-bad-fg disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                ))}
             </div>
-        </div>
+
+            <button
+                type="button"
+                onClick={addRow}
+                disabled={busy}
+                className="mt-3 text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:opacity-40"
+            >
+                + Add signer
+            </button>
+
+            <fieldset className="mt-5">
+                <legend className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-2">Completion</legend>
+                <div className="space-y-2">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                            type="radio"
+                            name="completionPolicy"
+                            checked={completionPolicy === "all"}
+                            disabled={busy}
+                            onChange={() => setCompletionPolicy("all")}
+                            className="mt-0.5 h-4 w-4 text-ih-primary focus:ring-ih-primary/30"
+                        />
+                        <span className="text-[13px] text-ih-fg-2">Everyone must sign</span>
+                    </label>
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                        <input
+                            type="radio"
+                            name="completionPolicy"
+                            checked={completionPolicy === "one"}
+                            disabled={busy}
+                            onChange={() => setCompletionPolicy("one")}
+                            className="mt-0.5 h-4 w-4 text-ih-primary focus:ring-ih-primary/30"
+                        />
+                        <span className="text-[13px] text-ih-fg-2">Any one signature completes it</span>
+                    </label>
+                </div>
+            </fieldset>
+
+            {error && <p className="text-[13px] text-ih-bad-fg mt-3">{error}</p>}
+        </Modal>
     );
 }

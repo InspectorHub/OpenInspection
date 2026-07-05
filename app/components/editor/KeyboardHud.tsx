@@ -60,7 +60,8 @@ export function KeyboardHud() {
 
   return (
     <div className="hidden md:flex fixed inset-0 z-[9999] items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-      <div className="absolute inset-0 bg-[rgba(15,23,42,0.85)] backdrop-blur-sm" onClick={() => setOpen(false)} />
+      {/* ds-allow: intentional heavier fixed-dark dim (0.85) for the full-screen keyboard-shortcuts overlay */}
+      <div className="absolute inset-0 bg-[rgba(15,23,42,0.85)]" onClick={() => setOpen(false)} />
       <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover border border-ih-border max-w-4xl w-full max-h-[85vh] overflow-y-auto">
         <header className="px-6 py-4 border-b border-ih-border flex items-center justify-between">
           <div>

@@ -80,6 +80,7 @@ export default function AuthLayout() {
       <div className="flex min-h-screen">
         <Sidebar />
         <main className="flex-1 w-full bg-ih-bg-app overflow-y-auto">
+          {/* ds-allow: page bottom gutter (60px), bespoke page-shell spacing with no token */}
           <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9">
             {showSkeleton ? (
               <RouteSkeleton pathname={navigation.location?.pathname ?? location.pathname} />

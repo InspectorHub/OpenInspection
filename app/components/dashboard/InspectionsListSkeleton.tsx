@@ -12,7 +12,7 @@ import { InspectionCardSkeleton } from "./InspectionCardSkeleton";
  */
 export function InspectionsListSkeleton() {
   return (
-    <div aria-busy="true" aria-live="polite" className="space-y-[18px]">
+    <div aria-busy="true" aria-live="polite" className="space-y-ih-list">
       <span className="sr-only">Loading inspections…</span>
 
       {/* Header: greeting + meta on the left, action buttons on the right */}
@@ -32,7 +32,7 @@ export function InspectionsListSkeleton() {
         {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className="bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-card p-[14px] flex flex-col gap-3"
+            className="bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-card p-ih-card flex flex-col gap-3"
           >
             <Skeleton variant="block" width="40px" className="h-10 rounded-md" />
             <Skeleton variant="text" width="48px" className="h-6" />

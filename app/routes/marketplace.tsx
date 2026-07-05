@@ -48,7 +48,7 @@ export default function MarketplacePage() {
   const { setPage, setPageSize } = usePagination();
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Marketplace" }]} />
       <PageHeader
         title="Marketplace"

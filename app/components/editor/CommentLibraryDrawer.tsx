@@ -1,6 +1,9 @@
+import { useRef } from "react";
+import { Drawer } from "@core/shared-ui";
 import { CommentLibraryList } from "./CommentLibraryList";
 
 export interface CommentLibraryDrawerProps {
+ open: boolean;
  comments: {
   filterMode: "auto" | "all";
   setFilterMode: (m: "auto" | "all") => void;
@@ -27,23 +30,14 @@ export interface CommentLibraryDrawerProps {
  onClose: () => void;
 }
 
-export function CommentLibraryDrawer({ comments, state, serverComments, onInsert, onClose }: CommentLibraryDrawerProps) {
+export function CommentLibraryDrawer({ open, comments, state, serverComments, onInsert, onClose }: CommentLibraryDrawerProps) {
+ const searchRef = useRef<HTMLInputElement>(null);
  return (
- <div className="fixed inset-0 z-[80] flex">
- <div
- className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm"
- onClick={onClose}
- />
- <div className="relative ml-auto w-full max-w-md bg-ih-bg-card border-l border-ih-border shadow-ih-popover flex flex-col h-full">
- <div className="flex items-center justify-between px-4 py-3 border-b border-ih-border">
- <h3 className="text-[14px] font-bold">Comment Library</h3>
- <button
- onClick={onClose}
- className="text-ih-fg-4 hover:text-ih-fg-2 text-lg"
- >
- &#x2715;
- </button>
- </div>
+ <Drawer open={open} onClose={onClose} title="Comment Library" wide initialFocusRef={searchRef}>
+ {/* -m-4 cancels the Drawer body padding so the sub-headers keep their
+     full-bleed borders and the list scrolls independently under the pinned
+     search/filter header (h-full flex column). */}
+ <div className="flex flex-col h-full -m-4">
 
  {/* Sort + Filter mode header */}
  <div className="flex items-center gap-3 px-3 py-2 border-b border-ih-border">
@@ -126,6 +120,7 @@ export function CommentLibraryDrawer({ comments, state, serverComments, onInsert
  {/* Search */}
  <div className="px-4 py-2">
  <input
+ ref={searchRef}
  id="comment-library-search"
  type="text"
  placeholder="Search comments..."
@@ -135,7 +130,6 @@ export function CommentLibraryDrawer({ comments, state, serverComments, onInsert
  state.setCommentLibrarySelectedIdx(0);
  }}
  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
- autoFocus
  />
  <p className="text-[10px] text-ih-fg-4 mt-1">
  {serverComments.length} comments
@@ -157,6 +151,6 @@ export function CommentLibraryDrawer({ comments, state, serverComments, onInsert
  />
  </div>
  </div>
- </div>
+ </Drawer>
  );
 }
