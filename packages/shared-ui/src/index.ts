@@ -9,6 +9,7 @@ export { EmptyState } from "./EmptyState";
 export { Skeleton } from "./Skeleton";
 export { Card } from "./Card";
 export { Modal } from "./Modal";
+export { Drawer } from "./Drawer";
 export { Pagination } from "./Pagination";
 export type { PaginationProps } from "./Pagination";
 export { FileDropzone, firstFileFromDrop, formatFileSize, truncateMiddle } from "./FileDropzone";

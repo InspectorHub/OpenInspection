@@ -55,9 +55,23 @@
   --color-ih-border: var(--ih-border-color, #e2e8f0);
   --color-ih-border-strong: var(--ih-border-strong-color, #cbd5e1);
 
+  /* ── Overlay backdrop (single source for every modal/drawer scrim) ── */
+  --color-ih-backdrop: var(--ih-backdrop);
+
   /* ── Layout ── */
   --width-sidebar: 200px;
   --width-sidebar-collapsed: 56px;
+
+  /* ── Radii (semantic; do not use raw rounded-md/lg/xl in primitives) ── */
+  --radius-ih-button: 6px;
+  --radius-ih-input: 8px;
+  --radius-ih-card: 8px;
+  --radius-ih-modal: 12px;
+  --radius-ih-pill: 4px;
+
+  /* ── Spacing scale extensions (established rhythms) ── */
+  --spacing-ih-list: 18px;   /* vertical rhythm between list rows / page sections */
+  --spacing-ih-card: 14px;   /* compact card padding */
 
   /* ── Shadows ── */
   --shadow-ih-card: 0 1px 3px rgba(15, 23, 42, 0.08);
@@ -109,6 +123,8 @@
 
   --ih-border-color: #e2e8f0;
   --ih-border-strong-color: #cbd5e1;
+
+  --ih-backdrop: rgba(15, 23, 42, 0.55);
 }
 
 /* ── Dark mode (the 'field' scheme is dark-based and inherits these vars) ── */
@@ -142,6 +158,8 @@ html[data-color-scheme="dark"], html[data-color-scheme="field"], .dark {
 
   --ih-border-color: #334155;
   --ih-border-strong-color: #475569;
+
+  --ih-backdrop: rgba(2, 6, 23, 0.65);
 }
 
 /* ── Field mode (Track H 迁移⑤) ──
@@ -182,7 +200,7 @@ html[data-color-scheme="field"] {
 .ih-input {
   height: 36px;
   padding: 0 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-ih-input);
   border: 1px solid var(--ih-border-color);
   background: var(--ih-bg-card);
   color: var(--ih-fg-1);
@@ -245,9 +263,11 @@ html[data-sidebar-collapsed="1"] .ih-sidebar { width: var(--width-sidebar-collap
    `animate-ih-dash-march` / `animate-ih-ok-flash` utilities exist. */
 @keyframes ih-dash-march { to { stroke-dashoffset: -14; } }
 @keyframes ih-ok-flash { from { background-color: var(--color-ih-ok-bg); } to { background-color: transparent; } }
+@keyframes ih-slide-in-right { from { transform: translateX(100%); } to { transform: none; } }
 @theme {
   --animate-ih-dash-march: ih-dash-march 0.6s linear infinite;
   --animate-ih-ok-flash: ih-ok-flash 1s ease-out;
+  --animate-ih-slide-in-right: ih-slide-in-right 0.2s ease-out;
 }
 
 /* ── Print layout (report PDF / browser print) ──

@@ -1,18 +1,22 @@
 import React, { useId, useRef } from "react";
 import { useDialogBehavior } from "./useDialogBehavior";
 
-interface ModalProps {
+interface DrawerProps {
   open: boolean;
   onClose: () => void;
   title: string;
-  size?: "sm" | "md" | "lg" | "xl";
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** 480px panel for dense forms; default is 360px. Mobile is always full-width. */
+  wide?: boolean;
 }
 
-const sizeClasses = { sm: "max-w-sm", md: "max-w-md", lg: "max-w-lg", xl: "max-w-xl" };
-
-export function Modal({ open, onClose, title, size = "md", children, footer }: ModalProps) {
+/**
+ * Right-side desktop drawer. Use for "adjust while seeing the page"
+ * flows (filters, long side forms) — NOT for confirm/decision moments,
+ * which stay in Modal. Reuses Modal's dialog chrome behavior and tokens.
+ */
+export function Drawer({ open, onClose, title, children, footer, wide = false }: DrawerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
@@ -22,7 +26,7 @@ export function Modal({ open, onClose, title, size = "md", children, footer }: M
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-ih-backdrop"
+      className="fixed inset-0 z-50 bg-ih-backdrop"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -33,10 +37,10 @@ export function Modal({ open, onClose, title, size = "md", children, footer }: M
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className={`w-full ${sizeClasses[size]} bg-ih-bg-card rounded-t-ih-modal sm:rounded-ih-modal shadow-ih-popover border border-ih-border max-h-[90vh] overflow-y-auto`}
+        className={`absolute inset-y-0 right-0 w-full ${wide ? "sm:w-[480px]" : "sm:w-[360px]"} bg-ih-bg-card border-l border-ih-border shadow-ih-popover flex flex-col animate-ih-slide-in-right`}
       >
         <div className="flex items-center justify-between p-4 border-b border-ih-border">
-          <h2 id={titleId} className="text-lg font-bold text-ih-fg-1">
+          <h2 id={titleId} className="text-[15px] font-bold text-ih-fg-1">
             {title}
           </h2>
           <button
@@ -48,7 +52,7 @@ export function Modal({ open, onClose, title, size = "md", children, footer }: M
             &#x2715;
           </button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="flex-1 overflow-y-auto p-4">{children}</div>
         {footer && <div className="flex justify-end gap-3 p-4 border-t border-ih-border">{footer}</div>}
       </div>
     </div>
