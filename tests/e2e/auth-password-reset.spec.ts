@@ -43,6 +43,10 @@ test.describe('Login entry point', () => {
     await page.goto(`${BASE_URL}/login`, { timeout: NAV_TIMEOUT, waitUntil: 'networkidle' });
     const link = page.getByRole('link', { name: /forgot password/i });
     await expect(link).toHaveAttribute('href', '/forgot-password');
+    // Click with the email still autofocused + empty. login.tsx reserves the
+    // field-error slots, so the onBlur validation message no longer shifts the
+    // link — the click lands. This guards against a return of that layout-shift
+    // regression (which would steal the click and strand the user on /login).
     await link.click();
     await expect(page).toHaveURL(/\/forgot-password$/);
     await expect(page.getByRole('heading', { name: /reset your password/i })).toBeVisible();
