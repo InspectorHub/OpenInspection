@@ -152,6 +152,12 @@ export default defineConfig({
             testMatch: 'subsystem-b-team-strip.spec.ts',
         },
         // --- wired during 2026-07 tests reorg (were collected by no project) ---
+        // Standalone password-reset / auth-page unification (#223). No `api`
+        // dependency: every test targets a public/unauthenticated page (forgot,
+        // reset, login link) and never logs in. The "existing email" assertion
+        // holds without a seeded workspace because the forgot flow is
+        // anti-enumeration (same confirmation whether or not the account exists).
+        { name: 'auth-password-reset', testMatch: 'auth-password-reset.spec.ts' },
         { name: 'branding', testMatch: 'branding.spec.ts' },
         { name: 'repair-list', testMatch: 'repair-list.spec.ts' },
         { name: 'report-viewer', testMatch: 'report-viewer.spec.ts' },

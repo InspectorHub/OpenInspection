@@ -80,8 +80,8 @@
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "^0.8.1",
-    "@conform-to/react": "^1.19.3",
-    "@conform-to/zod": "^1.19.3",
+    "@conform-to/react": "^1.19.4",
+    "@conform-to/zod": "^1.19.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@stripe/react-stripe-js": "^6.5.0",
     "@stripe/stripe-js": "^9.7.0",

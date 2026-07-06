@@ -127,9 +127,12 @@ export default function LoginPage() {
               aria-invalid={fields.email.errors ? true : undefined}
               className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
-            {fields.email.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.email.errors[0]}</p>
-            )}
+            {/* Reserve the error slot's height so the onBlur validation message
+                doesn't shift the "Forgot password?" link below it (which would
+                let a click land above the moved link and miss). */}
+            <p className="mt-1 min-h-4 text-xs text-ih-bad-fg" aria-live="polite">
+              {fields.email.errors?.[0] ?? ""}
+            </p>
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -147,9 +150,9 @@ export default function LoginPage() {
               aria-invalid={fields.password.errors ? true : undefined}
               className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
-            {fields.password.errors && (
-              <p className="mt-1 text-xs text-ih-bad-fg">{fields.password.errors[0]}</p>
-            )}
+            <p className="mt-1 min-h-4 text-xs text-ih-bad-fg" aria-live="polite">
+              {fields.password.errors?.[0] ?? ""}
+            </p>
           </div>
 
           {form.errors && (
