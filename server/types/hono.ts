@@ -88,6 +88,13 @@ export interface AppEnv {
     // suite's concentrated single-IP logins don't trip the 10/60s login limiter.
     // Unset (the default) everywhere else — production/self-host stays enforced.
     DISABLE_RATE_LIMIT?: string;
+    // Test-only email sink: when '1', every outbound email is captured to KV
+    // instead of sent (RecordingEmailProvider) and the env-gated
+    // `/api/__test__/last-email` route reads it back — so E2E can obtain the
+    // password-reset token, which is emailed and never returned by an API. Set
+    // ONLY on the Playwright worker (playwright.config.ts `--var`). Unset (the
+    // default) everywhere else — production/self-host never sink or expose it.
+    E2E_EMAIL_SINK?: string;
 
     // Payments
     STRIPE_SECRET_KEY?: string;

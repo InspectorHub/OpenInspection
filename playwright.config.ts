@@ -23,7 +23,15 @@ export default defineConfig({
     },
     tsconfig: './tsconfig.playwright.json',
     webServer: {
-        command: 'npm run build && npx wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state --port 8789',
+        // --var injects E2E-only bindings onto the Playwright worker WITHOUT
+        // touching .dev.vars, so `npm run dev` is unaffected:
+        //   E2E_EMAIL_SINK=1   — capture outbound email to KV (read back via
+        //                        /api/__test__/last-email) so the reset-token
+        //                        happy path is testable end to end.
+        //   SETUP_CODE=000000  — matches the api project's setup fixture in BOTH
+        //                        CI and local (local .dev.vars may differ).
+        //   DISABLE_RATE_LIMIT=1 — the seeded suite drives many logins from one IP.
+        command: 'npm run build && npx wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state --port 8789 --var E2E_EMAIL_SINK:1 --var SETUP_CODE:000000 --var DISABLE_RATE_LIMIT:1',
         url: 'http://127.0.0.1:8789/status',
         reuseExistingServer: true,
         stdout: 'pipe',
@@ -152,12 +160,12 @@ export default defineConfig({
             testMatch: 'subsystem-b-team-strip.spec.ts',
         },
         // --- wired during 2026-07 tests reorg (were collected by no project) ---
-        // Standalone password-reset / auth-page unification (#223). No `api`
-        // dependency: every test targets a public/unauthenticated page (forgot,
-        // reset, login link) and never logs in. The "existing email" assertion
-        // holds without a seeded workspace because the forgot flow is
-        // anti-enumeration (same confirmation whether or not the account exists).
-        { name: 'auth-password-reset', testMatch: 'auth-password-reset.spec.ts' },
+        // Standalone password-reset / auth-page unification (#223, #224). The
+        // public-page tests (forgot / reset / login link) need no seed, but the
+        // valid-token happy path invites a throwaway member off the shared admin,
+        // so depend on `api` (which seeds admin@autotest.com). The reset token is
+        // read back from the E2E email sink (E2E_EMAIL_SINK, wired on the worker).
+        { name: 'auth-password-reset', testMatch: 'auth-password-reset.spec.ts', dependencies: ['api'] },
         { name: 'branding', testMatch: 'branding.spec.ts' },
         { name: 'repair-list', testMatch: 'repair-list.spec.ts' },
         { name: 'report-viewer', testMatch: 'report-viewer.spec.ts' },

@@ -6,7 +6,7 @@
   "app/routes/inspections.tsx": 902,
   "server/durable-objects/inspection-doc.ts": 896,
   "server/services/booking.service.ts": 848,
-  "server/index.ts": 827,
+  "server/index.ts": 830,
   "server/api/sms.ts": 818,
   "server/services/inspection.service.ts": 739,
   "app/routes/settings-communication-templates.tsx": 731,
