@@ -152,7 +152,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 - **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); there is no separate server-side CSS build.
 - **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. The React Router v7 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
 - **State management**: React hooks — `useInspection` (~900 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
-- **Component library**: `packages/shared-ui/` provides 13 design-system components (Button, Pill, Card, Input, Modal, Icon, EmptyState, Eyebrow, FileDropzone, PageHeader, Pagination, Skeleton, TabStrip) consumed by the frontend.
+- **Component library**: `packages/shared-ui/` provides 25 design-system components consumed by the frontend — Button, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar. See `docs/developers/11_design_system.md`.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
 - **Offline**: Service Worker + `useOfflineQueue` hook for photo upload queue and field sync.
 

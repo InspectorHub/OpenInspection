@@ -1,6 +1,6 @@
 import React from "react";
 
-type PillTone = "sat" | "monitor" | "defect" | "ni" | "np" | "info" | "gen" | "primary" | "neutral" | "warning";
+export type PillTone = "sat" | "monitor" | "defect" | "ni" | "np" | "info" | "gen" | "primary" | "neutral" | "warning";
 
 const toneClasses: Record<PillTone, string> = {
   sat: "bg-ih-ok-bg text-ih-ok-fg",

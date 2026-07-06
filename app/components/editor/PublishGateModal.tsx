@@ -56,7 +56,7 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
     const warningOnly = readiness.ready && warnings.length > 0;
     if (readiness.ready && warnings.length === 0) return null;
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ih-backdrop">
             <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-2xl max-h-[80vh] flex flex-col">
                 <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
                     <h2 className="text-[14px] font-bold">

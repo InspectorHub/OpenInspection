@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLoaderData, useActionData, useNavigation, useFetcher } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-communication";
@@ -577,15 +578,8 @@ export default function SettingsCommunication() {
   if (denied) return <AccessDenied />;
 
   return (
-    <div className="space-y-[18px]">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Communication</span>
-      </div>
-
-      <h2 className="text-[19px] font-bold text-ih-fg-1">Communication</h2>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Communication" }]} />
       <p className="text-[13px] text-ih-fg-3">
         Configure email delivery, templates, and calendar sync.
       </p>

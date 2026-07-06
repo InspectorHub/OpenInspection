@@ -5,7 +5,7 @@ import type { Route } from "./+types/contacts";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { addContactSchema } from "~/lib/forms/contacts.schema";
-import { PageHeader, TabStrip, Button } from "@core/shared-ui";
+import { PageHeader, TabStrip, Button, Select } from "@core/shared-ui";
 import { inferMappingFromCsv, type Contact, type Agent } from "~/components/contacts/contacts-helpers";
 import { ContactModal } from "~/components/contacts/ContactModal";
 import { CsvImportModal } from "~/components/contacts/CsvImportModal";
@@ -124,21 +124,25 @@ export default function ContactsPage() {
     : contactList;
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       <PageHeader
         title={`${filtered.length} ${filtered.length === 1 ? "Contact" : "Contacts"}`}
         meta={`${filtered.length} contacts`}
         actions={
           <>
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="h-8 px-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-[13px] font-medium"
-            >
-              <option value="">All Types</option>
-              <option value="agent">Agents</option>
-              <option value="client">Clients</option>
-            </select>
+            <div className="w-[130px]">
+              <Select
+                bare
+                aria-label="Filter by contact type"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                options={[
+                  { value: "", label: "All Types" },
+                  { value: "agent", label: "Agents" },
+                  { value: "client", label: "Clients" },
+                ]}
+              />
+            </div>
             <Button variant="secondary" size="sm" onClick={() => setCsvModalOpen(true)}>
               Import CSV
             </Button>

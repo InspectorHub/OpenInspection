@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Form, Link, useLoaderData, useActionData, useNavigation } from "react-router";
+import { Form, useLoaderData, useActionData, useNavigation } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-security";
@@ -197,14 +198,8 @@ export default function SettingsSecurityPage() {
   });
 
   return (
-    <div className="space-y-[18px] max-w-3xl">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Account & Security</span>
-      </div>
-      <h2 className="text-[19px] font-bold text-ih-fg-1">Account & Security</h2>
+    <div className="space-y-ih-list max-w-3xl">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Account & Security" }]} />
       <p className="text-[13px] text-ih-fg-3">Password, two-factor authentication, account data, and security settings.</p>
 
       {/* Flash */}

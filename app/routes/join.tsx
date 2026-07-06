@@ -3,7 +3,8 @@ import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/join";
 import { createApi } from "~/lib/api-client.server";
-import { joinSchema } from "~/lib/forms/auth.schema";
+import { joinSchema, PASSWORD_HINT } from "~/lib/forms/auth.schema";
+import { AuthShell } from "~/components/AuthShell";
 
 export function meta() {
   return [{ title: "Accept Invite - OpenInspection" }];
@@ -14,14 +15,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = url.searchParams.get("token") || "";
 
   if (!token) {
-    return { valid: false, error: "Missing invite token", invite: null };
+    return { valid: false, error: "Missing invite token", invite: null, token: "" };
   }
 
   try {
     const api = createApi(context);
     const res = await api.auth["invite-info"].$get({ query: { token } });
     if (!res.ok) {
-      return { valid: false, error: "Invalid or expired invite link", invite: null };
+      return { valid: false, error: "Invalid or expired invite link", invite: null, token };
     }
     const body = await res.json();
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
@@ -29,9 +30,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       valid: true,
       error: null,
       invite: (Object.keys(d).length > 0 ? d : null) as { email: string; workspaceName: string } | null,
+      token,
     };
   } catch {
-    return { valid: false, error: "Service unavailable", invite: null };
+    return { valid: false, error: "Service unavailable", invite: null, token: "" };
   }
 }
 
@@ -80,7 +82,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function JoinPage() {
-  const { valid, error: loaderError, invite } = useLoaderData<typeof loader>();
+  const { valid, error: loaderError, invite, token } = useLoaderData<typeof loader>();
   const lastResult = useActionData<typeof action>();
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting";
@@ -108,25 +110,12 @@ export default function JoinPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-ih-bg-app">
-      <div className="w-full max-w-md p-8">
-        <div className="flex items-center gap-3 mb-8">
-          <img src="/logo.svg" alt="" className="w-8 h-8" width={32} height={32} />
-          <span className="text-lg font-bold text-ih-fg-1">
-            OpenInspection
-          </span>
-        </div>
-
-        <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">
-          Join {invite?.workspaceName ?? "the team"}
-        </h1>
-        <p className="text-sm text-ih-fg-3 mb-6">
-          You have been invited{invite?.email ? ` as ${invite.email}` : ""}. Set
-          your name and password to get started.
-        </p>
-
+    <AuthShell
+      heading={`Join ${invite?.workspaceName ?? "the team"}`}
+      subtitle={`You have been invited${invite?.email ? ` as ${invite.email}` : ""}. Set your name and password to get started.`}
+    >
         <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
-          <input type="hidden" name="token" value={new URL(typeof window !== "undefined" ? window.location.href : "http://localhost").searchParams.get("token") || ""} />
+          <input type="hidden" name="token" value={token} />
           <div>
             <label htmlFor={fields.name.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
               Full name
@@ -154,6 +143,7 @@ export default function JoinPage() {
               aria-invalid={fields.password.errors ? true : undefined}
               className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
+            <p className="mt-1 text-xs text-ih-fg-3">{PASSWORD_HINT}</p>
             {fields.password.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.password.errors[0]}</p>
             )}
@@ -173,7 +163,6 @@ export default function JoinPage() {
             {isSubmitting ? "Accepting…" : "Accept Invite"}
           </button>
         </Form>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

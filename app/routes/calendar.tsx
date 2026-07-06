@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher, useNavigate, useNavigation } from "react-rou
 import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { Modal } from "@core/shared-ui";
 import { startOfWeek, addDays, type CalendarEvent, type ViewMode } from "~/components/calendar/calendar-helpers";
 import { MonthView } from "~/components/calendar/MonthView";
 import { WeekView } from "~/components/calendar/WeekView";
@@ -142,8 +143,11 @@ export default function CalendarPage() {
   };
 
   /* ---- Day click (create) ---- */
-  const handleDayClick = (dateStr: string) => {
-    navigate(`/inspections?newInspection=1&date=${encodeURIComponent(dateStr)}`);
+  const handleDayClick = (_dateStr: string) => {
+    // Opens the dedicated New Inspection page. (The former ?date= seed was
+    // never consumed by the wizard — it always defaults to today — so no date
+    // is forwarded; behavior is unchanged.)
+    navigate("/inspections/new");
   };
 
   /* ---- Drag reschedule ---- */
@@ -152,7 +156,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -262,26 +266,14 @@ export default function CalendarPage() {
       )}
 
       {/* Event detail modal */}
-      {eventModalOpen && selectedEvent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => setEventModalOpen(false)}>
-          <div className="w-full max-w-sm bg-ih-bg-card rounded-xl shadow-ih-popover p-6" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[16px] font-bold text-ih-fg-1">{selectedEvent.title}</h2>
-              <button onClick={() => setEventModalOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg">&times;</button>
-            </div>
-            <div className="space-y-2 text-[13px] text-ih-fg-3">
-              <p>
-                <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Date:</span>{" "}
-                {selectedEvent.start ? new Date(selectedEvent.start).toLocaleString() : "N/A"}
-              </p>
-              {selectedEvent.status && (
-                <p>
-                  <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Status:</span>{" "}
-                  {selectedEvent.status.replace(/_/g, " ")}
-                </p>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 mt-5">
+      {selectedEvent && (
+        <Modal
+          open={eventModalOpen}
+          onClose={() => setEventModalOpen(false)}
+          title={selectedEvent.title}
+          size="sm"
+          footer={
+            <>
               <button onClick={() => setEventModalOpen(false)} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3">
                 Close
               </button>
@@ -293,9 +285,22 @@ export default function CalendarPage() {
                   Open Inspection
                 </button>
               )}
-            </div>
+            </>
+          }
+        >
+          <div className="space-y-2 text-[13px] text-ih-fg-3">
+            <p>
+              <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Date:</span>{" "}
+              {selectedEvent.start ? new Date(selectedEvent.start).toLocaleString() : "N/A"}
+            </p>
+            {selectedEvent.status && (
+              <p>
+                <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Status:</span>{" "}
+                {selectedEvent.status.replace(/_/g, " ")}
+              </p>
+            )}
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

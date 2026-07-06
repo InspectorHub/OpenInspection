@@ -33,7 +33,7 @@ export function MobileBottomDrawer({ open, onClose, title, children, heightFract
         <>
             <div
                 onClick={onClose}
-                className={`fixed inset-0 z-40 bg-[rgba(15,23,42,0.4)] transition-opacity ${
+                className={`fixed inset-0 z-40 bg-ih-backdrop transition-opacity ${
                     open ? 'opacity-100' : 'opacity-0 pointer-events-none'
                 }`}
             />

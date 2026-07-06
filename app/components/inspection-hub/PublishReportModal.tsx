@@ -1,11 +1,15 @@
 import { useFetcher } from "react-router";
+import { Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
 
 /* ------------------------------------------------------------------ */
 /*  Publish-report modal                                              */
 /* ------------------------------------------------------------------ */
 
+const FORM_ID = "ih-publish-report-form";
+
 export function PublishReportModal({
+  open,
   agreementRequired,
   paymentRequired,
   fetcher,
@@ -13,6 +17,7 @@ export function PublishReportModal({
   error,
   onClose,
 }: {
+  open: boolean;
   agreementRequired: boolean;
   paymentRequired: boolean;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
@@ -21,66 +26,50 @@ export function PublishReportModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)]">
-      <div className="bg-ih-bg-card text-ih-fg-1 rounded-lg shadow-ih-popover w-full max-w-md flex flex-col">
-        <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
-          <h2 className="text-[14px] font-bold">Publish report</h2>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Publish report"
+      footer={
+        <>
           <button
             type="button"
             onClick={onClose}
-            className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
-            aria-label="Close"
+            className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
           >
-            &#x2715;
+            Cancel
           </button>
-        </div>
+          <button
+            type="submit"
+            form={FORM_ID}
+            disabled={submitting}
+            className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+          >
+            {submitting ? "Publishing…" : "Publish report"}
+          </button>
+        </>
+      }
+    >
+      <fetcher.Form id={FORM_ID} method="post" className="space-y-3">
+        <input type="hidden" name="intent" value="publish" />
+        {/* No theme picker — rides the editor's effective default (server
+            'modern'); the action sends theme:"modern" explicitly. */}
+        <ToggleRow name="notifyClient" label="Notify client by email" defaultChecked />
+        <ToggleRow name="notifyAgent" label="Notify agent" defaultChecked={false} />
+        <ToggleRow
+          name="requireSignature"
+          label="Require signature before viewing"
+          defaultChecked={agreementRequired}
+        />
+        <ToggleRow
+          name="requirePayment"
+          label="Require payment before viewing"
+          defaultChecked={paymentRequired}
+        />
 
-        <fetcher.Form method="post" className="flex flex-col">
-          <input type="hidden" name="intent" value="publish" />
-          {/* No theme picker — rides the editor's effective default (server
-              'modern'); the action sends theme:"modern" explicitly. */}
-          <div className="px-5 py-4 space-y-3">
-            <ToggleRow
-              name="notifyClient"
-              label="Notify client by email"
-              defaultChecked
-            />
-            <ToggleRow name="notifyAgent" label="Notify agent" defaultChecked={false} />
-            <ToggleRow
-              name="requireSignature"
-              label="Require signature before viewing"
-              defaultChecked={agreementRequired}
-            />
-            <ToggleRow
-              name="requirePayment"
-              label="Require payment before viewing"
-              defaultChecked={paymentRequired}
-            />
-
-            {error && (
-              <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>
-            )}
-          </div>
-
-          <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={submitting}
-              className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
-            >
-              {submitting ? "Publishing…" : "Publish report"}
-            </button>
-          </div>
-        </fetcher.Form>
-      </div>
-    </div>
+        {error && <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>}
+      </fetcher.Form>
+    </Modal>
   );
 }
 

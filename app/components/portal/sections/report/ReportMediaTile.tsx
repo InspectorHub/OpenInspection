@@ -59,6 +59,7 @@ export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, on
         />
         <a
           href={m.playerLinkUrl}
+          /* ds-allow: customer report render surface, not app chrome — fixed-dark caption chip over media */
           className="absolute inset-x-0 bottom-0 bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white"
         >
           ▶ Watch the walk-through
@@ -113,6 +114,7 @@ export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, on
         download={name}
         title={`Download ${name}`}
         onClick={(e) => e.stopPropagation()}
+        /* ds-allow: customer report render surface, not app chrome — fixed-dark download chip over media */
         className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"
       >
         ↓

@@ -658,6 +658,7 @@ export function ReportView(props: ReportViewProps) {
       {/* Lightbox */}
       {lightboxUrl && (
         <div
+          /* ds-allow: customer report render surface, not app chrome — fixed-dark image lightbox */
           className="fixed inset-0 z-[60] bg-[rgba(15,23,42,0.9)] flex items-center justify-center p-4 cursor-pointer"
           onClick={() => setLightboxUrl(null)}
         >

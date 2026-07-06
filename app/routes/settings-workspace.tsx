@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { Form, Link, useLoaderData, useActionData, useFetcher } from "react-router";
+import { Form, useLoaderData, useActionData, useFetcher } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-workspace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
+import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { workspaceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
@@ -144,14 +146,8 @@ export default function SettingsWorkspacePage() {
   if ("forbidden" in data) return <AccessDenied />;
 
   return (
-    <div className="space-y-[18px]">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Company</span>
-      </div>
-      <h2 className="text-[19px] font-bold text-ih-fg-1">Company</h2>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Company" }]} />
       <p className="text-[13px] text-ih-fg-3">Branding, report theme, and referral sources.</p>
 
       {/* Flash */}
@@ -216,7 +212,7 @@ export default function SettingsWorkspacePage() {
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Report Theme</h3>
           <p className="text-[12px] text-ih-fg-3">Default visual style for client-facing reports.</p>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {THEMES.map((t) => (
               <label key={t} className="cursor-pointer">
                 <input type="radio" name={fields.reportTheme.name} value={t}
@@ -361,13 +357,8 @@ export default function SettingsWorkspacePage() {
           </div>
         )}
 
-        {/* Save */}
-        <div className="flex justify-end">
-          <button type="submit"
-            className="px-4 py-2 bg-ih-primary text-white rounded-md font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-            Save Company
-          </button>
-        </div>
+        {/* Save — sticky bar pinned to the bottom of the settings scroll area */}
+        <SettingsSaveBar label="Save Company" />
       </Form>
     </div>
   );

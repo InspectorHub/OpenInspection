@@ -433,7 +433,8 @@ export default function InspectionHubPage() {
   const invoiceSent = hub.invoice?.status === "sent" || hub.invoice?.status === "partial";
 
   return (
-    <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-[18px]">
+    /* ds-allow: page bottom gutter (60px), bespoke page-shell spacing with no token */
+    <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-ih-list">
       {/* Breadcrumb — Inspections > this inspection */}
       <Breadcrumb
         items={[
@@ -794,53 +795,49 @@ export default function InspectionHubPage() {
         error={docError}
       />
 
-      {/* Send-agreement modal — custom (no window.confirm) */}
-      {agreementModal.open && (
-        <SendAgreementModal
-          agreements={hub.agreements}
-          defaultEmail={inspection.clientEmail ?? ""}
-          fetcher={agreementModal.fetcher}
-          submitting={agreementModal.busy}
-          error={agreementModal.error}
-          onClose={() => agreementModal.setOpen(false)}
-        />
-      )}
+      {/* Send-agreement modal — shared Modal primitive (no window.confirm) */}
+      <SendAgreementModal
+        open={agreementModal.open}
+        agreements={hub.agreements}
+        defaultEmail={inspection.clientEmail ?? ""}
+        fetcher={agreementModal.fetcher}
+        submitting={agreementModal.busy}
+        error={agreementModal.error}
+        onClose={() => agreementModal.setOpen(false)}
+      />
 
-      {/* Request-payment modal — custom (no window.confirm) */}
-      {paymentModal.open && (
-        <RequestPaymentModal
-          recipientEmail={inspection.clientEmail ?? ""}
-          amountLabel={formatCents(invoiceAmountCents)}
-          resend={invoiceSent}
-          fetcher={paymentModal.fetcher}
-          submitting={paymentModal.busy}
-          error={paymentModal.error}
-          onClose={() => paymentModal.setOpen(false)}
-        />
-      )}
+      {/* Request-payment modal — shared Modal primitive (no window.confirm) */}
+      <RequestPaymentModal
+        open={paymentModal.open}
+        recipientEmail={inspection.clientEmail ?? ""}
+        amountLabel={formatCents(invoiceAmountCents)}
+        resend={invoiceSent}
+        fetcher={paymentModal.fetcher}
+        submitting={paymentModal.busy}
+        error={paymentModal.error}
+        onClose={() => paymentModal.setOpen(false)}
+      />
 
-      {/* Publish modal — custom (no window.confirm) */}
-      {publishModal.open && (
-        <PublishReportModal
-          agreementRequired={inspection.agreementRequired}
-          paymentRequired={inspection.paymentRequired}
-          fetcher={publishModal.fetcher}
-          submitting={publishModal.busy}
-          error={publishModal.error}
-          onClose={() => publishModal.setOpen(false)}
-        />
-      )}
+      {/* Publish modal — shared Modal primitive (no window.confirm) */}
+      <PublishReportModal
+        open={publishModal.open}
+        agreementRequired={inspection.agreementRequired}
+        paymentRequired={inspection.paymentRequired}
+        fetcher={publishModal.fetcher}
+        submitting={publishModal.busy}
+        error={publishModal.error}
+        onClose={() => publishModal.setOpen(false)}
+      />
 
-      {/* Create-re-inspection modal — custom (no window.confirm) */}
-      {reinspectModal.open && (
-        <CreateReinspectionModal
-          candidates={reinspectCandidates}
-          fetcher={reinspectModal.fetcher}
-          submitting={reinspectModal.busy}
-          error={reinspectModal.error}
-          onClose={() => reinspectModal.setOpen(false)}
-        />
-      )}
+      {/* Create-re-inspection modal — shared Modal primitive (no window.confirm) */}
+      <CreateReinspectionModal
+        open={reinspectModal.open}
+        candidates={reinspectCandidates}
+        fetcher={reinspectModal.fetcher}
+        submitting={reinspectModal.busy}
+        error={reinspectModal.error}
+        onClose={() => reinspectModal.setOpen(false)}
+      />
     </div>
   );
 }

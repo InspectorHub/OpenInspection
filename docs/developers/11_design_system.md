@@ -67,6 +67,44 @@ Exactly two elevations exist — do not use Tailwind's `shadow-sm/md/lg/xl/2xl`:
 | `shadow-ih-popover` | Elevated overlays — `Modal`, dropdowns, toasts |
 | `shadow-ih-focus` | Focus ring (`0 0 0 3px var(--ih-primary-glow)`) — applied via `focus:shadow-ih-focus` |
 
+### Radius
+
+Five semantic corner radii — do not use raw `rounded-md/lg/xl` or arbitrary
+`rounded-[10px]` in components (`lint:ds` flags the latter):
+
+| Token | Value | Use |
+|---|---|---|
+| `rounded-ih-pill` | 4px | Pills, segment buttons, small chips |
+| `rounded-ih-button` | 6px | Buttons, icon buttons, segmented-control track |
+| `rounded-ih-input` | 8px | Text inputs (the `.ih-input` base radius) |
+| `rounded-ih-card` | 8px | Cards, banners, popovers, panels |
+| `rounded-ih-modal` | 12px | Modal dialog corners |
+
+### Spacing
+
+Two named spacing tokens capture recurring rhythms; use the standard Tailwind
+scale for everything else. Arbitrary px spacing (`p-[18px]`, `gap-[2px]`) is
+flagged by `lint:ds`:
+
+| Token | Value | Use |
+|---|---|---|
+| `space-y-ih-list` / `gap-ih-list` / `p-ih-list` | 18px | Vertical rhythm between list rows / page sections |
+| `p-ih-card` / `gap-ih-card` | 14px | Compact card padding |
+
+(These are `@theme` spacing extensions, so they work with any spacing utility —
+`p-`, `px-`, `gap-`, `space-y-`, `m-`, etc.)
+
+### Backdrop (overlay scrim)
+
+| Token | Use |
+|---|---|
+| `bg-ih-backdrop` | The single canonical overlay scrim — a fixed dark wash (`rgba(15,23,42,0.55)` light / `rgba(2,6,23,0.65)` dark) behind full-screen dialogs |
+
+`Modal` and `Drawer` both render `bg-ih-backdrop` as their full-screen scrim;
+`Popover` deliberately has **no** scrim (it is an anchored, non-blocking
+overlay). Never hand-roll a scrim with `bg-[rgba(...)]` or `backdrop-blur` —
+both are flagged by `lint:ds`; use this token.
+
 ### Fonts
 
 `font-ih-display` (Bricolage Grotesque, headings), `font-ih-body` (Inter,
@@ -128,7 +166,7 @@ beyond the ad hoc pixel sizes already used throughout `app/components/`.
 
 ## 3. Component primitives
 
-`packages/shared-ui/src/` (exported from `index.ts`) — 13 components. **Check
+`packages/shared-ui/src/` (exported from `index.ts`) — 25 components. **Check
 here before hand-rolling UI.** A new repeated pattern (a card variant used in
 three places, a new pill tone) belongs in `shared-ui`, not copy-pasted across
 route files.
@@ -140,7 +178,13 @@ route files.
 | `Icon` | Inline SVG icon from a fixed named set | `name` (see `ICON_PATHS` in `Icon.tsx` for the full list — dashboard, calendar, check, edit, camera, ...), `size`, `strokeWidth` |
 | `Card` | Bordered/rounded/elevated surface container | no variants — compose with `className` |
 | `Input` | Labeled text input built on `.ih-input` | `label`, `error` (red border + message), `hint` (shown only when no error) |
-| `Modal` | Dialog overlay (`role="dialog"` + `aria-modal`), Escape-to-close, click-outside-to-close | `open`, `onClose`, `title`, `size`: `sm` \| `md` \| `lg` \| `xl`, `footer` |
+| `Textarea` | Labeled multiline input — same `.ih-input` chrome as `Input` but grows with `rows` and resizes vertically | `label`, `error`, `hint`, `rows` (default 3), `bare` (raw control only, for inline composition) |
+| `Select` | Labeled single/multi select mirroring `Input`'s chrome; tokenized chevron in single-select mode | `label`, `error`, `hint`, `options` (`SelectOption[]`) or native `<option>` children, `multiple`, `bare`. Use for a fixed option list; use `Input` for free text |
+| `Checkbox` | Single checkbox with native `<label>` association; DS `accent-ih-primary` fill | `label`, `error`, `bare` (raw input only, e.g. inside `FormField`) |
+| `Radio` / `RadioGroup` | `RadioGroup` renders a `<fieldset>`/`role=radiogroup` set of options; `Radio` is the single control for custom layouts | `RadioGroup`: `name`, `value`, `onChange(value)`, `options` (`RadioOption[]`), `legend`, `error`, `hint`. Prefer `RadioGroup`; reach for bare `Radio` only for bespoke layouts |
+| `Modal` | Centered dialog overlay (`role="dialog"` + `aria-modal`), full-screen `bg-ih-backdrop` scrim, Escape-to-close, click-outside-to-close, focus trap | `open`, `onClose`, `title`, `size`: `sm` \| `md` \| `lg` \| `xl`, `footer`. Use for confirm/decision moments and short forms (see §4) |
+| `Drawer` | Right-side slide-in panel sharing `Modal`'s dialog behavior + scrim | `open`, `onClose`, `title`, `footer`, `wide` (480px vs 360px; mobile always full-width), `initialFocusRef`. Use for "adjust while seeing the page" flows — filters, long side forms — NOT confirm moments (see §4) |
+| `Popover` | Anchored, non-blocking floating panel — no scrim, no scroll-lock, no hard focus-trap; Esc / click-outside close, focus restores to the anchor | `open`, `onClose`, `anchorRef` (trigger the panel positions against), `align`: `left` \| `right` (default `right`). Use for lightweight in-context choices (column toggles, dropdowns) where the page must stay visible (see §4) |
 | `EmptyState` | Centered icon + title + description + action for empty lists | `icon`, `title`, `description`, `action` |
 | `Eyebrow` | **Deprecated** small label chip (bg tint + text) | `color`: `slate` \| `indigo` \| `emerald` \| `amber` \| `rose` — kept for back-compat; new pages use a breadcrumb + a `Pill` in `PageHeader`'s `meta` instead |
 | `PageHeader` | Page title row with optional meta line and trailing actions | `title`, `meta`, `actions`; `eyebrow`/`eyebrowColor` are deprecated (same reason as `Eyebrow`) |
@@ -148,6 +192,11 @@ route files.
 | `Skeleton` | Loading placeholder block | `variant`: `text` \| `block`, `width` |
 | `TabStrip` | Underline-style tab bar with optional counts | `tabs` (`{id, label, count?}[]`), `activeId`, `onChange` |
 | `FileDropzone` | Drag-and-drop / click-to-pick file input with a full state machine (idle → drag-over → busy → selected → error) | `accept`, `onFile`, `fileName`/`fileSize` (controlled selection display), `busy`, `error`, `hint`, `onClear`. Also exports `firstFileFromDrop`, `formatFileSize`, `truncateMiddle` helpers |
+| `Banner` | Full-width inline status/notice strip with ARIA live-region role (`alert` for warn/danger, `status` otherwise) | `tone`: `info` \| `warn` \| `danger` \| `success` \| `brand`; `actions`, `dismissible`/`onDismiss`, `icon`, `sticky`. Use for page-level or section-level messages; use `Pill` for a compact inline badge, a toast for a transient async outcome |
+| `Table` | Generic column-config data table (tokenized header, hover rows, empty-state slot) | `columns` (`TableColumn<T>[]` — `label`, `align`, `cell`, `key`), `rows`, `empty`, `getRowKey`, `onRowClick`. Use for tabular listings instead of hand-rolled `<table>` markup |
+| `SegmentedControl` | Single-select segmented toggle (WAI-ARIA radiogroup — roving tabindex, Arrow/Home/End keys) | `options` (`SegmentedControlOption[]` — `value`, `label`, `icon`, `title`), `value`, `onChange(value)`, `size`: `sm` \| `md`, `ariaLabel`. Use for a small set of mutually exclusive views/modes; use `TabStrip` for page navigation |
+| `Avatar` | User initials/status chip; consolidates the app's initials logic (`avatarInitials` helper is exported) | `name` (initials derived), `size`: `28` \| `32` \| `36`, `variant`: `flat` \| `self` (gradient), `statusDot`, `ring`, `fallbackIcon` |
+| `StatCard` | Compact metric card (label + large value + optional hint), optional left-accent tone bar reusing the `Pill` tone palette | `label`, `value`, `tone` (`PillTone`), `hint` |
 
 `Eyebrow` and `PageHeader`'s `eyebrow`/`eyebrowColor` props are deprecated but
 still shipped for back-compat — don't use them on new pages.
@@ -226,6 +275,31 @@ Container choice:
   small single-purpose dialogs) — build on the shared `Modal` component's
   `footer` slot for the Save/Cancel button pair.
 
+### Overlay containers — Modal vs Drawer vs Popover
+
+Three overlay primitives cover three distinct intents. Picking the wrong one is
+the usual cause of "this feels heavy/interrupting" complaints:
+
+| Primitive | Shape | Scrim / blocking | Use it for |
+|---|---|---|---|
+| `Modal` | Centered dialog | Full-screen `bg-ih-backdrop` scrim + focus trap — **interrupts** the page | Confirm/decision moments (destructive actions), short single-purpose forms |
+| `Drawer` | Right-side slide-in panel | Same full-screen scrim + focus trap, but content stays anchored to the edge | Longer/complex side forms and "adjust while the page context is still framed" flows (filters, settings sub-panels) |
+| `Popover` | Small panel anchored to a trigger | **No scrim, no scroll-lock, no hard focus-trap** — the page stays visible and interactive | Lightweight in-context choices (column toggles, dropdown menus, quick pickers) |
+
+Rules of thumb:
+
+- If the user must **stop and answer** before continuing → `Modal`.
+- If they're **filling a longer form but the page behind it still gives useful
+  context** → `Drawer`.
+- If it's a **quick, low-stakes pick anchored to a button** and the rest of the
+  page should stay live → `Popover`.
+
+`Drawer` deliberately reuses `Modal`'s dialog chrome (`useDialogBehavior`:
+scroll-lock, focus-trap, Escape/click-outside close). `Popover` intentionally
+does **not** — it reimplements Esc/click-outside close and focus capture/restore
+without the trap or scroll-lock, because those would be wrong for a non-blocking
+anchored panel.
+
 ### Toasts
 
 `app/hooks/useToast.ts` (`pushToast`) + `app/components/Toast.tsx`
@@ -256,7 +330,7 @@ Save/Cancel (or Confirm/Cancel) actions in its `footer`.
 ## 5. Conformance tooling — `npm run lint:ds`
 
 `scripts/check-ds-tokens.mjs` scans `app/` and `packages/shared-ui/src/` for
-four violation classes:
+eight violation classes:
 
 1. **Dead `-bg0` pseudo-token** — `ih-(ok|watch|bad|primary)-bg0` generates no
    utility and silently ships invisible elements.
@@ -268,6 +342,15 @@ four violation classes:
 3. **Literal `bg-white` / `bg-black`** on in-app surfaces.
 4. **Non-token shadows** — `shadow-sm|md|lg|xl|2xl`. Only `shadow-ih-card` and
    `shadow-ih-popover` are sanctioned.
+5. **Arbitrary radius** — `rounded-[10px]` and friends. Use the semantic radii
+   (`rounded-ih-pill|button|input|card|modal`).
+6. **Arbitrary px spacing** — arbitrary-value padding/margin/gap/space like
+   `p-[18px]`, `gap-[2px]`. Use the standard Tailwind scale or the
+   `ih-list`/`ih-card` spacing tokens. (Width/height/inset and `min-`/`max-`
+   dimensions are legitimately bespoke and are **not** flagged.)
+7. **`backdrop-blur`** — glass blur is not part of the DS surface language.
+8. **`bg-[rgba(...)]` scrims** — hand-rolled overlay tints. Use the single
+   `bg-ih-backdrop` overlay token instead.
 
 ### Escape hatches
 
@@ -286,7 +369,8 @@ four violation classes:
 
 - `npm run lint` (part of the aggregate lint script alongside `lint:svg`,
   `lint:erasure`, `lint:migrefs`, `lint:filesize`, `lint:dup`,
-  `lint:tenant-scope`, `lint:tests`).
+  `lint:tenant-scope`, `lint:tests`, and `lint:deadcode` — knip, which flags
+  unused exports so retired primitives don't linger in `shared-ui`).
 - Pre-commit (`.githooks/pre-commit`) — runs on every commit that touches
   non-docs/tests files.
 - CI (`.github/workflows/ci.yml`, `verify` job) via `npm run lint`.

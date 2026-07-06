@@ -336,14 +336,6 @@ export function NewInspectionWizard({
   }
   const canNext = canAdvanceFromStep();
 
-  // B-21 — the backdrop used to discard a half-filled wizard on a stray
-  // click. Once the form is dirty, only Cancel / × close it (no native
-  // confirm dialogs per project convention).
-  const dirty = address.trim().length > 0 || templateId.length > 0 || services.size > 0;
-  const handleBackdrop = () => {
-    if (!dirty) onClose();
-  };
-
   function handleSubmit() {
     // P-4: Build serviceSelections with optional per-row price overrides.
     // Also keep legacy serviceIds for backward compat (the server uses
@@ -385,8 +377,7 @@ export function NewInspectionWizard({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={handleBackdrop}>
-      <div className="w-full max-w-lg max-h-[90vh] flex flex-col bg-ih-bg-card rounded-xl shadow-ih-popover" onClick={(e) => e.stopPropagation()}>
+    <div className="w-full max-w-[720px] mx-auto flex flex-col bg-ih-bg-card rounded-xl border border-ih-border shadow-ih-popover">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-ih-border">
           <h2 className="text-[16px] font-bold">New Inspection</h2>
@@ -502,7 +493,6 @@ export function NewInspectionWizard({
         </div>
         </>
         )}
-      </div>
     </div>
   );
 }

@@ -69,6 +69,7 @@ export function PhotoCropper({
   }
 
   return (
+    // ds-allow: full-bleed media studio chrome, intentional fixed-dark backdrop
     <div className="fixed inset-0 z-[70] bg-[rgba(15,23,42,0.7)] flex flex-col" role="dialog" aria-modal="true" aria-label={title}>
       <div className="relative flex-1">
         <Cropper image={sourceUrl} crop={crop} zoom={zoom} aspect={ratio} showGrid restrictPosition

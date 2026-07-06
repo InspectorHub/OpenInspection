@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFetcher } from "react-router";
+import { Icon } from "@core/shared-ui";
 
 interface TemplateSummary {
     id: string;
@@ -146,9 +147,7 @@ export function TemplateCombobox({
                 <span className={selectedName ? "text-ih-fg-1" : "text-ih-fg-4"}>
                     {selectedName || placeholder}
                 </span>
-                <svg className={`w-4 h-4 text-ih-fg-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                <Icon name="chevD" className={`w-4 h-4 text-ih-fg-4 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
             </button>
 
             {/* Dropdown */}

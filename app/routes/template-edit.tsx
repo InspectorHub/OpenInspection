@@ -494,15 +494,14 @@ export default function TemplateEditPage() {
       </div>
 
       {/* Rating system modal */}
-      {ratingModalOpen && (
-        <RatingSystemModal
-          ratingSystem={ratingSystem}
-          setRatingSystem={setRatingSystem}
-          applyPreset={applyPreset}
-          addRatingLevel={addRatingLevel}
-          onClose={() => setRatingModalOpen(false)}
-        />
-      )}
+      <RatingSystemModal
+        open={ratingModalOpen}
+        ratingSystem={ratingSystem}
+        setRatingSystem={setRatingSystem}
+        applyPreset={applyPreset}
+        addRatingLevel={addRatingLevel}
+        onClose={() => setRatingModalOpen(false)}
+      />
     </div>
   );
 }

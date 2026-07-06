@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { Form, Link, useLoaderData, useActionData, useFetcher } from "react-router";
+import { Form, useLoaderData, useActionData, useFetcher } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-profile";
@@ -7,6 +8,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SignaturePad } from "~/components/SignaturePad";
 import { AvatarCropper } from "~/components/media-studio/AvatarCropper";
+import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { profileSchema } from "~/lib/forms/settings.schema";
 
 /* ------------------------------------------------------------------ */
@@ -149,14 +151,8 @@ export default function SettingsProfilePage() {
     ? (sigFetcher.data.error as string) : null;
 
   return (
-    <div className="space-y-[18px]">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Profile</span>
-      </div>
-      <h2 className="text-[19px] font-bold text-ih-fg-1">Profile</h2>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Profile" }]} />
       <p className="text-[13px] text-ih-fg-3">Inspector identity that appears on every report you generate.</p>
 
       {/* Flash */}
@@ -288,13 +284,8 @@ export default function SettingsProfilePage() {
           </div>
         )}
 
-        {/* Save */}
-        <div className="flex justify-end">
-          <button type="submit"
-            className="px-4 py-2 bg-ih-primary text-white rounded-md font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all">
-            Save Profile
-          </button>
-        </div>
+        {/* Save — sticky bar pinned to the bottom of the settings scroll area */}
+        <SettingsSaveBar label="Save Profile" />
       </Form>
 
       {/* Saved signature */}

@@ -75,7 +75,7 @@ export function VersionCompare({
 
     return (
         <div
-            className="fixed inset-0 z-50 bg-[rgba(15,23,42,0.7)] backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 bg-ih-backdrop flex items-center justify-center p-4"
             onClick={(e) => {
                 if (e.target === e.currentTarget && !busy) onClose();
             }}

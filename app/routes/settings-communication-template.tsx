@@ -1,4 +1,5 @@
-import { Link, useLoaderData, useActionData, Form, useNavigation, redirect } from "react-router";
+import { useLoaderData, useActionData, Form, useNavigation, redirect } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useRef, useState } from "react";
 import type { Route } from "./+types/settings-communication-template";
 import { requireToken } from "~/lib/session.server";
@@ -98,13 +99,15 @@ function TemplateEditor({ detail }: { detail: Detail }) {
   };
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-          <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link><span>&rsaquo;</span>
-          <Link to="/settings/communication" className="hover:text-ih-primary transition-colors">Communication</Link><span>&rsaquo;</span>
-          <span className="text-ih-fg-1">{detail.name}</span>
-        </div>
+        <SettingsCrumb
+          items={[
+            { label: "Settings", href: "/settings" },
+            { label: "Communication", href: "/settings/communication" },
+            { label: detail.name },
+          ]}
+        />
         <div className="flex items-center gap-2">
           {confirmReset ? (
             <Form method="post" className="flex items-center gap-2">

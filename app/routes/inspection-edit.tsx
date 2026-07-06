@@ -1304,7 +1304,7 @@ export default function InspectionEditPage() {
  undefined,
  (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined,
  ).then((ok) => {
- if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", variant: "error", durationMs: 6000 });
+ if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", variant: "warning", durationMs: 6000 });
  });
  }}
  queuedPreviews={[]}
@@ -1616,12 +1616,11 @@ export default function InspectionEditPage() {
  )}
 
  {/* Plan 4 — re-crop warning modal (annotation will be discarded). */}
- {recropWarn && (
  <RecropWarningModal
+ open={Boolean(recropWarn)}
  onCancel={() => setRecropWarn(null)}
- onConfirm={() => { const r = recropWarn.run; setRecropWarn(null); r(); }}
+ onConfirm={() => { const r = recropWarn?.run; setRecropWarn(null); r?.(); }}
  />
- )}
 
  {/* D8 — structural delete confirmation modal (section OR item; NEVER window.confirm). */}
  <StructureDeleteModal
@@ -1688,16 +1687,15 @@ export default function InspectionEditPage() {
  )}
 
  {/* Unsaved changes blocker dialog */}
- {blocker.state === "blocked" && (
  <UnsavedChangesBlocker
+ open={blocker.state === "blocked"}
  onStay={cancelLeave}
  onLeave={confirmLeave}
  />
- )}
 
  {/* Publish confirmation modal */}
- {state.showPublishModal && (
  <PublishModal
+ open={state.showPublishModal}
  progress={{ rated: state.progress.rated, total: state.progress.total, pct: state.progress.pct }}
  status={state.inspection.status as string}
  publishError={publishError}
@@ -1712,7 +1710,6 @@ export default function InspectionEditPage() {
  autoSign={autoSign}
  onAutoSignToggle={handleAutoSignToggle}
  />
- )}
 
  {/* #181 — Version history panel (collab Phase 4). Only reachable when the
      collabEditing flag is on (the trigger button is gated in EditorHeader).
@@ -1730,17 +1727,16 @@ export default function InspectionEditPage() {
  />
 
  {/* Inspector sign modal */}
- {signModalOpen && (
  <SignModal
+ open={signModalOpen}
  onSubmit={handleSignSubmit}
  onCancel={() => setSignModalOpen(false)}
  failed={Boolean(signFetcher.data && !(signFetcher.data as { ok: boolean }).ok)}
  />
- )}
 
  {/* Comment library drawer */}
- {state.showCommentLibrary && (
  <CommentLibraryDrawer
+ open={state.showCommentLibrary}
  comments={{
  filterMode: comments.filterMode,
  setFilterMode: comments.setFilterMode,
@@ -1766,11 +1762,10 @@ export default function InspectionEditPage() {
  onInsert={onInsert}
  onClose={() => state.setShowCommentLibrary(false)}
  />
- )}
 
  {/* Section picker modal */}
- {state.sectionPickerOpen && (
  <SectionPickerModal
+ open={state.sectionPickerOpen}
  sectionPickerQuery={state.sectionPickerQuery}
  setSectionPickerQuery={state.setSectionPickerQuery}
  filteredSectionsForPicker={state.filteredSectionsForPicker}
@@ -1778,18 +1773,16 @@ export default function InspectionEditPage() {
  pickSection={state.pickSection}
  closeSectionPicker={state.closeSectionPicker}
  />
- )}
 
  {/* Tag picker modal */}
- {tagPickerOpen && state.activeItemId && (
  <TagPickerModal
-  activeItemId={state.activeItemId}
+  open={tagPickerOpen && Boolean(state.activeItemId)}
+  activeItemId={state.activeItemId ?? ""}
   tagsByItem={state.tagsByItem}
   presetTags={PRESET_TAGS}
   onToggle={toggleTag}
   onClose={() => setTagPickerOpen(false)}
  />
- )}
 
  {/* Publish gate modal */}
  <PublishGateModal

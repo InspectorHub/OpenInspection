@@ -1,4 +1,5 @@
 import { Link, useLoaderData } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-billing";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
@@ -62,14 +63,8 @@ export default function SettingsBillingPage() {
   } = billing;
 
   return (
-    <div className="space-y-[18px]">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Billing</span>
-      </div>
-      <h2 className="text-[19px] font-bold text-ih-fg-1">Billing</h2>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Billing" }]} />
       <p className="text-[13px] text-ih-fg-3">
         {hasBilling
           ? "Manage your subscription, seats, and invoices."

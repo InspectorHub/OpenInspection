@@ -102,7 +102,7 @@ export default function RatingSystemsPage() {
   }
 
   return (
-    <div className="space-y-[18px]">
+    <div className="space-y-ih-list">
       <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Rating Systems" }]} />
       <PageHeader
         title="Rating Systems"

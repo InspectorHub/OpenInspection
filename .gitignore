@@ -36,6 +36,7 @@ wrangler.*.toml
 .qwen/
 .worktrees/
 .tsbuildinfo*
+.eslintcache
 
 # drizzle-kit schema-first: generated/temp artifacts (db:check regenerates drizzle-tmp)
 drizzle-tmp/

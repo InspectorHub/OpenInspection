@@ -1,4 +1,5 @@
-import { Link, useLoaderData } from "react-router";
+import { useLoaderData } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-data";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
@@ -16,15 +17,8 @@ export default function SettingsData() {
   const { forbidden } = useLoaderData<typeof loader>();
   if (forbidden) return <AccessDenied />;
   return (
-    <div className="space-y-[18px]">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Data</span>
-      </div>
-
-      <h2 className="text-[19px] font-bold text-ih-fg-1">Data import / export</h2>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Data import / export" }]} />
       <p className="text-[13px] text-ih-fg-3">
         Download your data or import contacts from other platforms.
       </p>

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Link, useLoaderData, useFetcher } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-contractor-types";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -107,17 +108,9 @@ export default function SettingsContractorTypes() {
   if ("forbidden" in data) return <AccessDenied />;
 
   return (
-    <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Contractor types</span>
-      </div>
-
-      <div>
-        <h2 className="text-[19px] font-bold text-ih-fg-1">Contractor types</h2>
-        <p className="text-[13px] text-ih-fg-3 mt-1">Recommended contractor categories shown on repair items and reports.</p>
-      </div>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Contractor types" }]} />
+      <p className="text-[13px] text-ih-fg-3">Recommended contractor categories shown on repair items and reports.</p>
 
       <div className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
         <createFetcher.Form method="POST" className="flex gap-2" onSubmit={() => setNewName("")}>

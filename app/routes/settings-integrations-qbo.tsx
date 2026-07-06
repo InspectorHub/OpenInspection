@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, useActionData, useNavigation, useFetcher, Link, Form } from "react-router";
+import { useLoaderData, useActionData, useNavigation, useFetcher, Form } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-integrations-qbo";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -173,30 +174,14 @@ export default function SettingsIntegrationsQbo() {
   }
 
   return (
-    <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link
-          to="/settings"
-          className="hover:text-ih-primary transition-colors"
-        >
-          Settings
-        </Link>
-        <span>&rsaquo;</span>
-        <Link
-          to="/settings/integrations"
-          className="hover:text-ih-primary transition-colors"
-        >
-          Integrations
-        </Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">
-          QuickBooks Online
-        </span>
-      </div>
-
-      <h2 className="text-[19px] font-bold text-ih-fg-1">
-        QuickBooks Online
-      </h2>
+    <div className="space-y-ih-list">
+      <SettingsCrumb
+        items={[
+          { label: "Settings", href: "/settings" },
+          { label: "Integrations", href: "/settings/integrations" },
+          { label: "QuickBooks Online" },
+        ]}
+      />
 
       {/* Flash */}
       {flashVisible && actionData?.success && (

@@ -3,9 +3,11 @@ import { useCallback, useEffect, useState } from 'react';
 export interface ToastEntry {
     id:           string;
     message:      string;
-    /** Visual intent — neutral (default) / error / success. Adds a left accent
-     *  bar in the DS color; the base card styling stays the same. */
-    variant?:     'neutral' | 'error' | 'success';
+    /** Visual intent — neutral (default) / error / success / warning. Adds a left
+     *  accent bar in the DS color; the base card styling stays the same.
+     *  `warning` (amber `ih-watch` tokens) is for partial / degraded outcomes
+     *  that are NOT outright failures — e.g. "saved, but one side-effect failed". */
+    variant?:     'neutral' | 'error' | 'success' | 'warning';
     actionLabel?: string;
     onAction?:    () => void;
     durationMs:   number;

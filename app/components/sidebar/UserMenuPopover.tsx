@@ -64,6 +64,7 @@ export function UserMenuPopover({
       </div>
 
       {/* Switch workspace — SaaS only */}
+      {/* ds-allow: compact menu row rhythm (7px), no semantic spacing token */}
       {showSwitchWorkspace && portalBaseUrl && (
         <a
           href={`${portalBaseUrl}/company/switch`}
@@ -85,6 +86,7 @@ export function UserMenuPopover({
 
       {/* Divider + Account items */}
       <div className="border-t border-ih-border my-1" />
+      {/* ds-allow: compact menu row rhythm (7px), no semantic spacing token */}
       <NavLink
         to="/settings/profile"
         role="menuitem"
@@ -100,6 +102,7 @@ export function UserMenuPopover({
       </NavLink>
 
       {privacyUrl && (
+        /* ds-allow: compact menu row rhythm (7px), no semantic spacing token */
         <a
           href={privacyUrl}
           target="_blank"
@@ -113,6 +116,7 @@ export function UserMenuPopover({
         </a>
       )}
 
+      {/* ds-allow: compact menu row rhythm (7px), no semantic spacing token */}
       <a
         href="/logout"
         role="menuitem"

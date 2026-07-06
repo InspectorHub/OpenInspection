@@ -1,4 +1,8 @@
+import { useRef } from "react";
+import { Modal } from "@core/shared-ui";
+
 export interface SectionPickerModalProps {
+ open: boolean;
  sectionPickerQuery: string;
  setSectionPickerQuery: (q: string) => void;
  filteredSectionsForPicker: Array<{ idx: number; title: string }>;
@@ -8,6 +12,7 @@ export interface SectionPickerModalProps {
 }
 
 export function SectionPickerModal({
+ open,
  sectionPickerQuery,
  setSectionPickerQuery,
  filteredSectionsForPicker,
@@ -15,22 +20,19 @@ export function SectionPickerModal({
  pickSection,
  closeSectionPicker,
 }: SectionPickerModalProps) {
+ const inputRef = useRef<HTMLInputElement>(null);
  return (
- <div className="fixed inset-0 z-[90] flex items-start justify-center pt-[20vh]">
- <div className="absolute inset-0 bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={() => closeSectionPicker()} />
- <div className="relative w-full max-w-md bg-ih-bg-card rounded-xl shadow-ih-popover border border-ih-border overflow-hidden">
- <div className="px-4 py-3 border-b border-ih-border">
+ <Modal open={open} onClose={closeSectionPicker} title="Jump to section" size="md" initialFocusRef={inputRef}>
  <input
+ ref={inputRef}
  id="section-picker-input"
  type="text"
  placeholder="Jump to section..."
  value={sectionPickerQuery}
  onChange={(e) => setSectionPickerQuery(e.target.value)}
  className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px]"
- autoFocus
  />
- </div>
- <div className="max-h-60 overflow-y-auto">
+ <div className="mt-3 -mx-4 max-h-60 overflow-y-auto border-t border-ih-border">
  {filteredSectionsForPicker.map((sec) => (
  <button
  key={sec.idx}
@@ -45,7 +47,6 @@ export function SectionPickerModal({
  <p className="text-center text-[13px] text-ih-fg-3 py-6">No sections match</p>
  )}
  </div>
- </div>
- </div>
+ </Modal>
  );
 }

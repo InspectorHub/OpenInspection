@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { Drawer } from "@core/shared-ui";
 import { TemplateCombobox } from "~/components/TemplateCombobox";
 import { CoverCropper } from "~/components/media-studio/CoverCropper";
 import { fullResUrl } from "~/components/media-studio/cropImage";
@@ -210,8 +211,6 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     setSaveState("error");
   }, [saveFetcher.state, saveFetcher.data, onTemplateApplied]);
 
-  if (!open) return null;
-
   function updateForm<K extends keyof SettingsForm>(key: K, value: SettingsForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
@@ -234,29 +233,29 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 z-[60] bg-[rgba(15,23,42,0.4)] backdrop-blur-sm" onClick={onClose} aria-hidden="true" />
-
-      {/* Slide-over panel */}
-      <aside className="fixed top-0 right-0 bottom-0 w-full max-w-xl z-[61] bg-ih-bg-card border-l border-ih-border shadow-ih-popover flex flex-col" role="dialog" aria-modal="true" aria-label="Inspection settings">
-        <header className="flex items-center justify-between gap-3 px-5 py-3 border-b border-ih-border">
-          <div className="min-w-0">
-            <h2 className="text-[14px] font-bold text-ih-fg-1">Inspection settings</h2>
-            <p className="text-[11px] text-ih-fg-3">Schedule, people, template, pricing & gates</p>
+      <Drawer
+        open={open}
+        onClose={onClose}
+        title="Inspection settings"
+        wide
+        footer={loading ? undefined : (
+          <>
+            {saveState === "saving" && <span className="text-[12px] text-ih-watch-fg font-bold self-center">Saving...</span>}
+            {saveState === "saved" && <span className="text-[12px] text-ih-ok-fg font-bold self-center">Saved</span>}
+            {saveState === "error" && <span className="text-[12px] text-ih-bad-fg font-bold self-center">Error -- try again</span>}
+            <button type="submit" form="inspection-settings-form" disabled={saveState === "saving"} className="h-10 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 disabled:bg-ih-border-strong">
+              Save changes
+            </button>
+          </>
+        )}
+      >
+        {loading ? (
+          <div className="space-y-2 py-4" aria-busy="true">
+            <div className="h-4 bg-ih-bg-muted rounded animate-pulse" style={{ width: "50%" }} />
+            <div className="h-4 bg-ih-bg-muted rounded animate-pulse" style={{ width: "75%" }} />
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1.5 rounded-md text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {loading ? (
-            <div className="space-y-2 py-4" aria-busy="true">
-              <div className="h-4 bg-ih-bg-muted rounded animate-pulse" style={{ width: "50%" }} />
-              <div className="h-4 bg-ih-bg-muted rounded animate-pulse" style={{ width: "75%" }} />
-            </div>
-          ) : (
-            <form onSubmit={handleSave} className="space-y-6 max-w-2xl">
+        ) : (
+          <form id="inspection-settings-form" onSubmit={handleSave} className="space-y-6">
               <fieldset className="space-y-4">
                 <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Schedule</legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -416,18 +415,9 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                 </label>
               </fieldset>
 
-              <div className="flex items-center justify-end gap-3 border-t border-ih-border pt-4">
-                {saveState === "saving" && <span className="text-[12px] text-ih-watch-fg font-bold">Saving...</span>}
-                {saveState === "saved" && <span className="text-[12px] text-ih-ok-fg font-bold">Saved</span>}
-                {saveState === "error" && <span className="text-[12px] text-ih-bad-fg font-bold">Error -- try again</span>}
-                <button type="submit" disabled={saveState === "saving"} className="h-10 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 disabled:bg-ih-border-strong">
-                  Save changes
-                </button>
-              </div>
-            </form>
-          )}
-        </div>
-      </aside>
+          </form>
+        )}
+      </Drawer>
       {cropSource && (
         <CoverCropper
           sourceUrl={fullResUrl(cropSource.url)}

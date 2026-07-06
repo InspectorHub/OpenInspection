@@ -5,7 +5,7 @@ export default function LibraryLayout() {
   return (
     <div>
       <PageHeader title="Library" />
-      <div className="mt-[18px]">
+      <div className="mt-ih-list">
         <Outlet />
       </div>
     </div>

@@ -264,7 +264,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] bg-[rgba(15,23,42,0.3)] backdrop-blur-sm" onClick={() => setOpen(false)}>
+    <div className="fixed inset-0 z-[60] flex items-start justify-center pt-[15vh] bg-ih-backdrop" onClick={() => setOpen(false)}>
       <div className="w-full max-w-md bg-ih-bg-card rounded-xl shadow-ih-popover border border-ih-border overflow-hidden" onClick={(e) => e.stopPropagation()}>
         {/* Search input */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-ih-border">

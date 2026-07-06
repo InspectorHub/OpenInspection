@@ -1,4 +1,5 @@
-import { Link, useLoaderData, useNavigate } from "react-router";
+import { useLoaderData, useNavigate } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-booking";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -186,14 +187,8 @@ export default function SettingsBookingPage() {
     : [];
 
   return (
-    <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Online Booking</span>
-      </div>
-
-      <h2 className="text-[19px] font-bold text-ih-fg-1">Online Booking</h2>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Online Booking" }]} />
       <p className="text-[13px] text-ih-fg-3">
         Configure your availability, booking policies, and embeddable widget.
       </p>

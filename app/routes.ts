@@ -8,6 +8,8 @@ import {
 export default [
   index("routes/home.tsx"),
   route("login", "routes/login.tsx"),
+  route("forgot-password", "routes/forgot-password.tsx"),
+  route("reset-password", "routes/reset-password.tsx"),
   route("logout", "routes/logout.tsx"),
   // Remote MCP OAuth consent screen (B3). Bare route (own chrome, own auth
   // handling); the OAuthProvider wrapper routes /oauth/authorize here via the
@@ -107,6 +109,10 @@ export default [
     // /dashboard). The thin status-grouped list was retired; this is the one
     // canonical inspections route.
     route("inspections", "routes/inspections.tsx"),
+    // Dedicated New Inspection wizard page (formerly a modal overlay mounted
+    // from /inspections). Static `new` outranks the dynamic `inspections/:id`
+    // hub route, so this resolves first.
+    route("inspections/new", "routes/inspections.new.tsx"),
     route("calendar", "routes/calendar.tsx"),
     route("contacts", "routes/contacts.tsx"),
     // IA-18 (#111) — contact detail (record + inspection history + stats).

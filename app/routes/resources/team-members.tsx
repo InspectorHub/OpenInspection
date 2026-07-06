@@ -1,5 +1,5 @@
 /**
- * C-12 — BFF resource route for TeamStrip / InviteSeatModal components.
+ * C-12 — BFF resource route for TeamStrip / InviteSeatDrawer components.
  *
  * loader: GET /api/team/members — returns active members and pending invites
  * action: invite — proxies POST /api/team/invite

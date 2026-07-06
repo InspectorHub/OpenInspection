@@ -9,6 +9,7 @@ import { PublishModal } from '~/components/editor/PublishModal';
  */
 
 const baseProps = {
+  open: true,
   progress: { rated: 5, total: 10, pct: 50 },
   status: 'draft',
   publishError: null,

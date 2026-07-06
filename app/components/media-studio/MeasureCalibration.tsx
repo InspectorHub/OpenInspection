@@ -1,3 +1,5 @@
+import { Icon } from "@core/shared-ui";
+
 interface MeasureCalibrationProps {
   calibKnown: string;
   calibUnit: string;
@@ -68,9 +70,7 @@ export function MeasureCalibration({
           className="text-white/40 hover:text-white/70 ml-1"
           aria-label="Cancel calibration"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <Icon name="x" className="w-4 h-4" />
         </button>
       </div>
     </div>

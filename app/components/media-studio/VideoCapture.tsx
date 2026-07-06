@@ -212,7 +212,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Add video">
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-[rgba(15,23,42,0.4)]" onClick={busy ? undefined : onClose} />
+      <button type="button" aria-label="Close" className="absolute inset-0 bg-ih-backdrop" onClick={busy ? undefined : onClose} />
       <div data-testid="video-capture" className="relative w-full max-w-md rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[15px] font-bold text-ih-fg-1">Add video walk-through</h2>

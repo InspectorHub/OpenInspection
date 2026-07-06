@@ -1,9 +1,11 @@
-import { useState } from "react";
-import { Link, useLoaderData } from "react-router";
+import { useState, useRef } from "react";
+import { useLoaderData } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-inspection-types";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
+import { Modal } from "@core/shared-ui";
 
 interface ApiInspectionType {
   id: string;
@@ -78,6 +80,7 @@ export default function SettingsInspectionTypes() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
 
   if (data.forbidden) return <AccessDenied />;
 
@@ -149,23 +152,8 @@ export default function SettingsInspectionTypes() {
   }
 
   return (
-    <div className="space-y-[18px]">
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link
-          to="/settings"
-          className="hover:text-ih-primary transition-colors"
-        >
-          Settings
-        </Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">
-          Inspection types
-        </span>
-      </div>
-
-      <h2 className="text-[19px] font-bold text-ih-fg-1">
-        Inspection types
-      </h2>
+    <div className="space-y-ih-list">
+      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Inspection types" }]} />
 
       {/* Platform subtypes */}
       <section className="space-y-3">
@@ -291,22 +279,36 @@ export default function SettingsInspectionTypes() {
       </section>
 
       {/* Add / Edit modal */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-[rgba(15,23,42,0.4)]"
-            onClick={() => setModalOpen(false)}
-          />
-          <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover w-full max-w-md mx-4 p-6 space-y-4">
-            <h3 className="text-[16px] font-bold text-ih-fg-1">
-              {editingId ? "Edit custom subtype" : "Add custom subtype"}
-            </h3>
-            <div className="space-y-3">
+      <Modal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingId ? "Edit custom subtype" : "Add custom subtype"}
+        initialFocusRef={nameRef}
+        footer={
+          <>
+            <button
+              onClick={() => setModalOpen(false)}
+              className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving}
+              className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-3">
               <div>
                 <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
                   Name
                 </label>
                 <input
+                  ref={nameRef}
                   type="text"
                   value={form.name}
                   onChange={(e) =>
@@ -349,25 +351,8 @@ export default function SettingsInspectionTypes() {
                   className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={save}
-                disabled={saving}
-                className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
-              >
-                {saving ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

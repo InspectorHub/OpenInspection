@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLoaderData, useFetcher } from "react-router";
+import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-communication-templates";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
-import { Button, Pill, PageHeader, TabStrip, EmptyState, Card, Modal } from "@core/shared-ui";
+import { Button, Pill, TabStrip, EmptyState, Card, Modal } from "@core/shared-ui";
 
 // ─── Exported pure helper ────────────────────────────────────────────────────
 
@@ -186,28 +187,24 @@ export default function SettingsCommunicationTemplates() {
   const templates = activeTab === "email" ? emailTemplates : smsTemplates;
 
   return (
-    <div className="space-y-[18px]">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-[13px] text-ih-fg-3">
-        <Link to="/settings" className="hover:text-ih-primary transition-colors">Settings</Link>
-        <span>&rsaquo;</span>
-        <Link to="/settings/communication" className="hover:text-ih-primary transition-colors">Communication</Link>
-        <span>&rsaquo;</span>
-        <span className="text-ih-fg-1">Templates</span>
-      </div>
-
-      <PageHeader
-        title="Templates"
-        meta="Reusable message templates for automations."
-        actions={
-          <Button
-            variant="primary"
-            onClick={() => setEditing(activeTab === "email" ? "new-email" : "new-sms")}
-          >
-            + New template
-          </Button>
-        }
+    <div className="space-y-ih-list">
+      <SettingsCrumb
+        items={[
+          { label: "Settings", href: "/settings" },
+          { label: "Communication", href: "/settings/communication" },
+          { label: "Templates" },
+        ]}
       />
+
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-[13px] text-ih-fg-3">Reusable message templates for automations.</p>
+        <Button
+          variant="primary"
+          onClick={() => setEditing(activeTab === "email" ? "new-email" : "new-sms")}
+        >
+          + New template
+        </Button>
+      </div>
 
       <TabStrip
         tabs={[

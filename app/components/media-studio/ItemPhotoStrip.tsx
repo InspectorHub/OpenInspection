@@ -285,6 +285,7 @@ export function ItemPhotoStrip({
                   {typeof p.durationSec === "number" && p.durationSec > 0 && (
                     <span
                       data-testid={`video-dur-${i}`}
+                      /* ds-allow: fixed-dark duration chip over a video thumbnail, needs contrast on any frame */
                       className="absolute bottom-0.5 right-0.5 rounded bg-[rgba(15,23,42,0.7)] px-1 text-[9px] font-bold tabular-nums text-white"
                     >
                       {formatDuration(p.durationSec)}
