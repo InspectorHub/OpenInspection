@@ -11,6 +11,7 @@ import { resolveEmailProvider, coerceEmailByoProvider, type EmailByoProvider } f
 import { buildEmailSuppression } from './suppression';
 import { logger } from '../logger';
 import { ResendProvider } from './providers/resend';
+import { RecordingEmailProvider } from './providers/recording';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../db/schema';
@@ -24,6 +25,8 @@ export interface EmailServiceEnv {
     DB: D1Database;
     APP_MODE?: string;
     TENANT_CACHE: KVNamespace;
+    /** Test-only email sink flag (see AppEnv.E2E_EMAIL_SINK). '1' ⇒ capture, don't send. */
+    E2E_EMAIL_SINK?: string;
     JWT_SECRET: string;
     JWT_SECRET_PREVIOUS?: string;
     RESEND_API_KEY?: string;
@@ -182,6 +185,24 @@ export function assembleTenantEmailService(
     const suppression = meterTenantId
         ? buildEmailSuppression(env.DB, meterTenantId)
         : undefined;
+
+    // TEST-ONLY email sink (E2E). Capture every message to KV instead of
+    // sending, so E2E can read back links it cannot see from the browser (the
+    // password-reset token). Sentinel apiKey + a non-empty From make `sendEmail`
+    // reach the provider (its missing-key / missing-sender guards would otherwise
+    // short-circuit); suppression/quota gates are dropped. Strictly gated on
+    // E2E_EMAIL_SINK — unset in every real deploy, so this never runs in prod.
+    if (env.E2E_EMAIL_SINK === '1') {
+        return new EmailService(
+            'e2e-email-sink',
+            fromAddress || 'e2e-sink@openinspection.test',
+            appName, emailIdentity, renderer, meter,
+            new RecordingEmailProvider(env.TENANT_CACHE),
+            undefined,
+            undefined,
+        );
+    }
+
     return new EmailService(apiKeySentinel, fromAddress, appName, emailIdentity, renderer, meter, provider, suppression, quota);
 }
 
