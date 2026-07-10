@@ -1,19 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { Modal, Button } from "@core/shared-ui";
+import type { Severity } from "~/lib/severity";
+import { SEVERITIES, SEVERITY_LABEL, SEVERITY_DOT } from "~/lib/severity";
 
 /* ------------------------------------------------------------------ */
 /*  Types + presets (mirrors server CreateRatingSystemSchema)         */
 /* ------------------------------------------------------------------ */
 
-export type RatingBucket = "satisfactory" | "monitor" | "defect" | "na";
-
 export interface EditorLevel {
   id?: string;
-  abbr: string;
+  abbreviation: string;
   label: string;
   color: string;
-  bucket: RatingBucket;
+  severity: Severity;
+  isDefect: boolean;
+  pausesAdvance?: boolean;
   hotkey?: string;
 }
 
@@ -26,31 +28,24 @@ export interface EditorSystem {
   levels: EditorLevel[];
 }
 
-const BUCKETS: { value: RatingBucket; label: string; dot: string }[] = [
-  { value: "satisfactory", label: "Satisfactory", dot: "bg-ih-ok" },
-  { value: "monitor", label: "Monitor", dot: "bg-ih-watch" },
-  { value: "defect", label: "Defect", dot: "bg-ih-bad" },
-  { value: "na", label: "N/A", dot: "bg-ih-fg-4" },
-];
-
 const PRESETS: { name: string; levels: EditorLevel[] }[] = [
   { name: "3-level", levels: [
-    { abbr: "S", label: "Satisfactory", color: "#22c55e", bucket: "satisfactory", hotkey: "1" },
-    { abbr: "M", label: "Monitor", color: "#f59e0b", bucket: "monitor", hotkey: "2" },
-    { abbr: "D", label: "Defect", color: "#ef4444", bucket: "defect", hotkey: "3" },
+    { abbreviation: "S", label: "Satisfactory", color: "#22c55e", severity: "good", isDefect: false, hotkey: "1" },
+    { abbreviation: "M", label: "Monitor", color: "#f59e0b", severity: "marginal", isDefect: false, hotkey: "2" },
+    { abbreviation: "D", label: "Defect", color: "#ef4444", severity: "significant", isDefect: true, pausesAdvance: true, hotkey: "3" },
   ] },
   { name: "5-level", levels: [
-    { abbr: "Sat", label: "Satisfactory", color: "#22c55e", bucket: "satisfactory", hotkey: "1" },
-    { abbr: "Mon", label: "Monitor", color: "#f59e0b", bucket: "monitor", hotkey: "2" },
-    { abbr: "Def", label: "Defect", color: "#ef4444", bucket: "defect", hotkey: "3" },
-    { abbr: "NI", label: "Not Inspected", color: "#9ca3af", bucket: "na", hotkey: "4" },
-    { abbr: "NP", label: "Not Present", color: "#6b7280", bucket: "na", hotkey: "5" },
+    { abbreviation: "Sat", label: "Satisfactory", color: "#22c55e", severity: "good", isDefect: false, hotkey: "1" },
+    { abbreviation: "Mon", label: "Monitor", color: "#f59e0b", severity: "marginal", isDefect: false, hotkey: "2" },
+    { abbreviation: "Def", label: "Defect", color: "#ef4444", severity: "significant", isDefect: true, pausesAdvance: true, hotkey: "3" },
+    { abbreviation: "NI", label: "Not Inspected", color: "#9ca3af", severity: "minor", isDefect: false, hotkey: "4" },
+    { abbreviation: "NP", label: "Not Present", color: "#6b7280", severity: "minor", isDefect: false, hotkey: "5" },
   ] },
   { name: "TREC", levels: [
-    { abbr: "I", label: "Inspected", color: "#22c55e", bucket: "satisfactory", hotkey: "1" },
-    { abbr: "D", label: "Deficient", color: "#ef4444", bucket: "defect", hotkey: "2" },
-    { abbr: "NI", label: "Not Inspected", color: "#9ca3af", bucket: "na", hotkey: "3" },
-    { abbr: "NP", label: "Not Present", color: "#6b7280", bucket: "na", hotkey: "4" },
+    { abbreviation: "I", label: "Inspected", color: "#22c55e", severity: "good", isDefect: false, hotkey: "1" },
+    { abbreviation: "D", label: "Deficient", color: "#ef4444", severity: "significant", isDefect: true, pausesAdvance: true, hotkey: "2" },
+    { abbreviation: "NI", label: "Not Inspected", color: "#9ca3af", severity: "minor", isDefect: false, hotkey: "3" },
+    { abbreviation: "NP", label: "Not Present", color: "#6b7280", severity: "minor", isDefect: false, hotkey: "4" },
   ] },
 ];
 
@@ -58,7 +53,7 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
 
-const blankLevel = (): EditorLevel => ({ abbr: "", label: "", color: "#64748b", bucket: "satisfactory" });
+const blankLevel = (): EditorLevel => ({ abbreviation: "", label: "", color: "#64748b", severity: "good", isDefect: false });
 
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
@@ -68,10 +63,14 @@ export function RatingSystemEditor({
   open,
   onClose,
   system,
+  onSaveLevels,
 }: {
   open: boolean;
   onClose: () => void;
   system?: EditorSystem | null;
+  /** When provided, the editor persists levels via this callback (template schema)
+   *  instead of POSTing to /library/rating-systems (the default library-table save). */
+  onSaveLevels?: (levels: EditorLevel[]) => void;
 }) {
   const fetcher = useFetcher<{ ok?: boolean; error?: string }>();
   const editing = !!system;
@@ -119,7 +118,7 @@ export function RatingSystemEditor({
     !name.trim() ? "Name is required"
     : effectiveSlug.length < 2 ? "Name must produce a 2+ character slug"
     : levels.length < 2 ? "Add at least 2 levels"
-    : levels.some((l) => !l.abbr.trim() || !l.label.trim()) ? "Every level needs an abbreviation and a label"
+    : levels.some((l) => !l.abbreviation.trim() || !l.label.trim()) ? "Every level needs an abbreviation and a label"
     : fetcher.data?.error ?? null;
 
   function patchLevel(idx: number, patch: Partial<EditorLevel>) {
@@ -137,6 +136,11 @@ export function RatingSystemEditor({
 
   function save() {
     if (error && error !== fetcher.data?.error) return;
+    if (onSaveLevels) {
+      onSaveLevels(levels.map((l) => ({ ...l })));
+      onClose();
+      return;
+    }
     submittedRef.current = true;
     fetcher.submit(
       {
@@ -149,10 +153,12 @@ export function RatingSystemEditor({
         levels: JSON.stringify(
           levels.map((l, i) => ({
             ...(l.id ? { id: l.id } : {}),
-            abbr: l.abbr.trim(),
+            abbreviation: l.abbreviation.trim(),
             label: l.label.trim(),
             color: l.color,
-            bucket: l.bucket,
+            severity: l.severity,
+            isDefect: l.isDefect,
+            ...(l.pausesAdvance ? { pausesAdvance: true } : {}),
             ...(l.hotkey ? { hotkey: l.hotkey } : {}),
             order: i,
           })),
@@ -236,7 +242,7 @@ export function RatingSystemEditor({
                   style={{ backgroundColor: lvl.color }}
                   title="Pick color"
                 >
-                  {lvl.abbr.slice(0, 3) || "·"}
+                  {lvl.abbreviation.slice(0, 3) || "·"}
                   <input
                     type="color"
                     value={lvl.color}
@@ -247,8 +253,8 @@ export function RatingSystemEditor({
                 </label>
 
                 <input
-                  value={lvl.abbr}
-                  onChange={(e) => patchLevel(i, { abbr: e.target.value })}
+                  value={lvl.abbreviation}
+                  onChange={(e) => patchLevel(i, { abbreviation: e.target.value })}
                   placeholder="ABBR"
                   maxLength={8}
                   className="w-16 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold uppercase text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none"
@@ -261,22 +267,30 @@ export function RatingSystemEditor({
                   className="flex-1 min-w-0 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none"
                 />
 
-                {/* Bucket — drives report grouping + defect rollups */}
+                {/* Severity — the single rating-axis classification (spec §4.F) */}
                 <div className="relative shrink-0">
                   <span
-                    className={`absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full pointer-events-none ${BUCKETS.find((b) => b.value === lvl.bucket)?.dot}`}
+                    className={`absolute left-2 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full pointer-events-none ${SEVERITY_DOT[lvl.severity]}`}
                   />
                   <select
-                    value={lvl.bucket}
-                    onChange={(e) => patchLevel(i, { bucket: e.target.value as RatingBucket })}
+                    value={lvl.severity}
+                    onChange={(e) => patchLevel(i, { severity: e.target.value as Severity })}
                     className="h-8 pl-6 pr-6 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 focus:shadow-ih-focus focus:border-ih-primary outline-none appearance-none"
-                    title="Report bucket"
+                    title="Severity"
                   >
-                    {BUCKETS.map((b) => (
-                      <option key={b.value} value={b.value}>{b.label}</option>
+                    {SEVERITIES.map((s) => (
+                      <option key={s} value={s}>{SEVERITY_LABEL[s]}</option>
                     ))}
                   </select>
                 </div>
+                <label className="flex items-center gap-1 text-[10px] text-ih-fg-3 shrink-0" title="Counts as a defect in rollups">
+                  <input type="checkbox" checked={lvl.isDefect} onChange={(e) => patchLevel(i, { isDefect: e.target.checked })} className="accent-ih-bad-fg" />
+                  Defect
+                </label>
+                <label className="flex items-center gap-1 text-[10px] text-ih-fg-3 shrink-0" title="Pause auto-advance after selecting this level">
+                  <input type="checkbox" checked={!!lvl.pausesAdvance} onChange={(e) => patchLevel(i, { pausesAdvance: e.target.checked })} className="accent-ih-primary" />
+                  Pause
+                </label>
 
                 {/* Reorder + remove */}
                 <div className="flex items-center shrink-0">
@@ -299,11 +313,13 @@ export function RatingSystemEditor({
           )}
         </div>
 
-        {/* Default toggle */}
-        <label className="flex items-center gap-2 text-[13px] text-ih-fg-2 select-none cursor-pointer">
-          <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary/30" />
-          Use as the default rating system for new templates
-        </label>
+        {/* Default toggle — meaningless when persisting to a template's own schema */}
+        {!onSaveLevels && (
+          <label className="flex items-center gap-2 text-[13px] text-ih-fg-2 select-none cursor-pointer">
+            <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary/30" />
+            Use as the default rating system for new templates
+          </label>
+        )}
 
         {error && (
           <div className="px-3 py-2 rounded-lg bg-ih-bad-bg border border-ih-bad text-[12px] text-ih-bad-fg">

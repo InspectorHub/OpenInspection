@@ -4,11 +4,11 @@ import type { InspectionContext } from "./helpers";
 /**
  * Progress slice: overall + per-section completion, defect counts, and live
  * report stats. Pure derivations over `sections` / `getResult` / `ratingLevels`
- * / `bucketForRatingId` from the shared context — same memo deps as the
+ * / `severityForRatingId` from the shared context — same memo deps as the
  * original monolithic hook.
  */
 export function useInspectionProgress(ctx: InspectionContext) {
-  const { sections, ratingLevels, getResult, bucketForRatingId } = ctx;
+  const { sections, ratingLevels, getResult, severityForRatingId } = ctx;
 
   const progress = useMemo(() => {
     let total = 0;
@@ -96,14 +96,14 @@ export function useInspectionProgress(ctx: InspectionContext) {
         const ratingId = getResult(item.id, sec.id)?.rating as string | null;
         if (!ratingId) continue;
         rated++;
-        const bucket = bucketForRatingId(ratingId);
-        if (bucket === "satisfactory") satisfactory++;
-        else if (bucket === "monitor") monitor++;
-        else if (bucket === "defect") defect++;
+        const severity = severityForRatingId(ratingId);
+        if (severity === "good") satisfactory++;
+        else if (severity === "marginal") monitor++;
+        else if (severity === "significant") defect++;
       }
     }
     return { total, rated, satisfactory, monitor, defect };
-  }, [sections, getResult, bucketForRatingId]);
+  }, [sections, getResult, severityForRatingId]);
 
   /** Overall stats incl. ETA — shape used by progress visualizations */
   const overallStats = useCallback(() => {
@@ -119,15 +119,15 @@ export function useInspectionProgress(ctx: InspectionContext) {
         const ratingId = getResult(item.id, sec.id)?.rating as string | null;
         if (!ratingId) continue;
         rated++;
-        const bucket = bucketForRatingId(ratingId);
-        if (bucket === "satisfactory") satisfactory++;
-        else if (bucket === "monitor") monitor++;
-        else if (bucket === "defect") defect++;
+        const severity = severityForRatingId(ratingId);
+        if (severity === "good") satisfactory++;
+        else if (severity === "marginal") monitor++;
+        else if (severity === "significant") defect++;
       }
     }
     const etaMinutes = Math.ceil((total - rated) * 0.35);
     return { total, rated, satisfactory, monitor, defect, etaMinutes };
-  }, [sections, getResult, bucketForRatingId]);
+  }, [sections, getResult, severityForRatingId]);
 
   return {
     progress,

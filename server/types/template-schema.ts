@@ -13,8 +13,15 @@
  * InspectionItemState — see `inspection-item-state.ts`.
  */
 
-/** Defect category — drives PDF Summary inclusion. */
-export type DefectCategory = 'maintenance' | 'recommendation' | 'safety';
+/**
+ * Defect category — references a tenant `defect_categories.id` (or, for
+ * templates/inspections predating Authoring-unification Plan-4 module K, one
+ * of the legacy seed names `maintenance` / `recommendation` / `safety`).
+ * Drives report Summary inclusion via `defect_categories.drivesSummary`
+ * (see `InspectionReportService.defectDrivesSummary`), resolved by id-or-name
+ * so both old and new values keep working with no data migration.
+ */
+export type DefectCategory = string;
 
 /** Information / Limitations canned entry. */
 export interface CannedInfoComment {
@@ -142,7 +149,10 @@ export interface TemplateSection {
     disclaimerText?: string | null;
     alwaysPageBreak?: boolean;
     source?: ItemSource | null;
+    /** FROZEN (module A): authored applicability retired; kept for round-trip of
+     *  already-stored templates + OpenAPI-snapshot stability. Not authored in UI. */
     defaultScope?: 'common' | 'unit';
+    /** FROZEN (module A): see `server/lib/section-applicability.ts`. Not authored in UI. */
     applicableTo?: SectionApplicability;
     sharedComments?: {
         information?: CannedInfoComment[];

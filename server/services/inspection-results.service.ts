@@ -8,17 +8,17 @@ import { findingKey, DEFAULT_UNIT } from '../lib/finding-key';
  *
  * The single-field PATCH at `/inspections/{id}/items/{itemId}` does one item
  * per request which is fine when the inspector is typing in the editor but
- * crippling for the form-renderer "Save" button at the end of a long form. The
+ * crippling for a bulk save that flushes many dirty fields at once. The
  * batch endpoint folds an array of `{ itemId, sectionId, field, value }`
  * patches into the same `inspection_results.data` JSON blob the single-field
  * path mutates, sharing the composite findingKey + version-bump semantics so
- * mixing single + batch writes is safe.
+ * mixing single + batch writes is safe. It is exposed as an MCP tool and can be
+ * driven by any bulk caller, not one specific UI.
  *
  * Conflict adjudication and compound `defectFields` / `itemAttribute`
  * shape-folding live in InspectionService.patchItem — the
  * batch service is intentionally simpler: forced last-writer-wins on each
- * scalar field. The form-renderer is the only caller and it serialises saves
- * locally; if we ever want batch + conflict the call site should funnel
+ * scalar field. A caller that needs batch + conflict resolution should funnel
  * through patchItem in a loop instead.
  */
 
@@ -104,7 +104,7 @@ export async function applyResultsBatch(
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
     } catch {
         // dataVersion may be absent on minimal test schemas — silently ignore;
-        // the form-renderer doesn't depend on the bump.
+        // batch callers don't depend on the bump.
     }
 
     return { applied: patches.length };

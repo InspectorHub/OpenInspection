@@ -8,3 +8,4 @@ export * from './services';
 export * from './automation';
 export * from './message-template';
 export * from './concierge';
+export * from './defect-category';

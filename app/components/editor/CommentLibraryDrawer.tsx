@@ -95,9 +95,9 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  <div className="flex gap-1 px-4 py-2 border-b border-ih-border flex-wrap">
  {[
  { id: "all", label: "All" },
- { id: "satisfactory", label: "Satisfactory" },
- { id: "monitor", label: "Monitor" },
- { id: "defect", label: "Defect" },
+ { id: "good", label: "Satisfactory" },
+ { id: "marginal", label: "Monitor" },
+ { id: "significant", label: "Defect" },
  { id: "my-snippets", label: "My Snippets" },
  ].map((f) => (
  <button

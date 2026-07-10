@@ -9,8 +9,8 @@ import { mapRatingSystemLevels } from '../../../server/lib/map-rating-levels';
  */
 describe('mapRatingSystemLevels', () => {
   const seedLevels = [
-    { abbr: 'Sat', label: 'Satisfactory', color: '#10b981', bucket: 'satisfactory', hotkey: '1', pausesAdvance: false, order: 0 },
-    { abbr: 'D', label: 'Defect', color: '#ef4444', bucket: 'defect', hotkey: '3', pausesAdvance: true, order: 2 },
+    { abbreviation: 'Sat', label: 'Satisfactory', color: '#10b981', severity: 'good', isDefect: false, hotkey: '1', pausesAdvance: false, order: 0 },
+    { abbreviation: 'D', label: 'Defect', color: '#ef4444', severity: 'significant', isDefect: true, hotkey: '3', pausesAdvance: true, order: 2 },
   ];
 
   it('passes pausesAdvance through to the client shape', () => {
@@ -21,7 +21,7 @@ describe('mapRatingSystemLevels', () => {
     expect(sat?.pausesAdvance).toBe(false);
   });
 
-  it('keeps the legacy mapping intact (id/abbreviation/severity/isDefect)', () => {
+  it('reads severity directly from the canonical shape (id/abbreviation/severity/isDefect)', () => {
     const mapped = mapRatingSystemLevels(seedLevels);
     const defect = mapped.find((l) => l.label === 'Defect')!;
     expect(defect.id).toBe('Defect');

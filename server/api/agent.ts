@@ -61,7 +61,11 @@ const RecommendationRowSchema = z.object({
     sectionTitle:    z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
     itemLabel:       z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
     defectTitle:     z.string().describe('TODO describe defectTitle field for the OpenInspection MCP integration'),
-    category:        z.enum(['safety', 'recommendation', 'maintenance']).describe('TODO describe category field for the OpenInspection MCP integration'),
+    // Widened (Authoring unification Plan-4 module K): a defect_categories.id
+    // or legacy seed name. This feed still only groups into the 3 fixed
+    // legacy buckets below (agent-recommendations.ts), so in practice the
+    // value here is always one of those three.
+    category:        z.string().describe('Defect category — a defect_categories.id or legacy seed name (safety/recommendation/maintenance).'),
     comment:         z.string().describe('TODO describe comment field for the OpenInspection MCP integration'),
     location:        z.string().nullable().describe('TODO describe location field for the OpenInspection MCP integration'),
     photos:          z.array(z.string()).describe('TODO describe photos field for the OpenInspection MCP integration'),

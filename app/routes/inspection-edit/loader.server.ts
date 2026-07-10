@@ -10,7 +10,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  api.inspections[":id"].results.$get({ param: { id } }),
  api.inspections[":id"]["report-data"].$get({ param: { id } }),
@@ -18,6 +18,11 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  api.tags.index.$get().catch(() => null),
  // tenantSlug for the "Preview full report" link (/report-view/:slug/:id).
  api.sessionContext.context.$get().catch(() => null),
+ // Authoring unification Plan-4 module K — the tenant's defect categories,
+ // fetched ONCE here (seeded on first read) so the editor can build a single
+ // name/id → color lookup and thread it into every canned-defect chip,
+ // instead of resolving color per-defect.
+ api.defectCategories["defect-categories"].$get().catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -31,8 +36,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  status: "draft",
  };
  // templateSnapshot may arrive as a JSON string (wizard-created inspections)
- // — parse before use, mirroring form-renderer.tsx. Mutating a string here
- // 500'd the whole editor.
+ // — parse before use, mirroring the template-snapshot normalization used
+ // elsewhere. Mutating a string here 500'd the whole editor.
  const rawSchema = data?.templateSnapshot ||
  (data?.template as Record<string, unknown>)?.schema;
  const schema = ((typeof rawSchema === "string"
@@ -104,5 +109,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // Commercial PCA Phase S — seed-resolved narrative for the editor panel.
  const pcaNarrative = resolvePcaNarrative((inspection as { pcaNarrative?: unknown }).pcaNarrative);
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative };
+ // Authoring unification Plan-4 module K — tenant defect categories (id/name/color).
+ let defectCategories: Array<{ id: string; name: string; color: string }> = [];
+ if (defectCatRes?.ok) {
+ const defectCatBody = await defectCatRes.json() as { data?: Array<{ id: string; name: string; color: string }> };
+ defectCategories = defectCatBody.data ?? [];
+ }
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories };
 }

@@ -6,17 +6,17 @@
  *
  * The DB `comments` table currently has no `itemLabels` column, so the
  * ranker uses fuzzy matching on `text` + `category` against the item
- * label, falling back to section + rating-bucket scoring.
+ * label, falling back to section + severity scoring.
  */
 import { describe, it, expect } from 'vitest';
 import { rankCannedCommentsForItem, type CannedCommentLike } from '../../../server/services/inspection.service';
 
 const sample: CannedCommentLike[] = [
-    { id: 'c1', section: 'Roof',  category: 'Roof Covering',         text: 'Roof covering appears serviceable.',                  ratingBucket: 'satisfactory' },
-    { id: 'c2', section: 'Roof',  category: 'Roof Flashing',         text: 'Roof flashing at penetrations is properly sealed.',   ratingBucket: 'satisfactory' },
-    { id: 'c3', section: 'Roof',  category: 'Gutters & Downspouts',  text: 'Gutters and downspouts are securely attached.',       ratingBucket: 'satisfactory' },
-    { id: 'c4', section: 'Roof',  category: null,                    text: 'A musty odor was present in the attic.',              ratingBucket: 'defect' },
-    { id: 'c5', section: 'Other', category: 'Gutters',               text: 'Gutter pitch is reversed.',                           ratingBucket: 'defect' },
+    { id: 'c1', section: 'Roof',  category: 'Roof Covering',         text: 'Roof covering appears serviceable.',                  severity: 'good' },
+    { id: 'c2', section: 'Roof',  category: 'Roof Flashing',         text: 'Roof flashing at penetrations is properly sealed.',   severity: 'good' },
+    { id: 'c3', section: 'Roof',  category: 'Gutters & Downspouts',  text: 'Gutters and downspouts are securely attached.',       severity: 'good' },
+    { id: 'c4', section: 'Roof',  category: null,                    text: 'A musty odor was present in the attic.',              severity: 'significant' },
+    { id: 'c5', section: 'Other', category: 'Gutters',               text: 'Gutter pitch is reversed.',                           severity: 'significant' },
 ];
 
 describe('rankCannedCommentsForItem — ITEM-aware ranking (A-2)', () => {
@@ -39,10 +39,10 @@ describe('rankCannedCommentsForItem — ITEM-aware ranking (A-2)', () => {
         expect(ranked[0].section).toBe('Roof');
     });
 
-    it('boosts entries whose ratingBucket matches the requested rating', () => {
-        const ranked = rankCannedCommentsForItem(sample, { section: 'Roof', itemLabel: 'Gutters & Downspouts', rating: 'defect' });
-        // c3 still wins on category exact match, but defect c4/c5 should outrank
-        // the satisfactory c1/c2 amongst the rest.
+    it('boosts entries whose severity matches the requested severity', () => {
+        const ranked = rankCannedCommentsForItem(sample, { section: 'Roof', itemLabel: 'Gutters & Downspouts', severity: 'significant' });
+        // c3 still wins on category exact match, but significant c4/c5 should
+        // outrank the good c1/c2 amongst the rest.
         const indexOf = (id: string) => ranked.findIndex(r => r.id === id);
         expect(indexOf('c4')).toBeLessThan(indexOf('c1'));
     });

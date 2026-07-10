@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { SectionDonut } from './SectionDonut';
-import { sectionIconFor } from './section-icons';
+import { SectionDonut } from '../editor/SectionDonut';
+import { sectionIconFor } from '../editor/section-icons';
+import type { EditorMode } from './editor-mode';
+import { useDragReorder } from './useDragReorder';
 
-interface SectionRailProps {
+interface SharedSectionRailProps {
+ mode: EditorMode;
  sections: Array<{ id: string; title: string; items: Array<{ id: string }> }>;
  activeSection: string;
  onSelect: (id: string) => void;
- results: Record<string, Record<string, unknown>>;
+ results?: Record<string, Record<string, unknown>>;
  sectionProgress?: (sectionId: string) => { total: number; rated: number; percent: number; hasDefect: boolean };
  sectionDefectCount?: (sectionId: string) => number;
  /** Whether the report-scoped "Inspection Details" overview entry is active. */
@@ -26,6 +29,8 @@ interface SectionRailProps {
  onDeleteSection?: (id: string) => void;
  /** Move the section in direction -1 (up) or +1 (down). */
  onMoveSection?: (id: string, dir: -1 | 1) => void;
+ /** Reorder a section via drag-and-drop (drop `fromId` onto `toId`). */
+ onReorderSection?: (fromId: string, toId: string) => void;
 }
 
 /** Clipboard / info glyph for the overview entry (no progress donut). */
@@ -63,6 +68,7 @@ function DotsIcon() {
 }
 
 export function SectionRail({
+ mode,
  sections,
  activeSection,
  onSelect,
@@ -77,14 +83,18 @@ export function SectionRail({
  onDuplicateSection,
  onDeleteSection,
  onMoveSection,
-}: SectionRailProps) {
+ onReorderSection,
+}: SharedSectionRailProps) {
  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
  const hasStructuralOps = Boolean(onAddSection || onDuplicateSection || onDeleteSection || onMoveSection);
+ const { dragProps } = useDragReorder({ ids: sections.map((s) => s.id), onReorder: onReorderSection ?? (() => {}) });
 
  return (
  <aside data-shortcut-scope className="w-[200px] flex-shrink-0 border-r border-ih-border overflow-y-auto bg-ih-bg-app/50">
  <nav className="p-2 space-y-0.5">
   {/* Report-scoped overview entry — sits above section list, no progress donut */}
+  {mode === 'fill' && (
+  <>
   <button
    data-testid="inspection-details-entry"
    aria-current={overviewActive ? "true" : undefined}
@@ -102,12 +112,14 @@ export function SectionRail({
    </div>
   </button>
   <hr className="my-1 border-ih-border" />
+  </>
+  )}
  {sections.map((section, idx) => {
  // Calculate completion
  const progress = sectionProgress?.(section.id);
  const total = progress?.total ?? (section.items?.length || 0);
  const rated = progress?.rated ?? (section.items?.filter((i) => {
- const r = results[`_default:${section.id}:${i.id}`] || results[i.id];
+ const r = results?.[`_default:${section.id}:${i.id}`] || results?.[i.id];
  return r?.rating;
  }).length || 0);
 
@@ -120,7 +132,14 @@ export function SectionRail({
  const menuOpen = openMenuId === section.id;
 
  return (
- <div key={section.id} className="relative group">
+ <div key={section.id} className="relative group" {...(onReorderSection ? dragProps(section.id) : {})}>
+  {onReorderSection && (
+   <span
+    aria-label={`Drag ${section.title}`}
+    title="Drag to reorder"
+    className="absolute left-0 top-1/2 -translate-y-1/2 px-0.5 hidden group-hover:flex items-center cursor-grab text-ih-fg-4 select-none pointer-events-none"
+   >☰</span>
+  )}
   <button
   onClick={() => onSelect(section.id)}
   title={`${section.title}: ${tipParts.join(', ')}`}
@@ -134,7 +153,9 @@ export function SectionRail({
   <span className="mr-1 shrink-0 text-ih-fg-3">{sectionIconFor(section.title ?? section.id)}</span>
   <span className="truncate flex-1">{section.title}</span>
   <span className="ml-1 shrink-0 flex items-center">
-  <SectionDonut rated={rated} total={total} hasDefect={hasDefect} />
+  {mode === 'fill'
+   ? <SectionDonut rated={rated} total={total} hasDefect={hasDefect} />
+   : <span className="text-[10px] text-ih-fg-4 font-mono">{section.items.length}</span>}
   </span>
   </div>
   </button>

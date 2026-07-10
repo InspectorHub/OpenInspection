@@ -32,7 +32,7 @@ test.describe('Sprint 2 S2-5 — inspection sub-routes', () => {
     // deep-link were retired in the design-alignment rollback (the editor is now
     // single-view at /edit with slide-over sheets; the report is reached via the
     // editor Preview link or the public /report/:tenant/:id share URL). routes.ts
-    // mounts only /inspections/:id, /:id/edit, and /:id/form — so these legacy
+    // mounts only /inspections/:id and /:id/edit — so these legacy
     // deep-links no longer resolve and return 404. Pin that retirement.
     test('/settings legacy deep-link is retired (404 — folded into the /edit slide-over)', async ({ request }) => {
         const res = await request.get(`${BASE_URL}/inspections/${FAKE_ID}/settings`, {

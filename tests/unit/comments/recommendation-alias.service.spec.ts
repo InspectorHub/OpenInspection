@@ -24,9 +24,9 @@ describe('RecommendationService (alias over comments)', () => {
   it('create writes a defect comment with repair fields; list returns only repair-item comments', async () => {
     // A plain non-repair comment must NOT appear in the recommendation list.
     // `created_at` is NOT NULL (no default) on the comments table — supply it.
-    await testDb.insert(schema.comments).values({ id: 'c-plain', tenantId: T, text: 'Just a note', ratingBucket: 'satisfactory', createdAt: new Date() });
+    await testDb.insert(schema.comments).values({ id: 'c-plain', tenantId: T, text: 'Just a note', severity: 'good', createdAt: new Date() });
 
-    const rec = await svc.create(T, { name: 'Fix gutter', severity: 'defect', defaultEstimateMin: 10000, defaultEstimateMax: 30000, defaultRepairSummary: 'Reattach gutter' });
+    const rec = await svc.create(T, { name: 'Fix gutter', severity: 'significant', defaultEstimateMin: 10000, defaultEstimateMax: 30000, defaultRepairSummary: 'Reattach gutter' });
     expect(rec.name).toBe('Fix gutter');
 
     const list = await svc.listByTenant(T);
@@ -35,6 +35,6 @@ describe('RecommendationService (alias over comments)', () => {
     // It is physically stored as a comment with repair fields.
     const c = await testDb.select().from(schema.comments).where(eq(schema.comments.id, rec.id)).get();
     expect(c?.repairSummary).toBe('Reattach gutter');
-    expect(c?.ratingBucket).toBe('defect');
+    expect(c?.severity).toBe('significant');
   });
 });

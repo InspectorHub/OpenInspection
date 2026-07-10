@@ -46,11 +46,11 @@ Inspector's field responses as JSON in `data`. One row per inspection.
 
 Keys are item IDs from the template. Only items the inspector interacted with are stored (sparse).
 
-## 2. Offline-First Field Collection
+## 2. Field Collection
 
-The form renderer (`app/routes/form-renderer.tsx`) uses the `useOfflineQueue` hook + IndexedDB to cache responses locally. When offline, changes are saved to IndexedDB. On reconnect, a background sync queue PATCHes changes to `PATCH /api/inspections/:id/results`.
+Field collection happens in the inspection editor (`app/routes/inspection-edit.tsx`) — the single fill surface. Values are captured through the findings API into the collaborative results document (`app/lib/collab/results-binding.ts`), keyed by the composite `finding-key`. (The former standalone offline form-renderer route was retired; there is no separate mobile form surface.)
 
-**Field-level merge**: PATCH does last-write-wins per item key — only changed items need to be sent.
+**Field-level merge**: writes are last-write-wins per item key — only changed items need to be sent. The bulk write path is `POST /api/inspections/:id/results/batch` (there is no `PATCH /api/inspections/:id/results` route).
 
 ## 3. Photo Upload Pipeline
 
@@ -110,7 +110,7 @@ Public booking: `GET /public/book/:tenant` returns the company booking page with
 1. Admin/inspector creates inspection
    → selects template, assigns inspector, enters address + client info
 
-2. Inspector opens inspection on mobile (form-renderer)
+2. Inspector opens inspection in the editor (/inspections/:id/edit)
    → template JSON parsed into interactive checklist
    → keyboard-driven: 1-5 ratings, / snippet picker, Cmd-K palette
    → responses saved to IndexedDB immediately
@@ -140,7 +140,6 @@ Public booking: `GET /public/book/:tenant` returns the company booking page with
 | `server/api/ai.ts` | AI comment assist + auto-summary |
 | `server/services/inspection.service.ts` | Core business logic (130KB) |
 | `server/lib/validations/template.schema.ts` | Template v2 schema validation |
-| `app/routes/inspection-edit.tsx` | 3-pane inspection editor |
-| `app/routes/form-renderer.tsx` | Mobile field form |
+| `app/routes/inspection-edit.tsx` | 3-pane inspection editor (single fill surface) |
 | `app/hooks/useInspection.ts` | Inspection state management (866 LOC) |
 | `app/hooks/useCannedComments.ts` | Comment picker logic |

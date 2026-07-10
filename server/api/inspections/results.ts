@@ -256,7 +256,7 @@ export const preflightRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------
-// Vectorised result patches (used by the standalone form-renderer "Save").
+// Vectorised result patches (bulk "Save" — MCP-exposed, any bulk caller).
 // -----------------------------------------------------------------------------
 // POST /{id}/results/batch — accepts an array of `{ itemId, sectionId, field,
 // value }` patches and folds them into inspection_results.data in one

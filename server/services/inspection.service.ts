@@ -23,7 +23,7 @@ import {
     type CreateInspectionData,
     type PropertyFacts,
     type PropertyFactFoundation,
-    type CannedRatingBucket,
+    type CannedSeverity,
     type CannedCommentLike,
     type RankCommentsOpts,
 } from './inspection/shared';
@@ -49,7 +49,7 @@ export type {
     RequireDefectFields,
     PublishReadiness,
     PropertyFacts,
-    CannedRatingBucket,
+    CannedSeverity,
     CannedCommentLike,
     RankCommentsOpts,
 };

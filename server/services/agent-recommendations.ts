@@ -131,6 +131,16 @@ export function groupRecommendations(
     rows: AgentRecommendationRow[],
 ): AgentRecommendationGroups {
     const out: AgentRecommendationGroups = { safety: [], recommendation: [], maintenance: [] };
-    for (const r of rows) out[r.category].push(r);
+    for (const r of rows) {
+        // Authoring unification Plan-4 module K widened DefectCategory to a
+        // tenant-defined reference. This agent-facing feed only understands the
+        // 3 fixed legacy buckets it was built around — a defect tagged with a
+        // custom tenant category simply doesn't surface here (no fixed bucket
+        // to file it under), matching the pre-widening behavior where such a
+        // value could never have occurred.
+        if (r.category === 'safety' || r.category === 'recommendation' || r.category === 'maintenance') {
+            out[r.category].push(r);
+        }
+    }
     return out;
 }

@@ -6,9 +6,9 @@ export const comments = sqliteTable('comments', {
     tenantId: text('tenant_id').notNull().references(() => tenants.id),
     text: text('text').notNull(),
     category: text('category'),
-    // Spec 2026-05-07 — rating bucket so user snippets stack alongside the
-    // 248 seeded library entries in the inspection-edit Library drawer.
-    // 'satisfactory' | 'monitor' | 'defect' | null (= uncategorized / "All")
+    // -- DEAD (2026-07-04, Plan-4 module F): retired in favor of the single
+    // `severity` column below. No reads/writes. Column frozen (D1 can't drop
+    // FK-referenced columns) — never reuse the name.
     ratingBucket: text('rating_bucket'),
     // Section label (Roof, Electrical, ...) — same shape as canned-comments.js
     // entries. Free-text so tenants can grow their own taxonomy.
@@ -26,9 +26,12 @@ export const comments = sqliteTable('comments', {
     // + filter UI in the inspection-edit Library drawer. Distinct from the
     // existing plural `itemLabels` which stores all matched labels.
     itemLabel: text('item_label'),
+    // Module F single severity vocabulary: 'good' | 'marginal' | 'significant'
+    // | 'minor' | null (= uncategorized / "All"). Shared with rating levels
+    // (server/lib/validations/rating-system.schema.ts's SeverityEnum).
     severity: text('severity'),
     // Comments-repair fold (2026-06-12): deficiency comments carry repair fields.
-    // Intended for rating_bucket='defect'; enforced in UI/validation, not DDL.
+    // Intended for severity='significant'; enforced in UI/validation, not DDL.
     repairSummary:     text('repair_summary'),
     estimateMinCents:  integer('estimate_min_cents'),
     estimateMaxCents:  integer('estimate_max_cents'),

@@ -68,7 +68,6 @@ export default [
   ]),
   // Standalone pages (own chrome, no sidebar)
   route("setup", "routes/setup.tsx"),
-  route("inspections/:id/form", "routes/form-renderer.tsx"),
   route("join/:token", "routes/join.tsx"),
   route("version-diff/:id", "routes/version-diff.tsx"),
   // Standalone public — no layout (iframe-friendly)
@@ -90,6 +89,7 @@ export default [
   // BFF resource routes (no UI) — Token-Relay endpoints for editor hooks
   // (Track H / C-12: client code never fetches /api directly).
   route("resources/comments-library", "routes/resources/comments-library.tsx"),
+  route("resources/defect-categories", "routes/resources/defect-categories.tsx"),
   route("resources/repair-items", "routes/resources/repair-items.tsx"),
   route("resources/identities", "routes/resources/identities.tsx"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
@@ -158,6 +158,7 @@ export default [
       route("library/tags", "routes/library/tags.tsx"),
       route("library/agreements", "routes/agreements.tsx"),
       route("library/rating-systems", "routes/library/rating-systems.tsx"),
+      route("library/defect-categories", "routes/library/defect-categories.tsx"),
       route("library/marketplace", "routes/marketplace.tsx"),
     ]),
   ]),

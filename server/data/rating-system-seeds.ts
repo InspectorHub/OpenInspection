@@ -11,11 +11,12 @@
  */
 
 export interface SeedLevel {
-    abbr:    string;
-    label:   string;
-    color:   string;
-    bucket:  'satisfactory' | 'monitor' | 'defect' | 'na';
-    hotkey?: string;
+    abbreviation: string;
+    label:        string;
+    color:        string;
+    severity:     'good' | 'marginal' | 'significant' | 'minor';
+    isDefect:     boolean;
+    hotkey?:      string;
     /** Workflow shortcuts PR — pause auto-advance after rating with this level. */
     pausesAdvance?: boolean;
 }
@@ -35,11 +36,11 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
         description: 'Standard four-tier rating used in most residential inspections.',
         isDefault:   true,
         levels: [
-            { abbr: 'Sat', label: 'Satisfactory',    color: '#10b981', bucket: 'satisfactory', hotkey: '1', pausesAdvance: false },
-            { abbr: 'Mon', label: 'Monitor',         color: '#f59e0b', bucket: 'monitor',      hotkey: '2', pausesAdvance: true  },
-            { abbr: 'D',   label: 'Defect',          color: '#ef4444', bucket: 'defect',       hotkey: '3', pausesAdvance: true  },
-            { abbr: 'NI',  label: 'Not Inspected',   color: '#94a3b8', bucket: 'na',           hotkey: '4', pausesAdvance: false },
-            { abbr: 'NP',  label: 'Not Present',     color: '#cbd5e1', bucket: 'na',           hotkey: '5', pausesAdvance: false },
+            { abbreviation: 'Sat', label: 'Satisfactory',    color: '#10b981', severity: 'good',        isDefect: false, hotkey: '1', pausesAdvance: false },
+            { abbreviation: 'Mon', label: 'Monitor',         color: '#f59e0b', severity: 'marginal',    isDefect: false, hotkey: '2', pausesAdvance: true  },
+            { abbreviation: 'D',   label: 'Defect',          color: '#ef4444', severity: 'significant', isDefect: true,  hotkey: '3', pausesAdvance: true  },
+            { abbreviation: 'NI',  label: 'Not Inspected',   color: '#94a3b8', severity: 'minor',       isDefect: false, hotkey: '4', pausesAdvance: false },
+            { abbreviation: 'NP',  label: 'Not Present',     color: '#cbd5e1', severity: 'minor',       isDefect: false, hotkey: '5', pausesAdvance: false },
         ],
     },
     {
@@ -48,10 +49,10 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
         description: 'Texas Real Estate Commission standard: Inspected / Not Inspected / Not Present / Deficient.',
         isDefault:   false,
         levels: [
-            { abbr: 'I',  label: 'Inspected',     color: '#10b981', bucket: 'satisfactory', hotkey: '1', pausesAdvance: false },
-            { abbr: 'NI', label: 'Not Inspected', color: '#94a3b8', bucket: 'na',           hotkey: '2', pausesAdvance: false },
-            { abbr: 'NP', label: 'Not Present',   color: '#cbd5e1', bucket: 'na',           hotkey: '3', pausesAdvance: false },
-            { abbr: 'D',  label: 'Deficient',     color: '#ef4444', bucket: 'defect',       hotkey: '4', pausesAdvance: true  },
+            { abbreviation: 'I',  label: 'Inspected',     color: '#10b981', severity: 'good',        isDefect: false, hotkey: '1', pausesAdvance: false },
+            { abbreviation: 'NI', label: 'Not Inspected', color: '#94a3b8', severity: 'minor',       isDefect: false, hotkey: '2', pausesAdvance: false },
+            { abbreviation: 'NP', label: 'Not Present',   color: '#cbd5e1', severity: 'minor',       isDefect: false, hotkey: '3', pausesAdvance: false },
+            { abbreviation: 'D',  label: 'Deficient',     color: '#ef4444', severity: 'significant', isDefect: true,  hotkey: '4', pausesAdvance: true  },
         ],
     },
     {
@@ -60,14 +61,14 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
         description: 'Inspector Toolbelt full granularity scheme — finer severity tracking for detailed reports.',
         isDefault:   false,
         levels: [
-            { abbr: 'F',   label: 'Functional',      color: '#10b981', bucket: 'satisfactory', hotkey: '1', pausesAdvance: false },
-            { abbr: 'LM',  label: 'Low Maintenance', color: '#34d399', bucket: 'satisfactory', hotkey: '2', pausesAdvance: false },
-            { abbr: 'Mon', label: 'Monitor',         color: '#fbbf24', bucket: 'monitor',      hotkey: '3', pausesAdvance: true  },
-            { abbr: 'Mar', label: 'Marginal',        color: '#f59e0b', bucket: 'monitor',      hotkey: '4', pausesAdvance: true  },
-            { abbr: 'D',   label: 'Deficiency',      color: '#ef4444', bucket: 'defect',       hotkey: '5', pausesAdvance: true  },
-            { abbr: 'H',   label: 'Hazard',          color: '#dc2626', bucket: 'defect',       hotkey: '6', pausesAdvance: true  },
-            { abbr: 'NP',  label: 'Not Present',     color: '#cbd5e1', bucket: 'na',           hotkey: '7', pausesAdvance: false },
-            { abbr: 'NI',  label: 'Not Inspected',   color: '#94a3b8', bucket: 'na',           hotkey: '8', pausesAdvance: false },
+            { abbreviation: 'F',   label: 'Functional',      color: '#10b981', severity: 'good',        isDefect: false, hotkey: '1', pausesAdvance: false },
+            { abbreviation: 'LM',  label: 'Low Maintenance', color: '#34d399', severity: 'good',        isDefect: false, hotkey: '2', pausesAdvance: false },
+            { abbreviation: 'Mon', label: 'Monitor',         color: '#fbbf24', severity: 'marginal',    isDefect: false, hotkey: '3', pausesAdvance: true  },
+            { abbreviation: 'Mar', label: 'Marginal',        color: '#f59e0b', severity: 'marginal',    isDefect: false, hotkey: '4', pausesAdvance: true  },
+            { abbreviation: 'D',   label: 'Deficiency',      color: '#ef4444', severity: 'significant', isDefect: true,  hotkey: '5', pausesAdvance: true  },
+            { abbreviation: 'H',   label: 'Hazard',          color: '#dc2626', severity: 'significant', isDefect: true,  hotkey: '6', pausesAdvance: true  },
+            { abbreviation: 'NP',  label: 'Not Present',     color: '#cbd5e1', severity: 'minor',       isDefect: false, hotkey: '7', pausesAdvance: false },
+            { abbreviation: 'NI',  label: 'Not Inspected',   color: '#94a3b8', severity: 'minor',       isDefect: false, hotkey: '8', pausesAdvance: false },
         ],
     },
     {
@@ -76,9 +77,9 @@ export const RATING_SYSTEM_SEEDS: SeedRatingSystem[] = [
         description: 'Inspector Toolbelt simplified scheme — Functional / Marginal / Deficient. Fast for screening visits.',
         isDefault:   false,
         levels: [
-            { abbr: 'F',   label: 'Functional', color: '#10b981', bucket: 'satisfactory', hotkey: '1', pausesAdvance: false },
-            { abbr: 'Mar', label: 'Marginal',   color: '#f59e0b', bucket: 'monitor',      hotkey: '2', pausesAdvance: true  },
-            { abbr: 'D',   label: 'Deficient',  color: '#ef4444', bucket: 'defect',       hotkey: '3', pausesAdvance: true  },
+            { abbreviation: 'F',   label: 'Functional', color: '#10b981', severity: 'good',        isDefect: false, hotkey: '1', pausesAdvance: false },
+            { abbreviation: 'Mar', label: 'Marginal',   color: '#f59e0b', severity: 'marginal',    isDefect: false, hotkey: '2', pausesAdvance: true  },
+            { abbreviation: 'D',   label: 'Deficient',  color: '#ef4444', severity: 'significant', isDefect: true,  hotkey: '3', pausesAdvance: true  },
         ],
     },
 ];

@@ -28,6 +28,13 @@ export interface ResolvedDefect {
   isCustom?: boolean;
   effectiveComment: string;
   effectiveCategory?: string;
+  /** Authoring unification Plan-4 module K — the tenant's configured
+   *  defect_categories.color for effectiveCategory, resolved server-side.
+   *  Undefined → DefectCategoryChip's tokened/muted fallback. */
+  categoryColor?: string;
+  /** Whether this defect's category counts toward the report Summary rollup
+   *  (defect_categories.drivesSummary), resolved server-side. */
+  drivesSummary?: boolean;
   effectiveLocation?: string | null;
   defectPhotos?: ReportPhoto[];
 }

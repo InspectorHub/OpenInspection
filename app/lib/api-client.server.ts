@@ -20,6 +20,7 @@ import type {
     ContactsImportApi,
     CoreAuthApi,
     DataApi,
+    AdminDefectCategoriesApi,
     EventsApi,
     EmailTemplatesApi,
     EvidenceApi,
@@ -127,6 +128,7 @@ export interface Api {
     contacts:           ReturnType<typeof hc<ContactsApi>>;
     contactsImport:     ReturnType<typeof hc<ContactsImportApi>>;
     data:               ReturnType<typeof hc<DataApi>>;
+    defectCategories:   ReturnType<typeof hc<AdminDefectCategoriesApi>>;
     events:             ReturnType<typeof hc<EventsApi>>;
     inspectionTypes:    ReturnType<typeof hc<InspectionTypesApi>>;
     emailTemplates:     ReturnType<typeof hc<EmailTemplatesApi>>;
@@ -194,6 +196,7 @@ const MOUNT: Record<keyof Api, string> = {
     contacts:           "/api/contacts",
     contactsImport:     "/api/contacts",
     data:               "/api/data",
+    defectCategories:   "/api/admin",
     events:             "/api",
     inspectionTypes:    "/api/admin",
     emailTemplates:     "/api/admin",
@@ -279,6 +282,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         contacts:           mk<ContactsApi>(MOUNT.contacts),
         contactsImport:     mk<ContactsImportApi>(MOUNT.contactsImport),
         data:               mk<DataApi>(MOUNT.data),
+        defectCategories:   mk<AdminDefectCategoriesApi>(MOUNT.defectCategories),
         events:             mk<EventsApi>(MOUNT.events),
         inspectionTypes:    mk<InspectionTypesApi>(MOUNT.inspectionTypes),
         emailTemplates:     mk<EmailTemplatesApi>(MOUNT.emailTemplates),

@@ -20,12 +20,31 @@ import type { Deviation } from '../../lib/pca-deviations';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
 import { InspectionSubService } from './base';
+import { DefectCategoryService } from './defect-category.service';
 import type {
     PhotoEntry,
     CannedState,
     DefectState,
     ResultsProjection,
 } from '../../lib/collab/results-doc.types';
+
+/**
+ * Authoring unification Plan-4 module K — pure decision of whether a defect's
+ * category counts toward the report Summary rollup. Resolves `category`
+ * (a `defect_categories.id` OR a legacy seed name, e.g. seed template JSON
+ * still stores `"safety"`) against the tenant's rows by id-or-name, matching
+ * how `categoryColor` is resolved in `getReportData`. An unresolved/absent
+ * category defaults to `true` — a defect must never be silently dropped from
+ * the Summary just because its category can't be matched.
+ */
+export function defectDrivesSummary(
+    category: string | null | undefined,
+    cats: Array<{ id: string; name: string; drivesSummary: boolean }>,
+): boolean {
+    if (!category) return true;
+    const row = cats.find((c) => c.id === category || c.name === category);
+    return row ? row.drivesSummary : true;
+}
 
 /**
  * Report data aggregation: getReportData (the resolved, render-ready report
@@ -70,7 +89,7 @@ export class InspectionReportService extends InspectionSubService {
         // Spec 5B — v2 schema is the authoritative shape. Items are 'rich'
         // (rating + 3 tabs of canned comments) or 'text' (free-text notes).
         interface CannedInfoComment { id: string; title: string; comment: string; default: boolean }
-        interface CannedDefect      { id: string; title: string; category: 'maintenance' | 'recommendation' | 'safety'; location: string; comment: string; photos: string[]; default: boolean }
+        interface CannedDefect      { id: string; title: string; category: string; location: string; comment: string; photos: string[]; default: boolean }
         interface ItemTabs          { information: CannedInfoComment[]; limitations: CannedInfoComment[]; defects: CannedDefect[] }
         interface SchemaItem        { id: string; label: string; icon?: string; type?: string; ratingOptions?: string[]; tabs?: ItemTabs; number?: string }
         // Track E2 (Spectora App.A) — per-section disclaimer + force-page-break
@@ -190,6 +209,19 @@ export class InspectionReportService extends InspectionSubService {
             });
         }
 
+        // Authoring unification Plan-4 module K — resolve the tenant's defect
+        // categories ONCE (seeding the 3 canonical rows on first use), so the
+        // per-defect Summary gate (defectDrivesSummary) and chip color can be
+        // looked up per-defect below with no N+1 query. Keyed by BOTH name
+        // and id: seed template JSON stores category NAMES ("safety"), while
+        // a template authored after Plan-4 may store a defect_categories.id.
+        const defectCategories = await new DefectCategoryService(this.db).ensureSeed(tenantId);
+        const categoryColorByKey = new Map<string, string>();
+        for (const cat of defectCategories) {
+            categoryColorByKey.set(cat.name, cat.color);
+            categoryColorByKey.set(cat.id, cat.color);
+        }
+
         const sections = schemaData.sections.map((sec: SchemaSection) => ({
             id: sec.id,
             title: sec.title || (sec as unknown as Record<string, string>).name || 'Untitled',
@@ -224,11 +256,23 @@ export class InspectionReportService extends InspectionSubService {
                     const st = defectStateMap.get(d.id);
                     const included = st ? !!st.included : !!d.default;
                     const override = st && typeof st.comment === 'string' && st.comment.length > 0 ? st.comment : null;
+                    const effectiveCategory = st?.category ?? d.category;
                     return {
                         ...d,
                         included,
                         effectiveComment: renderTemplate(override ?? d.comment, resolveDefectMustacheVars(st as DefectCommentState | undefined, d as CannedDefect, res.attributes)),
-                        effectiveCategory: st?.category ?? d.category,
+                        effectiveCategory,
+                        // Authoring unification Plan-4 module K — the tenant's
+                        // configured category color; undefined (no color) falls
+                        // back to DefectCategoryChip's own tokened/muted styling.
+                        categoryColor: categoryColorByKey.get(effectiveCategory),
+                        // Category-axis Summary-inclusion signal
+                        // (defect_categories.drivesSummary), resolved data-driven
+                        // rather than by a hard-coded category name. Exposed on the
+                        // report data model as the foundation for a category-based
+                        // "Summary" view; orthogonal to ReportView's severity-based
+                        // Summary filter (spec §9), which no consumer conflates.
+                        drivesSummary: defectDrivesSummary(effectiveCategory, defectCategories),
                         effectiveLocation: (typeof st?.location === 'string' && st.location.length > 0) ? st.location : d.location,
                         // #181 PR-G: pending uploads have no R2 object yet — skip them.
                         defectPhotos: (st?.photos ?? []).filter(p => !p.pendingUpload).map(mapReportPhoto),
@@ -246,7 +290,11 @@ export class InspectionReportService extends InspectionSubService {
                 const customDefects = mapCustomDefectsForReport(
                     (res as { customComments?: { defects?: Array<{ id: string }> } }).customComments,
                     makePhotoUrl,
-                );
+                ).map(cd => ({
+                    ...cd,
+                    categoryColor: categoryColorByKey.get(cd.effectiveCategory),
+                    drivesSummary: defectDrivesSummary(cd.effectiveCategory, defectCategories),
+                }));
 
                 // Sprint 2 S2-3 / S2-4 — when the inspector left the legacy
                 // top-level recommendation / estimate empty but tagged the

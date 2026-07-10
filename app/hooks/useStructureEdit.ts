@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import {
-  addSection, duplicateSection, deleteSection, moveSection,
+  addSection, duplicateSection, deleteSection, moveSection, reorderSection,
   addItem, duplicateItem, deleteItem, moveItem,
 } from "~/lib/editor/structure-ops";
 import type { Snapshot, ItemType } from "~/lib/editor/structure-ops";
@@ -53,6 +53,8 @@ export interface UseStructureEditReturn {
   deleteSection: (id: string) => void;
   /** Move a section up (-1) or down (1). */
   moveSection: (id: string, dir: -1 | 1) => void;
+  /** Reorder a section via drag-and-drop (move `fromId` to `toId`'s position). */
+  reorderSection: (fromId: string, toId: string) => void;
   /** Pending delete state — non-null while the StructureDeleteModal is open (section OR item). */
   deletePending: DeletePending | null;
   /** Confirm the pending delete and fire the restructure action. */
@@ -258,6 +260,13 @@ export function useStructureEdit({
     [applyStructure],
   );
 
+  const handleReorderSection = useCallback(
+    (fromId: string, toId: string) => {
+      applyStructure(reorderSection(snapshotRef.current, fromId, toId));
+    },
+    [applyStructure],
+  );
+
   // ── Item-level handlers (mirror the section ones over the item ops) ──────────
   const handleDuplicateItem = useCallback(
     (sectionId: string, itemId: string) => {
@@ -332,6 +341,7 @@ export function useStructureEdit({
     duplicateSection: handleDuplicateSection,
     deleteSection: handleDeleteSection,
     moveSection: handleMoveSection,
+    reorderSection: handleReorderSection,
     deletePending,
     confirmDelete,
     cancelDelete,

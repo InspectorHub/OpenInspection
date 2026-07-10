@@ -297,14 +297,14 @@ test.describe.serial('Standalone API Tests', () => {
         expect(res.status(), 'Inspector must be forbidden from an admin-only endpoint').toBe(403);
     });
 
-    // API-18/19 assert the form's DATA-ACCESS contract (GET /api/inspections/:id)
-    // rather than SSR-loading the /inspections/:id/form page. The page shell is
-    // authenticated-only (form-renderer.tsx requireToken) with no role gate, so
-    // "can access the form" reduces to "can read the inspection". Driving the JSON
-    // endpoint is deterministic; SSR-rendering the full editor shell over the
-    // built worker is slow/flaky in the seeded harness. The inspection GET carries
-    // no requireRole (server/api/inspections.ts) — it is tenant-scoped, so every
-    // authenticated user in the workspace can read it.
+    // API-18/19 assert the inspector's DATA-ACCESS contract for the inspection
+    // they will fill (GET /api/inspections/:id) rather than SSR-loading the editor.
+    // "can access the fill surface" reduces to "can read the inspection". Driving
+    // the JSON endpoint is deterministic; SSR-rendering the full editor shell over
+    // the built worker is slow/flaky in the seeded harness. The inspection GET
+    // carries no requireRole (server/api/inspections.ts) — it is tenant-scoped, so
+    // every authenticated user in the workspace can read it. (The standalone /form
+    // page was retired; the single fill surface is /inspections/:id/edit.)
     test('API-18: Inspector CAN read the inspection backing the form (200)', async ({ request }) => {
         const res = await apiGet(request, `/api/inspections/${createdInspectionId}`, inspectorToken);
         expect(res.status(), 'Inspector must read the inspection they will fill out').toBe(200);

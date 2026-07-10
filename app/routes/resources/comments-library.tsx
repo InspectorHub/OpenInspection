@@ -17,13 +17,13 @@ export interface LibraryComment {
     id: string;
     text: string;
     category: string | null;
-    ratingBucket: string | null;
+    severity: string | null;
     section: string | null;
     libraryId?: string | null;
     useCount?: number;
 }
 
-const QUERY_KEYS = ["search", "sort", "filterMode", "itemLabel", "section", "rating", "pageSize"] as const;
+const QUERY_KEYS = ["search", "sort", "filterMode", "itemLabel", "section", "severity", "pageSize"] as const;
 
 export async function loader({ request, context }: Route.LoaderArgs) {
     const token = await getToken(context, request);
@@ -68,29 +68,41 @@ export async function action({ request, context }: Route.ActionArgs) {
             return { ok: res.ok };
         }
 
-        if (intent === "save") {
+        if (intent === "save" || intent === "edit") {
             const text = String(form.get("text") ?? "").trim();
             if (!text) return { ok: false as const };
-            const rawBucket = String(form.get("ratingBucket") ?? "");
-            const BUCKETS = ["satisfactory", "monitor", "defect"] as const;
-            const ratingBucket = (BUCKETS as readonly string[]).includes(rawBucket)
-                ? (rawBucket as (typeof BUCKETS)[number])
+            const rawSeverity = String(form.get("severity") ?? "");
+            const SEVERITIES = ["good", "marginal", "significant", "minor"] as const;
+            const severity = (SEVERITIES as readonly string[]).includes(rawSeverity)
+                ? (rawSeverity as (typeof SEVERITIES)[number])
                 : null;
             const section = String(form.get("section") ?? "");
             const category = String(form.get("category") ?? "");
             const itemLabel = String(form.get("itemLabel") ?? "");
-            const res = await api.admin.comments.$post(
-                {
-                    json: {
-                        text,
-                        ratingBucket,
-                        section: section || null,
-                        category: category || null,
-                        itemLabel: itemLabel || null,
-                    },
-                },
-                { headers: { "x-token-relay": "1" } },
-            );
+            const numOrNull = (k: string) => {
+                const v = String(form.get(k) ?? "");
+                return v ? Number(v) : null;
+            };
+            const json = {
+                text,
+                severity,
+                section: section || null,
+                category: category || null,
+                itemLabel: itemLabel || null,
+                repairSummary: String(form.get("repairSummary") ?? "") || null,
+                estimateMinCents: numOrNull("estimateMinCents"),
+                estimateMaxCents: numOrNull("estimateMaxCents"),
+                recommendedContractorTypeId: String(form.get("recommendedContractorTypeId") ?? "") || null,
+            };
+            const res = intent === "edit"
+                ? await api.admin.comments[":id"].$put(
+                    { param: { id: String(form.get("id") ?? "") }, json },
+                    { headers: { "x-token-relay": "1" } },
+                )
+                : await api.admin.comments.$post(
+                    { json },
+                    { headers: { "x-token-relay": "1" } },
+                );
             return { ok: res.ok };
         }
     } catch {

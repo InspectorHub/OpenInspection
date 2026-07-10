@@ -13,7 +13,10 @@ import { z } from '@hono/zod-openapi';
  * silently drop on the wire.
  */
 
-const DefectCategoryEnum = z.enum(['maintenance', 'recommendation', 'safety']);
+// Widened (Authoring unification Plan-4 module K): CannedDefect.category
+// references a tenant defect_categories.id (or a legacy seed name) rather
+// than a hard-coded 3-value enum — see server/types/template-schema.ts.
+const DefectCategorySchema = z.string().min(1);
 
 const PropertyTypeEnum = z.enum(['single-family', 'multi-unit', 'commercial']);
 
@@ -35,7 +38,7 @@ const CannedInfoCommentSchema = z.object({
 const CannedDefectSchema = z.object({
     id:       z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
     title:    z.string().min(1).describe('TODO describe title field for the OpenInspection MCP integration'),
-    category: DefectCategoryEnum.describe('TODO describe category field for the OpenInspection MCP integration'),
+    category: DefectCategorySchema.describe('TODO describe category field for the OpenInspection MCP integration'),
     location: z.string().describe('TODO describe location field for the OpenInspection MCP integration'),
     comment:  z.string().describe('TODO describe comment field for the OpenInspection MCP integration'),
     photos:   z.array(z.string()).describe('TODO describe photos field for the OpenInspection MCP integration'),
@@ -187,9 +190,12 @@ const TemplateSectionSchema = z.object({
     // PCA / multi-unit — gates a section by (propertyType, commercialSubtype)
     // via server/lib/section-applicability.ts sectionApplies(). Absent = applies
     // to every property type.
+    // FROZEN (module A): retired from authoring UI; field retained so the OpenAPI
+    // snapshot does not churn and already-stored templates still validate.
     applicableTo: SectionApplicabilitySchema.optional().describe('Property-type / commercial-subtype gating for this section'),
     // PCA / multi-unit — 'unit' sections repeat per unit in per-unit inspections
     // (Phase U). Absent defaults to 'common'.
+    // FROZEN (module A): Phase-U per-unit scope placeholder; not authored in UI yet.
     defaultScope: z.enum(['common', 'unit']).optional().describe('common (once) or unit (repeats per unit)'),
 }).strict();
 
@@ -200,6 +206,7 @@ const RatingLevelSchema = z.object({
     color:        z.string().optional().describe('TODO describe color field for the OpenInspection MCP integration'),
     severity:     z.enum(['good', 'minor', 'marginal', 'significant']).optional().describe('TODO describe severity field for the OpenInspection MCP integration'),
     isDefect:     z.boolean().optional().describe('TODO describe isDefect field for the OpenInspection MCP integration'),
+    pausesAdvance: z.boolean().optional().describe('Pause auto-advance after selecting this level (focus notes)'),
     default:      z.boolean().optional().describe('TODO describe default field for the OpenInspection MCP integration'),
     description:  z.string().optional().describe('TODO describe description field for the OpenInspection MCP integration'),
 }).strict();

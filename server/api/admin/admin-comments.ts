@@ -29,15 +29,17 @@ import { withMcpMetadata } from "../../lib/route-metadata-standards";
 
 // --- Comments Library ---
 
-// Spec 2026-05-07 — narrow Drizzle's generic `string | null` for
-// `ratingBucket` down to the Zod enum shape the OpenAPI response schema
+// Module F (2026-07) — narrow Drizzle's generic `string | null` for
+// `severity` down to the Zod enum shape the OpenAPI response schema
 // declares. The DB column is just TEXT (column constraint isn't enforced
-// at the SQLite layer), so we cast at the response boundary.
-type RatingBucketResp = 'satisfactory' | 'monitor' | 'defect' | null;
-function commentRowToResponse(r: typeof comments.$inferSelect) {
+// at the SQLite layer), so we cast at the response boundary. `ratingBucket`
+// is retired — `comments.rating_bucket` is FROZEN, no reads/writes; the
+// param type excludes it so no call site can accidentally reintroduce it.
+type SeverityResp = 'good' | 'marginal' | 'significant' | 'minor' | null;
+function commentRowToResponse(r: Omit<typeof comments.$inferSelect, 'ratingBucket'>) {
     return {
         ...r,
-        ratingBucket: (r.ratingBucket as RatingBucketResp) ?? null,
+        severity: (r.severity as SeverityResp) ?? null,
         createdAt: safeISODate(r.createdAt),
     };
 }
@@ -150,7 +152,7 @@ const touchCommentRoute = createRoute(withMcpMetadata({
 export const adminCommentsRoutes = createApiRouter()
     .openapi(listCommentsRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const { rating, section, sectionId, triggerCode, search, sort, filterMode, itemLabel, page, pageSize } = c.req.valid('query');
+        const { severity, section, sectionId, triggerCode, search, sort, filterMode, itemLabel, page, pageSize } = c.req.valid('query');
         // Per-user usage join — needs the JWT subject (same convention as the
         // touch endpoint above and the rest of admin.ts).
         const userId = c.get('user')?.sub ?? '';
@@ -158,7 +160,7 @@ export const adminCommentsRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
         // Filters layered defensively: tenantId always first (multi-tenant
         // isolation rule from CLAUDE.md). `sectionId` / `triggerCode` are
-        // explicit user-typed filters and always apply; `rating` / `section`
+        // explicit user-typed filters and always apply; `severity` / `section`
         // / `itemLabel` are context-derived and only apply when filterMode=auto
         // (filterMode=all means "ignore inspection context, show everything").
         const conditions = [eq(comments.tenantId, tenantId)];
@@ -168,10 +170,10 @@ export const adminCommentsRoutes = createApiRouter()
         if (triggerCode) {
             conditions.push(eq(comments.triggerCode, triggerCode));
         }
-        // Track H: `rating` applies whenever the caller sends it — the library
-        // modal's bucket chips pass it explicitly in `all` mode too (it used to
+        // Track H: `severity` applies whenever the caller sends it — the library
+        // modal's severity chips pass it explicitly in `all` mode too (it used to
         // be auto-gated like section/itemLabel, which left the chips dead).
-        if (rating) conditions.push(eq(comments.ratingBucket, rating));
+        if (severity) conditions.push(eq(comments.severity, severity));
         if (auto && section) conditions.push(eq(comments.section, section));
         if (auto && itemLabel) conditions.push(eq(comments.itemLabel, itemLabel));
         // Track H (IA-5): search is pushed down to SQL so pagination + count
@@ -192,14 +194,13 @@ export const adminCommentsRoutes = createApiRouter()
           : sort === 'created'  ? [descDz(comments.createdAt)]
           : sort === 'frequent' ? [descDz(commentUsage.useCount), descDz(commentUsage.lastUsedAt)]
           : sort === 'alpha'    ? [ascDz(comments.text)]
-          :                       [ascDz(comments.ratingBucket), descDz(comments.createdAt)];
+          :                       [ascDz(comments.severity), descDz(comments.createdAt)];
 
         const rows = await db.select({
             id:             comments.id,
             tenantId:       comments.tenantId,
             text:           comments.text,
             category:       comments.category,
-            ratingBucket:   comments.ratingBucket,
             section:        comments.section,
             sectionIds:     comments.sectionIds,
             itemLabels:     comments.itemLabels,
@@ -253,14 +254,13 @@ export const adminCommentsRoutes = createApiRouter()
     })
     .openapi(createCommentRoute, async (c) => {
         const tenantId = c.get('tenantId');
-        const { text, category, ratingBucket, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
+        const { text, category, severity, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
         const db = drizzle(c.env.DB);
         const row = {
             id: crypto.randomUUID(),
             tenantId,
             text,
             category: category ?? null,
-            ratingBucket: ratingBucket ?? null,
             section: section ?? null,
             // S2-7 — libraryId tracks marketplace provenance; null for tenant-authored.
             libraryId: null as string | null,
@@ -269,7 +269,7 @@ export const adminCommentsRoutes = createApiRouter()
             triggerCode: null as string | null,
             searchKeywords: null as string | null,
             itemLabel: null as string | null,
-            severity: null as string | null,
+            severity: severity ?? null,
             repairSummary: repairSummary ?? null,
             estimateMinCents: estimateMinCents ?? null,
             estimateMaxCents: estimateMaxCents ?? null,
@@ -300,7 +300,7 @@ export const adminCommentsRoutes = createApiRouter()
     .openapi(updateCommentRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
-        const { text, category, ratingBucket, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
+        const { text, category, severity, section, repairSummary, estimateMinCents, estimateMaxCents, recommendedContractorTypeId } = c.req.valid('json');
         const db = drizzle(c.env.DB);
         const existing = await db.select().from(comments)
             .where(and(eq(comments.id, id), eq(comments.tenantId, tenantId))).get();
@@ -308,7 +308,7 @@ export const adminCommentsRoutes = createApiRouter()
         const patch: Partial<typeof comments.$inferInsert> = {
             text,
             category: category ?? null,
-            ratingBucket: ratingBucket ?? null,
+            severity: severity ?? null,
             section: section ?? null,
         };
         if (repairSummary !== undefined) patch.repairSummary = repairSummary ?? null;
@@ -323,7 +323,7 @@ export const adminCommentsRoutes = createApiRouter()
             entityId: id,
             metadata: {
                 category: category ?? null,
-                ratingBucket: ratingBucket ?? null,
+                severity: severity ?? null,
                 section: section ?? null,
                 textPreview: text.slice(0, 80),
             },

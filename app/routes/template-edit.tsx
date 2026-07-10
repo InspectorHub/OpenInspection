@@ -1,22 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLoaderData, useFetcher, Link, isRouteErrorResponse, useRouteError } from "react-router";
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { RATING_PRESETS } from "~/components/template/types";
 import type { RatingLevel, RatingSystem, TemplateItem, TemplateSchema, TemplateSection, CannedComment } from "~/components/template/types";
-import { RatingSystemModal } from "~/components/template/RatingSystemModal";
+import { RatingSystemEditor } from "~/components/RatingSystemEditor";
+import { toEditorLevel, fromEditorLevel } from "~/lib/editor/rating-level-adapter";
 import { ItemPropertiesPanel } from "~/components/template/ItemPropertiesPanel";
 import { ItemCommentsPanel } from "~/components/template/ItemCommentsPanel";
 import { ItemPreviewPanel } from "~/components/template/ItemPreviewPanel";
-import { SectionsList } from "~/components/template/SectionsList";
-import { SectionRail } from "~/components/template/SectionRail";
+import { SectionAuthorHeader } from "~/components/template/SectionAuthorHeader";
+import { SectionPreview } from "~/components/template/SectionPreview";
+import { SectionRail } from "~/components/editor-shared/SectionRail";
+import { ItemList } from "~/components/editor-shared/ItemList";
 import { TemplatePropertyTypePanel } from "~/components/template/TemplatePropertyTypePanel";
-import { SectionPropertiesPanel } from "~/components/template/SectionPropertiesPanel";
-import { SectionApplicabilityPreview } from "~/components/template/SectionApplicabilityPreview";
-import type { TemplateSection as ServerTemplateSection } from "../../server/types/template-schema";
 import { serializeTemplateMeta, serializeSectionMeta } from "~/lib/editor/template-meta";
 import type { PropertyType } from "~/components/template/types";
+import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
+import { useCannedComments } from "~/hooks/useCannedComments";
+import { buildCannedFromText, TAB_SEVERITY, type CannedTab } from "~/lib/editor/canned-from-library";
 
 export function meta() {
   return [{ title: "Edit Template - OpenInspection" }];
@@ -30,7 +33,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const id = params.id;
   const api = createApi(context, { token });
-  const res = await api.inspections.templates[":id"].$get({ param: { id } });
+  const [res, defectCatRes] = await Promise.all([
+    api.inspections.templates[":id"].$get({ param: { id } }),
+    // Authoring unification Plan-4 module K — the tenant's defect categories,
+    // fetched ONCE here (seeded on first read) so the editor can build a
+    // single name/id → color lookup for the defects-tab chip.
+    api.defectCategories["defect-categories"].$get().catch(() => null),
+  ]);
   // A non-OK response previously fell through to an empty `{}`, which rendered a
   // section-less editor that looks blank ("the editor never opened"). Surface the
   // failure to the ErrorBoundary instead so the user gets an actionable message.
@@ -72,7 +81,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       : [];
     return s;
   });
-  return { id, name, version, schema, token };
+  // Authoring unification Plan-4 module K — tenant defect categories (id/name/color).
+  let defectCategories: Array<{ id: string; name: string; color: string }> = [];
+  if (defectCatRes?.ok) {
+    const defectCatBody = await defectCatRes.json() as { data?: Array<{ id: string; name: string; color: string }> };
+    defectCategories = defectCatBody.data ?? [];
+  }
+  return { id, name, version, schema, token, defectCategories };
 }
 
 /* ------------------------------------------------------------------ */
@@ -112,8 +127,20 @@ function serializeCanned(c: CannedComment): Record<string, unknown> {
 }
 
 export default function TemplateEditPage() {
-  const { name: initialName, version: initialVersion, schema: initial } = useLoaderData<typeof loader>();
+  const { id, name: initialName, version: initialVersion, schema: initial, defectCategories } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
+
+  // Authoring unification Plan-4 module K — one tenant-wide category → color
+  // lookup, built once from the loader's single fetch, keyed by BOTH name and
+  // id (mirroring the report's + inspection editor's resolution).
+  const catColor = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const c of defectCategories ?? []) {
+      map.set(c.name, c.color);
+      map.set(c.id, c.color);
+    }
+    return map;
+  }, [defectCategories]);
 
   const [templateName, setTemplateName] = useState(initialName);
   const [sections, setSections] = useState<TemplateSection[]>(initial.sections || []);
@@ -131,6 +158,12 @@ export default function TemplateEditPage() {
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const section = sections[activeSection] || null;
+  const activeSectionId = sections[activeSection]?.id ?? "";
+  const findSectionIdx = (id: string) => sections.findIndex((s) => s.id === id);
+  const selectSectionById = (id: string) => {
+    const idx = findSectionIdx(id);
+    if (idx >= 0) { setActiveSection(idx); setEditingItem(null); }
+  };
 
   const fetcherData = fetcher.data as { ok?: boolean; error?: string; version?: number } | undefined;
 
@@ -172,11 +205,19 @@ export default function TemplateEditPage() {
     setActiveSection(Math.max(0, Math.min(sections.length - 1, activeSection + dir)));
   }
 
-  function updateSection(patch: Partial<TemplateSection>) {
+  function reorderSection(fromId: string, toId: string) {
+    const activeId = sections[activeSection]?.id;
+    let nextIdx = activeSection;
     updateSections((s) => {
-      if (s[activeSection]) Object.assign(s[activeSection], patch);
+      const from = s.findIndex((sec) => sec.id === fromId);
+      const to = s.findIndex((sec) => sec.id === toId);
+      if (from < 0 || to < 0 || from === to) return s;
+      const [moved] = s.splice(from, 1);
+      s.splice(to, 0, moved);
+      nextIdx = s.findIndex((sec) => sec.id === activeId);
       return s;
     });
+    if (nextIdx >= 0) setActiveSection(nextIdx);
   }
 
   /* ---- Item CRUD ---- */
@@ -224,6 +265,35 @@ export default function TemplateEditPage() {
     });
   }
 
+  function duplicateItem(itemId: string) {
+    if (!section) return;
+    const newId = `item_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    updateSections((s) => {
+      const items = s[activeSection].items;
+      const idx = items.findIndex((i) => i.id === itemId);
+      if (idx < 0) return s;
+      const clone = structuredClone(items[idx]);
+      clone.id = newId;
+      clone.label = `${clone.label} (copy)`;
+      items.splice(idx + 1, 0, clone);
+      return s;
+    });
+    setEditingItem(newId);
+    setRightRail("properties");
+  }
+
+  function reorderItem(fromId: string, toId: string) {
+    updateSections((s) => {
+      const items = s[activeSection].items;
+      const from = items.findIndex((i) => i.id === fromId);
+      const to = items.findIndex((i) => i.id === toId);
+      if (from < 0 || to < 0 || from === to) return s;
+      const [moved] = items.splice(from, 1);
+      items.splice(to, 0, moved);
+      return s;
+    });
+  }
+
   /* ---- Canned comment CRUD ---- */
   function addCannedToItem(tab: "information" | "limitations" | "defects") {
     if (!editingItem || !section) return;
@@ -252,22 +322,6 @@ export default function TemplateEditPage() {
       item.tabs[tab].splice(idx, 1);
       return s;
     });
-  }
-
-  /* ---- Rating system ---- */
-  function applyPreset(preset: typeof RATING_PRESETS[0]) {
-    setRatingSystem({
-      name: preset.name,
-      defaultLevelId: preset.levels.find((l) => l.default)?.id || preset.levels[0]?.id,
-      levels: structuredClone(preset.levels),
-    });
-  }
-
-  function addRatingLevel() {
-    setRatingSystem((prev) => ({
-      ...prev,
-      levels: [...prev.levels, { id: "NEW", label: "New Level", abbreviation: "", color: "#6b7280", severity: "minor", isDefect: false, default: false, description: "" }],
-    }));
   }
 
   /* ---- Save ---- */
@@ -324,6 +378,7 @@ export default function TemplateEditPage() {
           if (l.color) lv.color = l.color;
           if (l.severity) lv.severity = l.severity;
           if (typeof l.isDefect === "boolean") lv.isDefect = l.isDefect;
+          if (typeof l.pausesAdvance === "boolean") lv.pausesAdvance = l.pausesAdvance;
           if (typeof l.default === "boolean") lv.default = l.default;
           if (l.description) lv.description = l.description;
           return lv as unknown as RatingLevel;
@@ -350,6 +405,69 @@ export default function TemplateEditPage() {
       setChoicesText("");
     }
   }, [editingItem]);
+
+  // Module C — shared comment-library drawer, hard-filtered by item + rating.
+  const [libraryTab, setLibraryTab] = useState<CannedTab | null>(null);
+  const [commentLibrarySearch, setCommentLibrarySearch] = useState("");
+  const [commentLibrarySelectedIdx, setCommentLibrarySelectedIdx] = useState(0);
+  const [serverComments, setServerComments] = useState<Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>>([]);
+
+  // Reuse the inspection editor's hook verbatim. `inspectionId` is only a load
+  // key for the tenant library route; the template id is a stable, unique key.
+  // `severityForRatingId` is unused on this surface (we pass the severity
+  // explicitly via TAB_SEVERITY), so a constant identity is sufficient.
+  const comments = useCannedComments({
+    inspectionId: id,
+    severityForRatingId: () => "all",
+  });
+
+  useEffect(() => {
+    if (!libraryTab || !selectedItem) { setServerComments([]); return; }
+    const ctx: { itemLabel?: string; section?: string; severity?: string; search?: string } = {
+      itemLabel: selectedItem.label,
+      severity: TAB_SEVERITY[libraryTab], // hard severity filter = the tab
+    };
+    if (section?.title) ctx.section = section.title; // hard item-context filter
+    const q = commentLibrarySearch.trim();
+    if (q.length >= 2) ctx.search = q;
+    let cancelled = false;
+    const t = setTimeout(() => {
+      comments.fetchFiltered(ctx).then((rows) => {
+        if (cancelled) return;
+        setServerComments(rows as Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>);
+      });
+    }, q ? 250 : 0);
+    return () => { cancelled = true; clearTimeout(t); };
+    // `selectedItem`/`section` are recomputed each render from state; depend on the
+    // stable ids so the effect re-runs on item/section change, not every render.
+  }, [libraryTab, selectedItem?.id, section?.id, commentLibrarySearch, comments.sort, comments.fetchFiltered]);
+
+  /* ---- Append a picked library comment to a tab (module C) ---- */
+  function addCannedFromLibrary(tab: CannedTab, text: string) {
+    if (!editingItem || !section) return;
+    updateSections((s) => {
+      const item = s[activeSection].items.find((i) => i.id === editingItem);
+      if (!item || item.type !== "rich") return s;
+      if (!item.tabs) item.tabs = { information: [], limitations: [], defects: [] };
+      item.tabs[tab].push(buildCannedFromText(tab, text));
+      return s;
+    });
+  }
+
+  function openCommentLibrary(tab: CannedTab) {
+    comments.setFilterMode("auto"); // ensure item context rides fetchFiltered
+    setCommentLibrarySearch("");
+    setCommentLibrarySelectedIdx(0);
+    setLibraryTab(tab);
+  }
+
+  // Stable reference so the shared editor's seed effect (keyed on the `system`
+  // prop identity) does not re-seed and discard in-progress edits on unrelated
+  // re-renders while the modal is open.
+  const editorSystem = useMemo(
+    () => ({ id, name: ratingSystem.name || "Rating System", slug: "template", levels: ratingSystem.levels.map(toEditorLevel) }),
+    [id, ratingSystem],
+  );
 
   return (
     <div className="flex flex-col h-screen bg-[#f8fafc] dark:bg-[#0f172a]">
@@ -397,36 +515,50 @@ export default function TemplateEditPage() {
       <div className="flex flex-1 overflow-hidden">
         {/* Section rail */}
         <SectionRail
+          mode="author"
           sections={sections}
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
-          setEditingItem={setEditingItem}
-          moveSection={moveSection}
-          removeSection={removeSection}
-          addSection={addSection}
+          activeSection={activeSectionId}
+          onSelect={selectSectionById}
+          onAddSection={addSection}
+          onMoveSection={(id, dir) => {
+            const idx = findSectionIdx(id);
+            if (idx >= 0) moveSection(idx, dir);
+          }}
+          onDeleteSection={(id) => {
+            const idx = findSectionIdx(id);
+            if (idx >= 0) removeSection(idx);
+          }}
+          onReorderSection={reorderSection}
         />
 
-        {/* Item list */}
-        <div className="flex-1 overflow-y-auto p-4">
-          <SectionsList
-            section={section}
-            activeSection={activeSection}
-            previewMode={previewMode}
-            editingItem={editingItem}
-            renameSection={renameSection}
-            updateSections={updateSections}
-            setEditingItem={setEditingItem}
-            setRightRail={setRightRail}
-            updateItem={updateItem}
-            moveItem={moveItem}
-            removeItem={removeItem}
-            addItem={addItem}
-          />
+        {/* Item nav (center column) */}
+        <div className="w-[280px] shrink-0 flex flex-col overflow-hidden">
+          {section && <SectionAuthorHeader section={section} activeSection={activeSection} renameSection={renameSection} updateSections={updateSections} />}
+          {section ? (
+            previewMode ? (
+              <div className="flex-1 overflow-y-auto p-3"><SectionPreview section={section} /></div>
+            ) : (
+              <ItemList
+                mode="author"
+                items={section.items}
+                sectionId={section.id}
+                activeItemId={editingItem}
+                onSelect={(id) => { setEditingItem(id); setRightRail("properties"); }}
+                onAddItem={addItem}
+                onDuplicateItem={duplicateItem}
+                onDeleteItem={removeItem}
+                onMoveItem={(id, dir) => { const idx = section.items.findIndex((i) => i.id === id); if (idx >= 0) moveItem(idx, dir); }}
+                onReorderItem={reorderItem}
+              />
+            )
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-[13px] text-ih-fg-4">Add a section to get started</div>
+          )}
         </div>
 
-        {/* Right rail (item properties) */}
+        {/* Right rail (item properties) — now the main editor area */}
         {selectedItem && !previewMode && (
-          <aside className="w-[280px] shrink-0 border-l border-ih-border bg-ih-bg-card overflow-y-auto">
+          <aside className="flex-1 border-l border-ih-border bg-ih-bg-card overflow-y-auto">
             {/* Rail tabs */}
             <div className="flex border-b border-ih-border">
               {(["properties", "comments", "preview"] as const).map((tab) => (
@@ -440,7 +572,7 @@ export default function TemplateEditPage() {
               ))}
             </div>
 
-            <div className="p-3 space-y-3">
+            <div className="p-4 space-y-3 max-w-xl">
               {rightRail === "properties" && (
                 <ItemPropertiesPanel
                   selectedItem={selectedItem}
@@ -458,49 +590,77 @@ export default function TemplateEditPage() {
                   updateSections={updateSections}
                   addCannedToItem={addCannedToItem}
                   removeCannedFromItem={removeCannedFromItem}
+                  onOpenLibrary={openCommentLibrary}
+                  categoryColor={catColor}
                 />
               )}
 
               {rightRail === "preview" && (
-                <ItemPreviewPanel selectedItem={selectedItem} />
+                <ItemPreviewPanel selectedItem={selectedItem} categoryColor={catColor} />
               )}
-            </div>
-          </aside>
-        )}
-
-        {/* Right rail (section applicability) — shown when a section is active and no item is selected */}
-        {section && !selectedItem && !previewMode && (
-          <aside className="w-[280px] shrink-0 border-l border-ih-border bg-ih-bg-card overflow-y-auto">
-            <div className="p-3 border-b border-ih-border">
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Section applicability</h3>
-            </div>
-            <div className="p-3">
-              <SectionPropertiesPanel
-                section={section}
-                templatePropertyType={propertyType}
-                updateSection={updateSection}
-              />
-            </div>
-            <div className="p-3 border-t border-ih-border">
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4 mb-2">Preview</h3>
-              <SectionApplicabilityPreview
-                sections={sections as unknown as ServerTemplateSection[]}
-                initialPropertyType={propertyType}
-                initialCommercialSubtype={commercialSubtype}
-              />
             </div>
           </aside>
         )}
       </div>
 
-      {/* Rating system modal */}
-      <RatingSystemModal
+      {/* Comment library drawer (shared with inspection editor; hard-filtered) */}
+      {libraryTab && selectedItem && section && (
+        <CommentLibraryDrawer
+          open              // required prop (CommentLibraryDrawer.tsx: `open: boolean`); host mounts only while open
+          comments={{
+            filterMode: "auto",            // locked: item context always rides
+            setFilterMode: () => {},       // template hard-filters — no auto/all toggle
+            sort: comments.sort,
+            setSort: comments.setSort,
+            touchSnippet: comments.touchSnippet,
+          }}
+          state={{
+            activeItem: { label: selectedItem.label },
+            currentSection: { id: section.id, title: section.title },
+            activeItemId: selectedItem.id,
+            getResult: () => ({}),          // template authoring has no per-item rating result
+            commentLibraryFilter: TAB_SEVERITY[libraryTab], // severity chip pinned to the tab's severity
+            setCommentLibraryFilter: () => {},            // locked
+            setCommentLibrarySelectedIdx,
+            commentLibrarySearch,
+            setCommentLibrarySearch,
+            commentLibrarySelectedIdx,
+            setShowCommentLibrary: (open: boolean) => { if (!open) setLibraryTab(null); },
+          }}
+          serverComments={serverComments}
+          onInsert={(_sectionId, _itemId, text) => addCannedFromLibrary(libraryTab, text)}
+          onClose={() => setLibraryTab(null)}
+        />
+      )}
+
+      {/* Rating system editor — canonical editor shared with /library/rating-systems (module F).
+          `onSaveLevels` writes back onto the template's own schema instead of POSTing to the
+          library table. */}
+      <RatingSystemEditor
         open={ratingModalOpen}
-        ratingSystem={ratingSystem}
-        setRatingSystem={setRatingSystem}
-        applyPreset={applyPreset}
-        addRatingLevel={addRatingLevel}
         onClose={() => setRatingModalOpen(false)}
+        system={editorSystem}
+        onSaveLevels={(levels) => {
+          setRatingSystem((prev) => {
+            const nextLevels = levels.map((l, i) => {
+              const next = fromEditorLevel(l, i);
+              // Preserve per-level fields the shared editor does not author
+              // (description feeds inspection helpers.backfillLevelDescriptions;
+              // `default` is a legacy per-level flag) by re-attaching from the
+              // prior level with the same id.
+              const old = prev.levels.find((o) => o.id === next.id);
+              if (old) {
+                if (old.description !== undefined) next.description = old.description;
+                if (old.default !== undefined) next.default = old.default;
+              }
+              return next;
+            });
+            const defaultLevelId = nextLevels.some((l) => l.id === prev.defaultLevelId)
+              ? prev.defaultLevelId
+              : nextLevels[0]?.id;
+            return { ...prev, levels: nextLevels, defaultLevelId };
+          });
+        }}
       />
     </div>
   );

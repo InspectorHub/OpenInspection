@@ -41,11 +41,13 @@ export interface RatingSystemRecord {
 /** Normalize an incoming level array — assign UUIDs + display order. */
 function normalizeLevels(input: RatingLevelInput[]): RatingLevel[] {
     return input.map((lvl, idx) => ({
-        id:     lvl.id ?? crypto.randomUUID(),
-        abbr:   lvl.abbr,
-        label:  lvl.label,
-        color:  lvl.color,
-        bucket: lvl.bucket,
+        id:           lvl.id ?? crypto.randomUUID(),
+        abbreviation: lvl.abbreviation,
+        label:        lvl.label,
+        color:        lvl.color,
+        severity:     lvl.severity,
+        isDefect:     lvl.isDefect ?? false,
+        ...(lvl.pausesAdvance !== undefined ? { pausesAdvance: lvl.pausesAdvance } : {}),
         ...(lvl.hotkey !== undefined ? { hotkey: lvl.hotkey } : {}),
         order:  lvl.order ?? idx,
     }));
@@ -258,11 +260,13 @@ export class RatingSystemService {
             if (existingSlugs.has(seed.slug)) { skipped++; continue; }
             const id = crypto.randomUUID();
             const levels: RatingLevel[] = seed.levels.map((lvl, idx) => ({
-                id:     crypto.randomUUID(),
-                abbr:   lvl.abbr,
-                label:  lvl.label,
-                color:  lvl.color,
-                bucket: lvl.bucket,
+                id:           crypto.randomUUID(),
+                abbreviation: lvl.abbreviation,
+                label:        lvl.label,
+                color:        lvl.color,
+                severity:     lvl.severity,
+                isDefect:     lvl.isDefect,
+                ...(lvl.pausesAdvance ? { pausesAdvance: true } : {}),
                 ...(lvl.hotkey ? { hotkey: lvl.hotkey } : {}),
                 order:  idx,
             }));

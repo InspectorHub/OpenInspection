@@ -219,43 +219,29 @@ export class InspectionResultsService extends InspectionSubService {
             .get();
         if (!sysRow) throw Errors.NotFound('Rating system not found');
 
-        type SeedLevel = { id?: string; abbr?: string; label: string; color?: string; bucket: string };
+        type SeedLevel = { id?: string; abbreviation?: string; label: string; color?: string; severity: string; isDefect?: boolean };
         const rawLevels = sysRow.levels as unknown;
         const newLevels: SeedLevel[] = typeof rawLevels === 'string' ? JSON.parse(rawLevels) as SeedLevel[] : rawLevels as SeedLevel[];
 
-        // bucket → severity mapping (rating-systems table uses 'bucket',
-        // TemplateSchemaV2 uses 'severity' on the embedded ratingSystem)
-        const bucketToSeverity = (b: string): 'good' | 'marginal' | 'significant' | 'minor' => {
-            if (b === 'satisfactory') return 'good';
-            if (b === 'monitor') return 'marginal';
-            if (b === 'defect') return 'significant';
-            return 'minor';
-        };
-
-        // Build new embedded rating system for the snapshot
+        // Build new embedded rating system for the snapshot — `rating_systems.levels`
+        // now stores the canonical `{ abbreviation, severity, isDefect }` shape
+        // directly (module F), so no bucket→severity translation is needed.
         const newSnapLevels = newLevels.map(l => ({
             id:           l.label,
             label:        l.label,
-            ...(l.abbr ? { abbreviation: l.abbr } : {}),
+            ...(l.abbreviation ? { abbreviation: l.abbreviation } : {}),
             ...(l.color ? { color: l.color } : {}),
-            severity:     bucketToSeverity(l.bucket),
-            isDefect:     l.bucket === 'defect',
+            severity:     l.severity as 'good' | 'marginal' | 'significant' | 'minor',
+            isDefect:     l.isDefect ?? l.severity === 'significant',
         }));
 
-        // Build remap: old level label/id → new level id, via bucket
+        // Build remap: old level label/id → new level id, matched by severity.
         const snapStr = inspection.templateSnapshot as unknown as string | null;
         const oldSnapshot = snapStr ? JSON.parse(snapStr) as { ratingSystem?: { levels?: Array<{ id: string; label?: string; severity?: string }> }; [k: string]: unknown } : {};
         const oldLevels = oldSnapshot.ratingSystem?.levels ?? [];
-        const severityToBucket = (s: string | undefined): string | null => {
-            if (s === 'good') return 'satisfactory';
-            if (s === 'marginal') return 'monitor';
-            if (s === 'significant') return 'defect';
-            return null;
-        };
         const remap = new Map<string, string | null>();
         for (const oldL of oldLevels) {
-            const bucket = severityToBucket(oldL.severity);
-            const newL = bucket ? newLevels.find(n => n.bucket === bucket) : null;
+            const newL = oldL.severity ? newLevels.find(n => n.severity === oldL.severity) : null;
             remap.set(oldL.id, newL?.label ?? null);
             if (oldL.label && oldL.label !== oldL.id) remap.set(oldL.label, newL?.label ?? null);
         }
