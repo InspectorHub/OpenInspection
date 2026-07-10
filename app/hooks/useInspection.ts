@@ -276,13 +276,15 @@ export function useInspectionState(opts: UseInspectionOptions) {
     [sections],
   );
 
-  /** Build a composite finding key for an itemId */
+  /** Build a composite finding key for an itemId in the ACTIVE unit scope.
+   *  Phase U: `activeUnitId == null` → the `_default` common key (byte-identical
+   *  to before); a non-null unit keys that unit's finding. */
   const fk = useCallback(
     (itemId: string): string => {
       const sid = sectionIdForItem(itemId);
-      return sid ? fKey(sid, itemId) : itemId;
+      return sid ? findingKey(activeUnitId, sid, itemId) : itemId;
     },
-    [sectionIdForItem],
+    [sectionIdForItem, activeUnitId],
   );
 
   /**

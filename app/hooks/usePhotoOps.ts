@@ -284,6 +284,11 @@ export function usePhotoOps(ctx: {
   const patchItemPhotos = useCallback(
     (itemId: string, next: (photos: ItemPhoto[]) => ItemPhoto[]) => {
       const sid = state.sectionIdForItem(itemId);
+      // Phase U — under a real unit we can only key a properly-scoped composite.
+      // If the section is unresolvable (defensive — should not happen for a real
+      // template item) the bare `itemId` is a valid fallback ONLY in the common
+      // scope; under a unit that shared slot would leak across units, so no-op.
+      if (!sid && activeUnitId != null) return;
       const ck = sid ? findingKey(activeUnitId, sid, itemId) : itemId;
       state.setResults((prev) => {
         const bare = activeUnitId == null ? (prev[itemId] as Record<string, unknown>) : undefined;

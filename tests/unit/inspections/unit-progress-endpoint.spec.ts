@@ -97,6 +97,49 @@ describe('unit-progress summary (Phase U Batch C2a)', () => {
         expect(p2).toEqual({ unitId: u2.id, rated: 1, total: 3 });
     });
 
+    it('is tenant-scoped: another tenant\'s units + results never enter this summary', async () => {
+        const OTHER = '00000000-0000-0000-0000-0000000000ff';
+        await testDb.insert(schema.tenants).values({
+            id: OTHER, name: 'Other', slug: 'other', status: 'active',
+            deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
+        });
+        // Same inspection id space is unique per row, so give the other tenant its
+        // own inspection + units + results — the handler filters by tenantId, so
+        // tenant A's list()/results query must exclude ALL of it.
+        const OTHER_INSP = '11111111-1111-1111-1111-1111111111ff';
+        await testDb.insert(schema.inspections).values({
+            id: OTHER_INSP, tenantId: OTHER, propertyAddress: 'x', date: '2026-06-01',
+            status: 'requested', paymentStatus: 'unpaid', price: 0, paymentRequired: false,
+            agreementRequired: false, createdAt: new Date(), templateSnapshot: TEMPLATE,
+            unitInspectionMode: 'per_unit',
+        });
+        const ghost = await unitSvc.create(OTHER, { inspectionId: OTHER_INSP, parentUnitId: null, kind: 'unit', name: 'GHOST' });
+        await testDb.insert(inspectionResults).values({
+            id: '33333333-3333-3333-3333-3333333333ff', tenantId: OTHER, inspectionId: OTHER_INSP,
+            data: { [`${ghost.id}:s1:i1`]: { rating: 'good' }, '_default:s1:i1': { rating: 'good' } },
+            lastSyncedAt: new Date(),
+        });
+
+        // Tenant A's inspection has one unit + one rated common finding.
+        const u1 = await unitSvc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'unit', name: '101' });
+        await testDb.insert(inspectionResults).values({
+            id: RESULTS, tenantId: TENANT, inspectionId: INSPECTION,
+            data: { '_default:s1:i1': { rating: 'good' } }, lastSyncedAt: new Date(),
+        });
+
+        // Mirror the handler's tenant-scoped reads for TENANT.
+        const units = (await unitSvc.list(TENANT, INSPECTION)).filter((u) => u.kind === 'unit');
+        const row = await testDb.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, INSPECTION), eq(inspectionResults.tenantId, TENANT)))
+            .get();
+        const summary = computeUnitProgress((row?.data || {}) as Record<string, unknown>, TEMPLATE, units.map((u) => u.id));
+
+        // Only tenant A's single unit is present; GHOST is absent; common count is A's only.
+        expect(summary.units).toEqual([{ unitId: u1.id, rated: 0, total: 3 }]);
+        expect(summary.units.some((u) => u.unitId === ghost.id)).toBe(false);
+        expect(summary.commonRated).toBe(1);
+    });
+
     it('reports zero rated for a unit with no findings and an empty results row', async () => {
         const u1 = await unitSvc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'unit', name: '101' });
         await testDb.insert(inspectionResults).values({
