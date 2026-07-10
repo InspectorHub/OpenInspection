@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../../../server/lib/validations/unit.schema';
+import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema, UnitModeSwitchSchema } from '../../../server/lib/validations/unit.schema';
 
 describe('CreateUnitSchema (subsystem D P1 T1.3)', () => {
     it('accepts root building', () => {
@@ -47,5 +47,20 @@ describe('MoveUnitSchema', () => {
     });
     it('rejects empty newParentUnitId string', () => {
         expect(MoveUnitSchema.safeParse({ newParentUnitId: '', newSortOrder: 0 }).success).toBe(false);
+    });
+});
+
+describe('UnitModeSwitchSchema (Phase U Batch C2a)', () => {
+    it('accepts mode=per_unit', () => {
+        expect(UnitModeSwitchSchema.safeParse({ mode: 'per_unit' }).success).toBe(true);
+    });
+    it('accepts mode=tagged', () => {
+        expect(UnitModeSwitchSchema.safeParse({ mode: 'tagged' }).success).toBe(true);
+    });
+    it('rejects an unknown mode', () => {
+        expect(UnitModeSwitchSchema.safeParse({ mode: 'matrix' }).success).toBe(false);
+    });
+    it('rejects a missing mode', () => {
+        expect(UnitModeSwitchSchema.safeParse({}).success).toBe(false);
     });
 });
