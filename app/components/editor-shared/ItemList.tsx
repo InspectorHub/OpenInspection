@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { EditorMode } from "./editor-mode";
 import { useDragReorder } from "./useDragReorder";
 import { findingKey } from "~/hooks/findings/shared";
@@ -56,9 +57,19 @@ export function ItemList({
   onReorderItem,
   activeUnitId = null,
 }: SharedItemListProps) {
-  const [filter, setFilter] = useState("all");
   const lastClickedRef = useRef<string | null>(null);
   const [menuItemId, setMenuItemId] = useState<string | null>(null);
+  // The ⋯ menu is rendered in a portal at this viewport anchor so the
+  // overflow-y-auto item column never clips it (the last item's menu opens
+  // downward past the scroll container's edge).
+  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
+  const openItemMenu = (itemId: string, el: HTMLElement) => {
+    if (menuItemId === itemId) { setMenuItemId(null); setMenuAnchor(null); return; }
+    const r = el.getBoundingClientRect();
+    setMenuItemId(itemId);
+    setMenuAnchor({ x: r.right, y: r.bottom });
+  };
+  const closeItemMenu = () => { setMenuItemId(null); setMenuAnchor(null); };
   const structuralEditing = Boolean(onDuplicateItem || onDeleteItem || onMoveItem);
   const resultsMap = results ?? {};
   // Phase U (Batch C1) — resolve a result in the active unit scope. The bare
@@ -72,45 +83,15 @@ export function ItemList({
     {};
   const { dragProps } = useDragReorder({ ids: items.map((i) => i.id), onReorder: onReorderItem ?? (() => {}) });
 
-  const filters = [
-    { id: "all", label: "All" },
-    { id: "unrated", label: "Unrated" },
-    { id: "issues", label: "Issues" },
-    { id: "flagged", label: "Flagged" },
-  ];
-
-  const filteredItems = items.filter((item) => {
-    if (filter === "all") return true;
-    const r = scopedResult(item.id);
-    if (filter === "unrated") return !r.rating;
-    if (filter === "issues") return r.rating === "DEF" || r.rating === "MON" || r.rating === "Defect" || r.rating === "Monitor";
-    return true;
-  });
-
   return (
     <div data-shortcut-scope className="w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto flex flex-col">
-      {/* Filter chips (fill-only) */}
-      {mode === "fill" && (
-        <div className="px-2 py-1.5 flex gap-1 border-b border-ih-border">
-          {filters.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFilter(f.id)}
-              className={`px-2 py-1 rounded text-[11px] font-bold ${
-                filter === f.id
-                  ? "bg-ih-primary-tint text-ih-primary"
-                  : "text-ih-fg-4 hover:text-ih-fg-2"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Filter chips live in the inspection-edit header row (with per-filter
+          counts + a working Flagged filter); this shared list only renders the
+          items it is handed, already filtered by the parent. */}
 
       {/* Item list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
-        {filteredItems.map((item, idx) => {
+        {items.map((item, idx) => {
           const result = scopedResult(item.id);
           const fullIdx = items.findIndex((i) => i.id === item.id);
           return (
@@ -180,31 +161,36 @@ export function ItemList({
               {structuralEditing && !batchMode && (
                 <div className="relative flex-shrink-0">
                   <button
-                    onClick={() => setMenuItemId(menuItemId === item.id ? null : item.id)}
+                    onClick={(e) => openItemMenu(item.id, e.currentTarget)}
                     className="w-7 h-7 rounded-md flex items-center justify-center text-ih-fg-4 opacity-0 group-hover:opacity-100 hover:bg-ih-bg-muted aria-expanded:opacity-100"
                     aria-label={`Edit ${item.label}`}
                     aria-expanded={menuItemId === item.id}
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
                   </button>
-                  {menuItemId === item.id && (
+                  {menuItemId === item.id && menuAnchor && createPortal(
                     <>
-                      <div className="fixed inset-0 z-[40]" onClick={() => setMenuItemId(null)} />
-                      <div role="menu" className="absolute right-0 top-7 z-[41] w-36 py-1 bg-ih-bg-card border border-ih-border rounded-md shadow-ih-popover text-[12px]">
+                      <div className="fixed inset-0 z-[60]" onClick={closeItemMenu} />
+                      <div
+                        role="menu"
+                        style={{ top: menuAnchor.y + 4, left: menuAnchor.x }}
+                        className="fixed -translate-x-full z-[61] w-36 py-1 bg-ih-bg-card border border-ih-border rounded-md shadow-ih-popover text-[12px]"
+                      >
                         {onDuplicateItem && (
-                          <button role="menuitem" onClick={() => { setMenuItemId(null); onDuplicateItem(item.id); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Duplicate</button>
+                          <button role="menuitem" onClick={() => { closeItemMenu(); onDuplicateItem(item.id); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Duplicate</button>
                         )}
                         {onMoveItem && fullIdx > 0 && (
-                          <button role="menuitem" onClick={() => { setMenuItemId(null); onMoveItem(item.id, -1); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Move up</button>
+                          <button role="menuitem" onClick={() => { closeItemMenu(); onMoveItem(item.id, -1); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Move up</button>
                         )}
                         {onMoveItem && fullIdx < items.length - 1 && (
-                          <button role="menuitem" onClick={() => { setMenuItemId(null); onMoveItem(item.id, 1); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Move down</button>
+                          <button role="menuitem" onClick={() => { closeItemMenu(); onMoveItem(item.id, 1); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Move down</button>
                         )}
                         {onDeleteItem && (
-                          <button role="menuitem" onClick={() => { setMenuItemId(null); onDeleteItem(item.id); }} className="w-full text-left px-3 py-1.5 text-ih-bad hover:bg-ih-bg-muted">Delete</button>
+                          <button role="menuitem" onClick={() => { closeItemMenu(); onDeleteItem(item.id); }} className="w-full text-left px-3 py-1.5 text-ih-bad hover:bg-ih-bg-muted">Delete</button>
                         )}
                       </div>
-                    </>
+                    </>,
+                    document.body,
                   )}
                 </div>
               )}

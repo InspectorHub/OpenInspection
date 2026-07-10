@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SectionDonut } from '../editor/SectionDonut';
 import { sectionIconFor } from '../editor/section-icons';
 import type { EditorMode } from './editor-mode';
@@ -93,6 +94,16 @@ export function SectionRail({
  onReorderSection,
 }: SharedSectionRailProps) {
  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+ // The ⋯ menu is portaled to a viewport anchor so the section rail's
+ // overflow-y-auto never clips the last section's menu.
+ const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
+ const openSectionMenu = (sectionId: string, el: HTMLElement) => {
+  if (openMenuId === sectionId) { setOpenMenuId(null); setMenuAnchor(null); return; }
+  const r = el.getBoundingClientRect();
+  setOpenMenuId(sectionId);
+  setMenuAnchor({ x: r.right, y: r.bottom });
+ };
+ const closeSectionMenu = () => { setOpenMenuId(null); setMenuAnchor(null); };
  const hasStructuralOps = Boolean(onAddSection || onDuplicateSection || onDeleteSection || onMoveSection);
  const { dragProps } = useDragReorder({ ids: sections.map((s) => s.id), onReorder: onReorderSection ?? (() => {}) });
 
@@ -162,7 +173,9 @@ export function SectionRail({
   <div className="flex items-center justify-between gap-1">
   <span className="mr-1 shrink-0 text-ih-fg-3">{sectionIconFor(section.title ?? section.id)}</span>
   <span className="truncate flex-1">{section.title}</span>
-  <span className="ml-1 shrink-0 flex items-center">
+  {/* The hover ⋯ menu is absolute right-1 and would sit ON TOP of this
+      donut/count; fade it out on hover so the menu cleanly replaces it. */}
+  <span className={`ml-1 shrink-0 flex items-center ${hasStructuralOps ? 'transition-opacity group-hover:opacity-0' : ''}`}>
   {mode === 'fill'
    ? <SectionDonut rated={rated} total={total} hasDefect={hasDefect} />
    : <span className="text-[10px] text-ih-fg-4 font-mono">{section.items.length}</span>}
@@ -174,7 +187,7 @@ export function SectionRail({
   {hasStructuralOps && (
   <div className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center">
    <button
-   onClick={(e) => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : section.id); }}
+   onClick={(e) => { e.stopPropagation(); openSectionMenu(section.id, e.currentTarget); }}
    className="w-6 h-6 flex items-center justify-center rounded text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ih-primary"
    aria-label={`Section options for ${section.title}`}
    aria-haspopup="true"
@@ -182,17 +195,19 @@ export function SectionRail({
    >
    <DotsIcon />
    </button>
-   {menuOpen && (
+   {menuOpen && menuAnchor && createPortal(
+   <>
+   <div className="fixed inset-0 z-[60]" onClick={closeSectionMenu} />
    <div
-    className="absolute right-0 top-full mt-0.5 z-40 w-36 rounded-md shadow-ih-popover bg-ih-bg-card border border-ih-border py-0.5 text-[12px]"
+    style={{ top: menuAnchor.y + 4, left: menuAnchor.x }}
+    className="fixed -translate-x-full z-[61] w-36 rounded-md shadow-ih-popover bg-ih-bg-card border border-ih-border py-0.5 text-[12px]"
     role="menu"
-    onMouseLeave={() => setOpenMenuId(null)}
    >
     {onDuplicateSection && (
     <button
      role="menuitem"
      className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
-     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onDuplicateSection(section.id); }}
+     onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onDuplicateSection(section.id); }}
     >
      Duplicate
     </button>
@@ -201,7 +216,7 @@ export function SectionRail({
     <button
      role="menuitem"
      className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
-     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onMoveSection(section.id, -1); }}
+     onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onMoveSection(section.id, -1); }}
     >
      Move up
     </button>
@@ -210,7 +225,7 @@ export function SectionRail({
     <button
      role="menuitem"
      className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
-     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onMoveSection(section.id, 1); }}
+     onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onMoveSection(section.id, 1); }}
     >
      Move down
     </button>
@@ -221,13 +236,15 @@ export function SectionRail({
      <button
      role="menuitem"
      className="w-full text-left px-3 py-1.5 text-ih-bad hover:bg-ih-bg-muted font-bold"
-     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onDeleteSection(section.id); }}
+     onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onDeleteSection(section.id); }}
      >
      Delete
      </button>
     </>
     )}
    </div>
+   </>,
+   document.body,
    )}
   </div>
   )}
@@ -256,15 +273,15 @@ export function SectionRail({
    <button
     onClick={() => onSaveToTemplate("back")}
     data-testid="save-template-back-btn"
-    className="w-full text-left px-3 py-1.5 rounded-md text-[11px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
+    className="w-full px-3 py-1.5 rounded-md text-[11px] font-bold text-center border border-ih-border bg-ih-bg-card text-ih-fg-2 hover:bg-ih-bg-muted hover:border-ih-border-strong transition-all"
    >
-    Save structure → template
+    Update source template
    </button>
   )}
   <button
    onClick={() => onSaveToTemplate("new")}
    data-testid="save-template-new-btn"
-   className="w-full text-left px-3 py-1.5 rounded-md text-[11px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
+   className="w-full px-3 py-1.5 rounded-md text-[11px] font-bold text-center border border-ih-border bg-ih-bg-card text-ih-fg-2 hover:bg-ih-bg-muted hover:border-ih-border-strong transition-all"
   >
    Save as new template…
   </button>

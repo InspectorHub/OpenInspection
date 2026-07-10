@@ -7,13 +7,16 @@ const items = [
   { id: 'i2', label: 'Roof Age', type: 'number' },
 ];
 
-test('fill mode shows filter chips and rating dot for rated items', () => {
+test('fill mode renders items with no filter chips (filtering lives in the editor header)', () => {
   render(
     <ItemList mode="fill" items={items} sectionId="s1" activeItemId="i1" onSelect={vi.fn()}
       results={{ '_default:s1:i1': { rating: 'Defect' } }} />
   );
-  expect(screen.getByText('Unrated')).toBeTruthy(); // filter chip
   expect(screen.getByText('Roof Covering')).toBeTruthy();
+  // The shared list no longer owns filter chips — inspection-edit's header row
+  // (with per-filter counts + a working Flagged filter) is the single owner.
+  expect(screen.queryByText('Unrated')).toBeNull();
+  expect(screen.queryByText('Flagged')).toBeNull();
 });
 
 // Phase U (Batch C1) regression — the rating dot must reflect ONLY the active
