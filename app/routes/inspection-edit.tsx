@@ -2,7 +2,8 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
 import { findRatingLevel, ratingAdvanceDecision } from "~/lib/rating-levels";
 import { makeCustomDefect } from "~/lib/custom-defects";
-import { useInspectionState, fKey, type InspectionSchema } from "~/hooks/useInspection";
+import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
+import { findingKey } from "~/hooks/findings/shared";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
@@ -558,6 +559,8 @@ export default function InspectionEditPage() {
   collabEditing: loaderData.collabEditing,
   results: state.results,
   templateId: (state.inspection.templateId as string | null | undefined) ?? null,
+  // Phase U (Batch C2a) — scope the delete-impact tally to the active unit.
+  activeUnitId,
  });
 
  /* Plan 7 — Stream customer subdomain (from loader env). Null ⇒ fail closed:
@@ -601,6 +604,8 @@ export default function InspectionEditPage() {
   streamCustomerSubdomain,
   // #181 — photo array ops route through the Y.Doc (the DO persists it to D1).
   collabDoc: collab?.doc ?? null,
+  // Phase U (Batch C2a) — scope photo composite keys to the active unit.
+  activeUnitId,
   setPhotoStudioUrl,
   setPhotoStudioKey,
   setPhotoStudioIndex,
@@ -905,7 +910,9 @@ export default function InspectionEditPage() {
  const doc = collab?.doc ?? null;
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
  if (typeof navigator !== "undefined" && navigator.onLine === false && doc && sid && !target) {
-  const fk = fKey(sid, itemId);
+  // Phase U (Batch C2a) — key the offline pending-photo doc entry to the active
+  // unit. At activeUnitId == null this === the legacy `_default:{sid}:{itemId}`.
+  const fk = findingKey(activeUnitId, sid, itemId);
   const pendingId = crypto.randomUUID();
   await enqueueMedia({
   pendingId,
@@ -933,7 +940,7 @@ export default function InspectionEditPage() {
  // Reset input so picking the same file twice re-fires onChange
  if (photoInputRef.current) photoInputRef.current.value = "";
  },
- [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection],
+ [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection, activeUnitId],
  );
 
  const handleBurstCommit = useCallback(

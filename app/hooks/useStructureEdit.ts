@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { findingKey } from "~/hooks/findings/shared";
 import {
   addSection, duplicateSection, deleteSection, moveSection, reorderSection,
   addItem, duplicateItem, deleteItem, moveItem,
@@ -30,6 +31,14 @@ export interface UseStructureEditOptions {
   results: Record<string, unknown>;
   /** The inspection's source template id (enables "save structure back to template"). */
   templateId?: string | null;
+  /**
+   * Phase U (Batch C2a) — the active per-unit scope. `null`/undefined (default)
+   * = the `_default` common scope, so the delete-impact tally is byte-identical
+   * to before this change. When a unit is active, `itemImpact` reads the finding
+   * under `findingKey(activeUnitId, …)` and never falls back to the ambiguous
+   * bare itemId (two units share an itemId in per-unit mode).
+   */
+  activeUnitId?: string | null;
 }
 
 /** Open "save structure to template" modal state. */
@@ -117,6 +126,7 @@ export function useStructureEdit({
   collabEditing,
   results,
   templateId,
+  activeUnitId = null,
 }: UseStructureEditOptions): UseStructureEditReturn {
   // Hold the RAW snapshot in a ref so ops always operate on a clean
   // TemplateSchemaV2 object. Updated when loaderData refreshes after each
@@ -153,9 +163,16 @@ export function useStructureEdit({
   const [deletePending, setDeletePending] = useState<DeletePending | null>(null);
 
   // Tally rating/notes/photos for one item id within a section from live results.
+  // Phase U (Batch C2a): read the finding under the ACTIVE unit. The bare-itemId
+  // fallback is only consulted in the `_default` view (activeUnitId == null) —
+  // under a real unit the bare key is ambiguous (two units share an itemId), so
+  // it must never let one unit's impact shadow another. At activeUnitId == null
+  // `findingKey(null, …)` === `_default:{sectionId}:{itemId}`, so the tally is
+  // byte-identical to before this change.
   const itemImpact = useCallback(
     (sectionId: string, itemId: string) => {
-      const r = (results[`_default:${sectionId}:${itemId}`] || results[itemId]) as
+      const ck = findingKey(activeUnitId, sectionId, itemId);
+      const r = (results[ck] || (activeUnitId == null ? results[itemId] : undefined)) as
         | Record<string, unknown>
         | undefined;
       const ratings = (r as { rating?: unknown } | undefined)?.rating ? 1 : 0;
@@ -165,7 +182,7 @@ export function useStructureEdit({
       const photos = Array.isArray(p) ? p.length : 0;
       return { ratings, notes, photos };
     },
-    [results],
+    [results, activeUnitId],
   );
 
   const handleDeleteSection = useCallback(

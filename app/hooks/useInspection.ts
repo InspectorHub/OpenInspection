@@ -160,6 +160,17 @@ export function useInspectionState(opts: UseInspectionOptions) {
         const ck = fKey(sec.id, item.id);
         if (!r[ck]) r[ck] = { rating: null, notes: "", photos: [] };
         if (!r[item.id]) r[item.id] = r[ck];
+        // Phase U (Batch C2a) — when a unit is the initial active scope, ALSO
+        // seed its per-unit stubs so per-unit reads never hit undefined. Gated on
+        // `activeUnitId != null`, so the `_default` seeding above is unchanged and
+        // behavior is byte-identical when no unit is active. Re-seeding on a live
+        // scope SWITCH is deferred to Batch C2b (the switcher UI) — `getResult`
+        // already returns `{}` for an unseeded per-unit key, so a switch before
+        // that lands cannot crash a read; it just lacks the empty-shape stub.
+        if (activeUnitId != null) {
+          const uk = findingKey(activeUnitId, sec.id, item.id);
+          if (!r[uk]) r[uk] = { rating: null, notes: "", photos: [] };
+        }
       }
     }
     return r;
