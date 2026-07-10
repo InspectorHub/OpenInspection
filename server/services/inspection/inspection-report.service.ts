@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions } from '../../lib/db/schema';
+import { eq, and, desc, asc } from 'drizzle-orm';
+import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
+import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
 import { parseReinspectionStatuses } from '../../lib/reinspection-status';
 import { computeReportStats, getRatingColor, getRatingBucket, getNaKind, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
@@ -562,6 +563,29 @@ export class InspectionReportService extends InspectionSubService {
             }
         }
 
+        // Commercial PCA Phase U — per-unit payload. `unit_inspection_mode` is
+        // Phase F's column (default 'tagged'); read defensively so this stays a
+        // no-op until Phase F lands and for every non-per_unit inspection.
+        const unitInspectionMode =
+            (inspection as { unitInspectionMode?: 'tagged' | 'per_unit' | null }).unitInspectionMode ?? 'tagged';
+        const unitRows = await db.select().from(inspectionUnits)
+            .where(and(eq(inspectionUnits.tenantId, tenantId), eq(inspectionUnits.inspectionId, inspectionId)))
+            .orderBy(asc(inspectionUnits.sortOrder)).all();
+        // Only kind='unit' rows form matrix rows; buildings/floors are grouping.
+        const matrixUnits = unitRows
+            .filter((u) => u.kind === 'unit')
+            .map((u) => ({ id: u.id, label: u.name }));
+        const perUnit = unitInspectionMode === 'per_unit';
+        // Pass the COMPLETE section id list so a per-unit finding in a section
+        // that is not otherwise expanded still lands in the matrix.
+        const sectionIds = sections.map((s) => s.id);
+        const unitConditionMatrix = perUnit
+            ? buildUnitConditionMatrix(matrixUnits, resultData as Record<string, unknown>, levels, sectionIds)
+            : [];
+        const unitDefectCounts = perUnit
+            ? defectCountsByUnit(matrixUnits, resultData as Record<string, unknown>, levels)
+            : {};
+
         return {
             inspection: { ...inspection, inspectorName },
             theme: reportTheme,
@@ -587,8 +611,18 @@ export class InspectionReportService extends InspectionSubService {
             commercialSubtype:   (inspection as { commercialSubtype?: string | null }).commercialSubtype ?? null,
             buildingProfile,
             pcaReport,
-            // Surfaced (unrendered) for the Phase S walk-through narrative.
-            unitInspectionMode:  (inspection as { unitInspectionMode?: 'tagged' | 'per_unit' | null }).unitInspectionMode ?? 'tagged',
+            // Commercial PCA Phase U — per-unit inspection mode + the unit tree,
+            // units×systems condition matrix, and per-unit defect counts. Matrix
+            // and counts are empty in 'tagged' mode so the existing report renders
+            // unchanged (additive fields only). Mode is also surfaced for the
+            // Phase S walk-through narrative.
+            unitInspectionMode,
+            units: unitRows.map((u) => ({
+                id: u.id, label: u.name, kind: u.kind, type: u.type,
+                parentUnitId: u.parentUnitId, sortOrder: u.sortOrder, attrs: u.attrs ?? null,
+            })),
+            unitConditionMatrix,
+            defectCountsByUnit: unitDefectCounts,
             samplingDeclaration: (inspection as { samplingDeclaration?: unknown }).samplingDeclaration ?? null,
             // Layer-2 report signature + verification (see docs/superpowers/specs/report-signature).
             isPublished,
