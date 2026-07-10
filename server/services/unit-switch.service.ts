@@ -11,9 +11,10 @@
  * Tenant isolation: every read/write filters by the caller's tenantId; unit
  * mutations go through UnitService, which enforces the same scoping.
  *
- * Phase F dependency: the unit_inspection_mode + location_options columns are
- * Phase F's. When they are absent (Phase F not landed) the switch throws a
- * clear error rather than corrupting data.
+ * Schema dependency: `unit_inspection_mode` (notNull, default 'tagged') and
+ * `location_options` live on `inspections` (see schema/inspection/core.ts). The
+ * db:check drift gate keeps schema and migrations in sync, so the columns are
+ * always present at runtime — no defensive column-presence guard is needed.
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
@@ -33,19 +34,6 @@ export class UnitSwitchService {
         return drizzle(this.db);
     }
 
-    /**
-     * Guard against a pre-Phase-F schema: unit_inspection_mode must exist on the
-     * inspection row. A missing column means Phase F has not landed — refuse
-     * rather than write a mode the schema cannot store.
-     */
-    private assertPhaseF(inspection: Record<string, unknown>): void {
-        if (!('unitInspectionMode' in inspection) || inspection.unitInspectionMode === undefined) {
-            throw new Error(
-                'tagged<->per_unit switch requires Phase F (unit_inspection_mode / location_options columns)',
-            );
-        }
-    }
-
     private parseData(raw: unknown): Record<string, unknown> {
         if (!raw) return {};
         return (typeof raw === 'string' ? JSON.parse(raw) : raw) as Record<string, unknown>;
@@ -63,7 +51,6 @@ export class UnitSwitchService {
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
-        this.assertPhaseF(inspection as Record<string, unknown>);
 
         const locationOptions = ((inspection as { locationOptions?: string[] | null }).locationOptions) ?? [];
         const existing = await this.units.list(tenantId, inspectionId);
@@ -114,26 +101,31 @@ export class UnitSwitchService {
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
-        this.assertPhaseF(inspection as Record<string, unknown>);
 
         const unitRows = (await this.units.list(tenantId, inspectionId)).filter((u) => u.kind === 'unit');
         const units = unitRows.map((u) => ({ id: u.id, label: u.name }));
 
+        // Every demoted unit's label MUST survive into location_options — even a
+        // unit the inspector created but left with zero findings (it contributes
+        // no finding key, so `flattenUnitsToTagged` would never surface it). Seed
+        // from the unit rows directly, not from what the rewrite happened to emit;
+        // this also makes a retry after a partial failure label-complete (the
+        // second run re-reads already-flattened data that carries no unit keys).
         const mergedOptions = (((inspection as { locationOptions?: string[] | null }).locationOptions) ?? []).slice();
         const optionSet = new Set(mergedOptions);
+        for (const u of units) {
+            if (!optionSet.has(u.label)) {
+                optionSet.add(u.label);
+                mergedOptions.push(u.label);
+            }
+        }
 
         const resultsRow = await db.select().from(inspectionResults)
             .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)))
             .get();
         if (resultsRow) {
             const data = this.parseData(resultsRow.data);
-            const { data: flattened, locationOptions } = flattenUnitsToTagged(data, units);
-            for (const label of locationOptions) {
-                if (!optionSet.has(label)) {
-                    optionSet.add(label);
-                    mergedOptions.push(label);
-                }
-            }
+            const { data: flattened } = flattenUnitsToTagged(data, units);
             await db.update(inspectionResults)
                 .set({ data: flattened, lastSyncedAt: new Date() })
                 .where(eq(inspectionResults.id, resultsRow.id));

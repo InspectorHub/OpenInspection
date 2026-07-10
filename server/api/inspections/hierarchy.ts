@@ -249,17 +249,23 @@ const hierarchyRoutes = createApiRouter()
                 ...(body.startAt !== undefined ? { startAt: body.startAt } : {}),
               })
             : parseUnitCsv(body.csv);
-        const out = await c.var.services.unit.createMany(tenantId, id, drafts, {
-            parentUnitId: body.parentUnitId ?? null,
-            kind: 'unit',
-            type: 'unit',
-        });
-        return c.json({ success: true as const, data: out }, 200);
+        try {
+            const out = await c.var.services.unit.createMany(tenantId, id, drafts, {
+                parentUnitId: body.parentUnitId ?? null,
+                kind: 'unit',
+                type: 'unit',
+            });
+            return c.json({ success: true as const, data: out }, 200);
+        } catch (err) {
+            throw Errors.BadRequest((err as Error).message);
+        }
     })
     .openapi(duplicateUnitRoute, async (c) => {
-        const { unitId } = c.req.valid('param');
+        const { id, unitId } = c.req.valid('param');
         try {
-            const out = await c.var.services.unit.duplicate(c.get('tenantId'), unitId);
+            // Scope the duplicate to this inspection so a unit from another
+            // inspection cannot be cloned through this URL.
+            const out = await c.var.services.unit.duplicate(c.get('tenantId'), unitId, id);
             return c.json({ success: true as const, data: out }, 200);
         } catch (err) {
             throw Errors.BadRequest((err as Error).message);

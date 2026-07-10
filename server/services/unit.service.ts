@@ -101,6 +101,13 @@ export class UnitService {
     ): Promise<{ ids: string[] }> {
         const db = this.getDrizzle();
         const parentUnitId = opts?.parentUnitId ?? null;
+        // Same MAX_DEPTH invariant the single-create path enforces — a bulk
+        // insert under a depth-3 parent would otherwise silently create depth-4
+        // rows and break the bounded parent-walk assumption.
+        const depth = await this._depthOf(db, tenantId, parentUnitId);
+        if (depth >= MAX_DEPTH) {
+            throw new Error(`Max tree depth (${MAX_DEPTH}) exceeded`);
+        }
         const siblings = (await this.list(tenantId, inspectionId))
             .filter((s) => (s.parentUnitId ?? null) === parentUnitId);
         const fresh = dedupeDrafts(siblings.map((s) => s.name), drafts);
@@ -132,12 +139,18 @@ export class UnitService {
      * findings. Finding keys are prefixed by the source unit id, so the new
      * unit starts empty by construction; only name/kind/type/parent/attrs clone.
      */
-    async duplicate(tenantId: string, unitId: string): Promise<{ id: string }> {
+    async duplicate(tenantId: string, unitId: string, inspectionId?: string): Promise<{ id: string }> {
         const db = this.getDrizzle();
         const src = await db.select().from(inspectionUnits)
             .where(and(eq(inspectionUnits.id, unitId), eq(inspectionUnits.tenantId, tenantId)))
             .get();
-        if (!src) throw new Error('Unit not found');
+        // When the caller supplies the inspection scope (the route does), the
+        // unit MUST belong to it — otherwise a unit from another inspection could
+        // be duplicated through this inspection's URL. Treat a mismatch as
+        // not-found so we don't confirm the unit's existence across inspections.
+        if (!src || (inspectionId !== undefined && src.inspectionId !== inspectionId)) {
+            throw new Error('Unit not found');
+        }
         const siblings = (await this.list(tenantId, src.inspectionId))
             .filter((s) => (s.parentUnitId ?? null) === (src.parentUnitId ?? null));
         const id = crypto.randomUUID();

@@ -106,4 +106,33 @@ describe('UnitService (subsystem D P1 T1.2)', () => {
         const list = await svc.list('other-tenant', INSPECTION);
         expect(list).toEqual([]);
     });
+
+    it('createMany enforces the same MAX_DEPTH as create', async () => {
+        const b = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'building', name: 'B' });
+        const f = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: b.id, kind: 'floor', name: 'F' });
+        const u = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: f.id, kind: 'unit', name: 'U' });
+        // Bulk-creating under a depth-3 unit would make depth-4 rows — must reject.
+        await expect(svc.createMany(TENANT, INSPECTION, [{ label: 'Sub', floor: null }], { parentUnitId: u.id }))
+            .rejects.toThrow(/depth/i);
+    });
+
+    it('createMany skips labels colliding with an existing sibling', async () => {
+        await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'unit', name: '101' });
+        const out = await svc.createMany(TENANT, INSPECTION, [
+            { label: '101', floor: null }, // dup of existing → skipped
+            { label: '102', floor: '2' },
+        ]);
+        expect(out.ids).toHaveLength(1);
+        const names = (await svc.list(TENANT, INSPECTION)).map((u) => u.name).sort();
+        expect(names).toEqual(['101', '102']);
+    });
+
+    it('duplicate refuses a unit that belongs to a different inspection', async () => {
+        const u = await svc.create(TENANT, { inspectionId: INSPECTION, parentUnitId: null, kind: 'unit', name: 'X' });
+        // Correct inspection scope → clones.
+        const dup = await svc.duplicate(TENANT, u.id, INSPECTION);
+        expect(dup.id).toBeTruthy();
+        // Wrong inspection scope → treated as not-found.
+        await expect(svc.duplicate(TENANT, u.id, 'some-other-inspection')).rejects.toThrow(/not found/i);
+    });
 });
