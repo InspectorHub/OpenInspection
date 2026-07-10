@@ -12,7 +12,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const api = createApi(context, { token });
  const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
- api.inspections[":id"].results.$get({ param: { id } }),
+ // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
+ // scope. The editor opens at activeUnitId = null (the '_default' scope), so
+ // we fetch just that slice: for a `tagged` inspection '_default' IS the whole
+ // map (no payload change); for a `per_unit` inspection this drops every unit's
+ // findings from first paint — they load on demand when a unit is selected
+ // (Batch C2, not this batch). The optional `scope` query flows through
+ // hono/client once the route declares it.
+ api.inspections[":id"].results.$get({ param: { id }, query: { scope: '_default' } }),
  api.inspections[":id"]["report-data"].$get({ param: { id } }),
  // Track H (C-12): tag library moved off the client-side fetch into the loader.
  api.tags.index.$get().catch(() => null),

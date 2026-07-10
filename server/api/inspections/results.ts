@@ -22,6 +22,7 @@ import { resolvePcaNarrative } from '../../lib/pca-narrative';
 import { TemplateSchemaV2Schema } from '../../lib/validations/template.schema';
 import { AggregatedRecommendationsResponseSchema } from '../../lib/validations/recommendation.schema';
 import { aggregateAttachedRecommendations } from '../../lib/aggregate-recommendations';
+import { findingsForUnit } from '../../lib/finding-key';
 import { applyResultsBatch } from '../../services/inspection-results.service';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspectionResults } from '../../lib/db/schema';
@@ -142,6 +143,12 @@ export const getResultsRoute = createRoute(withMcpMetadata({
     summary: "List inspection results for current tenant",
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        // Commercial PCA Phase U (Batch C-lazy) — OPTIONAL per-unit read-slice:
+        // present ⇒ only that scope's findings (unit id, or '_default' common);
+        // omitted ⇒ full map, backward compatible for every existing caller.
+        query: z.object({
+            scope: z.string().min(1).optional().describe('Optional per-unit scope to slice the results map (unit id, or "_default" for the common scope). Omit for the full map.'),
+        }),
     },
     responses: {
         200: {
@@ -348,10 +355,15 @@ const resultsRoutes = createApiRouter()
     })
     .openapi(getResultsRoute, async (c) => {
         const { id } = c.req.valid('param');
+        const { scope } = c.req.valid('query');
         const db = drizzle(c.env.DB);
         await c.var.services.inspection.getInspection(id, c.get('tenantId'));
         const results = await db.select().from(inspectionResults).where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, c.get('tenantId')))).get();
-        return c.json({ success: true, data: { results: (results?.data || {}) } }, 200);
+        const data = (results?.data || {}) as Record<string, unknown>;
+        // Phase U — read-slice to one scope's findings when requested; no scope
+        // ⇒ full map, unchanged. Write model (Yjs/DO) is untouched.
+        const sliced = scope ? findingsForUnit(data, scope) : data;
+        return c.json({ success: true, data: { results: sliced } }, 200);
     })
     .openapi(updateTemplateSnapshotRoute, async (c) => {
         const { id } = c.req.valid('param');
