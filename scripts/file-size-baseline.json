@@ -11,10 +11,10 @@
   "server/services/inspection.service.ts": 739,
   "app/routes/settings-communication-templates.tsx": 728,
   "app/routes/settings-communication.tsx": 715,
+  "server/services/inspection/inspection-report.service.ts": 706,
   "app/routes/template-edit.tsx": 697,
   "app/components/media-studio/PhotoAnnotator.tsx": 689,
   "app/components/portal/sections/ReportView.tsx": 677,
-  "server/services/inspection/inspection-report.service.ts": 672,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "app/hooks/usePhotoOps.ts": 639,
   "app/components/editor/ItemEditor.tsx": 631,
@@ -49,5 +49,6 @@
   "server/api/inspections/results.ts": 418,
   "server/lib/email-templates/registry.ts": 413,
   "app/routes/templates.tsx": 409,
+  "server/lib/middleware/di.ts": 404,
   "server/api/secrets.ts": 401
 }

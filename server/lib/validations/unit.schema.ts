@@ -19,6 +19,25 @@ export const MoveUnitSchema = z.object({
     newSortOrder:    z.number().int().min(0).describe('TODO describe newSortOrder field for the OpenInspection MCP integration'),
 }).openapi('MoveUnit');
 
+// Commercial PCA Phase U — bulk create N units (floors×stacks or CSV) under one
+// parent node. parentUnitId null = top-level (single-building inspections).
+export const BulkCreateUnitsSchema = z.discriminatedUnion('mode', [
+    z.object({
+        mode:         z.literal('floors_stacks'),
+        floors:       z.array(z.number().int()).min(1).max(200),
+        stacks:       z.number().int().min(1).max(200),
+        startAt:      z.number().int().min(0).optional(),
+        parentUnitId: z.string().min(1).nullish(),
+    }),
+    z.object({
+        mode:         z.literal('csv'),
+        csv:          z.string().min(1).max(20000),
+        parentUnitId: z.string().min(1).nullish(),
+    }),
+]).openapi('BulkCreateUnits');
+
+export type BulkCreateUnitsInput = z.infer<typeof BulkCreateUnitsSchema>;
+
 export type CreateUnitInput = z.infer<typeof CreateUnitSchema>;
 export type UpdateUnitInput = z.infer<typeof UpdateUnitSchema>;
 export type MoveUnitInput   = z.infer<typeof MoveUnitSchema>;
