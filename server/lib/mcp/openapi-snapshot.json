@@ -363,6 +363,36 @@
     "description": "Operator diagnostic for confirming Browser Run is enabled before enabling the per-tenant PDF pipeline."
   },
   {
+    "operationId": "bulkCreateInspectionUnits",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/units/bulk",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "TODO describe id field for the OpenInspection MCP integration"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/BulkCreateUnits"
+      }
+    },
+    "summary": "Bulk-create units under an inspection (floors×stacks or CSV)",
+    "description": "Auto-generated placeholder for bulkCreateInspectionUnits (POST /{id}/units/bulk, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
     "operationId": "bulkInspection",
     "method": "PATCH",
     "pathTemplate": "/api/inspections/bulk",
@@ -5634,6 +5664,45 @@
     "description": "Streams the workflow-rendered signed.pdf for an agreement request from R2 storage to the caller."
   },
   {
+    "operationId": "duplicateInspectionUnit",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/units/{unitId}/duplicate",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "TODO describe id field for the OpenInspection MCP integration"
+          }
+        },
+        {
+          "name": "unitId",
+          "in": "path",
+          "required": true,
+          "description": "TODO describe unitId field for the OpenInspection MCP integration",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "TODO describe unitId field for the OpenInspection MCP integration"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Duplicate a unit (clone attributes into a new empty sibling)",
+    "description": "Auto-generated placeholder for duplicateInspectionUnit (POST /{id}/units/{unitId}/duplicate, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
     "operationId": "duplicateMessageTemplate",
     "method": "POST",
     "pathTemplate": "/api/message-templates/{id}/duplicate",
@@ -8569,6 +8638,17 @@
             "format": "uuid",
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
+        },
+        {
+          "name": "scope",
+          "in": "query",
+          "required": false,
+          "description": "Optional per-unit scope to slice the results map (unit id, or \"_default\" for the common scope). Omit for the full map.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Optional per-unit scope to slice the results map (unit id, or \"_default\" for the common scope). Omit for the full map."
+          }
         }
       ],
       "body": null
@@ -8767,6 +8847,34 @@
     },
     "summary": "List duplicate marketplace imports",
     "description": "Returns one entry per marketplace template ID that has more than one local copy."
+  },
+  {
+    "operationId": "listInspectionUnitProgress",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/unit-progress",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id whose per-unit progress is summarized",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Inspection id whose per-unit progress is summarized"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Per-unit rated/total progress summary (server-computed, no full map)",
+    "description": "Returns { units: [{ unitId, rated, total }], commonRated, total } for an inspection. `total` is the template item count; `rated` counts each scope's findings that carry a truthy rating. Computed server-side from one results row to avoid shipping the full results map to the client."
   },
   {
     "operationId": "listInspectionUnits",
@@ -14460,6 +14568,36 @@
     },
     "summary": "Switch the rating system on the per-inspection snapshot",
     "description": "Swaps the per-inspection ratingSystem to the target system. mode=\"remap\" maps existing item ratings by severity bucket; mode=\"clear\" wipes them. Notes/photos/canned comments preserved. Clears the inspection_results.ratingSystemSnapshot freeze so the new system applies end-to-end."
+  },
+  {
+    "operationId": "switchInspectionUnitMode",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/unit-mode",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id whose unit-inspection mode is switched",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Inspection id whose unit-inspection mode is switched"
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/UnitModeSwitch"
+      }
+    },
+    "summary": "Switch an inspection between tagged and per-unit inspection mode",
+    "description": "Switches inspections.unit_inspection_mode. mode='per_unit' promotes location tags into unit rows and re-keys unambiguous findings; mode='tagged' is the lossy reverse (flattens unit findings back to the common scope, unions labels into location_options, deletes the promoted unit rows)."
   },
   {
     "operationId": "syncGoogleCalendarBusyBlocks",

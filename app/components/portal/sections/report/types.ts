@@ -162,7 +162,7 @@ export interface ReportVerification {
    server/app boundary (app/ cannot import server/lib/). Shapes mirror
    server/lib/unit-scope.ts exactly (same precedent as the Phase S types above). */
 export type Severity = 'good' | 'marginal' | 'significant' | 'minor';
-export interface MatrixCell {
+interface MatrixCell {
   worst: Severity | null;
   counts: { safety: number; recommendation: number; maintenance: number };
 }
@@ -172,7 +172,7 @@ export interface UnitMatrixRow {
   cells: Record<string, MatrixCell>;
   isException: boolean;
 }
-export interface ReportUnit {
+interface ReportUnit {
   id: string;
   label: string;
   kind: string;
