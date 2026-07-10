@@ -33,7 +33,7 @@
     "setup-code:ensure": "node scripts/ensure-setup-code.mjs",
     "vendor:copy": "node scripts/vendor-copy.js",
     "gen-version": "node scripts/gen-version.js",
-    "type-check": "react-router typegen && concurrently -g -n app,api \"npm:type-check:app\" \"npm:type-check:api\"",
+    "type-check": "react-router typegen && npm run type-check:app && npm run type-check:api",
     "type-check:app": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.json --noEmit",
     "type-check:api": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.api.json --noEmit",
     "type-check:fast": "react-router typegen && tsgo -p tsconfig.json --noEmit --tsBuildInfoFile ./.tsbuildinfo.app.tsgo && tsgo -p tsconfig.api.json --noEmit --tsBuildInfoFile ./.tsbuildinfo.api.tsgo",

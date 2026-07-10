@@ -12,6 +12,17 @@
 # Never run in CI / non-interactive contexts (CI does not commit, but guard anyway).
 [ -n "$CI" ] && exit 0
 
+# Memory ceiling so concurrent pre-commits (two parallel agent sessions on this
+# machine) don't exhaust RAM and freeze the box. Local-only (CI exited above).
+# `:-` keeps any value the caller already exported.
+#   GOMEMLIMIT/GOGC → bound tsgo (@typescript/native-preview is a Go binary; the
+#                     type-check:*:fast steps are the tsgo path the hook runs).
+#   NODE_OPTIONS    → bound the node heavy steps (react-router build for the
+#                     bundle-size gate, jscpd for lint:dup, eslint).
+export GOMEMLIMIT="${GOMEMLIMIT:-2GiB}"
+export GOGC="${GOGC:-75}"
+case " $NODE_OPTIONS " in *"--max-old-space-size"*) : ;; *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=4096" ;; esac
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
