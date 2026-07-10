@@ -1,5 +1,5 @@
 {
-  "app/routes/inspection-edit.tsx": 2031,
+  "app/routes/inspection-edit.tsx": 2043,
   "server/services/inspection/inspection-core.service.ts": 991,
   "app/routes/inspection-hub.tsx": 988,
   "server/lib/collab/results-doc.ts": 917,
@@ -22,9 +22,9 @@
   "app/components/portal/sections/RepairBuilderSection.tsx": 596,
   "server/services/marketplace.service.ts": 587,
   "server/api/admin/admin-settings.ts": 557,
-  "app/hooks/useInspection.ts": 556,
+  "app/hooks/useInspection.ts": 576,
   "server/api/inspections/publish.ts": 551,
-  "app/lib/collab/results-binding.ts": 540,
+  "app/lib/collab/results-binding.ts": 574,
   "server/api/auth.ts": 536,
   "server/api/inspections/media-studio.ts": 534,
   "server/api/inspections/report-delivery.ts": 534,

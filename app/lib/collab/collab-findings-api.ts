@@ -51,6 +51,15 @@ export interface CollabFindingsDeps {
     setResults: (fn: (prev: ResultMap) => ResultMap) => void;
     setDirty: (v: boolean) => void;
     setSaveStatus: (s: SaveStatus) => void;
+    /**
+     * Phase U (Batch C1) — the editor's active per-unit scope. `null`/undefined
+     * (the default) means the `_default` common scope, so behavior is identical
+     * to before this change. When a unit is active every write is keyed to that
+     * unit (`findingKey(activeUnitId, …)`), so two units sharing an itemId never
+     * collide. `getResult` is supplied ALREADY scoped by the editor, so reads
+     * here go through it unchanged.
+     */
+    activeUnitId?: string | null;
 }
 
 /**
@@ -115,37 +124,48 @@ export interface CollabFindingsApi {
  */
 export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): CollabFindingsApi {
     const { getResult, sectionIdForItem, setResults, setDirty, setSaveStatus } = deps;
+    // Phase U (Batch C1): resolve the active per-unit scope once. `null` = the
+    // `_default` common scope (byte-identical to pre-Phase-U behavior). Threaded
+    // into every write binding so a non-null unit keys ONLY that unit's finding.
+    const unit = deps.activeUnitId ?? null;
 
     const setRating = (sectionId: string, itemId: string, rating: string | null): void => {
-        bindingSetRating(doc, sectionId, itemId, rating);
+        bindingSetRating(doc, sectionId, itemId, rating, unit);
         setDirty(true);
     };
 
     // OPTIMISTIC LOCAL ONLY — do NOT write the doc here. Writing every keystroke
     // through the doc/observer round-trips back into `results` and jumps the
-    // textarea cursor. The doc write happens on blur via `commitNotes`. We patch
-    // the `notes` field under BOTH the composite key and the bare itemId to
-    // mirror the editor's dual-key read pattern.
+    // textarea cursor. The doc write happens on blur via `commitNotes`.
+    //
+    // Phase U (Batch C1): the bare `itemId` slot holds only ONE unit's entry, so
+    // we only mirror the echo there in the common scope (`unit == null`) — the
+    // legacy dual-key read pattern. Under a real unit the composite key IS what
+    // the read resolvers consult, so writing the shared bare slot would leak this
+    // unit's optimistic notes into another unit that lacks a composite entry.
     const setNotes = (sectionId: string, itemId: string, notes: string): void => {
-        const key = findingKey(null, sectionId, itemId);
+        const key = findingKey(unit, sectionId, itemId);
         setResults((prev) => {
+            const bare = unit == null ? ((prev[itemId] as Record<string, unknown>) || {}) : {};
             const merged = {
                 ...((prev[key] as Record<string, unknown>) || {}),
-                ...((prev[itemId] as Record<string, unknown>) || {}),
+                ...bare,
                 notes,
             };
-            return { ...prev, [key]: merged, [itemId]: merged };
+            return unit == null
+                ? { ...prev, [key]: merged, [itemId]: merged }
+                : { ...prev, [key]: merged };
         });
         setDirty(true);
     };
 
     const commitNotes = (sectionId: string, itemId: string, notes: string): void => {
-        bindingSetNotes(doc, sectionId, itemId, notes);
+        bindingSetNotes(doc, sectionId, itemId, notes, unit);
         setDirty(true);
     };
 
     const setItemValue = (sectionId: string, itemId: string, value: unknown): void => {
-        bindingSetValue(doc, sectionId, itemId, value);
+        bindingSetValue(doc, sectionId, itemId, value, unit);
         setDirty(true);
     };
 
@@ -156,7 +176,7 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         cannedId: string,
         included: boolean,
     ): void => {
-        bindingToggleCanned(doc, sectionId, itemId, tabName as 'information' | 'limitations' | 'defects', cannedId, included);
+        bindingToggleCanned(doc, sectionId, itemId, tabName as 'information' | 'limitations' | 'defects', cannedId, included, unit);
         setDirty(true);
     };
 
@@ -166,7 +186,7 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         cannedId: string,
         patch: { location?: string | null; trade?: string | null; deadline?: string | null; timeframe?: string | null },
     ): void => {
-        bindingSetDefectFields(doc, sectionId, itemId, cannedId, patch as Record<string, unknown>);
+        bindingSetDefectFields(doc, sectionId, itemId, cannedId, patch as Record<string, unknown>, unit);
         setDirty(true);
     };
 
@@ -176,7 +196,7 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         text: string,
         withExtraNewline = false,
     ): void => {
-        bindingAppendNote(doc, sectionId, itemId, text, withExtraNewline);
+        bindingAppendNote(doc, sectionId, itemId, text, withExtraNewline, unit);
         setDirty(true);
     };
 
@@ -202,10 +222,10 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         if (!priorResult) return false;
         const projected = cloneByScope(priorResult, scope);
         if ('rating' in projected) {
-            bindingSetRating(doc, sectionId, itemId, (projected.rating as string | null) ?? null);
+            bindingSetRating(doc, sectionId, itemId, (projected.rating as string | null) ?? null, unit);
         }
         if ('notes' in projected && typeof projected.notes === 'string') {
-            bindingSetNotes(doc, sectionId, itemId, projected.notes);
+            bindingSetNotes(doc, sectionId, itemId, projected.notes, unit);
         }
         setDirty(true);
         return true;
@@ -220,7 +240,7 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         let count = 0;
         for (const item of items) {
             if (!selected[item.id]) continue;
-            bindingSetRating(doc, sectionId, item.id, levelId);
+            bindingSetRating(doc, sectionId, item.id, levelId, unit);
             count++;
         }
         setDirty(true);
@@ -230,7 +250,7 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
     const addPhotoToItem = (itemId: string, photoKey: string): void => {
         const sid = sectionIdForItem(itemId);
         if (!sid) return;
-        bindingAppendPhoto(doc, sid, itemId, { key: photoKey });
+        bindingAppendPhoto(doc, sid, itemId, { key: photoKey }, unit);
         setDirty(true);
     };
 
@@ -242,9 +262,9 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         const sid = sectionIdForItem(itemId);
         if (!sid) return;
         if (target.kind === 'canned') {
-            bindingAddPhotoToCannedDefect(doc, sid, itemId, target.id, { key: photoKey });
+            bindingAddPhotoToCannedDefect(doc, sid, itemId, target.id, { key: photoKey }, unit);
         } else {
-            bindingAddPhotoToCustomDefect(doc, sid, itemId, target.id, { key: photoKey });
+            bindingAddPhotoToCustomDefect(doc, sid, itemId, target.id, { key: photoKey }, unit);
         }
         setDirty(true);
     };
@@ -259,7 +279,7 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
     const addCustomDefect = (sectionId: string, itemId: string, defect: CustomCommentEntry): void => {
         // CustomCommentEntry has no index signature; the binding only needs `id`
         // plus arbitrary fields. Widen via unknown (structurally compatible).
-        bindingAddCustomDefect(doc, sectionId, itemId, defect as unknown as { id: string } & Record<string, unknown>);
+        bindingAddCustomDefect(doc, sectionId, itemId, defect as unknown as { id: string } & Record<string, unknown>, unit);
         setDirty(true);
     };
 
@@ -269,21 +289,21 @@ export function buildCollabFindingsApi(doc: Y.Doc, deps: CollabFindingsDeps): Co
         customId: string,
         included: boolean,
     ): void => {
-        bindingToggleCustomDefect(doc, sectionId, itemId, customId, included);
+        bindingToggleCustomDefect(doc, sectionId, itemId, customId, included, unit);
         setDirty(true);
     };
 
     const attachRepairItem = (itemId: string, snap: AttachedRepairItem): void => {
         const sid = sectionIdForItem(itemId);
         if (!sid) return;
-        bindingAttachRepairItem(doc, sid, itemId, snap);
+        bindingAttachRepairItem(doc, sid, itemId, snap, unit);
         setDirty(true);
     };
 
     const detachRepairItem = (itemId: string, recommendationId: string): void => {
         const sid = sectionIdForItem(itemId);
         if (!sid) return;
-        bindingDetachRepairItem(doc, sid, itemId, recommendationId);
+        bindingDetachRepairItem(doc, sid, itemId, recommendationId, unit);
         setDirty(true);
     };
 

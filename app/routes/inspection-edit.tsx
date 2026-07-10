@@ -169,11 +169,19 @@ export default function InspectionEditPage() {
  /* Core state (useInspection) */
  /* ---------------------------------------------------------------- */
 
+ // Commercial PCA Phase U (Batch C1) — the active per-unit scope threaded
+ // through the editor's result keying. It stays `null` (the `_default` common
+ // scope) in this batch: there is NO scope-switcher UI yet (Batch C2), so
+ // behavior is byte-identical to before. The setter is intentionally not
+ // destructured until C2 wires the switcher.
+ const [activeUnitId] = useState<string | null>(null);
+
  const state = useInspectionState({
  inspection: loaderData.inspection,
  schema: loaderData.schema as unknown as InspectionSchema,
  results: loaderData.results,
  ratingLevels: loaderData.ratingLevels,
+ activeUnitId,
  });
 
  /* ---------------------------------------------------------------- */
@@ -217,6 +225,8 @@ export default function InspectionEditPage() {
     // #181 — every write routes through the Y.Doc. The doc is briefly null on
     // the SSR / first-paint window before the connection initialises.
     collab: collab?.doc ? { doc: collab.doc } : undefined,
+    // Phase U (Batch C1) — scope every read/write to the active unit (null = _default).
+    activeUnitId,
  });
 
  /* ---------------------------------------------------------------- */
@@ -1180,6 +1190,7 @@ export default function InspectionEditPage() {
  if (isMobile) setMobileDrawer(null);
  }}
  results={state.results}
+ activeUnitId={activeUnitId}
  sectionProgress={state.sectionProgress}
  sectionDefectCount={state.sectionDefectCount}
  overviewActive={state.activeView === "property"}
@@ -1205,6 +1216,7 @@ export default function InspectionEditPage() {
  if (isMobile) setMobileDrawer(null);
  }}
  results={state.results}
+ activeUnitId={activeUnitId}
  batchMode={state.batchMode}
  batchSelected={state.batchSelected}
  onBatchToggle={(id) => state.toggleBatchSelect(id)}

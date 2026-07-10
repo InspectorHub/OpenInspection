@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import type { EditorMode } from "./editor-mode";
 import { useDragReorder } from "./useDragReorder";
+import { findingKey } from "~/hooks/findings/shared";
 
 interface SharedItemListProps {
   mode: EditorMode;
@@ -8,8 +9,13 @@ interface SharedItemListProps {
   sectionId: string;
   activeItemId: string | null;
   onSelect: (id: string) => void;
-  /** Live results keyed by `_default:{sectionId}:{itemId}` (fill-only). */
+  /** Live results keyed by `{unitId}:{sectionId}:{itemId}` (fill-only). */
   results?: Record<string, Record<string, unknown>>;
+  /**
+   * Phase U (Batch C1) — active per-unit scope for result lookups. `null`
+   * (default) resolves the `_default` common scope, byte-identical to before.
+   */
+  activeUnitId?: string | null;
   // batch (fill-only today; reserved for author bulk later):
   batchMode?: boolean;
   batchSelected?: Record<string, boolean>;
@@ -48,12 +54,22 @@ export function ItemList({
   onDeleteItem,
   onMoveItem,
   onReorderItem,
+  activeUnitId = null,
 }: SharedItemListProps) {
   const [filter, setFilter] = useState("all");
   const lastClickedRef = useRef<string | null>(null);
   const [menuItemId, setMenuItemId] = useState<string | null>(null);
   const structuralEditing = Boolean(onDuplicateItem || onDeleteItem || onMoveItem);
   const resultsMap = results ?? {};
+  // Phase U (Batch C1) — resolve a result in the active unit scope. The bare
+  // `itemId` key holds only ONE unit's entry (last projected wins), so it is a
+  // legitimate fallback ONLY in the common scope (`activeUnitId == null`);
+  // consulting it under a real unit would shadow one unit's finding with
+  // another's. Mirrors `getResult` in useFindings/useInspection.
+  const scopedResult = (itemId: string): Record<string, unknown> =>
+    resultsMap[findingKey(activeUnitId, sectionId, itemId)] ||
+    (activeUnitId == null ? resultsMap[itemId] : undefined) ||
+    {};
   const { dragProps } = useDragReorder({ ids: items.map((i) => i.id), onReorder: onReorderItem ?? (() => {}) });
 
   const filters = [
@@ -65,7 +81,7 @@ export function ItemList({
 
   const filteredItems = items.filter((item) => {
     if (filter === "all") return true;
-    const r = resultsMap[`_default:${sectionId}:${item.id}`] || resultsMap[item.id] || {};
+    const r = scopedResult(item.id);
     if (filter === "unrated") return !r.rating;
     if (filter === "issues") return r.rating === "DEF" || r.rating === "MON" || r.rating === "Defect" || r.rating === "Monitor";
     return true;
@@ -95,7 +111,7 @@ export function ItemList({
       {/* Item list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {filteredItems.map((item, idx) => {
-          const result = resultsMap[`_default:${sectionId}:${item.id}`] || resultsMap[item.id] || {};
+          const result = scopedResult(item.id);
           const fullIdx = items.findIndex((i) => i.id === item.id);
           return (
             <div

@@ -45,6 +45,17 @@ export type ResultMap = Record<string, Record<string, unknown>>;
  * For each composite finding key (e.g. `_default:s1:i1`) the entry is stored
  * under BOTH the composite key AND the bare itemId. This mirrors the dual-key
  * writes in `useInspection.ts` that `getResult(itemId, sectionId?)` relies on.
+ *
+ * Phase U (per-unit keying) note: this projection stays FULL-SCOPE — it emits
+ * every unit's composite key (`_default:…`, `u1:…`, `u2:…`) plus the bare
+ * itemId. In per-unit mode two units share the same itemId, so the bare key is
+ * ambiguous (last write wins). Scoping is therefore done at the READ-RESOLVER
+ * layer (`getResult` / the item-list read), which resolves the composite
+ * `findingKey(activeUnitId, sectionId, itemId)` and only falls back to the bare
+ * itemId when `activeUnitId === null` (the `_default` view). Keeping the
+ * projection full-scope means a `_default`-only doc produces byte-identical
+ * output to before this change, and no re-projection is needed when the active
+ * unit changes. See finding-key.ts / Phase U Batch C1.
  */
 export function readResultMap(doc: Y.Doc): ResultMap {
     const projection = projectResults(doc);
@@ -81,6 +92,15 @@ export function bindResultMap(
 // Signatures mirror the editor's existing write hooks (useInspection.ts) so
 // Task 9 can swap them in 1:1. Each helper resolves the composite finding key
 // and routes to the Task 7p mutator in results-doc.ts.
+//
+// Phase U (Batch C1): each helper accepts an OPTIONAL trailing
+// `unitId: string | null` (default `null`) that is threaded into
+// `findingKey(unitId, …)`. `null` yields the `_default` scope, so every existing
+// call site (and every existing test) is byte-identical to before. A non-null
+// unit id writes ONLY that unit's finding (`u1:sectionId:itemId`), so two units
+// carrying the SAME itemId never collide. The param is trailing-optional (rather
+// than a required scope arg) precisely to keep this a zero-behavior-change,
+// zero-call-site-churn refactor until the scope switcher (Batch C2) lands.
 
 /** Set the rating scalar on a finding (last-write-wins via CRDT scalar). */
 export function setRating(
@@ -88,8 +108,9 @@ export function setRating(
     sectionId: string,
     itemId: string,
     rating: string | null,
+    unitId: string | null = null,
 ): void {
-    applyItemPatch(doc, findingKey(null, sectionId, itemId), 'rating', rating);
+    applyItemPatch(doc, findingKey(unitId, sectionId, itemId), 'rating', rating);
 }
 
 /** Set the inspector notes scalar on a finding. */
@@ -98,8 +119,9 @@ export function setNotes(
     sectionId: string,
     itemId: string,
     notes: string,
+    unitId: string | null = null,
 ): void {
-    applyItemPatch(doc, findingKey(null, sectionId, itemId), 'notes', notes);
+    applyItemPatch(doc, findingKey(unitId, sectionId, itemId), 'notes', notes);
 }
 
 /** Set the non-rated value scalar on a finding (boolean/text/number/select/etc.). */
@@ -108,8 +130,9 @@ export function setValue(
     sectionId: string,
     itemId: string,
     value: unknown,
+    unitId: string | null = null,
 ): void {
-    applyItemPatch(doc, findingKey(null, sectionId, itemId), 'value', value);
+    applyItemPatch(doc, findingKey(unitId, sectionId, itemId), 'value', value);
 }
 
 /** Set a key on the finding's structured `attributes` property bag. */
@@ -119,8 +142,9 @@ export function setItemAttribute(
     itemId: string,
     key: string,
     value: unknown,
+    unitId: string | null = null,
 ): void {
-    docSetItemAttribute(doc, findingKey(null, sectionId, itemId), key, value);
+    docSetItemAttribute(doc, findingKey(unitId, sectionId, itemId), key, value);
 }
 
 /**
@@ -134,8 +158,9 @@ export function toggleCanned(
     tab: 'information' | 'limitations' | 'defects',
     cannedId: string,
     included: boolean,
+    unitId: string | null = null,
 ): void {
-    upsertCanned(doc, findingKey(null, sectionId, itemId), tab, { cannedId, included });
+    upsertCanned(doc, findingKey(unitId, sectionId, itemId), tab, { cannedId, included });
 }
 
 /**
@@ -148,8 +173,9 @@ export function setDefectFields(
     itemId: string,
     cannedId: string,
     patch: Record<string, unknown>,
+    unitId: string | null = null,
 ): void {
-    upsertCanned(doc, findingKey(null, sectionId, itemId), 'defects', { cannedId, ...patch });
+    upsertCanned(doc, findingKey(unitId, sectionId, itemId), 'defects', { cannedId, ...patch });
 }
 
 /** Append (or merge) a photo attachment to the finding's photo array. */
@@ -158,8 +184,9 @@ export function appendPhoto(
     sectionId: string,
     itemId: string,
     photo: { key: string } & Record<string, unknown>,
+    unitId: string | null = null,
 ): void {
-    docAppendPhoto(doc, findingKey(null, sectionId, itemId), photo);
+    docAppendPhoto(doc, findingKey(unitId, sectionId, itemId), photo);
 }
 
 /**
@@ -405,8 +432,9 @@ export function addCustomDefect(
     sectionId: string,
     itemId: string,
     entry: { id: string } & Record<string, unknown>,
+    unitId: string | null = null,
 ): void {
-    upsertCustomComment(doc, findingKey(null, sectionId, itemId), 'defects', entry);
+    upsertCustomComment(doc, findingKey(unitId, sectionId, itemId), 'defects', entry);
 }
 
 /**
@@ -418,11 +446,12 @@ export function attachRepairItem(
     sectionId: string,
     itemId: string,
     rec: RepairItemSnapshot,
+    unitId: string | null = null,
 ): void {
     // The editor's AttachedRepairItem is structurally a RepairItemSnapshot
     // (recommendationId + the five estimate/summary/contractor/attachedAt
     // fields), so the call boundary is fully typed — no cast.
-    upsertRecommendation(doc, findingKey(null, sectionId, itemId), rec);
+    upsertRecommendation(doc, findingKey(unitId, sectionId, itemId), rec);
 }
 
 /**
@@ -434,8 +463,9 @@ export function detachRepairItem(
     sectionId: string,
     itemId: string,
     recommendationId: string,
+    unitId: string | null = null,
 ): void {
-    removeRecommendation(doc, findingKey(null, sectionId, itemId), recommendationId);
+    removeRecommendation(doc, findingKey(unitId, sectionId, itemId), recommendationId);
 }
 
 /**
@@ -448,8 +478,9 @@ export function toggleCustomDefect(
     itemId: string,
     customId: string,
     included: boolean,
+    unitId: string | null = null,
 ): void {
-    upsertCustomComment(doc, findingKey(null, sectionId, itemId), 'defects', { id: customId, included });
+    upsertCustomComment(doc, findingKey(unitId, sectionId, itemId), 'defects', { id: customId, included });
 }
 
 /**
@@ -465,8 +496,9 @@ export function addPhotoToCannedDefect(
     itemId: string,
     cannedId: string,
     photo: { key: string } & Record<string, unknown>,
+    unitId: string | null = null,
 ): void {
-    const fk = findingKey(null, sectionId, itemId);
+    const fk = findingKey(unitId, sectionId, itemId);
     const entry = readResultMap(doc)[fk];
     if (!entry) return;
 
@@ -496,8 +528,9 @@ export function addPhotoToCustomDefect(
     itemId: string,
     customId: string,
     photo: { key: string } & Record<string, unknown>,
+    unitId: string | null = null,
 ): void {
-    const fk = findingKey(null, sectionId, itemId);
+    const fk = findingKey(unitId, sectionId, itemId);
     const entry = readResultMap(doc)[fk];
     if (!entry) return;
 
@@ -529,8 +562,9 @@ export function appendNote(
     itemId: string,
     text: string,
     withExtraNewline?: boolean,
+    unitId: string | null = null,
 ): void {
-    const fk = findingKey(null, sectionId, itemId);
+    const fk = findingKey(unitId, sectionId, itemId);
     const entry = readResultMap(doc)[fk];
     const oldNotes = (entry?.notes as string | undefined) ?? '';
     const sep = withExtraNewline ? '\n\n' : '\n';

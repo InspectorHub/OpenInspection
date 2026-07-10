@@ -3,6 +3,7 @@ import { SectionDonut } from '../editor/SectionDonut';
 import { sectionIconFor } from '../editor/section-icons';
 import type { EditorMode } from './editor-mode';
 import { useDragReorder } from './useDragReorder';
+import { findingKey } from '~/hooks/findings/shared';
 
 interface SharedSectionRailProps {
  mode: EditorMode;
@@ -10,6 +11,11 @@ interface SharedSectionRailProps {
  activeSection: string;
  onSelect: (id: string) => void;
  results?: Record<string, Record<string, unknown>>;
+ /**
+  * Phase U (Batch C1) — active per-unit scope for result lookups. `null`
+  * (default) resolves the `_default` common scope, byte-identical to before.
+  */
+ activeUnitId?: string | null;
  sectionProgress?: (sectionId: string) => { total: number; rated: number; percent: number; hasDefect: boolean };
  sectionDefectCount?: (sectionId: string) => number;
  /** Whether the report-scoped "Inspection Details" overview entry is active. */
@@ -73,6 +79,7 @@ export function SectionRail({
  activeSection,
  onSelect,
  results,
+ activeUnitId = null,
  sectionProgress,
  sectionDefectCount,
  overviewActive = false,
@@ -119,7 +126,10 @@ export function SectionRail({
  const progress = sectionProgress?.(section.id);
  const total = progress?.total ?? (section.items?.length || 0);
  const rated = progress?.rated ?? (section.items?.filter((i) => {
- const r = results?.[`_default:${section.id}:${i.id}`] || results?.[i.id];
+ // Phase U (Batch C1) — the bare `i.id` key holds only one unit's entry, so
+ // it is a valid fallback ONLY in the common scope (activeUnitId == null);
+ // under a real unit it would count another unit's rating as this one's.
+ const r = results?.[findingKey(activeUnitId, section.id, i.id)] || (activeUnitId == null ? results?.[i.id] : undefined);
  return r?.rating;
  }).length || 0);
 

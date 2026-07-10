@@ -49,6 +49,116 @@ function makeHarness() {
     return { doc, api, setResults, setDirty, setSaveStatus, getLocal: () => local };
 }
 
+/**
+ * Phase U (Batch C1) harness — seeds findings for TWO units sharing the same
+ * itemId (i1 in section s1) and wires an api scoped to `unit`. The stub
+ * `getResult` mirrors the real editor's scoped resolver: it resolves the
+ * unit-scoped composite key and only falls back to the bare itemId when the
+ * scope is the `_default` common view (unit === null).
+ */
+function makeUnitHarness(unit: string | null) {
+    const doc = new Y.Doc();
+    seedResultsDoc(doc, [
+        { findingKey: findingKey('u1', 's1', 'i1') },
+        { findingKey: findingKey('u2', 's1', 'i1') },
+        { findingKey: findingKey(null, 's1', 'i1') },
+    ]);
+
+    const setResults = vi.fn();
+    const setDirty = vi.fn();
+    const setSaveStatus = vi.fn();
+
+    const deps: CollabFindingsDeps = {
+        getResult: (itemId, sectionId) => {
+            const map = readResultMap(doc);
+            const sid = sectionId ?? 's1';
+            const ck = findingKey(unit, sid, itemId);
+            if (map[ck]) return map[ck] as Record<string, unknown>;
+            // Bare-itemId fallback is only unambiguous in the _default view.
+            if (unit == null) return (map[itemId] as Record<string, unknown>) ?? {};
+            return {};
+        },
+        sectionIdForItem: (itemId) => (itemId === 'i1' ? 's1' : null),
+        setResults,
+        setDirty,
+        setSaveStatus,
+        activeUnitId: unit,
+    };
+
+    return { doc, api: buildCollabFindingsApi(doc, deps), deps, setResults };
+}
+
+// ─── 0. Phase U per-unit scoping (Batch C1) ──────────────────────────────────
+
+describe('collab-findings-api – per-unit scoping (Phase U)', () => {
+    it('a write via a u1-scoped api lands under u1, leaving _default untouched', () => {
+        const { doc, api } = makeUnitHarness('u1');
+        api.setRating('s1', 'i1', 'NI');
+        expect(projectResults(doc)[findingKey('u1', 's1', 'i1')].rating).toBe('NI');
+        // The common (_default) scope for the same item is NOT written.
+        expect(projectResults(doc)[findingKey(null, 's1', 'i1')].rating).toBeUndefined();
+    });
+
+    it('two units with the SAME itemId do not collide; each api sees only its own scope', () => {
+        // Independent docs are unrealistic; use ONE shared doc so a real collision
+        // could occur if scoping were wrong.
+        const { doc, api: apiU1, deps: depsU1 } = makeUnitHarness('u1');
+        // Build a u2-scoped api over the SAME doc.
+        const depsU2: CollabFindingsDeps = {
+            ...depsU1,
+            getResult: (itemId, sectionId) => {
+                const map = readResultMap(doc);
+                const ck = findingKey('u2', sectionId ?? 's1', itemId);
+                return (map[ck] as Record<string, unknown>) ?? {};
+            },
+            activeUnitId: 'u2',
+        };
+        const apiU2 = buildCollabFindingsApi(doc, depsU2);
+
+        apiU1.setRating('s1', 'i1', 'NI');
+        apiU2.setRating('s1', 'i1', 'IN');
+
+        // Each unit's write is isolated in the doc.
+        expect(projectResults(doc)[findingKey('u1', 's1', 'i1')].rating).toBe('NI');
+        expect(projectResults(doc)[findingKey('u2', 's1', 'i1')].rating).toBe('IN');
+
+        // The scoped reads never bleed: u1's api reads NI, u2's api reads IN.
+        expect(apiU1.getResult('i1', 's1').rating).toBe('NI');
+        expect(apiU2.getResult('i1', 's1').rating).toBe('IN');
+    });
+
+    it('optimistic setNotes echoes ONLY under the unit-scoped composite key (no bare-itemId leak)', () => {
+        const { api, setResults } = makeUnitHarness('u1');
+        api.setNotes('s1', 'i1', 'draft');
+        expect(setResults).toHaveBeenCalledTimes(1);
+        // Apply the optimistic updater to an empty map and confirm the u1 key.
+        const updater = setResults.mock.calls[0][0] as (prev: ResultMap) => ResultMap;
+        const next = updater({});
+        expect((next[findingKey('u1', 's1', 'i1')] as Record<string, unknown>).notes).toBe('draft');
+        // The _default composite key is NOT the optimistic target.
+        expect(next[findingKey(null, 's1', 'i1')]).toBeUndefined();
+        // CRITICAL: under a real unit the bare `itemId` slot MUST NOT be written —
+        // it is shared across units and would leak u1's draft into another unit.
+        expect(next['i1']).toBeUndefined();
+    });
+
+    it('optimistic setNotes DOES echo under the bare itemId in the common scope (legacy dual-key)', () => {
+        const { api, setResults } = makeUnitHarness(null);
+        api.setNotes('s1', 'i1', 'draft');
+        const updater = setResults.mock.calls[0][0] as (prev: ResultMap) => ResultMap;
+        const next = updater({});
+        // Common scope keeps the legacy dual-key echo (composite + bare itemId).
+        expect((next[findingKey(null, 's1', 'i1')] as Record<string, unknown>).notes).toBe('draft');
+        expect((next['i1'] as Record<string, unknown>).notes).toBe('draft');
+    });
+
+    it('unit=null api is byte-identical to the legacy _default behavior', () => {
+        const { doc, api } = makeUnitHarness(null);
+        api.setRating('s1', 'i1', 'D');
+        expect(projectResults(doc)[findingKey(null, 's1', 'i1')].rating).toBe('D');
+    });
+});
+
 // ─── 1. setRating ────────────────────────────────────────────────────────────
 
 describe('collab-findings-api – setRating', () => {

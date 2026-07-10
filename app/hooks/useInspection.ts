@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { findingKey } from "./findings/shared";
 import { backfillLevelDescriptions } from "./inspection/helpers";
 import type { InspectionContext } from "./inspection/helpers";
 import type { Severity } from "~/lib/severity";
@@ -111,6 +112,15 @@ export interface UseInspectionOptions {
   schema: InspectionSchema;
   results: ResultMap;
   ratingLevels?: RatingLevel[];
+  /**
+   * Phase U (Batch C1) — the active per-unit scope. `null`/undefined (default)
+   * = the `_default` common scope, so behavior is byte-identical to before this
+   * change. When a unit is active, `getResult` resolves the composite key under
+   * that unit and never falls back to the collision-prone bare itemId. The
+   * editor (inspection-edit.tsx) owns this state; the scope switcher UI lands in
+   * Batch C2.
+   */
+  activeUnitId?: string | null;
 }
 
 /**
@@ -135,6 +145,9 @@ export function useInspectionState(opts: UseInspectionOptions) {
   );
   const [schema] = useState<InspectionSchema>(opts.schema);
   const sections = schema.sections || [];
+
+  // Phase U (Batch C1) — active per-unit scope (null = `_default` common scope).
+  const activeUnitId = opts.activeUnitId ?? null;
 
   const [ratingLevels, setRatingLevels] = useState<RatingLevel[]>(() =>
     backfillLevelDescriptions(opts.ratingLevels || []),
@@ -261,17 +274,24 @@ export function useInspectionState(opts: UseInspectionOptions) {
     [sectionIdForItem],
   );
 
-  /** Read a result entry with composite-key-first fallback */
+  /**
+   * Read a result entry with composite-key-first fallback. Phase U: the
+   * composite key resolves under the ACTIVE unit (`findingKey(activeUnitId,…)`).
+   * The bare-itemId fallback is only used in the `_default` view — in per-unit
+   * mode two units share an itemId, so the bare key is ambiguous and must never
+   * let one unit shadow another.
+   */
   const getResult = useCallback(
     (itemId: string, sectionId?: string): Record<string, unknown> => {
       const sid = sectionId || sectionIdForItem(itemId);
       if (sid) {
-        const ck = fKey(sid, itemId);
+        const ck = findingKey(activeUnitId, sid, itemId);
         if (results[ck]) return results[ck];
       }
-      return results[itemId] || {};
+      if (activeUnitId == null) return results[itemId] || {};
+      return {};
     },
-    [results, sectionIdForItem],
+    [results, sectionIdForItem, activeUnitId],
   );
 
   /** Find an item by id across all sections */

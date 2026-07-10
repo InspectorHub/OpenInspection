@@ -91,4 +91,11 @@ export interface FindingsOptions {
   notesFetcher?: ReturnType<typeof useFetcher>;
   /** #181 — the editor routes every write through the Yjs doc (collab). */
   collab?: { doc: import("yjs").Doc };
+  /**
+   * Phase U (Batch C1) — the active per-unit scope. `null`/undefined (default)
+   * = the `_default` common scope (identical to pre-Phase-U behavior). When a
+   * unit is active, reads resolve `findingKey(activeUnitId, …)` and writes are
+   * keyed to that unit, so two units sharing an itemId never collide.
+   */
+  activeUnitId?: string | null;
 }
