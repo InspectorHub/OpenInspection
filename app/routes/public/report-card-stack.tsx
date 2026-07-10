@@ -119,6 +119,10 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  commercialSubtype: (raw?.commercialSubtype as string | undefined) ?? null,
  buildingProfile: (raw?.buildingProfile as LoaderResult["buildingProfile"] | undefined) ?? [],
  pcaReport: (raw?.pcaReport as LoaderResult["pcaReport"] | undefined) ?? null,
+ unitInspectionMode: (raw?.unitInspectionMode as 'tagged' | 'per_unit' | undefined) ?? 'tagged',
+ units: (raw?.units as LoaderResult["units"] | undefined) ?? [],
+ unitConditionMatrix: (raw?.unitConditionMatrix as LoaderResult["unitConditionMatrix"] | undefined) ?? [],
+ defectCountsByUnit: (raw?.defectCountsByUnit as LoaderResult["defectCountsByUnit"] | undefined) ?? {},
  } satisfies LoaderResult;
  } catch {
  return {
@@ -147,6 +151,10 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  commercialSubtype: null,
  buildingProfile: [],
  pcaReport: null,
+ unitInspectionMode: 'tagged',
+ units: [],
+ unitConditionMatrix: [],
+ defectCountsByUnit: {},
  } satisfies LoaderResult;
  }
 }

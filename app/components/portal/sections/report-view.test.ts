@@ -10,6 +10,7 @@ describe('ReportView extraction', () => {
       isPublished: true, brand: { name: 'Acme' } as any,
       inspectionId: 'insp-1', address: '1 Main St', date: '2026-06-01',
       inspectorName: 'Jane Doe',
+      unitInspectionMode: 'per_unit',
     } as any);
     expect(p.isPublished).toBe(true);
     expect(p.sections).toBe(sections);
@@ -18,6 +19,7 @@ describe('ReportView extraction', () => {
     expect(p.reportId).toBe('insp-1'); // reportId derives from inspectionId
     expect(p.address).toBe('1 Main St');
     expect(p.inspectorName).toBe('Jane Doe');
+    expect(p.unitInspectionMode).toBe('per_unit'); // Phase U mode carried through
   });
 
   it('falls back to safe defaults when fields are omitted (defensive against partial payloads)', () => {
@@ -31,5 +33,11 @@ describe('ReportView extraction', () => {
     expect(p.initialFilter).toBe('all');
     expect(p.buildingProfile).toEqual([]);
     expect(p.pcaReport).toBeNull();
+    // Phase U — default to 'tagged' so a non-per_unit report renders byte-identically
+    // (the ReportView per-unit block is gated on unitInspectionMode === 'per_unit').
+    expect(p.unitInspectionMode).toBe('tagged');
+    expect(p.units).toEqual([]);
+    expect(p.unitConditionMatrix).toEqual([]);
+    expect(p.defectCountsByUnit).toEqual({});
   });
 });

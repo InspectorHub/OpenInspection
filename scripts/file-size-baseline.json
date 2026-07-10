@@ -14,7 +14,7 @@
   "server/services/inspection/inspection-report.service.ts": 706,
   "app/routes/template-edit.tsx": 697,
   "app/components/media-studio/PhotoAnnotator.tsx": 689,
-  "app/components/portal/sections/ReportView.tsx": 677,
+  "app/components/portal/sections/ReportView.tsx": 685,
   "app/hooks/usePhotoOps.ts": 661,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "app/components/editor/ItemEditor.tsx": 631,
