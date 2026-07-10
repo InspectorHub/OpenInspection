@@ -47,6 +47,21 @@ export type Constructor<T = object> = new (...args: any[]) => T;
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import type { automations, inspections } from '../../lib/db/schema';
 
+// The inspection columns the cron flush path actually consumes (condition
+// evaluation + SMS consent + base template vars). The flush query MUST project
+// only these instead of the whole `inspections` row: the 4-table join
+// (automation_logs + automations + inspections + tenants) otherwise produced
+// 100+ result columns and tripped D1's result-set column cap ("too many columns
+// in result set", SQLITE_ERROR 7500), failing EVERY cron tick once `inspections`
+// grew past ~70 columns. `delivery.ts` FLUSH_SELECTION.inspection projects
+// exactly these columns; because flush() feeds that row into consumers typed as
+// FlushInspection, type-check enforces the projection stays a superset of this
+// type, and the `flush-column-budget` spec guards the total under the cap.
+export type FlushInspection = Pick<typeof inspections.$inferSelect,
+    | 'id' | 'tenantId' | 'clientContactId' | 'clientName'
+    | 'propertyAddress' | 'date' | 'status' | 'reportStatus' | 'paymentStatus'
+>;
+
 export interface HasParseChannels {
     parseChannels(raw: string | null): ('email' | 'sms')[];
 }
@@ -66,14 +81,14 @@ export interface HasEvaluateConditions {
     evaluateConditions(
         db: DrizzleD1Database,
         automation: typeof automations.$inferSelect,
-        inspection: typeof inspections.$inferSelect,
+        inspection: FlushInspection,
     ): Promise<{ ok: true } | { ok: false; reason: string }>;
 }
 export interface HasDeliverSms {
     deliverSms(
         db: DrizzleD1Database,
         ctx: { log: typeof import('../../lib/db/schema').automationLogs.$inferSelect; automation: typeof automations.$inferSelect;
-               inspection: typeof inspections.$inferSelect; tenant: typeof import('../../lib/db/schema').tenants.$inferSelect },
+               inspection: FlushInspection; tenant: typeof import('../../lib/db/schema').tenants.$inferSelect },
         sms: import('./sms').SmsRuntime,
         appName: string, appHost: string,
         env?: import('../../lib/sms/managed-send-gate').ManagedSendGateEnv,

@@ -12,6 +12,26 @@ import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
 
 /**
+ * The flush query's SELECT projection. `inspection` is narrowed to the
+ * FlushInspection columns (NOT the whole `inspections` row) so the 4-table join
+ * stays well under D1's result-set column cap — selecting the full row pushed the
+ * total past 100 columns and failed every cron tick (see shared.ts). Exported so
+ * the `flush-column-budget` spec can assert the column count.
+ */
+export const FLUSH_SELECTION = {
+    log: automationLogs,
+    automation: automations,
+    tenant: tenants,
+    inspection: {
+        id: inspections.id, tenantId: inspections.tenantId,
+        clientContactId: inspections.clientContactId, clientName: inspections.clientName,
+        propertyAddress: inspections.propertyAddress, date: inspections.date,
+        status: inspections.status, reportStatus: inspections.reportStatus,
+        paymentStatus: inspections.paymentStatus,
+    },
+} as const;
+
+/**
  * Delivery mixin: the cron-driven flush() that drains due automation_log rows.
  * Re-checks conditions (conditions mixin), branches SMS to deliverSms (sms mixin),
  * and renders + sends email through the per-tenant EmailService. Body is
@@ -34,10 +54,10 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             const nowMs = Date.parse(now);
 
             // Shared 4-table join so both flush queries (non-reminder fast path +
-            // reminder live-due path) select the same shape.
-            const baseSelect = () => db.select({
-                log: automationLogs, automation: automations, inspection: inspections, tenant: tenants,
-            })
+            // reminder live-due path) select the same shape. `inspection` is a
+            // narrowed projection (FLUSH_SELECTION) — selecting the whole inspections
+            // row overflows D1's result-set column cap; see FLUSH_SELECTION above.
+            const baseSelect = () => db.select(FLUSH_SELECTION)
                 .from(automationLogs)
                 .innerJoin(automations, eq(automationLogs.automationId, automations.id))
                 .innerJoin(inspections, eq(automationLogs.inspectionId, inspections.id))

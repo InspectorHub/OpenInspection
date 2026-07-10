@@ -1,11 +1,11 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { automations, inspections, agreementRequests, inspectionServices } from '../../lib/db/schema';
+import { automations, agreementRequests, inspectionServices } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { isReportPublished } from '../../lib/status/report-status';
 import { evaluateConditions as coreEvaluate } from '../../lib/automation-core';
 import type { CoreCondition } from '../../lib/automation-core';
-import { type Constructor } from './shared';
+import { type Constructor, type FlushInspection } from './shared';
 import type { AutomationBase } from './shared';
 
 /**
@@ -25,7 +25,7 @@ export function AutomationConditions<TBase extends Constructor<AutomationBase>>(
         async evaluateConditions(
             db: DrizzleD1Database,
             automation: typeof automations.$inferSelect,
-            inspection: typeof inspections.$inferSelect,
+            inspection: FlushInspection,
         ): Promise<{ ok: true } | { ok: false; reason: string }> {
             // Reminder-staleness predicate (computed here; same condition as before).
             const isStale = inspection.status === 'cancelled' || inspection.status === 'completed' ||

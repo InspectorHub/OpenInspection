@@ -1,9 +1,9 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { automationLogs, automations, inspections, tenants, tenantConfigs } from '../../lib/db/schema';
+import { automationLogs, automations, tenants, tenantConfigs } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { currentPeriodKey } from '../../lib/usage/period';
-import { interpolate, type Constructor } from './shared';
+import { interpolate, type Constructor, type FlushInspection } from './shared';
 import { buildBaseTemplateVars } from './template-vars';
 import type { AutomationBase } from './shared';
 import { managedSendAllowed, type ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
@@ -57,7 +57,7 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
         async deliverSms(
             db: DrizzleD1Database,
             ctx: { log: typeof automationLogs.$inferSelect; automation: typeof automations.$inferSelect;
-                   inspection: typeof inspections.$inferSelect; tenant: typeof tenants.$inferSelect },
+                   inspection: FlushInspection; tenant: typeof tenants.$inferSelect },
             sms: SmsRuntime,
             appName: string, appHost: string,
             env?: ManagedSendGateEnv,

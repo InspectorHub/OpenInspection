@@ -1,5 +1,6 @@
 import { reportUrl } from '../../lib/public-urls';
-import type { inspections, tenants } from '../../lib/db/schema';
+import type { tenants } from '../../lib/db/schema';
+import type { FlushInspection } from './shared';
 
 /**
  * Shared template-variable construction for automation delivery.
@@ -20,7 +21,7 @@ import type { inspections, tenants } from '../../lib/db/schema';
  * channel's final variable map is unchanged.
  */
 export function buildBaseTemplateVars(
-    inspection: typeof inspections.$inferSelect,
+    inspection: FlushInspection,
     tenant: typeof tenants.$inferSelect,
     appName: string,
     appHost: string,
