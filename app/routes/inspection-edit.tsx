@@ -473,9 +473,15 @@ export default function InspectionEditPage() {
  // After any units mutation lands, revalidate so the switcher / manager /
  // progress refresh from the loader. (POST submissions skip revalidation via
  // shouldRevalidate; this explicit call carries no formMethod so it runs.)
+ // `unitsFetcher.data` keeps the same {ok:true} reference until the next submit
+ // and `revalidator` is a fresh object each render, so without a one-shot guard
+ // this effect re-fires every render → an unbounded revalidation storm. Track
+ // the last-revalidated data object so each distinct result revalidates once.
+ const lastRevalidatedUnitsData = useRef<unknown>(null);
  useEffect(() => {
   const d = unitsFetcher.data;
-  if (unitsFetcher.state === "idle" && d?.ok) {
+  if (unitsFetcher.state === "idle" && d?.ok && lastRevalidatedUnitsData.current !== d) {
+   lastRevalidatedUnitsData.current = d;
    revalidator.revalidate();
   }
  }, [unitsFetcher.state, unitsFetcher.data, revalidator]);

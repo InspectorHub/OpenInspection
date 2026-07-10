@@ -130,7 +130,25 @@ export class UnitService {
             sort += 10;
             return row;
         });
-        await db.insert(inspectionUnits).values(rows);
+        // D1 caps bind parameters at 100 per prepared statement; each row binds
+        // ~10 columns, so a single VALUES list for a full apartment stack (the
+        // default 3×4 = 12 units → 120 params) overflows and D1 rejects it.
+        // Chunk the VALUES lists, all chunks inside ONE db.batch() (atomic);
+        // drivers without batch (better-sqlite3 unit mock) fall back to
+        // sequential chunk inserts — same idiom as contacts-import/starter-content.
+        const colsPerRow = Object.keys(rows[0]!).length;
+        const maxRowsPerStmt = Math.max(1, Math.floor(100 / colsPerRow));
+        const stmts = [];
+        for (let i = 0; i < rows.length; i += maxRowsPerStmt) {
+            stmts.push(db.insert(inspectionUnits).values(rows.slice(i, i + maxRowsPerStmt)));
+        }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if (typeof (db as any).batch === 'function') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (db as any).batch(stmts as [any, ...any[]]);
+        } else {
+            for (const s of stmts) await s;
+        }
         return { ids: rows.map((r) => r.id) };
     }
 
