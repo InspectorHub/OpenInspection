@@ -6,6 +6,7 @@ import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection
 import { findingKey } from "~/hooks/findings/shared";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
+import { useScopeLoader } from "~/hooks/useScopeLoader";
 import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
 import { pushToast } from "~/hooks/useToast";
 import { useKeyboard } from "~/hooks/useKeyboard";
@@ -440,37 +441,34 @@ export default function InspectionEditPage() {
  // render byte-identically to before.
  const showUnitsSurface = (loaderData.inspection as Record<string, unknown>).propertyType === "commercial";
 
- // Scope switch is fetch-if-missing. Scopes already merged into the results map
- // are tracked so a switch never re-fetches. '_default' (common) is always
- // present from the loader's first-paint slice.
- const fetchedScopesRef = useRef<Set<string>>(new Set(["_default"]));
-
  // When the collab doc has synced, `readResultMap` already holds EVERY scope's
  // findings (the DO hydrated the full D1 blob), so a scope switch needs no fetch.
  const collabSynced = Boolean(collab?.synced);
 
- const requestScope = useCallback((unitId: string | null) => {
-  setActiveUnitId(unitId);
-  const scope = unitId ?? "_default";
-  if (scope === "_default") return;                 // always loaded
-  if (collabSynced) return;                          // full map already present
-  if (fetchedScopesRef.current.has(scope)) return;   // already merged / in-flight
-  fetchedScopesRef.current.add(scope);               // optimistic — dedupe in-flight
-  scopeFetcher.submit({ intent: "load-scope", scope }, { method: "POST" });
- }, [collabSynced, scopeFetcher]);
-
- // Merge a fetched scope slice into the results map (non-collab / pre-sync path).
- // On failure, drop the scope from the fetched set so a later switch can retry.
- useEffect(() => {
-  const d = scopeFetcher.data;
-  if (!d || d.intent !== "load-scope") return;
-  if (d.ok && d.results) {
-   const slice = d.results;
-   state.setResults((prev) => ({ ...prev, ...slice }));
-  } else if (d.scope) {
-   fetchedScopesRef.current.delete(d.scope);
-  }
- }, [scopeFetcher.data, state.setResults]);
+ // Scope switch is fetch-if-missing, tracked in useScopeLoader (which owns the
+ // merged/in-flight bookkeeping + the shared-fetcher abort race). This wrapper
+ // just also sets the active-unit UI state.
+ const submitScope = useCallback(
+  (scope: string) => scopeFetcher.submit({ intent: "load-scope", scope }, { method: "POST" }),
+  [scopeFetcher],
+ );
+ const mergeScopeSlice = useCallback(
+  (slice: ResultMap) => state.setResults((prev) => ({ ...prev, ...slice })),
+  [state.setResults],
+ );
+ const loadScope = useScopeLoader({
+  collabSynced,
+  fetcherData: scopeFetcher.data,
+  submit: submitScope,
+  onSlice: mergeScopeSlice,
+ });
+ const requestScope = useCallback(
+  (unitId: string | null) => {
+   setActiveUnitId(unitId);
+   loadScope(unitId);
+  },
+  [loadScope],
+ );
 
  // After any units mutation lands, revalidate so the switcher / manager /
  // progress refresh from the loader. (POST submissions skip revalidation via
