@@ -164,7 +164,8 @@
   "overrides": {
     "esbuild": "^0.28.1",
     "uuid": "^11.1.1",
-    "undici": "^7.28.0"
+    "undici": "^7.28.0",
+    "ws": "^8.21.0"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "1.0.3",
