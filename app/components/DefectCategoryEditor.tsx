@@ -141,7 +141,6 @@ export function DefectCategoryEditor({
             checked={drivesSummary}
             onChange={(e) => setDrivesSummary(e.target.checked)}
             className="h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary/30"
-            aria-label="Include in report Summary"
           />
           Include defects in this category in the report Summary
         </label>

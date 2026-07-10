@@ -11,5 +11,6 @@ test('edit mode seeds name + drivesSummary toggle', () => {
   ]);
   render(<Stub initialEntries={['/library/defect-categories']} />);
   expect((screen.getByLabelText(/Name/i) as HTMLInputElement).value).toBe('Safety');
-  expect((screen.getByLabelText(/Include in report Summary/i) as HTMLInputElement).checked).toBe(true);
+  // The visible <label> is the accessible name (no separate aria-label — WCAG 2.5.3).
+  expect((screen.getByLabelText(/in the report Summary/i) as HTMLInputElement).checked).toBe(true);
 });

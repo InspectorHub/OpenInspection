@@ -43,28 +43,40 @@ export class DefectCategoryService {
         return row;
     }
 
-    async update(tenantId: string, id: string, patch: UpdateDefectCategoryInput): Promise<void> {
+    /** Returns the updated row (tenant-scoped point-read via RETURNING), or null
+     *  if no row matched — so callers don't full-scan the list to re-fetch it. */
+    async update(tenantId: string, id: string, patch: UpdateDefectCategoryInput): Promise<DefectCategory | null> {
         const db = this.getDrizzle();
         const updates: Partial<DefectCategory> = {};
         if (patch.name !== undefined) updates.name = patch.name;
         if (patch.color !== undefined) updates.color = patch.color;
         if (patch.drivesSummary !== undefined) updates.drivesSummary = patch.drivesSummary;
         if (patch.sortOrder !== undefined) updates.sortOrder = patch.sortOrder;
-        await db.update(defectCategories).set(updates)
-            .where(and(eq(defectCategories.tenantId, tenantId), eq(defectCategories.id, id)));
+        const where = and(eq(defectCategories.tenantId, tenantId), eq(defectCategories.id, id));
+        if (Object.keys(updates).length === 0) {
+            const cur = await db.select().from(defectCategories).where(where).get();
+            return cur ?? null;
+        }
+        const rows = await db.update(defectCategories).set(updates).where(where).returning();
+        return rows[0] ?? null;
     }
 
-    async remove(tenantId: string, id: string): Promise<void> {
+    /** Returns true iff a row was actually deleted — false when the id is unknown,
+     *  belongs to another tenant, or is a protected seed row (so callers don't log
+     *  a phantom delete for a no-op). */
+    async remove(tenantId: string, id: string): Promise<boolean> {
         const db = this.getDrizzle();
         // Seed rows (maintenance/recommendation/safety) are protected — the UI
         // hides Delete for them, but enforce it here too so a direct API call
         // cannot remove a category the report Summary logic depends on.
-        await db.delete(defectCategories)
+        const rows = await db.delete(defectCategories)
             .where(and(
                 eq(defectCategories.tenantId, tenantId),
                 eq(defectCategories.id, id),
                 eq(defectCategories.isSeed, false),
-            ));
+            ))
+            .returning({ id: defectCategories.id });
+        return rows.length > 0;
     }
 
     async ensureSeed(tenantId: string): Promise<DefectCategory[]> {
