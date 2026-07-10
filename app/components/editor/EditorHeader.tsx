@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { useInspectionState } from "~/hooks/useInspection";
 import { Icon } from "@core/shared-ui";
 import type { ColorScheme } from "~/lib/ui-prefs";
@@ -23,6 +24,13 @@ export interface EditorHeaderProps {
  collabEditing?: boolean;
  /** Opens the version-history panel. */
  onOpenVersionHistory?: () => void;
+ /**
+  * Commercial PCA Phase U (Batch C2b) — per-unit controls (scope switcher +
+  * per-unit progress + the Units-manager button). Rendered in the left zone
+  * only when provided; residential / tagged-mode editors pass nothing and the
+  * header renders byte-identically to before.
+  */
+ perUnitControls?: ReactNode;
 }
 
 export function EditorHeader({
@@ -34,6 +42,7 @@ export function EditorHeader({
  handlePublishClick,
  collabEditing,
  onOpenVersionHistory,
+ perUnitControls,
 }: EditorHeaderProps) {
  return (
  <div className="fixed top-0 left-0 right-0 z-50">
@@ -131,6 +140,9 @@ export function EditorHeader({
  <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-ih-bg-muted text-ih-fg-2 ring-ih-border inline-flex items-center">
   {state.inspection.status as string}
  </span>
+
+ {/* Phase U — per-unit scope controls (per_unit mode only; nothing here otherwise) */}
+ {perUnitControls}
  </div>
 
  {/* Center zone: search + view mode + batch mode + version history */}

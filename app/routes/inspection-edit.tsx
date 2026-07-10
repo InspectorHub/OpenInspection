@@ -65,6 +65,10 @@ import { useIsMobile } from "~/hooks/useBreakpoint";
 import { MobileAppBar } from "~/components/editor/MobileAppBar";
 import { MobileDrawerTriggers, type MobileDrawerId } from "~/components/editor/MobileDrawerTriggers";
 import { MobileBottomDrawer } from "~/components/MobileBottomDrawer";
+import { BreadcrumbDropdown, type UnitScopeRow } from "~/components/editor/BreadcrumbDropdown";
+import { UnitProgress } from "~/components/editor/UnitProgress";
+import { UnitsManager } from "~/components/editor/UnitsManager";
+import type { ResultMap } from "~/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
 
 export function meta() {
@@ -155,6 +159,11 @@ export default function InspectionEditPage() {
  const saveNarrative = useCallback((key: keyof PcaNarrativeData, value: string) => {
   narrativeFetcher.submit({ intent: "save-pca-narrative", key, value }, { method: "POST" });
  }, [narrativeFetcher]);
+ // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
+ // (create/rename/delete/duplicate/bulk/mode-switch) and the lazy per-unit
+ // results-slice fetcher (scope switch → merge missing findings).
+ const unitsFetcher = useFetcher<{ ok: boolean; intent?: string }>();
+ const scopeFetcher = useFetcher<{ ok: boolean; intent?: string; scope?: string; results?: ResultMap }>();
  const navigate = useNavigate();
  const photoInputRef = useRef<HTMLInputElement>(null);
  const { scheme, setColorScheme } = useTheme();
@@ -170,12 +179,11 @@ export default function InspectionEditPage() {
  /* Core state (useInspection) */
  /* ---------------------------------------------------------------- */
 
- // Commercial PCA Phase U (Batch C1) — the active per-unit scope threaded
- // through the editor's result keying. It stays `null` (the `_default` common
- // scope) in this batch: there is NO scope-switcher UI yet (Batch C2), so
- // behavior is byte-identical to before. The setter is intentionally not
- // destructured until C2 wires the switcher.
- const [activeUnitId] = useState<string | null>(null);
+ // Commercial PCA Phase U — the active per-unit scope threaded through the
+ // editor's result keying. `null` = the `_default` common scope. In `tagged`
+ // mode the scope switcher is hidden, so this stays null and behavior is
+ // byte-identical to before. Batch C2b wires the switcher (per_unit mode).
+ const [activeUnitId, setActiveUnitId] = useState<string | null>(null);
 
  const state = useInspectionState({
  inspection: loaderData.inspection,
@@ -417,6 +425,83 @@ export default function InspectionEditPage() {
  ]);
 
  const revalidator = useRevalidator();
+
+ /* ---------------------------------------------------------------- */
+ /* Commercial PCA Phase U (Batch C2b) — per-unit scope switcher + manager */
+ /* ---------------------------------------------------------------- */
+
+ const units = (loaderData.units ?? []) as UnitScopeRow[];
+ const unitInspectionMode = loaderData.unitInspectionMode ?? "tagged";
+ const isPerUnit = unitInspectionMode === "per_unit";
+ const [unitsManagerOpen, setUnitsManagerOpen] = useState(false);
+
+ // Only 'commercial' inspections expose the units surface (same gate as the PCA
+ // narrative panel). Residential editors never see the switcher/manager, so they
+ // render byte-identically to before.
+ const showUnitsSurface = (loaderData.inspection as Record<string, unknown>).propertyType === "commercial";
+
+ // Scope switch is fetch-if-missing. Scopes already merged into the results map
+ // are tracked so a switch never re-fetches. '_default' (common) is always
+ // present from the loader's first-paint slice.
+ const fetchedScopesRef = useRef<Set<string>>(new Set(["_default"]));
+
+ // When the collab doc has synced, `readResultMap` already holds EVERY scope's
+ // findings (the DO hydrated the full D1 blob), so a scope switch needs no fetch.
+ const collabSynced = Boolean(collab?.synced);
+
+ const requestScope = useCallback((unitId: string | null) => {
+  setActiveUnitId(unitId);
+  const scope = unitId ?? "_default";
+  if (scope === "_default") return;                 // always loaded
+  if (collabSynced) return;                          // full map already present
+  if (fetchedScopesRef.current.has(scope)) return;   // already merged / in-flight
+  fetchedScopesRef.current.add(scope);               // optimistic — dedupe in-flight
+  scopeFetcher.submit({ intent: "load-scope", scope }, { method: "POST" });
+ }, [collabSynced, scopeFetcher]);
+
+ // Merge a fetched scope slice into the results map (non-collab / pre-sync path).
+ // On failure, drop the scope from the fetched set so a later switch can retry.
+ useEffect(() => {
+  const d = scopeFetcher.data;
+  if (!d || d.intent !== "load-scope") return;
+  if (d.ok && d.results) {
+   const slice = d.results;
+   state.setResults((prev) => ({ ...prev, ...slice }));
+  } else if (d.scope) {
+   fetchedScopesRef.current.delete(d.scope);
+  }
+ }, [scopeFetcher.data, state.setResults]);
+
+ // After any units mutation lands, revalidate so the switcher / manager /
+ // progress refresh from the loader. (POST submissions skip revalidation via
+ // shouldRevalidate; this explicit call carries no formMethod so it runs.)
+ useEffect(() => {
+  const d = unitsFetcher.data;
+  if (unitsFetcher.state === "idle" && d?.ok) {
+   revalidator.revalidate();
+  }
+ }, [unitsFetcher.state, unitsFetcher.data, revalidator]);
+
+ // If the active unit was deleted (or the inspection left per_unit mode), fall
+ // back to the common scope so reads never point at a vanished unit.
+ useEffect(() => {
+  if (activeUnitId == null) return;
+  if (!isPerUnit || !units.some((u) => u.id === activeUnitId)) {
+   setActiveUnitId(null);
+  }
+ }, [activeUnitId, isPerUnit, units]);
+
+ // Map the server progress summary → the UnitProgress component shape: a unit is
+ // "complete" when rated === total (and the template has items).
+ const unitProgressUnits = useMemo(
+  () => units.filter((u) => (u.kind ?? "unit") === "unit").map((u) => ({ id: u.id, label: u.name })),
+  [units],
+ );
+ const completedUnitIds = useMemo(() => {
+  const prog = loaderData.unitProgress;
+  if (!prog) return [] as string[];
+  return prog.units.filter((u) => u.total > 0 && u.rated === u.total).map((u) => u.unitId);
+ }, [loaderData.unitProgress]);
 
  /* ---------------------------------------------------------------- */
  /* Unsaved changes guard */
@@ -1868,7 +1953,46 @@ export default function InspectionEditPage() {
  handlePublishClick={handlePublishClick}
  collabEditing={loaderData.collabEditing}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
+ perUnitControls={
+  showUnitsSurface ? (
+   <div className="flex items-center gap-2">
+    {isPerUnit && (
+     <>
+      <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} />
+      <UnitProgress
+       units={unitProgressUnits}
+       completedUnitIds={completedUnitIds}
+       activeUnitId={activeUnitId}
+       onSelectUnit={requestScope}
+      />
+     </>
+    )}
+    <button
+     type="button"
+     onClick={() => setUnitsManagerOpen(true)}
+     className="hidden lg:inline-flex h-7 px-2.5 rounded-ih-button bg-ih-bg-muted text-ih-fg-2 text-[12px] font-bold hover:bg-ih-border items-center gap-1.5"
+     title="Manage units"
+    >
+     <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+     </svg>
+     Units
+    </button>
+   </div>
+  ) : undefined
+ }
  />
+ {/* Commercial PCA Phase U (Batch C2b) — units management drawer */}
+ {showUnitsSurface && (
+  <UnitsManager
+   open={unitsManagerOpen}
+   onClose={() => setUnitsManagerOpen(false)}
+   inspectionId={String(state.inspection.id)}
+   units={units}
+   mode={unitInspectionMode}
+   fetcher={unitsFetcher}
+  />
+ )}
  {/* ------------------------------------------------------------ */}
  {/* 4-column layout below header */}
  {/* ------------------------------------------------------------ */}
