@@ -36,8 +36,6 @@ export const BulkCreateUnitsSchema = z.discriminatedUnion('mode', [
     }),
 ]).openapi('BulkCreateUnits');
 
-export type BulkCreateUnitsInput = z.infer<typeof BulkCreateUnitsSchema>;
-
 // Commercial PCA Phase U (Batch C2a) — switch an inspection's unit-inspection
 // mode. `per_unit` promotes location tags into first-class unit rows + re-keys
 // findings; `tagged` is the LOSSY reverse (drops the unit rows + matrix). The
@@ -46,8 +44,6 @@ export type BulkCreateUnitsInput = z.infer<typeof BulkCreateUnitsSchema>;
 export const UnitModeSwitchSchema = z.object({
     mode: z.enum(['tagged', 'per_unit']).describe('Target unit-inspection mode: "per_unit" (promote to per-unit matrix) or "tagged" (flatten back to common scope + location tags).'),
 }).openapi('UnitModeSwitch');
-
-export type UnitModeSwitchInput = z.infer<typeof UnitModeSwitchSchema>;
 
 export type CreateUnitInput = z.infer<typeof CreateUnitSchema>;
 export type UpdateUnitInput = z.infer<typeof UpdateUnitSchema>;

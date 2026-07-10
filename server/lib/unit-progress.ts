@@ -14,7 +14,7 @@
  */
 import { findingsForUnit, findingKeysFromTemplateSnapshot, DEFAULT_UNIT } from './finding-key';
 
-export interface UnitProgress {
+interface UnitProgress {
     unitId: string;
     rated: number;
     total: number;

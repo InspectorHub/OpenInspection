@@ -79,7 +79,7 @@ export class UnitSwitchService {
             const rewritten = rewriteKeysForPromotion(data, labelToUnitId);
             await db.update(inspectionResults)
                 .set({ data: rewritten, lastSyncedAt: new Date() })
-                .where(eq(inspectionResults.id, resultsRow.id));
+                .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
         }
 
         await db.update(inspections)
@@ -128,7 +128,7 @@ export class UnitSwitchService {
             const { data: flattened } = flattenUnitsToTagged(data, units);
             await db.update(inspectionResults)
                 .set({ data: flattened, lastSyncedAt: new Date() })
-                .where(eq(inspectionResults.id, resultsRow.id));
+                .where(and(eq(inspectionResults.inspectionId, inspectionId), eq(inspectionResults.tenantId, tenantId)));
         }
 
         // Delete the promoted unit rows (leaf 'unit' nodes; buildings/floors, if
