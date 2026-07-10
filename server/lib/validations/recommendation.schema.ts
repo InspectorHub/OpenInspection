@@ -1,6 +1,11 @@
 import { z } from '@hono/zod-openapi';
 
-export const SeverityEnum = z.enum(['satisfactory', 'monitor', 'defect']);
+// Module F (2026-07) — the single canonical severity vocabulary shared with
+// rating levels (good | marginal | significant | minor). Mirrors
+// rating-system.schema.ts's SeverityEnum; kept as a separate declaration
+// here (recommendations is its own domain schema) rather than importing
+// across domains.
+export const SeverityEnum = z.enum(['good', 'marginal', 'significant', 'minor']);
 
 export const CreateRecommendationSchema = z.object({
     category:             z.string().nullable().optional().describe('TODO describe category field for the OpenInspection MCP integration'),

@@ -18,9 +18,9 @@ import { bindResultMap, appendPendingPhoto } from "~/lib/collab/results-binding"
 import { enqueueMedia } from "~/lib/collab/media-upload-queue";
 import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
 import type { ResultsProjection } from "../../server/lib/collab/results-doc.types";
-import { SectionRail } from "~/components/editor/SectionRail";
+import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
-import { ItemList } from "~/components/editor/ItemList";
+import { ItemList } from "~/components/editor-shared/ItemList";
 import { ItemEditor } from "~/components/editor/ItemEditor";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
 import type { DefectFieldsValue } from "~/components/editor/DefectFieldsRow";
@@ -29,6 +29,7 @@ import { SpeedMode } from "~/components/editor/SpeedMode";
 import { FooterBar } from "~/components/editor/FooterBar";
 import { BatchActionBar } from "~/components/editor/BatchActionBar";
 import { capturePriorRatings } from "~/lib/editor/batch-undo";
+import { reorderItemBySwap } from "~/lib/editor/reorder-by-swap";
 import { KeyboardHud } from "~/components/editor/KeyboardHud";
 import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
@@ -232,6 +233,19 @@ export default function InspectionEditPage() {
  // instead of a raw client fetch against /api/tags.
  const tagLibrary = (loaderData.tagLibrary ?? []) as TagPin[];
 
+ // Authoring unification Plan-4 module K — one tenant-wide category → color
+ // lookup, built once from the loader's single fetch, keyed by BOTH name and
+ // id (a defect's stored `category` may be either a legacy seed name or a
+ // defect_categories.id, mirroring how the report resolves drivesSummary).
+ const catColor = useMemo(() => {
+  const map = new Map<string, string>();
+  for (const c of loaderData.defectCategories ?? []) {
+   map.set(c.name, c.color);
+   map.set(c.id, c.color);
+  }
+  return map;
+ }, [loaderData.defectCategories]);
+
  const pinnedTags = useMemo(() => {
  return inspectionPrefs.pinnedTagIds
  .map(id => tagLibrary.find(t => t.id === id))
@@ -334,7 +348,7 @@ export default function InspectionEditPage() {
 
  const comments = useCannedComments({
  inspectionId: String(state.inspection.id),
- bucketForRatingId: state.bucketForRatingId,
+ severityForRatingId: state.severityForRatingId,
  });
 
  /* ---------------------------------------------------------------- */
@@ -351,22 +365,22 @@ export default function InspectionEditPage() {
 
  useEffect(() => {
  if (!state.showCommentLibrary && !librarySideOpen) { setServerComments([]); return; }
- const ctx: { itemLabel?: string; section?: string; ratingBucket?: string; search?: string } = {};
+ const ctx: { itemLabel?: string; section?: string; severity?: string; search?: string } = {};
  if (comments.filterMode === 'auto' && state.activeItem) {
  ctx.itemLabel = (state.activeItem.label || state.activeItem.name || '') as string;
  ctx.section   = state.currentSection?.title;
  const r = state.activeItemId ? state.getResult(state.activeItemId)?.rating : null;
- if (r && state.bucketForRatingId) {
- ctx.ratingBucket = state.bucketForRatingId(r as string);
+ if (r && state.severityForRatingId) {
+ ctx.severity = state.severityForRatingId(r as string);
  }
  }
  // Track H (IA-5) — the modal's search box queries the SERVER (SQL pushdown
  // over the whole tenant library incl. imported rows); it used to only reset
- // the keyboard cursor. Bucket chips override the context-derived rating.
+ // the keyboard cursor. Severity chips override the context-derived severity.
  const q = state.commentLibrarySearch.trim();
  if (q.length >= 2) ctx.search = q;
- if (['satisfactory', 'monitor', 'defect'].includes(state.commentLibraryFilter)) {
- ctx.ratingBucket = state.commentLibraryFilter;
+ if (['good', 'marginal', 'significant'].includes(state.commentLibraryFilter)) {
+ ctx.severity = state.commentLibraryFilter;
  }
  let cancelled = false;
  const t = setTimeout(() => {
@@ -388,7 +402,7 @@ export default function InspectionEditPage() {
  state.currentSection,
  comments.fetchFiltered,
  state.getResult,
- state.bucketForRatingId,
+ state.severityForRatingId,
  ]);
 
  const revalidator = useRevalidator();
@@ -1054,7 +1068,7 @@ export default function InspectionEditPage() {
  if (!state.activeItemId) return;
  const r = state.getResult(state.activeItemId);
  state.setCommentLibraryFilter(
- state.bucketForRatingId(r?.rating as string),
+ state.severityForRatingId(r?.rating as string),
  );
  state.setCommentLibrarySearch("");
  state.setCommentLibrarySelectedIdx(0);
@@ -1101,9 +1115,9 @@ export default function InspectionEditPage() {
  const r = state.getResult(state.activeItemId);
  const notes = ((r?.notes as string) || "").trim();
  if (!notes) return;
- const bucket = state.bucketForRatingId(r?.rating as string);
+ const severity = state.severityForRatingId(r?.rating as string);
  const section = state.currentSection?.title || "";
- comments.saveSnippet(notes, bucket, section, undefined, (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined);
+ comments.saveSnippet(notes, severity, section, undefined, (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined);
  },
  onToggleCheatsheet: () =>
  state.setShowCheatsheet(!state.showCheatsheet),
@@ -1157,6 +1171,7 @@ export default function InspectionEditPage() {
 
  const sectionRailEl = (
  <SectionRail
+ mode="fill"
  sections={state.sections}
  activeSection={state.currentSection?.id || ""}
  onSelect={(id) => {
@@ -1173,6 +1188,7 @@ export default function InspectionEditPage() {
  onDuplicateSection={structure.duplicateSection}
  onDeleteSection={structure.deleteSection}
  onMoveSection={structure.moveSection}
+ onReorderSection={structure.reorderSection}
  onSaveToTemplate={structure.openSaveTemplate}
  canSaveBack={structure.canSaveBack}
  />
@@ -1180,6 +1196,7 @@ export default function InspectionEditPage() {
 
  const itemListEl = (
  <ItemList
+ mode="fill"
  items={visibleItems}
  sectionId={state.currentSection?.id || ""}
  activeItemId={state.activeItemId}
@@ -1196,6 +1213,7 @@ export default function InspectionEditPage() {
  onDuplicateItem={(itemId) => structure.duplicateItem(state.currentSection?.id || "", itemId)}
  onDeleteItem={(itemId) => structure.deleteItem(state.currentSection?.id || "", itemId)}
  onMoveItem={(itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir)}
+ onReorderItem={(fromId, toId) => reorderItemBySwap(state.currentSectionItems, fromId, toId, state.currentSection?.id || "", structure.moveItem)}
  />
  );
 
@@ -1262,6 +1280,15 @@ export default function InspectionEditPage() {
  );
  }
  }}
+ onValue={(value) => {
+ if (state.activeItemId && state.currentSection) {
+ findings.setItemValue(
+ state.currentSection.id,
+ state.activeItemId,
+ value,
+ );
+ }
+ }}
  onToggleCanned={(tabName, cannedId, included) => {
  if (state.activeItemId && state.currentSection) {
  findings.toggleCannedComment(
@@ -1277,6 +1304,7 @@ export default function InspectionEditPage() {
  locationSuggestions={locationSuggestions}
  missingFields={missingFields}
  requiredDefectFields={requiredDefectFields}
+ categoryColor={catColor}
  onDefectFields={(cannedId, patch) => {
  if (state.activeItemId && state.currentSection) {
  findings.setDefectFields(
@@ -1299,7 +1327,7 @@ export default function InspectionEditPage() {
  const text = input.comment ? `${input.title} — ${input.comment}` : input.title;
  comments.saveSnippet(
  text,
- "defect",
+ "significant",
  state.currentSection?.title || "",
  undefined,
  (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined,
@@ -1341,7 +1369,8 @@ export default function InspectionEditPage() {
 
  const sideRailEl = (
  <SideRail
- activeItem={state.activeItem ? { id: state.activeItem.id, label: (state.activeItem.label || state.activeItem.name || "") as string } : null}
+ mode="fill"
+ activeItem={state.activeItem ? { id: state.activeItem.id, label: (state.activeItem.label || state.activeItem.name || "") as string, type: state.activeItem.type } : null}
  activeResult={state.activeItemId ? state.getResult(state.activeItemId) : null}
  ratingLevels={state.ratingLevels}
  getRatingColor={state.getRatingColor}
@@ -1359,6 +1388,7 @@ export default function InspectionEditPage() {
  comments.touchSnippet(id);
  }}
  onLibraryTabChange={(isOpen) => setLibrarySideOpen(isOpen)}
+ categoryColor={catColor}
  />
  );
 

@@ -1,16 +1,22 @@
 import { z } from '@hono/zod-openapi';
 
 // Spec 2026-05-07 — Comments Library unification.
-// `ratingBucket` aligns user snippets with the seeded 248-entry library so
-// both surfaces (the /comments page and the inspection-edit Library drawer)
+// `severity` aligns user snippets with the seeded 250-entry library so both
+// surfaces (the /comments page and the inspection-edit Library drawer)
 // classify entries identically. `section` is free-text so tenants can grow
 // their own taxonomy alongside the seeded sections (Roof / Electrical / …).
-const RatingBucketSchema = z.enum(['satisfactory', 'monitor', 'defect']);
+//
+// Module F (2026-07) — the single canonical severity vocabulary shared with
+// rating levels (`good | marginal | significant | minor`; see
+// app/lib/severity.ts / rating-system.schema.ts's SeverityEnum). Retires the
+// legacy `ratingBucket` (satisfactory | monitor | defect) write/read path —
+// `comments.rating_bucket` is FROZEN (schema/inspection/comments.ts).
+const SeverityFieldSchema = z.enum(['good', 'marginal', 'significant', 'minor']);
 
 export const CommentSchema = z.object({
     text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('TODO describe text field for the OpenInspection MCP integration'),
     category: z.string().max(50).optional().nullable().openapi({ example: 'Roofing' }).describe('TODO describe category field for the OpenInspection MCP integration'),
-    ratingBucket: RatingBucketSchema.optional().nullable().openapi({ example: 'defect' }).describe('TODO describe ratingBucket field for the OpenInspection MCP integration'),
+    severity: SeverityFieldSchema.optional().nullable().openapi({ example: 'significant' }).describe('The single severity vocabulary shared with rating levels.'),
     section: z.string().max(64).optional().nullable().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
     // Comments Library Upgrade — canonical single item label drives sort/filter.
     itemLabel: z.string().max(120).optional().nullable().openapi({ example: 'Roof Covering' }),
@@ -23,7 +29,7 @@ export const CommentSchema = z.object({
 export const UpdateCommentSchema = z.object({
     text: z.string().min(1).max(1000).openapi({ example: 'Evidence of previous repair was observed.' }).describe('TODO describe text field for the OpenInspection MCP integration'),
     category: z.string().max(50).nullable().optional().openapi({ example: 'Roofing' }).describe('TODO describe category field for the OpenInspection MCP integration'),
-    ratingBucket: RatingBucketSchema.nullable().optional().openapi({ example: 'defect' }).describe('TODO describe ratingBucket field for the OpenInspection MCP integration'),
+    severity: SeverityFieldSchema.nullable().optional().openapi({ example: 'significant' }).describe('The single severity vocabulary shared with rating levels.'),
     section: z.string().max(64).nullable().optional().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
     itemLabel: z.string().max(120).optional().nullable(),
     repairSummary: z.string().max(2000).optional().nullable().describe('Repair recommendation summary (defect comments only).'),
@@ -37,7 +43,7 @@ export const CommentResponseSchema = z.object({
     tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     text: z.string().describe('TODO describe text field for the OpenInspection MCP integration'),
     category: z.string().nullable().describe('TODO describe category field for the OpenInspection MCP integration'),
-    ratingBucket: RatingBucketSchema.nullable().describe('TODO describe ratingBucket field for the OpenInspection MCP integration'),
+    severity: SeverityFieldSchema.nullable().describe('The single severity vocabulary shared with rating levels.'),
     section: z.string().nullable().describe('TODO describe section field for the OpenInspection MCP integration'),
     itemLabel: z.string().nullable().optional(),
     repairSummary: z.string().nullable().optional(),
@@ -50,7 +56,7 @@ export const CommentResponseSchema = z.object({
 }).openapi('CommentResponse');
 
 export const ListCommentsQuerySchema = z.object({
-    rating: RatingBucketSchema.optional().openapi({ example: 'defect' }).describe('TODO describe rating field for the OpenInspection MCP integration'),
+    severity: SeverityFieldSchema.optional().openapi({ example: 'significant' }).describe('Filter by the single severity vocabulary shared with rating levels.'),
     section: z.string().max(64).optional().openapi({ example: 'Roof' }).describe('TODO describe section field for the OpenInspection MCP integration'),
     sectionId: z.string().max(64).optional().openapi({ example: 'roof-general' }).describe('Filter by section ID (matches within the section_ids JSON array)'),
     triggerCode: z.string().max(64).optional().openapi({ example: 'NI' }).describe('Filter by trigger code'),

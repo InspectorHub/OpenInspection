@@ -11,6 +11,7 @@ import type {
   SaveStatus,
 } from "../useInspection";
 import { fKey } from "../useInspection";
+import type { Severity } from "~/lib/severity";
 
 /**
  * Pure helpers + shared context type for the composed `useInspectionState`
@@ -115,7 +116,7 @@ export interface InspectionContext {
 
   // Result + rating helpers (computed in Core)
   getResult: (itemId: string, sectionId?: string) => Record<string, unknown>;
-  bucketForRatingId: (ratingId: string | null | undefined) => string;
+  severityForRatingId: (ratingId: string | null | undefined) => Severity | "all";
 }
 
 // Re-export shared types/values used by the slices and consumers.

@@ -1,11 +1,16 @@
 import { useState, useRef } from "react";
+import type { EditorMode } from "./editor-mode";
+import { useDragReorder } from "./useDragReorder";
 
-interface ItemListProps {
+interface SharedItemListProps {
+  mode: EditorMode;
   items: Array<{ id: string; label: string; type: string }>;
   sectionId: string;
   activeItemId: string | null;
   onSelect: (id: string) => void;
-  results: Record<string, Record<string, unknown>>;
+  /** Live results keyed by `_default:{sectionId}:{itemId}` (fill-only). */
+  results?: Record<string, Record<string, unknown>>;
+  // batch (fill-only today; reserved for author bulk later):
   batchMode?: boolean;
   batchSelected?: Record<string, boolean>;
   onBatchToggle?: (id: string) => void;
@@ -15,6 +20,8 @@ interface ItemListProps {
   onDuplicateItem?: (itemId: string) => void;
   onDeleteItem?: (itemId: string) => void;
   onMoveItem?: (itemId: string, dir: -1 | 1) => void;
+  /** Reorder an item via drag-and-drop (drop `fromId` onto `toId`). */
+  onReorderItem?: (fromId: string, toId: string) => void;
 }
 
 /** Map rating to dot color for the item list */
@@ -25,11 +32,29 @@ function ratingDotClass(rating: string): string {
   return "bg-ih-border-strong";
 }
 
-export function ItemList({ items, sectionId, activeItemId, onSelect, results, batchMode, batchSelected, onBatchToggle, onBatchRange, onAddItem, onDuplicateItem, onDeleteItem, onMoveItem }: ItemListProps) {
+export function ItemList({
+  mode,
+  items,
+  sectionId,
+  activeItemId,
+  onSelect,
+  results,
+  batchMode,
+  batchSelected,
+  onBatchToggle,
+  onBatchRange,
+  onAddItem,
+  onDuplicateItem,
+  onDeleteItem,
+  onMoveItem,
+  onReorderItem,
+}: SharedItemListProps) {
   const [filter, setFilter] = useState("all");
   const lastClickedRef = useRef<string | null>(null);
   const [menuItemId, setMenuItemId] = useState<string | null>(null);
   const structuralEditing = Boolean(onDuplicateItem || onDeleteItem || onMoveItem);
+  const resultsMap = results ?? {};
+  const { dragProps } = useDragReorder({ ids: items.map((i) => i.id), onReorder: onReorderItem ?? (() => {}) });
 
   const filters = [
     { id: "all", label: "All" },
@@ -40,7 +65,7 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
 
   const filteredItems = items.filter((item) => {
     if (filter === "all") return true;
-    const r = results[`_default:${sectionId}:${item.id}`] || results[item.id] || {};
+    const r = resultsMap[`_default:${sectionId}:${item.id}`] || resultsMap[item.id] || {};
     if (filter === "unrated") return !r.rating;
     if (filter === "issues") return r.rating === "DEF" || r.rating === "MON" || r.rating === "Defect" || r.rating === "Monitor";
     return true;
@@ -48,30 +73,45 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
 
   return (
     <div data-shortcut-scope className="w-[280px] flex-shrink-0 border-r border-ih-border overflow-y-auto flex flex-col">
-      {/* Filter chips */}
-      <div className="px-2 py-1.5 flex gap-1 border-b border-ih-border">
-        {filters.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setFilter(f.id)}
-            className={`px-2 py-1 rounded text-[11px] font-bold ${
-              filter === f.id
-                ? "bg-ih-primary-tint text-ih-primary"
-                : "text-ih-fg-4 hover:text-ih-fg-2"
-            }`}
-          >
-            {f.label}
-          </button>
-        ))}
-      </div>
+      {/* Filter chips (fill-only) */}
+      {mode === "fill" && (
+        <div className="px-2 py-1.5 flex gap-1 border-b border-ih-border">
+          {filters.map((f) => (
+            <button
+              key={f.id}
+              onClick={() => setFilter(f.id)}
+              className={`px-2 py-1 rounded text-[11px] font-bold ${
+                filter === f.id
+                  ? "bg-ih-primary-tint text-ih-primary"
+                  : "text-ih-fg-4 hover:text-ih-fg-2"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Item list */}
       <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
         {filteredItems.map((item, idx) => {
-          const result = results[`_default:${sectionId}:${item.id}`] || results[item.id] || {};
+          const result = resultsMap[`_default:${sectionId}:${item.id}`] || resultsMap[item.id] || {};
           const fullIdx = items.findIndex((i) => i.id === item.id);
           return (
-            <div key={item.id} className="group relative flex items-center">
+            <div
+              key={item.id}
+              className="group relative flex items-center"
+              {...(mode === "author" && onReorderItem ? dragProps(item.id) : {})}
+            >
+              {mode === "author" && (
+                <span
+                  aria-label={`Drag ${item.label}`}
+                  title="Drag to reorder"
+                  className="cursor-grab text-ih-fg-4 px-1 select-none"
+                >
+                  ☰
+                </span>
+              )}
               <button
                 onClick={(e) => {
                   if (batchMode && onBatchToggle) {
@@ -110,10 +150,15 @@ export function ItemList({ items, sectionId, activeItemId, onSelect, results, ba
                   {String(idx + 1).padStart(2, "0")}
                 </span>
                 <span className="flex-1 truncate">{item.label}</span>
-                {Boolean(result.rating) && (
+                {mode === "fill" && Boolean(result.rating) && (
                   <span
                     className={`w-2 h-2 rounded-full flex-shrink-0 ${ratingDotClass(result.rating as string)}`}
                   />
+                )}
+                {mode === "author" && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-4 flex-shrink-0">
+                    {item.type}
+                  </span>
                 )}
               </button>
               {structuralEditing && !batchMode && (

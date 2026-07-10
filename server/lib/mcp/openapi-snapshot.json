@@ -930,6 +930,24 @@
     "description": "Auto-generated placeholder for createContractorType (POST /, contractor-types domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "createDefectCategory",
+    "method": "POST",
+    "pathTemplate": "/api/admin/defect-categories",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/CreateDefectCategory"
+      }
+    },
+    "summary": "Create a defect category for current tenant",
+    "description": "Create a custom defect category (name/color/drivesSummary/sortOrder)."
+  },
+  {
     "operationId": "createEventType",
     "method": "POST",
     "pathTemplate": "/api/admin/event-types",
@@ -1597,11 +1615,7 @@
                                             },
                                             "category": {
                                               "type": "string",
-                                              "enum": [
-                                                "maintenance",
-                                                "recommendation",
-                                                "safety"
-                                              ],
+                                              "minLength": 1,
                                               "description": "TODO describe category field for the OpenInspection MCP integration"
                                             },
                                             "location": {
@@ -3357,6 +3371,10 @@
                               "type": "boolean",
                               "description": "TODO describe isDefect field for the OpenInspection MCP integration"
                             },
+                            "pausesAdvance": {
+                              "type": "boolean",
+                              "description": "Pause auto-advance after selecting this level (focus notes)"
+                            },
                             "default": {
                               "type": "boolean",
                               "description": "TODO describe default field for the OpenInspection MCP integration"
@@ -3935,11 +3953,11 @@
                   "maxLength": 64,
                   "description": "TODO describe id field for the OpenInspection MCP integration"
                 },
-                "abbr": {
+                "abbreviation": {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 8,
-                  "description": "TODO describe abbr field for the OpenInspection MCP integration"
+                  "description": "TODO describe abbreviation field for the OpenInspection MCP integration"
                 },
                 "label": {
                   "type": "string",
@@ -3952,15 +3970,24 @@
                   "pattern": "^#[0-9a-fA-F]{6}$",
                   "description": "TODO describe color field for the OpenInspection MCP integration"
                 },
-                "bucket": {
+                "severity": {
                   "type": "string",
                   "enum": [
-                    "satisfactory",
-                    "monitor",
-                    "defect",
-                    "na"
+                    "good",
+                    "marginal",
+                    "significant",
+                    "minor"
                   ],
-                  "description": "TODO describe bucket field for the OpenInspection MCP integration"
+                  "description": "TODO describe severity field for the OpenInspection MCP integration"
+                },
+                "isDefect": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "TODO describe isDefect field for the OpenInspection MCP integration"
+                },
+                "pausesAdvance": {
+                  "type": "boolean",
+                  "description": "TODO describe pausesAdvance field for the OpenInspection MCP integration"
                 },
                 "hotkey": {
                   "type": "string",
@@ -3975,10 +4002,10 @@
                 }
               },
               "required": [
-                "abbr",
+                "abbreviation",
                 "label",
                 "color",
-                "bucket"
+                "severity"
               ],
               "additionalProperties": false
             },
@@ -4661,6 +4688,34 @@
     },
     "summary": "Delete contractor type for current tenant",
     "description": "Auto-generated placeholder for deleteContractorType (DELETE /{id}, contractor-types domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "deleteDefectCategory",
+    "method": "DELETE",
+    "pathTemplate": "/api/admin/defect-categories/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Defect category id.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Defect category id."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a non-seed defect category for current tenant",
+    "description": "Delete a custom (non-seed) defect category. Seed rows (maintenance/recommendation/safety) are protected and silently no-op."
   },
   {
     "operationId": "deleteEventType",
@@ -8060,6 +8115,22 @@
     "description": "Auto-generated placeholder for listContractorTypes (GET /, contractor-types domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "listDefectCategories",
+    "method": "GET",
+    "pathTemplate": "/api/admin/defect-categories",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List defect categories for current tenant, seeding defaults on first read",
+    "description": "List the tenant defect categories, seeding maintenance/recommendation/safety on first read."
+  },
+  {
     "operationId": "listEmailTemplates",
     "method": "GET",
     "pathTemplate": "/api/admin/email-templates",
@@ -9246,9 +9317,10 @@
           "schema": {
             "type": "string",
             "enum": [
-              "satisfactory",
-              "monitor",
-              "defect"
+              "good",
+              "marginal",
+              "significant",
+              "minor"
             ],
             "description": "TODO describe severity field for the OpenInspection MCP integration"
           }
@@ -9690,19 +9762,20 @@
     "inputSchema": {
       "parameters": [
         {
-          "name": "rating",
+          "name": "severity",
           "in": "query",
           "required": false,
-          "description": "TODO describe rating field for the OpenInspection MCP integration",
+          "description": "Filter by the single severity vocabulary shared with rating levels.",
           "schema": {
             "type": "string",
             "enum": [
-              "satisfactory",
-              "monitor",
-              "defect"
+              "good",
+              "marginal",
+              "significant",
+              "minor"
             ],
-            "example": "defect",
-            "description": "TODO describe rating field for the OpenInspection MCP integration"
+            "example": "significant",
+            "description": "Filter by the single severity vocabulary shared with rating levels."
           }
         },
         {
@@ -10715,11 +10788,7 @@
                                         },
                                         "category": {
                                           "type": "string",
-                                          "enum": [
-                                            "maintenance",
-                                            "recommendation",
-                                            "safety"
-                                          ],
+                                          "minLength": 1,
                                           "description": "TODO describe category field for the OpenInspection MCP integration"
                                         },
                                         "location": {
@@ -12475,6 +12544,10 @@
                           "type": "boolean",
                           "description": "TODO describe isDefect field for the OpenInspection MCP integration"
                         },
+                        "pausesAdvance": {
+                          "type": "boolean",
+                          "description": "Pause auto-advance after selecting this level (focus notes)"
+                        },
                         "default": {
                           "type": "boolean",
                           "description": "TODO describe default field for the OpenInspection MCP integration"
@@ -13469,11 +13542,11 @@
                   "maxLength": 64,
                   "description": "TODO describe id field for the OpenInspection MCP integration"
                 },
-                "abbr": {
+                "abbreviation": {
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 8,
-                  "description": "TODO describe abbr field for the OpenInspection MCP integration"
+                  "description": "TODO describe abbreviation field for the OpenInspection MCP integration"
                 },
                 "label": {
                   "type": "string",
@@ -13486,15 +13559,24 @@
                   "pattern": "^#[0-9a-fA-F]{6}$",
                   "description": "TODO describe color field for the OpenInspection MCP integration"
                 },
-                "bucket": {
+                "severity": {
                   "type": "string",
                   "enum": [
-                    "satisfactory",
-                    "monitor",
-                    "defect",
-                    "na"
+                    "good",
+                    "marginal",
+                    "significant",
+                    "minor"
                   ],
-                  "description": "TODO describe bucket field for the OpenInspection MCP integration"
+                  "description": "TODO describe severity field for the OpenInspection MCP integration"
+                },
+                "isDefect": {
+                  "type": "boolean",
+                  "default": false,
+                  "description": "TODO describe isDefect field for the OpenInspection MCP integration"
+                },
+                "pausesAdvance": {
+                  "type": "boolean",
+                  "description": "TODO describe pausesAdvance field for the OpenInspection MCP integration"
                 },
                 "hotkey": {
                   "type": "string",
@@ -13509,10 +13591,10 @@
                 }
               },
               "required": [
-                "abbr",
+                "abbreviation",
                 "label",
                 "color",
-                "bucket"
+                "severity"
               ],
               "additionalProperties": false
             },
@@ -14680,6 +14762,36 @@
     "description": "Auto-generated placeholder for updateContractorType (PATCH /{id}, contractor-types domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "updateDefectCategory",
+    "method": "PUT",
+    "pathTemplate": "/api/admin/defect-categories/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Defect category id.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Defect category id."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/UpdateDefectCategory"
+      }
+    },
+    "summary": "Update a defect category for current tenant",
+    "description": "Patch name/color/drivesSummary/sortOrder on an existing defect category (seed rows may be edited, not deleted)."
+  },
+  {
     "operationId": "updateEventType",
     "method": "PATCH",
     "pathTemplate": "/api/admin/event-types/{id}",
@@ -15101,11 +15213,7 @@
                                             },
                                             "category": {
                                               "type": "string",
-                                              "enum": [
-                                                "maintenance",
-                                                "recommendation",
-                                                "safety"
-                                              ],
+                                              "minLength": 1,
                                               "description": "TODO describe category field for the OpenInspection MCP integration"
                                             },
                                             "location": {
@@ -16860,6 +16968,10 @@
                             "isDefect": {
                               "type": "boolean",
                               "description": "TODO describe isDefect field for the OpenInspection MCP integration"
+                            },
+                            "pausesAdvance": {
+                              "type": "boolean",
+                              "description": "Pause auto-advance after selecting this level (focus notes)"
                             },
                             "default": {
                               "type": "boolean",

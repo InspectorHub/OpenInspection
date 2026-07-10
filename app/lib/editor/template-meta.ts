@@ -1,9 +1,15 @@
 /**
  * PCA / multi-unit editor — pure serialization + normalization for the template
- * property-type and section applicability fields. Kept separate from the React
- * components so payload building is unit-testable without a DOM. Mirrors the
+ * property-type and (FROZEN) section-applicability fields. Kept separate from the
+ * React components so payload building is unit-testable without a DOM. Mirrors the
  * server rules: commercialSubtype only for commercial; empty applicability
  * arrays collapse to "applies to all" (matches sectionApplies()).
+ *
+ * `serializeTemplateMeta` is live (property type = template identity).
+ * `serializeSectionMeta` / `normalizeApplicability` / `toggleInArray` are now
+ * ROUND-TRIP-ONLY: no UI authors `applicableTo`/`defaultScope` (module A retired
+ * that rail), but `toV2Payload` still re-emits whatever a loaded template already
+ * carries so saving an imported/legacy template is lossless. Do not delete.
  */
 import type { PropertyType, SectionApplicability, TemplateSection } from '../../components/template/types';
 

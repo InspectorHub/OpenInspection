@@ -7,6 +7,7 @@ import {
     duplicateSection,
     deleteSection,
     moveSection,
+    reorderSection,
     addItem,
     duplicateItem,
     deleteItem,
@@ -314,6 +315,54 @@ describe('moveSection', () => {
         const snap = makeFixture();
         moveSection(snap as Parameters<typeof moveSection>[0], 'sec_1', 1);
         expect(snap.sections[0].id).toBe('sec_1');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// reorderSection
+// ---------------------------------------------------------------------------
+
+/** Build a minimal 3-section snapshot (a, b, c) for drag-reorder tests. */
+function makeThreeSectionFixture() {
+    return {
+        schemaVersion: 2 as const,
+        sections: [
+            { id: 'a', title: 'Section A', items: [] },
+            { id: 'b', title: 'Section B', items: [] },
+            { id: 'c', title: 'Section C', items: [] },
+        ],
+    };
+}
+
+describe('reorderSection', () => {
+    it('moves the first section onto the third, yielding order [b, c, a]', () => {
+        const snap = makeThreeSectionFixture();
+        const result = reorderSection(snap as Parameters<typeof reorderSection>[0], 'a', 'c');
+        expect(result.sections.map(s => s.id)).toEqual(['b', 'c', 'a']);
+    });
+
+    it('is a no-op for an unknown fromId', () => {
+        const snap = makeThreeSectionFixture();
+        const result = reorderSection(snap as Parameters<typeof reorderSection>[0], 'nope', 'c');
+        expect(result.sections.map(s => s.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('is a no-op for an unknown toId', () => {
+        const snap = makeThreeSectionFixture();
+        const result = reorderSection(snap as Parameters<typeof reorderSection>[0], 'a', 'nope');
+        expect(result.sections.map(s => s.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('is a no-op when fromId === toId', () => {
+        const snap = makeThreeSectionFixture();
+        const result = reorderSection(snap as Parameters<typeof reorderSection>[0], 'b', 'b');
+        expect(result.sections.map(s => s.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    it('does not mutate input', () => {
+        const snap = makeThreeSectionFixture();
+        reorderSection(snap as Parameters<typeof reorderSection>[0], 'a', 'c');
+        expect(snap.sections.map(s => s.id)).toEqual(['a', 'b', 'c']);
     });
 });
 

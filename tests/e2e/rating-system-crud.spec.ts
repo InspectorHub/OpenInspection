@@ -101,6 +101,29 @@ test.describe.serial('Sprint 2 S2-1 — Rating Systems CRUD', () => {
         expect(body.data.levels.length).toBeGreaterThan(0);
     });
 
+    test('R-02b: POST /api/rating-systems round-trips canonical abbreviation/severity/isDefect', async ({ request }) => {
+        const res = await apiPost(request, '/api/rating-systems', adminToken, {
+            name: 'E2E Canonical Levels',
+            slug: 'e2e-canonical-levels',
+            isDefault: false,
+            levels: [
+                { abbreviation: 'S', label: 'Satisfactory', color: '#22c55e', severity: 'good', isDefect: false },
+                { abbreviation: 'D', label: 'Defect', color: '#ef4444', severity: 'significant', isDefect: true, pausesAdvance: true },
+            ],
+        });
+        expect(res.status()).toBe(200);
+        const body = await res.json();
+        const levels = body.data.levels as Array<{ abbreviation: string; severity: string; isDefect: boolean; pausesAdvance?: boolean }>;
+        const defect = levels.find(l => l.abbreviation === 'D');
+        expect(defect).toBeTruthy();
+        expect(defect!.severity).toBe('significant');
+        expect(defect!.isDefect).toBe(true);
+        expect(defect!.pausesAdvance).toBe(true);
+        const sat = levels.find(l => l.abbreviation === 'S');
+        expect(sat!.severity).toBe('good');
+        expect(sat!.isDefect).toBe(false);
+    });
+
     test('R-03: PUT on a seed system returns 403', async ({ request }) => {
         const res = await apiPut(request, `/api/rating-systems/${seedTrecId}`, adminToken, {
             name: 'Hacked',

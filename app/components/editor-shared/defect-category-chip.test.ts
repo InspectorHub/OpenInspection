@@ -3,8 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { DefectCategoryChip } from "~/components/editor-shared/DefectCategoryChip";
 
-function html(category: string, className?: string): string {
-  return renderToStaticMarkup(createElement(DefectCategoryChip, { category, className }));
+function html(category: string, className?: string, color?: string): string {
+  return renderToStaticMarkup(createElement(DefectCategoryChip, { category, className, color }));
 }
 
 describe("DefectCategoryChip", () => {
@@ -35,5 +35,18 @@ describe("DefectCategoryChip", () => {
     expect(out).toContain("rounded-full");
     expect(out).toContain("uppercase");
     expect(out).toContain("ml-1.5");
+  });
+
+  it("a data-driven color wins over the category tokens (allowed user-color exemption)", () => {
+    const out = html("maintenance", undefined, "#ff8800");
+    expect(out).toContain("color:#ff8800");
+    expect(out).not.toContain("text-ih-fg-3");
+    expect(out).toContain("bg-ih-bg-muted");
+  });
+
+  it("falls back to the tokened styling when no color is given", () => {
+    const out = html("safety");
+    expect(out).not.toContain("style=");
+    expect(out).toContain("bg-ih-bad-bg");
   });
 });

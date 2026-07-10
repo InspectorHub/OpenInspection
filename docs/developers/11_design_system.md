@@ -228,7 +228,7 @@ Use inline editing **only when ALL of these hold**:
 
 Canonical examples in this repo:
 
-- **Template editor section title** — `app/components/template/SectionsList.tsx`:
+- **Template editor section title** — `app/components/template/SectionAuthorHeader.tsx`:
   a transparent-background `<input>` with a focus underline
   (`border-b-2 border-transparent focus:border-ih-primary`), committing on
   every keystroke via `renameSection`.

@@ -9,19 +9,21 @@
  */
 import { z } from '@hono/zod-openapi';
 
-/** Bucket the level rolls up into for stats / report cards. */
-export const RatingBucketEnum = z.enum(['satisfactory', 'monitor', 'defect', 'na']);
-export type RatingBucket = z.infer<typeof RatingBucketEnum>;
+/** The single severity vocabulary shared by rating levels AND comments (spec §4.F, §9 #1). */
+export const SeverityEnum = z.enum(['good', 'marginal', 'significant', 'minor']);
+export type Severity = z.infer<typeof SeverityEnum>;
 
 /** A single level inside a rating system. */
 export const RatingLevelInputSchema = z.object({
-    id:       z.string().min(1).max(64).optional().describe('TODO describe id field for the OpenInspection MCP integration'),     // server-assigned UUID when missing
-    abbr:     z.string().min(1).max(8).describe('TODO describe abbr field for the OpenInspection MCP integration'),                 // 'Sat', 'I', 'D', 'NI'
-    label:    z.string().min(1).max(40).describe('TODO describe label field for the OpenInspection MCP integration'),                // 'Satisfactory'
-    color:    z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Color must be a hex value like #aabbcc').describe('TODO describe color field for the OpenInspection MCP integration'),
-    bucket:   RatingBucketEnum.describe('TODO describe bucket field for the OpenInspection MCP integration'),
-    hotkey:   z.string().regex(/^[0-9a-zA-Z]?$/).optional().describe('TODO describe hotkey field for the OpenInspection MCP integration'),
-    order:    z.number().int().min(0).max(20).optional().describe('TODO describe order field for the OpenInspection MCP integration'),
+    id:            z.string().min(1).max(64).optional().describe('TODO describe id field for the OpenInspection MCP integration'),     // server-assigned UUID when missing
+    abbreviation:  z.string().min(1).max(8).describe('TODO describe abbreviation field for the OpenInspection MCP integration'),                 // 'Sat', 'I', 'D', 'NI'
+    label:         z.string().min(1).max(40).describe('TODO describe label field for the OpenInspection MCP integration'),                // 'Satisfactory'
+    color:         z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Color must be a hex value like #aabbcc').describe('TODO describe color field for the OpenInspection MCP integration'),
+    severity:      SeverityEnum.describe('TODO describe severity field for the OpenInspection MCP integration'),
+    isDefect:      z.boolean().optional().default(false).describe('TODO describe isDefect field for the OpenInspection MCP integration'),
+    pausesAdvance: z.boolean().optional().describe('TODO describe pausesAdvance field for the OpenInspection MCP integration'),
+    hotkey:        z.string().regex(/^[0-9a-zA-Z]?$/).optional().describe('TODO describe hotkey field for the OpenInspection MCP integration'),
+    order:         z.number().int().min(0).max(20).optional().describe('TODO describe order field for the OpenInspection MCP integration'),
 }).strict();
 export type RatingLevelInput = z.infer<typeof RatingLevelInputSchema>;
 

@@ -59,16 +59,16 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
     });
 
     it('finds a match that sorts beyond the first page (the legacy JS post-filter missed it)', async () => {
-        // 12 fillers that sort FIRST (ratingBucket asc puts 'defect' before null),
+        // 12 fillers that sort FIRST (severity asc puts 'significant' before null),
         // then the needle row sorting last — a pageSize-12 fetch without the
         // pushdown would never contain it.
         const fillers = Array.from({ length: 12 }, (_, i) => ({
             id: `f${i}`, tenantId: TENANT, text: `Filler entry ${i}`,
-            ratingBucket: 'defect' as const, section: null, category: null, createdAt: new Date(),
+            severity: 'significant' as const, section: null, category: null, createdAt: new Date(),
         }));
         await db.insert(schema.comments).values([
             ...fillers,
-            { id: 'needle', tenantId: TENANT, text: 'Water staining observed on roof covering.', ratingBucket: null, section: null, category: null, createdAt: new Date() },
+            { id: 'needle', tenantId: TENANT, text: 'Water staining observed on roof covering.', severity: null, section: null, category: null, createdAt: new Date() },
         ]);
 
         const { texts, total } = await search('water staining');
@@ -81,7 +81,7 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
         await db.insert(schema.comments).values({
             id: 'kw', tenantId: TENANT, text: 'Shingle granule loss at south slope.',
             searchKeywords: 'wear aging deterioration',
-            ratingBucket: 'monitor', section: null, category: null, createdAt: new Date(),
+            severity: 'marginal', section: null, category: null, createdAt: new Date(),
         });
         const { texts } = await search('deterioration');
         expect(texts).toEqual(['Shingle granule loss at south slope.']);
@@ -91,7 +91,7 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
         await db.insert(schema.comments).values({
             id: 'imp', tenantId: TENANT, text: 'Imported: flue cap missing at water heater vent.',
             libraryId: 'lib-spectora-1',
-            ratingBucket: 'defect', section: null, category: null, createdAt: new Date(),
+            severity: 'significant', section: null, category: null, createdAt: new Date(),
         });
         const { texts } = await search('flue cap');
         expect(texts).toEqual(['Imported: flue cap missing at water heater vent.']);
@@ -101,19 +101,19 @@ describe('GET /api/admin/comments?search= — SQL pushdown (Track H)', () => {
         await db.insert(schema.tenants).values({ id: 't2', name: 'O', slug: 'o', createdAt: new Date() });
         await db.insert(schema.comments).values({
             id: 'other', tenantId: 't2', text: 'Water staining elsewhere.',
-            ratingBucket: null, section: null, category: null, createdAt: new Date(),
+            severity: null, section: null, category: null, createdAt: new Date(),
         });
         const { texts, total } = await search('water staining');
         expect(texts).toHaveLength(0);
         expect(total).toBe(0);
     });
-    it('rating filter applies in filterMode=all too (the modal bucket chips)', async () => {
+    it('severity filter applies in filterMode=all too (the modal severity chips)', async () => {
         await db.insert(schema.comments).values([
-            { id: 'd1', tenantId: TENANT, text: 'Defect one.', ratingBucket: 'defect', section: null, category: null, createdAt: new Date() },
-            { id: 's1', tenantId: TENANT, text: 'Sat one.', ratingBucket: 'satisfactory', section: null, category: null, createdAt: new Date() },
+            { id: 'd1', tenantId: TENANT, text: 'Defect one.', severity: 'significant', section: null, category: null, createdAt: new Date() },
+            { id: 's1', tenantId: TENANT, text: 'Sat one.', severity: 'good', section: null, category: null, createdAt: new Date() },
         ]);
         const res = await buildApp().request(
-            '/api/admin/comments?filterMode=all&rating=defect',
+            '/api/admin/comments?filterMode=all&severity=significant',
             {},
             { DB: {} },
         );

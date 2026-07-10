@@ -219,6 +219,23 @@ export function moveSection(snapshot: Snapshot, sectionId: string, dir: -1 | 1):
     return stripRuntimeKeys({ ...snapshot, sections });
 }
 
+/**
+ * Moves the section `fromId` to the position currently held by `toId`
+ * (remove-then-insert-before-target — a single move-to-index, NOT a swap).
+ * No-op if either id is missing or they are equal.
+ */
+export function reorderSection(snapshot: Snapshot, fromId: string, toId: string): Snapshot {
+    const from = snapshot.sections.findIndex(s => s.id === fromId);
+    const to = snapshot.sections.findIndex(s => s.id === toId);
+    if (from === -1 || to === -1 || from === to) {
+        return stripRuntimeKeys({ ...snapshot, sections: [...snapshot.sections] });
+    }
+    const sections = [...snapshot.sections];
+    const [moved] = sections.splice(from, 1);
+    sections.splice(to, 0, moved);
+    return stripRuntimeKeys({ ...snapshot, sections });
+}
+
 // ---------------------------------------------------------------------------
 // Item mutators
 // ---------------------------------------------------------------------------

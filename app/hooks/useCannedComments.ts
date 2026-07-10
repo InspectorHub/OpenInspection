@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useEffect } from "react";
+import type { Severity } from "~/lib/severity";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -6,7 +7,8 @@ import { useState, useCallback, useMemo, useEffect } from "react";
 
 export interface CommentEntry {
   id?: string;
-  rating: string;
+  /** The single severity vocabulary shared with rating levels; "all" = applies regardless. */
+  severity: Severity | "all";
   text: string;
   section?: string | null;
   category?: string | null;
@@ -21,57 +23,57 @@ const BUILT_IN_LIBRARY: CommentEntry[] = buildLibrary();
 
 function buildLibrary(): CommentEntry[] {
   const L: CommentEntry[] = [];
-  function add(section: string, rating: string, text: string) {
-    L.push({ rating, section, text, source: "preset" });
+  function add(section: string, severity: Severity | "all", text: string) {
+    L.push({ severity, section, text, source: "preset" });
   }
 
   // Roof (30)
-  add("Roof", "satisfactory", "Roof covering appears serviceable with no visible defects at the time of inspection.");
-  add("Roof", "satisfactory", "Asphalt composition shingles in good overall condition; estimated remaining service life 10+ years.");
-  add("Roof", "satisfactory", "Roof flashing at penetrations and chimney appears properly installed and sealed.");
-  add("Roof", "satisfactory", "Gutters and downspouts are securely attached and free of significant debris.");
-  add("Roof", "satisfactory", "Soffit and ridge vents present and clear of obstructions; attic ventilation appears adequate.");
-  add("Roof", "satisfactory", "No active leaks or moisture intrusion observed at roof surface or interior ceilings below.");
-  add("Roof", "satisfactory", "Roof valleys and rake edges are properly flashed and sealed.");
-  add("Roof", "satisfactory", "Roof deck appears structurally sound with no visible sagging or deflection.");
-  add("Roof", "monitor", "Asphalt shingles show signs of granule loss and weathering; monitor and budget for replacement within 3-5 years.");
-  add("Roof", "monitor", "Minor moss or algae growth observed on north-facing slopes; recommend treatment to prevent moisture retention.");
-  add("Roof", "monitor", "One or more shingles show curling or cupping at edges; monitor for further deterioration.");
-  add("Roof", "monitor", "Flashing shows minor surface rust; monitor and apply sealant when accessible.");
-  add("Roof", "monitor", "Gutters exhibit minor sagging at one or more attachment points; monitor and secure as needed.");
-  add("Roof", "monitor", "Sealant at roof penetrations shows minor cracking; recommend renewal within 12 months.");
-  add("Roof", "monitor", "Roof appears near end of expected service life; recommend planning for replacement within 1-3 years.");
-  add("Roof", "monitor", "Skylight gaskets show minor weathering; monitor for active leakage and reseal if necessary.");
-  add("Roof", "defect", "Multiple shingles are missing, broken, or lifted; recommend repair by a qualified roofing contractor.");
-  add("Roof", "defect", "Active roof leak observed; recommend immediate professional repair to prevent further water damage.");
-  add("Roof", "defect", "Improper or missing flashing observed at chimney/wall intersection; recommend correction to prevent leakage.");
-  add("Roof", "defect", "Roof deck exhibits sagging or deflection indicating possible structural issue; further evaluation by a structural professional recommended.");
-  add("Roof", "defect", "Gutters are detached or severely damaged; replacement recommended.");
-  add("Roof", "defect", "Downspouts discharge directly against the foundation; extend at least 4-6 feet away to prevent foundation moisture issues.");
-  add("Roof", "defect", "Multiple layers of roofing observed; full tear-off recommended at next replacement to verify deck condition.");
-  add("Roof", "defect", "Visible holes or punctures in roof covering; recommend repair to prevent water intrusion.");
-  add("Roof", "defect", "Improper roof slope at one or more areas causing standing water; recommend evaluation by a roofing contractor.");
-  add("Roof", "defect", "Plumbing vent flashing shows separation from roof surface; recommend re-sealing.");
-  add("Roof", "defect", "Exposed nail heads observed without sealant; recommend sealing to prevent rust and leakage.");
-  add("Roof", "defect", "Chimney crown shows significant cracking; recommend repair or replacement.");
+  add("Roof", "good", "Roof covering appears serviceable with no visible defects at the time of inspection.");
+  add("Roof", "good", "Asphalt composition shingles in good overall condition; estimated remaining service life 10+ years.");
+  add("Roof", "good", "Roof flashing at penetrations and chimney appears properly installed and sealed.");
+  add("Roof", "good", "Gutters and downspouts are securely attached and free of significant debris.");
+  add("Roof", "good", "Soffit and ridge vents present and clear of obstructions; attic ventilation appears adequate.");
+  add("Roof", "good", "No active leaks or moisture intrusion observed at roof surface or interior ceilings below.");
+  add("Roof", "good", "Roof valleys and rake edges are properly flashed and sealed.");
+  add("Roof", "good", "Roof deck appears structurally sound with no visible sagging or deflection.");
+  add("Roof", "marginal", "Asphalt shingles show signs of granule loss and weathering; monitor and budget for replacement within 3-5 years.");
+  add("Roof", "marginal", "Minor moss or algae growth observed on north-facing slopes; recommend treatment to prevent moisture retention.");
+  add("Roof", "marginal", "One or more shingles show curling or cupping at edges; monitor for further deterioration.");
+  add("Roof", "marginal", "Flashing shows minor surface rust; monitor and apply sealant when accessible.");
+  add("Roof", "marginal", "Gutters exhibit minor sagging at one or more attachment points; monitor and secure as needed.");
+  add("Roof", "marginal", "Sealant at roof penetrations shows minor cracking; recommend renewal within 12 months.");
+  add("Roof", "marginal", "Roof appears near end of expected service life; recommend planning for replacement within 1-3 years.");
+  add("Roof", "marginal", "Skylight gaskets show minor weathering; monitor for active leakage and reseal if necessary.");
+  add("Roof", "significant", "Multiple shingles are missing, broken, or lifted; recommend repair by a qualified roofing contractor.");
+  add("Roof", "significant", "Active roof leak observed; recommend immediate professional repair to prevent further water damage.");
+  add("Roof", "significant", "Improper or missing flashing observed at chimney/wall intersection; recommend correction to prevent leakage.");
+  add("Roof", "significant", "Roof deck exhibits sagging or deflection indicating possible structural issue; further evaluation by a structural professional recommended.");
+  add("Roof", "significant", "Gutters are detached or severely damaged; replacement recommended.");
+  add("Roof", "significant", "Downspouts discharge directly against the foundation; extend at least 4-6 feet away to prevent foundation moisture issues.");
+  add("Roof", "significant", "Multiple layers of roofing observed; full tear-off recommended at next replacement to verify deck condition.");
+  add("Roof", "significant", "Visible holes or punctures in roof covering; recommend repair to prevent water intrusion.");
+  add("Roof", "significant", "Improper roof slope at one or more areas causing standing water; recommend evaluation by a roofing contractor.");
+  add("Roof", "significant", "Plumbing vent flashing shows separation from roof surface; recommend re-sealing.");
+  add("Roof", "significant", "Exposed nail heads observed without sealant; recommend sealing to prevent rust and leakage.");
+  add("Roof", "significant", "Chimney crown shows significant cracking; recommend repair or replacement.");
   add("Roof", "all", "Roof was inspected from ground level / accessible eaves only; areas not safely accessible were not inspected.");
   add("Roof", "all", "Recommend follow-up inspection by a licensed roofing contractor for cost estimate and warranty validation.");
 
   // General (condensed for brevity -- the full 248 library is loaded from server or window.__OI_COMMENT_LIBRARY)
-  add("General", "satisfactory", "Functional and operating as intended at the time of inspection.");
-  add("General", "satisfactory", "No deficiencies observed.");
-  add("General", "satisfactory", "Appears to be properly installed and in working order.");
-  add("General", "satisfactory", "Cleaning and routine maintenance recommended.");
-  add("General", "monitor", "Recommend monitoring for further deterioration.");
-  add("General", "monitor", "Minor wear noted; consider preventive maintenance.");
-  add("General", "monitor", "Cosmetic defects observed; functional but recommend repair when convenient.");
-  add("General", "monitor", "Approaching end of useful service life; budget for replacement.");
-  add("General", "defect", "Recommend repair or replacement by a qualified contractor.");
-  add("General", "defect", "Active leak observed; recommend immediate professional attention.");
-  add("General", "defect", "Safety hazard noted; recommend correction prior to occupancy.");
-  add("General", "defect", "Not functioning at time of inspection; further evaluation recommended.");
-  add("General", "defect", "Improper installation observed; recommend correction by licensed professional.");
-  add("General", "defect", "Damaged or deteriorated; replacement recommended.");
+  add("General", "good", "Functional and operating as intended at the time of inspection.");
+  add("General", "good", "No deficiencies observed.");
+  add("General", "good", "Appears to be properly installed and in working order.");
+  add("General", "good", "Cleaning and routine maintenance recommended.");
+  add("General", "marginal", "Recommend monitoring for further deterioration.");
+  add("General", "marginal", "Minor wear noted; consider preventive maintenance.");
+  add("General", "marginal", "Cosmetic defects observed; functional but recommend repair when convenient.");
+  add("General", "marginal", "Approaching end of useful service life; budget for replacement.");
+  add("General", "significant", "Recommend repair or replacement by a qualified contractor.");
+  add("General", "significant", "Active leak observed; recommend immediate professional attention.");
+  add("General", "significant", "Safety hazard noted; recommend correction prior to occupancy.");
+  add("General", "significant", "Not functioning at time of inspection; further evaluation recommended.");
+  add("General", "significant", "Improper installation observed; recommend correction by licensed professional.");
+  add("General", "significant", "Damaged or deteriorated; replacement recommended.");
   add("General", "all", "Further evaluation recommended by a qualified specialist.");
   add("General", "all", "Recommend a licensed professional review the condition for cost estimate.");
   add("General", "all", "See attached photos for documentation.");
@@ -93,7 +95,7 @@ const LIBRARY_ROUTE = "/resources/comments-library";
 function mapRow(r: Record<string, unknown>): CommentEntry {
   return {
     id: r.id as string,
-    rating: (r.ratingBucket as string) || "all",
+    severity: ((r.severity as Severity) || "all"),
     section: (r.section as string) || null,
     category: (r.category as string) || null,
     text: r.text as string,
@@ -107,9 +109,9 @@ function mapRow(r: Record<string, unknown>): CommentEntry {
 
 export function useCannedComments(options: {
   inspectionId: string;
-  bucketForRatingId: (ratingId: string | null | undefined) => string;
+  severityForRatingId: (ratingId: string | null | undefined) => Severity | "all";
 }) {
-  const { inspectionId, bucketForRatingId } = options;
+  const { inspectionId, severityForRatingId } = options;
   const [userSnippets, setUserSnippets] = useState<CommentEntry[]>([]);
   const [localSnippets, setLocalSnippets] = useState<CommentEntry[]>([]);
 
@@ -164,16 +166,16 @@ export function useCannedComments(options: {
     async (ctx: {
       itemLabel?: string;
       section?: string;
-      ratingBucket?: string;
+      severity?: string;
       search?: string;
     }) => {
       const params = new URLSearchParams();
       params.set("sort", sort);
       params.set("filterMode", filterMode);
       if (ctx.search) params.set("search", ctx.search);
-      // Track H: rating rides regardless of filter mode (the modal's bucket
+      // Track H: severity rides regardless of filter mode (the modal's severity
       // chips set it explicitly); section/itemLabel stay auto-only context.
-      if (ctx.ratingBucket) params.set("rating", ctx.ratingBucket);
+      if (ctx.severity) params.set("severity", ctx.severity);
       if (filterMode === "auto") {
         if (ctx.itemLabel) params.set("itemLabel", ctx.itemLabel);
         if (ctx.section) params.set("section", ctx.section);
@@ -257,7 +259,7 @@ export function useCannedComments(options: {
         filtered = commentPool;
       } else {
         filtered = commentPool.filter(
-          (c) => c.rating === "all" || c.rating === filter,
+          (c) => c.severity === "all" || c.severity === filter,
         );
       }
       const q = (search || "").trim().toLowerCase();
@@ -278,12 +280,12 @@ export function useCannedComments(options: {
       itemLabel: string,
       sectionTitle: string,
     ): CommentEntry[] => {
-      const bucket = bucketForRatingId(ratingId);
+      const severity = severityForRatingId(ratingId);
       const filtered =
-        bucket === "all"
+        severity === "all"
           ? commentPool
           : commentPool.filter(
-              (c) => c.rating === "all" || c.rating === bucket,
+              (c) => c.severity === "all" || c.severity === severity,
             );
 
       const itemTokens = (itemLabel || "")
@@ -317,14 +319,14 @@ export function useCannedComments(options: {
       scored.sort((a, b) => b.s - a.s || a.idx - b.idx);
       return scored.map((x) => x.c).slice(0, 6);
     },
-    [commentPool, bucketForRatingId],
+    [commentPool, severityForRatingId],
   );
 
   /** Save current notes as a snippet (server-first, localStorage fallback) */
   const saveSnippet = useCallback(
     async (
       text: string,
-      bucket: string,
+      severity: Severity | "all",
       section: string,
       title?: string,
       itemLabel?: string,
@@ -333,7 +335,7 @@ export function useCannedComments(options: {
         const form = new FormData();
         form.set("intent", "save");
         form.set("text", text);
-        form.set("ratingBucket", bucket);
+        form.set("severity", severity);
         form.set("section", section || "");
         form.set("category", title || "");
         form.set("itemLabel", itemLabel || "");
@@ -362,7 +364,7 @@ export function useCannedComments(options: {
         );
         if (existing.some((c) => c.text === text)) return false;
         existing.unshift({
-          rating: bucket,
+          severity,
           text,
           source: "snippet",
         });

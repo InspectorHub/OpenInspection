@@ -88,13 +88,15 @@ async function fetchPublicReport(tenantSlug: string, inspectionId: string, token
 }
 
 // A 3-level rating system on the template snapshot so getReinspectCandidates'
-// defect/monitor bucket logic + getReportData's chips resolve. The shape is the
-// raw rating_systems.levels[] payload (bucket / abbr / order) that
-// mapRatingSystemLevels consumes — NOT the already-mapped RatingLevel shape.
+// defect/monitor logic + getReportData's chips resolve. The shape is the raw
+// rating_systems.levels[] payload (canonical severity / abbreviation / order,
+// post module-F) that mapRatingSystemLevels + getRatingBucket consume — NOT the
+// already-mapped RatingLevel shape. getRatingBucket maps severity → display
+// bucket (good→satisfactory, marginal→monitor, significant→defect).
 const RATING_LEVELS = [
-    { id: 'satisfactory', label: 'Satisfactory', abbr: 'SAT', color: '#22c55e', bucket: 'satisfactory', order: 0 },
-    { id: 'monitor', label: 'Monitor', abbr: 'MON', color: '#f59e0b', bucket: 'monitor', order: 1 },
-    { id: 'defect', label: 'Defect', abbr: 'DEF', color: '#f43f5e', bucket: 'defect', order: 2 },
+    { id: 'satisfactory', label: 'Satisfactory', abbreviation: 'SAT', color: '#22c55e', severity: 'good', order: 0 },
+    { id: 'monitor', label: 'Monitor', abbreviation: 'MON', color: '#f59e0b', severity: 'marginal', order: 1 },
+    { id: 'defect', label: 'Defect', abbreviation: 'DEF', color: '#f43f5e', severity: 'significant', order: 2 },
 ];
 
 /** Build a template snapshot whose items use plain ids (same keys the results

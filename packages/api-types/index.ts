@@ -24,6 +24,7 @@ export type { ContactsApi }           from '../../server/api/contacts';
 export type { ContactsImportApi }     from '../../server/api/contacts/import';
 export type { CoreAuthApi }           from '../../server/api/auth';
 export type { DataApi }               from '../../server/api/data';
+export type { AdminDefectCategoriesApi } from '../../server/api/admin/admin-defect-categories';
 export type { EventsApi }             from '../../server/api/events';
 export type { EvidenceApi }           from '../../server/api/evidence';
 export type { IdentityApi }           from '../../server/api/identity';

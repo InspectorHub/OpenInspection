@@ -91,6 +91,7 @@ export interface RatingLevel {
   color?: string;
   severity?: string;
   isDefect?: boolean;
+  pausesAdvance?: boolean;
   default?: boolean;
   description?: string;
 }

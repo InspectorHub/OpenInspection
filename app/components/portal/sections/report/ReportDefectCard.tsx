@@ -10,6 +10,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import type { ReactNode } from "react";
+import { DefectCategoryChip } from "~/components/editor-shared/DefectCategoryChip";
 import { DEFECT_PHOTO_GRID_CLASS, PRINT_CARD_CLASS, type ReportItem, type ReportPhoto } from "./types";
 
 export interface ReportDefectCardProps {
@@ -32,17 +33,7 @@ export function ReportDefectCard({ item, mediaVisible, renderMediaTile }: Report
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[13px] font-bold text-ih-fg-1">{d.title}</span>
               {d.effectiveCategory && (
-                <span
-                  className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full ${
-                    d.effectiveCategory === "safety"
-                      ? "bg-ih-bad-bg text-ih-bad-fg"
-                      : d.effectiveCategory === "recommendation"
-                      ? "bg-ih-watch-bg text-ih-watch-fg"
-                      : "bg-ih-bg-muted text-ih-fg-2"
-                  }`}
-                >
-                  {d.effectiveCategory}
-                </span>
+                <DefectCategoryChip category={d.effectiveCategory} color={d.categoryColor} />
               )}
               {d.isCustom && (
                 <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary">

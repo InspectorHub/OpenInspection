@@ -1,56 +1,93 @@
 import { useState } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useSearchParams } from "react-router";
 import type { Route } from "./+types/comments";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
+import { CommentEditor } from "~/components/CommentEditor";
+import type { Severity } from "~/lib/severity";
+import { SEVERITIES, SEVERITY_LABEL, isSeverity } from "~/lib/severity";
 
 export function meta() {
   return [{ title: "Canned Comments - OpenInspection" }];
 }
 
+export interface LibraryComment {
+  id: string;
+  text: string;
+  severity?: Severity | null;
+  section?: string | null;
+  itemLabel?: string | null;
+  repairSummary?: string | null;
+  estimateMinCents?: number | null;
+  estimateMaxCents?: number | null;
+  recommendedContractorTypeId?: string | null;
+}
+
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
+  const url = new URL(request.url);
+  const page     = url.searchParams.get("page")     ?? "1";
+  const pageSize = url.searchParams.get("pageSize") ?? "50";
+  const severityParam = url.searchParams.get("severity") ?? "";
+  const query: Record<string, string> = { page, pageSize };
+  if (isSeverity(severityParam)) query.severity = severityParam;
+  const api = createApi(context, { token });
+  const empty = { comments: [] as LibraryComment[], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 }, contractorTypes: [] as Array<{ id: string; name: string }> };
   try {
-    const url = new URL(request.url);
-    const page     = url.searchParams.get("page")     ?? "1";
-    const pageSize = url.searchParams.get("pageSize") ?? "50";
-    const api = createApi(context, { token });
-    const res = await api.admin.comments.$get({ query: { page, pageSize } });
-    const body = res.ok
-      ? ((await res.json()) as { data?: unknown[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } })
-      : { data: [], meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 } };
+    const [commentsRes, contractorTypesRes] = await Promise.all([
+      api.admin.comments.$get({ query }),
+      api.contractorTypes.index.$get(),
+    ]);
+    const body = commentsRes.ok
+      ? ((await commentsRes.json()) as { data?: LibraryComment[]; meta?: { total: number; page: number; pageSize: number; totalPages: number } })
+      : { data: [], meta: empty.meta };
+    const contractorTypes = contractorTypesRes.ok
+      ? (((await contractorTypesRes.json()) as { data?: Array<{ id: string; name: string }> }).data ?? [])
+      : [];
     return {
-      comments: (body.data ?? []) as Array<{ id: string; text: string; ratingBucket?: string; section?: string }>,
-      meta: body.meta ?? { total: 0, page: 1, pageSize: 50, totalPages: 1 },
+      comments: body.data ?? [],
+      meta: body.meta ?? empty.meta,
+      contractorTypes,
     };
   } catch {
-    return {
-      comments: [] as Array<{ id: string; text: string; ratingBucket?: string; section?: string }>,
-      meta: { total: 0, page: 1, pageSize: 50, totalPages: 1 },
-    };
+    return empty;
   }
 }
 
+// Module D — severity tabs (single canonical vocabulary shared with rating
+// levels, module F). The "all" tab clears the filter; the rest map straight
+// onto the `severity` query param the loader forwards to the API.
 const TABS = [
   { id: "all", label: "All" },
-  { id: "satisfactory", label: "Satisfactory" },
-  { id: "monitor", label: "Monitor" },
-  { id: "defect", label: "Defect" },
+  ...SEVERITIES.map((s) => ({ id: s, label: SEVERITY_LABEL[s] })),
 ];
 
-const BUCKET_TONE: Record<string, "sat" | "monitor" | "defect"> = {
-  satisfactory: "sat",
-  monitor: "monitor",
-  defect: "defect",
+const SEVERITY_TONE: Record<Severity, "sat" | "monitor" | "defect" | "gen"> = {
+  good: "sat",
+  marginal: "monitor",
+  significant: "defect",
+  minor: "gen",
 };
 
 export default function CommentsPage() {
-  const { comments, meta } = useLoaderData<typeof loader>();
-  const [activeTab, setActiveTab] = useState("all");
+  const { comments, meta, contractorTypes } = useLoaderData<typeof loader>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = isSeverity(searchParams.get("severity") ?? "") ? (searchParams.get("severity") as Severity) : "all";
   const { setPage, setPageSize } = usePagination();
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editing, setEditing] = useState<LibraryComment | null>(null);
+
+  function setActiveTab(id: string) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id === "all") next.delete("severity"); else next.set("severity", id);
+      next.delete("page"); // reset to page 1 when the filter changes
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-ih-list">
@@ -59,7 +96,7 @@ export default function CommentsPage() {
         title="Canned Comments"
         meta={`${meta.total} in library`}
         actions={
-          <Button variant="primary">+ Add comment</Button>
+          <Button variant="primary" onClick={() => { setEditing(null); setEditorOpen(true); }}>+ Add comment</Button>
         }
       />
 
@@ -78,11 +115,20 @@ export default function CommentsPage() {
             {comments.map((c) => (
               <Card key={c.id} className="p-4">
                 <p className="text-[13px] text-ih-fg-3 line-clamp-3">{c.text}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  {c.ratingBucket && (
-                    <Pill tone={BUCKET_TONE[c.ratingBucket] || "gen"}>{c.ratingBucket}</Pill>
-                  )}
-                  {c.section && <span className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-4">{c.section}</span>}
+                <div className="flex items-center justify-between gap-2 mt-2">
+                  <div className="flex items-center gap-2">
+                    {c.severity && (
+                      <Pill tone={SEVERITY_TONE[c.severity]}>{SEVERITY_LABEL[c.severity]}</Pill>
+                    )}
+                    {c.section && <span className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-4">{c.section}</span>}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { setEditing(c); setEditorOpen(true); }}
+                    className="text-[11px] font-bold text-ih-primary hover:text-ih-primary-600"
+                  >
+                    Edit
+                  </button>
                 </div>
               </Card>
             ))}
@@ -98,6 +144,13 @@ export default function CommentsPage() {
           />
         </>
       )}
+
+      <CommentEditor
+        open={editorOpen}
+        onClose={() => setEditorOpen(false)}
+        comment={editing}
+        contractorTypes={contractorTypes}
+      />
     </div>
   );
 }

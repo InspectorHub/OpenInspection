@@ -7,6 +7,10 @@ export interface CannedCommentRowProps {
   titleSlot?: React.ReactNode;
   /** Defect category — renders a DefectCategoryChip (ml-1.5) after the title. */
   category?: string;
+  /** Authoring unification Plan-4 module K — the tenant's configured
+   *  `defect_categories.color` for `category`. Forwarded to the chip's
+   *  data-driven `color` prop; undefined keeps the chip's tokened fallback. */
+  categoryColor?: string;
   /** Extra badge after the chip (e.g. the "custom" pill). Caller owns its margin. */
   extraBadge?: React.ReactNode;
   /** inspection: "included"; template: "editing". Drives the primary-tint shell. */
@@ -33,6 +37,7 @@ export function CannedCommentRow({
   title,
   titleSlot,
   category,
+  categoryColor,
   extraBadge,
   selected = false,
   interactive = true,
@@ -56,7 +61,7 @@ export function CannedCommentRow({
       <div className="flex-1 min-w-0">
         <div className="text-[12px] font-bold text-ih-fg-2">
           {titleSlot ?? title}
-          {category && <DefectCategoryChip category={category} className="ml-1.5" />}
+          {category && <DefectCategoryChip category={category} color={categoryColor} className="ml-1.5" />}
           {extraBadge}
         </div>
         {bodySlot}

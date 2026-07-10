@@ -4,7 +4,7 @@ import { unwrapResultsResponse } from '~/lib/results';
 /**
  * B-17 regression: GET /api/inspections/:id/results returns
  * `{ success, data: { results: <map> } }` (server/api/inspections.ts
- * getResultsRoute), but the inspection-edit + form-renderer loaders
+ * getResultsRoute), but the inspection-edit loader
  * unwrapped `body.data.data || body.data` — one level short — so every
  * persisted rating rendered as unrated after a reload ("0/40 rated"
  * while the row sat in D1).

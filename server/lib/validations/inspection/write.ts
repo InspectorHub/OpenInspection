@@ -1,9 +1,9 @@
 import { z } from '@hono/zod-openapi';
 
 // -----------------------------------------------------------------------------
-// Results batch (standalone form-renderer "Save").
+// Results batch (bulk "Save").
 // -----------------------------------------------------------------------------
-// ResultsBatchSchema: vectorised form-renderer save. One `{ itemId, sectionId,
+// ResultsBatchSchema: vectorised bulk save. One `{ itemId, sectionId,
 // field, value }` patch per dirty field — the service folds each patch into the
 // shared inspection_results.data JSON blob using the same composite findingKey,
 // with forced last-writer-wins per field (NOT the retired CAS version-check path).

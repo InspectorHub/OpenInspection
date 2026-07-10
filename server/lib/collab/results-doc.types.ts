@@ -99,7 +99,9 @@ export interface DefectState {
     cannedId:          string;
     included:          boolean;
     comment?:          string | null;
-    category?:         'maintenance' | 'recommendation' | 'safety';
+    /** References a `defect_categories.id` (or a legacy seed name). Widened
+     *  from the former 3-value enum — Authoring unification Plan-4 module K. */
+    category?:         string;
     location?:         string | null;
     photos?:           PhotoEntry[];
     recommendationId?: string | null;

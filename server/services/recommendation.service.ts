@@ -3,30 +3,31 @@ import { eq, and, isNotNull } from 'drizzle-orm';
 import { comments } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import type { SeedRecommendation } from '../data/recommendation-seeds';
+import type { Severity } from '../lib/validations/rating-system.schema';
 
 // Comments-repair fold (2026-06-12): RecommendationService is now a THIN ALIAS
 // over "repair-item comments" — rows in `comments` carrying repair fields. The
 // dedicated `recommendations` table was dropped. The defining predicate is
-// content-based (`repair_summary IS NOT NULL`), NOT rating_bucket='defect', so
-// migrated rows that preserved a non-defect severity still surface here.
+// content-based (`repair_summary IS NOT NULL`), NOT severity='significant', so
+// migrated rows that preserved a non-significant severity still surface here.
 //
 // Field mapping recommendation ↔ comment:
 //   name                 → comments.text
 //   category             → comments.category
-//   severity             → comments.severity        (rating_bucket also set on create)
+//   severity             → comments.severity        (module F canonical vocabulary; rating_bucket is FROZEN)
 //   defaultEstimateMin   → comments.estimateMinCents
 //   defaultEstimateMax   → comments.estimateMaxCents
 //   defaultRepairSummary → comments.repairSummary
 export interface Recommendation {
     id: string; tenantId: string; category: string | null; name: string;
-    severity: 'satisfactory' | 'monitor' | 'defect';
+    severity: Severity;
     defaultEstimateMin: number | null; defaultEstimateMax: number | null;
     defaultRepairSummary: string; createdByUserId: string | null; createdAt: number | null;
     recommendedContractorTypeId: string | null;
 }
 export interface CreateRecommendationInput {
     category?: string | null; name: string;
-    severity: 'satisfactory' | 'monitor' | 'defect';
+    severity: Severity;
     defaultEstimateMin?: number | null; defaultEstimateMax?: number | null;
     defaultRepairSummary: string; createdByUserId?: string | null;
     recommendedContractorTypeId?: string | null;
@@ -39,7 +40,7 @@ function toRec(c: CommentRow): Recommendation {
     return {
         id: c.id, tenantId: c.tenantId, category: c.category ?? null,
         name: c.text,
-        severity: (c.severity as Recommendation['severity']) ?? 'defect',
+        severity: (c.severity as Recommendation['severity']) ?? 'significant',
         defaultEstimateMin: c.estimateMinCents ?? null,
         defaultEstimateMax: c.estimateMaxCents ?? null,
         defaultRepairSummary: c.repairSummary ?? '',
@@ -59,7 +60,7 @@ export class RecommendationService {
         const row = {
             id: crypto.randomUUID(), tenantId, text: input.name,
             category: input.category ?? null,
-            ratingBucket: 'defect', severity: input.severity,
+            severity: input.severity,
             repairSummary: input.defaultRepairSummary,
             estimateMinCents: input.defaultEstimateMin ?? null,
             estimateMaxCents: input.defaultEstimateMax ?? null,
@@ -78,7 +79,7 @@ export class RecommendationService {
         return c ? toRec(c) : null;
     }
 
-    async listByTenant(tenantId: string, filter?: { category?: string; severity?: 'satisfactory'|'monitor'|'defect' }): Promise<Recommendation[]> {
+    async listByTenant(tenantId: string, filter?: { category?: string; severity?: Severity }): Promise<Recommendation[]> {
         const db = this.getDrizzle();
         const conds = [eq(comments.tenantId, tenantId), isNotNull(comments.repairSummary)];
         if (filter?.category) conds.push(eq(comments.category, filter.category));
@@ -126,7 +127,7 @@ export class RecommendationService {
             if (seen.has(key)) { skipped++; continue; }
             await db.insert(comments).values({
                 id: crypto.randomUUID(), tenantId, text: s.name, category: s.category ?? null,
-                ratingBucket: 'defect', severity: s.severity, repairSummary: s.defaultRepairSummary,
+                severity: s.severity, repairSummary: s.defaultRepairSummary,
                 estimateMinCents: s.defaultEstimateMin ?? null, estimateMaxCents: s.defaultEstimateMax ?? null,
                 createdAt: new Date(),
             });

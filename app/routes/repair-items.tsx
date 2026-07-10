@@ -15,7 +15,7 @@ interface RepairItem {
   id: string;
   name: string;
   category: string | null;
-  severity: "satisfactory" | "monitor" | "defect";
+  severity: "good" | "marginal" | "significant" | "minor";
   defaultEstimateMin: number | null;
   defaultEstimateMax: number | null;
   defaultRepairSummary: string;
@@ -52,7 +52,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const buildJson = () => ({
     name: String(form.get("name") ?? ""),
     category: (String(form.get("category") ?? "").trim() || null),
-    severity: (String(form.get("severity") ?? "defect")) as RepairItem["severity"],
+    severity: (String(form.get("severity") ?? "significant")) as RepairItem["severity"],
     defaultRepairSummary: String(form.get("defaultRepairSummary") ?? ""),
     defaultEstimateMin: num("estimateMinDollars"),
     defaultEstimateMax: num("estimateMaxDollars"),
@@ -81,11 +81,11 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 const SEVERITY_TONE: Record<string, "sat" | "monitor" | "defect"> = {
-  satisfactory: "sat", monitor: "monitor", defect: "defect",
+  good: "sat", marginal: "monitor", significant: "defect",
 };
 
 const EMPTY = {
-  id: "", name: "", category: "", severity: "defect" as RepairItem["severity"],
+  id: "", name: "", category: "", severity: "significant" as RepairItem["severity"],
   estimateMinDollars: "", estimateMaxDollars: "", defaultRepairSummary: "", recommendedContractorTypeId: "",
 };
 
@@ -171,9 +171,9 @@ export default function RepairItemsPage() {
                 <Field label="Category"><input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} placeholder="Electrical" className={INPUT} /></Field>
                 <Field label="Severity">
                   <select value={form.severity} onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value as RepairItem["severity"] }))} className={INPUT}>
-                    <option value="satisfactory">Satisfactory</option>
-                    <option value="monitor">Monitor</option>
-                    <option value="defect">Defect</option>
+                    <option value="good">Satisfactory</option>
+                    <option value="marginal">Monitor</option>
+                    <option value="significant">Defect</option>
                   </select>
                 </Field>
               </div>

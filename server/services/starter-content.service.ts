@@ -208,7 +208,7 @@ export async function seedStarterContent(
                 tenantId,
                 text:         c.text,
                 category:     c.category,
-                ratingBucket: c.ratingBucket,
+                severity:     c.severity,
                 section:      c.category,
                 sectionIds:   null,
                 itemLabels:   null,
@@ -279,7 +279,6 @@ export async function seedStarterContent(
                 tenantId,
                 text:              r.name,
                 category:          r.category,
-                ratingBucket:      'defect',
                 severity:          r.severity,
                 repairSummary:     r.defaultRepairSummary,
                 estimateMinCents:  r.defaultEstimateMin,
@@ -299,11 +298,13 @@ export async function seedStarterContent(
         const now = Date.now();
         const rows = RATING_SYSTEMS.filter(rs => !existingSlugs.has(rs.slug)).map(rs => {
             const levels = rs.levels.map((lvl, idx) => ({
-                id:    crypto.randomUUID(),
-                abbr:  lvl.abbr,
-                label: lvl.label,
-                color: lvl.color,
-                bucket: lvl.bucket,
+                id:           crypto.randomUUID(),
+                abbreviation: lvl.abbreviation,
+                label:        lvl.label,
+                color:        lvl.color,
+                severity:     lvl.severity,
+                isDefect:     lvl.isDefect,
+                ...(lvl.pausesAdvance ? { pausesAdvance: true } : {}),
                 ...(lvl.hotkey ? { hotkey: lvl.hotkey } : {}),
                 order: idx,
             }));

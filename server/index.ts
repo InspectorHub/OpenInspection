@@ -51,6 +51,7 @@ import bookingsRoutes from './api/bookings';
 import { smsPublicRoutes, smsAdminRoutes } from './api/sms';
 import adminRoutes from './api/admin';
 import adminBrandingRoutes from './api/admin/branding';
+import adminDefectCategoriesRoutes from './api/admin/admin-defect-categories';
 import secretsRoutes from './api/secrets';
 import emailTemplateRoutes from './api/email-templates';
 import agentRoutes from './api/agent';
@@ -508,6 +509,8 @@ const routes = app
   .route('/api/admin', emailTemplateRoutes)
   // Settings + Library IA — GET/POST/PUT/DELETE /api/admin/inspection-types
   .route('/api/admin', inspectionTypesRoutes)
+  // Authoring unification Plan-4 module K — GET/POST/PUT/DELETE /api/admin/defect-categories
+  .route('/api/admin', adminDefectCategoriesRoutes)
   .route('/api/agent', agentRoutes)
   // Agent Accounts A1 — invite + accept endpoints
   .route('/api/agents', agentsRoutes)

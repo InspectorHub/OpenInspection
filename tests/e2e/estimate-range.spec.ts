@@ -109,7 +109,7 @@ test.describe.serial('Sprint 2 S2-4 — Repair estimate range', () => {
         const inspectionId = (listBody.data?.[0] ?? listBody.data?.items?.[0])?.id;
         if (!inspectionId) test.skip(true, 'No autotest inspection seeded; skipping results write e2e leg');
 
-        // The form-renderer "Save" writes through POST /:id/results/batch with an
+        // A bulk "Save" writes through POST /:id/results/batch with an
         // array of { itemId, sectionId, field, value } patches -- there is NO
         // PATCH /:id/results route (that 404s). The defect-estimate sanitizer
         // itself (sanitizeDefectStates: negative low, unknown recommendation

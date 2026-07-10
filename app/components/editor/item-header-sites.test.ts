@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { ItemEditor } from "~/components/editor/ItemEditor";
-import { SectionsList } from "~/components/template/SectionsList";
+import { ItemList } from "~/components/editor-shared/ItemList";
 
 describe("item header sites (behavior-preserving)", () => {
   it("ItemEditor still shows the section eyebrow + item label", () => {
@@ -17,12 +17,13 @@ describe("item header sites (behavior-preserving)", () => {
     expect(out).toContain("<h2");
   });
 
-  it("SectionsList still shows the padded index + item label", () => {
-    const out = renderToStaticMarkup(createElement(SectionsList, {
-      section: { id: "s1", title: "Exterior", items: [{ id: "i1", label: "Roof covering", type: "text" }] },
-      activeSection: 0, previewMode: false, editingItem: null,
-      renameSection: () => {}, updateSections: () => {}, setEditingItem: () => {},
-      setRightRail: () => {}, updateItem: () => {}, moveItem: () => {}, removeItem: () => {}, addItem: () => {},
+  it("ItemList author mode still shows the padded index + item label", () => {
+    const out = renderToStaticMarkup(createElement(ItemList, {
+      mode: "author",
+      items: [{ id: "i1", label: "Roof covering", type: "text" }],
+      sectionId: "s1",
+      activeItemId: null,
+      onSelect: () => {},
     } as never));
     expect(out).toContain(">01<");
     expect(out).toContain("Roof covering");

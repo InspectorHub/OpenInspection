@@ -28,6 +28,7 @@ export {
     inspectionItemTagLinks,
     conciergeConfirmTokens,
     commentUsage,
+    defectCategories,
 } from './inspection';
 export { commercialSubtypes } from './commercial-subtypes';
 export { contacts } from './contact';

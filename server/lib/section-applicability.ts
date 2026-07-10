@@ -1,10 +1,14 @@
 /**
- * Gap 16 — Section applicability resolver.
+ * Section applicability resolver — FROZEN / DEAD CODE (module A of the
+ * authoring-surface unification, see docs/superpowers/plans/2026-07-04-
+ * authoring-unification-plan3-template-side.md: the template editor is now
+ * property-type-as-identity, so sections no longer carry authored applicability).
  *
- * Determines which template sections apply to a given (propertyType, subtype).
- * Used by wizard step 2 and template filtering.
- *
- * Canonical source: Design System 0523 Catalog.jsx sectionApplies().
+ * Not deleted because: (1) `tests/unit/inspections/commercial-subtypes.spec.ts` still exercises
+ * `sectionApplies`/`getApplicableSections` directly, and (2) the `applicableTo`
+ * JSON-schema field is frozen in place to avoid OpenAPI-snapshot churn (pre-launch,
+ * no data to migrate). No production caller invokes these. Do NOT re-wire into the
+ * editor; revive only under a future spec that re-introduces authored applicability.
  */
 
 import type { TemplateSection } from '../types/template-schema';

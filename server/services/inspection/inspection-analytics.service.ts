@@ -216,7 +216,12 @@ export class InspectionAnalyticsService extends InspectionSubService {
         const totals = entries.reduce(
             (acc, e) => {
                 acc.count++;
-                acc[e.category]++;
+                // Guard the fixed legacy-bucket increment: DefectCategory widened to
+                // a free string (Plan-4 K), so a custom tenant category must not
+                // create a stray NaN property here — mirror getDefectStats' guard.
+                if (e.category === 'safety' || e.category === 'recommendation' || e.category === 'maintenance') {
+                    acc[e.category]++;
+                }
                 if (typeof e.estimateLow  === 'number') acc.estimateLowSum  += e.estimateLow;
                 if (typeof e.estimateHigh === 'number') acc.estimateHighSum += e.estimateHigh;
                 return acc;

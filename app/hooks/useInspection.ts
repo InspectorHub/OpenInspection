@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { backfillLevelDescriptions } from "./inspection/helpers";
 import type { InspectionContext } from "./inspection/helpers";
+import type { Severity } from "~/lib/severity";
 import { rangeIds } from "~/lib/editor/batch-range";
 import { useInspectionProgress } from "./inspection/useInspectionProgress";
 import { useInspectionNavigation } from "./inspection/useInspectionNavigation";
@@ -289,41 +290,12 @@ export function useInspectionState(opts: UseInspectionOptions) {
   /*  Rating helpers                                                   */
   /* ---------------------------------------------------------------- */
 
-  /** Map a ratingLevelId to a bucket: satisfactory | monitor | defect | all */
-  const bucketForRatingId = useCallback(
-    (ratingId: string | null | undefined): string => {
+  /** Read the severity of a rating level by id (structured — no name guessing). */
+  const severityForRatingId = useCallback(
+    (ratingId: string | null | undefined): Severity | "all" => {
       if (!ratingId) return "all";
-      for (const lvl of ratingLevels) {
-        if (lvl.id !== ratingId) continue;
-        const nm = (lvl.name || lvl.label || "").toLowerCase();
-        const ab = (lvl.abbreviation || "").toUpperCase();
-        const id = (lvl.id || "").toUpperCase();
-        if (
-          nm.includes("sat") ||
-          ab === "SAT" ||
-          ab === "S" ||
-          id === "S"
-        )
-          return "satisfactory";
-        if (
-          nm.includes("mon") ||
-          nm.includes("marg") ||
-          ab === "MON" ||
-          ab === "M" ||
-          id === "M"
-        )
-          return "monitor";
-        if (
-          nm.includes("def") ||
-          nm.includes("rep") ||
-          ab === "DEF" ||
-          ab === "D" ||
-          id === "D"
-        )
-          return "defect";
-        break;
-      }
-      return "all";
+      const lvl = ratingLevels.find((l) => l.id === ratingId);
+      return (lvl?.severity as Severity | undefined) ?? "all";
     },
     [ratingLevels],
   );
@@ -384,7 +356,7 @@ export function useInspectionState(opts: UseInspectionOptions) {
     setSectionPickerIdx,
     tagsByItem,
     getResult,
-    bucketForRatingId,
+    severityForRatingId,
   };
 
   /* ---------------------------------------------------------------- */
@@ -566,7 +538,7 @@ export function useInspectionState(opts: UseInspectionOptions) {
     findItemById,
     sectionIdForItem,
     fk,
-    bucketForRatingId,
+    severityForRatingId,
     getRatingColor,
     getRatingLabel,
 

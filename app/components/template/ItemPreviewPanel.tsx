@@ -3,9 +3,13 @@ import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 
 export interface ItemPreviewPanelProps {
   selectedItem: TemplateItem;
+  /** Authoring unification Plan-4 module K — tenant defect_categories color
+   *  lookup (keyed by name AND id) so the defects-tab chip renders its
+   *  configured color here too, not just muted. */
+  categoryColor?: Map<string, string>;
 }
 
-export function ItemPreviewPanel({ selectedItem }: ItemPreviewPanelProps) {
+export function ItemPreviewPanel({ selectedItem, categoryColor }: ItemPreviewPanelProps) {
   return (
     <div className="space-y-2">
       <p className="text-[13px] font-bold text-ih-fg-1">{selectedItem.label}</p>
@@ -34,6 +38,7 @@ export function ItemPreviewPanel({ selectedItem }: ItemPreviewPanelProps) {
                     selected={false}
                     title={c.title}
                     category={tab === "defects" ? c.category : undefined}
+                    categoryColor={tab === "defects" ? categoryColor?.get(c.category ?? "") : undefined}
                     bodySlot={c.comment ? <p className="text-[11px] mt-0.5 leading-relaxed text-ih-fg-3">{c.comment}</p> : null}
                   />
                 ))}

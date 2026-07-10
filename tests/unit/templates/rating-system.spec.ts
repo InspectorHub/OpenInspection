@@ -137,15 +137,15 @@ describe('RatingSystemService — seed + tenant scope', () => {
         await svc.create(TENANT_A, {
             name: 'X', slug: 'my-system', isDefault: false,
             levels: [
-                { abbr: 'A', label: 'Apple',  color: '#10b981', bucket: 'satisfactory' },
-                { abbr: 'B', label: 'Banana', color: '#ef4444', bucket: 'defect' },
+                { abbreviation: 'A', label: 'Apple',  color: '#10b981', severity: 'good', isDefect: false },
+                { abbreviation: 'B', label: 'Banana', color: '#ef4444', severity: 'significant', isDefect: true },
             ],
         });
         await expect(svc.create(TENANT_A, {
             name: 'Y', slug: 'my-system', isDefault: false,
             levels: [
-                { abbr: 'A', label: 'Apple',  color: '#10b981', bucket: 'satisfactory' },
-                { abbr: 'B', label: 'Banana', color: '#ef4444', bucket: 'defect' },
+                { abbreviation: 'A', label: 'Apple',  color: '#10b981', severity: 'good', isDefect: false },
+                { abbreviation: 'B', label: 'Banana', color: '#ef4444', severity: 'significant', isDefect: true },
             ],
         })).rejects.toThrow(/already exists/);
     });

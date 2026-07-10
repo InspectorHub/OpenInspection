@@ -54,4 +54,15 @@ describe("CannedCommentRow", () => {
     expect(html({ title: "x", as: "div", interactive: false })).not.toContain("cursor-pointer");
     expect(html({ title: "x" })).toContain("cursor-pointer");
   });
+
+  it("forwards categoryColor to the chip's data-driven color (Plan-4 module K)", () => {
+    const out = html({ title: "x", category: "safety", categoryColor: "#ff8800" });
+    expect(out).toContain("color:#ff8800");
+  });
+
+  it("omits the inline color when categoryColor is unset (chip keeps its tokened fallback)", () => {
+    const out = html({ title: "x", category: "safety" });
+    expect(out).not.toContain("style=");
+    expect(out).toContain("bg-ih-bad-bg");
+  });
 });

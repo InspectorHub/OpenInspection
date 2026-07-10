@@ -185,18 +185,17 @@ test.describe.serial('Standalone Browser Tests', () => {
         await expect(page.getByRole('main')).toBeVisible({ timeout: 10000 });
     });
 
-    // ── Field Form (Inspector) ────────────────────────────────────────────────
+    // ── Field Form retired (Module B) ─────────────────────────────────────────
 
-    test('UI-14: Field form loads for inspector role', async ({ page }) => {
-        // The field-form route (app/routes/form-renderer.tsx, wired at
-        // routes.ts:69) is a bare full-screen route — it renders its own <div>
-        // shell, NOT the authed MainLayout <main> landmark. Assert on the
-        // renderer's own chrome instead: the inspector is NOT bounced to /login
-        // (url stays on /form) and the "Inspection Form" eyebrow is present (the
-        // "Form Unavailable" branch only renders when the inspection fails to load).
+    test('UI-14: retired /form route 404s even for an authed inspector', async ({ page }) => {
+        // The standalone field-form route was retired — the single fill surface is
+        // now /inspections/:id/edit. Even an authenticated inspector navigating
+        // directly to the old path lands on the 404 boundary, not a renderer. This
+        // guards against reintroducing the parallel surface from the authed-browser
+        // angle (the unauthenticated request-level 404 is covered by
+        // form-route-retired.spec.ts).
         await gotoAuth(page, `/inspections/${createdInspectionId}/form`, inspectorToken);
-        expect(page.url()).toContain('/form');
-        await expect(page.getByText('Inspection Form')).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText('Page not found')).toBeVisible({ timeout: 10000 });
     });
 
     // ── Report Page (Public) ──────────────────────────────────────────────────

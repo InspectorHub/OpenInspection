@@ -5,13 +5,15 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { RatingSystemEditor, type EditorSystem, type RatingBucket } from "~/components/RatingSystemEditor";
+import { RatingSystemEditor, type EditorSystem } from "~/components/RatingSystemEditor";
+import type { Severity } from "~/lib/severity";
+import { SEVERITY_LABEL } from "~/lib/severity";
 
 export function meta() {
   return [{ title: "Rating Systems - OpenInspection" }];
 }
 
-type Level = { id: string; abbr: string; label: string; color: string; bucket: RatingBucket; hotkey?: string; order?: number };
+type Level = { id: string; abbreviation: string; label: string; color: string; severity: Severity; isDefect?: boolean; pausesAdvance?: boolean; hotkey?: string; order?: number };
 type System = { id: string; name: string; slug: string; description?: string | null; isDefault?: boolean; isSeed?: boolean; levels: Level[] };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -62,11 +64,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   return { ok: false };
 }
 
-const BUCKET_RING: Record<RatingBucket, string> = {
-  satisfactory: "ring-ih-ok/30",
-  monitor: "ring-ih-watch/30",
-  defect: "ring-ih-bad/30",
-  na: "ring-ih-border-strong/30",
+const SEVERITY_RING: Record<Severity, string> = {
+  good: "ring-ih-ok/30", marginal: "ring-ih-watch/30", significant: "ring-ih-bad/30", minor: "ring-ih-border-strong/30",
 };
 
 export default function RatingSystemsPage() {
@@ -88,7 +87,8 @@ export default function RatingSystemsPage() {
     const levels = [...(sys.levels ?? [])]
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
       .map((l) => ({
-        id: l.id, abbr: l.abbr, label: l.label, color: l.color, bucket: l.bucket, hotkey: l.hotkey,
+        id: l.id, abbreviation: l.abbreviation, label: l.label, color: l.color, severity: l.severity,
+        isDefect: l.isDefect ?? false, pausesAdvance: l.pausesAdvance, hotkey: l.hotkey,
       }));
     setEditing({
       id: sys.id,
@@ -158,12 +158,12 @@ export default function RatingSystemsPage() {
                   <div className="flex items-center flex-wrap gap-1.5 mt-3">
                     {levels.map((l) => (
                       <span
-                        key={l.id || l.abbr}
-                        className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold ring-1 ${BUCKET_RING[l.bucket] ?? "ring-ih-border-strong/30"}`}
+                        key={l.id || l.abbreviation}
+                        className={`inline-flex items-center h-6 px-2 rounded text-[11px] font-bold ring-1 ${SEVERITY_RING[l.severity] ?? "ring-ih-border-strong/30"}`}
                         style={{ backgroundColor: l.color ? `${l.color}1a` : undefined, color: l.color || undefined }}
-                        title={`${l.label} · ${l.bucket}`}
+                        title={`${l.label} · ${SEVERITY_LABEL[l.severity]}`}
                       >
-                        {l.abbr || l.label}
+                        {l.abbreviation || l.label}
                       </span>
                     ))}
                   </div>

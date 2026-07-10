@@ -23,12 +23,13 @@ import { findRatingLevel, type EditorRatingLevel } from "../../lib/rating-levels
 import { findRatingContradictions } from "../../lib/contradiction-lint";
 import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
 import { ItemHeader } from "../editor-shared/ItemHeader";
+import { FormField, type ItemOptions, type TemplateItem } from "../form/FormField";
 
 export type { LibraryMatch };
 
 /* C-14a — rating buttons render from the inspection's rating-system levels
  * (full words + always-on semantic colour). The hardcoded SAT/MON/DEF row
- * wrote ids the rest of the editor (bucketForRatingId, getRatingColor,
+ * wrote ids the rest of the editor (severityForRatingId, getRatingColor,
  * pausesAdvance lookup) could never match. This fallback only covers the
  * no-levels edge and mirrors the server's fallback ids. */
 const FALLBACK_LEVELS: EditorRatingLevel[] = [
@@ -60,7 +61,7 @@ const CANNED_TABS: Array<{ id: CannedTabId; label: string }> = [
 /* ------------------------------------------------------------------ */
 
 interface ItemEditorProps {
- item: { id: string; label: string; type: string; tabs?: unknown; attributes?: ItemAttribute[] } | undefined;
+ item: { id: string; label: string; type: string; description?: string; options?: ItemOptions; tabs?: unknown; attributes?: ItemAttribute[] } | undefined;
  sectionTitle: string | undefined;
  result: Record<string, unknown>;
  /** Rating-system levels for this inspection; falls back to the standard five. */
@@ -68,6 +69,8 @@ interface ItemEditorProps {
  onRating: (rating: string) => void;
  onNotes: (notes: string) => void;
  onNotesBlur: (notes: string) => void;
+ /** Module B — capture a non-rich typed value onto result.value (collab doc). */
+ onValue?: (value: string | boolean | number) => void;
  onToggleCanned?: (tabName: string, cannedId: string, included: boolean) => void;
  /** FE-2 — opens the photo picker (the button was previously unwired). */
  onAddPhoto?: () => void;
@@ -88,6 +91,10 @@ interface ItemEditorProps {
   *  fields are required at publish. Drives the proactive red asterisk on
   *  every defect row (missingFields still unions in post-gate flags). */
  requiredDefectFields?: { location: boolean; trade: boolean };
+ /** Authoring unification Plan-4 module K — tenant defect_categories color
+  *  lookup (keyed by name AND id), forwarded to CannedCommentTabs so every
+  *  canned/custom defect chip renders the tenant's configured color. */
+ categoryColor?: Map<string, string>;
  onItemAttribute?: (itemId: string, attributeId: string, value: string | number | boolean | null) => void;
  onCloneLast?: (scope: 'rating' | 'rating_notes' | 'all') => void;
  cloneDefaultScope?: 'rating' | 'rating_notes' | 'all';
@@ -141,6 +148,7 @@ export function ItemEditor({
  onRating,
  onNotes,
  onNotesBlur,
+ onValue,
  onToggleCanned,
  onAddPhoto,
  onAddDefectPhoto,
@@ -152,6 +160,7 @@ export function ItemEditor({
  onDefectFields,
  missingFields,
  requiredDefectFields,
+ categoryColor,
  onItemAttribute,
  onCloneLast,
  cloneDefaultScope,
@@ -217,7 +226,7 @@ export function ItemEditor({
  onSearchLibrary(q).then((rows) => {
  if (cancelled) return;
  const ranked = [...rows].sort((a, b) =>
- (a.rating === "defect" ? 0 : 1) - (b.rating === "defect" ? 0 : 1));
+ (a.severity === "significant" ? 0 : 1) - (b.severity === "significant" ? 0 : 1));
  setLibraryMatches(ranked.slice(0, 6));
  }).catch(() => { /* search is best-effort */ });
  }, 250);
@@ -359,6 +368,11 @@ export function ItemEditor({
  {sectionTitle}
  </div>
  <ItemHeader label={item.label} size="lg" className="mt-1 text-ih-fg-1" as="h2" />
+ {item.description && (
+ <p data-testid="item-description-hint" className="mt-1 text-[12px] text-ih-fg-4 leading-relaxed">
+ {item.description}
+ </p>
+ )}
  </div>
 
  {/* Item attributes (equipment fields: brand, year, model, etc.) */}
@@ -385,6 +399,25 @@ export function ItemEditor({
  full words on ≥sm, abbreviation on narrow, always-on semantic colour. */}
  {item.type === "rich" && (
  <RatingButtonRow levels={levels} activeLevel={activeLevel} onRating={onRating} />
+ )}
+
+ {/* Module B — non-rich typed inputs (text/number/boolean/select/
+ multi_select/textarea/date). photo_only is owned by the Photos strip
+ below, so we skip FormField's placeholder for it. Rich is handled above. */}
+ {item.type !== "rich" && item.type !== "photo_only" && (
+ <div>
+ <FormField
+ item={{
+ id: item.id,
+ label: item.label,
+ type: item.type as TemplateItem["type"],
+ ...(item.description !== undefined ? { description: item.description } : {}),
+ ...(item.options !== undefined ? { options: item.options } : {}),
+ }}
+ value={(result.value ?? "") as string | boolean | number}
+ onChange={(val) => onValue?.(val)}
+ />
+ </div>
  )}
 
  {/* C-14b — contradiction lint: the rating says defect/monitor while an
@@ -499,6 +532,7 @@ export function ItemEditor({
  requiredDefectFields={requiredDefectFields}
  defectPhotoChip={defectPhotoChip}
  cannedDefectPhotoCount={cannedDefectPhotoCount}
+ categoryColor={categoryColor}
  libraryMatches={libraryMatches}
  onSeedFromLibrary={(m) => {
   setCustomTitle(deriveDefectTitle(m.text));
