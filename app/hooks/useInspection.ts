@@ -143,8 +143,16 @@ export function useInspectionState(opts: UseInspectionOptions) {
   const [inspection, setInspection] = useState<Inspection>(
     opts.inspection as Inspection,
   );
-  const [schema] = useState<InspectionSchema>(opts.schema);
+  // Frozen at mount EXCEPT for structural edits, which optimistically replace
+  // the section list via setSections so the rail / item list reflect an
+  // add/rename/delete/move immediately (POST persistence + shouldRevalidate skip
+  // mean no loader refresh otherwise). Item runtime data (ratings/notes) lives
+  // in `results`, not on these section objects, so swapping structure here is safe.
+  const [schema, setSchema] = useState<InspectionSchema>(opts.schema);
   const sections = schema.sections || [];
+  const setSections = useCallback((next: SchemaSection[]) => {
+    setSchema((s) => ({ ...s, sections: next }));
+  }, []);
 
   // Phase U (Batch C1) — active per-unit scope (null = `_default` common scope).
   const activeUnitId = opts.activeUnitId ?? null;
@@ -457,6 +465,7 @@ export function useInspectionState(opts: UseInspectionOptions) {
     setInspection,
     schema,
     sections,
+    setSections,
     ratingLevels,
     setRatingLevels,
     results,

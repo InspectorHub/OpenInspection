@@ -49,10 +49,18 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  propertyAddress: "Loading...",
  status: "draft",
  };
- // templateSnapshot may arrive as a JSON string (wizard-created inspections)
- // — parse before use, mirroring the template-snapshot normalization used
- // elsewhere. Mutating a string here 500'd the whole editor.
- const rawSchema = data?.templateSnapshot ||
+ // The base structure MUST come from the inspection's OWN templateSnapshot
+ // column — that's where inline structure edits (add/rename/delete/move) are
+ // PATCHed, and it's the exact source getReportData reads for the display. The
+ // top-level `data.templateSnapshot` is not set by the inspection GET, so the
+ // old fallback resolved to `template.schema` (the pristine SOURCE template),
+ // which never tracks per-inspection edits — every structural op then rebuilt
+ // from the original template and silently dropped prior edits. Prefer the
+ // per-inspection column; fall back to the source template only for legacy
+ // inspections that pre-date the snapshot column.
+ // (May arrive as a JSON string — parsed below.)
+ const rawSchema = (data?.inspection as Record<string, unknown>)?.templateSnapshot ||
+ data?.templateSnapshot ||
  (data?.template as Record<string, unknown>)?.schema;
  const schema = ((typeof rawSchema === "string"
  ? JSON.parse(rawSchema)

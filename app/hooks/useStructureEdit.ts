@@ -2,8 +2,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 import { findingKey } from "~/hooks/findings/shared";
 import {
-  addSection, duplicateSection, deleteSection, moveSection, reorderSection,
-  addItem, duplicateItem, deleteItem, moveItem,
+  addSection, duplicateSection, deleteSection, moveSection, reorderSection, renameSection,
+  addItem, duplicateItem, deleteItem, moveItem, renameItem,
 } from "~/lib/editor/structure-ops";
 import type { Snapshot, ItemType } from "~/lib/editor/structure-ops";
 
@@ -39,6 +39,12 @@ export interface UseStructureEditOptions {
    * bare itemId (two units share an itemId in per-unit mode).
    */
   activeUnitId?: string | null;
+  /**
+   * Optimistic display sync — called with the next snapshot on every structural
+   * edit so the editor's section list updates immediately (POST persistence +
+   * shouldRevalidate's POST skip mean the loader never refreshes on its own).
+   */
+  onApply?: (snapshot: Snapshot) => void;
 }
 
 /** Open "save structure to template" modal state. */
@@ -64,6 +70,8 @@ export interface UseStructureEditReturn {
   moveSection: (id: string, dir: -1 | 1) => void;
   /** Reorder a section via drag-and-drop (move `fromId` to `toId`'s position). */
   reorderSection: (fromId: string, toId: string) => void;
+  /** Rename a section's title inline. */
+  renameSection: (id: string, title: string) => void;
   /** Pending delete state — non-null while the StructureDeleteModal is open (section OR item). */
   deletePending: DeletePending | null;
   /** Confirm the pending delete and fire the restructure action. */
@@ -88,6 +96,8 @@ export interface UseStructureEditReturn {
   deleteItem: (sectionId: string, itemId: string) => void;
   /** Move an item up (-1) or down (1) within its section. */
   moveItem: (sectionId: string, itemId: string, dir: -1 | 1) => void;
+  /** Rename an item's label inline. */
+  renameItem: (sectionId: string, itemId: string, label: string) => void;
   /** Pending "Add item" type-picker state — non-null while the AddItemTypeModal is open. */
   addItemPending: AddItemPending | null;
   /** Open the "Add item" type-picker for a section. */
@@ -127,6 +137,7 @@ export function useStructureEdit({
   results,
   templateId,
   activeUnitId = null,
+  onApply,
 }: UseStructureEditOptions): UseStructureEditReturn {
   // Hold the RAW snapshot in a ref so ops always operate on a clean
   // TemplateSchemaV2 object. Updated when loaderData refreshes after each
@@ -138,8 +149,15 @@ export function useStructureEdit({
 
   const structureFetcher = useFetcher();
 
+  // Kept in a ref so applyStructure's identity is stable even though the caller
+  // passes a fresh onApply closure each render.
+  const onApplyRef = useRef(onApply);
+  onApplyRef.current = onApply;
+
   const applyStructure = useCallback(
     (next: Snapshot) => {
+      // Optimistic display refresh (see UseStructureEditOptions.onApply).
+      onApplyRef.current?.(next);
       // Advance the ref optimistically so a second structural op fired before
       // the action→revalidation round-trip composes on top of this change.
       // The PATCH replaces the whole snapshot (last-write-wins); without this,
@@ -284,6 +302,13 @@ export function useStructureEdit({
     [applyStructure],
   );
 
+  const handleRenameSection = useCallback(
+    (id: string, title: string) => {
+      applyStructure(renameSection(snapshotRef.current, id, title));
+    },
+    [applyStructure],
+  );
+
   // ── Item-level handlers (mirror the section ones over the item ops) ──────────
   const handleDuplicateItem = useCallback(
     (sectionId: string, itemId: string) => {
@@ -295,6 +320,13 @@ export function useStructureEdit({
   const handleMoveItem = useCallback(
     (sectionId: string, itemId: string, dir: -1 | 1) => {
       applyStructure(moveItem(snapshotRef.current, sectionId, itemId, dir));
+    },
+    [applyStructure],
+  );
+
+  const handleRenameItem = useCallback(
+    (sectionId: string, itemId: string, label: string) => {
+      applyStructure(renameItem(snapshotRef.current, sectionId, itemId, label));
     },
     [applyStructure],
   );
@@ -359,6 +391,7 @@ export function useStructureEdit({
     deleteSection: handleDeleteSection,
     moveSection: handleMoveSection,
     reorderSection: handleReorderSection,
+    renameSection: handleRenameSection,
     deletePending,
     confirmDelete,
     cancelDelete,
@@ -372,6 +405,7 @@ export function useStructureEdit({
     duplicateItem: handleDuplicateItem,
     deleteItem: handleDeleteItem,
     moveItem: handleMoveItem,
+    renameItem: handleRenameItem,
     addItemPending,
     openAddItemPrompt,
     closeAddItemPrompt,

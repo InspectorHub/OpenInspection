@@ -128,7 +128,12 @@ export function SpeedMode({
 
   return (
     /* ds-allow: fixed-dark surface */
-    <div className="fixed inset-0 z-[100] bg-slate-900 flex flex-col">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Speed-rate inspection items"
+      className="fixed inset-0 z-[100] bg-slate-900 flex flex-col"
+    >
       {/* Top bar */}
       {/* ds-allow: fixed-dark surface */}
       <div className="h-12 flex items-center justify-between px-4 border-b border-slate-700">

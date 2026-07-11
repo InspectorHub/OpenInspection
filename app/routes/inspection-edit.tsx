@@ -22,6 +22,7 @@ import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
 import type { ResultsProjection } from "../../server/lib/collab/results-doc.types";
 import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
+import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
 import { ItemList } from "~/components/editor-shared/ItemList";
 import { ItemEditor } from "~/components/editor/ItemEditor";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
@@ -67,7 +68,6 @@ import { MobileAppBar } from "~/components/editor/MobileAppBar";
 import { MobileDrawerTriggers, type MobileDrawerId } from "~/components/editor/MobileDrawerTriggers";
 import { MobileBottomDrawer } from "~/components/MobileBottomDrawer";
 import { BreadcrumbDropdown, type UnitScopeRow } from "~/components/editor/BreadcrumbDropdown";
-import { UnitProgress } from "~/components/editor/UnitProgress";
 import { UnitsManager } from "~/components/editor/UnitsManager";
 import type { ResultMap } from "~/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
@@ -495,18 +495,6 @@ export default function InspectionEditPage() {
   }
  }, [activeUnitId, isPerUnit, units]);
 
- // Map the server progress summary → the UnitProgress component shape: a unit is
- // "complete" when rated === total (and the template has items).
- const unitProgressUnits = useMemo(
-  () => units.filter((u) => (u.kind ?? "unit") === "unit").map((u) => ({ id: u.id, label: u.name })),
-  [units],
- );
- const completedUnitIds = useMemo(() => {
-  const prog = loaderData.unitProgress;
-  if (!prog) return [] as string[];
-  return prog.units.filter((u) => u.total > 0 && u.rated === u.total).map((u) => u.unitId);
- }, [loaderData.unitProgress]);
-
  /* ---------------------------------------------------------------- */
  /* Unsaved changes guard */
  /* ---------------------------------------------------------------- */
@@ -650,6 +638,10 @@ export default function InspectionEditPage() {
   templateId: (state.inspection.templateId as string | null | undefined) ?? null,
   // Phase U (Batch C2a) — scope the delete-impact tally to the active unit.
   activeUnitId,
+  // Optimistic display refresh: structural edits POST + skip revalidation, so
+  // push the new section list straight into editor state (the rail / item list
+  // re-render immediately instead of only after a reload).
+  onApply: (next) => state.setSections(next.sections as unknown as Parameters<typeof state.setSections>[0]),
  });
 
  /* Plan 7 — Stream customer subdomain (from loader env). Null ⇒ fail closed:
@@ -1296,8 +1288,7 @@ export default function InspectionEditPage() {
  onDeleteSection={structure.deleteSection}
  onMoveSection={structure.moveSection}
  onReorderSection={structure.reorderSection}
- onSaveToTemplate={structure.openSaveTemplate}
- canSaveBack={structure.canSaveBack}
+ onRenameSection={structure.renameSection}
  />
  );
 
@@ -1322,6 +1313,7 @@ export default function InspectionEditPage() {
  onDeleteItem={(itemId) => structure.deleteItem(state.currentSection?.id || "", itemId)}
  onMoveItem={(itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir)}
  onReorderItem={(fromId, toId) => reorderItemBySwap(state.currentSectionItems, fromId, toId, state.currentSection?.id || "", structure.moveItem)}
+ onRenameItem={(itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label)}
  />
  );
 
@@ -1579,7 +1571,14 @@ export default function InspectionEditPage() {
  }
 
  return (
- <div className="flex h-screen bg-ih-bg-card">
+ <div
+  /* Desktop editor minimum design width 1024px (iPad landscape fits without
+     scroll; real phones/small tablets never reach here — the isMobile branch
+     above owns <768px). Below 1024 the whole editor scrolls horizontally
+     instead of squeezing the fixed-width rails; the fixed header/footer stay
+     pinned to the viewport and always cover the visible area. */
+  className="flex h-screen bg-ih-bg-card overflow-x-auto"
+ >
  <ToastPortal />
  {/* Hidden photo input */}
  <input
@@ -1625,7 +1624,7 @@ export default function InspectionEditPage() {
  )}
 
  {/* Keyboard cheatsheet overlay */}
- {state.showCheatsheet && <KeyboardHud />}
+ {state.showCheatsheet && <KeyboardHud onClose={() => state.setShowCheatsheet(false)} />}
 
  {/* Burst camera overlay */}
  <BurstCamera
@@ -1957,19 +1956,15 @@ export default function InspectionEditPage() {
  handlePublishClick={handlePublishClick}
  collabEditing={loaderData.collabEditing}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
+ onChangeTemplate={() => state.setSettingsOpen(true)}
+ onSaveAsNewTemplate={() => structure.openSaveTemplate("new")}
+ onUpdateSourceTemplate={() => structure.openSaveTemplate("back")}
+ canUpdateSourceTemplate={structure.canSaveBack}
  perUnitControls={
   showUnitsSurface ? (
    <div className="flex items-center gap-2">
     {isPerUnit && (
-     <>
       <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} />
-      <UnitProgress
-       units={unitProgressUnits}
-       completedUnitIds={completedUnitIds}
-       activeUnitId={activeUnitId}
-       onSelectUnit={requestScope}
-      />
-     </>
     )}
     <button
      type="button"
@@ -2000,7 +1995,7 @@ export default function InspectionEditPage() {
  {/* ------------------------------------------------------------ */}
  {/* 4-column layout below header */}
  {/* ------------------------------------------------------------ */}
- <div className="flex flex-1 pt-14 pb-9">
+ <div className="flex flex-1 pt-14 pb-9 min-w-[1024px]">
  {/* B-22: if no sections, show the empty-template CTA spanning the full body */}
  {emptyTemplateEl ? (
  <div className="flex-1 flex">
@@ -2034,13 +2029,44 @@ export default function InspectionEditPage() {
  )}
  </button>
  ))}
+ {/* Batch mode toggle — object-scoped action, lives with the items it selects
+     (moved out of the global header). */}
+ <button
+ onClick={() => {
+  if (state.batchMode) {
+  state.setBatchMode(false);
+  state.setBatchSelected({});
+  } else {
+  state.setBatchMode(true);
+  }
+ }}
+ className={`ml-auto flex items-center justify-center w-7 h-7 rounded ${
+  state.batchMode ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-3 hover:bg-ih-bg-muted"
+ }`}
+ title={state.batchMode ? "Exit batch mode" : "Batch mode (B)"}
+ aria-label={state.batchMode ? "Exit batch mode" : "Batch select items"}
+ aria-pressed={state.batchMode}
+ >
+ <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+ </svg>
+ </button>
  </div>
  {itemListEl}
  </div>
  )}
 
  {/* Column 3: Item Editor (flex-1, focal) or Inspection Details overview — always rendered */}
- <main className="flex-1 overflow-y-auto border-t-2 border-ih-primary p-6">
+ <div className="flex-1 min-w-0 relative flex flex-col border-t-2 border-ih-primary">
+ {/* Fullscreen toggle — object-scoped action (focuses the item editor); pinned
+     to the pane top-right, outside the scroll area. Hidden in the property
+     overview. Serves as the exit affordance while in fullscreen too. */}
+ {state.activeView !== "property" && (
+  <div className="absolute top-2.5 right-2.5 z-10">
+  <FullscreenToggle active={state.itemFullscreen} onToggle={() => state.setItemFullscreen(!state.itemFullscreen)} />
+  </div>
+ )}
+ <main className="flex-1 overflow-y-auto p-6">
  {state.activeView === "property" ? (
   <>
   <PropertyInfoForm
@@ -2067,6 +2093,7 @@ export default function InspectionEditPage() {
   </>
  ) : itemEditorEl}
  </main>
+ </div>
 
  {/* Column 4: SideRail — hidden in fullscreen; collapsible otherwise */}
  {!state.itemFullscreen && (
