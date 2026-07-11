@@ -114,3 +114,17 @@ export function resolvePhotoRef(
   if (!photoRef) return null;
   return index.get(photoRef) ?? null;
 }
+
+export type PhotoMode = 'appendix' | 'inline';
+
+/**
+ * Commercial PCA Phase P — derive the report's photo presentation mode.
+ * Default source is the tier (Phase T): `full_pca` → centralized appendix;
+ * everything else (light commercial, unknown, absent) → inline residential
+ * default. A valid per-inspection override is the only escape hatch and wins;
+ * an invalid override is ignored.
+ */
+export function derivePhotoMode(input: { reportTier?: string | null; override?: string | null }): PhotoMode {
+  if (input.override === 'appendix' || input.override === 'inline') return input.override;
+  return input.reportTier === 'full_pca' ? 'appendix' : 'inline';
+}
