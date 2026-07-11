@@ -80,3 +80,5 @@ export { repairRequests, repairRequestItems } from './repair-request';
 export type { RepairRequest, RepairRequestItem } from './repair-request';
 // Client documents — bidirectional per-inspection uploads (clients + inspectors).
 export * from './client-upload';
+// Commercial PCA Phase M — ASTM E2018 compliance artifacts (dual sign-off, PSQ, document review).
+export { reportSignoff, psqResponses, documentReviewItems } from './pca-compliance';
