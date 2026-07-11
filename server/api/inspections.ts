@@ -32,6 +32,7 @@ import coreRoutes from './inspections/core';
 import resultsRoutes from './inspections/results';
 import collabRoutes from './inspections/collab';
 import costExportRoutes from './inspections/cost-export';
+import costItemRoutes from './inspections/cost-items';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
@@ -46,6 +47,8 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', hierarchyRoutes)
     // Commercial PCA Phase C — cost line CSV export (Task 11).
     .route('/', costExportRoutes)
+    // Commercial PCA Phase C — cost_items CRUD + finding-seed (Task 13a).
+    .route('/', costItemRoutes)
     // Yjs collab WS upgrade route (#181) — GET /:id/collab/ws.
     // Auth + forward to INSPECTION_DOC DO; mirrors the presence WS pattern.
     .route('/', collabRoutes);
