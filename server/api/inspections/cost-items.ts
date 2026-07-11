@@ -22,7 +22,7 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { CostItemService } from '../../services/cost-item.service';
 import { seedCostFromFinding, type FindingSeedInput } from '../../lib/pca-costs';
-import { inspectionResults } from '../../lib/db/schema';
+import { inspectionResults, tenantConfigs } from '../../lib/db/schema';
 import { CreateCostItemSchema, UpdateCostItemSchema } from '../../lib/validations/cost-item.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
@@ -64,10 +64,20 @@ export const listCostItemsRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
-                    schema: z.object({ success: z.literal(true), data: z.array(CostItemResponseItem) }),
+                    schema: z.object({
+                        success: z.literal(true),
+                        data: z.array(CostItemResponseItem),
+                        // Tenant `reserveScheduleEnabled` config, piggybacked onto the
+                        // list response so the BFF resource route (app/routes/
+                        // resources/cost-items.tsx) doesn't need its own Drizzle
+                        // access to reach it — mirrors the reserve-config read in
+                        // cost-export.ts's xlsx handler and
+                        // InspectionReportService.getReportData.
+                        reserveEnabled: z.boolean().describe('Whether the tenant has the EUL/EFF AGE/RUL reserve schedule enabled.'),
+                    }),
                 },
             },
-            description: 'The tenant-scoped cost items recorded for this inspection, sorted by sortOrder.',
+            description: 'The tenant-scoped cost items recorded for this inspection, sorted by sortOrder, plus the tenant reserve-schedule flag.',
         },
     },
     operationId: 'listInspectionCostItems',
@@ -198,7 +208,14 @@ const costItemRoutes = createApiRouter()
         const tenantId = getTenantId(c);
         const { id } = c.req.valid('param');
         const items = await new CostItemService(c.env.DB).listByInspection(id, tenantId);
-        return c.json({ success: true as const, data: items }, 200);
+        // Tenant-scoped reserve-schedule flag (JWT tenantId only — never
+        // client input), same read shape as cost-export.ts's xlsx handler.
+        const cfg = await getDrizzle(c)
+            .select({ reserveScheduleEnabled: tenantConfigs.reserveScheduleEnabled })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        return c.json({ success: true as const, data: items, reserveEnabled: Boolean(cfg?.reserveScheduleEnabled) }, 200);
     })
     .openapi(createCostItemRoute, async (c) => {
         const tenantId = getTenantId(c);

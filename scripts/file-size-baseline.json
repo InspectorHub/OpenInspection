@@ -42,6 +42,7 @@
   "server/api/admin/admin-config.ts": 473,
   "server/api/inspections/media.ts": 468,
   "server/api/bookings.ts": 465,
+  "app/components/editor/CostItemsPanel.tsx": 443,
   "app/components/editor/InspectionSettingsSheet.tsx": 440,
   "app/lib/collab/results-doc-connection.ts": 435,
   "app/components/media-studio/VideoCapture.tsx": 432,

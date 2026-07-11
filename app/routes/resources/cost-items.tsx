@@ -9,11 +9,14 @@
  * loader: GET  ?inspectionId= -> { items: CostItemView[], reserveEnabled }
  * action: POST intent=create|update|delete -> { success, id? }
  *
- * `reserveEnabled` (tenant `reserveScheduleEnabled`) is NOT currently
- * exposed by any `/api/*` route — Task 13a's server routes don't surface
- * tenant config, and this task is scoped to the app half only (no new
- * server/api routes). Defaults to `false` (ASTM baseline: Table 1 only)
- * until a follow-up adds that read. See task-13b-report.md.
+ * `reserveEnabled` (tenant `reserveScheduleEnabled`) is piggybacked onto the
+ * `/api/inspections/:id/cost-items` list response (see the `listCostItemsRoute`
+ * handler in `server/api/inspections/cost-items.ts`, fix wave, task-13b-
+ * report.md) rather than read directly here via Drizzle: `app/` and `server/`
+ * are separate tsc programs (tsconfig.json excludes `server/**`, which only
+ * `tsconfig.api.json` includes), so this loader never imports `server/lib/db/
+ * schema` — it only ever reaches data through the `hc`-typed `createApi`
+ * client, same as every other `app/routes/resources/*` route.
  */
 import type { Route } from "./+types/cost-items";
 import { getToken, requireToken } from "~/lib/session.server";
@@ -36,9 +39,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       { headers: { "x-token-relay": "1" } },
     );
     if (!res.ok) return EMPTY;
-    const body = (await res.json()) as { data?: CostItemView[] };
-    // See file header: reserveEnabled defaults false — no API surface yet.
-    return { items: body.data ?? [], reserveEnabled: false };
+    const body = (await res.json()) as { data?: CostItemView[]; reserveEnabled?: boolean };
+    return { items: body.data ?? [], reserveEnabled: Boolean(body.reserveEnabled) };
   } catch {
     return EMPTY;
   }
@@ -70,6 +72,7 @@ function readCostItemJson(fd: FormData) {
     rul: num("rul") ?? null,
     suggestedRemedy: str("suggestedRemedy") ?? "",
     bucket: String(fd.get("bucket") ?? "immediate") as "immediate" | "short_term" | "long_term",
+    sortOrder: num("sortOrder"),
   };
 }
 

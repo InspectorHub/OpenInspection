@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { formatCents, parseDollarsToCents } from "~/lib/money";
 import type { CostItemView } from "~/components/portal/sections/report/types";
 
@@ -83,6 +83,7 @@ async function submitCostItem(
     fd.set("rul", item.rul == null ? "" : String(item.rul));
     fd.set("suggestedRemedy", item.suggestedRemedy ?? "");
     fd.set("bucket", item.bucket);
+    fd.set("sortOrder", String(item.sortOrder ?? 0));
   }
   try {
     const res = await fetch("/resources/cost-items", { method: "POST", credentials: "include", body: fd });
@@ -102,6 +103,12 @@ export function CostItemsPanel({
 }) {
   const [rows, setRows] = useState<CostItemView[]>(items);
   const [saving, setSaving] = useState<Record<string, boolean>>({});
+  // Temp ids the user asked to remove while their initial background
+  // `create` was still in flight (see `removeRow`) — cleaned up once that
+  // create resolves, by immediately deleting the just-landed server row
+  // instead of leaving it as an orphan. A ref (not state) because it's only
+  // ever read/written from async callbacks, never rendered.
+  const pendingRemovalRef = useRef<Set<string>>(new Set());
 
   const bucketTotals = { immediate: 0, short_term: 0, long_term: 0 } as Record<CostItemView["bucket"], number>;
   for (const row of rows) bucketTotals[row.bucket] += rowTotalCents(row);
@@ -114,6 +121,13 @@ export function CostItemsPanel({
   async function commitRow(id: string) {
     const row = rows.find((r) => r.id === id);
     if (!row) return;
+    // Guard against the temp-id create race: while a temp row's initial
+    // `create` is still in flight (`saving[id]` true), its inputs are
+    // disabled (see `CostItemRow`) so this normally can't fire — but keep
+    // the check here too as defense-in-depth so a stray commit can never
+    // issue a second `create` for the same row (which would land a
+    // duplicate server row — see task-13b-report.md fix wave).
+    if (isTempId(id) && saving[id]) return;
     setSaving((s) => ({ ...s, [id]: true }));
     const result = await submitCostItem(inspectionId, isTempId(id) ? "create" : "update", row);
     setSaving((s) => ({ ...s, [id]: false }));
@@ -123,26 +137,45 @@ export function CostItemsPanel({
   }
 
   function addRow() {
-    setRows((prev) => {
-      const draft = blankRow(prev.length);
-      // Fire-and-forget create so an empty row is persisted immediately
-      // (mirrors AddUnitForm — the row is editable right away and each
-      // subsequent field edit re-PATCHes the now-real id).
-      void submitCostItem(inspectionId, "create", draft).then((result) => {
-        if (result.success && result.id) {
-          setRows((cur) => cur.map((r) => (r.id === draft.id ? { ...r, id: result.id! } : r)));
+    const draft = blankRow(rows.length);
+    setRows((prev) => [...prev, draft]);
+    // Mark the row busy for the duration of its initial background create —
+    // `CostItemRow` disables every input/select while `busy`, so no field
+    // commit can race the create and fire a second one (see `commitRow`'s
+    // matching guard, and the fix-wave note in task-13b-report.md).
+    setSaving((s) => ({ ...s, [draft.id]: true }));
+    void submitCostItem(inspectionId, "create", draft).then((result) => {
+      setSaving((s) => { const next = { ...s }; delete next[draft.id]; return next; });
+      const wasRemoved = pendingRemovalRef.current.delete(draft.id);
+      if (result.success && result.id) {
+        if (wasRemoved) {
+          // The user removed this row while its create was still pending —
+          // the local row is already gone from `rows`; the server row that
+          // just landed would otherwise be a permanent orphan, so delete it
+          // now that we finally have its real id.
+          void submitCostItem(inspectionId, "delete", { ...draft, id: result.id });
+          return;
         }
-      });
-      return [...prev, draft];
+        setRows((cur) => cur.map((r) => (r.id === draft.id ? { ...r, id: result.id! } : r)));
+      }
+      // Create failed: nothing persisted server-side, so a pending removal
+      // needs no follow-up — the row is already gone from `rows` (or, if not
+      // removed, it stays a temp row the user can retry by editing it).
     });
   }
 
   async function removeRow(id: string) {
     setRows((prev) => prev.filter((r) => r.id !== id));
-    if (!isTempId(id)) {
-      const row = items.find((r) => r.id === id) ?? rows.find((r) => r.id === id);
-      if (row) await submitCostItem(inspectionId, "delete", row);
+    if (isTempId(id)) {
+      // Still-pending create for this row — queue the eventual delete
+      // instead of silently dropping it (the zombie-row case: skipping the
+      // delete here because "it's still temp" would otherwise leave the
+      // server row created moments later with no local reference to it).
+      if (saving[id]) pendingRemovalRef.current.add(id);
+      return;
     }
+    const row = items.find((r) => r.id === id) ?? rows.find((r) => r.id === id);
+    if (row) await submitCostItem(inspectionId, "delete", row);
   }
 
   return (
@@ -224,6 +257,7 @@ function CostItemRow({
             value={item.system}
             onChange={(e) => onChange({ system: e.target.value })}
             onBlur={onCommit}
+            disabled={busy}
             placeholder="e.g. roof"
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           />
@@ -234,6 +268,7 @@ function CostItemRow({
             value={item.component}
             onChange={(e) => onChange({ component: e.target.value })}
             onBlur={onCommit}
+            disabled={busy}
             placeholder="e.g. membrane"
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           />
@@ -244,6 +279,7 @@ function CostItemRow({
             value={item.location ?? ""}
             onChange={(e) => onChange({ location: e.target.value })}
             onBlur={onCommit}
+            disabled={busy}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           />
         </div>
@@ -252,6 +288,7 @@ function CostItemRow({
           <select
             value={item.action}
             onChange={(e) => { onChange({ action: e.target.value as CostItemView["action"] }); onCommit(); }}
+            disabled={busy}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           >
             {ACTION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -263,6 +300,7 @@ function CostItemRow({
           <select
             value={item.costMethod}
             onChange={(e) => { onChange({ costMethod: e.target.value as CostItemView["costMethod"] }); onCommit(); }}
+            disabled={busy}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           >
             {COST_METHOD_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -278,6 +316,7 @@ function CostItemRow({
                 value={item.quantity ?? ""}
                 onChange={(e) => onChange({ quantity: e.target.value === "" ? null : Number(e.target.value) })}
                 onBlur={onCommit}
+                disabled={busy}
                 className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
               />
             </div>
@@ -287,6 +326,7 @@ function CostItemRow({
                 value={item.uom ?? ""}
                 onChange={(e) => onChange({ uom: e.target.value || null })}
                 onBlur={onCommit}
+                disabled={busy}
                 placeholder="sf, ea…"
                 className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
               />
@@ -297,6 +337,7 @@ function CostItemRow({
                 value={item.unitCostCents == null ? "" : (item.unitCostCents / 100).toFixed(2)}
                 onChange={(e) => onChange({ unitCostCents: parseDollarsToCents(e.target.value) })}
                 onBlur={onCommit}
+                disabled={busy}
                 placeholder="$0.00"
                 className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
               />
@@ -309,6 +350,7 @@ function CostItemRow({
               value={item.lumpSumCents == null ? "" : (item.lumpSumCents / 100).toFixed(2)}
               onChange={(e) => onChange({ lumpSumCents: parseDollarsToCents(e.target.value) })}
               onBlur={onCommit}
+              disabled={busy}
               placeholder="$0.00"
               className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
             />
@@ -320,6 +362,7 @@ function CostItemRow({
           <select
             value={item.bucket}
             onChange={(e) => { onChange({ bucket: e.target.value as CostItemView["bucket"] }); onCommit(); }}
+            disabled={busy}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           >
             {BUCKET_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -335,6 +378,7 @@ function CostItemRow({
                 value={item.eul ?? ""}
                 onChange={(e) => onChange({ eul: e.target.value === "" ? null : Number(e.target.value) })}
                 onBlur={onCommit}
+                disabled={busy}
                 className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
               />
             </div>
@@ -345,6 +389,7 @@ function CostItemRow({
                 value={item.effAge ?? ""}
                 onChange={(e) => onChange({ effAge: e.target.value === "" ? null : Number(e.target.value) })}
                 onBlur={onCommit}
+                disabled={busy}
                 className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
               />
             </div>
@@ -355,6 +400,7 @@ function CostItemRow({
                 value={item.rul ?? ""}
                 onChange={(e) => onChange({ rul: e.target.value === "" ? null : Number(e.target.value) })}
                 onBlur={onCommit}
+                disabled={busy}
                 className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
               />
             </div>
@@ -367,6 +413,7 @@ function CostItemRow({
             value={item.suggestedRemedy}
             onChange={(e) => onChange({ suggestedRemedy: e.target.value })}
             onBlur={onCommit}
+            disabled={busy}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           />
         </div>
