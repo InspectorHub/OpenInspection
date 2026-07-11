@@ -69,3 +69,79 @@ describe('buildReportDocx — skeleton', () => {
         expect(Packer).toBeTruthy();
     });
 });
+
+const sectionedInput: ReportDocxInput = {
+    ...baseInput,
+    outline: [
+        ...baseInput.outline,
+        { id: 'property-description', level: 1, title: '3. General Property Description' },
+        { id: 'roofing', level: 1, title: '5. Roofing' },
+        { id: 'summary.deviations', level: 2, title: 'Deviations from the Guide' },
+    ],
+    buildingProfile: [
+        { id: 'yearBuilt', group: 'identity', label: 'Year built', value: 1998, unit: null },
+        { id: 'sqft', group: 'identity', label: 'Building area', value: 42000, unit: 'sf' },
+    ],
+    sections: [
+        {
+            id: 'property-description', level: 1, title: '3. General Property Description',
+            body: 'The subject property is a two-story office building.',
+        },
+        {
+            id: 'roofing', level: 1, title: '5. Roofing',
+            body: 'The roof is a modified bitumen membrane in fair condition.',
+        },
+        {
+            id: 'summary.deviations', level: 2, title: 'Deviations from the Guide',
+            deviations: [{ area: 'PSQ', description: 'Owner did not complete the pre-survey questionnaire.' }],
+        },
+    ],
+};
+
+describe('buildReportDocx — building profile + sections', () => {
+    it('emits the Building Profile as a two-column table with Year built / 1998', async () => {
+        const body = await xml(sectionedInput);
+        expect(body).toContain('Year built');
+        expect(body).toContain('1998');
+    });
+
+    it('emits the §3 General Property Description heading', async () => {
+        const body = await xml(sectionedInput);
+        expect(body).toContain('General Property Description');
+    });
+
+    it('emits a system section heading at level 1 with its narrative body', async () => {
+        const body = await xml(sectionedInput);
+        expect(body).toContain('5. Roofing');
+        expect(body).toContain('modified bitumen membrane');
+    });
+
+    it('renders Deviations as a sub-table', async () => {
+        const body = await xml(sectionedInput);
+        expect(body).toContain('Deviations from the Guide');
+        expect(body).toContain('Owner did not complete');
+        expect(body).toMatch(/<w:tbl>[\s\S]*Owner did not complete[\s\S]*<\/w:tbl>/);
+    });
+
+    it('follows outline order: Building Profile, then property-description, then roofing, then deviations', async () => {
+        const body = await xml(sectionedInput);
+        const bpIdx = body.indexOf('Year built');
+        const pdIdx = body.indexOf('General Property Description');
+        const roofIdx = body.indexOf('5. Roofing');
+        const devIdx = body.indexOf('Deviations from the Guide');
+        expect(bpIdx).toBeGreaterThan(-1);
+        expect(pdIdx).toBeGreaterThan(bpIdx);
+        expect(roofIdx).toBeGreaterThan(pdIdx);
+        expect(devIdx).toBeGreaterThan(roofIdx);
+    });
+
+    it('emits nothing for an empty section (no body/items/deviations)', async () => {
+        const withEmpty: ReportDocxInput = {
+            ...sectionedInput,
+            outline: [...sectionedInput.outline, { id: 'mep', level: 1, title: '6. Mechanical, Electrical & Plumbing' }],
+            sections: [...sectionedInput.sections, { id: 'mep', level: 1, title: '6. Mechanical, Electrical & Plumbing' }],
+        };
+        const body = await xml(withEmpty);
+        expect(body).not.toContain('Mechanical, Electrical');
+    });
+});
