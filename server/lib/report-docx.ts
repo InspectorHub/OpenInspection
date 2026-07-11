@@ -5,7 +5,7 @@
 // the native Word TOC field + document outline mirror the HTML/PDF.
 import {
     Document, Packer, Paragraph, TextRun, HeadingLevel,
-    Table, TableRow, TableCell, WidthType, TableOfContents,
+    Table, TableRow, TableCell, WidthType, TableOfContents, ImageRun,
 } from 'docx';
 import type { ReportOutlineEntry } from './report-outline'; // Phase O registry type
 
@@ -72,6 +72,21 @@ export interface DocxCostTables {
     reserveSchedule: DocxReserveScheduleRow[] | null;
 }
 
+/**
+ * Commercial PCA Phase P — Appendix B photo. The builder is pure: it receives
+ * ALREADY-FETCHED, ALREADY-DOWNSCALED bytes (the consumer does the R2 fetch +
+ * resize). `type` selects the docx `ImageRun` codec; defaults to `jpg` (the
+ * common R2-stored photo format) when omitted.
+ */
+export interface DocxAppendixPhoto {
+    photoNo: string;
+    caption?: string;
+    bytes: Uint8Array;
+    widthPx: number;
+    heightPx: number;
+    type?: 'jpg' | 'png' | 'gif' | 'bmp';
+}
+
 export interface ReportDocxInput {
     inspection: { propertyAddress?: string | null; companyName?: string | null };
     tier: 'light_commercial' | 'full_pca';
@@ -82,8 +97,7 @@ export interface ReportDocxInput {
     buildingProfile: DocxProfileRow[];
     sections: DocxSection[];
     costTables: DocxCostTables | null;
-    // wired in Task 3c:
-    appendixPhotos: unknown[];
+    appendixPhotos: DocxAppendixPhoto[];
 }
 
 const isLight = (input: ReportDocxInput) => input.tier === 'light_commercial';
@@ -273,6 +287,42 @@ function buildCostTables(costTables: DocxCostTables | null): Array<Paragraph | T
     ];
 }
 
+// Bound each embedded appendix photo's rendered width to this many px so the
+// generated .docx stays a reasonable print-thumbnail size regardless of the
+// source resolution (the consumer already downscales the source bytes; this
+// is the *display* transformation docx writes into the drawing XML).
+const PRINT_THUMB_WIDTH_PX = 480;
+
+function scaledDimensions(widthPx: number, heightPx: number): { width: number; height: number } {
+    if (widthPx <= PRINT_THUMB_WIDTH_PX || widthPx <= 0) return { width: widthPx, height: heightPx };
+    const ratio = PRINT_THUMB_WIDTH_PX / widthPx;
+    return { width: PRINT_THUMB_WIDTH_PX, height: Math.round(heightPx * ratio) };
+}
+
+/**
+ * Appendix B — Photographs. `[]` for light_commercial (light uses inline
+ * photos, out of Phase W scope — the consumer passes `appendixPhotos: []`)
+ * or when there are no photos. Each photo emits one bounded `ImageRun` plus
+ * its `PHOTO NO.` caption paragraph, in the order supplied.
+ */
+function buildAppendixPhotos(input: ReportDocxInput): Paragraph[] {
+    if (isLight(input) || input.appendixPhotos.length === 0) return [];
+    const out: Paragraph[] = [new Paragraph({ text: 'Appendix B — Photographs', heading: HeadingLevel.HEADING_1 })];
+    for (const photo of input.appendixPhotos) {
+        const { width, height } = scaledDimensions(photo.widthPx, photo.heightPx);
+        out.push(new Paragraph({
+            children: [new ImageRun({
+                type: photo.type ?? 'jpg',
+                data: photo.bytes,
+                transformation: { width, height },
+            })],
+        }));
+        const captionText = photo.caption ? `PHOTO NO. ${photo.photoNo} — ${photo.caption}` : `PHOTO NO. ${photo.photoNo}`;
+        out.push(new Paragraph(captionText));
+    }
+    return out;
+}
+
 export async function buildReportDocx(input: ReportDocxInput): Promise<Uint8Array> {
     const summary = buildSystemsSummary(input);
     const children = [
@@ -283,7 +333,7 @@ export async function buildReportDocx(input: ReportDocxInput): Promise<Uint8Arra
         ...(Array.isArray(summary) ? summary : [summary]),
         ...buildSections(input.sections),
         ...buildCostTables(input.costTables),
-        // Task 3c appends the Appendix B photo gallery here, last.
+        ...buildAppendixPhotos(input),
     ];
     const doc = new Document({ features: { updateFields: true }, sections: [{ children }] });
     const buf = await Packer.toBuffer(doc);

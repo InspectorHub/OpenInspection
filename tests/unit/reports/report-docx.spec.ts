@@ -201,3 +201,56 @@ describe('buildReportDocx — cost tables', () => {
         expect(body).not.toContain('TABLE 2');
     });
 });
+
+// Two distinct tiny real 1x1 PNGs (transparent, red) — docx dedupes identical
+// image bytes into a single media relationship, so the two-relationship
+// assertion below needs genuinely different bytes, same as two real photos.
+const TINY_PNG_TRANSPARENT_BASE64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+const TINY_PNG_RED_BASE64 =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const pngBytes = (base64: string): Uint8Array => Uint8Array.from(Buffer.from(base64, 'base64'));
+
+const appendixInput: ReportDocxInput = {
+    ...costedInput,
+    appendixPhotos: [
+        {
+            photoNo: '1', caption: 'Roof membrane, north slope',
+            bytes: pngBytes(TINY_PNG_TRANSPARENT_BASE64), widthPx: 800, heightPx: 600, type: 'png',
+        },
+        {
+            photoNo: '2', caption: 'Parking lot seal coat',
+            bytes: pngBytes(TINY_PNG_RED_BASE64), widthPx: 800, heightPx: 600, type: 'png',
+        },
+    ],
+};
+
+describe('buildReportDocx — appendix photos', () => {
+    it('emits an Appendix B heading + one ImageRun and caption per photo for full_pca', async () => {
+        const bytes = await buildReportDocx(appendixInput);
+        const { unzipSync, strFromU8 } = await import('fflate');
+        const files = unzipSync(bytes);
+        const doc = strFromU8(files['word/document.xml']);
+        expect(doc).toContain('Appendix B');
+        expect(doc).toContain('PHOTO NO. 1');
+        expect(doc).toContain('Roof membrane, north slope');
+        expect(doc).toContain('PHOTO NO. 2');
+        expect(doc).toContain('Parking lot seal coat');
+
+        const rels = strFromU8(files['word/_rels/document.xml.rels']);
+        const imageRelCount = (rels.match(/relationships\/image"/g) ?? []).length;
+        expect(imageRelCount).toBe(2);
+    });
+
+    it('omits Appendix B entirely for light_commercial (appendixPhotos: [])', async () => {
+        const lightInput: ReportDocxInput = { ...appendixInput, tier: 'light_commercial', appendixPhotos: [] };
+        const doc = await xml(lightInput);
+        expect(doc).not.toContain('Appendix B');
+    });
+
+    it('emits nothing when appendixPhotos is empty even for full_pca', async () => {
+        const noPhotos: ReportDocxInput = { ...costedInput, appendixPhotos: [] };
+        const doc = await xml(noPhotos);
+        expect(doc).not.toContain('Appendix B');
+    });
+});
