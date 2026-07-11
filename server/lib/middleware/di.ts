@@ -55,6 +55,7 @@ import { IntegrationsService } from '../../services/integrations.service';
 import { AnalyticsService } from '../../services/analytics.service';
 import { RepairRequestService } from '../../services/repair-request.service';
 import { ClientDocumentService } from '../../services/client-document.service';
+import { ComplianceService } from '../../services/compliance/pca-compliance.service';
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
 import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
@@ -393,6 +394,11 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'clientDocument':
                     target.clientDocument = new ClientDocumentService(c.env.DB, c.env.PHOTOS);
+                    break;
+                case 'compliance':
+                    // Commercial PCA Phase M — reuses the tenant Ed25519 signing key
+                    // (same secret as signingKey/reportVersion) for dual sign-off attestations.
+                    target.compliance = new ComplianceService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
                     break;
             }
             return target[prop];

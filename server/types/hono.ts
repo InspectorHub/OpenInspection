@@ -312,6 +312,7 @@ export interface AppServices {
     analytics: import('../services/analytics.service').AnalyticsService;
     repairRequest: import('../services/repair-request.service').RepairRequestService;
     clientDocument: import('../services/client-document.service').ClientDocumentService;
+    compliance: import('../services/compliance/pca-compliance.service').ComplianceService;
 }
 
 /**
