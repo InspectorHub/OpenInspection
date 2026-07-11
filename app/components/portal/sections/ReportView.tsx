@@ -29,6 +29,7 @@ import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
 import { ReportRepairPanel } from "./report/ReportRepairPanel";
 import { BuildingProfile } from "./report/BuildingProfile";
 import { PcaSkeleton } from "./report/PcaSkeleton";
+import { ReportToc } from "./report/ReportToc";
 import { PerUnitReportBlock } from "./report/PerUnitReportBlock";
 import { CostTables } from "./report/CostTables";
 import {
@@ -436,8 +437,12 @@ export function ReportView(props: ReportViewProps) {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
+      {/* Stats — Commercial PCA Phase O: this at-a-glance block is the report's
+          "PCA Summary" front-matter page (registry id `pca-summary`), so it
+          carries that anchor for the TOC / PDF bookmarks. It renders
+          unconditionally (data.stats always present), so the anchor is never
+          dangling regardless of tier. */}
+      <div id="pca-summary" className="max-w-4xl mx-auto px-4 sm:px-6 mb-6 scroll-mt-4">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {summaryCards.map((s) => (
             <div key={s.label} className={`bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center ${PRINT_CARD_CLASS}`}>
@@ -483,6 +488,11 @@ export function ReportView(props: ReportViewProps) {
             compliance prop (Phase M) feeds the conformance/signoff/doc-review/
             PSQ/reliance slots inside it; every field is empty/null-safe so it
             only ever adds content when the skeleton itself is already rendering. */}
+        {/* Commercial PCA Phase O — reserved TOC slot: after the cover/header
+            front matter, before the PcaSkeleton body. `?? []` guards the
+            inline-Hub mount that may pass a partial payload during
+            transition; ReportToc itself renders nothing when empty. */}
+        <ReportToc entries={data.outline ?? []} showPageNumbers={false} />
         <PcaSkeleton
           data={data.pcaReport ?? null}
           compliance={{
@@ -499,7 +509,7 @@ export function ReportView(props: ReportViewProps) {
         {filteredSections.map((section, sectionIdx) => {
           if (filter === "defects" && section.items.length === 0) return null;
           return (
-            <div key={section.id} className="mb-6 group/section relative">
+            <div key={section.id} id={section.id} className="mb-6 group/section relative scroll-mt-4">
               <div className={`flex items-center gap-3 mb-4 ${PRINT_SECTION_HEADING_CLASS}`}>
                 <span className="text-2xl">{getSectionIcon(section.title)}</span>
                 <h2 className="text-2xl font-bold italic text-ih-fg-1">

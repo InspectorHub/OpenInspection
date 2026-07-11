@@ -24,12 +24,44 @@ export interface PcaComplianceProps {
   relianceText: RelianceText;
 }
 
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+function Block({
+  id,
+  title,
+  children,
+}: {
+  /** Commercial PCA Phase O — registry section id, stamped on the wrapper so
+   *  the TOC / PDF bookmarks anchor here. Omitted for blocks that aren't
+   *  registry entries in their own right. */
+  id?: string;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="mb-5 print:break-inside-avoid">
+    <section id={id} className="mb-5 print:break-inside-avoid scroll-mt-4">
       <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">{title}</h3>
       <div className="whitespace-pre-line text-sm text-ih-fg-1">{children}</div>
     </section>
+  );
+}
+
+/**
+ * Commercial PCA Phase O — a bare chapter-divider heading for the level-1
+ * system chapters (property-description, site, structural-envelope, mep,
+ * interior, life-safety) that the registry lists but the skeleton doesn't yet
+ * render detailed content for (the per-item findings render further down in
+ * <ReportView>'s `filteredSections`, keyed by the inspection template's own
+ * section ids — NOT the PCA registry ids). This gives every registry entry a
+ * real anchor target (no dangling TOC links) and shows the full ASTM chapter
+ * structure; a future phase can replace it with real chapter content.
+ */
+function ChapterDivider({ id, title }: { id: string; title: string }) {
+  return (
+    <h2
+      id={id}
+      className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3 scroll-mt-4"
+    >
+      {title}
+    </h2>
   );
 }
 
@@ -57,24 +89,30 @@ export function PcaSkeleton({
   return (
     <div className="mb-8">
       {/* Transmittal Letter (full tier; gated upstream) */}
-      <Block title="Transmittal Letter">{narrative.transmittalLetter}</Block>
+      <Block id="transmittal-letter" title="Transmittal Letter">{narrative.transmittalLetter}</Block>
       {/* Transmittal signature slot — Phase M dual-role signoffs. */}
       <SignoffBlock signoffs={signoffs} />
 
-      <SystemsSummaryTable rows={data.systemsSummary} />
+      {/* Wrapper carries the anchor unconditionally — SystemsSummaryTable
+          itself renders null when there are no systems, which would otherwise
+          leave a dangling #systems-summary TOC link on a full-tier report
+          with an empty rollup. */}
+      <div id="systems-summary" className="scroll-mt-4">
+        <SystemsSummaryTable rows={data.systemsSummary} />
+      </div>
 
       {/* 1. SUMMARY */}
-      <h2 className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">1. Summary</h2>
-      <Block title="1.1 General Description">{narrative.summaryGeneralDescription}</Block>
-      <Block title="1.2 General Physical Condition">{narrative.summaryPhysicalCondition}</Block>
+      <h2 id="summary" className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3 scroll-mt-4">1. Summary</h2>
+      <Block id="summary.general-description" title="1.1 General Description">{narrative.summaryGeneralDescription}</Block>
+      <Block id="summary.physical-condition" title="1.2 General Physical Condition">{narrative.summaryPhysicalCondition}</Block>
       {/* 1.3 Opinion of Cost — prose + EMPTY cost region (Phase C fills numbers). */}
-      <section className="mb-5 print:break-inside-avoid">
+      <section id="summary.opinion-of-cost" className="mb-5 print:break-inside-avoid scroll-mt-4">
         <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">1.3 Opinion of Cost</h3>
         <div data-pca-cost-region className="text-sm text-ih-fg-3" aria-hidden="true" />
       </section>
       {/* 1.4 Deviations from the Guide — structured, with the ASTM conformance
           statement (Phase M) rendered adjacent. */}
-      <section className="mb-5 print:break-inside-avoid">
+      <section id="summary.deviations" className="mb-5 print:break-inside-avoid scroll-mt-4">
         <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">1.4 Deviations from the Guide</h3>
         <ConformanceStatement conformance={conformance} />
         {deviations.length === 0 ? (
@@ -90,16 +128,16 @@ export function PcaSkeleton({
           </ul>
         )}
       </section>
-      <Block title="1.5 Recommendations">{narrative.summaryRecommendations}</Block>
+      <Block id="summary.recommendations" title="1.5 Recommendations">{narrative.summaryRecommendations}</Block>
 
       {/* 2. INTRODUCTION */}
-      <h2 className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">2. Introduction</h2>
-      <Block title="2.1 Purpose">{narrative.purpose}</Block>
-      <Block title="2.2 Scope of Work">{narrative.scopeOfWork}</Block>
-      <Block title="2.3 Limitations & Exceptions">{narrative.limitationsExceptions}</Block>
-      <Block title="2.4 General Property Reconnaissance">{narrative.reconnaissance}</Block>
+      <h2 id="introduction" className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3 scroll-mt-4">2. Introduction</h2>
+      <Block id="introduction.purpose" title="2.1 Purpose">{narrative.purpose}</Block>
+      <Block id="introduction.scope-of-work" title="2.2 Scope of Work">{narrative.scopeOfWork}</Block>
+      <Block id="introduction.limitations-exceptions" title="2.3 Limitations & Exceptions">{narrative.limitationsExceptions}</Block>
+      <Block id="introduction.reconnaissance" title="2.4 General Property Reconnaissance">{narrative.reconnaissance}</Block>
       {/* 2.5 User Reliance + §11.4.4 arm's-length disclosure slot (Phase M copy). */}
-      <section className="mb-5 print:break-inside-avoid">
+      <section id="introduction.user-reliance" className="mb-5 print:break-inside-avoid scroll-mt-4">
         <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">2.5 User Reliance</h3>
         <p data-pca-reliance className="text-sm text-ih-fg-3">
           {relianceText?.userReliance ||
@@ -113,12 +151,29 @@ export function PcaSkeleton({
         ) : null}
       </section>
 
-      {/* Document Review & Interviews + Additional Considerations. */}
-      <Block title="Document Review & Interviews">
+      {/* 3. GENERAL PROPERTY DESCRIPTION — chapter divider (Phase O); detailed
+          content lives in the Building Profile block above the fold. */}
+      <ChapterDivider id="property-description" title="General Property Description" />
+
+      {/* Document Review & Interviews. */}
+      <Block id="document-review" title="Document Review & Interviews">
         <DocumentReviewTable items={documentReview} />
         <PsqExhibit psq={psq} />
       </Block>
-      <Block title="Additional Considerations">{narrative.additionalConsiderations}</Block>
+
+      {/* System chapters — dividers only (Phase O). The per-item findings for
+          these systems render in <ReportView>'s `filteredSections`, keyed by
+          the inspection template's own section ids, which don't line up with
+          these canonical ASTM chapter ids 1:1. These headings exist so every
+          registry entry has a real anchor and the report shows the full
+          chapter structure; a later phase can bind real content to them. */}
+      <ChapterDivider id="site" title="Site" />
+      <ChapterDivider id="structural-envelope" title="Structural Frame & Building Envelope" />
+      <ChapterDivider id="mep" title="Mechanical, Electrical & Plumbing" />
+      <ChapterDivider id="interior" title="Interior Elements" />
+      <ChapterDivider id="life-safety" title="Life Safety / Fire Protection" />
+
+      <Block id="additional-considerations" title="Additional Considerations">{narrative.additionalConsiderations}</Block>
     </div>
   );
 }

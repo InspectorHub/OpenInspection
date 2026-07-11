@@ -10,7 +10,7 @@
   "server/index.ts": 833,
   "server/api/sms.ts": 818,
   "server/services/inspection.service.ts": 755,
-  "app/components/portal/sections/ReportView.tsx": 732,
+  "app/components/portal/sections/ReportView.tsx": 742,
   "app/routes/settings-communication-templates.tsx": 728,
   "app/routes/settings-communication.tsx": 716,
   "app/routes/template-edit.tsx": 698,
