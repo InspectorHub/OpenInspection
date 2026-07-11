@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useFetcher } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { useFetcher, useRevalidator } from "react-router";
 import { Modal } from "@core/shared-ui";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 
@@ -21,7 +21,11 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
  * The route POSTs skip revalidation (see inspection-edit.tsx's
  * `shouldRevalidate`), so every sub-section keeps its own local optimistic
  * copy of the server row(s) it owns rather than re-reading stale loader data
- * after a submit.
+ * after a submit. Sign-off (add/remove) and the doc-review seed have no local
+ * optimistic copy — they render straight off `data` (loader props) — so those
+ * three call `revalidator.revalidate()` on a successful submit, mirroring the
+ * units pattern in inspection-edit.tsx (~line 510). PSQ and per-row doc-review
+ * keep local state and stay revalidation-free.
  */
 
 // ── Wire-shape mirrors (hand-mirrored from server/lib/validations/compliance.schema.ts;
@@ -133,6 +137,31 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
 
   const saving = signFetcher.state !== "idle";
   const removing = removeFetcher.state !== "idle";
+
+  // This card renders straight off `existing` (loader props) — no local
+  // optimistic copy of "signed" state — so a successful sign-off or removal
+  // must revalidate the route or the card never leaves its stale state.
+  // Mirrors the units pattern in inspection-edit.tsx (~line 510): guard with
+  // a last-seen ref since `fetcher.data` keeps the same reference across
+  // renders and `revalidator` is a fresh object every render — without the
+  // guard this effect would re-fire and revalidate on every render.
+  const revalidator = useRevalidator();
+  const lastRevalidatedSignData = useRef<unknown>(null);
+  useEffect(() => {
+    const d = signFetcher.data as { ok?: boolean } | undefined;
+    if (signFetcher.state === "idle" && d?.ok && lastRevalidatedSignData.current !== d) {
+      lastRevalidatedSignData.current = d;
+      revalidator.revalidate();
+    }
+  }, [signFetcher.state, signFetcher.data, revalidator]);
+  const lastRevalidatedRemoveData = useRef<unknown>(null);
+  useEffect(() => {
+    const d = removeFetcher.data as { ok?: boolean } | undefined;
+    if (removeFetcher.state === "idle" && d?.ok && lastRevalidatedRemoveData.current !== d) {
+      lastRevalidatedRemoveData.current = d;
+      revalidator.revalidate();
+    }
+  }, [removeFetcher.state, removeFetcher.data, revalidator]);
 
   const submitSignoff = () => {
     if (!personId.trim() || !name.trim()) return;
@@ -446,6 +475,20 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
   // Seeding the standard checklist is its own mutation type/fetcher too.
   const seedFetcher = useFetcher();
   const seeding = seedFetcher.state !== "idle";
+
+  // Seeding creates rows server-side but this section renders `items`
+  // straight from loader props — without a revalidation the checklist stays
+  // empty after a successful seed. Same guarded pattern as SignoffRoleCard /
+  // the units fetcher in inspection-edit.tsx.
+  const revalidator = useRevalidator();
+  const lastRevalidatedSeedData = useRef<unknown>(null);
+  useEffect(() => {
+    const d = seedFetcher.data as { ok?: boolean } | undefined;
+    if (seedFetcher.state === "idle" && d?.ok && lastRevalidatedSeedData.current !== d) {
+      lastRevalidatedSeedData.current = d;
+      revalidator.revalidate();
+    }
+  }, [seedFetcher.state, seedFetcher.data, revalidator]);
 
   return (
     <div className="space-y-2" data-testid="doc-review-section">
