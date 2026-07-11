@@ -162,6 +162,23 @@ export interface ReportVerification {
   publishedAt: number; // unix seconds
 }
 
+/* Commercial PCA Phase M — compliance-record view types re-declared across the
+   server/app boundary (app/ cannot import server/lib/). Shapes mirror the M7
+   compliance payload (ASTM conformance flag, dual-role signoffs, PSQ,
+   document-review checklist, reliance language) exactly. */
+export interface AstmConformance { standard: 'E2018-24'; conforms: boolean }
+export interface ReportSignoffView {
+  role: 'field_observer' | 'pcr_reviewer';
+  name: string; license: string | null; qualificationsRef: string | null;
+  signedAt: number; dualRole: boolean;
+}
+export interface PsqView { status: 'sent' | 'received' | 'declined'; responses: Record<string, unknown> | null }
+export interface DocReviewView {
+  documentKey: string; label: string;
+  requested: boolean; received: boolean; reviewed: boolean; na: boolean; notes: string | null;
+}
+export interface RelianceText { userReliance: string; pointInTime: string; siteSpecific: string }
+
 /* Commercial PCA Phase U — per-unit matrix types re-declared across the
    server/app boundary (app/ cannot import server/lib/). Shapes mirror
    server/lib/unit-scope.ts exactly (same precedent as the Phase S types above). */
@@ -244,6 +261,14 @@ export interface ReportLoaderResult {
   isPublished: boolean;
   signature: ReportSignature | null;
   verification: ReportVerification | null;
+  /* Commercial PCA Phase M — compliance record surfaces (ASTM conformance
+     statement, dual-role signoffs, PSQ status, document-review checklist,
+     reliance language). Empty/null-safe in every fallback path. */
+  astmConformance: AstmConformance | null;
+  reportSignoffs: ReportSignoffView[];
+  psq: PsqView | null;
+  documentReview: DocReviewView[];
+  relianceText: RelianceText;
   ownerPreview: boolean;
   baseUrl: string;
   propertyType: string | null;
