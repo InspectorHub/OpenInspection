@@ -135,6 +135,8 @@ export function reportViewProps(
     relianceText: data.relianceText ?? { userReliance: "", pointInTime: "", siteSpecific: "" },
     ownerPreview: data.ownerPreview ?? false,
     baseUrl: data.baseUrl ?? "",
+    photoMode: data.photoMode ?? "inline",
+    photoAppendix: data.photoAppendix ?? [],
     propertyType: data.propertyType ?? null,
     commercialSubtype: data.commercialSubtype ?? null,
     reportTier: data.reportTier ?? null,

@@ -9,8 +9,30 @@
 import type { TenantBrand } from "~/lib/brand";
 import type { ReportMedia } from "../../../../../server/lib/report-video";
 
-/** Plan 7 — a report photo object may carry a resolved media kind (video). */
-export type ReportPhoto = { key: string; url: string; media?: ReportMedia };
+/** Plan 7 — a report photo object may carry a resolved media kind (video).
+ *  Commercial PCA Phase P — `photoNo` is the render-order stamp assigned
+ *  server-side (Appendix B back-references + inline numbering); absent when
+ *  the server hasn't assigned one yet. */
+export type ReportPhoto = { key: string; url: string; media?: ReportMedia; photoNo?: number };
+
+/** Commercial PCA Phase P — whether report photos render inline (per-item,
+ *  legacy behavior) or are collected into a numbered Appendix B (server
+ *  resolves this from report_tier + the per-inspection override; app/ cannot
+ *  import server/lib/report-photo-mode, so it's re-declared here). */
+export type PhotoMode = "appendix" | "inline";
+
+/** Commercial PCA Phase P — a single Appendix B entry (server produces these
+ *  in render order; app/ cannot import server/lib/pca-photo-appendix). */
+export interface AppendixPhoto {
+  photoNo: number;
+  key: string;
+  url: string;
+  caption: string | null;
+  sectionId: string;
+  sectionTitle: string;
+  itemId: string;
+  itemLabel: string;
+}
 
 /** Commercial PCA Phase F — a resolved Building Profile display row (server produces these). */
 export interface ProfileRow {
@@ -271,6 +293,11 @@ export interface ReportLoaderResult {
   relianceText: RelianceText;
   ownerPreview: boolean;
   baseUrl: string;
+  /* Commercial PCA Phase P — photo rendering mode (inline vs. numbered
+     Appendix B) and the resolved appendix entries. Empty/'inline' in every
+     fallback path so non-appendix reports render byte-identically. */
+  photoMode: PhotoMode;
+  photoAppendix: AppendixPhoto[];
   propertyType: string | null;
   commercialSubtype: string | null;
   reportTier: ReportTier | null;
