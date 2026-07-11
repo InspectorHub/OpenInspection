@@ -82,3 +82,48 @@ export function applyThreshold(
   }
   return { kept, dropped };
 }
+
+export interface Table1Row {
+  item: CostItem;
+  total: number;
+}
+
+export interface Table1 {
+  immediate: Table1Row[];
+  shortTerm: Table1Row[];
+  immediateTotalCents: number;
+  shortTermTotalCents: number;
+}
+
+/** TABLE 1 — Immediate + Short-Term buckets, each sorted, with totals. */
+export function table1(items: CostItem[]): Table1 {
+  const bySort = (a: CostItem, b: CostItem) => a.sortOrder - b.sortOrder;
+  const toRows = (bucket: CostItem['bucket']): Table1Row[] =>
+    items.filter((it) => it.bucket === bucket).sort(bySort).map((it) => ({ item: it, total: lineTotal(it) }));
+  const immediate = toRows('immediate');
+  const shortTerm = toRows('short_term');
+  const sum = (rows: Table1Row[]) => rows.reduce((s, r) => s + r.total, 0);
+  return {
+    immediate,
+    shortTerm,
+    immediateTotalCents: sum(immediate),
+    shortTermTotalCents: sum(shortTerm),
+  };
+}
+
+export interface BucketRollup {
+  immediateCents: number;
+  shortTermCents: number;
+  reserveCents: number;
+}
+
+/** Immediate / Short-Term / Long-Term(reserve) totals for the Phase S ES seam. */
+export function bucketRollup(items: CostItem[]): BucketRollup {
+  const sumOf = (bucket: CostItem['bucket']) =>
+    items.filter((it) => it.bucket === bucket).reduce((s, it) => s + lineTotal(it), 0);
+  return {
+    immediateCents: sumOf('immediate'),
+    shortTermCents: sumOf('short_term'),
+    reserveCents: sumOf('long_term'),
+  };
+}
