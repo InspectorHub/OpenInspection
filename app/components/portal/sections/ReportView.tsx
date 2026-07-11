@@ -475,8 +475,20 @@ export function ReportView(props: ReportViewProps) {
       <div className={`max-w-4xl mx-auto px-4 sm:px-6 ${repairPanel ? "pb-[65vh]" : "pb-32"}`}>
         {/* PCA Skeleton — Commercial PCA Phase S front matter. data.pcaReport is
             null for non-commercial reports (server gates it in getReportData), so
-            PcaSkeleton renders nothing on residential home inspections. */}
-        <PcaSkeleton data={data.pcaReport ?? null} />
+            PcaSkeleton renders nothing on residential home inspections. The
+            compliance prop (Phase M) feeds the conformance/signoff/doc-review/
+            PSQ/reliance slots inside it; every field is empty/null-safe so it
+            only ever adds content when the skeleton itself is already rendering. */}
+        <PcaSkeleton
+          data={data.pcaReport ?? null}
+          compliance={{
+            conformance: data.astmConformance ?? null,
+            signoffs: data.reportSignoffs ?? [],
+            psq: data.psq ?? null,
+            documentReview: data.documentReview ?? [],
+            relianceText: data.relianceText ?? { userReliance: "", pointInTime: "", siteSpecific: "" },
+          }}
+        />
         {/* Commercial PCA Phase U — per-unit matrix + exception detail (gated on
             per_unit mode; renders nothing otherwise → report byte-identical). */}
         <PerUnitReportBlock data={data} />
