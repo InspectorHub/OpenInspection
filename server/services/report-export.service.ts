@@ -22,8 +22,7 @@ export class ReportExportService {
         private r2: R2Bucket | undefined,   // PHOTOS bucket binding (optional during local dev)
     ) {}
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    private getDrizzle() { return drizzle(this.db as any); }
+    private getDrizzle() { return drizzle(this.db); }
 
     /**
      * Insert a new `queued` export row. One row per export request — repeat

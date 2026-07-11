@@ -620,16 +620,18 @@ const reportDeliveryRoutes = createApiRouter()
     })
     .openapi(getExportStatusRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
-        const { exportId } = c.req.valid('param');
+        const { id, exportId } = c.req.valid('param');
         const record = await c.var.services.reportExport.get(exportId, tenantId);
-        if (!record) return c.json({ success: false, error: { message: 'Export not found' } }, 404);
+        // Defense in depth: the export must belong to the inspection in the path
+        // (tenant scoping is already enforced by get()).
+        if (!record || record.inspectionId !== id) return c.json({ success: false, error: { message: 'Export not found' } }, 404);
         return c.json({ success: true, data: { status: record.status, r2Key: record.r2Key, error: record.error } }, 200);
     })
     .openapi(downloadExportRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
-        const { exportId } = c.req.valid('param');
+        const { id, exportId } = c.req.valid('param');
         const record = await c.var.services.reportExport.get(exportId, tenantId);
-        if (!record) return c.json({ success: false, error: { message: 'Export not found' } }, 404);
+        if (!record || record.inspectionId !== id) return c.json({ success: false, error: { message: 'Export not found' } }, 404);
         const obj = await c.var.services.reportExport.stream(record);
         if (!obj) return c.json({ success: false, error: { message: 'Export object missing in storage' } }, 404);
         return new Response(obj.body, {
