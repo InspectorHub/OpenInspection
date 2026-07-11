@@ -1,5 +1,5 @@
 {
-  "app/routes/inspection-edit.tsx": 2205,
+  "app/routes/inspection-edit.tsx": 2231,
   "server/services/inspection/inspection-core.service.ts": 991,
   "app/routes/inspection-hub.tsx": 988,
   "server/lib/collab/results-doc.ts": 917,
