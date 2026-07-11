@@ -1,59 +1,27 @@
 /**
  * Design System 0520 subsystem B phase 7 task 7.3 — TeamStrip E2E.
  *
- * Two-context test: both inspectors open the dashboard simultaneously and
- * each should see the other appear in TeamStrip's roster within a few
- * seconds (server WS broadcast latency target = sub-second on local).
+ * TODO(dead-feature): the dashboard "Team today" TeamStrip live-presence roster
+ * was REMOVED in #223 (Design-system consistency & auth-page unification) —
+ * app/components/dashboard/TeamStrip.tsx no longer exists and /inspections
+ * renders no presence roster. usePresence now lives only in the inspection
+ * editor (FooterBar), and its two-context "each side sees the other online"
+ * intent is already covered end to end by the collab-editing suite
+ * (tests/e2e/collab-editing.spec.ts, the `browser-collab` project), which drives
+ * the real WS presence between two clients editing one inspection.
  *
- * Required env vars:
- *   TEST_INSPECTOR_A_EMAIL   / TEST_INSPECTOR_A_PASSWORD
- *   TEST_INSPECTOR_B_EMAIL   / TEST_INSPECTOR_B_PASSWORD
- *
- * Both users must be in the same tenant. Skipped automatically when any
- * env var is missing.
+ * This spec is kept as a skip-shell (rather than deleted) so the removed
+ * dashboard-roster coverage stays visible until the feature is either dropped
+ * from the plan or reintroduced. If it is reintroduced, rewrite against the new
+ * roster surface and seed two same-tenant users (the `api` project already
+ * seeds admin@autotest.com + inspector@autotest.com).
  */
-import { test, expect } from '@playwright/test';
-
-const A_EMAIL    = process.env['TEST_INSPECTOR_A_EMAIL'];
-const A_PASSWORD = process.env['TEST_INSPECTOR_A_PASSWORD'];
-const B_EMAIL    = process.env['TEST_INSPECTOR_B_EMAIL'];
-const B_PASSWORD = process.env['TEST_INSPECTOR_B_PASSWORD'];
+import { test } from '@playwright/test';
 
 test.describe('TeamStrip live presence (subsystem B M3 + M7)', () => {
-    test.skip(
-        !A_EMAIL || !A_PASSWORD || !B_EMAIL || !B_PASSWORD,
-        'Set TEST_INSPECTOR_A_* and TEST_INSPECTOR_B_* (same tenant) to run.',
-    );
+    test.skip(true, 'Dashboard TeamStrip removed in #223 — presence is covered by the collab-editing suite.');
 
-    test('two contexts on /inspections see each other in TeamStrip roster', async ({ browser }) => {
-        const ctxA = await browser.newContext();
-        const ctxB = await browser.newContext();
-        const pageA = await ctxA.newPage();
-        const pageB = await ctxB.newPage();
-
-        for (const [page, email, password] of [
-            [pageA, A_EMAIL!, A_PASSWORD!] as const,
-            [pageB, B_EMAIL!, B_PASSWORD!] as const,
-        ]) {
-            await page.goto('/login');
-            await page.fill('input[name=email]',    email);
-            await page.fill('input[name=password]', password);
-            await page.click('button[type=submit]');
-            await page.waitForURL('**/inspections');
-        }
-
-        // TeamStrip is conditionally rendered when members.length > 1; both
-        // pages should show the eyebrow "Team today" once the static roster
-        // loads.
-        await expect(pageA.locator('text=Team today')).toBeVisible({ timeout: 5_000 });
-        await expect(pageB.locator('text=Team today')).toBeVisible({ timeout: 5_000 });
-
-        // After the WS broadcasts the join roster (~2s budget), at least one
-        // "Online" tile should be visible on each side. De-stale (2026-07
-        // tests-reorg): the RR v7 TeamStrip renders online members as
-        // <span class="text-ih-ok-fg">Online</span> (app/components/dashboard/
-        // TeamStrip.tsx:59) — was the Alpine [x-data*=teamStrip] root.
-        await expect(pageA.getByText('Online', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
-        await expect(pageB.getByText('Online', { exact: true }).first()).toBeVisible({ timeout: 10_000 });
+    test('two contexts on /inspections see each other in TeamStrip roster', () => {
+        // Intentionally empty — see the skip above.
     });
 });
