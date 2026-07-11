@@ -255,3 +255,43 @@ export function seedCostFromFinding(
     '';
   return { unitCostCents: null, lumpSumCents, suggestedRemedy };
 }
+
+export interface CostTables {
+  table1: Table1;
+  reserveSchedule: ReserveSchedule | null;
+  rollup: BucketRollup;
+  droppedCount: number;
+}
+
+export interface ReserveConfig {
+  reserveScheduleEnabled: boolean;
+  reserveTermYears: number;
+  inflationRateBps: number | null;
+}
+
+/**
+ * Assemble the report-facing cost tables from raw items. Applies the ASTM $3k
+ * threshold first; TABLE 1 + rollup are computed over kept items; the reserve
+ * schedule (TABLE 2) is built only when enabled. Pure — the service passes the
+ * inspection's area (sqft) and current year.
+ */
+export function buildCostTables(
+  items: CostItem[],
+  cfg: ReserveConfig,
+  currentYear: number,
+  areaSqft: number | null,
+): CostTables {
+  const { kept, dropped } = applyThreshold(items);
+  const t1 = table1(kept);
+  const rollup = bucketRollup(kept);
+  const longTerm = kept.filter((it) => it.bucket === 'long_term');
+  const reserve = cfg.reserveScheduleEnabled
+    ? reserveSchedule(longTerm, {
+        currentYear,
+        termYears: cfg.reserveTermYears,
+        ...(cfg.inflationRateBps !== null ? { inflationRateBps: cfg.inflationRateBps } : {}),
+        buildingAreaSqft: areaSqft,
+      })
+    : null;
+  return { table1: t1, reserveSchedule: reserve, rollup, droppedCount: dropped.length };
+}
