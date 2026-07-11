@@ -127,3 +127,74 @@ export function bucketRollup(items: CostItem[]): BucketRollup {
     reserveCents: sumOf('long_term'),
   };
 }
+
+export interface ReserveRow {
+  item: CostItem;
+  placementYear: number;
+  replacementCents: number;
+}
+
+export interface ReserveSchedule {
+  startYear: number;
+  termYears: number;
+  years: number[];
+  rows: ReserveRow[];
+  uninflatedByYear: number[];
+  inflatedByYear: number[];
+  cumulativeInflatedByYear: number[];
+  totalUninflatedCents: number;
+  totalInflatedCents: number;
+  perSfUninflatedAllYears: number | null;
+  perSfInflatedAllYears: number | null;
+  perSfInflatedPerYear: number | null;
+}
+
+function clamp(n: number, lo: number, hi: number): number {
+  return Math.max(lo, Math.min(hi, n));
+}
+
+/**
+ * TABLE 2 — Capital Replacement Reserve Schedule. Each long-term item's
+ * replacement cost lands in column currentYear + clamp(RUL, 0, term-1).
+ * Per-year inflation factor = (1 + bps/10000) ^ yearIndex; cumulative is the
+ * running sum of inflated yearly totals. Per-SF divides by building area.
+ */
+export function reserveSchedule(
+  longTermItems: CostItem[],
+  opts: { currentYear: number; termYears: number; inflationRateBps?: number; buildingAreaSqft?: number | null },
+): ReserveSchedule {
+  const termYears = Math.max(1, Math.floor(opts.termYears));
+  const startYear = opts.currentYear;
+  const bps = opts.inflationRateBps ?? 0;
+  const years = Array.from({ length: termYears }, (_v, i) => startYear + i);
+
+  const uninflatedByYear = new Array<number>(termYears).fill(0);
+  const rows: ReserveRow[] = longTermItems.map((it) => {
+    const idx = clamp(it.rul ?? 0, 0, termYears - 1);
+    const cents = lineTotal(it);
+    uninflatedByYear[idx] += cents;
+    return { item: it, placementYear: startYear + idx, replacementCents: cents };
+  });
+
+  const factor = 1 + bps / 10_000;
+  const inflatedByYear = uninflatedByYear.map((c, i) => Math.round(c * Math.pow(factor, i)));
+  const cumulativeInflatedByYear: number[] = [];
+  let run = 0;
+  for (const c of inflatedByYear) { run += c; cumulativeInflatedByYear.push(run); }
+
+  const totalUninflatedCents = uninflatedByYear.reduce((s, c) => s + c, 0);
+  const totalInflatedCents = inflatedByYear.reduce((s, c) => s + c, 0);
+
+  const area = opts.buildingAreaSqft ?? 0;
+  const perSf = (cents: number): number | null => (area > 0 ? Math.round(cents / area) : null);
+  const perSfUninflatedAllYears = perSf(totalUninflatedCents);
+  const perSfInflatedAllYears = perSf(totalInflatedCents);
+  const perSfInflatedPerYear = perSfInflatedAllYears === null ? null : Math.round(perSfInflatedAllYears / termYears);
+
+  return {
+    startYear, termYears, years, rows,
+    uninflatedByYear, inflatedByYear, cumulativeInflatedByYear,
+    totalUninflatedCents, totalInflatedCents,
+    perSfUninflatedAllYears, perSfInflatedAllYears, perSfInflatedPerYear,
+  };
+}
