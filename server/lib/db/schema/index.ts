@@ -29,6 +29,7 @@ export {
     conciergeConfirmTokens,
     commentUsage,
     defectCategories,
+    costItems,
 } from './inspection';
 export { commercialSubtypes } from './commercial-subtypes';
 export { contacts } from './contact';
