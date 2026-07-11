@@ -115,6 +115,7 @@ export function reportViewProps(
     coverPhotoUrl: data.coverPhotoUrl ?? null,
     stats: data.stats ?? { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
     sections: data.sections ?? [],
+    outline: data.outline ?? [],
     showEstimates: data.showEstimates ?? false,
     costTables: data.costTables ?? null,
     enableRepairList: data.enableRepairList ?? false,

@@ -146,6 +146,17 @@ export interface PcaSectionEntry {
   title: string;
   tiers: ('light' | 'full')[];
 }
+
+/* Commercial PCA Phase O — TOC projection re-declared across the server/app
+   boundary (app/ cannot import server/lib/report-outline.ts). Shape mirrors
+   server/lib/report-outline.ts's ReportOutlineEntry exactly. */
+export interface ReportOutlineEntry {
+  id: string;
+  level: number;
+  title: string;
+  /** Filled by the PDF measurement pass; undefined/null on the web. */
+  page?: number | null;
+}
 export interface PcaNarrativeData {
   transmittalLetter: string;
   summaryGeneralDescription: string;
@@ -317,4 +328,8 @@ export interface ReportLoaderResult {
   units: ReportUnit[];
   unitConditionMatrix: UnitMatrixRow[];
   defectCountsByUnit: Record<string, number>;
+  /* Commercial PCA Phase O — the TOC projection over the tier-gated section
+     registry. Empty for residential/no-tier reports (no PCA front matter to
+     project a TOC over). */
+  outline: ReportOutlineEntry[];
 }

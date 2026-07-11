@@ -17,6 +17,8 @@ import { isReportPublished } from '../../lib/status/report-status';
 import { resolveBuildingProfile } from '../../lib/building-profile';
 import { buildSystemsSummary } from '../../lib/pca-systems-summary';
 import { buildPcaReportBlock } from '../../lib/pca-report-block';
+import { gatedSectionRegistry } from '../../lib/pca-section-registry';
+import { buildReportOutline } from '../../lib/report-outline';
 import type { Deviation } from '../../lib/pca-deviations';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
@@ -571,6 +573,15 @@ export class InspectionReportService extends InspectionSubService {
             sections: sections as Parameters<typeof buildSystemsSummary>[0],
         });
 
+        // Commercial PCA Phase O — TOC projection over the tier-gated section
+        // registry. No reportTier (residential) -> no PCA front matter -> no
+        // outline. full_pca gets the full registry (Transmittal Letter +
+        // Systems Summary included); light_commercial gets those two dropped
+        // by gatedSectionRegistry.
+        const outline = reportTier
+            ? buildReportOutline(gatedSectionRegistry(reportTier === 'full_pca' ? 'full' : 'light'))
+            : [];
+
         // #120 — amendment trail. Surfaced to the client report page so a
         // re-published report shows "Amended on …" + per-version reasons.
         // Only meaningful when there is more than one published version; live
@@ -738,6 +749,8 @@ export class InspectionReportService extends InspectionSubService {
             coverPhotoUrl: resolveCoverUrl(inspection as { coverImageKey?: string | null; coverPhotoId?: string | null }, makePhotoUrl),
             stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
             sections: numberedSections,
+            // Commercial PCA Phase O — TOC projection (empty for residential/no-tier reports).
+            outline,
             // Commercial PCA Phase P — photo presentation mode + the flat
             // centralized photo appendix (Appendix B). Computed unconditionally;
             // the renderer decides whether to display the appendix (mode === 'appendix').
