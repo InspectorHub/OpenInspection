@@ -74,6 +74,22 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  return { ok: res.ok, intent: "save-pca-narrative" };
  }
 
+ // Commercial PCA Phase T — the commercial subtype + report tier selectors
+ // (CommercialReportControls) persist through the real property-facts PATCH
+ // like every other mutation (no raw client fetch — see
+ // feedback_core_bff_no_client_fetch). Reuses the same
+ // /api/inspections/:id/property-facts endpoint PropertyInfoForm's fields
+ // are validated against (PropertyFactsSchema), just with a payload limited
+ // to the one or two keys the caller changed.
+ if (intent === "save-property-facts") {
+ const payload = JSON.parse(String(formData.get("payload") ?? "{}"));
+ const res = await api.inspections[":id"]["property-facts"].$patch({
+ param: { id: params.id },
+ json: payload,
+ });
+ return { ok: res.ok, intent: "save-property-facts" };
+ }
+
  // Commercial PCA Phase U (Batch C2b) — per-unit editor mutations + lazy scope
  // read. All ride the BFF relay (no bare client fetch to /api/...): the action
  // holds the authed tenant context that the unit routes' requireRole guard

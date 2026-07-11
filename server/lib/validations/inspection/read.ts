@@ -21,6 +21,12 @@ export const PropertyFactsSchema = z.object({
     // against REPORT_TIERS; never accepted un-validated (CLAUDE.md Input
     // Validation Rules).
     reportTier:     z.enum(['light_commercial', 'full_pca']).nullable().optional().openapi({ example: 'light_commercial' }).describe('Commercial report tier: light_commercial or full_pca. Null falls back to the resolver default.'),
+    // Commercial PCA Phase T — commercial subtype capture. Plain text, not an
+    // enum: the 6 locked platform ids (office/retail/hospitality/industrial/
+    // institutional/mixed-use) cover the common case, but org-custom subtypes
+    // also live here (commercial_subtypes table), so this is deliberately
+    // permissive rather than a hard-rejecting z.enum.
+    commercialSubtype: z.string().max(64).nullable().optional().openapi({ example: 'office' }).describe('Commercial subtype id (platform id or org-custom). Only meaningful when propertyType = commercial.'),
 }).openapi('PropertyFacts');
 
 export const PropertyFactsResponseSchema = createApiResponseSchema(PropertyFactsSchema).openapi('PropertyFactsResponse');

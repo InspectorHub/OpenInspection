@@ -63,6 +63,10 @@ export class InspectionResultsService extends InspectionSubService {
         bathrooms?:      number | null | undefined;
         // Commercial PCA Phase T — tier elevation from the editor.
         reportTier?:     'light_commercial' | 'full_pca' | null | undefined;
+        // Commercial PCA Phase T — commercial subtype capture from the editor.
+        // Plain text column (org-custom subtypes exist alongside the 6 locked
+        // platform ids) — mirrors reportTier's write path exactly.
+        commercialSubtype?: string | null | undefined;
     }): Promise<PropertyFacts> {
         const db = this.getDrizzle();
         const existing = await db.select({ id: inspections.id }).from(inspections)
@@ -78,6 +82,7 @@ export class InspectionResultsService extends InspectionSubService {
         if (facts.bedrooms       !== undefined) update.bedrooms       = facts.bedrooms;
         if (facts.bathrooms      !== undefined) update.bathrooms      = facts.bathrooms;
         if (facts.reportTier     !== undefined) update.reportTier     = facts.reportTier;
+        if (facts.commercialSubtype !== undefined) update.commercialSubtype = facts.commercialSubtype;
 
         if (Object.keys(update).length > 0) {
             await db.update(inspections).set(update)

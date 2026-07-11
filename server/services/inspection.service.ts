@@ -224,6 +224,8 @@ export class InspectionService {
         bathrooms?:      number | null | undefined;
         // Commercial PCA Phase T — tier elevation from the editor.
         reportTier?:     'light_commercial' | 'full_pca' | null | undefined;
+        // Commercial PCA Phase T — commercial subtype capture from the editor.
+        commercialSubtype?: string | null | undefined;
     }): Promise<PropertyFacts> {
         return this.results.updatePropertyFacts(id, tenantId, facts);
     }

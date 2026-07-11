@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PLATFORM_SUBTYPES, METADATA_PRESETS, getSubtypeDef, getMetadataPreset } from '../../../server/lib/commercial-subtypes';
+import { PLATFORM_SUBTYPES, METADATA_PRESETS, getSubtypeDef, getMetadataPreset, normalizePropertyType } from '../../../server/lib/commercial-subtypes';
 import { sectionApplies, getApplicableSections } from '../../../server/lib/section-applicability';
 import type { TemplateSection } from '../../../server/types/template-schema';
 
@@ -68,6 +68,58 @@ describe('getMetadataPreset', () => {
 
     it('falls back to empty for unknown type', () => {
         expect(getMetadataPreset('unknown')).toEqual([]);
+    });
+
+    // Phase T — the wizard stores underscore slugs (single_family, multi_unit)
+    // but METADATA_PRESETS is keyed on hyphen slugs. Before normalization these
+    // returned [] for EVERY residential/multi-unit inspection (Building Profile
+    // dormant). getMetadataPreset must normalize internally so callers never
+    // have to remember to hyphenate.
+    it('returns single-family preset for the underscore wizard slug single_family', () => {
+        const fields = getMetadataPreset('single_family');
+        expect(fields.length).toBeGreaterThan(0);
+        expect(fields.find(f => f.id === 'yearBuilt')).toBeDefined();
+        expect(fields).toEqual(getMetadataPreset('single-family'));
+    });
+
+    it('returns multi-unit preset for the underscore wizard slug multi_unit', () => {
+        const fields = getMetadataPreset('multi_unit');
+        expect(fields.find(f => f.id === 'totalUnits')).toBeDefined();
+        expect(fields).toEqual(getMetadataPreset('multi-unit'));
+    });
+
+    it('commercial + subtype lookup is unaffected by normalization (commercial has no underscore)', () => {
+        const fields = getMetadataPreset('commercial', 'office');
+        expect(fields.find(f => f.id === 'nra')).toBeDefined();
+    });
+});
+
+describe('normalizePropertyType', () => {
+    it('maps single_family -> single-family', () => {
+        expect(normalizePropertyType('single_family')).toBe('single-family');
+    });
+
+    it('maps multi_unit -> multi-unit', () => {
+        expect(normalizePropertyType('multi_unit')).toBe('multi-unit');
+    });
+
+    it('passes commercial through unchanged', () => {
+        expect(normalizePropertyType('commercial')).toBe('commercial');
+    });
+
+    it('passes an already-hyphenated value through unchanged', () => {
+        expect(normalizePropertyType('single-family')).toBe('single-family');
+        expect(normalizePropertyType('multi-unit')).toBe('multi-unit');
+    });
+
+    it('maps null/undefined/empty to null', () => {
+        expect(normalizePropertyType(null)).toBeNull();
+        expect(normalizePropertyType(undefined)).toBeNull();
+        expect(normalizePropertyType('')).toBeNull();
+    });
+
+    it('passes an unrecognized value through unchanged', () => {
+        expect(normalizePropertyType('townhouse')).toBe('townhouse');
     });
 });
 

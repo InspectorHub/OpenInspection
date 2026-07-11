@@ -1,5 +1,5 @@
 {
-  "app/routes/inspection-edit.tsx": 2231,
+  "app/routes/inspection-edit.tsx": 2266,
   "server/services/inspection/inspection-core.service.ts": 991,
   "app/routes/inspection-hub.tsx": 988,
   "server/lib/collab/results-doc.ts": 917,
@@ -8,7 +8,7 @@
   "server/services/booking.service.ts": 848,
   "server/index.ts": 833,
   "server/api/sms.ts": 818,
-  "server/services/inspection.service.ts": 741,
+  "server/services/inspection.service.ts": 743,
   "server/services/inspection/inspection-report.service.ts": 740,
   "app/routes/settings-communication-templates.tsx": 728,
   "app/routes/settings-communication.tsx": 716,

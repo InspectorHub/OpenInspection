@@ -39,6 +39,7 @@ import { BurstCamera } from "~/components/editor/BurstCamera";
 import { PhotoAnnotator } from "~/components/media-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
+import { CommercialReportControls, type ReportTier } from "~/components/editor/CommercialReportControls";
 import type { PcaNarrativeData } from "~/components/portal/sections/report/types";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
 import { CoverCropper } from "~/components/media-studio/CoverCropper";
@@ -161,6 +162,18 @@ export default function InspectionEditPage() {
  const saveNarrative = useCallback((key: keyof PcaNarrativeData, value: string) => {
   narrativeFetcher.submit({ intent: "save-pca-narrative", key, value }, { method: "POST" });
  }, [narrativeFetcher]);
+ // Commercial PCA Phase T — the commercial subtype + report tier selectors
+ // (CommercialReportControls) get their own fetcher for the same reason the
+ // narrative panel does: a selector change must not be aborted by an
+ // unrelated in-flight mutation. Dispatches "save-property-facts" through
+ // the route action (BFF pattern), which PATCHes the real
+ // /api/inspections/:id/property-facts endpoint — PropertyInfoForm's onSave
+ // above only mutates local state and does not persist (pre-existing gap,
+ // out of scope here); these two fields must actually round-trip.
+ const propertyFactsFetcher = useFetcher();
+ const savePropertyFacts = useCallback((patch: { commercialSubtype?: string | null; reportTier?: "light_commercial" | "full_pca" }) => {
+  propertyFactsFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify(patch) }, { method: "POST" });
+ }, [propertyFactsFetcher]);
  // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
  // (create/rename/delete/duplicate/bulk/mode-switch) and the lazy per-unit
  // results-slice fetcher (scope switch → merge missing findings).
@@ -2104,6 +2117,28 @@ export default function InspectionEditPage() {
   }));
   }}
   />
+  {/* Commercial PCA Phase T — subtype + report tier selectors. Gated on the
+     same propertyType === 'commercial' flag section-applicability.ts uses
+     to decide PCA-only sections apply. Sits above the narrative panel so
+     the subtype (which the Building Profile / cost tables key off) is set
+     before the inspector writes narrative for a specific tier. */}
+  {(state.inspection as Record<string, unknown>).propertyType === "commercial" ? (
+   <div className="mt-8 border-t border-ih-border pt-6">
+    <CommercialReportControls
+     commercialSubtype={((state.inspection as Record<string, unknown>).commercialSubtype as string | null | undefined) ?? null}
+     reportTier={((state.inspection as Record<string, unknown>).reportTier as ReportTier | null | undefined) ?? null}
+     saving={propertyFactsFetcher.state !== "idle"}
+     onChangeSubtype={(subtype) => {
+      state.setInspection((prev) => ({ ...prev, commercialSubtype: subtype }));
+      savePropertyFacts({ commercialSubtype: subtype });
+     }}
+     onChangeTier={(tier) => {
+      state.setInspection((prev) => ({ ...prev, reportTier: tier }));
+      savePropertyFacts({ reportTier: tier });
+     }}
+    />
+   </div>
+  ) : null}
   {/* Commercial PCA Phase S — narrative editor panel. Gated on the same
      propertyType === 'commercial' flag section-applicability.ts uses to
      decide PCA-only sections apply. */}

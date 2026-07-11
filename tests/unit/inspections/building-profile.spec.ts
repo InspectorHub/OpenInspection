@@ -7,7 +7,27 @@ describe('resolveBuildingProfile', () => {
   });
 
   it('returns [] for a propertyType with no matching preset', () => {
-    expect(resolveBuildingProfile({ propertyType: 'single_family', propertyFacts: { yearBuilt: 1975 } })).toEqual([]);
+    expect(resolveBuildingProfile({ propertyType: 'townhouse', propertyFacts: { yearBuilt: 1975 } })).toEqual([]);
+  });
+
+  // Phase T root-cause fix — inspections store the underscore wizard slug
+  // (single_family/multi_unit), but METADATA_PRESETS is hyphen-keyed. Before
+  // normalizePropertyType was wired into getMetadataPreset, this returned []
+  // for EVERY residential/multi-unit inspection (Building Profile dormant).
+  it('resolves single-family rows for the underscore wizard slug single_family (was [])', () => {
+    const rows = resolveBuildingProfile({ propertyType: 'single_family', yearBuilt: 1975, sqft: 2100 });
+    expect(rows).not.toEqual([]);
+    expect(rows.find((r) => r.id === 'yearBuilt')?.value).toBe(1975);
+    expect(rows.find((r) => r.id === 'sqft')?.value).toBe(2100);
+  });
+
+  it('resolves multi-unit rows for the underscore wizard slug multi_unit (was [])', () => {
+    const rows = resolveBuildingProfile({
+      propertyType: 'multi_unit',
+      propertyFacts: { yearBuilt: 1988, totalUnits: 12 },
+    });
+    expect(rows).not.toEqual([]);
+    expect(rows.find((r) => r.id === 'totalUnits')?.value).toBe(12);
   });
 
   it('resolves commercial office rows from propertyFacts, ordered by preset, null values dropped', () => {
