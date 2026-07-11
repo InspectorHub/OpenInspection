@@ -1,86 +1,66 @@
 /**
- * Spec 3A — Inspection Lifecycle E2E
+ * Inspection Lifecycle E2E — cancel + uncancel via the dashboard row.
  *
- * Requires env vars (or defaults to local dev):
- *   BASE_URL      — e.g. https://your-core.workers.dev   (default: http://127.0.0.1:8788)
- *   TEST_EMAIL    — admin account email                   (default: admin@example.com)
- *   TEST_PASSWORD — admin account password                (default: changeme)
+ * Rewritten for the current RR v7 dashboard (the pre-RR action-menu + cancel
+ * reason modal + dedicated "Uncancel" control no longer exist). Today the
+ * lifecycle is driven by the per-row status <select> in DashboardInspectionRow:
+ * picking "Cancelled" fires transitionStatus() → PATCH /api/inspections/:id
+ * {status}, RR revalidates the dashboard loader, and the inspection re-buckets
+ * into the "Cancelled" group. Reversing the status un-cancels it — no separate
+ * endpoint. This exercises that full PATCH → revalidate → re-render loop.
  *
- * Do NOT run against a local wrangler instance without first completing setup
- * (POST /setup) and ensuring the admin credentials above are valid.
- *
- * Coverage:
- *   1. Cancel via action menu → inspection appears in Cancelled section
- *   2. Uncancel → inspection returns to scheduled/today section
+ * Fixture: the `editor-seed` setup project seeds one editable inspection and
+ * records it via {@link readEditorSeed}; this spec depends on it (see
+ * playwright.config.ts) and skips only when the seed is absent.
  */
+import { test, expect } from '@playwright/test';
+import { readEditorSeed } from './helpers/editor-seed';
 
-import { test, expect, Page } from '@playwright/test';
+test.describe('Inspection lifecycle — cancel / uncancel', () => {
+    test('row status select cancels then un-cancels the seeded inspection', async ({ page }) => {
+        // Read at RUNTIME — the editor-seed dependency writes the handoff during
+        // the run, after Playwright evaluates top-level spec code.
+        const seed = readEditorSeed();
+        test.skip(!seed, 'editor-seed handoff missing — run with the editor-seed setup project.');
 
-const BASE_URL = process.env.BASE_URL || 'http://127.0.0.1:8788';
-const TEST_EMAIL = process.env.TEST_EMAIL || 'admin@example.com';
-const TEST_PASSWORD = process.env.TEST_PASSWORD || 'changeme';
+        await page.goto('/login');
+        await page.fill('input[name=email]', seed!.email);
+        await page.fill('input[name=password]', seed!.password);
+        await page.click('button[type=submit]');
+        await page.waitForURL('**/inspections');
 
-/**
- * Log in via the /login page and wait for the inspections hub to appear.
- * De-stale (2026-07 tests-reorg): the RR v7 login form uses conform field
- * names + a type=submit button (app/routes/login.tsx), and the post-login
- * landing route is /inspections (the /dashboard route was retired in #203).
- */
-async function login(page: Page): Promise<void> {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input[name=email]', TEST_EMAIL);
-    await page.fill('input[name=password]', TEST_PASSWORD);
-    await page.click('button[type=submit]');
-    await page.waitForURL('**/inspections', { timeout: 15000 });
-}
+        // Locate the seeded inspection's row via its unique edit-link href, then
+        // walk up to the nearest ancestor row that owns a <select> (the status
+        // dropdown). `.first()` because the grouped dashboard view does NOT dedup
+        // across buckets — a cancelled inspection can render in more than one
+        // bucket, but every copy's select is bound to the same server status, so
+        // driving/asserting one is representative. Re-querying finds the row
+        // wherever it re-buckets after each status change.
+        const row = page
+            .locator(`a[href="/inspections/${seed!.inspectionId}/edit"]`)
+            .locator('xpath=ancestor::div[.//select][1]')
+            .first();
+        await expect(row).toBeVisible();
 
-// TODO(tests-reorg): manual suite — destructive DB reset (or foreign BASE_URL).
-// Wired as a project for discoverability; opt in explicitly:
-test.skip(!process.env.LIFECYCLE_E2E, 'set LIFECYCLE_E2E=1 to run');
+        const statusSelect = row.locator('select').first();
+        // Sanity: it starts in a non-cancelled state (fresh inspections are
+        // requested/scheduled, never cancelled).
+        await expect(statusSelect).not.toHaveValue('cancelled');
 
-test.describe('Spec 3A — Inspection Lifecycle (action menu + cancel modal)', () => {
-    test('cancel via action menu → appears in Cancelled section → uncancel', async ({ page }) => {
-        await login(page);
-        await page.goto(`${BASE_URL}/inspections`);
-
-        // Find first inspection row (any section). data-test attribute added by T11.
-        const firstRow = page.locator('[data-test="inspection-row"]').first();
-        const exists = (await firstRow.count()) > 0;
-        if (!exists) {
-            test.skip(true, 'No inspections present on dashboard — cannot exercise lifecycle');
-            return;
-        }
-
-        // Click •••, choose Cancel
-        await firstRow.locator('button:has-text("•••")').click();
-        await page.click('button:has-text("Cancel")');
-
-        // Cancel modal opens — choose reason + submit
-        await expect(page.locator('text=Cancel inspection')).toBeVisible({ timeout: 5000 });
-        await page
-            .locator('text=Reason >> ../select')
-            .selectOption('weather')
-            .catch(async () => {
-                // Fallback: any select inside the modal
-                await page.locator('select').first().selectOption('weather');
-            });
-        await page.fill('textarea', 'E2E test — automated cancel');
-        await page.click('button:has-text("Cancel inspection")');
-
-        // Wait for the dashboard to reload + Cancelled section to appear
-        await expect(page.locator('button:has-text("Cancelled")')).toBeVisible({ timeout: 10000 });
-
-        // Expand Cancelled section
-        await page.click('button:has-text("Cancelled")');
-
-        // Find a row inside the now-expanded Cancelled section, click ••• → Uncancel
-        const cancelledRow = page.locator('[data-test="inspection-row"]').last();
-        await cancelledRow.locator('button:has-text("•••")').click();
-        await page.click('button:has-text("Uncancel")');
-
-        // Look for success indicator (toast or row reappearing in scheduled/today section)
+        // ── Cancel ────────────────────────────────────────────────────────
+        await row.hover();
+        await statusSelect.selectOption('cancelled');
+        // PATCH + loader revalidation land the row in the Cancelled bucket with
+        // its status select bound to the new value.
+        await expect(statusSelect).toHaveValue('cancelled');
+        // The Cancelled bucket header is now present (grouped view, "all" tab).
         await expect(
-            page.locator('text=succeeded').or(page.locator('text=Today'))
-        ).toBeVisible({ timeout: 10000 });
+            page.getByText('Cancelled inspections', { exact: true }),
+        ).toBeVisible();
+
+        // ── Un-cancel ─────────────────────────────────────────────────────
+        await row.hover();
+        await statusSelect.selectOption('scheduled');
+        await expect(statusSelect).toHaveValue('scheduled');
     });
 });

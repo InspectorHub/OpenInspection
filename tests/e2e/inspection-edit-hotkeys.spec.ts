@@ -16,97 +16,65 @@
  * fail just because the seed data isn't present.
  */
 import { test, expect } from '@playwright/test';
-
-const EMAIL = process.env['TEST_INSPECTOR_EMAIL'];
-const PASSWORD = process.env['TEST_INSPECTOR_PASSWORD'];
-const INSPECTION_ID = process.env['TEST_INSPECTION_ID'];
+import { readEditorSeed } from './helpers/editor-seed';
 
 test.describe('Inspection Edit hotkeys (Sprint 1 A-1..A-9)', () => {
-    test.skip(
-        !EMAIL || !PASSWORD || !INSPECTION_ID,
-        'Set TEST_INSPECTOR_EMAIL / TEST_INSPECTOR_PASSWORD / TEST_INSPECTION_ID to run.',
-    );
-
     test.beforeEach(async ({ page }) => {
+        // Read at RUNTIME — the editor-seed dependency writes the handoff during
+        // the run, after Playwright evaluates top-level spec code.
+        const seed = readEditorSeed();
+        test.skip(!seed, 'editor-seed handoff missing — run with the editor-seed setup project.');
         await page.goto('/login');
-        await page.fill('input[name=email]',    EMAIL!);
-        await page.fill('input[name=password]', PASSWORD!);
+        await page.fill('input[name=email]',    seed!.email);
+        await page.fill('input[name=password]', seed!.password);
         await page.click('button[type=submit]');
         await page.waitForURL('**/inspections');
+        await page.goto(`/inspections/${seed!.inspectionId}/edit`);
+        // The RR v7 editor shell renders a single <main>; wait for it to hydrate.
+        await page.getByRole('main').waitFor({ state: 'visible' });
     });
 
     test('? opens keyboard HUD with all 5 rating rows', async ({ page }) => {
-        await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
-        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
-        // [x-data*=inspectionEditor] root. TODO(tests-reorg): the inner rating/
-        // Comment Library/Active Item text assertions below still need
-        // live-verification against the RR editor before this env-gated suite
-        // is exercised.
-        await page.getByRole('main').waitFor({ state: 'visible' });
         await page.keyboard.press('?');
-        // KeyboardHUD shows the canonical rating ladder.
-        await expect(page.locator('text=Satisfactory').first()).toBeVisible();
-        await expect(page.locator('text=Monitor').first()).toBeVisible();
-        await expect(page.locator('text=Defect').first()).toBeVisible();
-        await expect(page.locator('text=Not Inspected').first()).toBeVisible();
-        await expect(page.locator('text=Not Present').first()).toBeVisible();
+        // KeyboardHud (role=dialog, aria-label="Keyboard shortcuts") lists the
+        // canonical 5-level ladder; scope to the HUD so the item editor's own
+        // rating buttons can't satisfy the assertion.
+        const hud = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+        await expect(hud).toBeVisible();
+        for (const label of ['Satisfactory', 'Monitor', 'Defect', 'Not Inspected', 'Not Present']) {
+            await expect(hud.getByText(label, { exact: true })).toBeVisible();
+        }
     });
 
     test('press 4 sets the active item rating to Not Inspected', async ({ page }) => {
-        await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
-        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
-        // [x-data*=inspectionEditor] root. TODO(tests-reorg): the inner rating/
-        // Comment Library/Active Item text assertions below still need
-        // live-verification against the RR editor before this env-gated suite
-        // is exercised.
-        await page.getByRole('main').waitFor({ state: 'visible' });
-        // Activate the first item by clicking its row title.
-        const firstItem = page.getByRole('main').locator('button, [role=button]').first();
-        await firstItem.click().catch(() => { /* tolerate non-button rows */ });
+        // Select an item so the rating hotkeys act on a live finding.
+        await page.getByRole('button', { name: /Roof/ }).first().click();
+        await page.getByRole('heading', { name: 'Roof' }).waitFor({ state: 'visible' });
         await page.keyboard.press('4');
-        // The shape of the rating UI varies, so we just confirm a rating
-        // pill or aria-selected="true" appears somewhere on the page after
-        // pressing the hotkey.
-        await expect(page.locator('[aria-selected=true], .ih-pill, [data-rating]')).not.toHaveCount(0);
+        // Rating hotkey 4 = "Not Inspected": its rating button becomes pressed.
+        await expect(page.getByRole('button', { name: /Not Inspected/ })).toHaveAttribute('aria-pressed', 'true');
     });
 
-    test('press / opens Comment Library and ACTIVE ITEM right pane hides', async ({ page }) => {
-        await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
-        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
-        // [x-data*=inspectionEditor] root. TODO(tests-reorg): the inner rating/
-        // Comment Library/Active Item text assertions below still need
-        // live-verification against the RR editor before this env-gated suite
-        // is exercised.
-        await page.getByRole('main').waitFor({ state: 'visible' });
-        // Click into the first textarea so the slash trigger fires inside a field.
+    test('press / opens the Comment Library drawer', async ({ page }) => {
+        // The rich item's Notes textarea is the slash trigger surface.
+        await page.getByRole('button', { name: /Roof/ }).first().click();
         const ta = page.locator('textarea').first();
         await ta.focus();
         await page.keyboard.press('/');
-        // Comment Library drawer opens.
-        await expect(page.locator('text=Comment Library').first()).toBeVisible();
-        // Right ACTIVE ITEM aside disappears (Sprint 1 A-1).
-        await expect(page.locator('text=Active Item').first()).toBeHidden();
+        // CommentLibraryDrawer renders as a titled dialog (was the Alpine right
+        // aside in the pre-RR editor; the "Active Item" pane label no longer
+        // exists, so this now asserts only the drawer surface).
+        await expect(page.getByRole('dialog', { name: 'Comment Library' })).toBeVisible();
     });
 
-    test('Esc closes Library and right pane returns', async ({ page }) => {
-        await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
-        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
-        // [x-data*=inspectionEditor] root. TODO(tests-reorg): the inner rating/
-        // Comment Library/Active Item text assertions below still need
-        // live-verification against the RR editor before this env-gated suite
-        // is exercised.
-        await page.getByRole('main').waitFor({ state: 'visible' });
+    test('Esc closes the Comment Library drawer', async ({ page }) => {
+        await page.getByRole('button', { name: /Roof/ }).first().click();
         const ta = page.locator('textarea').first();
         await ta.focus();
         await page.keyboard.press('/');
-        await expect(page.locator('text=Comment Library').first()).toBeVisible();
+        const library = page.getByRole('dialog', { name: 'Comment Library' });
+        await expect(library).toBeVisible();
         await page.keyboard.press('Escape');
-        await expect(page.locator('text=Comment Library').first()).toBeHidden();
-        // Right ACTIVE ITEM pane returns once the drawer closes.
-        await expect(page.locator('text=Active Item').first()).toBeVisible();
+        await expect(library).toBeHidden();
     });
 });

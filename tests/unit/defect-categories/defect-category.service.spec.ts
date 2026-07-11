@@ -44,20 +44,28 @@ describe('DefectCategoryService', () => {
         const row = await svc.create(T1, { name: 'custom', color: '#123456', drivesSummary: false });
         expect(row.isSeed).toBe(false);
 
-        await svc.update(T1, row.id, { name: 'custom-renamed', sortOrder: 5 });
-        const afterUpdate = await svc.list(T1);
-        expect(afterUpdate.find((r) => r.id === row.id)!.name).toBe('custom-renamed');
+        const updated = await svc.update(T1, row.id, { name: 'custom-renamed', sortOrder: 5 });
+        expect(updated?.name).toBe('custom-renamed'); // point-read return, no list scan
+        expect(updated?.sortOrder).toBe(5);
 
-        await svc.remove(T1, row.id);
+        const deleted = await svc.remove(T1, row.id);
+        expect(deleted).toBe(true); // a real row was removed
         expect(await svc.list(T1)).toHaveLength(0);
     });
 
-    it('remove refuses to delete a seed row', async () => {
+    it('update returns null for an unknown / cross-tenant id', async () => {
+        const row = await svc.create(T1, { name: 'custom', color: '#123456', drivesSummary: false });
+        expect(await svc.update(T1, 'no-such-id', { name: 'x' })).toBeNull();
+        expect(await svc.update(T2, row.id, { name: 'x' })).toBeNull(); // wrong tenant
+    });
+
+    it('remove refuses to delete a seed row and reports false (no phantom delete)', async () => {
         await svc.ensureSeed(T1);
         const rows = await svc.list(T1);
         const safety = rows.find((r) => r.name === 'safety')!;
 
-        await svc.remove(T1, safety.id);
+        const deleted = await svc.remove(T1, safety.id);
+        expect(deleted).toBe(false); // seed protected → no-op → callers skip the audit log
 
         const after = await svc.list(T1);
         expect(after.find((r) => r.id === safety.id)).toBeDefined();

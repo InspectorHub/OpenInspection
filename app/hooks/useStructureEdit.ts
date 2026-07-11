@@ -1,8 +1,9 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { findingKey } from "~/hooks/findings/shared";
 import {
-  addSection, duplicateSection, deleteSection, moveSection, reorderSection,
-  addItem, duplicateItem, deleteItem, moveItem,
+  addSection, duplicateSection, deleteSection, moveSection, reorderSection, renameSection,
+  addItem, duplicateItem, deleteItem, moveItem, renameItem,
 } from "~/lib/editor/structure-ops";
 import type { Snapshot, ItemType } from "~/lib/editor/structure-ops";
 
@@ -30,6 +31,20 @@ export interface UseStructureEditOptions {
   results: Record<string, unknown>;
   /** The inspection's source template id (enables "save structure back to template"). */
   templateId?: string | null;
+  /**
+   * Phase U (Batch C2a) — the active per-unit scope. `null`/undefined (default)
+   * = the `_default` common scope, so the delete-impact tally is byte-identical
+   * to before this change. When a unit is active, `itemImpact` reads the finding
+   * under `findingKey(activeUnitId, …)` and never falls back to the ambiguous
+   * bare itemId (two units share an itemId in per-unit mode).
+   */
+  activeUnitId?: string | null;
+  /**
+   * Optimistic display sync — called with the next snapshot on every structural
+   * edit so the editor's section list updates immediately (POST persistence +
+   * shouldRevalidate's POST skip mean the loader never refreshes on its own).
+   */
+  onApply?: (snapshot: Snapshot) => void;
 }
 
 /** Open "save structure to template" modal state. */
@@ -55,6 +70,8 @@ export interface UseStructureEditReturn {
   moveSection: (id: string, dir: -1 | 1) => void;
   /** Reorder a section via drag-and-drop (move `fromId` to `toId`'s position). */
   reorderSection: (fromId: string, toId: string) => void;
+  /** Rename a section's title inline. */
+  renameSection: (id: string, title: string) => void;
   /** Pending delete state — non-null while the StructureDeleteModal is open (section OR item). */
   deletePending: DeletePending | null;
   /** Confirm the pending delete and fire the restructure action. */
@@ -79,6 +96,8 @@ export interface UseStructureEditReturn {
   deleteItem: (sectionId: string, itemId: string) => void;
   /** Move an item up (-1) or down (1) within its section. */
   moveItem: (sectionId: string, itemId: string, dir: -1 | 1) => void;
+  /** Rename an item's label inline. */
+  renameItem: (sectionId: string, itemId: string, label: string) => void;
   /** Pending "Add item" type-picker state — non-null while the AddItemTypeModal is open. */
   addItemPending: AddItemPending | null;
   /** Open the "Add item" type-picker for a section. */
@@ -117,6 +136,8 @@ export function useStructureEdit({
   collabEditing,
   results,
   templateId,
+  activeUnitId = null,
+  onApply,
 }: UseStructureEditOptions): UseStructureEditReturn {
   // Hold the RAW snapshot in a ref so ops always operate on a clean
   // TemplateSchemaV2 object. Updated when loaderData refreshes after each
@@ -128,8 +149,15 @@ export function useStructureEdit({
 
   const structureFetcher = useFetcher();
 
+  // Kept in a ref so applyStructure's identity is stable even though the caller
+  // passes a fresh onApply closure each render.
+  const onApplyRef = useRef(onApply);
+  onApplyRef.current = onApply;
+
   const applyStructure = useCallback(
     (next: Snapshot) => {
+      // Optimistic display refresh (see UseStructureEditOptions.onApply).
+      onApplyRef.current?.(next);
       // Advance the ref optimistically so a second structural op fired before
       // the action→revalidation round-trip composes on top of this change.
       // The PATCH replaces the whole snapshot (last-write-wins); without this,
@@ -153,9 +181,16 @@ export function useStructureEdit({
   const [deletePending, setDeletePending] = useState<DeletePending | null>(null);
 
   // Tally rating/notes/photos for one item id within a section from live results.
+  // Phase U (Batch C2a): read the finding under the ACTIVE unit. The bare-itemId
+  // fallback is only consulted in the `_default` view (activeUnitId == null) —
+  // under a real unit the bare key is ambiguous (two units share an itemId), so
+  // it must never let one unit's impact shadow another. At activeUnitId == null
+  // `findingKey(null, …)` === `_default:{sectionId}:{itemId}`, so the tally is
+  // byte-identical to before this change.
   const itemImpact = useCallback(
     (sectionId: string, itemId: string) => {
-      const r = (results[`_default:${sectionId}:${itemId}`] || results[itemId]) as
+      const ck = findingKey(activeUnitId, sectionId, itemId);
+      const r = (results[ck] || (activeUnitId == null ? results[itemId] : undefined)) as
         | Record<string, unknown>
         | undefined;
       const ratings = (r as { rating?: unknown } | undefined)?.rating ? 1 : 0;
@@ -165,7 +200,7 @@ export function useStructureEdit({
       const photos = Array.isArray(p) ? p.length : 0;
       return { ratings, notes, photos };
     },
-    [results],
+    [results, activeUnitId],
   );
 
   const handleDeleteSection = useCallback(
@@ -267,6 +302,13 @@ export function useStructureEdit({
     [applyStructure],
   );
 
+  const handleRenameSection = useCallback(
+    (id: string, title: string) => {
+      applyStructure(renameSection(snapshotRef.current, id, title));
+    },
+    [applyStructure],
+  );
+
   // ── Item-level handlers (mirror the section ones over the item ops) ──────────
   const handleDuplicateItem = useCallback(
     (sectionId: string, itemId: string) => {
@@ -278,6 +320,13 @@ export function useStructureEdit({
   const handleMoveItem = useCallback(
     (sectionId: string, itemId: string, dir: -1 | 1) => {
       applyStructure(moveItem(snapshotRef.current, sectionId, itemId, dir));
+    },
+    [applyStructure],
+  );
+
+  const handleRenameItem = useCallback(
+    (sectionId: string, itemId: string, label: string) => {
+      applyStructure(renameItem(snapshotRef.current, sectionId, itemId, label));
     },
     [applyStructure],
   );
@@ -342,6 +391,7 @@ export function useStructureEdit({
     deleteSection: handleDeleteSection,
     moveSection: handleMoveSection,
     reorderSection: handleReorderSection,
+    renameSection: handleRenameSection,
     deletePending,
     confirmDelete,
     cancelDelete,
@@ -355,6 +405,7 @@ export function useStructureEdit({
     duplicateItem: handleDuplicateItem,
     deleteItem: handleDeleteItem,
     moveItem: handleMoveItem,
+    renameItem: handleRenameItem,
     addItemPending,
     openAddItemPrompt,
     closeAddItemPrompt,

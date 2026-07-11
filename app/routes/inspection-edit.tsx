@@ -2,9 +2,11 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
 import { findRatingLevel, ratingAdvanceDecision } from "~/lib/rating-levels";
 import { makeCustomDefect } from "~/lib/custom-defects";
-import { useInspectionState, fKey, type InspectionSchema } from "~/hooks/useInspection";
+import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
+import { findingKey } from "~/hooks/findings/shared";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
+import { useScopeLoader } from "~/hooks/useScopeLoader";
 import { useInspectionPrefs } from "~/hooks/useInspectionPrefs";
 import { pushToast } from "~/hooks/useToast";
 import { useKeyboard } from "~/hooks/useKeyboard";
@@ -20,6 +22,7 @@ import { VersionHistoryPanel } from "~/components/collab/VersionHistoryPanel";
 import type { ResultsProjection } from "../../server/lib/collab/results-doc.types";
 import { SectionRail } from "~/components/editor-shared/SectionRail";
 import { EditorHeader } from "~/components/editor/EditorHeader";
+import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
 import { ItemList } from "~/components/editor-shared/ItemList";
 import { ItemEditor } from "~/components/editor/ItemEditor";
 import { TagChipRow, type TagPin } from "~/components/editor/TagChipRow";
@@ -64,6 +67,9 @@ import { useIsMobile } from "~/hooks/useBreakpoint";
 import { MobileAppBar } from "~/components/editor/MobileAppBar";
 import { MobileDrawerTriggers, type MobileDrawerId } from "~/components/editor/MobileDrawerTriggers";
 import { MobileBottomDrawer } from "~/components/MobileBottomDrawer";
+import { BreadcrumbDropdown, type UnitScopeRow } from "~/components/editor/BreadcrumbDropdown";
+import { UnitsManager } from "~/components/editor/UnitsManager";
+import type { ResultMap } from "~/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
 
 export function meta() {
@@ -154,6 +160,11 @@ export default function InspectionEditPage() {
  const saveNarrative = useCallback((key: keyof PcaNarrativeData, value: string) => {
   narrativeFetcher.submit({ intent: "save-pca-narrative", key, value }, { method: "POST" });
  }, [narrativeFetcher]);
+ // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
+ // (create/rename/delete/duplicate/bulk/mode-switch) and the lazy per-unit
+ // results-slice fetcher (scope switch → merge missing findings).
+ const unitsFetcher = useFetcher<{ ok: boolean; intent?: string }>();
+ const scopeFetcher = useFetcher<{ ok: boolean; intent?: string; scope?: string; results?: ResultMap }>();
  const navigate = useNavigate();
  const photoInputRef = useRef<HTMLInputElement>(null);
  const { scheme, setColorScheme } = useTheme();
@@ -169,11 +180,18 @@ export default function InspectionEditPage() {
  /* Core state (useInspection) */
  /* ---------------------------------------------------------------- */
 
+ // Commercial PCA Phase U — the active per-unit scope threaded through the
+ // editor's result keying. `null` = the `_default` common scope. In `tagged`
+ // mode the scope switcher is hidden, so this stays null and behavior is
+ // byte-identical to before. Batch C2b wires the switcher (per_unit mode).
+ const [activeUnitId, setActiveUnitId] = useState<string | null>(null);
+
  const state = useInspectionState({
  inspection: loaderData.inspection,
  schema: loaderData.schema as unknown as InspectionSchema,
  results: loaderData.results,
  ratingLevels: loaderData.ratingLevels,
+ activeUnitId,
  });
 
  /* ---------------------------------------------------------------- */
@@ -217,6 +235,8 @@ export default function InspectionEditPage() {
     // #181 — every write routes through the Y.Doc. The doc is briefly null on
     // the SSR / first-paint window before the connection initialises.
     collab: collab?.doc ? { doc: collab.doc } : undefined,
+    // Phase U (Batch C1) — scope every read/write to the active unit (null = _default).
+    activeUnitId,
  });
 
  /* ---------------------------------------------------------------- */
@@ -408,6 +428,74 @@ export default function InspectionEditPage() {
  const revalidator = useRevalidator();
 
  /* ---------------------------------------------------------------- */
+ /* Commercial PCA Phase U (Batch C2b) — per-unit scope switcher + manager */
+ /* ---------------------------------------------------------------- */
+
+ const units = (loaderData.units ?? []) as UnitScopeRow[];
+ const unitInspectionMode = loaderData.unitInspectionMode ?? "tagged";
+ const isPerUnit = unitInspectionMode === "per_unit";
+ const [unitsManagerOpen, setUnitsManagerOpen] = useState(false);
+
+ // Only 'commercial' inspections expose the units surface (same gate as the PCA
+ // narrative panel). Residential editors never see the switcher/manager, so they
+ // render byte-identically to before.
+ const showUnitsSurface = (loaderData.inspection as Record<string, unknown>).propertyType === "commercial";
+
+ // When the collab doc has synced, `readResultMap` already holds EVERY scope's
+ // findings (the DO hydrated the full D1 blob), so a scope switch needs no fetch.
+ const collabSynced = Boolean(collab?.synced);
+
+ // Scope switch is fetch-if-missing, tracked in useScopeLoader (which owns the
+ // merged/in-flight bookkeeping + the shared-fetcher abort race). This wrapper
+ // just also sets the active-unit UI state.
+ const submitScope = useCallback(
+  (scope: string) => scopeFetcher.submit({ intent: "load-scope", scope }, { method: "POST" }),
+  [scopeFetcher],
+ );
+ const mergeScopeSlice = useCallback(
+  (slice: ResultMap) => state.setResults((prev) => ({ ...prev, ...slice })),
+  [state.setResults],
+ );
+ const loadScope = useScopeLoader({
+  collabSynced,
+  fetcherData: scopeFetcher.data,
+  submit: submitScope,
+  onSlice: mergeScopeSlice,
+ });
+ const requestScope = useCallback(
+  (unitId: string | null) => {
+   setActiveUnitId(unitId);
+   loadScope(unitId);
+  },
+  [loadScope],
+ );
+
+ // After any units mutation lands, revalidate so the switcher / manager /
+ // progress refresh from the loader. (POST submissions skip revalidation via
+ // shouldRevalidate; this explicit call carries no formMethod so it runs.)
+ // `unitsFetcher.data` keeps the same {ok:true} reference until the next submit
+ // and `revalidator` is a fresh object each render, so without a one-shot guard
+ // this effect re-fires every render → an unbounded revalidation storm. Track
+ // the last-revalidated data object so each distinct result revalidates once.
+ const lastRevalidatedUnitsData = useRef<unknown>(null);
+ useEffect(() => {
+  const d = unitsFetcher.data;
+  if (unitsFetcher.state === "idle" && d?.ok && lastRevalidatedUnitsData.current !== d) {
+   lastRevalidatedUnitsData.current = d;
+   revalidator.revalidate();
+  }
+ }, [unitsFetcher.state, unitsFetcher.data, revalidator]);
+
+ // If the active unit was deleted (or the inspection left per_unit mode), fall
+ // back to the common scope so reads never point at a vanished unit.
+ useEffect(() => {
+  if (activeUnitId == null) return;
+  if (!isPerUnit || !units.some((u) => u.id === activeUnitId)) {
+   setActiveUnitId(null);
+  }
+ }, [activeUnitId, isPerUnit, units]);
+
+ /* ---------------------------------------------------------------- */
  /* Unsaved changes guard */
  /* ---------------------------------------------------------------- */
 
@@ -548,6 +636,12 @@ export default function InspectionEditPage() {
   collabEditing: loaderData.collabEditing,
   results: state.results,
   templateId: (state.inspection.templateId as string | null | undefined) ?? null,
+  // Phase U (Batch C2a) — scope the delete-impact tally to the active unit.
+  activeUnitId,
+  // Optimistic display refresh: structural edits POST + skip revalidation, so
+  // push the new section list straight into editor state (the rail / item list
+  // re-render immediately instead of only after a reload).
+  onApply: (next) => state.setSections(next.sections as unknown as Parameters<typeof state.setSections>[0]),
  });
 
  /* Plan 7 — Stream customer subdomain (from loader env). Null ⇒ fail closed:
@@ -591,6 +685,8 @@ export default function InspectionEditPage() {
   streamCustomerSubdomain,
   // #181 — photo array ops route through the Y.Doc (the DO persists it to D1).
   collabDoc: collab?.doc ?? null,
+  // Phase U (Batch C2a) — scope photo composite keys to the active unit.
+  activeUnitId,
   setPhotoStudioUrl,
   setPhotoStudioKey,
   setPhotoStudioIndex,
@@ -895,7 +991,9 @@ export default function InspectionEditPage() {
  const doc = collab?.doc ?? null;
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
  if (typeof navigator !== "undefined" && navigator.onLine === false && doc && sid && !target) {
-  const fk = fKey(sid, itemId);
+  // Phase U (Batch C2a) — key the offline pending-photo doc entry to the active
+  // unit. At activeUnitId == null this === the legacy `_default:{sid}:{itemId}`.
+  const fk = findingKey(activeUnitId, sid, itemId);
   const pendingId = crypto.randomUUID();
   await enqueueMedia({
   pendingId,
@@ -923,7 +1021,7 @@ export default function InspectionEditPage() {
  // Reset input so picking the same file twice re-fires onChange
  if (photoInputRef.current) photoInputRef.current.value = "";
  },
- [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection],
+ [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection, activeUnitId],
  );
 
  const handleBurstCommit = useCallback(
@@ -1180,6 +1278,7 @@ export default function InspectionEditPage() {
  if (isMobile) setMobileDrawer(null);
  }}
  results={state.results}
+ activeUnitId={activeUnitId}
  sectionProgress={state.sectionProgress}
  sectionDefectCount={state.sectionDefectCount}
  overviewActive={state.activeView === "property"}
@@ -1189,8 +1288,7 @@ export default function InspectionEditPage() {
  onDeleteSection={structure.deleteSection}
  onMoveSection={structure.moveSection}
  onReorderSection={structure.reorderSection}
- onSaveToTemplate={structure.openSaveTemplate}
- canSaveBack={structure.canSaveBack}
+ onRenameSection={structure.renameSection}
  />
  );
 
@@ -1205,6 +1303,7 @@ export default function InspectionEditPage() {
  if (isMobile) setMobileDrawer(null);
  }}
  results={state.results}
+ activeUnitId={activeUnitId}
  batchMode={state.batchMode}
  batchSelected={state.batchSelected}
  onBatchToggle={(id) => state.toggleBatchSelect(id)}
@@ -1214,6 +1313,7 @@ export default function InspectionEditPage() {
  onDeleteItem={(itemId) => structure.deleteItem(state.currentSection?.id || "", itemId)}
  onMoveItem={(itemId, dir) => structure.moveItem(state.currentSection?.id || "", itemId, dir)}
  onReorderItem={(fromId, toId) => reorderItemBySwap(state.currentSectionItems, fromId, toId, state.currentSection?.id || "", structure.moveItem)}
+ onRenameItem={(itemId, label) => structure.renameItem(state.currentSection?.id || "", itemId, label)}
  />
  );
 
@@ -1471,7 +1571,14 @@ export default function InspectionEditPage() {
  }
 
  return (
- <div className="flex h-screen bg-ih-bg-card">
+ <div
+  /* Desktop editor minimum design width 1024px (iPad landscape fits without
+     scroll; real phones/small tablets never reach here — the isMobile branch
+     above owns <768px). Below 1024 the whole editor scrolls horizontally
+     instead of squeezing the fixed-width rails; the fixed header/footer stay
+     pinned to the viewport and always cover the visible area. */
+  className="flex h-screen bg-ih-bg-card overflow-x-auto"
+ >
  <ToastPortal />
  {/* Hidden photo input */}
  <input
@@ -1517,7 +1624,7 @@ export default function InspectionEditPage() {
  )}
 
  {/* Keyboard cheatsheet overlay */}
- {state.showCheatsheet && <KeyboardHud />}
+ {state.showCheatsheet && <KeyboardHud onClose={() => state.setShowCheatsheet(false)} />}
 
  {/* Burst camera overlay */}
  <BurstCamera
@@ -1849,11 +1956,46 @@ export default function InspectionEditPage() {
  handlePublishClick={handlePublishClick}
  collabEditing={loaderData.collabEditing}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
+ onChangeTemplate={() => state.setSettingsOpen(true)}
+ onSaveAsNewTemplate={() => structure.openSaveTemplate("new")}
+ onUpdateSourceTemplate={() => structure.openSaveTemplate("back")}
+ canUpdateSourceTemplate={structure.canSaveBack}
+ perUnitControls={
+  showUnitsSurface ? (
+   <div className="flex items-center gap-2">
+    {isPerUnit && (
+      <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} />
+    )}
+    <button
+     type="button"
+     onClick={() => setUnitsManagerOpen(true)}
+     className="hidden lg:inline-flex h-7 px-2.5 rounded-ih-button bg-ih-bg-muted text-ih-fg-2 text-[12px] font-bold hover:bg-ih-border items-center gap-1.5"
+     title="Manage units"
+    >
+     <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+     </svg>
+     Units
+    </button>
+   </div>
+  ) : undefined
+ }
  />
+ {/* Commercial PCA Phase U (Batch C2b) — units management drawer */}
+ {showUnitsSurface && (
+  <UnitsManager
+   open={unitsManagerOpen}
+   onClose={() => setUnitsManagerOpen(false)}
+   inspectionId={String(state.inspection.id)}
+   units={units}
+   mode={unitInspectionMode}
+   fetcher={unitsFetcher}
+  />
+ )}
  {/* ------------------------------------------------------------ */}
  {/* 4-column layout below header */}
  {/* ------------------------------------------------------------ */}
- <div className="flex flex-1 pt-14 pb-9">
+ <div className="flex flex-1 pt-14 pb-9 min-w-[1024px]">
  {/* B-22: if no sections, show the empty-template CTA spanning the full body */}
  {emptyTemplateEl ? (
  <div className="flex-1 flex">
@@ -1887,13 +2029,44 @@ export default function InspectionEditPage() {
  )}
  </button>
  ))}
+ {/* Batch mode toggle — object-scoped action, lives with the items it selects
+     (moved out of the global header). */}
+ <button
+ onClick={() => {
+  if (state.batchMode) {
+  state.setBatchMode(false);
+  state.setBatchSelected({});
+  } else {
+  state.setBatchMode(true);
+  }
+ }}
+ className={`ml-auto flex items-center justify-center w-7 h-7 rounded ${
+  state.batchMode ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-3 hover:bg-ih-bg-muted"
+ }`}
+ title={state.batchMode ? "Exit batch mode" : "Batch mode (B)"}
+ aria-label={state.batchMode ? "Exit batch mode" : "Batch select items"}
+ aria-pressed={state.batchMode}
+ >
+ <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+ <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+ </svg>
+ </button>
  </div>
  {itemListEl}
  </div>
  )}
 
  {/* Column 3: Item Editor (flex-1, focal) or Inspection Details overview — always rendered */}
- <main className="flex-1 overflow-y-auto border-t-2 border-ih-primary p-6">
+ <div className="flex-1 min-w-0 relative flex flex-col border-t-2 border-ih-primary">
+ {/* Fullscreen toggle — object-scoped action (focuses the item editor); pinned
+     to the pane top-right, outside the scroll area. Hidden in the property
+     overview. Serves as the exit affordance while in fullscreen too. */}
+ {state.activeView !== "property" && (
+  <div className="absolute top-2.5 right-2.5 z-10">
+  <FullscreenToggle active={state.itemFullscreen} onToggle={() => state.setItemFullscreen(!state.itemFullscreen)} />
+  </div>
+ )}
+ <main className="flex-1 overflow-y-auto p-6">
  {state.activeView === "property" ? (
   <>
   <PropertyInfoForm
@@ -1920,6 +2093,7 @@ export default function InspectionEditPage() {
   </>
  ) : itemEditorEl}
  </main>
+ </div>
 
  {/* Column 4: SideRail — hidden in fullscreen; collapsible otherwise */}
  {!state.itemFullscreen && (

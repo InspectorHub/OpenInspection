@@ -2,6 +2,7 @@ import type { Route } from "../+types/inspection-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { sanitizeSettingsPatch } from "~/lib/settings-patch";
+import { unwrapResultsResponse } from "~/lib/results";
 
 export async function action({ request, params, context }: Route.ActionArgs) {
  const token = await requireToken(context, request);
@@ -71,6 +72,86 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  json: { [key]: value },
  });
  return { ok: res.ok, intent: "save-pca-narrative" };
+ }
+
+ // Commercial PCA Phase U (Batch C2b) — per-unit editor mutations + lazy scope
+ // read. All ride the BFF relay (no bare client fetch to /api/...): the action
+ // holds the authed tenant context that the unit routes' requireRole guard
+ // needs. The editor watches this fetcher and revalidates the loader on success
+ // so the scope switcher / units manager / progress dots refresh.
+ if (intent === "unit-create") {
+ const name = String(formData.get("name") ?? "").trim();
+ if (!name) return { ok: false as const, intent: "unit-create" };
+ const res = await api.inspections[":id"].units.$post({
+ param: { id: params.id },
+ json: { parentUnitId: null, kind: "unit", type: "unit", name },
+ });
+ return { ok: res.ok, intent: "unit-create" };
+ }
+
+ if (intent === "unit-rename") {
+ const unitId = String(formData.get("unitId") ?? "");
+ const name = String(formData.get("name") ?? "").trim();
+ if (!unitId || !name) return { ok: false as const, intent: "unit-rename" };
+ const res = await api.inspections[":id"].units[":unitId"].$patch({
+ param: { id: params.id, unitId },
+ json: { name },
+ });
+ return { ok: res.ok, intent: "unit-rename" };
+ }
+
+ if (intent === "unit-delete") {
+ const unitId = String(formData.get("unitId") ?? "");
+ if (!unitId) return { ok: false as const, intent: "unit-delete" };
+ const res = await api.inspections[":id"].units[":unitId"].$delete({
+ param: { id: params.id, unitId },
+ });
+ return { ok: res.ok, intent: "unit-delete" };
+ }
+
+ if (intent === "unit-duplicate") {
+ const unitId = String(formData.get("unitId") ?? "");
+ if (!unitId) return { ok: false as const, intent: "unit-duplicate" };
+ const res = await api.inspections[":id"].units[":unitId"].duplicate.$post({
+ param: { id: params.id, unitId },
+ });
+ return { ok: res.ok, intent: "unit-duplicate" };
+ }
+
+ if (intent === "unit-bulk-create") {
+ // The panel forwards the whole discriminated-union body as JSON so a single
+ // relay covers both floors_stacks and csv modes.
+ const payload = JSON.parse(String(formData.get("payload") ?? "{}"));
+ const res = await api.inspections[":id"].units.bulk.$post({
+ param: { id: params.id },
+ json: payload,
+ });
+ return { ok: res.ok, intent: "unit-bulk-create" };
+ }
+
+ if (intent === "unit-mode-switch") {
+ const mode = formData.get("mode") === "per_unit" ? ("per_unit" as const) : ("tagged" as const);
+ const res = await api.inspections[":id"]["unit-mode"].$post({
+ param: { id: params.id },
+ json: { mode },
+ });
+ return { ok: res.ok, intent: "unit-mode-switch" };
+ }
+
+ if (intent === "load-scope") {
+ // Lazy per-unit results slice — the loader only fetches the '_default'
+ // common scope on first paint; a scope switch pulls the selected unit's
+ // findings on demand (only when the collab doc has not already synced the
+ // full map). Returns the composite-keyed slice for the editor to merge.
+ const scope = String(formData.get("scope") ?? "");
+ if (!scope) return { ok: false as const, intent: "load-scope" };
+ const res = await api.inspections[":id"].results.$get({
+ param: { id: params.id },
+ query: { scope },
+ });
+ if (!res.ok) return { ok: false as const, intent: "load-scope", scope };
+ const body = await res.json();
+ return { ok: true as const, intent: "load-scope", scope, results: unwrapResultsResponse(body) };
  }
 
  if (intent === "set-cover") {

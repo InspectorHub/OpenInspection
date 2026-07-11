@@ -3,6 +3,7 @@ import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
 import { HonoConfig, AppServices } from '../../types/hono';
 import { AdminService } from '../../services/admin.service';
 import { UnitService } from '../../services/unit.service';
+import { UnitSwitchService } from '../../services/unit-switch.service';
 import { ObserverLinkService } from '../../services/observer-link.service';
 import { ReportVersionService } from '../../services/report-version.service';
 import { AIService } from '../../services/ai.service';
@@ -365,6 +366,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'unit':
                     target.unit = new UnitService(c.env.DB);
+                    break;
+                case 'unitSwitch':
+                    target.unitSwitch = new UnitSwitchService(c.env.DB);
                     break;
                 case 'observerLink':
                     target.observerLink = new ObserverLinkService(c.env.DB, {

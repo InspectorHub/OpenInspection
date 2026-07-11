@@ -1,8 +1,16 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { SectionDonut } from '../editor/SectionDonut';
 import { sectionIconFor } from '../editor/section-icons';
 import type { EditorMode } from './editor-mode';
-import { useDragReorder } from './useDragReorder';
+import { useSortableReorder } from './useSortableReorder';
+import { InlineRename } from './InlineRename';
+import { findingKey } from '~/hooks/findings/shared';
+
+// Handle + ⋮ live in reserved flex slots so they never occlude the section name
+// or progress donut. On desktop the glyph shows on hover; on touch (no hover) it
+// is always shown. Space is reserved either way, so nothing shifts or overlaps.
+const REVEAL = 'invisible group-hover:visible focus-within:visible [@media(hover:none)]:visible';
 
 interface SharedSectionRailProps {
  mode: EditorMode;
@@ -10,6 +18,11 @@ interface SharedSectionRailProps {
  activeSection: string;
  onSelect: (id: string) => void;
  results?: Record<string, Record<string, unknown>>;
+ /**
+  * Phase U (Batch C1) — active per-unit scope for result lookups. `null`
+  * (default) resolves the `_default` common scope, byte-identical to before.
+  */
+ activeUnitId?: string | null;
  sectionProgress?: (sectionId: string) => { total: number; rated: number; percent: number; hasDefect: boolean };
  sectionDefectCount?: (sectionId: string) => number;
  /** Whether the report-scoped "Inspection Details" overview entry is active. */
@@ -19,10 +32,6 @@ interface SharedSectionRailProps {
  // D8 — structural-edit callbacks (optional; hidden when absent)
  /** Add a new section at the end. */
  onAddSection?: () => void;
- /** D8 — save the current structure to the source template ('back') or a new one ('new'). */
- onSaveToTemplate?: (mode: "back" | "new") => void;
- /** Whether the inspection has a source template (enables the 'back' action). */
- canSaveBack?: boolean;
  /** Duplicate the section with the given id. */
  onDuplicateSection?: (id: string) => void;
  /** Delete the section with the given id. */
@@ -31,6 +40,8 @@ interface SharedSectionRailProps {
  onMoveSection?: (id: string, dir: -1 | 1) => void;
  /** Reorder a section via drag-and-drop (drop `fromId` onto `toId`). */
  onReorderSection?: (fromId: string, toId: string) => void;
+ /** Rename a section inline (double-click / F2 / ⋯ menu). */
+ onRenameSection?: (id: string, title: string) => void;
 }
 
 /** Clipboard / info glyph for the overview entry (no progress donut). */
@@ -73,21 +84,38 @@ export function SectionRail({
  activeSection,
  onSelect,
  results,
+ activeUnitId = null,
  sectionProgress,
  sectionDefectCount,
  overviewActive = false,
  onSelectOverview,
  onAddSection,
- onSaveToTemplate,
- canSaveBack,
  onDuplicateSection,
  onDeleteSection,
  onMoveSection,
  onReorderSection,
+ onRenameSection,
 }: SharedSectionRailProps) {
  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
- const hasStructuralOps = Boolean(onAddSection || onDuplicateSection || onDeleteSection || onMoveSection);
- const { dragProps } = useDragReorder({ ids: sections.map((s) => s.id), onReorder: onReorderSection ?? (() => {}) });
+ const [editingId, setEditingId] = useState<string | null>(null);
+ // The ⋯ menu is portaled to a viewport anchor so the section rail's
+ // overflow-y-auto never clips the last section's menu.
+ const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number } | null>(null);
+ const openSectionMenu = (sectionId: string, el: HTMLElement) => {
+  if (openMenuId === sectionId) { setOpenMenuId(null); setMenuAnchor(null); return; }
+  const r = el.getBoundingClientRect();
+  setOpenMenuId(sectionId);
+  setMenuAnchor({ x: r.right, y: r.bottom });
+ };
+ const closeSectionMenu = () => { setOpenMenuId(null); setMenuAnchor(null); };
+ const hasStructuralOps = Boolean(onAddSection || onDuplicateSection || onDeleteSection || onMoveSection || onRenameSection);
+ // Drag-to-reorder via SortableJS (desktop: grab the handle; touch: 500ms
+ // long-press). Disabled mid-rename so the input isn't torn out from under you.
+ const { containerRef } = useSortableReorder<HTMLDivElement>({
+  ids: sections.map((s) => s.id),
+  onReorder: onReorderSection ?? (() => {}),
+  disabled: !onReorderSection || editingId !== null,
+ });
 
  return (
  <aside data-shortcut-scope className="w-[200px] flex-shrink-0 border-r border-ih-border overflow-y-auto bg-ih-bg-app/50">
@@ -114,12 +142,16 @@ export function SectionRail({
   <hr className="my-1 border-ih-border" />
   </>
   )}
+ <div ref={containerRef} className="space-y-0.5">
  {sections.map((section, idx) => {
  // Calculate completion
  const progress = sectionProgress?.(section.id);
  const total = progress?.total ?? (section.items?.length || 0);
  const rated = progress?.rated ?? (section.items?.filter((i) => {
- const r = results?.[`_default:${section.id}:${i.id}`] || results?.[i.id];
+ // Phase U (Batch C1) — the bare `i.id` key holds only one unit's entry, so
+ // it is a valid fallback ONLY in the common scope (activeUnitId == null);
+ // under a real unit it would count another unit's rating as this one's.
+ const r = results?.[findingKey(activeUnitId, section.id, i.id)] || (activeUnitId == null ? results?.[i.id] : undefined);
  return r?.rating;
  }).length || 0);
 
@@ -130,41 +162,74 @@ export function SectionRail({
  if (unrated > 0) tipParts.push(`${unrated} unrated`);
  if (defects > 0) tipParts.push(`${defects} defect${defects > 1 ? 's' : ''}`);
  const menuOpen = openMenuId === section.id;
+ const editing = editingId === section.id;
 
  return (
- <div key={section.id} className="relative group" {...(onReorderSection ? dragProps(section.id) : {})}>
+ <div
+  key={section.id}
+  data-sortable-item
+  data-sortable-id={section.id}
+  onKeyDown={(e) => {
+   if (onMoveSection && e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    onMoveSection(section.id, e.key === 'ArrowUp' ? -1 : 1);
+   } else if (onRenameSection && e.key === 'F2') {
+    e.preventDefault();
+    setEditingId(section.id);
+   }
+  }}
+  className={`group relative flex items-stretch rounded-md text-[13px] transition-all ${
+   activeSection === section.id
+    ? "bg-ih-primary-tint text-ih-primary font-bold border-l-2 border-ih-primary"
+    : "text-ih-fg-3 hover:bg-ih-bg-muted"
+  }`}
+ >
+  {/* Reserved drag-handle slot — its own column, so it never covers the name or
+      donut. Grip shows on desktop hover / always on touch; touch-none lets the
+      long-press drag win over scroll only while the finger is on the handle. */}
   {onReorderSection && (
    <span
+    data-drag-handle
     aria-label={`Drag ${section.title}`}
     title="Drag to reorder"
-    className="absolute left-0 top-1/2 -translate-y-1/2 px-0.5 hidden group-hover:flex items-center cursor-grab text-ih-fg-4 select-none pointer-events-none"
+    className={`shrink-0 w-5 flex items-center justify-center cursor-grab select-none text-ih-fg-4 touch-none ${REVEAL}`}
    >☰</span>
   )}
-  <button
-  onClick={() => onSelect(section.id)}
-  title={`${section.title}: ${tipParts.join(', ')}`}
-  className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all ${
-  activeSection === section.id
-  ? "bg-ih-primary-tint text-ih-primary font-bold border-l-2 border-ih-primary"
-  : "text-ih-fg-3 hover:bg-ih-bg-muted"
-  }`}
-  >
-  <div className="flex items-center justify-between gap-1">
-  <span className="mr-1 shrink-0 text-ih-fg-3">{sectionIconFor(section.title ?? section.id)}</span>
-  <span className="truncate flex-1">{section.title}</span>
-  <span className="ml-1 shrink-0 flex items-center">
-  {mode === 'fill'
-   ? <SectionDonut rated={rated} total={total} hasDefect={hasDefect} />
-   : <span className="text-[10px] text-ih-fg-4 font-mono">{section.items.length}</span>}
-  </span>
-  </div>
-  </button>
 
-  {/* D8 — per-section ⋯ menu (only when structural ops are wired) */}
-  {hasStructuralOps && (
-  <div className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center">
+  {editing && onRenameSection ? (
+   <div className={`min-w-0 flex-1 flex items-center gap-1 py-2 ${onReorderSection ? 'pr-1' : 'px-3'}`}>
+    <span className="shrink-0 text-ih-fg-3">{sectionIconFor(section.title ?? section.id)}</span>
+    <InlineRename
+     value={section.title}
+     ariaLabel="Section name"
+     onCommit={(next) => { onRenameSection(section.id, next); setEditingId(null); }}
+     onCancel={() => setEditingId(null)}
+     className="min-w-0 flex-1 bg-transparent border-b border-ih-primary outline-none text-[13px] text-ih-fg-1"
+    />
+   </div>
+  ) : (
    <button
-   onClick={(e) => { e.stopPropagation(); setOpenMenuId(menuOpen ? null : section.id); }}
+    onClick={() => onSelect(section.id)}
+    onDoubleClick={onRenameSection ? () => setEditingId(section.id) : undefined}
+    title={`${section.title}: ${tipParts.join(', ')}`}
+    className={`min-w-0 flex-1 text-left py-2 flex items-center gap-1 ${onReorderSection ? 'pr-1' : 'px-3'}`}
+   >
+    {/* Icon + donut are ALWAYS visible — the handle/⋮ have their own slots. */}
+    <span className="shrink-0 text-ih-fg-3">{sectionIconFor(section.title ?? section.id)}</span>
+    <span className="truncate flex-1">{section.title}</span>
+    <span className="ml-1 shrink-0 flex items-center">
+    {mode === 'fill'
+     ? <SectionDonut rated={rated} total={total} hasDefect={hasDefect} />
+     : <span className="text-[10px] text-ih-fg-4 font-mono">{section.items.length}</span>}
+    </span>
+   </button>
+  )}
+
+  {/* Reserved ⋯ slot — its own column, never overlaps the donut. */}
+  {hasStructuralOps && (
+  <div className={`shrink-0 w-6 flex items-center justify-center ${REVEAL}`}>
+   <button
+   onClick={(e) => { e.stopPropagation(); openSectionMenu(section.id, e.currentTarget); }}
    className="w-6 h-6 flex items-center justify-center rounded text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ih-primary"
    aria-label={`Section options for ${section.title}`}
    aria-haspopup="true"
@@ -172,17 +237,28 @@ export function SectionRail({
    >
    <DotsIcon />
    </button>
-   {menuOpen && (
+   {menuOpen && menuAnchor && createPortal(
+   <>
+   <div className="fixed inset-0 z-[60]" onClick={closeSectionMenu} />
    <div
-    className="absolute right-0 top-full mt-0.5 z-40 w-36 rounded-md shadow-ih-popover bg-ih-bg-card border border-ih-border py-0.5 text-[12px]"
+    style={{ top: menuAnchor.y + 4, left: menuAnchor.x }}
+    className="fixed -translate-x-full z-[61] w-36 rounded-md shadow-ih-popover bg-ih-bg-card border border-ih-border py-0.5 text-[12px]"
     role="menu"
-    onMouseLeave={() => setOpenMenuId(null)}
    >
+    {onRenameSection && (
+    <button
+     role="menuitem"
+     className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
+     onClick={(e) => { e.stopPropagation(); closeSectionMenu(); setEditingId(section.id); }}
+    >
+     Rename
+    </button>
+    )}
     {onDuplicateSection && (
     <button
      role="menuitem"
      className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
-     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onDuplicateSection(section.id); }}
+     onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onDuplicateSection(section.id); }}
     >
      Duplicate
     </button>
@@ -191,7 +267,7 @@ export function SectionRail({
     <button
      role="menuitem"
      className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
-     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onMoveSection(section.id, -1); }}
+     onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onMoveSection(section.id, -1); }}
     >
      Move up
     </button>
@@ -200,7 +276,7 @@ export function SectionRail({
     <button
      role="menuitem"
      className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
-     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onMoveSection(section.id, 1); }}
+     onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onMoveSection(section.id, 1); }}
     >
      Move down
     </button>
@@ -211,19 +287,22 @@ export function SectionRail({
      <button
      role="menuitem"
      className="w-full text-left px-3 py-1.5 text-ih-bad hover:bg-ih-bg-muted font-bold"
-     onClick={(e) => { e.stopPropagation(); setOpenMenuId(null); onDeleteSection(section.id); }}
+     onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onDeleteSection(section.id); }}
      >
      Delete
      </button>
     </>
     )}
    </div>
+   </>,
+   document.body,
    )}
   </div>
   )}
  </div>
  );
  })}
+ </div>
  </nav>
 
  {/* D8 — "+ Add section" CTA at the rail bottom (only when structural ops are wired) */}
@@ -239,27 +318,6 @@ export function SectionRail({
   </div>
  )}
 
- {/* D8 — save the inspection's current structure to a template. */}
- {onSaveToTemplate && (
-  <div className="p-2 pt-0 flex flex-col gap-1 border-t border-ih-border mt-1 pt-2">
-  {canSaveBack && (
-   <button
-    onClick={() => onSaveToTemplate("back")}
-    data-testid="save-template-back-btn"
-    className="w-full text-left px-3 py-1.5 rounded-md text-[11px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
-   >
-    Save structure → template
-   </button>
-  )}
-  <button
-   onClick={() => onSaveToTemplate("new")}
-   data-testid="save-template-new-btn"
-   className="w-full text-left px-3 py-1.5 rounded-md text-[11px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-fg-1"
-  >
-   Save as new template…
-  </button>
-  </div>
- )}
  </aside>
  );
 }

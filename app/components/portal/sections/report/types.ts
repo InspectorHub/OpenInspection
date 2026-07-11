@@ -158,6 +158,30 @@ export interface ReportVerification {
   publishedAt: number; // unix seconds
 }
 
+/* Commercial PCA Phase U — per-unit matrix types re-declared across the
+   server/app boundary (app/ cannot import server/lib/). Shapes mirror
+   server/lib/unit-scope.ts exactly (same precedent as the Phase S types above). */
+export type Severity = 'good' | 'marginal' | 'significant' | 'minor';
+interface MatrixCell {
+  worst: Severity | null;
+  counts: { safety: number; recommendation: number; maintenance: number };
+}
+export interface UnitMatrixRow {
+  unitId: string;
+  label: string;
+  cells: Record<string, MatrixCell>;
+  isException: boolean;
+}
+interface ReportUnit {
+  id: string;
+  label: string;
+  kind: string;
+  type: string;
+  parentUnitId: string | null;
+  sortOrder: number;
+  attrs: unknown;
+}
+
 /**
  * The report loader payload shape. Kept here (exported) so both the standalone
  * route and the portal route can type their loaders against it and feed it to
@@ -190,4 +214,11 @@ export interface ReportLoaderResult {
   commercialSubtype: string | null;
   buildingProfile: ProfileRow[];
   pcaReport: PcaReportData | null;
+  /* Commercial PCA Phase U — per-unit inspection mode + the unit tree,
+     units×systems condition matrix, and per-unit defect counts. Matrix + counts
+     are empty in 'tagged' mode so non-per_unit reports render byte-identically. */
+  unitInspectionMode: 'tagged' | 'per_unit';
+  units: ReportUnit[];
+  unitConditionMatrix: UnitMatrixRow[];
+  defectCountsByUnit: Record<string, number>;
 }

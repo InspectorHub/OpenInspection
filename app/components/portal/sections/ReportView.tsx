@@ -28,6 +28,7 @@ import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
 import { ReportRepairPanel } from "./report/ReportRepairPanel";
 import { BuildingProfile } from "./report/BuildingProfile";
 import { PcaSkeleton } from "./report/PcaSkeleton";
+import { PerUnitReportBlock } from "./report/PerUnitReportBlock";
 import {
   PRINT_CARD_CLASS,
   PRINT_SECTION_HEADING_CLASS,
@@ -131,6 +132,10 @@ export function reportViewProps(
     commercialSubtype: data.commercialSubtype ?? null,
     buildingProfile: data.buildingProfile ?? [],
     pcaReport: data.pcaReport ?? null,
+    unitInspectionMode: data.unitInspectionMode ?? "tagged",
+    units: data.units ?? [],
+    unitConditionMatrix: data.unitConditionMatrix ?? [],
+    defectCountsByUnit: data.defectCountsByUnit ?? {},
     tenant: data.tenant ?? "",
     reportId,
     token: data.token,
@@ -464,6 +469,9 @@ export function ReportView(props: ReportViewProps) {
             null for non-commercial reports (server gates it in getReportData), so
             PcaSkeleton renders nothing on residential home inspections. */}
         <PcaSkeleton data={data.pcaReport ?? null} />
+        {/* Commercial PCA Phase U — per-unit matrix + exception detail (gated on
+            per_unit mode; renders nothing otherwise → report byte-identical). */}
+        <PerUnitReportBlock data={data} />
         {filteredSections.map((section, sectionIdx) => {
           if (filter === "defects" && section.items.length === 0) return null;
           return (

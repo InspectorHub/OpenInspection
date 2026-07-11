@@ -11,6 +11,8 @@ import { drizzle } from 'drizzle-orm/d1';
 import { syncInspectionAssignmentsBatch } from '../../server/lib/db/assignment-links';
 import { BookingService } from '../../server/services/booking.service';
 import { importContacts } from '../../server/services/contacts-import.service';
+import { UnitService } from '../../server/services/unit.service';
+import { expandFloorsStacks } from '../../server/lib/unit-pattern';
 
 interface TestBindings { DB: D1Database }
 const b = env as unknown as TestBindings;
@@ -112,6 +114,37 @@ describe('B-29+ importContacts phase 2 — real D1 bind limit', () => {
         expect(result.inserted).toBe(200);
         const count = await b.DB.prepare('SELECT COUNT(*) AS n FROM contacts').first<{ n: number }>();
         expect(count?.n).toBe(200);
+    });
+});
+
+describe('Phase U UnitService.createMany — real D1 bind limit', () => {
+    // Regression for the E2E-found bug: a single VALUES list for the DEFAULT
+    // bulk-create (3 floors × 4 = 12 units) binds 12 × ~10 columns = 120 params,
+    // over D1's 100-bind cap → 400 in production while the better-sqlite3 unit
+    // suite (no such cap) passes. createMany must chunk into db.batch().
+    beforeAll(async () => {
+        await b.DB.exec(
+            'CREATE TABLE IF NOT EXISTS inspection_units (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, inspection_id TEXT NOT NULL, parent_unit_id TEXT, kind TEXT NOT NULL, type TEXT NOT NULL DEFAULT \'unit\', name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime(\'now\')), attrs TEXT);',
+        );
+    });
+    beforeEach(async () => {
+        await b.DB.exec('DELETE FROM inspection_units;');
+    });
+
+    it('bulk-creates 12 units (120 binds) — an unchunked VALUES list would blow the 100-bind cap', async () => {
+        const svc = new UnitService(b.DB);
+        const drafts = expandFloorsStacks({ floors: [1, 2, 3], stacks: 4, startAt: 1 });
+        expect(drafts).toHaveLength(12);
+
+        const { ids } = await svc.createMany(TENANT, 'insp-units', drafts, { kind: 'unit', type: 'unit' });
+
+        expect(ids).toHaveLength(12);
+        const count = await b.DB.prepare('SELECT COUNT(*) AS n FROM inspection_units WHERE inspection_id = ?')
+            .bind('insp-units').first<{ n: number }>();
+        expect(count?.n).toBe(12);
+        const names = await b.DB.prepare('SELECT name FROM inspection_units WHERE inspection_id = ? ORDER BY sort_order')
+            .bind('insp-units').all<{ name: string }>();
+        expect(names.results.map(r => r.name)).toEqual(['101','102','103','104','201','202','203','204','301','302','303','304']);
     });
 });
 

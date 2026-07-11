@@ -304,6 +304,7 @@ export interface AppServices {
     // QuickBooks Online integration
     qbo: import('../services/qbo.service').QBOService;
     unit: import('../services/unit.service').UnitService;
+    unitSwitch: import('../services/unit-switch.service').UnitSwitchService;
     observerLink: import('../services/observer-link.service').ObserverLinkService;
     reportVersion: import('../services/report-version.service').ReportVersionService;
     identity: import('../services/identity.service').IdentityService;

@@ -19,6 +19,32 @@ export const MoveUnitSchema = z.object({
     newSortOrder:    z.number().int().min(0).describe('TODO describe newSortOrder field for the OpenInspection MCP integration'),
 }).openapi('MoveUnit');
 
+// Commercial PCA Phase U — bulk create N units (floors×stacks or CSV) under one
+// parent node. parentUnitId null = top-level (single-building inspections).
+export const BulkCreateUnitsSchema = z.discriminatedUnion('mode', [
+    z.object({
+        mode:         z.literal('floors_stacks'),
+        floors:       z.array(z.number().int()).min(1).max(200),
+        stacks:       z.number().int().min(1).max(200),
+        startAt:      z.number().int().min(0).optional(),
+        parentUnitId: z.string().min(1).nullish(),
+    }),
+    z.object({
+        mode:         z.literal('csv'),
+        csv:          z.string().min(1).max(20000),
+        parentUnitId: z.string().min(1).nullish(),
+    }),
+]).openapi('BulkCreateUnits');
+
+// Commercial PCA Phase U (Batch C2a) — switch an inspection's unit-inspection
+// mode. `per_unit` promotes location tags into first-class unit rows + re-keys
+// findings; `tagged` is the LOSSY reverse (drops the unit rows + matrix). The
+// UI gates the lossy direction behind a confirm modal (Batch C2b); the endpoint
+// itself just executes whichever mode the caller asks for.
+export const UnitModeSwitchSchema = z.object({
+    mode: z.enum(['tagged', 'per_unit']).describe('Target unit-inspection mode: "per_unit" (promote to per-unit matrix) or "tagged" (flatten back to common scope + location tags).'),
+}).openapi('UnitModeSwitch');
+
 export type CreateUnitInput = z.infer<typeof CreateUnitSchema>;
 export type UpdateUnitInput = z.infer<typeof UpdateUnitSchema>;
 export type MoveUnitInput   = z.infer<typeof MoveUnitSchema>;

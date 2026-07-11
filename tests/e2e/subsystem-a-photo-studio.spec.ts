@@ -1,108 +1,37 @@
 /**
  * Design System 0520 subsystem A phase 4 — PhotoStudio E2E (Task 4.10).
  *
- * Required env vars (.dev.vars or shell):
- *   TEST_INSPECTOR_EMAIL
- *   TEST_INSPECTOR_PASSWORD
- *   TEST_INSPECTION_ID
- *   TEST_MEDIA_POOL_ID      — a row in inspection_media_pool for the
- *                              inspection above (skip when absent so local
- *                              CI doesn't fail without seed data).
+ * TODO(replaced-component): this spec targeted the original SVG-based, window-
+ * event-driven PhotoStudio ("open-photo-studio" CustomEvent, a role=dialog with
+ * aria-label "Photo annotation studio", an <svg ellipse>, and a PUT
+ * /media/{mediaId}/annotations save). That component has been REPLACED by the
+ * react-konva PhotoAnnotator (app/components/media-studio/PhotoAnnotator.tsx):
+ *   - it renders shapes to a <canvas> via Konva (Stage/Layer/Circle/Arrow), so
+ *     there is NO <svg ellipse> — annotation shapes are not DOM nodes and can't
+ *     be asserted with a Playwright selector;
+ *   - it opens from React state (the tools-dock "Photo Studio" action or the
+ *     item photo gallery via openPhotoStudio), not a window event;
+ *   - Save is item-photo-centric: onSave bakes the annotated PNG and persists
+ *     through the collab Y.Doc (performPhotoAnnotationSave, keyed by
+ *     item + photoIndex), NOT the old /media/{mediaId}/annotations endpoint.
  *
- * Skipped automatically when any var is missing.
+ * A faithful rewrite would have to attach a photo to an item, open the annotator
+ * from that item's gallery, drive the Konva canvas by mouse, and assert the
+ * collab-doc annotate-save — with no DOM-level shape assertion available. That
+ * canvas save path already runs through the same Y.Doc machinery the
+ * collab-editing suite (tests/e2e/collab-editing.spec.ts) exercises end to end.
+ *
+ * Kept as a skip-shell (not deleted) so the PhotoStudio coverage intent stays
+ * visible until it is either rewritten against the Konva annotator (accepting a
+ * canvas-state signal in place of a DOM shape assertion) or dropped from the
+ * plan.
  */
-import { test, expect } from '@playwright/test';
-
-const EMAIL = process.env['TEST_INSPECTOR_EMAIL'];
-const PASSWORD = process.env['TEST_INSPECTOR_PASSWORD'];
-const INSPECTION_ID = process.env['TEST_INSPECTION_ID'];
-const MEDIA_POOL_ID = process.env['TEST_MEDIA_POOL_ID'];
+import { test } from '@playwright/test';
 
 test.describe('PhotoStudio MVP (subsystem A M14)', () => {
-    test.skip(
-        !EMAIL || !PASSWORD || !INSPECTION_ID || !MEDIA_POOL_ID,
-        'Set TEST_INSPECTOR_EMAIL / TEST_INSPECTOR_PASSWORD / TEST_INSPECTION_ID / TEST_MEDIA_POOL_ID to run.',
-    );
+    test.skip(true, 'SVG PhotoStudio replaced by the Konva PhotoAnnotator — see the TODO above; canvas shapes are not DOM-assertable.');
 
-    test.beforeEach(async ({ page }) => {
-        await page.goto('/login');
-        await page.fill('input[name=email]',    EMAIL!);
-        await page.fill('input[name=password]', PASSWORD!);
-        await page.click('button[type=submit]');
-        await page.waitForURL('**/inspections');
-        await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
-        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
-        // [x-data*=inspectionEditor] root.
-        await page.getByRole('main').waitFor({ state: 'visible' });
-    });
-
-    test('dispatch open-photo-studio → overlay visible; Circle draws ellipse; Save persists', async ({ page }) => {
-        // Open via window event — the factory listens for this in init().
-        await page.evaluate(({ inspectionId, mediaId }) => {
-            window.dispatchEvent(new CustomEvent('open-photo-studio', {
-                detail: {
-                    media: {
-                        id: mediaId,
-                        inspectionId,
-                        url: `/api/inspections/${inspectionId}/photos/${encodeURIComponent('placeholder')}`,
-                        naturalWidth: 1200,
-                        naturalHeight: 800,
-                    },
-                    inspectionContext: { sectionName: 'Roof', itemTitle: 'NE corner' },
-                },
-            }));
-        }, { inspectionId: INSPECTION_ID!, mediaId: MEDIA_POOL_ID! });
-
-        const dialog = page.locator('[role=dialog][aria-label="Photo annotation studio"]');
-        await expect(dialog).toBeVisible({ timeout: 5_000 });
-
-        // Caption pre-filled with auto-caption ("Roof · NE corner").
-        await expect(dialog.locator('input[type=text]')).toHaveValue('Roof · NE corner');
-
-        // Select Circle tool + drag on the SVG canvas to draw an ellipse.
-        await dialog.locator('button[aria-label=Circle]').click();
-        const svg = dialog.locator('svg').first();
-        const box = await svg.boundingBox();
-        if (!box) throw new Error('SVG canvas not laid out');
-        await page.mouse.move(box.x + 60, box.y + 60);
-        await page.mouse.down();
-        await page.mouse.move(box.x + 180, box.y + 180);
-        await page.mouse.up();
-        await expect(dialog.locator('svg ellipse')).toHaveCount(1, { timeout: 3_000 });
-
-        // Save → PUT request fires; modal closes on 200.
-        const respPromise = page.waitForResponse(
-            (r) => r.url().includes(`/media/${MEDIA_POOL_ID}/annotations`) && r.request().method() === 'PUT',
-        );
-        await dialog.locator('button:has-text("Save")').click();
-        const resp = await respPromise;
-        expect(resp.status()).toBe(200);
-        await expect(dialog).toBeHidden({ timeout: 3_000 });
-    });
-
-    test('Reset confirmation clears shapes + restores auto-caption', async ({ page }) => {
-        page.on('dialog', d => d.accept());
-
-        await page.evaluate(({ inspectionId, mediaId }) => {
-            window.dispatchEvent(new CustomEvent('open-photo-studio', {
-                detail: {
-                    media: { id: mediaId, inspectionId, url: '', naturalWidth: 800, naturalHeight: 600 },
-                    inspectionContext: { sectionName: 'Roof', itemTitle: 'flashing' },
-                },
-            }));
-        }, { inspectionId: INSPECTION_ID!, mediaId: MEDIA_POOL_ID! });
-
-        const dialog = page.locator('[role=dialog][aria-label="Photo annotation studio"]');
-        await expect(dialog).toBeVisible({ timeout: 5_000 });
-
-        // Type a non-auto caption.
-        const captionInput = dialog.locator('input[type=text]').first();
-        await captionInput.fill('overridden caption');
-        await expect(captionInput).toHaveValue('overridden caption');
-
-        // Reset → confirmation accepted → caption returns to auto-fill.
-        await dialog.locator('button[aria-label="Reset all annotations and caption"]').click();
-        await expect(captionInput).toHaveValue('Roof · flashing', { timeout: 3_000 });
+    test('dispatch open-photo-studio → overlay visible; Circle draws ellipse; Save persists', () => {
+        // Intentionally empty — see the skip above.
     });
 });

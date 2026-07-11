@@ -1,8 +1,9 @@
+import type { ReactNode } from "react";
 import type { useInspectionState } from "~/hooks/useInspection";
 import { Icon } from "@core/shared-ui";
 import type { ColorScheme } from "~/lib/ui-prefs";
 import { ProgressStripText } from "~/components/editor/ProgressStripText";
-import { FullscreenToggle } from "~/components/editor/FullscreenToggle";
+import { TemplateMenu } from "~/components/editor/TemplateMenu";
 
 type EditorState = ReturnType<typeof useInspectionState>;
 
@@ -23,6 +24,21 @@ export interface EditorHeaderProps {
  collabEditing?: boolean;
  /** Opens the version-history panel. */
  onOpenVersionHistory?: () => void;
+ /**
+  * Commercial PCA Phase U (Batch C2b) — per-unit controls (scope switcher +
+  * per-unit progress + the Units-manager button). Rendered in the left zone
+  * only when provided; residential / tagged-mode editors pass nothing and the
+  * header renders byte-identically to before.
+  */
+ perUnitControls?: ReactNode;
+ /** Template menu (config cluster) — open the template picker to swap templates. */
+ onChangeTemplate: () => void;
+ /** Template menu — save the current structure as a new template. */
+ onSaveAsNewTemplate: () => void;
+ /** Template menu — write the current structure back to the source template. */
+ onUpdateSourceTemplate: () => void;
+ /** Whether the inspection has a source template (enables "Update source"). */
+ canUpdateSourceTemplate: boolean;
 }
 
 export function EditorHeader({
@@ -34,16 +50,27 @@ export function EditorHeader({
  handlePublishClick,
  collabEditing,
  onOpenVersionHistory,
+ perUnitControls,
+ onChangeTemplate,
+ onSaveAsNewTemplate,
+ onUpdateSourceTemplate,
+ canUpdateSourceTemplate,
 }: EditorHeaderProps) {
  return (
- <div className="fixed top-0 left-0 right-0 z-50">
+ // z-40 (below the z-50 overlay layer): this fixed header is page chrome, so
+ // modals and right-side Drawers (both z-50) must paint OVER it. At an equal
+ // z-50 the header's top-right Publish button geometrically overlapped a
+ // Drawer's top-right Close ✕ and — winning the paint-order tie — stole its
+ // clicks. Keeping the header a layer below the overlays fixes that for every
+ // drawer/modal without per-dialog z bumps.
+ <div className="fixed top-0 left-0 right-0 z-40">
  <div className="h-14 bg-ih-bg-card border-b border-ih-border flex items-center px-4 gap-3">
 
  {/* Left zone: navigation + identity + progress + save status + status badge */}
  <div className="flex items-center gap-3 min-w-0 flex-1">
  <a
   href="/inspections"
-  className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
+  className="w-9 h-9 shrink-0 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
  >
   <svg
   className="w-4 h-4"
@@ -71,7 +98,9 @@ export function EditorHeader({
   </div>
  </div>
 
- {/* Completion progress */}
+ {/* Completion progress [INFORMATION] — the least critical info; drops out
+     first on narrow widths so identity + status stay legible. */}
+ <div className="hidden 2xl:flex items-center">
  {(() => {
   const stats = state.overallStats();
   return (
@@ -84,6 +113,7 @@ export function EditorHeader({
   />
   );
  })()}
+ </div>
 
  {/* Save status indicator */}
  {state.saveStatus !== "idle" && (
@@ -131,10 +161,21 @@ export function EditorHeader({
  <span className="px-2 h-7 rounded-md text-[11px] font-bold uppercase tracking-wide ring-1 ring-inset bg-ih-bg-muted text-ih-fg-2 ring-ih-border inline-flex items-center">
   {state.inspection.status as string}
  </span>
+
  </div>
 
- {/* Center zone: search + view mode + batch mode + version history */}
- <div className="hidden lg:flex items-center gap-2">
+ {/* SCOPE zone [per-unit only] — the "which unit am I editing" cluster
+     (scope breadcrumb + unit progress + Units manager). Its own group, set
+     apart from both identity (left) and actions (right). Nothing renders here
+     for residential / tagged-mode editors. */}
+ {perUnitControls && (
+ <div className="flex items-center shrink-0 border-l border-ih-border pl-3">
+ {perUnitControls}
+ </div>
+ )}
+
+ {/* Center zone: report search + version history [tools] */}
+ <div className="hidden xl:flex items-center gap-2">
  {/* Search */}
  <input
   type="text"
@@ -144,33 +185,9 @@ export function EditorHeader({
   className="w-44 h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
  />
 
- {/* Item fullscreen toggle */}
- <FullscreenToggle
-  active={state.itemFullscreen}
-  onToggle={() => state.setItemFullscreen(!state.itemFullscreen)}
- />
-
- {/* Batch mode toggle */}
- <button
-  onClick={() => {
-  if (state.batchMode) {
-   state.setBatchMode(false);
-   state.setBatchSelected({});
-  } else {
-   state.setBatchMode(true);
-  }
-  }}
-  className={`flex w-9 h-9 rounded-md items-center justify-center ${
-  state.batchMode
-   ? "bg-ih-primary-tint text-ih-primary"
-   : "text-ih-fg-3 hover:bg-ih-bg-muted"
-  }`}
-  title={state.batchMode ? "Exit batch mode" : "Batch mode (B)"}
- >
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-  </svg>
- </button>
+ {/* Item fullscreen + batch mode moved OUT of the header — object-scoped
+     actions live with their object (fullscreen → item editor pane; batch →
+     item list column). The header holds global actions only. */}
 
  {/* #181 — Version history (only when collab editing is enabled) */}
  {collabEditing && (
@@ -191,7 +208,7 @@ export function EditorHeader({
  {/* Theme cycle: light → dark → field → auto */}
  <button
   onClick={() => setColorScheme(scheme === 'light' ? 'dark' : scheme === 'dark' ? 'field' : scheme === 'field' ? 'auto' : 'light')}
-  className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
+  className="w-9 h-9 rounded-md hidden xl:flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
   title={`Theme: ${scheme}${scheme === 'field' ? ' (high-contrast outdoor)' : ''}`}
  >
   {scheme === 'dark' ? (
@@ -232,12 +249,22 @@ export function EditorHeader({
   </svg>
  </button>
 
+ {/* Template menu [config] — global template actions consolidated here
+     (swap template · save as new · update source), replacing the buttons
+     that used to sit at the section-rail bottom. */}
+ <TemplateMenu
+  onChangeTemplate={onChangeTemplate}
+  onSaveAsNewTemplate={onSaveAsNewTemplate}
+  onUpdateSourceTemplate={onUpdateSourceTemplate}
+  canUpdateSource={canUpdateSourceTemplate}
+ />
+
  {/* Preview full report — opens the whole report (all sections) in a new tab.
      Owner preview works on drafts (tokenless via the report-view loader). */}
  {tenantSlug && (
   <button
   onClick={() => window.open(`/report-view/${tenantSlug}/${state.inspection.id}`, "_blank", "noopener")}
-  className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+  className="hidden 2xl:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
   title="Preview the full report (all sections) in a new tab"
   >
   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -253,7 +280,7 @@ export function EditorHeader({
      on drafts via the owner/JWT-authed /api/inspections/:id/pdf endpoint. */}
  <button
   onClick={() => window.open(`/api/inspections/${state.inspection.id}/pdf?type=full`, "_blank", "noopener")}
-  className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+  className="hidden xl:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
   title="Preview the real server-rendered PDF (the exact client deliverable) in a new tab"
  >
   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,7 +292,7 @@ export function EditorHeader({
  {/* Sign now button */}
  <button
   onClick={() => setSignModalOpen(true)}
-  className="hidden lg:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+  className="hidden xl:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
   title="Sign this inspection now"
  >
   <Icon name="edit" className="w-3.5 h-3.5" />

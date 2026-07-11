@@ -10,9 +10,16 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
- api.inspections[":id"].results.$get({ param: { id } }),
+ // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
+ // scope. The editor opens at activeUnitId = null (the '_default' scope), so
+ // we fetch just that slice: for a `tagged` inspection '_default' IS the whole
+ // map (no payload change); for a `per_unit` inspection this drops every unit's
+ // findings from first paint — they load on demand when a unit is selected
+ // (Batch C2, not this batch). The optional `scope` query flows through
+ // hono/client once the route declares it.
+ api.inspections[":id"].results.$get({ param: { id }, query: { scope: '_default' } }),
  api.inspections[":id"]["report-data"].$get({ param: { id } }),
  // Track H (C-12): tag library moved off the client-side fetch into the loader.
  api.tags.index.$get().catch(() => null),
@@ -23,6 +30,13 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // name/id → color lookup and thread it into every canned-defect chip,
  // instead of resolving color per-defect.
  api.defectCategories["defect-categories"].$get().catch(() => null),
+ // Commercial PCA Phase U (Batch C2b) — the inspection's unit rows (scope
+ // switcher + units manager) and the server-computed per-unit progress
+ // summary (completion dots). Both default to empty when absent (residential
+ // inspections with no units render exactly as today). Tolerant .catch so a
+ // per-unit endpoint hiccup never 500s the whole editor.
+ api.inspections[":id"].units.$get({ param: { id } }).catch(() => null),
+ api.inspections[":id"]["unit-progress"].$get({ param: { id } }).catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -35,10 +49,18 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  propertyAddress: "Loading...",
  status: "draft",
  };
- // templateSnapshot may arrive as a JSON string (wizard-created inspections)
- // — parse before use, mirroring the template-snapshot normalization used
- // elsewhere. Mutating a string here 500'd the whole editor.
- const rawSchema = data?.templateSnapshot ||
+ // The base structure MUST come from the inspection's OWN templateSnapshot
+ // column — that's where inline structure edits (add/rename/delete/move) are
+ // PATCHed, and it's the exact source getReportData reads for the display. The
+ // top-level `data.templateSnapshot` is not set by the inspection GET, so the
+ // old fallback resolved to `template.schema` (the pristine SOURCE template),
+ // which never tracks per-inspection edits — every structural op then rebuilt
+ // from the original template and silently dropped prior edits. Prefer the
+ // per-inspection column; fall back to the source template only for legacy
+ // inspections that pre-date the snapshot column.
+ // (May arrive as a JSON string — parsed below.)
+ const rawSchema = (data?.inspection as Record<string, unknown>)?.templateSnapshot ||
+ data?.templateSnapshot ||
  (data?.template as Record<string, unknown>)?.schema;
  const schema = ((typeof rawSchema === "string"
  ? JSON.parse(rawSchema)
@@ -116,5 +138,35 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  defectCategories = defectCatBody.data ?? [];
  }
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories };
+ // Commercial PCA Phase U (Batch C2b) — unit rows + per-unit progress.
+ type UnitRow = {
+   id: string; name: string; kind: string; type: string;
+   parentUnitId: string | null; sortOrder: number;
+ };
+ let units: UnitRow[] = [];
+ if (unitsRes?.ok) {
+   const unitsBody = await unitsRes.json() as { data?: { units?: UnitRow[] } };
+   units = unitsBody.data?.units ?? [];
+ }
+
+ type UnitProgressSummary = {
+   units: Array<{ unitId: string; rated: number; total: number }>;
+   commonRated: number;
+   total: number;
+ };
+ let unitProgress: UnitProgressSummary = { units: [], commonRated: 0, total: 0 };
+ if (unitProgressRes?.ok) {
+   const upBody = await unitProgressRes.json() as { data?: UnitProgressSummary };
+   if (upBody.data) unitProgress = upBody.data;
+ }
+
+ // `unit_inspection_mode` rides along on the inspection row (getInspection
+ // spreads the full row); it is not in the hand-written narrow type, so read it
+ // defensively. Default 'tagged' → the editor looks exactly as today.
+ const unitInspectionMode =
+   (inspection as { unitInspectionMode?: "tagged" | "per_unit" }).unitInspectionMode === "per_unit"
+     ? "per_unit" as const
+     : "tagged" as const;
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode };
 }

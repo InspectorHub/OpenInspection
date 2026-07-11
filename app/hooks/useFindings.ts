@@ -1,6 +1,5 @@
 import { useCallback } from "react";
 import type { ResultMap } from "./useInspection";
-import { fKey } from "./useInspection";
 import {
   findingKey,
   cloneByScope,
@@ -42,19 +41,25 @@ export function useFindings(
   options: FindingsOptions,
 ) {
   const { sectionIdForItem, setDirty, setSaveStatus } = options;
+  // Phase U (Batch C1) — active per-unit scope (null = `_default` common scope).
+  const activeUnitId = options.activeUnitId ?? null;
 
   // Composite-key-preferred read helper (shared by the collab API and the
-  // pre-connect fallback below).
+  // pre-connect fallback below). Phase U: resolve the composite key under the
+  // ACTIVE unit. The bare-itemId fallback is only consulted in the `_default`
+  // view — in per-unit mode two units share an itemId, so the bare key is
+  // ambiguous and must never let one unit shadow another.
   const getResult = useCallback(
     (itemId: string, sectionId?: string): Record<string, unknown> => {
       const sid = sectionId || sectionIdForItem(itemId);
       if (sid) {
-        const ck = fKey(sid, itemId);
+        const ck = findingKey(activeUnitId, sid, itemId);
         if (results[ck]) return results[ck];
       }
-      return results[itemId] || {};
+      if (activeUnitId == null) return results[itemId] || {};
+      return {};
     },
-    [results, sectionIdForItem],
+    [results, sectionIdForItem, activeUnitId],
   );
 
   // #181 — collab is the only write path. Once the doc is live, return the pure
@@ -66,6 +71,7 @@ export function useFindings(
       setResults,
       setDirty,
       setSaveStatus,
+      activeUnitId,
     });
   }
 

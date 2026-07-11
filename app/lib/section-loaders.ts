@@ -114,6 +114,10 @@ export async function loadReportSection(
       commercialSubtype: (raw?.commercialSubtype as string | undefined) ?? null,
       buildingProfile: (raw?.buildingProfile as ReportLoaderResult["buildingProfile"] | undefined) ?? [],
       pcaReport: (raw?.pcaReport as ReportLoaderResult["pcaReport"] | undefined) ?? null,
+      unitInspectionMode: (raw?.unitInspectionMode as 'tagged' | 'per_unit' | undefined) ?? 'tagged',
+      units: (raw?.units as ReportLoaderResult["units"] | undefined) ?? [],
+      unitConditionMatrix: (raw?.unitConditionMatrix as ReportLoaderResult["unitConditionMatrix"] | undefined) ?? [],
+      defectCountsByUnit: (raw?.defectCountsByUnit as ReportLoaderResult["defectCountsByUnit"] | undefined) ?? {},
     } satisfies ReportLoaderResult;
   } catch {
     return {
@@ -142,6 +146,10 @@ export async function loadReportSection(
       commercialSubtype: null,
       buildingProfile: [],
       pcaReport: null,
+      unitInspectionMode: 'tagged',
+      units: [],
+      unitConditionMatrix: [],
+      defectCountsByUnit: {},
     } satisfies ReportLoaderResult;
   }
 }

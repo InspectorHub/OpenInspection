@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface DockTile {
   id: string;
@@ -32,6 +32,19 @@ export function InspectorToolsDock({
   hidden,
 }: InspectorToolsDockProps) {
   const [dockOpen, setDockOpen] = useState(false);
+
+  // Escape closes the dock menu (parity with every Modal/Drawer, which close on
+  // Escape via useDialogBehavior). Without this the menu could only be dismissed
+  // by clicking its click-outside backdrop — and that full-screen backdrop
+  // intercepts pointer events over the rest of the editor until it closes.
+  useEffect(() => {
+    if (!dockOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDockOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [dockOpen]);
 
   if (hidden) return null;
 
@@ -68,7 +81,7 @@ export function InspectorToolsDock({
         type="button"
         className="w-14 h-14 rounded-full bg-gradient-to-br from-ih-primary to-ih-primary-600 shadow-ih-popover flex items-center justify-center text-white active:scale-95 transition-transform"
         onClick={() => setDockOpen(!dockOpen)}
-        aria-label="Open inspector tools"
+        aria-label={dockOpen ? "Close inspector tools" : "Open inspector tools"}
         aria-expanded={dockOpen}
       >
         <svg aria-hidden="true" className="w-6 h-6 transition-transform duration-150" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" style={dockOpen ? { transform: "rotate(45deg)" } : undefined}>

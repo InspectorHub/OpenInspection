@@ -83,7 +83,7 @@ const deleteDefectCategoryRoute = createRoute(withMcpMetadata({
     request: { params: z.object({ id: z.string().min(1).describe('Defect category id.') }) },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ deleted: z.literal(true) }) }) } },
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ deleted: z.boolean() }) }) } },
             description: 'Deleted',
         },
     },
@@ -112,8 +112,7 @@ export const adminDefectCategoriesRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const patch = c.req.valid('json');
         const svc = new DefectCategoryService(c.env.DB);
-        await svc.update(tenantId, id, patch);
-        const updated = (await svc.list(tenantId)).find((r) => r.id === id);
+        const updated = await svc.update(tenantId, id, patch);
         if (!updated) throw Errors.NotFound('Defect category not found');
         auditFromContext(c, 'defect_category.updated', 'defect_category', { entityId: id });
         return c.json({ success: true as const, data: updated }, 200);
@@ -122,9 +121,11 @@ export const adminDefectCategoriesRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const { id } = c.req.valid('param');
         const svc = new DefectCategoryService(c.env.DB);
-        await svc.remove(tenantId, id);
-        auditFromContext(c, 'defect_category.deleted', 'defect_category', { entityId: id });
-        return c.json({ success: true as const, data: { deleted: true as const } }, 200);
+        const deleted = await svc.remove(tenantId, id);
+        // Only log the delete when a row actually went away (a no-op — unknown id,
+        // cross-tenant, or protected seed — must not emit a phantom audit entry).
+        if (deleted) auditFromContext(c, 'defect_category.deleted', 'defect_category', { entityId: id });
+        return c.json({ success: true as const, data: { deleted } }, 200);
     });
 
 export type AdminDefectCategoriesApi = typeof adminDefectCategoriesRoutes;

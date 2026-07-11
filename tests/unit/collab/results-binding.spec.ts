@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as Y from 'yjs';
+import { findingKey } from '../../../server/lib/finding-key';
 import {
     readResultMap,
     bindResultMap,
@@ -402,5 +403,98 @@ describe('results-binding – appendNote', () => {
 
         const map = readResultMap(doc);
         expect(map['_default:s1:i1'].notes).toBe('only note');
+    });
+});
+
+// ─── Group 10: Phase U per-unit scoping (Batch C1) ───────────────────────────
+
+describe('results-binding – per-unit scoping (Phase U)', () => {
+    it('a write with unitId="u1" lands under u1:sec:item, NOT _default', () => {
+        const doc = new Y.Doc();
+
+        // Trailing unitId arg scopes the write to unit u1.
+        setRating(doc, 's1', 'i1', 'NI', 'u1');
+
+        const map = readResultMap(doc);
+
+        // The finding is stored under the u1-scoped composite key.
+        expect(map['u1:s1:i1']).toBeDefined();
+        expect(map['u1:s1:i1'].rating).toBe('NI');
+
+        // The _default scope was NOT touched.
+        expect(map['_default:s1:i1']).toBeUndefined();
+    });
+
+    it('unitId omitted (default null) still lands under _default (regression)', () => {
+        const doc = new Y.Doc();
+
+        // No unitId → the _default common scope, byte-identical to pre-Phase-U.
+        setRating(doc, 's1', 'i1', 'IN');
+
+        const map = readResultMap(doc);
+        expect(map['_default:s1:i1'].rating).toBe('IN');
+        expect(map['u1:s1:i1']).toBeUndefined();
+    });
+
+    it('unitId=null explicit behaves identically to omitting it', () => {
+        const doc = new Y.Doc();
+
+        setNotes(doc, 's1', 'i1', 'common note', null);
+
+        const map = readResultMap(doc);
+        expect(map['_default:s1:i1'].notes).toBe('common note');
+        expect(map[findingKey(null, 's1', 'i1')].notes).toBe('common note');
+    });
+
+    it('two units carrying the SAME itemId do NOT collide (composite scope)', () => {
+        const doc = new Y.Doc();
+
+        // Same section + same itemId, two different units.
+        setRating(doc, 's1', 'i1', 'NI', 'u1');
+        setNotes(doc, 's1', 'i1', 'unit-1 note', 'u1');
+        setRating(doc, 's1', 'i1', 'IN', 'u2');
+        setNotes(doc, 's1', 'i1', 'unit-2 note', 'u2');
+
+        const map = readResultMap(doc);
+
+        // Each unit keeps its own finding under its own composite key.
+        expect(map[findingKey('u1', 's1', 'i1')].rating).toBe('NI');
+        expect(map[findingKey('u1', 's1', 'i1')].notes).toBe('unit-1 note');
+        expect(map[findingKey('u2', 's1', 'i1')].rating).toBe('IN');
+        expect(map[findingKey('u2', 's1', 'i1')].notes).toBe('unit-2 note');
+
+        // Cross-check: the two units' entries are distinct objects and never
+        // bleed into each other despite sharing sectionId + itemId.
+        expect(map['u1:s1:i1']).not.toBe(map['u2:s1:i1']);
+        expect(map['u1:s1:i1'].rating).not.toBe(map['u2:s1:i1'].rating);
+    });
+
+    it('nested writes (canned defect + photo) scope to the active unit', () => {
+        const doc = new Y.Doc();
+
+        toggleCanned(doc, 's1', 'i1', 'defects', 'd1', true, 'u1');
+        setDefectFields(doc, 's1', 'i1', 'd1', { location: 'Unit 1 wall' }, 'u1');
+        appendPhoto(doc, 's1', 'i1', { key: 'r2/u1.jpg' }, 'u1');
+
+        // A different unit's canned defect on the same item.
+        toggleCanned(doc, 's1', 'i1', 'defects', 'd1', true, 'u2');
+        setDefectFields(doc, 's1', 'i1', 'd1', { location: 'Unit 2 wall' }, 'u2');
+
+        const map = readResultMap(doc);
+
+        const u1Defect = (map['u1:s1:i1'].tabs as { defects?: Array<{ cannedId: string; location?: string }> })
+            .defects?.find((d) => d.cannedId === 'd1');
+        const u2Defect = (map['u2:s1:i1'].tabs as { defects?: Array<{ cannedId: string; location?: string }> })
+            .defects?.find((d) => d.cannedId === 'd1');
+
+        expect(u1Defect?.location).toBe('Unit 1 wall');
+        expect(u2Defect?.location).toBe('Unit 2 wall');
+
+        // u1's photo is invisible in u2's scope.
+        const u1Photos = map['u1:s1:i1'].photos as Array<{ key: string }> | undefined;
+        const u2Photos = map['u2:s1:i1'].photos as Array<{ key: string }> | undefined;
+        expect(u1Photos?.some((p) => p.key === 'r2/u1.jpg')).toBe(true);
+        // u2 never had a photo written — its scope has no photos array at all.
+        expect(Boolean(u2Photos?.some((p) => p.key === 'r2/u1.jpg'))).toBe(false);
     });
 });

@@ -1,25 +1,25 @@
 /**
- * New Inspection wizard — now a dedicated full page at /inspections/new
- * (converted from the former modal overlay).
+ * New Inspection wizard — a dedicated full page at /inspections/new (converted
+ * from the former modal overlay).
  *
- * Required env vars (.dev.vars or shell):
- *   TEST_INSPECTOR_EMAIL
- *   TEST_INSPECTOR_PASSWORD
- *
- * Skipped automatically when missing.
+ * Fixture: the `editor-seed` setup project logs in as the api-seeded admin and
+ * records its credentials via {@link readEditorSeed}; this spec depends on it
+ * (see playwright.config.ts) and reuses those creds. Skips only when the seed
+ * is absent. The wizard needs no inspection id — it exercises the create flow's
+ * property step, not an existing inspection.
  */
 import { test, expect } from '@playwright/test';
-
-const EMAIL    = process.env['TEST_INSPECTOR_EMAIL'];
-const PASSWORD = process.env['TEST_INSPECTOR_PASSWORD'];
+import { readEditorSeed } from './helpers/editor-seed';
 
 test.describe('New Inspection wizard page (/inspections/new)', () => {
-    test.skip(!EMAIL || !PASSWORD, 'Set TEST_INSPECTOR_EMAIL / TEST_INSPECTOR_PASSWORD to run.');
-
     test.beforeEach(async ({ page }) => {
+        // Read at RUNTIME — the editor-seed dependency writes the handoff during
+        // the run, after Playwright evaluates top-level spec code.
+        const seed = readEditorSeed();
+        test.skip(!seed, 'editor-seed handoff missing — run with the editor-seed setup project.');
         await page.goto('/login');
-        await page.fill('input[name=email]',    EMAIL!);
-        await page.fill('input[name=password]', PASSWORD!);
+        await page.fill('input[name=email]',    seed!.email);
+        await page.fill('input[name=password]', seed!.password);
         await page.click('button[type=submit]');
         await page.waitForURL('**/inspections');
     });
@@ -37,7 +37,8 @@ test.describe('New Inspection wizard page (/inspections/new)', () => {
         await expect(page.getByText('Property Type')).toBeVisible();
         await page.locator('input[placeholder="123 Main St, City, State"]').fill('789 Test Lane');
         // Next gates on address (>=5 chars) AND a selected template, so it
-        // stays present; the create flow itself is covered by unit/api tests.
+        // stays present (possibly disabled); the create flow itself is covered
+        // by unit/api tests.
         await expect(page.getByRole('button', { name: 'Next' })).toBeVisible();
     });
 });

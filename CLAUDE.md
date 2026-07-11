@@ -19,7 +19,7 @@ npm run dev:hmr      # Vite dev server with HMR (react-router dev). The fast ite
 npm run build        # react-router build — bundles server/ (API) + app/ (RR SSR) into one worker
 npm run deploy       # standalone: build + wrangler deploy (real ids via wrangler.local.jsonc)
 npm run deploy:saas  # saas: build + wrangler deploy with wrangler.saas.jsonc
-npm run type-check   # react-router typegen, then the app + api tsc passes run CONCURRENTLY
+npm run type-check   # react-router typegen, then the app + api tsc passes run serially (lower peak RAM)
 npm run type-check:app   # tsc app side only (tsconfig.json)
 npm run type-check:api   # tsc api side only (tsconfig.api.json) — fastest loop for server/ work
 npm run type-check:fast  # tsgo (@typescript/native-preview) both passes; tsc stays the CI gate

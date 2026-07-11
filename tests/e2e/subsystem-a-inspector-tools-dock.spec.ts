@@ -2,35 +2,30 @@
  * Design System 0520 subsystem A phase 5 — InspectorTools FAB dock E2E
  * (Task 5.5).
  *
- * Required env vars (.dev.vars or shell):
- *   TEST_INSPECTOR_EMAIL
- *   TEST_INSPECTOR_PASSWORD
- *   TEST_INSPECTION_ID
- *
- * Skipped automatically when any var is missing.
+ * Fixture: the `editor-seed` setup project creates an editable inspection with
+ * items and records it via {@link readEditorSeed}; this spec depends on it (see
+ * playwright.config.ts), so the handoff is present. Skips only when the seed is
+ * absent (e.g. the setup project was not selected).
  */
 import { test, expect } from '@playwright/test';
-
-const EMAIL = process.env['TEST_INSPECTOR_EMAIL'];
-const PASSWORD = process.env['TEST_INSPECTOR_PASSWORD'];
-const INSPECTION_ID = process.env['TEST_INSPECTION_ID'];
+import { readEditorSeed } from './helpers/editor-seed';
 
 test.describe('InspectorTools FAB dock (subsystem A M15)', () => {
-    test.skip(
-        !EMAIL || !PASSWORD || !INSPECTION_ID,
-        'Set TEST_INSPECTOR_EMAIL / TEST_INSPECTOR_PASSWORD / TEST_INSPECTION_ID to run.',
-    );
-
     test.beforeEach(async ({ page }) => {
+        // Read at RUNTIME, not module scope: the editor-seed dependency writes the
+        // handoff while the suite is executing, but Playwright evaluates top-level
+        // spec code at collection time (before any project runs), so a module-level
+        // read would always see it missing and skip.
+        const seed = readEditorSeed();
+        test.skip(!seed, 'editor-seed handoff missing — run with the editor-seed setup project.');
         await page.goto('/login');
-        await page.fill('input[name=email]',    EMAIL!);
-        await page.fill('input[name=password]', PASSWORD!);
+        await page.fill('input[name=email]',    seed!.email);
+        await page.fill('input[name=password]', seed!.password);
         await page.click('button[type=submit]');
         await page.waitForURL('**/inspections');
-        await page.goto(`/inspections/${INSPECTION_ID}/edit`);
-        // De-stale (2026-07 tests-reorg): the RR v7 editor shell renders a
-        // single <main> (app/routes/inspection-edit.tsx:1873) — was the Alpine
-        // [x-data*=inspectionEditor] root.
+        await page.goto(`/inspections/${seed!.inspectionId}/edit`);
+        // The RR v7 editor shell renders a single <main>; wait for it to hydrate
+        // before driving keyboard/pointer flows.
         await page.getByRole('main').waitFor({ state: 'visible' });
     });
 

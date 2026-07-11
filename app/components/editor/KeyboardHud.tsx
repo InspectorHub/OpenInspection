@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 
 interface ShortcutColumn {
   title: string;
@@ -39,36 +39,32 @@ const COLUMNS: ShortcutColumn[] = [
   ]},
 ];
 
-export function KeyboardHud() {
-  const [open, setOpen] = useState(false);
-
+export function KeyboardHud({ onClose }: { onClose: () => void }) {
+  // The editor mounts this only while the cheatsheet is toggled on — that state
+  // lives in the parent, and the `?` hotkey (useKeyboard) flips it — so the
+  // overlay renders as soon as it mounts and closes via `onClose` (Esc, backdrop
+  // click, or another `?`). It previously kept a private `open` state that
+  // started false, so it mounted but rendered nothing: the `?` HUD never
+  // appeared after the Alpine→RR migration.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
-        const tag = (e.target as HTMLElement)?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return;
-        e.preventDefault();
-        setOpen((v) => !v);
-      }
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") onClose();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  if (!open) return null;
+  }, [onClose]);
 
   return (
     <div className="hidden md:flex fixed inset-0 z-[9999] items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
       {/* ds-allow: intentional heavier fixed-dark dim (0.85) for the full-screen keyboard-shortcuts overlay */}
-      <div className="absolute inset-0 bg-[rgba(15,23,42,0.85)]" onClick={() => setOpen(false)} />
+      <div className="absolute inset-0 bg-[rgba(15,23,42,0.85)]" onClick={onClose} />
       <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover border border-ih-border max-w-4xl w-full max-h-[85vh] overflow-y-auto">
         <header className="px-6 py-4 border-b border-ih-border flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-ih-fg-1">Keyboard shortcuts</h2>
             <p className="text-xs text-ih-fg-3 mt-0.5">Press <kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">?</kbd> to toggle, <kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">Esc</kbd> to close</p>
           </div>
-          <button onClick={() => setOpen(false)} className="text-ih-fg-4 hover:text-ih-fg-2 text-xl leading-none" aria-label="Close">&times;</button>
+          <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-xl leading-none" aria-label="Close">&times;</button>
         </header>
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {COLUMNS.map((col) => (

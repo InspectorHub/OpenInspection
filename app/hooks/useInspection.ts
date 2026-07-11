@@ -1,4 +1,5 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
+import { findingKey } from "./findings/shared";
 import { backfillLevelDescriptions } from "./inspection/helpers";
 import type { InspectionContext } from "./inspection/helpers";
 import type { Severity } from "~/lib/severity";
@@ -111,6 +112,15 @@ export interface UseInspectionOptions {
   schema: InspectionSchema;
   results: ResultMap;
   ratingLevels?: RatingLevel[];
+  /**
+   * Phase U (Batch C1) — the active per-unit scope. `null`/undefined (default)
+   * = the `_default` common scope, so behavior is byte-identical to before this
+   * change. When a unit is active, `getResult` resolves the composite key under
+   * that unit and never falls back to the collision-prone bare itemId. The
+   * editor (inspection-edit.tsx) owns this state; the scope switcher UI lands in
+   * Batch C2.
+   */
+  activeUnitId?: string | null;
 }
 
 /**
@@ -133,8 +143,19 @@ export function useInspectionState(opts: UseInspectionOptions) {
   const [inspection, setInspection] = useState<Inspection>(
     opts.inspection as Inspection,
   );
-  const [schema] = useState<InspectionSchema>(opts.schema);
+  // Frozen at mount EXCEPT for structural edits, which optimistically replace
+  // the section list via setSections so the rail / item list reflect an
+  // add/rename/delete/move immediately (POST persistence + shouldRevalidate skip
+  // mean no loader refresh otherwise). Item runtime data (ratings/notes) lives
+  // in `results`, not on these section objects, so swapping structure here is safe.
+  const [schema, setSchema] = useState<InspectionSchema>(opts.schema);
   const sections = schema.sections || [];
+  const setSections = useCallback((next: SchemaSection[]) => {
+    setSchema((s) => ({ ...s, sections: next }));
+  }, []);
+
+  // Phase U (Batch C1) — active per-unit scope (null = `_default` common scope).
+  const activeUnitId = opts.activeUnitId ?? null;
 
   const [ratingLevels, setRatingLevels] = useState<RatingLevel[]>(() =>
     backfillLevelDescriptions(opts.ratingLevels || []),
@@ -147,6 +168,17 @@ export function useInspectionState(opts: UseInspectionOptions) {
         const ck = fKey(sec.id, item.id);
         if (!r[ck]) r[ck] = { rating: null, notes: "", photos: [] };
         if (!r[item.id]) r[item.id] = r[ck];
+        // Phase U (Batch C2a) — when a unit is the initial active scope, ALSO
+        // seed its per-unit stubs so per-unit reads never hit undefined. Gated on
+        // `activeUnitId != null`, so the `_default` seeding above is unchanged and
+        // behavior is byte-identical when no unit is active. Re-seeding on a live
+        // scope SWITCH is deferred to Batch C2b (the switcher UI) — `getResult`
+        // already returns `{}` for an unseeded per-unit key, so a switch before
+        // that lands cannot crash a read; it just lacks the empty-shape stub.
+        if (activeUnitId != null) {
+          const uk = findingKey(activeUnitId, sec.id, item.id);
+          if (!r[uk]) r[uk] = { rating: null, notes: "", photos: [] };
+        }
       }
     }
     return r;
@@ -252,26 +284,35 @@ export function useInspectionState(opts: UseInspectionOptions) {
     [sections],
   );
 
-  /** Build a composite finding key for an itemId */
+  /** Build a composite finding key for an itemId in the ACTIVE unit scope.
+   *  Phase U: `activeUnitId == null` → the `_default` common key (byte-identical
+   *  to before); a non-null unit keys that unit's finding. */
   const fk = useCallback(
     (itemId: string): string => {
       const sid = sectionIdForItem(itemId);
-      return sid ? fKey(sid, itemId) : itemId;
+      return sid ? findingKey(activeUnitId, sid, itemId) : itemId;
     },
-    [sectionIdForItem],
+    [sectionIdForItem, activeUnitId],
   );
 
-  /** Read a result entry with composite-key-first fallback */
+  /**
+   * Read a result entry with composite-key-first fallback. Phase U: the
+   * composite key resolves under the ACTIVE unit (`findingKey(activeUnitId,…)`).
+   * The bare-itemId fallback is only used in the `_default` view — in per-unit
+   * mode two units share an itemId, so the bare key is ambiguous and must never
+   * let one unit shadow another.
+   */
   const getResult = useCallback(
     (itemId: string, sectionId?: string): Record<string, unknown> => {
       const sid = sectionId || sectionIdForItem(itemId);
       if (sid) {
-        const ck = fKey(sid, itemId);
+        const ck = findingKey(activeUnitId, sid, itemId);
         if (results[ck]) return results[ck];
       }
-      return results[itemId] || {};
+      if (activeUnitId == null) return results[itemId] || {};
+      return {};
     },
-    [results, sectionIdForItem],
+    [results, sectionIdForItem, activeUnitId],
   );
 
   /** Find an item by id across all sections */
@@ -424,6 +465,7 @@ export function useInspectionState(opts: UseInspectionOptions) {
     setInspection,
     schema,
     sections,
+    setSections,
     ratingLevels,
     setRatingLevels,
     results,

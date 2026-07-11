@@ -5,9 +5,14 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { Errors } from '../../lib/errors';
-import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema } from '../../lib/validations/unit.schema';
+import { CreateUnitSchema, UpdateUnitSchema, MoveUnitSchema, BulkCreateUnitsSchema, UnitModeSwitchSchema } from '../../lib/validations/unit.schema';
 import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { expandFloorsStacks, parseUnitCsv } from '../../lib/unit-pattern';
+import { computeUnitProgress } from '../../lib/unit-progress';
+import { drizzle } from 'drizzle-orm/d1';
+import { inspectionResults } from '../../lib/db/schema';
+import { and, eq } from 'drizzle-orm';
 
 // -----------------------------------------------------------------------------
 // Design System 0520 subsystem D phase 1 task 1.3 — UnitTree CRUD routes.
@@ -33,6 +38,82 @@ export const createUnitRoute = createRoute(withMcpMetadata({
     operationId: "createInspectionUnits",
     description: "Auto-generated placeholder for createInspectionUnits (POST /{id}/units, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
+
+// Commercial PCA Phase U — bulk-create N units (floors×stacks / CSV paste) and
+// duplicate a unit's attributes into a new empty sibling. Same mount, same
+// requireRole guard, same c.var.services.unit as the single-create route.
+export const bulkCreateUnitsRoute = createRoute(withMcpMetadata({
+    method:     'post',
+    path:       '/{id}/units/bulk',
+    tags: ["inspections"],
+    summary:    'Bulk-create units under an inspection (floors×stacks or CSV)',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        body: { content: { 'application/json': { schema: BulkCreateUnitsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+    },
+    responses: {
+        200: { description: 'created', content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ ids: z.array(z.string()).describe('TODO describe ids field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } } },
+        400: { description: 'validation' },
+    },
+    operationId: "bulkCreateInspectionUnits",
+    description: "Auto-generated placeholder for bulkCreateInspectionUnits (POST /{id}/units/bulk, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['write'], tier: 'extended' }));
+
+export const duplicateUnitRoute = createRoute(withMcpMetadata({
+    method:     'post',
+    path:       '/{id}/units/{unitId}/duplicate',
+    tags: ["inspections"],
+    summary:    'Duplicate a unit (clone attributes into a new empty sibling)',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'), unitId: z.string().min(1).describe('TODO describe unitId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+    },
+    responses: {
+        200: { description: 'duplicated', content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } } },
+        400: { description: 'unit not found' },
+    },
+    operationId: "duplicateInspectionUnit",
+    description: "Auto-generated placeholder for duplicateInspectionUnit (POST /{id}/units/{unitId}/duplicate, inspections domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['write'], tier: 'extended' }));
+
+// Commercial PCA Phase U (Batch C2a) — flip an inspection between tagged and
+// per_unit mode. Delegates to c.var.services.unitSwitch (Batch B); the
+// per_unit → tagged direction is LOSSY (drops the unit rows + matrix). Same
+// requireRole guard as the other write routes on this mount.
+export const unitModeSwitchRoute = createRoute(withMcpMetadata({
+    method:     'post',
+    path:       '/{id}/unit-mode',
+    tags: ["inspections"],
+    summary:    'Switch an inspection between tagged and per-unit inspection mode',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({ id: z.string().uuid().describe('Inspection id whose unit-inspection mode is switched') }),
+        body: { content: { 'application/json': { schema: UnitModeSwitchSchema } } },
+    },
+    responses: {
+        200: { description: 'switched', content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.record(z.string(), z.unknown()) }) } } },
+        400: { description: 'switch failed (e.g. inspection not found in this tenant)' },
+    },
+    operationId: "switchInspectionUnitMode",
+    description: "Switches inspections.unit_inspection_mode. mode='per_unit' promotes location tags into unit rows and re-keys unambiguous findings; mode='tagged' is the lossy reverse (flattens unit findings back to the common scope, unions labels into location_options, deletes the promoted unit rows)."
+}, { scopes: ['write'], tier: 'extended' }));
+
+// Commercial PCA Phase U (Batch C2a) — lightweight per-unit progress summary.
+// Computes rated/total per unit + the common scope SERVER-SIDE from one results
+// row + the template snapshot, so the scope switcher never has to pull the full
+// results map. Same roles as listUnits (read, includes agent).
+export const unitProgressRoute = createRoute(withMcpMetadata({
+    method:     'get',
+    path:       '/{id}/unit-progress',
+    tags: ["inspections"],
+    summary:    'Per-unit rated/total progress summary (server-computed, no full map)',
+    middleware: [requireRole('owner', 'manager', 'inspector', 'agent')] as const,
+    request:    { params: z.object({ id: z.string().uuid().describe('Inspection id whose per-unit progress is summarized') }) },
+    responses:  { 200: { description: 'ok' } },
+    operationId: "listInspectionUnitProgress",
+    description: "Returns { units: [{ unitId, rated, total }], commonRated, total } for an inspection. `total` is the template item count; `rated` counts each scope's findings that carry a truthy rating. Computed server-side from one results row to avoid shipping the full results map to the client."
+}, { scopes: ['read'], tier: 'extended' }));
 
 export const listUnitsRoute = createRoute(withMcpMetadata({
     method:     'get',
@@ -199,6 +280,71 @@ const hierarchyRoutes = createApiRouter()
         } catch (err) {
             throw Errors.BadRequest((err as Error).message);
         }
+    })
+    .openapi(bulkCreateUnitsRoute, async (c) => {
+        const { id }   = c.req.valid('param');
+        const body     = c.req.valid('json');
+        const tenantId = c.get('tenantId');
+        const drafts = body.mode === 'floors_stacks'
+            ? expandFloorsStacks({
+                floors: body.floors, stacks: body.stacks,
+                ...(body.startAt !== undefined ? { startAt: body.startAt } : {}),
+              })
+            : parseUnitCsv(body.csv);
+        try {
+            const out = await c.var.services.unit.createMany(tenantId, id, drafts, {
+                parentUnitId: body.parentUnitId ?? null,
+                kind: 'unit',
+                type: 'unit',
+            });
+            return c.json({ success: true as const, data: out }, 200);
+        } catch (err) {
+            throw Errors.BadRequest((err as Error).message);
+        }
+    })
+    .openapi(duplicateUnitRoute, async (c) => {
+        const { id, unitId } = c.req.valid('param');
+        try {
+            // Scope the duplicate to this inspection so a unit from another
+            // inspection cannot be cloned through this URL.
+            const out = await c.var.services.unit.duplicate(c.get('tenantId'), unitId, id);
+            return c.json({ success: true as const, data: out }, 200);
+        } catch (err) {
+            throw Errors.BadRequest((err as Error).message);
+        }
+    })
+    .openapi(unitModeSwitchRoute, async (c) => {
+        const { id }   = c.req.valid('param');
+        const { mode } = c.req.valid('json');
+        const tenantId = c.get('tenantId');
+        try {
+            const data = mode === 'per_unit'
+                ? await c.var.services.unitSwitch.toPerUnit(tenantId, id)
+                : await c.var.services.unitSwitch.toTagged(tenantId, id);
+            return c.json({ success: true as const, data }, 200);
+        } catch (err) {
+            throw Errors.BadRequest((err as Error).message);
+        }
+    })
+    .openapi(unitProgressRoute, async (c) => {
+        const { id }   = c.req.valid('param');
+        const tenantId = c.get('tenantId');
+        // Ownership guard + source of the template snapshot (denominator).
+        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+        const units = (await c.var.services.unit.list(tenantId, id)).filter((u: { kind: string }) => u.kind === 'unit');
+        // One tenant-scoped results row read — computeUnitProgress does the rest
+        // server-side; the full map never leaves the worker.
+        const db  = drizzle(c.env.DB);
+        const row = await db.select().from(inspectionResults)
+            .where(and(eq(inspectionResults.inspectionId, id), eq(inspectionResults.tenantId, tenantId)))
+            .get();
+        const data = (row?.data || {}) as Record<string, unknown>;
+        const summary = computeUnitProgress(
+            data,
+            (inspection as { templateSnapshot?: unknown }).templateSnapshot,
+            units.map((u: { id: string }) => u.id),
+        );
+        return c.json({ success: true as const, data: summary }, 200);
     })
     .openapi(listUnitsRoute, async (c) => {
         const { id }   = c.req.valid('param');

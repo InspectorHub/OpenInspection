@@ -236,6 +236,12 @@ export function reorderSection(snapshot: Snapshot, fromId: string, toId: string)
     return stripRuntimeKeys({ ...snapshot, sections });
 }
 
+/** Rename a section's title (structure only; unchanged sections untouched). */
+export function renameSection(snapshot: Snapshot, sectionId: string, title: string): Snapshot {
+    const sections = snapshot.sections.map(s => (s.id === sectionId ? { ...s, title } : s));
+    return stripRuntimeKeys({ ...snapshot, sections });
+}
+
 // ---------------------------------------------------------------------------
 // Item mutators
 // ---------------------------------------------------------------------------
@@ -314,6 +320,20 @@ export function moveItem(
         const items = [...sec.items];
         [items[idx], items[targetIdx]] = [items[targetIdx], items[idx]];
         return { ...sec, items } as Section;
+    });
+    return stripRuntimeKeys({ ...snapshot, sections });
+}
+
+/** Rename an item's label (structure only). */
+export function renameItem(
+    snapshot: Snapshot,
+    sectionId: string,
+    itemId: string,
+    label: string,
+): Snapshot {
+    const sections = snapshot.sections.map(sec => {
+        if (sec.id !== sectionId) return sec;
+        return { ...sec, items: sec.items.map(it => (it.id === itemId ? { ...it, label } : it)) } as Section;
     });
     return stripRuntimeKeys({ ...snapshot, sections });
 }

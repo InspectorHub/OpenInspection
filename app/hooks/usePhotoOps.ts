@@ -4,7 +4,7 @@ import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "~/components/me
 import { type MediaAction } from "~/components/media-studio/MediaViewer";
 import { streamThumbUrl } from "~/components/media-studio/PosterPicker";
 import type { GalleryPhoto } from "~/lib/inspection-media";
-import { fKey } from "~/hooks/useInspection";
+import { findingKey } from "~/hooks/findings/shared";
 import { type PhotoCrop } from "~/components/media-studio/PhotoCropper";
 import type { useInspectionState } from "~/hooks/useInspection";
 import type { useFindings } from "~/hooks/useFindings";
@@ -50,6 +50,12 @@ export function usePhotoOps(ctx: {
   // binary R2/Stream calls (upload, crop/annotation bake, video delete) remain
   // network ops. null only in the brief pre-connect window before the doc syncs.
   collabDoc: Y.Doc | null;
+  // Phase U (Batch C2a) — the editor's active per-unit scope. `null` (default) =
+  // the `_default` common scope, so the composite finding keys this hook builds
+  // (patchItemPhotos optimistic write + docFindingKey doc write) are
+  // byte-identical to before. When a unit is active, photo ops key ONLY that
+  // unit's finding and never alias the ambiguous bare itemId slot.
+  activeUnitId: string | null;
   // PhotoAnnotator (Photo Studio) overlay setters — owned by the component; the
   // annotate branch of onViewerAction opens that overlay. Threaded so the moved
   // body stays byte-identical (these setters are stable, so deps are unaffected).
@@ -64,6 +70,7 @@ export function usePhotoOps(ctx: {
     findings,
     streamCustomerSubdomain,
     collabDoc,
+    activeUnitId,
     setPhotoStudioUrl,
     setPhotoStudioKey,
     setPhotoStudioIndex,
@@ -266,33 +273,48 @@ export function usePhotoOps(ctx: {
     setViewer({ itemId, index });
   }, []);
 
-  /* Task 8 — optimistically apply a photos[] transform to BOTH result keys
-   * (composite + bare itemId), mirroring useFindings' dual-write. */
+  /* Task 8 — optimistically apply a photos[] transform to the composite result
+   * key. Phase U (Batch C2a): the composite key resolves under the ACTIVE unit
+   * (`findingKey(activeUnitId, …)`). The bare-itemId mirror is written only in
+   * the `_default` view (activeUnitId == null) — the legacy dual-write; under a
+   * real unit the bare slot holds only one unit's entry, so mirroring would leak
+   * this unit's photos into another unit that lacks a composite entry. At
+   * activeUnitId == null the composite key === `_default:{sid}:{itemId}` and the
+   * dual-write is preserved, so behavior is byte-identical to before. */
   const patchItemPhotos = useCallback(
     (itemId: string, next: (photos: ItemPhoto[]) => ItemPhoto[]) => {
       const sid = state.sectionIdForItem(itemId);
-      const ck = sid ? fKey(sid, itemId) : itemId;
+      // Phase U — under a real unit we can only key a properly-scoped composite.
+      // If the section is unresolvable (defensive — should not happen for a real
+      // template item) the bare `itemId` is a valid fallback ONLY in the common
+      // scope; under a unit that shared slot would leak across units, so no-op.
+      if (!sid && activeUnitId != null) return;
+      const ck = sid ? findingKey(activeUnitId, sid, itemId) : itemId;
       state.setResults((prev) => {
-        const existing = ((prev[ck] as Record<string, unknown>) || (prev[itemId] as Record<string, unknown>) || {});
+        const bare = activeUnitId == null ? (prev[itemId] as Record<string, unknown>) : undefined;
+        const existing = ((prev[ck] as Record<string, unknown>) || bare || {});
         const photos = next(((existing.photos as ItemPhoto[]) ?? []));
         const updated = { ...existing, photos };
-        return { ...prev, [ck]: updated, [itemId]: updated };
+        return activeUnitId == null
+          ? { ...prev, [ck]: updated, [itemId]: updated }
+          : { ...prev, [ck]: updated };
       });
       state.setDirty(true);
     },
-    [state.sectionIdForItem, state.setResults, state.setDirty],
+    [state.sectionIdForItem, state.setResults, state.setDirty, activeUnitId],
   );
 
-  /* #181 — the composite finding key the collab doc is keyed by. The doc seeds
-   * keys as `_default:{sectionId}:{itemId}` (fKey); resolve the section the same
-   * way patchItemPhotos does. Returns null when the item has no resolvable
-   * section (defensive — should not happen for a real template item). */
+  /* #181 — the composite finding key the collab doc is keyed by. Phase U (Batch
+   * C2a): resolve under the ACTIVE unit (`findingKey(activeUnitId, …)`), the
+   * same scope patchItemPhotos writes. At activeUnitId == null this === the
+   * legacy `_default:{sectionId}:{itemId}`. Returns null when the item has no
+   * resolvable section (defensive — should not happen for a real template item). */
   const docFindingKey = useCallback(
     (itemId: string, sectionIdOverride?: string): string | null => {
       const sid = sectionIdOverride ?? state.sectionIdForItem(itemId);
-      return sid ? fKey(sid, itemId) : null;
+      return sid ? findingKey(activeUnitId, sid, itemId) : null;
     },
-    [state.sectionIdForItem],
+    [state.sectionIdForItem, activeUnitId],
   );
 
   /* Task 8 — persist a reorder. CONTRACT: `order` is the ORIGINAL key order.
