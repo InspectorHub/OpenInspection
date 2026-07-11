@@ -25,6 +25,11 @@ import { DefectCategoryService } from './defect-category.service';
 import { buildCostTables } from '../../lib/pca-costs';
 import { CostItemService } from '../cost-item.service';
 import { resolveReportTier } from '../../lib/report-tier';
+import { computeConformance, deriveConformanceInput, type AstmConformance } from '../../lib/pca-conformance';
+import { RELIANCE_TEMPLATES } from '../../lib/pca-reliance-text';
+import { ComplianceService } from '../compliance/pca-compliance.service';
+import type { ScopedDB } from '../../lib/db/scoped';
+import type { ImagesBinding } from '../../lib/media/strip-exif';
 import type {
     PhotoEntry,
     CannedState,
@@ -57,6 +62,26 @@ export function defectDrivesSummary(
  * internally (same service).
  */
 export class InspectionReportService extends InspectionSubService {
+    /**
+     * `encryptionSecret` is only consumed to construct a scoped
+     * `ComplianceService` (Phase M) for full_pca reports — every other method
+     * on this service is unaffected. Optional so existing positional
+     * construction call sites (and unit tests that build this service
+     * directly) keep working unchanged; full_pca reports built without a
+     * secret still resolve sign-off/PSQ/doc-review reads (which don't touch
+     * crypto), just with an empty key material fallback.
+     */
+    constructor(
+        db: D1Database,
+        r2?: R2Bucket,
+        sdb?: ScopedDB,
+        kv?: KVNamespace,
+        images?: ImagesBinding,
+        private readonly encryptionSecret?: string,
+    ) {
+        super(db, r2, sdb, kv, images);
+    }
+
     /**
      * Builds structured report data for a given inspection.
      *
@@ -595,6 +620,41 @@ export class InspectionReportService extends InspectionSubService {
             }
         }
 
+        // Commercial PCA Phase M — ASTM E2018 compliance artifacts (sign-off,
+        // PSQ, document review, computed conformance, and reliance text), gated
+        // to full_pca so light/residential reports keep the fields
+        // null/empty/seeded and pay no extra reads. Deviations reuse the same
+        // `inspection.deviations` array `pcaReport` reads above (Phase S) — no
+        // separate `.list()` call.
+        const isFullPca = reportTier === 'full_pca';
+        let astmConformance: AstmConformance | null = null;
+        let reportSignoffs: Awaited<ReturnType<ComplianceService['getCompliance']>>['reportSignoffs'] = [];
+        let psq: { status: string; responses: Record<string, unknown> | null } | null = null;
+        let documentReview: Awaited<ReturnType<ComplianceService['getCompliance']>>['documentReview'] = [];
+        let relianceText: typeof RELIANCE_TEMPLATES = { ...RELIANCE_TEMPLATES };
+        if (isFullPca) {
+            const compliance = new ComplianceService(this.db, this.encryptionSecret ?? '');
+            const c = await compliance.getCompliance(tenantId, inspectionId);
+            const deviations = (inspection as { deviations?: Deviation[] | null }).deviations ?? [];
+            reportSignoffs = c.reportSignoffs;
+            psq = c.psq ? { status: c.psq.status, responses: (c.psq.responses as Record<string, unknown> | null) ?? null } : null;
+            documentReview = c.documentReview;
+            astmConformance = computeConformance(deriveConformanceInput({
+                reportSignoffs: c.reportSignoffs,
+                deviations,
+                psqStatus: c.psq?.status ?? null,
+                psqDisclosedInDeviations: deviations.some((d) => d.area === 'PSQ'),
+            }));
+            // Phase S pca_narrative may carry inspector-edited reliance text;
+            // fall back to the seeded ASTM boilerplate per-field.
+            const narr = (inspection as { pcaNarrative?: { userReliance?: string; pointInTime?: string; siteSpecific?: string } }).pcaNarrative;
+            relianceText = {
+                userReliance: narr?.userReliance || RELIANCE_TEMPLATES.userReliance,
+                pointInTime:  narr?.pointInTime  || RELIANCE_TEMPLATES.pointInTime,
+                siteSpecific: narr?.siteSpecific || RELIANCE_TEMPLATES.siteSpecific,
+            };
+        }
+
         // Commercial PCA Phase U — per-unit payload. `unit_inspection_mode` is
         // Phase F's column (default 'tagged'); read defensively so this stays a
         // no-op until Phase F lands and for every non-per_unit inspection.
@@ -662,6 +722,13 @@ export class InspectionReportService extends InspectionSubService {
             isPublished,
             signature,
             verification,
+            // Commercial PCA Phase M — ASTM compliance artifacts (full_pca only;
+            // null/empty/seeded-default otherwise).
+            astmConformance,
+            reportSignoffs,
+            psq,
+            documentReview,
+            relianceText,
         };
     }
 
