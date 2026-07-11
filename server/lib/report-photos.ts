@@ -89,3 +89,28 @@ export function assignPhotoNumbers(sections: SectionLike[]): {
 
   return { sections: outSections, appendix };
 }
+
+/**
+ * Commercial PCA Phase P — build a `photo_ref` → `photoNo` index over the
+ * appendix. `photo_ref` is the photo storage `key`; the cost reserve table
+ * (Phase C, the SECTION NO. / PHOTO NO. column) and observations resolve their
+ * ref through this to print the appendix photo number / anchor.
+ */
+export function buildPhotoRefIndex(appendix: AppendixPhoto[]): Map<string, number> {
+  const idx = new Map<string, number>();
+  for (const p of appendix) idx.set(p.key, p.photoNo);
+  return idx;
+}
+
+/**
+ * Resolve a single `photo_ref` to its appendix `photoNo`. Returns null when the
+ * ref is empty or points at a photo absent from the appendix (excluded/removed)
+ * so the body renders no broken PHOTO NO. pointer.
+ */
+export function resolvePhotoRef(
+  index: Map<string, number>,
+  photoRef: string | null | undefined,
+): number | null {
+  if (!photoRef) return null;
+  return index.get(photoRef) ?? null;
+}
