@@ -13,7 +13,7 @@
   "app/routes/settings-communication-templates.tsx": 728,
   "app/routes/settings-communication.tsx": 716,
   "app/routes/template-edit.tsx": 698,
-  "app/components/portal/sections/ReportView.tsx": 694,
+  "app/components/portal/sections/ReportView.tsx": 695,
   "app/components/media-studio/PhotoAnnotator.tsx": 689,
   "app/hooks/usePhotoOps.ts": 661,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,

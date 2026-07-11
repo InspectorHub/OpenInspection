@@ -83,6 +83,10 @@ export interface ReportSection {
 
 export type FilterKey = "all" | "defects" | "summary";
 
+/** Commercial PCA Phase T — the resolved report tier (server produces this;
+ *  app/ cannot import server/lib/report-tier, so it's re-declared here). */
+export type ReportTier = 'light_commercial' | 'full_pca';
+
 /* ------------------------------------------------------------------ */
 /* Print layout constants (exported for tests + re-exported via the    */
 /* standalone route). PRINT-ONLY — on-screen rendering is unchanged.   */
@@ -244,6 +248,7 @@ export interface ReportLoaderResult {
   baseUrl: string;
   propertyType: string | null;
   commercialSubtype: string | null;
+  reportTier: ReportTier | null;
   buildingProfile: ProfileRow[];
   pcaReport: PcaReportData | null;
   /* Commercial PCA Phase U — per-unit inspection mode + the unit tree,

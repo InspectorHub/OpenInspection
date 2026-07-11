@@ -132,6 +132,7 @@ export function reportViewProps(
     baseUrl: data.baseUrl ?? "",
     propertyType: data.propertyType ?? null,
     commercialSubtype: data.commercialSubtype ?? null,
+    reportTier: data.reportTier ?? null,
     buildingProfile: data.buildingProfile ?? [],
     pcaReport: data.pcaReport ?? null,
     unitInspectionMode: data.unitInspectionMode ?? "tagged",
