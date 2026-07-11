@@ -61,6 +61,8 @@ export class InspectionResultsService extends InspectionSubService {
         lotSize?:        string | null | undefined;
         bedrooms?:       number | null | undefined;
         bathrooms?:      number | null | undefined;
+        // Commercial PCA Phase T — tier elevation from the editor.
+        reportTier?:     'light_commercial' | 'full_pca' | null | undefined;
     }): Promise<PropertyFacts> {
         const db = this.getDrizzle();
         const existing = await db.select({ id: inspections.id }).from(inspections)
@@ -75,6 +77,7 @@ export class InspectionResultsService extends InspectionSubService {
         if (facts.lotSize        !== undefined) update.lotSize        = facts.lotSize;
         if (facts.bedrooms       !== undefined) update.bedrooms       = facts.bedrooms;
         if (facts.bathrooms      !== undefined) update.bathrooms      = facts.bathrooms;
+        if (facts.reportTier     !== undefined) update.reportTier     = facts.reportTier;
 
         if (Object.keys(update).length > 0) {
             await db.update(inspections).set(update)

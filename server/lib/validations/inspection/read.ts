@@ -17,6 +17,10 @@ export const PropertyFactsSchema = z.object({
     lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }).describe('TODO describe lotSize field for the OpenInspection MCP integration'),
     bedrooms:       z.number().int().min(0).max(50).nullable().optional().openapi({ example: 3 }).describe('TODO describe bedrooms field for the OpenInspection MCP integration'),
     bathrooms:      z.number().min(0).max(50).nullable().optional().openapi({ example: 2.5 }).describe('TODO describe bathrooms field for the OpenInspection MCP integration'),
+    // Commercial PCA Phase T — tier elevation from the editor. Validated
+    // against REPORT_TIERS; never accepted un-validated (CLAUDE.md Input
+    // Validation Rules).
+    reportTier:     z.enum(['light_commercial', 'full_pca']).nullable().optional().openapi({ example: 'light_commercial' }).describe('Commercial report tier: light_commercial or full_pca. Null falls back to the resolver default.'),
 }).openapi('PropertyFacts');
 
 export const PropertyFactsResponseSchema = createApiResponseSchema(PropertyFactsSchema).openapi('PropertyFactsResponse');

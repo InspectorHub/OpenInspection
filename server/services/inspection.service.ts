@@ -222,6 +222,8 @@ export class InspectionService {
         lotSize?:        string | null | undefined;
         bedrooms?:       number | null | undefined;
         bathrooms?:      number | null | undefined;
+        // Commercial PCA Phase T — tier elevation from the editor.
+        reportTier?:     'light_commercial' | 'full_pca' | null | undefined;
     }): Promise<PropertyFacts> {
         return this.results.updatePropertyFacts(id, tenantId, facts);
     }

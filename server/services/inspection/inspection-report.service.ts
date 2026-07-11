@@ -24,6 +24,7 @@ import { InspectionSubService } from './base';
 import { DefectCategoryService } from './defect-category.service';
 import { buildCostTables } from '../../lib/pca-costs';
 import { CostItemService } from '../cost-item.service';
+import { resolveReportTier } from '../../lib/report-tier';
 import type {
     PhotoEntry,
     CannedState,
@@ -467,6 +468,14 @@ export class InspectionReportService extends InspectionSubService {
             bathrooms:      (inspection as { bathrooms?: number | null }).bathrooms           ?? null,
         };
 
+        // Commercial PCA Phase T — resolve the report tier from the stored
+        // value (defaults commercial -> light_commercial; null on residential).
+        // Every later phase (sections/cost/compliance/photos) gates on this.
+        const reportTier = resolveReportTier({
+            propertyType: (inspection as { propertyType?: string | null }).propertyType ?? null,
+            storedTier: (inspection as { reportTier?: 'light_commercial' | 'full_pca' | null }).reportTier ?? null,
+        });
+
         // Commercial PCA Phase C — manual cost line items -> two render tables
         // (Opinion of Cost + opt-in Reserve Schedule) + the Phase S ES roll-up.
         const costItemRows = await new CostItemService(this.db).listByInspection(inspectionId, tenantId);
@@ -630,6 +639,7 @@ export class InspectionReportService extends InspectionSubService {
             enableRepairList,
             enableCustomerRepairExport,
             propertyFacts,
+            reportTier,
             costTables,
             propertyType:        (inspection as { propertyType?: string | null }).propertyType ?? null,
             commercialSubtype:   (inspection as { commercialSubtype?: string | null }).commercialSubtype ?? null,
