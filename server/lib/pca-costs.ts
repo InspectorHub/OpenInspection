@@ -198,3 +198,60 @@ export function reserveSchedule(
     perSfUninflatedAllYears, perSfInflatedAllYears, perSfInflatedPerYear,
   };
 }
+
+export interface FindingSeedInput {
+  recommendations?: Array<{
+    estimateSnapshotMin?: number | null;
+    estimateSnapshotMax?: number | null;
+    summarySnapshot?: string | null;
+  }> | null;
+}
+export interface TemplateItemSeed {
+  defaultEstimateMin?: number | null;
+  defaultEstimateMax?: number | null;
+  defaultRecommendation?: string | null;
+}
+export interface CannedCommentSeed {
+  estimateMinCents?: number | null;
+  estimateMaxCents?: number | null;
+  repairSummary?: string | null;
+}
+export interface CostSeed {
+  unitCostCents: number | null;
+  lumpSumCents: number | null;
+  suggestedRemedy: string;
+}
+
+/** Midpoint of an estimate range (integer cents); null when both bounds absent. */
+function estimateMidpoint(min: number | null | undefined, max: number | null | undefined): number | null {
+  const lo = min ?? null;
+  const hi = max ?? null;
+  if (lo === null && hi === null) return null;
+  if (lo !== null && hi !== null) return Math.round((lo + hi) / 2);
+  return (lo ?? hi) as number;
+}
+
+/**
+ * Seed a cost line from a finding's existing per-finding cost data (design spec
+ * §4 "Cost seeding"). Pure, no IO. Priority: canned comment > finding
+ * recommendation snapshot > template default. Values are integer cents; the seed
+ * is a starting point the inspector edits (not authoritative). Seeded lines
+ * default to the lump-sum method (unitCostCents stays null).
+ */
+export function seedCostFromFinding(
+  finding: FindingSeedInput,
+  templateItem: TemplateItemSeed | null,
+  cannedComment?: CannedCommentSeed | null,
+): CostSeed {
+  const rec = finding?.recommendations?.[0];
+  const lumpSumCents =
+    estimateMidpoint(cannedComment?.estimateMinCents, cannedComment?.estimateMaxCents) ??
+    estimateMidpoint(rec?.estimateSnapshotMin, rec?.estimateSnapshotMax) ??
+    estimateMidpoint(templateItem?.defaultEstimateMin, templateItem?.defaultEstimateMax);
+  const suggestedRemedy =
+    cannedComment?.repairSummary?.trim() ||
+    rec?.summarySnapshot?.trim() ||
+    templateItem?.defaultRecommendation?.trim() ||
+    '';
+  return { unitCostCents: null, lumpSumCents, suggestedRemedy };
+}
