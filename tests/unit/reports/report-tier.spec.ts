@@ -1,6 +1,6 @@
-// tests/unit/report-tier.spec.ts
+// tests/unit/reports/report-tier.spec.ts
 import { describe, it, expect } from 'vitest';
-import { resolveReportTier, REPORT_TIERS } from '../../server/lib/report-tier';
+import { resolveReportTier, REPORT_TIERS } from '../../../server/lib/report-tier';
 
 describe('resolveReportTier', () => {
   it('returns null for non-commercial property types (tier N/A)', () => {

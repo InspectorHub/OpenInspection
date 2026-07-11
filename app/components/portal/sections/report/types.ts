@@ -85,7 +85,7 @@ export type FilterKey = "all" | "defects" | "summary";
 
 /** Commercial PCA Phase T — the resolved report tier (server produces this;
  *  app/ cannot import server/lib/report-tier, so it's re-declared here). */
-export type ReportTier = 'light_commercial' | 'full_pca';
+type ReportTier = 'light_commercial' | 'full_pca';
 
 /* ------------------------------------------------------------------ */
 /* Print layout constants (exported for tests + re-exported via the    */

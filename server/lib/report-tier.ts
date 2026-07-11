@@ -25,7 +25,3 @@ export function resolveReportTier(input: ResolveReportTierInput): ReportTier | n
   }
   return 'light_commercial';
 }
-
-export function isFullPca(tier: ReportTier | null | undefined): boolean {
-  return tier === 'full_pca';
-}

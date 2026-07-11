@@ -12,7 +12,7 @@
  *   - Cooking Areas            -> ComSOP §6.5.13  (kitchen-flag gated)
  * Server-only (do not import from app/). See "Commercial PCA Phase T".
  */
-export type CoverageStandard =
+type CoverageStandard =
   | { standard: 'ASTM E2018'; section: string }
   | { standard: 'CCPIA ComSOP'; section: string };
 

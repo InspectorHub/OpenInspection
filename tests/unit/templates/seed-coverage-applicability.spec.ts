@@ -1,15 +1,16 @@
+// tests/unit/templates/seed-coverage-applicability.spec.ts
 // Asserts the seed templates' system-coverage sections are tagged so that
 // getApplicableSections() yields exactly what resolveSystemCoverage() prescribes
 // per subtype — i.e. coverage is data-driven, not hardcoded in the renderer.
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { getApplicableSections } from '../../server/lib/section-applicability';
-import { SYSTEM_COVERAGE } from '../../server/lib/system-coverage';
-import type { TemplateSection } from '../../server/types/template-schema';
+import { getApplicableSections } from '../../../server/lib/section-applicability';
+import { SYSTEM_COVERAGE } from '../../../server/lib/system-coverage';
+import type { TemplateSection } from '../../../server/types/template-schema';
 
 function loadSeed(name: string): TemplateSection[] {
-  const raw = JSON.parse(readFileSync(join(__dirname, '../../server/data/seed-templates', name), 'utf8'));
+  const raw = JSON.parse(readFileSync(join(__dirname, '../../../server/data/seed-templates', name), 'utf8'));
   return raw.schema.sections as TemplateSection[];
 }
 

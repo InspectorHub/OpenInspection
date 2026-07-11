@@ -1,6 +1,6 @@
-// tests/unit/subtype-specials.spec.ts
+// tests/unit/inspections/subtype-specials.spec.ts
 import { describe, it, expect } from 'vitest';
-import { resolveKitchenChain, resolveIndustrialSpecials } from '../../server/lib/subtype-specials';
+import { resolveKitchenChain, resolveIndustrialSpecials } from '../../../server/lib/subtype-specials';
 
 describe('commercial-kitchen chain', () => {
   it('mounts nothing when the flag is off', () => {

@@ -1,4 +1,4 @@
-export interface CommercialSubtypeOption {
+interface CommercialSubtypeOption {
  id: string;
  label: string;
 }
@@ -11,7 +11,7 @@ export interface CommercialSubtypeOption {
  * subtype selector. Keep in sync with PLATFORM_SUBTYPES if a platform
  * subtype is ever added/renamed.
  */
-export const APP_COMMERCIAL_SUBTYPES: readonly CommercialSubtypeOption[] = [
+const APP_COMMERCIAL_SUBTYPES: readonly CommercialSubtypeOption[] = [
  { id: "office", label: "Office" },
  { id: "retail", label: "Retail" },
  { id: "hospitality", label: "Hospitality" },

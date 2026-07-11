@@ -1,6 +1,6 @@
-// tests/unit/system-coverage.spec.ts
+// tests/unit/reports/system-coverage.spec.ts
 import { describe, it, expect } from 'vitest';
-import { SYSTEM_COVERAGE, resolveSystemCoverage } from '../../server/lib/system-coverage';
+import { SYSTEM_COVERAGE, resolveSystemCoverage } from '../../../server/lib/system-coverage';
 
 describe('system coverage standard attribution', () => {
   const byId = (id: string) => SYSTEM_COVERAGE.find((c) => c.id === id)!;

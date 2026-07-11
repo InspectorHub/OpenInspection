@@ -1,8 +1,8 @@
-// tests/unit/report-tier-payload.spec.ts
+// tests/unit/reports/report-tier-payload.spec.ts
 // Pins the payload-shaping contract: getReportData resolves report_tier from the
 // inspection row via resolveReportTier (commercial -> light by default, stored wins).
 import { describe, it, expect } from 'vitest';
-import { resolveReportTier } from '../../server/lib/report-tier';
+import { resolveReportTier } from '../../../server/lib/report-tier';
 
 describe('report payload tier shaping', () => {
   it('resolves light_commercial for a commercial inspection with no stored tier', () => {
