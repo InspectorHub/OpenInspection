@@ -87,7 +87,14 @@ export type AuditAction =
     | 'sms.compliance.provision'
     | 'sms.compliance.resubmit'
     | 'mcp.grant.created'
-    | 'mcp.grant.revoked';
+    | 'mcp.grant.revoked'
+    // Commercial PCA Phase M — ASTM compliance artifacts (dual sign-off / PSQ / doc-review).
+    | 'inspection.compliance.signoff'
+    | 'inspection.compliance.signoff_removed'
+    | 'inspection.compliance.doc_review_seeded'
+    | 'inspection.compliance.doc_review_updated'
+    | 'inspection.compliance.psq_updated'
+    | 'inspection.compliance.psq_status_changed';
 
 export interface AuditParams {
     db: D1Database;

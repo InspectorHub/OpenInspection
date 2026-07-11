@@ -4,6 +4,7 @@ import type { AgreementService } from './agreement.service';
 import { type ReportMediaContext } from '../lib/report-video';
 import { type ImagesBinding } from '../lib/media/strip-exif';
 import { type PdfSettings } from '../lib/pdf-settings';
+import { type DeviationInput } from '../lib/pca-deviations';
 
 // Module-level types, constants, and pure helpers now live in
 // ./inspection/shared.ts (single source of truth shared by the facade + every
@@ -236,6 +237,14 @@ export class InspectionService {
      */
     async updatePcaNarrative(id: string, tenantId: string, value: Record<string, string>): Promise<void> {
         return this.results.updatePcaNarrative(id, tenantId, value);
+    }
+
+    /**
+     * Commercial PCA Phase M — append a deviation disclosure. See
+     * InspectionResultsService.appendDeviation.
+     */
+    async appendDeviation(id: string, tenantId: string, input: DeviationInput): Promise<void> {
+        return this.results.appendDeviation(id, tenantId, input);
     }
 
     async updateResults(id: string, tenantId: string, data: Record<string, unknown>) {

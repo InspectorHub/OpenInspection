@@ -24,6 +24,11 @@ export enum ErrorCode {
     // Free-tier usage-quota exhaustion (inspections / sms / email). Contract:
     // payload carries metric/used/cap/billingPortalUrl — see Errors.QuotaExhausted.
     QUOTA_EXHAUSTED = 'QUOTA_EXHAUSTED',
+    // Commercial PCA Phase M — sign-off / PSQ writes require the inspection's
+    // report_tier to already be 'full_pca' (Phase T elevation). Distinct code
+    // so the editor can surface a "elevate to Full PCA first" prompt instead
+    // of a generic conflict.
+    TIER_NOT_FULL_PCA = 'TIER_NOT_FULL_PCA',
 }
 
 /**
@@ -75,4 +80,6 @@ export const Errors = {
             `Free plan limit reached: ${details.used}/${details.cap} ${details.metric}. Subscribe to continue.`,
             details,
         ),
+    TierNotFullPca: (msg: string = 'This action requires the inspection report tier to be full_pca.') =>
+        new AppError(409, ErrorCode.TIER_NOT_FULL_PCA, msg),
 };
