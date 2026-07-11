@@ -90,7 +90,9 @@ describe('UnitSwitchService', () => {
 
         const data = await readData(testDb);
         // The 101-located finding moved onto unit 101's scope; the common one stayed.
-        expect(Object.keys(data).sort()).toEqual([`${u101.id}:kitchen:sink`, '_default:roof:flash']);
+        // Both sides sorted: unit ids are random UUIDs, so a fixed expected order
+        // would flake on whether the id's first hex char sorts before/after '_'.
+        expect(Object.keys(data).sort()).toEqual([`${u101.id}:kitchen:sink`, '_default:roof:flash'].sort());
         expect(await readMode(testDb)).toBe('per_unit');
     });
 
