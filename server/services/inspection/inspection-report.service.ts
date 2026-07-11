@@ -25,6 +25,7 @@ import { DefectCategoryService } from './defect-category.service';
 import { buildCostTables } from '../../lib/pca-costs';
 import { CostItemService } from '../cost-item.service';
 import { resolveReportTier } from '../../lib/report-tier';
+import { assignPhotoNumbers, derivePhotoMode, type AppendixPhoto, type PhotoMode } from '../../lib/report-photos';
 import { computeConformance, deriveConformanceInput, type AstmConformance } from '../../lib/pca-conformance';
 import { RELIANCE_TEMPLATES } from '../../lib/pca-reliance-text';
 import { ComplianceService } from '../compliance/pca-compliance.service';
@@ -422,6 +423,26 @@ export class InspectionReportService extends InspectionSubService {
             }),
         }));
 
+        // Commercial PCA Phase P — assign continuous, stable photo numbers in
+        // render order and collect the centralized photo appendix (Appendix B).
+        // photoMode derives from the tier (Phase T) with an optional per-
+        // inspection override; computed unconditionally (cheap + deterministic)
+        // so the renderer can branch. See server/lib/report-photos.ts.
+        const photoMode: PhotoMode = derivePhotoMode({
+            reportTier: (inspection as { reportTier?: string | null }).reportTier ?? null,
+            override:   (inspection as { reportPhotoMode?: string | null }).reportPhotoMode ?? null,
+        });
+        const photoNumbering = assignPhotoNumbers(sections as Parameters<typeof assignPhotoNumbers>[0]);
+        // assignPhotoNumbers's declared return type is the generic SectionLike[]
+        // shape it walks; at runtime each section/item is a shallow copy that
+        // keeps every original field (defectCount, rating, ratingColor, ...)
+        // plus `photoNo` stamped onto photo/defectPhoto entries. Cast back to
+        // the specific literal type of `sections` so downstream consumers of
+        // getReportData's inferred return type (report-delivery route,
+        // inspection-analytics.service) keep their existing field access.
+        const numberedSections = photoNumbering.sections as typeof sections;
+        const photoAppendix: AppendixPhoto[] = photoNumbering.appendix;
+
         let inspectorName: string | null = null;
         let inspectorLicense: string | null = null;
         if (inspection.inspectorId) {
@@ -698,7 +719,12 @@ export class InspectionReportService extends InspectionSubService {
             // picked a cover. The renderer consumes this directly.
             coverPhotoUrl: resolveCoverUrl(inspection as { coverImageKey?: string | null; coverPhotoId?: string | null }, makePhotoUrl),
             stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
-            sections,
+            sections: numberedSections,
+            // Commercial PCA Phase P — photo presentation mode + the flat
+            // centralized photo appendix (Appendix B). Computed unconditionally;
+            // the renderer decides whether to display the appendix (mode === 'appendix').
+            photoMode,
+            photoAppendix,
             ratingLevels: levels.length > 0 ? levels : [
                 { id: 'Satisfactory', label: 'Satisfactory', abbreviation: 'SAT', color: '#22c55e', severity: 'good', isDefect: false },
                 { id: 'Monitor', label: 'Monitor', abbreviation: 'MON', color: '#f59e0b', severity: 'marginal', isDefect: false },
