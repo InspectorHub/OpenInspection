@@ -87,6 +87,13 @@ export const inspections = sqliteTable('inspections', {
     unit:                text('unit'),
     propertyType:        text('property_type'),
     commercialSubtype:   text('commercial_subtype'),
+    // Commercial PCA Phase T — report tier. Meaningful only for commercial
+    // inspections (NULL on residential/multi-unit). Drives which report
+    // sections / cost tables / compliance modules / photo mode apply. A
+    // commercial inspection defaults to 'light_commercial' (see report-tier.ts
+    // resolveReportTier — "auto light, user elevates"); 'full_pca' is the
+    // ASTM E2018 deliverable. See "Commercial PCA Phase T".
+    reportTier:          text('report_tier', { enum: ['light_commercial', 'full_pca'] }),
     county:              text('county'),
     sellingAgentId:      text('selling_agent_id').references(() => contacts.id),
     disableAutomations:  integer('disable_automations', { mode: 'boolean' }).notNull().default(false),
