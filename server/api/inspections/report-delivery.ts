@@ -239,6 +239,58 @@ export const refreshPdfRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for refreshInspection (POST /{id}/pdf/refresh, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
+// ── Commercial PCA Phase W Task 4 — .docx export status + download ─────────
+// POST /{id}/export/word (Task 5) enqueues the build job; these two GETs are
+// the polling status endpoint and the streaming R2 download the UI's
+// "Export to Word" button (Task 6) uses once status flips to 'ready'.
+export const getExportStatusRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/{id}/export/{exportId}',
+    tags: ["inspections"],
+    summary: 'Get Word export status',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({
+            id: z.string().min(1).describe('Inspection identifier'),
+            exportId: z.string().min(1).describe('report_exports row id'),
+        }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({
+                status: z.enum(['queued', 'building', 'ready', 'failed']),
+                r2Key: z.string().nullable().optional(),
+                error: z.string().nullable().optional(),
+            })) } },
+            description: 'Export status',
+        },
+        404: { description: 'Export not found' },
+    },
+    operationId: "getInspectionExportStatus",
+    description: "Poll the status of a queued/building .docx export (Commercial PCA Phase W).",
+}, { scopes: ['read'], tier: 'extended' }));
+
+export const downloadExportRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/{id}/export/{exportId}/download',
+    tags: ["inspections"],
+    summary: 'Download the built .docx export',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({
+            id: z.string().min(1).describe('Inspection identifier'),
+            exportId: z.string().min(1).describe('report_exports row id'),
+        }),
+    },
+    responses: {
+        200: {
+            content: { 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { schema: z.any() } },
+            description: '.docx bytes',
+        },
+        404: { description: 'Export not found or not ready' },
+    },
+    operationId: "downloadInspectionExport",
+    description: "Stream the .docx bytes for a ready export from R2 (Commercial PCA Phase W).",
+}, { scopes: ['read'], tier: 'extended' }));
+
 export const downloadPdfRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/pdf',
     tags: ["inspections"],
@@ -517,6 +569,28 @@ const reportDeliveryRoutes = createApiRouter()
                 'Content-Type': 'application/pdf',
                 'Content-Disposition': `attachment; filename="${filename}"`,
                 'Cache-Control': 'private, max-age=300',
+            },
+        });
+    })
+    .openapi(getExportStatusRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { exportId } = c.req.valid('param');
+        const record = await c.var.services.reportExport.get(exportId, tenantId);
+        if (!record) return c.json({ success: false, error: { message: 'Export not found' } }, 404);
+        return c.json({ success: true, data: { status: record.status, r2Key: record.r2Key, error: record.error } }, 200);
+    })
+    .openapi(downloadExportRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { exportId } = c.req.valid('param');
+        const record = await c.var.services.reportExport.get(exportId, tenantId);
+        if (!record) return c.json({ success: false, error: { message: 'Export not found' } }, 404);
+        const obj = await c.var.services.reportExport.stream(record);
+        if (!obj) return c.json({ success: false, error: { message: 'Export object missing in storage' } }, 404);
+        return new Response(obj.body, {
+            status: 200,
+            headers: {
+                'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'Content-Disposition': 'attachment; filename="report.docx"',
             },
         });
     })

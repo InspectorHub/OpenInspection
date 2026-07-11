@@ -22,6 +22,10 @@ export const r2Keys = {
     `${t}/inspections/${i}/documents/${docId}-${filename}`,
   // Note: report PDFs are content-hash-addressed and built inline in
   // server/services/report-pdf.service.ts — not via a key builder here.
+  // Commercial PCA Phase W — async .docx export, one object per exportId
+  // (report_exports.id); see server/services/report-export.service.ts.
+  reportWordExport: (t: string, i: string, exportId: string) =>
+    `${t}/inspections/${i}/exports/${exportId}.docx`,
   agreementFile: (t: string, i: string, envelopeId: string, name: string) =>
     `${t}/inspections/${i}/agreements/${envelopeId}/${name}`,
   brandingLogo: (t: string, mediaId: string, ext: string) =>

@@ -36,6 +36,7 @@ import { InspectionTypeService } from '../../services/inspection-type.service';
 import { TotpService } from '../../services/totp.service';
 import { TemplateSeedService } from '../../services/template-seed.service';
 import { ReportPdfService } from '../../services/report-pdf.service';
+import { ReportExportService } from '../../services/report-export.service';
 import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
 import { TemplateMigrationService } from '../../services/template-migration.service';
@@ -288,6 +289,12 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'reportPdf':
                     target.reportPdf = new ReportPdfService(c.env.DB, c.env.BROWSER, c.env.PHOTOS);
+                    break;
+                case 'reportExport':
+                    // Commercial PCA Phase W Task 4 — .docx export status row + R2
+                    // stream. Reuses the PHOTOS bucket binding (same object store as
+                    // report PDFs; see server/lib/r2-keys.ts:reportWordExport).
+                    target.reportExport = new ReportExportService(c.env.DB, c.env.PHOTOS);
                     break;
                 case 'templateMigration':
                     target.templateMigration = new TemplateMigrationService(c.env.DB, c.get('tenantId'));

@@ -236,6 +236,7 @@ import { InspectionTypeService } from '../services/inspection-type.service';
 import { TotpService } from '../services/totp.service';
 import { TemplateSeedService } from '../services/template-seed.service';
 import { ReportPdfService } from '../services/report-pdf.service';
+import { ReportExportService } from '../services/report-export.service';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
 import { TemplateMigrationService } from '../services/template-migration.service';
@@ -286,6 +287,7 @@ export interface AppServices {
     totp: TotpService;
     templateSeed: TemplateSeedService;
     reportPdf: ReportPdfService;
+    reportExport: ReportExportService;
     signingKey: SigningKeyService;
     auditLog: AuditLogService;
     templateMigration: TemplateMigrationService;

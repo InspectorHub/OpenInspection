@@ -5795,6 +5795,45 @@
     "description": "Returns evidence.zip from R2 (signed.pdf + certificate.pdf + audit-trail.json + public-key.pem)."
   },
   {
+    "operationId": "downloadInspectionExport",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/export/{exportId}/download",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "exportId",
+          "in": "path",
+          "required": true,
+          "description": "report_exports row id",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "report_exports row id"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Download the built .docx export",
+    "description": "Stream the .docx bytes for a ready export from R2 (Commercial PCA Phase W)."
+  },
+  {
     "operationId": "downloadMessageAttachmentInspection",
     "method": "GET",
     "pathTemplate": "/api/inspections/{inspectionId}/messages/attachments/{attachmentId}",
@@ -6377,6 +6416,45 @@
     },
     "summary": "Get inspection compliance artifacts",
     "description": "Returns the ASTM E2018 compliance artifacts for the inspection — dual sign-off attestations, the Pre-Survey Questionnaire, the Document Review checklist, and the derived conformance verdict computed from all three plus the Deviations store."
+  },
+  {
+    "operationId": "getInspectionExportStatus",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/export/{exportId}",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "exportId",
+          "in": "path",
+          "required": true,
+          "description": "report_exports row id",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "report_exports row id"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get Word export status",
+    "description": "Poll the status of a queued/building .docx export (Commercial PCA Phase W)."
   },
   {
     "operationId": "getInspectionHub",

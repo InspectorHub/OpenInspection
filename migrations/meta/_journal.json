@@ -169,6 +169,13 @@
       "when": 1783798002139,
       "tag": "0023_overconfident_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1783806245254,
+      "tag": "0024_watery_wolf_cub",
+      "breakpoints": true
     }
   ]
 }
