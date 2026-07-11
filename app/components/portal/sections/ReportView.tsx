@@ -23,6 +23,7 @@ import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, isDefect } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
 import { ReportDefectCard } from "./report/ReportDefectCard";
+import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
 import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
 import { ReportRepairPanel } from "./report/ReportRepairPanel";
@@ -573,7 +574,12 @@ export function ReportView(props: ReportViewProps) {
                         {/* FE-3/B-20 — findings: included canned + custom defects with their
                         own photos. Previously the viewer rendered neither (field-authored
                         defects never appeared in the published report at all). */}
-                        <ReportDefectCard item={item} mediaVisible={mediaVisible} renderMediaTile={renderMediaTile} />
+                        <ReportDefectCard
+                          item={item}
+                          mediaVisible={mediaVisible}
+                          renderMediaTile={renderMediaTile}
+                          showPhotos={data.photoMode !== "appendix"}
+                        />
 
                         {item.recommendation && (
                           <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -609,7 +615,7 @@ export function ReportView(props: ReportViewProps) {
                           </div>
                         )}
 
-                        {item.photos.filter(mediaVisible).length > 0 && (
+                        {data.photoMode !== "appendix" && item.photos.filter(mediaVisible).length > 0 && (
                           <div className={`mt-3 ${ITEM_PHOTO_GRID_CLASS}`}>
                             {item.photos
                               .filter(mediaVisible)
@@ -676,6 +682,17 @@ export function ReportView(props: ReportViewProps) {
             'light_commercial' && showEstimates)` instead. */}
         <CostTables data={data.costTables ?? null} show={data.showEstimates} />
       </div>
+
+      {/* Commercial PCA Phase P — Appendix B: centralized numbered photo
+          appendix. Mounted once at the end of the report body (after every
+          section + the cost tables, before signature/verification) so it
+          reads as the report's final content block, matching the real-PCA
+          layout. Suppressed entirely (renders null) outside 'appendix' mode. */}
+      {data.photoMode === "appendix" && (
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
+          <PhotoAppendix photos={data.photoAppendix ?? []} isPrint={data.printMode} />
+        </div>
+      )}
 
       {/* ── Signature block ──────────────────────────────────────────── */}
       <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} />

@@ -20,8 +20,11 @@ import type { PdfSettings } from './pdf-settings';
  * license) via the CF /pdf quick action's pdfOptions; Letter format.
  * 'r4' — hide interactive controls (filter chips, Add-to-repair, repair panel)
  * from the print/PDF render.
+ * 'r5' — Commercial PCA Phase P: 'appendix' photoMode suppresses inline
+ * item/defect photo grids and renders a single end-of-report Appendix B
+ * instead (template output structurally differs from 'inline').
  */
-export const RENDER_VERSION = 'r4';
+export const RENDER_VERSION = 'r5';
 
 export async function generatePdfFromUrl(
     browser: BrowserRun | undefined,

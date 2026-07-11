@@ -17,9 +17,14 @@ export interface ReportDefectCardProps {
   item: ReportItem;
   mediaVisible: (p: ReportPhoto) => boolean;
   renderMediaTile: (photo: ReportPhoto, alt: string, idx: number) => ReactNode;
+  /** Commercial PCA Phase P — false in 'appendix' photoMode so the body stays
+   *  text-only (photos move to the end-of-report Appendix B). Defaults to
+   *  true so existing callers (and the byte-identical 'inline' default path)
+   *  are unaffected. */
+  showPhotos?: boolean;
 }
 
-export function ReportDefectCard({ item, mediaVisible, renderMediaTile }: ReportDefectCardProps) {
+export function ReportDefectCard({ item, mediaVisible, renderMediaTile, showPhotos = true }: ReportDefectCardProps) {
   if ((item.resolvedTabs?.defects ?? []).filter((d) => d.included).length === 0) return null;
   return (
     <div className="mt-3 space-y-2">
@@ -49,7 +54,7 @@ export function ReportDefectCard({ item, mediaVisible, renderMediaTile }: Report
                 {d.effectiveComment}
               </p>
             )}
-            {(d.defectPhotos ?? []).filter(mediaVisible).length > 0 && (
+            {showPhotos && (d.defectPhotos ?? []).filter(mediaVisible).length > 0 && (
               <div className={`mt-2 ${DEFECT_PHOTO_GRID_CLASS}`}>
                 {(d.defectPhotos ?? [])
                   .filter(mediaVisible)
