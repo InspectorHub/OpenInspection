@@ -1,5 +1,5 @@
 /** Minimal view of a resolved report photo (as produced by mapReportPhoto). */
-export interface ReportPhotoLike {
+interface ReportPhotoLike {
   key: string;
   originalKey?: string;
   url: string;

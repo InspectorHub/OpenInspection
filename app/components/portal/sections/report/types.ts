@@ -19,7 +19,7 @@ export type ReportPhoto = { key: string; url: string; media?: ReportMedia; photo
  *  legacy behavior) or are collected into a numbered Appendix B (server
  *  resolves this from report_tier + the per-inspection override; app/ cannot
  *  import server/lib/report-photo-mode, so it's re-declared here). */
-export type PhotoMode = "appendix" | "inline";
+type PhotoMode = "appendix" | "inline";
 
 /** Commercial PCA Phase P — a single Appendix B entry (server produces these
  *  in render order; app/ cannot import server/lib/pca-photo-appendix). */
