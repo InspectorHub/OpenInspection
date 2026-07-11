@@ -4,13 +4,15 @@ import { createApi } from "~/lib/api-client.server";
 import { unwrapResultsResponse } from "~/lib/results";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
 import { resolvePcaNarrative } from "../../../server/lib/pca-narrative";
+import { RELIANCE_TEMPLATES } from "../../../server/lib/pca-reliance-text";
+import type { CompliancePanelData } from "~/components/inspection-edit/CompliancePanel";
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
  const token = await requireToken(context, request);
  const id = params.id;
 
  const api = createApi(context, { token });
- const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes] = await Promise.all([
+ const [inspRes, resultsRes, reportRes, tagsRes, sessRes, defectCatRes, unitsRes, unitProgressRes, complianceRes] = await Promise.all([
  api.inspections[":id"].$get({ param: { id } }),
  // Commercial PCA Phase U (Batch C-lazy) — first paint only needs the common
  // scope. The editor opens at activeUnitId = null (the '_default' scope), so
@@ -37,6 +39,12 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // per-unit endpoint hiccup never 500s the whole editor.
  api.inspections[":id"].units.$get({ param: { id } }).catch(() => null),
  api.inspections[":id"]["unit-progress"].$get({ param: { id } }).catch(() => null),
+ // Commercial PCA Phase M Task 10 — sign-off/PSQ/doc-review/conformance for
+ // the CompliancePanel. Fetched unconditionally (cheap, same shape as
+ // units/unit-progress above) even though the panel only renders at
+ // reportTier === 'full_pca' — mirrors the existing loader convention of not
+ // conditioning the parallel fetch list on client-only gates.
+ api.inspections[":id"].compliance.$get({ param: { id } }).catch(() => null),
  ]);
 
  const inspBody = inspRes.ok ? await inspRes.json() : {};
@@ -168,5 +176,32 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
      ? "per_unit" as const
      : "tagged" as const;
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode };
+ // Commercial PCA Phase M Task 10 — compliance artifacts for the
+ // CompliancePanel. Defaults to the empty/non-conformant shape when the fetch
+ // fails or the inspection has no compliance rows yet (new full_pca reports).
+ let compliance: Omit<CompliancePanelData, "relianceText"> = {
+   reportSignoffs: [],
+   psq: null,
+   documentReview: [],
+   conformance: { standard: "E2018-24", conforms: false },
+ };
+ if (complianceRes?.ok) {
+   const complianceBody = await complianceRes.json() as { data?: Omit<CompliancePanelData, "relianceText"> };
+   if (complianceBody.data) compliance = complianceBody.data;
+ }
+
+ // Mirrors inspection-report.service.ts's own relianceText resolution
+ // (Phase M): Phase S's pca_narrative JSON blob may carry inspector-edited
+ // userReliance/pointInTime/siteSpecific text under those keys; fall back to
+ // the seeded ASTM boilerplate per-field. Read directly off the raw
+ // pcaNarrative blob (NOT resolvePcaNarrative, which only knows the 9
+ // free-prose block keys and would strip these three).
+ const rawNarrative = (inspection as { pcaNarrative?: { userReliance?: string; pointInTime?: string; siteSpecific?: string } }).pcaNarrative;
+ const relianceText = {
+   userReliance: rawNarrative?.userReliance || RELIANCE_TEMPLATES.userReliance,
+   pointInTime:  rawNarrative?.pointInTime  || RELIANCE_TEMPLATES.pointInTime,
+   siteSpecific: rawNarrative?.siteSpecific || RELIANCE_TEMPLATES.siteSpecific,
+ };
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText };
 }

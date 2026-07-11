@@ -39,6 +39,7 @@ import { BurstCamera } from "~/components/editor/BurstCamera";
 import { PhotoAnnotator } from "~/components/media-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
+import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
 import { CommercialReportControls, type ReportTier } from "~/components/editor/CommercialReportControls";
 import type { PcaNarrativeData } from "~/components/portal/sections/report/types";
 import { InspectionSettingsSheet } from "~/components/editor/InspectionSettingsSheet";
@@ -2156,6 +2157,20 @@ export default function InspectionEditPage() {
      narrative={loaderData.pcaNarrative}
      onSave={saveNarrative}
      saving={narrativeFetcher.state !== "idle"}
+    />
+   </div>
+  ) : null}
+  {/* Commercial PCA Phase M Task 10 — compliance panel (dual sign-off / PSQ /
+     doc-review checklist / conformance preview). Rendered ONLY at
+     reportTier === 'full_pca' — a light_commercial report has no compliance
+     surface (the Task 6 API 409s writes at any other tier). Self-manages its
+     own fetchers/intents; the loader only supplies the read-side artifacts. */}
+  {(state.inspection as Record<string, unknown>).propertyType === "commercial" &&
+   ((state.inspection as Record<string, unknown>).reportTier as ReportTier | null | undefined) === "full_pca" ? (
+   <div className="mt-8 border-t border-ih-border pt-6">
+    <CompliancePanel
+     inspectionId={String(state.inspection.id)}
+     data={{ ...loaderData.compliance, relianceText: loaderData.relianceText }}
     />
    </div>
   ) : null}

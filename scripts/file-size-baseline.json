@@ -1,5 +1,5 @@
 {
-  "app/routes/inspection-edit.tsx": 2274,
+  "app/routes/inspection-edit.tsx": 2289,
   "server/services/inspection/inspection-core.service.ts": 991,
   "app/routes/inspection-hub.tsx": 988,
   "server/lib/collab/results-doc.ts": 917,
@@ -31,6 +31,7 @@
   "server/services/inspection/inspection-photo.service.ts": 531,
   "server/api/inspections/core.ts": 527,
   "server/services/concierge.service.ts": 521,
+  "app/components/inspection-edit/CompliancePanel.tsx": 519,
   "server/api/public-report.ts": 516,
   "app/components/settings/ManagedComplianceWizard.tsx": 514,
   "server/services/inspection/inspection-publish.service.ts": 510,
@@ -44,6 +45,7 @@
   "server/api/bookings.ts": 465,
   "app/components/editor/CostItemsPanel.tsx": 449,
   "app/components/editor/InspectionSettingsSheet.tsx": 441,
+  "app/routes/inspection-edit/action.server.ts": 440,
   "app/lib/collab/results-doc-connection.ts": 435,
   "app/components/media-studio/VideoCapture.tsx": 432,
   "server/api/inspections/results.ts": 430,

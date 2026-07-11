@@ -315,6 +315,91 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  }
  }
 
+ // Commercial PCA Phase M Task 10 — Compliance panel mutations. All ride the
+ // BFF relay (no raw client fetch to /api/...) through the Task 6 compliance
+ // API. Mirrors the save-pca-narrative / save-property-facts shape: relay
+ // through createApi, return { ok: res.ok, intent }.
+ if (intent === "compliance-signoff") {
+  const role = String(formData.get("role") ?? "");
+  const personId = String(formData.get("personId") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const license = String(formData.get("license") ?? "").trim() || null;
+  const dualRole = formData.get("dualRole") === "true";
+  if ((role !== "field_observer" && role !== "pcr_reviewer") || !personId || !name) {
+   return { ok: false as const, intent: "compliance-signoff" };
+  }
+  const res = await api.inspections[":id"].compliance.signoff.$post({
+   param: { id: params.id },
+   json: { role, personId, name, license, dualRole },
+  });
+  return { ok: res.ok, intent: "compliance-signoff", role };
+ }
+
+ if (intent === "compliance-remove-signoff") {
+  const role = String(formData.get("role") ?? "");
+  if (role !== "field_observer" && role !== "pcr_reviewer") {
+   return { ok: false as const, intent: "compliance-remove-signoff" };
+  }
+  const res = await api.inspections[":id"].compliance.signoff[":role"].$delete({
+   param: { id: params.id, role },
+  });
+  return { ok: res.ok, intent: "compliance-remove-signoff", role };
+ }
+
+ if (intent === "compliance-doc-review-seed") {
+  // Not one of the Task 10 brief's five listed intents, but required so the
+  // checklist is reachable at all — nothing else in the app calls
+  // seedDocumentReview, so an inspector with an empty checklist would
+  // otherwise have no way to populate it.
+  const res = await api.inspections[":id"].compliance["doc-review"].seed.$post({
+   param: { id: params.id },
+  });
+  return { ok: res.ok, intent: "compliance-doc-review-seed" };
+ }
+
+ if (intent === "compliance-doc-review") {
+  const documentKey = String(formData.get("documentKey") ?? "");
+  if (!documentKey) return { ok: false as const, intent: "compliance-doc-review" };
+  const res = await api.inspections[":id"].compliance["doc-review"][":documentKey"].$patch({
+   param: { id: params.id, documentKey },
+   json: {
+    requested: formData.get("requested") === "true",
+    received: formData.get("received") === "true",
+    reviewed: formData.get("reviewed") === "true",
+    na: formData.get("na") === "true",
+    notes: String(formData.get("notes") ?? "") || null,
+   },
+  });
+  return { ok: res.ok, intent: "compliance-doc-review", documentKey };
+ }
+
+ if (intent === "compliance-psq") {
+  let responses: Record<string, unknown> = {};
+  try {
+   responses = JSON.parse(String(formData.get("responses") ?? "{}"));
+  } catch {
+   /* malformed payload — send the empty object rather than throwing */
+  }
+  const res = await api.inspections[":id"].compliance.psq.$put({
+   param: { id: params.id },
+   json: { responses },
+  });
+  return { ok: res.ok, intent: "compliance-psq" };
+ }
+
+ if (intent === "compliance-psq-status") {
+  const status = String(formData.get("status") ?? "");
+  if (status !== "sent" && status !== "received" && status !== "declined") {
+   return { ok: false as const, intent: "compliance-psq-status" };
+  }
+  const reason = formData.get("reason");
+  const res = await api.inspections[":id"].compliance.psq.status.$post({
+   param: { id: params.id },
+   json: { status, ...(reason ? { reason: String(reason) } : {}) },
+  });
+  return { ok: res.ok, intent: "compliance-psq-status", status };
+ }
+
  // FE-2: photo upload rides the BFF relay like every other mutation —
  // the old client-side fetch('/api/…/upload') was unauthenticated in saas
  // (C-12 class). Accepts one or many files (burst camera) per submission.
