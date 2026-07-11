@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/settings-profile";
+import { PageHeader } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Agent Settings - OpenInspection" }];
@@ -38,12 +39,7 @@ export default function AgentSettingsProfilePage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-[19px] font-bold tracking-tight text-ih-fg-1">Settings</h1>
-        <p className="text-[14px] text-ih-fg-3 mt-1">
-          Your public referral slug and the emails we send you.
-        </p>
-      </div>
+      <PageHeader title="Settings" meta="Your public referral slug and the emails we send you." />
 
       {/* Slug card */}
       <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6">

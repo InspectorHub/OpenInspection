@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { formatCents, parseDollarsToCents } from "~/lib/money";
+import { formatDollars } from "~/lib/money";
+import { MoneyInput } from "~/components/MoneyInput";
 import type { CostItemView } from "~/components/portal/sections/report/types";
 
 /**
@@ -196,21 +197,21 @@ export function CostItemsPanel({
           <div className="grid grid-cols-3 gap-3 text-[12px] mb-2 pb-2 border-b border-ih-border">
             <div>
               <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">Immediate</div>
-              <div className="tabular-nums text-ih-fg-1 font-bold">{formatCents(bucketTotals.immediate)}</div>
+              <div className="tabular-nums text-ih-fg-1 font-bold">{formatDollars(bucketTotals.immediate)}</div>
             </div>
             <div>
               <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">Short-term</div>
-              <div className="tabular-nums text-ih-fg-1 font-bold">{formatCents(bucketTotals.short_term)}</div>
+              <div className="tabular-nums text-ih-fg-1 font-bold">{formatDollars(bucketTotals.short_term)}</div>
             </div>
             <div>
               <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">Long-term</div>
-              <div className="tabular-nums text-ih-fg-1 font-bold">{formatCents(bucketTotals.long_term)}</div>
+              <div className="tabular-nums text-ih-fg-1 font-bold">{formatDollars(bucketTotals.long_term)}</div>
             </div>
           </div>
         )}
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Running total</span>
-          <span className="tabular-nums text-ih-fg-1 font-bold text-[14px]">{formatCents(grandTotalCents)}</span>
+          <span className="tabular-nums text-ih-fg-1 font-bold text-[14px]">{formatDollars(grandTotalCents)}</span>
         </div>
       </div>
 
@@ -333,12 +334,12 @@ function CostItemRow({
             </div>
             <div className="col-span-4 md:col-span-2">
               <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Unit cost</label>
-              <input
-                value={item.unitCostCents == null ? "" : (item.unitCostCents / 100).toFixed(2)}
-                onChange={(e) => onChange({ unitCostCents: parseDollarsToCents(e.target.value) })}
+              <MoneyInput
+                cents={item.unitCostCents}
+                onChange={(c) => onChange({ unitCostCents: c })}
                 onBlur={onCommit}
                 disabled={busy}
-                placeholder="$0.00"
+                ariaLabel="Unit cost"
                 className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
               />
             </div>
@@ -346,12 +347,12 @@ function CostItemRow({
         ) : (
           <div className="col-span-6 md:col-span-3">
             <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Lump sum</label>
-            <input
-              value={item.lumpSumCents == null ? "" : (item.lumpSumCents / 100).toFixed(2)}
-              onChange={(e) => onChange({ lumpSumCents: parseDollarsToCents(e.target.value) })}
+            <MoneyInput
+              cents={item.lumpSumCents}
+              onChange={(c) => onChange({ lumpSumCents: c })}
               onBlur={onCommit}
               disabled={busy}
-              placeholder="$0.00"
+              ariaLabel="Lump sum"
               className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
             />
           </div>
@@ -370,41 +371,46 @@ function CostItemRow({
         </div>
 
         {reserveEnabled && (
-          <>
-            <div className="col-span-4 md:col-span-2">
-              <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">EUL (yrs)</label>
-              <input
-                type="number" min={0}
-                value={item.eul ?? ""}
-                onChange={(e) => onChange({ eul: e.target.value === "" ? null : Number(e.target.value) })}
-                onBlur={onCommit}
-                disabled={busy}
-                className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
-              />
+          <div className="col-span-12 rounded-md border border-ih-border bg-ih-bg-muted/40 p-2.5">
+            <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ih-fg-4">
+              Reserve schedule (Table 2) — expected / effective / remaining useful life (years)
             </div>
-            <div className="col-span-4 md:col-span-2">
-              <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Eff. age</label>
-              <input
-                type="number" min={0}
-                value={item.effAge ?? ""}
-                onChange={(e) => onChange({ effAge: e.target.value === "" ? null : Number(e.target.value) })}
-                onBlur={onCommit}
-                disabled={busy}
-                className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
-              />
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">EUL</label>
+                <input
+                  type="number" min={0}
+                  value={item.eul ?? ""}
+                  onChange={(e) => onChange({ eul: e.target.value === "" ? null : Number(e.target.value) })}
+                  onBlur={onCommit}
+                  disabled={busy}
+                  className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
+                />
+              </div>
+              <div>
+                <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Eff. age</label>
+                <input
+                  type="number" min={0}
+                  value={item.effAge ?? ""}
+                  onChange={(e) => onChange({ effAge: e.target.value === "" ? null : Number(e.target.value) })}
+                  onBlur={onCommit}
+                  disabled={busy}
+                  className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
+                />
+              </div>
+              <div>
+                <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">RUL</label>
+                <input
+                  type="number" min={0}
+                  value={item.rul ?? ""}
+                  onChange={(e) => onChange({ rul: e.target.value === "" ? null : Number(e.target.value) })}
+                  onBlur={onCommit}
+                  disabled={busy}
+                  className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
+                />
+              </div>
             </div>
-            <div className="col-span-4 md:col-span-2">
-              <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">RUL (yrs)</label>
-              <input
-                type="number" min={0}
-                value={item.rul ?? ""}
-                onChange={(e) => onChange({ rul: e.target.value === "" ? null : Number(e.target.value) })}
-                onBlur={onCommit}
-                disabled={busy}
-                className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
-              />
-            </div>
-          </>
+          </div>
         )}
 
         <div className="col-span-12">
@@ -421,7 +427,7 @@ function CostItemRow({
 
       <div className="flex items-center justify-between pt-1">
         <div className="text-[12px] tabular-nums text-ih-fg-2 font-bold">
-          {formatCents(total)}
+          {formatDollars(total)}
           {underThreshold && (
             <span className="ml-2 px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-info-fg text-[11px] font-normal normal-case tracking-normal">
               below the $3,000 threshold

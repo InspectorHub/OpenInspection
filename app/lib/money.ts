@@ -22,3 +22,31 @@ export function parseDollarsToCents(input: string): number | null {
   if (Number.isNaN(dollars)) return null;
   return Math.round(dollars * 100);
 }
+
+/**
+ * Integer cents -> a `$`-prefixed dollar string that shows cents ONLY when the
+ * amount has them: `$8,500` for a whole-dollar estimate, `$8,500.50` when cents
+ * were entered. The Commercial PCA Opinion-of-Cost convention is whole dollars,
+ * so the common case never carries a redundant `.00`, but any cents the user
+ * enters are preserved. Storage stays in integer cents.
+ */
+export function formatDollars(cents: number): string {
+  const hasCents = cents % 100 !== 0;
+  return `$${(cents / 100).toLocaleString('en-US', {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+/**
+ * Currency user input -> integer cents. Tolerates a `$` prefix, thousands
+ * commas, and surrounding spaces, and accepts an optional decimal — the user
+ * can type `8500`, `8,500`, or `$8,500.50`. Empty / non-numeric -> null.
+ */
+export function parseCurrencyToCents(input: string): number | null {
+  const cleaned = input.replace(/[$,\s]/g, '');
+  if (cleaned === '') return null;
+  const dollars = Number.parseFloat(cleaned);
+  if (Number.isNaN(dollars)) return null;
+  return Math.round(dollars * 100);
+}

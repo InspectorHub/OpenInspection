@@ -2,6 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/inspectors";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { PageHeader } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Your Inspectors - OpenInspection" }];
@@ -39,12 +40,7 @@ export default function AgentInspectorsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-[28px] font-bold tracking-tight text-ih-fg-1">Your Inspectors</h1>
-        <p className="text-[14px] text-ih-fg-3 mt-1">
-          Every team you partner with. Copy a booking link to share with clients.
-        </p>
-      </div>
+      <PageHeader title="Your Inspectors" meta="Every team you partner with. Copy a booking link to share with clients." />
 
       {inspectors.length === 0 ? (
         <div className="bg-ih-bg-card border border-dashed border-ih-border-strong rounded-xl p-8 text-center">

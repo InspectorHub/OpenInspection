@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Icon } from '@core/shared-ui';
 import { usePointerGesture } from '../../hooks/usePointerGesture';
 import { MobileBottomDrawer } from '../MobileBottomDrawer';
 import { SpeedModeUndoToast } from './SpeedModeUndoToast';
@@ -175,8 +176,8 @@ export function SpeedMode({
         {/* Nav */}
         {/* ds-allow: fixed-dark surface */}
         <div className="flex gap-4 mt-8">
-          <button onClick={onPrev} disabled={currentIndex === 0} className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30 text-sm">&larr; Prev</button>
-          <button onClick={onNext} disabled={currentIndex >= totalCount - 1} className="px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30 text-sm">Next &rarr;</button>
+          <button onClick={onPrev} disabled={currentIndex === 0} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30 text-sm"><Icon name="chevL" size={16} /> Prev</button>
+          <button onClick={onNext} disabled={currentIndex >= totalCount - 1} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30 text-sm">Next <Icon name="chevR" size={16} /></button>
         </div>
       </div>
 

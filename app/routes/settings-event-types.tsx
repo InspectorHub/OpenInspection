@@ -6,6 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Table, Modal } from "@core/shared-ui";
+import { MoneyInput } from "~/components/MoneyInput";
 
 interface EventType {
   id: string;
@@ -273,19 +274,17 @@ export default function SettingsEventTypes() {
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                    Price ($)
+                    Price
                   </label>
-                  <input
-                    type="number"
-                    value={form.priceDollars}
-                    onChange={(e) =>
+                  <MoneyInput
+                    cents={Math.round(form.priceDollars * 100)}
+                    onChange={(c) =>
                       setForm((f) => ({
                         ...f,
-                        priceDollars: Number(e.target.value),
+                        priceDollars: c == null ? 0 : c / 100,
                       }))
                     }
-                    min={0}
-                    step={0.01}
+                    ariaLabel="Price"
                     className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                   />
                 </div>

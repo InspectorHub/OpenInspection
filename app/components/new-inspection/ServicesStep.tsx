@@ -1,5 +1,6 @@
 import { formatPriceCents } from "~/lib/wizard-steps";
 import { getEffectivePriceCents } from "~/lib/effective-price";
+import { MoneyInput } from "~/components/MoneyInput";
 import type { WizardService } from "../NewInspectionWizard";
 
 export function ServicesStep({
@@ -13,7 +14,7 @@ export function ServicesStep({
   services: Set<string>;
   priceOverrides: Map<string, number>;
   toggleService: (id: string) => void;
-  handlePriceOverrideChange: (serviceId: string, dollarValue: string, catalogCents: number | null | undefined) => void;
+  handlePriceOverrideChange: (serviceId: string, cents: number | null, catalogCents: number | null | undefined) => void;
 }) {
   return (
     <div className="space-y-2">
@@ -23,13 +24,8 @@ export function ServicesStep({
           const selected = services.has(s.id);
           const catalogCents = typeof s.price === "number" && s.price > 0 ? s.price : null;
           const overrideCents = priceOverrides.get(s.id);
-          // Display value for the price input: override dollars, or catalog dollars, or empty.
-          const priceInputDefault =
-            overrideCents !== undefined
-              ? (overrideCents / 100).toFixed(2)
-              : catalogCents !== null
-                ? (catalogCents / 100).toFixed(2)
-                : "";
+          // Price shown in the input: the override, else the catalog price, else empty.
+          const priceCents = overrideCents !== undefined ? overrideCents : catalogCents;
           return (
             <div
               key={s.id}
@@ -48,20 +44,12 @@ export function ServicesStep({
               </button>
               {/* Price: editable input when selected, static text otherwise */}
               {selected ? (
-                <div className="flex items-center gap-1">
-                  <span className="text-[12px] text-ih-fg-4">$</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    defaultValue={priceInputDefault}
-                    onBlur={(e) => handlePriceOverrideChange(s.id, e.target.value, catalogCents)}
-                    onChange={(e) => handlePriceOverrideChange(s.id, e.target.value, catalogCents)}
-                    className="w-20 h-7 px-1.5 rounded border border-ih-border bg-ih-bg-card text-[12px] text-right focus:shadow-ih-focus outline-none"
-                    aria-label={`Price for ${s.name}`}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
+                <MoneyInput
+                  cents={priceCents}
+                  onChange={(c) => handlePriceOverrideChange(s.id, c, catalogCents)}
+                  className="w-24 h-7 px-1.5 rounded border border-ih-border bg-ih-bg-card text-[12px] text-right focus:shadow-ih-focus outline-none"
+                  ariaLabel={`Price for ${s.name}`}
+                />
               ) : catalogCents !== null ? (
                 // FE-7: price is stored in cents — "$400.00", not "$40000"
                 <span className="text-[12px] text-ih-fg-4 flex-shrink-0">{formatPriceCents(catalogCents)}</span>

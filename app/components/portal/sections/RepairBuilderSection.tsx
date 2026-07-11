@@ -24,7 +24,7 @@ import { useFetcher } from "react-router";
 import { RepairDefectRow } from "./repair/RepairDefectRow";
 import { RepairIntroPanel } from "./repair/RepairIntroPanel";
 import { RepairSharePanel } from "./repair/RepairSharePanel";
-import { formatCents, parseDollarsToCents } from "~/lib/money";
+import { formatCents } from "~/lib/money";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -378,8 +378,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
   );
 
   const updateCredit = useCallback(
-    (defect: Defect, dollars: string) => {
-      const cents = parseDollarsToCents(dollars);
+    (defect: Defect, cents: number | null) => {
       setDrafts((prev) => ({
         ...prev,
         [defect.findingKey]: { ...(prev[defect.findingKey] ?? { note: "" }), requestedCreditCents: cents },
@@ -520,10 +519,6 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
           {sorted.map((defect) => {
             const isSelected = selected.has(defect.findingKey);
             const draft = drafts[defect.findingKey];
-            const creditDollars =
-              draft?.requestedCreditCents != null
-                ? String(draft.requestedCreditCents / 100)
-                : "";
 
             return (
               <RepairDefectRow
@@ -531,7 +526,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
                 defect={defect}
                 isSelected={isSelected}
                 draft={draft}
-                creditDollars={creditDollars}
+                creditCents={draft?.requestedCreditCents ?? null}
                 onToggle={toggleDefect}
                 onUpdateCredit={updateCredit}
                 onUpdateNote={updateNote}

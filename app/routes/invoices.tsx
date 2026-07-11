@@ -4,6 +4,7 @@ import type { Route } from "./+types/invoices";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, StatCard, Button, EmptyState, Modal, Table, Pill, type PillTone } from "@core/shared-ui";
+import { MoneyInput } from "~/components/MoneyInput";
 
 export function meta() {
   return [{ title: "Invoices - OpenInspection" }];
@@ -127,6 +128,9 @@ function NewInvoiceModal({
   const fetcher = useFetcher<typeof action>();
   const busy = fetcher.state !== "idle";
   const [clientName, setClientName] = useState("");
+  // Money stays in integer cents; the hidden `amount` field carries dollars to
+  // the action (which multiplies by 100), so the wire contract is unchanged.
+  const [amountCents, setAmountCents] = useState<number | null>(null);
 
   // Close on successful create; the action revalidates the list automatically.
   // (onClose is intentionally omitted from deps — parent recreates it per render.)
@@ -175,7 +179,8 @@ function NewInvoiceModal({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label htmlFor="ninv-amount" className={labelCls}>Amount (USD)</label>
-            <input id="ninv-amount" name="amount" type="number" min="0.01" step="0.01" required className={inputCls} />
+            <MoneyInput cents={amountCents} onChange={setAmountCents} ariaLabel="Amount (USD)" className={inputCls} />
+            <input type="hidden" name="amount" value={amountCents == null ? "" : String(amountCents / 100)} />
           </div>
           <div>
             <label htmlFor="ninv-due" className={labelCls}>Due date</label>

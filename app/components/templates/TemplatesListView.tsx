@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Table } from "@core/shared-ui";
+import { Table, Icon } from "@core/shared-ui";
 import { TemplateIcon } from "./TemplateIcon";
 import { countItems, type Template } from "./types";
 
@@ -44,7 +44,8 @@ export function TemplatesListView({
                   onClick={() => setImportOpen(true)}
                   className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
                 >
-                  &darr; Import from Spectora
+                  <Icon name="download" size={16} strokeWidth={1.75} />
+                  Import from Spectora
                 </button>
                 <button
                   onClick={() => setCreateOpen(true)}

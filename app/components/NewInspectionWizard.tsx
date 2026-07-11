@@ -293,18 +293,16 @@ export function NewInspectionWizard({
   };
 
   /** P-4: Update the price override for a selected service.
-   *  `dollarValue` is the raw string from the number input (e.g. "449.99").
-   *  Uses Math.round(v * 100) to avoid float precision errors (44999, not 44998.999).
-   *  Clearing the input (empty string) or matching the catalog price removes the override.
+   *  `cents` is the parsed integer-cents value from the MoneyInput (or null when
+   *  the field is cleared). Clearing the input or matching the catalog price
+   *  removes the override.
    */
-  function handlePriceOverrideChange(serviceId: string, dollarValue: string, catalogCents: number | null | undefined) {
-    if (dollarValue === '') {
+  function handlePriceOverrideChange(serviceId: string, cents: number | null, catalogCents: number | null | undefined) {
+    if (cents == null) {
       removePriceOverride(serviceId);
       return;
     }
-    const parsed = parseFloat(dollarValue);
-    if (!isFinite(parsed) || parsed < 0) return;
-    const cents = Math.round(parsed * 100);
+    if (cents < 0) return;
     // If the value equals the catalog price, treat it as "no override".
     if (catalogCents != null && cents === catalogCents) {
       removePriceOverride(serviceId);

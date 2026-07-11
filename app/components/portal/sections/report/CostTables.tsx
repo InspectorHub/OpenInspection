@@ -1,4 +1,4 @@
-import { formatCents } from "~/lib/money";
+import { formatDollars } from "~/lib/money";
 import type { CostTables as CT, Table1Row } from "./types";
 
 /**
@@ -6,7 +6,8 @@ import type { CostTables as CT, Table1Row } from "./types";
  * and the opt-in TABLE 2 (Capital Replacement Reserve Schedule). Renders
  * nothing when costs are hidden or both tables are empty. No %-replace / code
  * columns (removed per the roadmap correction). Money via the shared
- * app/lib/money.ts formatCents. Wide reserve grid reuses the existing print
+ * app/lib/money.ts formatDollars (whole dollars, cents shown only when present).
+ * Wide reserve grid reuses the existing print
  * landscape/scaling.
  */
 export function CostTables({ data, show }: { data: CT | null; show: boolean }) {
@@ -20,9 +21,9 @@ export function CostTables({ data, show }: { data: CT | null; show: boolean }) {
       <td className="py-1 pr-4">{r.item.component}{r.item.location ? ` — ${r.item.location}` : ""}</td>
       <td className="py-1 pr-4 text-right">{r.item.quantity ?? ""}</td>
       <td className="py-1 pr-4">{r.item.uom ?? ""}</td>
-      <td className="py-1 pr-4 text-right">{r.item.unitCostCents != null ? formatCents(r.item.unitCostCents) : ""}</td>
-      <td className="py-1 pr-4 text-right">{r.item.bucket === "immediate" ? formatCents(r.total) : ""}</td>
-      <td className="py-1 pr-4 text-right">{r.item.bucket === "short_term" ? formatCents(r.total) : ""}</td>
+      <td className="py-1 pr-4 text-right">{r.item.unitCostCents != null ? formatDollars(r.item.unitCostCents) : ""}</td>
+      <td className="py-1 pr-4 text-right">{r.item.bucket === "immediate" ? formatDollars(r.total) : ""}</td>
+      <td className="py-1 pr-4 text-right">{r.item.bucket === "short_term" ? formatDollars(r.total) : ""}</td>
       <td className="py-1 text-ih-fg-3">{r.item.suggestedRemedy}</td>
     </tr>
   );
@@ -48,8 +49,8 @@ export function CostTables({ data, show }: { data: CT | null; show: boolean }) {
             <tfoot>
               <tr className="font-medium text-ih-fg-1">
                 <td className="pt-2" colSpan={4}>Totals</td>
-                <td className="pt-2 text-right">{formatCents(table1.immediateTotalCents)}</td>
-                <td className="pt-2 text-right">{formatCents(table1.shortTermTotalCents)}</td>
+                <td className="pt-2 text-right">{formatDollars(table1.immediateTotalCents)}</td>
+                <td className="pt-2 text-right">{formatDollars(table1.shortTermTotalCents)}</td>
                 <td />
               </tr>
             </tfoot>
@@ -78,23 +79,23 @@ export function CostTables({ data, show }: { data: CT | null; show: boolean }) {
                   <td className="py-1 pr-2 text-right">{row.item.rul ?? ""}</td>
                   {reserveSchedule.years.map((y) => (
                     <td key={y} className="py-1 pr-2 text-right">
-                      {y === row.placementYear ? formatCents(row.replacementCents) : ""}
+                      {y === row.placementYear ? formatDollars(row.replacementCents) : ""}
                     </td>
                   ))}
-                  <td className="py-1 text-right">{formatCents(row.replacementCents)}</td>
+                  <td className="py-1 text-right">{formatDollars(row.replacementCents)}</td>
                 </tr>
               ))}
             </tbody>
             <tfoot className="text-ih-fg-1">
               <tr className="font-medium">
                 <td className="pt-2" colSpan={4}>Total Uninflated</td>
-                {reserveSchedule.uninflatedByYear.map((c, i) => <td key={i} className="pt-2 pr-2 text-right">{formatCents(c)}</td>)}
-                <td className="pt-2 text-right">{formatCents(reserveSchedule.totalUninflatedCents)}</td>
+                {reserveSchedule.uninflatedByYear.map((c, i) => <td key={i} className="pt-2 pr-2 text-right">{formatDollars(c)}</td>)}
+                <td className="pt-2 text-right">{formatDollars(reserveSchedule.totalUninflatedCents)}</td>
               </tr>
               <tr className="font-medium">
                 <td className="pt-1" colSpan={4}>Cumulative Inflated</td>
-                {reserveSchedule.cumulativeInflatedByYear.map((c, i) => <td key={i} className="pt-1 pr-2 text-right">{formatCents(c)}</td>)}
-                <td className="pt-1 text-right">{formatCents(reserveSchedule.totalInflatedCents)}</td>
+                {reserveSchedule.cumulativeInflatedByYear.map((c, i) => <td key={i} className="pt-1 pr-2 text-right">{formatDollars(c)}</td>)}
+                <td className="pt-1 text-right">{formatDollars(reserveSchedule.totalInflatedCents)}</td>
               </tr>
             </tfoot>
           </table>

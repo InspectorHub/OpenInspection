@@ -3,7 +3,7 @@ import { useLoaderData, useFetcher, useNavigate, useNavigation } from "react-rou
 import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { Modal } from "@core/shared-ui";
+import { Modal, PageHeader, Icon } from "@core/shared-ui";
 import { startOfWeek, addDays, type CalendarEvent, type ViewMode } from "~/components/calendar/calendar-helpers";
 import { MonthView } from "~/components/calendar/MonthView";
 import { WeekView } from "~/components/calendar/WeekView";
@@ -157,32 +157,25 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-ih-list">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-[0.2em] bg-ih-primary-tint text-ih-primary">
-            <span className="w-1 h-1 rounded-full bg-current opacity-60" />
-            Calendar
-          </span>
-          <h1 className="text-[26px] font-bold tracking-tight mt-1">Calendar</h1>
-          <p className="text-[13px] text-ih-fg-3 mt-1">
-            {thisWeekEvents.length === 0
-              ? "No inspections scheduled this week"
-              : drafts.length > 0
-                ? `${confirmed} confirmed · ${drafts.length} draft${drafts.length === 1 ? "" : "s"}`
-                : `${thisWeekEvents.length} this week`}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Calendar"
+        meta={
+          thisWeekEvents.length === 0
+            ? "No inspections scheduled this week"
+            : drafts.length > 0
+              ? `${confirmed} confirmed · ${drafts.length} draft${drafts.length === 1 ? "" : "s"}`
+              : `${thisWeekEvents.length} this week`
+        }
+      />
 
       {/* Navigation */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <button onClick={prev} className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted text-lg">
-            &lsaquo;
+          <button onClick={prev} aria-label="Previous" className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted">
+            <Icon name="chevL" size={18} />
           </button>
-          <button onClick={next} className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted text-lg">
-            &rsaquo;
+          <button onClick={next} aria-label="Next" className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted">
+            <Icon name="chevR" size={18} />
           </button>
           <button onClick={goToday} className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
             Today

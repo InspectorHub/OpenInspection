@@ -1,3 +1,5 @@
+import { Icon } from "@core/shared-ui";
+
 export interface MobileAppBarProps {
     sectionTitle: string;
     itemLabel:    string;
@@ -17,7 +19,7 @@ export function MobileAppBar({ sectionTitle, itemLabel, onBack, onMore }: Mobile
                 onClick={onBack}
                 className="w-10 h-10 flex items-center justify-center text-ih-fg-2 hover:bg-ih-bg-muted rounded"
                 aria-label="Back"
-            >←</button>
+            ><Icon name="back" size={18} /></button>
             <div className="flex-1 min-w-0">
                 <div className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4 truncate">{sectionTitle}</div>
                 <div className="text-[13px] font-bold truncate">{itemLabel}</div>
