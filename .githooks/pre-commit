@@ -15,12 +15,9 @@
 # Memory ceiling so concurrent pre-commits (two parallel agent sessions on this
 # machine) don't exhaust RAM and freeze the box. Local-only (CI exited above).
 # `:-` keeps any value the caller already exported.
-#   GOMEMLIMIT/GOGC → bound tsgo (@typescript/native-preview is a Go binary; the
-#                     type-check:*:fast steps are the tsgo path the hook runs).
-#   NODE_OPTIONS    → bound the node heavy steps (react-router build for the
-#                     bundle-size gate, jscpd for lint:dup, eslint).
-export GOMEMLIMIT="${GOMEMLIMIT:-2GiB}"
-export GOGC="${GOGC:-75}"
+#   NODE_OPTIONS → bound the node heavy steps: tsc type-check (--max-old-space-size
+#                  is also set per-script), react-router build for the bundle-size
+#                  gate, jscpd for lint:dup, eslint.
 case " $NODE_OPTIONS " in *"--max-old-space-size"*) : ;; *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=4096" ;; esac
 
 # Colors
@@ -41,15 +38,16 @@ step() { printf '\n  →  %b\n' "$1"; }
 printf '%b\n' "${BOLD}── OpenInspection (Pre-commit Checks) ───────────────────────────${NC}"
 
 # 1. Type check — SCOPED to what the staged changes can actually affect.
-#    CI's required "verify" check runs tsc and is the authoritative full gate;
-#    this hook is a fast LOCAL guard and uses tsgo (@typescript/native-preview),
-#    which is ~5-10x faster than tsc so a commit does not cost minutes. tsgo is a
-#    preview compiler and can differ subtly from tsc — CI's tsc remains the truth.
+#    Runs tsc (the SAME compiler as CI's authoritative "verify" gate) with
+#    --incremental build-info caching, so a warm commit only re-checks what
+#    changed and stays fast. (We used tsgo/@typescript/native-preview here before;
+#    it was faster cold but unstable under memory pressure — GC death-loops that
+#    timed out and left multi-GB zombies. tsc is bounded and predictable.)
 #    Tiers:
 #      - no staged .ts/.tsx or ts-config files  → skip type check entirely
 #        (docs, assets, hooks, fixtures — a markdown edit must not cost seconds)
-#      - staged TS confined to server/          → api pass only (type-check:api:fast)
-#      - anything touching app/ workers/ packages/ or ts-config files → full (type-check:fast)
+#      - staged TS confined to server/          → api pass only (type-check:api)
+#      - anything touching app/ workers/ packages/ or ts-config files → full (type-check)
 STAGED=$(git diff --cached --name-only --diff-filter=ACMRD)
 TS_STAGED=$(echo "$STAGED" | grep -E '\.(ts|tsx)$' || true)
 CONFIG_STAGED=$(echo "$STAGED" | grep -E '^(tsconfig|package\.json|package-lock\.json|vite\.config|react-router\.config|worker-configuration)' || true)
@@ -58,16 +56,16 @@ step "Type check"
 if [ -z "$TS_STAGED" ] && [ -z "$CONFIG_STAGED" ]; then
     pass "Skipped — no staged TypeScript/config changes (CI verify remains the full gate)"
 elif [ -z "$CONFIG_STAGED" ] && [ -z "$(echo "$TS_STAGED" | grep -vE '^(server|tests)/')" ]; then
-    if npm run type-check:api:fast > /dev/null 2>&1; then
-        pass "Type check passed (tsgo, api pass only — staged TS confined to server/ and tests/)"
+    if npm run type-check:api > /dev/null 2>&1; then
+        pass "Type check passed (tsc, api pass only — staged TS confined to server/ and tests/)"
     else
-        fail "Type check failed  →  npm run type-check:api:fast (authoritative: npm run type-check:api)"
+        fail "Type check failed  →  npm run type-check:api"
     fi
 else
-    if npm run type-check:fast > /dev/null 2>&1; then
-        pass "Type check passed (tsgo)"
+    if npm run type-check > /dev/null 2>&1; then
+        pass "Type check passed (tsc)"
     else
-        fail "Type check failed  →  npm run type-check:fast (authoritative: npm run type-check)"
+        fail "Type check failed  →  npm run type-check"
     fi
 fi
 
@@ -124,26 +122,10 @@ else
     fail "Duplicate-code gate failed  →  npm run lint:dup"
 fi
 
-# 4. Worker bundle size (C-13b) — Workers FREE caps the script at 3 MiB
-#    gzipped, and OpenInspection promises one-click Free-plan deploys, so an
-#    oversized bundle breaks every self-hoster. Runs the REAL build pipeline
-#    (the old check died on virtual:react-router/server-build outside it and
-#    trained everyone to --no-verify), so it costs ~1-2 min — gated to commits
-#    that can actually change the bundle; docs/tests-only commits skip it.
-BUNDLE_STAGED=$(echo "$STAGED" | grep -E '^(app/|server/|workers/|packages/|public/vendor|package\.json|package-lock\.json|vite\.config|react-router\.config|wrangler.*\.jsonc?)' || true)
-step "Worker bundle size"
-if [ -z "$BUNDLE_STAGED" ]; then
-    pass "Skipped — no staged bundle-affecting changes (CI verify remains the full gate)"
-else
-    BUNDLE_OUT=$(node scripts/check-bundle-size.mjs 2>&1)
-    BUNDLE_RC=$?
-    BUNDLE_LINE=$(echo "$BUNDLE_OUT" | grep -E '^\[bundle-size\] (worker upload|FAIL|WARNING)' | tail -2 | tr '\n' ' ')
-    if [ "$BUNDLE_RC" -eq 0 ]; then
-        pass "Bundle size OK — ${BUNDLE_LINE:-see node scripts/check-bundle-size.mjs}"
-    else
-        fail "Bundle size gate failed — ${BUNDLE_LINE:-run node scripts/check-bundle-size.mjs}"
-    fi
-fi
+# NOTE: the Worker bundle-size gate lives in .githooks/pre-push, not here. The
+#    bundle can only break at deploy, and its check runs the REAL build pipeline
+#    (~1-2 min), so paying it on every commit was overkill. pre-push builds it
+#    once per push instead; CI's verify remains the authoritative final gate.
 
 if [ "$FAILED" -eq 1 ]; then
     printf '\n%b\n' "${RED}Pre-commit checks failed. Fix the errors before committing.${NC}"

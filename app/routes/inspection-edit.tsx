@@ -69,6 +69,7 @@ import { MobileDrawerTriggers, type MobileDrawerId } from "~/components/editor/M
 import { MobileBottomDrawer } from "~/components/MobileBottomDrawer";
 import { BreadcrumbDropdown, type UnitScopeRow } from "~/components/editor/BreadcrumbDropdown";
 import { UnitsManager } from "~/components/editor/UnitsManager";
+import { CostItemsHost } from "~/components/editor/CostItemsHost";
 import type { ResultMap } from "~/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
 
@@ -440,6 +441,12 @@ export default function InspectionEditPage() {
  // narrative panel). Residential editors never see the switcher/manager, so they
  // render byte-identically to before.
  const showUnitsSurface = (loaderData.inspection as Record<string, unknown>).propertyType === "commercial";
+
+ // Commercial PCA Phase C Task 13b — Cost Items drawer (Opinion of Cost /
+ // ASTM E2018 Table 1). Same commercial-only gate as the units surface;
+ // self-loads its data on open via CostItemsHost, so it doesn't need
+ // anything threaded through the (already very large) inspection-edit loader.
+ const [costItemsOpen, setCostItemsOpen] = useState(false);
 
  // When the collab doc has synced, `readResultMap` already holds EVERY scope's
  // findings (the DO hydrated the full D1 blob), so a scope switch needs no fetch.
@@ -1977,6 +1984,17 @@ export default function InspectionEditPage() {
      </svg>
      Units
     </button>
+    <button
+     type="button"
+     onClick={() => setCostItemsOpen(true)}
+     className="hidden lg:inline-flex h-7 px-2.5 rounded-ih-button bg-ih-bg-muted text-ih-fg-2 text-[12px] font-bold hover:bg-ih-border items-center gap-1.5"
+     title="Cost items"
+    >
+     <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.66 0-3 .9-3 2s1.34 2 3 2 3 .9 3 2-1.34 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m0-10a4 4 0 100 8 4 4 0 000-8z" />
+     </svg>
+     Cost Items
+    </button>
    </div>
   ) : undefined
  }
@@ -1990,6 +2008,14 @@ export default function InspectionEditPage() {
    units={units}
    mode={unitInspectionMode}
    fetcher={unitsFetcher}
+  />
+ )}
+ {/* Commercial PCA Phase C Task 13b — cost items drawer (Opinion of Cost) */}
+ {showUnitsSurface && (
+  <CostItemsHost
+   open={costItemsOpen}
+   onClose={() => setCostItemsOpen(false)}
+   inspectionId={String(state.inspection.id)}
   />
  )}
  {/* ------------------------------------------------------------ */}

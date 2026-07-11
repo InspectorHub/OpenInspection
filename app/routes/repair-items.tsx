@@ -6,6 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { MoneyInput } from "~/components/MoneyInput";
 
 export function meta() {
   return [{ title: "Repair Items - OpenInspection" }];
@@ -179,8 +180,8 @@ export default function RepairItemsPage() {
               </div>
               <Field label="Repair summary"><textarea value={form.defaultRepairSummary} onChange={(e) => setForm((f) => ({ ...f, defaultRepairSummary: e.target.value }))} rows={3} className={INPUT} /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Est. min ($)"><input type="number" min={0} step="any" value={form.estimateMinDollars} onChange={(e) => setForm((f) => ({ ...f, estimateMinDollars: e.target.value }))} className={INPUT} /></Field>
-                <Field label="Est. max ($)"><input type="number" min={0} step="any" value={form.estimateMaxDollars} onChange={(e) => setForm((f) => ({ ...f, estimateMaxDollars: e.target.value }))} className={INPUT} /></Field>
+                <Field label="Est. min"><MoneyInput ariaLabel="Est. min" cents={form.estimateMinDollars === "" ? null : Math.round(Number(form.estimateMinDollars) * 100)} onChange={(c) => setForm((f) => ({ ...f, estimateMinDollars: c == null ? "" : String(c / 100) }))} className={INPUT} /></Field>
+                <Field label="Est. max"><MoneyInput ariaLabel="Est. max" cents={form.estimateMaxDollars === "" ? null : Math.round(Number(form.estimateMaxDollars) * 100)} onChange={(c) => setForm((f) => ({ ...f, estimateMaxDollars: c == null ? "" : String(c / 100) }))} className={INPUT} /></Field>
               </div>
               <Field label="Recommended contractor">
                 <select value={form.recommendedContractorTypeId} onChange={(e) => setForm((f) => ({ ...f, recommendedContractorTypeId: e.target.value }))} className={INPUT}>

@@ -134,6 +134,20 @@
       "when": 1783630853373,
       "tag": "0018_legal_dark_phoenix",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1783751298923,
+      "tag": "0019_redundant_red_skull",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1783752955383,
+      "tag": "0020_stiff_post",
+      "breakpoints": true
     }
   ]
 }

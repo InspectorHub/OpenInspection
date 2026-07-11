@@ -3,7 +3,8 @@ import { useLoaderData, useFetcher, useNavigate, useSearchParams } from "react-r
 import type { Route } from "./+types/templates";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { Pagination } from "@core/shared-ui";
+import { Pagination, PageHeader, Icon } from "@core/shared-ui";
+import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
 import { type SortKey, type Template } from "~/components/templates/types";
 import { TemplatesListView } from "~/components/templates/TemplatesListView";
@@ -278,64 +279,60 @@ export default function TemplatesPage() {
 
   return (
     <div className="space-y-ih-list">
-      {/* PageHeader */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-[0.2em] bg-ih-bg-muted text-ih-fg-3">
-            <span className="w-1 h-1 rounded-full bg-current opacity-60" />
-            Library &middot; Templates
-          </span>
-          <h1 className="text-[26px] font-bold tracking-tight mt-1">
-            Inspection Templates
-          </h1>
-          <p className="text-[13px] text-ih-fg-3 mt-1">
-            {metaParts.join(" · ")}
-          </p>
+      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Templates" }]} />
+      <PageHeader
+        title="Inspection Templates"
+        meta={metaParts.join(" · ")}
+        actions={
+          <>
+            <button onClick={() => setImportOpen(true)} className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2">
+              <Icon name="download" size={16} strokeWidth={1.75} />
+              Import Spectora
+            </button>
+            <button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2">
+              + New Template
+            </button>
+          </>
+        }
+      />
+
+      {/* Filter bar — search / sort / view. Kept out of the header so a wide
+          toolbar can never squeeze the title into a wrap (DS PageHeader owns the
+          title/actions split; controls that scale with content live here). */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search templates..."
+            className="h-9 w-44 pl-8 pr-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-2 focus:border-ih-primary focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
+          />
+          <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ih-fg-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+          </svg>
         </div>
-        <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="relative">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search templates..."
-              className="h-9 w-44 pl-8 pr-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-2 focus:border-ih-primary focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
-            />
-            <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ih-fg-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-            </svg>
-          </div>
-          {/* Sort */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortKey)}
-            className="h-9 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-3 outline-none"
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortKey)}
+          className="h-9 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-3 outline-none"
+        >
+          <option value="name">Name</option>
+          <option value="date">Last modified</option>
+          <option value="usage">Most used</option>
+        </select>
+        <div className="flex bg-ih-bg-muted rounded-md p-0.5 ml-auto">
+          <button
+            onClick={() => setView("card")}
+            className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "card" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
           >
-            <option value="name">Name</option>
-            <option value="date">Last modified</option>
-            <option value="usage">Most used</option>
-          </select>
-          {/* View toggle */}
-          <div className="flex bg-ih-bg-muted rounded-md p-0.5">
-            <button
-              onClick={() => setView("card")}
-              className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "card" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
-            >
-              Cards
-            </button>
-            <button
-              onClick={() => setView("list")}
-              className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "list" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
-            >
-              List
-            </button>
-          </div>
-          <button onClick={() => setImportOpen(true)} className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2">
-            &darr; Import Spectora
+            Cards
           </button>
-          <button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2">
-            + New Template
+          <button
+            onClick={() => setView("list")}
+            className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "list" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
+          >
+            List
           </button>
         </div>
       </div>

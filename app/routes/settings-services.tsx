@@ -7,6 +7,7 @@ import type { Route } from "./+types/settings-services";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { createServiceSchema } from "~/lib/forms/settings.schema";
+import { MoneyInput } from "~/components/MoneyInput";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { SCHEDULING_ROLES_SET } from "~/lib/settings/constants";
@@ -167,6 +168,9 @@ export default function SettingsServices() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [showForm, setShowForm] = useState(false);
+  // Price stays in integer cents; a hidden `price` field carries dollars so
+  // Conform's zod schema (which multiplies by 100) sees the same contract.
+  const [priceCents, setPriceCents] = useState<number | null>(null);
 
   // Conform owns only the create-service form. The toggle-service form posts
   // hidden fields only (no text validation), so it stays a plain <Form>. Guard
@@ -235,13 +239,15 @@ export default function SettingsServices() {
               )}
             </div>
             <div>
-              <label htmlFor={fields.price.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Price ($)</label>
-              <input
-                type="number" id={fields.price.id} name={fields.price.name} min="0" step="0.01"
-                placeholder="450.00"
-                aria-invalid={fields.price.errors ? true : undefined}
+              <label htmlFor={fields.price.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Price</label>
+              <MoneyInput
+                id={fields.price.id}
+                cents={priceCents}
+                onChange={setPriceCents}
+                ariaLabel="Price"
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
+              <input type="hidden" name={fields.price.name} value={priceCents == null ? "" : String(priceCents / 100)} />
               {fields.price.errors && (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.price.errors[0]}</p>
               )}
@@ -253,7 +259,7 @@ export default function SettingsServices() {
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => setShowForm(false)} className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
+            <button type="button" onClick={() => { setShowForm(false); setPriceCents(null); }} className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
               Cancel
             </button>
             <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">

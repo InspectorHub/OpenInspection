@@ -2,6 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/repair-request.$shareToken";
 import { createApi } from "~/lib/api-client.server";
 import { PublicNotice } from "~/components/PublicNotice";
+import { formatCents } from "~/lib/money";
 
 export function meta() {
   return [{ title: "Repair Request - OpenInspection" }];
@@ -41,10 +42,6 @@ export interface ShareViewModel {
   customIntro?: string | null;
   creditTotalDisplay?: string;
   rows: ShareViewRow[];
-}
-
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 export function shareViewModel(data: ShareApiData): ShareViewModel {

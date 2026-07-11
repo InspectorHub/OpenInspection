@@ -182,6 +182,37 @@ interface ReportUnit {
   attrs: unknown;
 }
 
+/* Commercial PCA Phase C — client-side mirror of server/lib/pca-costs shapes
+   (server lib cannot be imported by app/; these are structural duplicates). */
+export interface CostItemView {
+  id: string; system: string; component: string; location: string;
+  action: 'repair' | 'replace' | 'further_study';
+  costMethod: 'unit' | 'lump_sum';
+  quantity: number | null; uom: string | null;
+  unitCostCents: number | null; lumpSumCents: number | null;
+  eul: number | null; effAge: number | null; rul: number | null;
+  suggestedRemedy: string;
+  bucket: 'immediate' | 'short_term' | 'long_term';
+  sectionRef: string | null; photoRef: string | null; sortOrder: number;
+}
+export interface Table1Row { item: CostItemView; total: number }
+export interface Table1 {
+  immediate: Table1Row[]; shortTerm: Table1Row[];
+  immediateTotalCents: number; shortTermTotalCents: number;
+}
+export interface ReserveRow { item: CostItemView; placementYear: number; replacementCents: number }
+export interface ReserveSchedule {
+  startYear: number; termYears: number; years: number[]; rows: ReserveRow[];
+  uninflatedByYear: number[]; inflatedByYear: number[]; cumulativeInflatedByYear: number[];
+  totalUninflatedCents: number; totalInflatedCents: number;
+  perSfUninflatedAllYears: number | null; perSfInflatedAllYears: number | null; perSfInflatedPerYear: number | null;
+}
+export interface BucketRollup { immediateCents: number; shortTermCents: number; reserveCents: number }
+export interface CostTables {
+  table1: Table1; reserveSchedule: ReserveSchedule | null;
+  rollup: BucketRollup; droppedCount: number;
+}
+
 /**
  * The report loader payload shape. Kept here (exported) so both the standalone
  * route and the portal route can type their loaders against it and feed it to
@@ -196,6 +227,7 @@ export interface ReportLoaderResult {
   stats: { total: number; satisfactory: number; monitor: number; defect: number };
   sections: ReportSection[];
   showEstimates: boolean;
+  costTables: CostTables | null;
   enableRepairList: boolean;
   enableCustomerRepairExport: boolean;
   isDelivered: boolean;

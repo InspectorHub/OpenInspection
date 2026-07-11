@@ -3,6 +3,7 @@ import { useLoaderData, useFetcher, Link, isRouteErrorResponse, useRouteError } 
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { Icon } from "@core/shared-ui";
 import { RATING_PRESETS } from "~/components/template/types";
 import type { RatingLevel, RatingSystem, TemplateItem, TemplateSchema, TemplateSection, CannedComment } from "~/components/template/types";
 import { RatingSystemEditor } from "~/components/RatingSystemEditor";
@@ -474,7 +475,7 @@ export default function TemplateEditPage() {
       {/* Toolbar */}
       <header className="flex items-center justify-between h-12 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
         <div className="flex items-center gap-3">
-          <Link to="/library/templates" className="text-ih-fg-4 hover:text-ih-fg-2 text-[13px]">&larr; Templates</Link>
+          <Link to="/library/templates" className="inline-flex items-center gap-1 text-ih-fg-4 hover:text-ih-fg-2 text-[13px]"><Icon name="chevL" size={14} /> Templates</Link>
           <input
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}

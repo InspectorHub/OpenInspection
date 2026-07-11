@@ -2,6 +2,7 @@ import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { PageHeader } from "@core/shared-ui";
 
 export function meta() {
  return [{ title: "Agent Dashboard - OpenInspection" }];
@@ -65,12 +66,7 @@ export default function AgentDashboardPage() {
 
  return (
  <div className="space-y-6">
- <div>
- <h1 className="text-[28px] font-bold tracking-tight text-ih-fg-1">Agent Dashboard</h1>
- <p className="text-[14px] text-ih-fg-3 mt-1">
- Your referrals across every team you partner with.
- </p>
- </div>
+ <PageHeader title="Agent Dashboard" meta="Your referrals across every team you partner with." />
 
  {/* Stat cards */}
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

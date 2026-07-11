@@ -1,3 +1,4 @@
+import { Icon } from '@core/shared-ui';
 import type { PublishReadiness, PublishBlockingDefect } from '../../lib/types';
 
 export interface PublishGateModalProps {
@@ -37,9 +38,9 @@ function DefectList({ entries, onJump, tone }: {
                     </div>
                     <button
                         onClick={() => onJump(b)}
-                        className="px-3 py-1 rounded bg-ih-primary text-white text-[12px] font-bold hover:opacity-90"
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded bg-ih-primary text-white text-[12px] font-bold hover:opacity-90"
                     >
-                        Jump &rarr;
+                        Jump <Icon name="arrowR" size={13} />
                     </button>
                 </li>
             ))}

@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from "react";
+import { Icon } from "@core/shared-ui";
 import type { TemplateItem, TemplateSection } from "./types";
 import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import { CommentTypeahead } from "../editor/CommentTypeahead";
@@ -97,7 +98,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                         return s;
                       })}
                       className="text-[10px] text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-30"
-                    >▲</button>
+                    ><Icon name="chevU" size={14} /></button>
                     <button
                       aria-label="Move down"
                       disabled={ci === arr.length - 1}
@@ -108,7 +109,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                         return s;
                       })}
                       className="text-[10px] text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-30"
-                    >▼</button>
+                    ><Icon name="chevD" size={14} /></button>
                   </div>
                 }
                 titleSlot={

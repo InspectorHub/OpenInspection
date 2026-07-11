@@ -29,6 +29,7 @@ import { ReportRepairPanel } from "./report/ReportRepairPanel";
 import { BuildingProfile } from "./report/BuildingProfile";
 import { PcaSkeleton } from "./report/PcaSkeleton";
 import { PerUnitReportBlock } from "./report/PerUnitReportBlock";
+import { CostTables } from "./report/CostTables";
 import {
   PRINT_CARD_CLASS,
   PRINT_SECTION_HEADING_CLASS,
@@ -114,6 +115,7 @@ export function reportViewProps(
     stats: data.stats ?? { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
     sections: data.sections ?? [],
     showEstimates: data.showEstimates ?? false,
+    costTables: data.costTables ?? null,
     enableRepairList: data.enableRepairList ?? false,
     enableCustomerRepairExport: data.enableCustomerRepairExport ?? false,
     isDelivered: data.isDelivered ?? false,
@@ -646,6 +648,13 @@ export function ReportView(props: ReportViewProps) {
             </div>
           );
         })}
+
+        {/* Commercial PCA Phase C — TABLE 1 (Opinion of Cost) + opt-in TABLE 2
+            (Reserve Schedule), following the body per the real-PCA layout.
+            Phase T seam: today gated on `showEstimates`; when report_tier
+            lands, gate on `reportTier === 'full_pca' || (reportTier ===
+            'light_commercial' && showEstimates)` instead. */}
+        <CostTables data={data.costTables ?? null} show={data.showEstimates} />
       </div>
 
       {/* ── Signature block ──────────────────────────────────────────── */}

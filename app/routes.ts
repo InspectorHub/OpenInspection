@@ -91,6 +91,7 @@ export default [
   route("resources/comments-library", "routes/resources/comments-library.tsx"),
   route("resources/defect-categories", "routes/resources/defect-categories.tsx"),
   route("resources/repair-items", "routes/resources/repair-items.tsx"),
+  route("resources/cost-items", "routes/resources/cost-items.tsx"),
   route("resources/identities", "routes/resources/identities.tsx"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),

@@ -24,6 +24,7 @@ import { useFetcher } from "react-router";
 import { RepairDefectRow } from "./repair/RepairDefectRow";
 import { RepairIntroPanel } from "./repair/RepairIntroPanel";
 import { RepairSharePanel } from "./repair/RepairSharePanel";
+import { formatCents } from "~/lib/money";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -122,10 +123,6 @@ export function repairBuilderSectionProps(data: {
 // ---------------------------------------------------------------------------
 // Component helpers
 // ---------------------------------------------------------------------------
-
-function formatCents(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
-}
 
 interface ItemDraft {
   requestedCreditCents: number | null;
@@ -381,8 +378,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
   );
 
   const updateCredit = useCallback(
-    (defect: Defect, dollars: string) => {
-      const cents = dollars === "" ? null : Math.round(parseFloat(dollars) * 100);
+    (defect: Defect, cents: number | null) => {
       setDrafts((prev) => ({
         ...prev,
         [defect.findingKey]: { ...(prev[defect.findingKey] ?? { note: "" }), requestedCreditCents: cents },
@@ -523,10 +519,6 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
           {sorted.map((defect) => {
             const isSelected = selected.has(defect.findingKey);
             const draft = drafts[defect.findingKey];
-            const creditDollars =
-              draft?.requestedCreditCents != null
-                ? String(draft.requestedCreditCents / 100)
-                : "";
 
             return (
               <RepairDefectRow
@@ -534,7 +526,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
                 defect={defect}
                 isSelected={isSelected}
                 draft={draft}
-                creditDollars={creditDollars}
+                creditCents={draft?.requestedCreditCents ?? null}
                 onToggle={toggleDefect}
                 onUpdateCredit={updateCredit}
                 onUpdateNote={updateNote}

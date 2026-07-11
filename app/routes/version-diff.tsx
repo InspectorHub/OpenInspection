@@ -2,6 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/version-diff";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { PageHeader } from "@core/shared-ui";
 
 export function meta() {
  return [{ title: "Version Diff - OpenInspection" }];
@@ -80,22 +81,19 @@ export default function VersionDiffPage() {
 
  return (
  <div className="max-w-4xl mx-auto py-8 px-6">
- {/* Header */}
- <div className="flex items-center justify-between mb-6">
- <div>
- <h1 className="text-2xl font-bold text-ih-fg-1">
- Version {version} Changes
- </h1>
- <p className="text-[13px] text-ih-fg-3 mt-1">
- Inspection #{String(inspectionId).slice(0, 8).toUpperCase()} — {diffs.length} change{diffs.length !== 1 ? "s" : ""}
- </p>
- </div>
+ <div className="mb-6">
+ <PageHeader
+ title={`Version ${version} Changes`}
+ meta={`Inspection #${String(inspectionId).slice(0, 8).toUpperCase()} — ${diffs.length} change${diffs.length !== 1 ? "s" : ""}`}
+ actions={
  <a
  href={`/inspections/${inspectionId}/edit`}
  className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors inline-flex items-center"
  >
  Back to Editor
  </a>
+ }
+ />
  </div>
 
  {/* Diff table */}

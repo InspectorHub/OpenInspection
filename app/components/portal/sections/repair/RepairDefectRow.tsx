@@ -8,6 +8,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import type { Defect } from "../RepairBuilderSection";
+import { MoneyInput } from "~/components/MoneyInput";
 
 interface ItemDraft {
   requestedCreditCents: number | null;
@@ -28,9 +29,9 @@ interface RepairDefectRowProps {
   defect: Defect;
   isSelected: boolean;
   draft: ItemDraft | undefined;
-  creditDollars: string;
+  creditCents: number | null;
   onToggle: (defect: Defect) => void;
-  onUpdateCredit: (defect: Defect, dollars: string) => void;
+  onUpdateCredit: (defect: Defect, cents: number | null) => void;
   onUpdateNote: (defect: Defect, note: string) => void;
 }
 
@@ -38,7 +39,7 @@ export function RepairDefectRow({
   defect,
   isSelected,
   draft,
-  creditDollars,
+  creditCents,
   onToggle,
   onUpdateCredit,
   onUpdateNote,
@@ -96,13 +97,10 @@ export function RepairDefectRow({
               <label className="block text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">
                 Credit Request ($)
               </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0.00"
-                value={creditDollars}
-                onChange={(e) => onUpdateCredit(defect, e.target.value)}
+              <MoneyInput
+                cents={creditCents}
+                onChange={(c) => onUpdateCredit(defect, c)}
+                ariaLabel={`Credit request for ${defect.itemLabel}`}
                 className="w-full h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:border-ih-primary"
               />
             </div>

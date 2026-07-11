@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLoaderData, useActionData, useNavigation, useFetcher } from "react-router";
+import { Icon } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -687,8 +688,8 @@ export default function SettingsCommunication() {
         <div className="flex items-baseline justify-between">
           <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email templates</h3>
           <div className="flex items-center gap-3">
-            <Link to="/settings/communication/templates" className="text-[12px] text-ih-primary font-semibold hover:underline">
-              Manage templates &rarr;
+            <Link to="/settings/communication/templates" className="inline-flex items-center gap-1 text-[12px] text-ih-primary font-semibold hover:underline">
+              Manage templates <Icon name="arrowR" size={12} />
             </Link>
             <span className="text-[11px] text-ih-fg-4">{emailTemplates.length} templates · click to customize</span>
           </div>

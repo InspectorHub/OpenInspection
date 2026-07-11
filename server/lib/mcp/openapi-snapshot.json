@@ -1071,6 +1071,164 @@
     "description": "Creates an agreement signing request for the inspection, emails it to the client, marks it sent, and returns the created request."
   },
   {
+    "operationId": "createInspectionCostItem",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/cost-items",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "buildingId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Phase F building/instance scope soft-ref."
+          },
+          "instanceIndex": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Phase F instance index within the building."
+          },
+          "unitId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Phase U per-unit scope soft-ref; null = common/tagged scope."
+          },
+          "findingKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "Originating finding key (unitId:sectionId:itemId), if linked."
+          },
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ASTM system grouping, e.g. \"roof\"."
+          },
+          "component": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Component within the system, e.g. \"membrane\"."
+          },
+          "location": {
+            "type": "string",
+            "description": "Tagged-mode scope location label."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "repair",
+              "replace",
+              "further_study"
+            ],
+            "description": "Remedial action for this line item."
+          },
+          "costMethod": {
+            "type": "string",
+            "enum": [
+              "unit",
+              "lump_sum"
+            ],
+            "description": "Whether the cost is quantity x unit cost or a flat lump sum."
+          },
+          "quantity": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Unit-method quantity (null for lump_sum)."
+          },
+          "uom": {
+            "type": "string",
+            "nullable": true,
+            "description": "Unit of measure for the quantity, e.g. \"sf\"."
+          },
+          "unitCostCents": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Per-unit cost in integer cents (unit method only)."
+          },
+          "lumpSumCents": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Flat total cost in integer cents (lump_sum method only)."
+          },
+          "eul": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Expected Useful Life in years, for the reserve schedule."
+          },
+          "effAge": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Effective Age in years, for the reserve schedule."
+          },
+          "rul": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Remaining Useful Life in years, for the reserve schedule."
+          },
+          "suggestedRemedy": {
+            "type": "string",
+            "description": "Free-text remedy description shown on the report line."
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "immediate",
+              "short_term",
+              "long_term"
+            ],
+            "description": "Deferred maintenance vs. capital reserve bucket."
+          },
+          "sectionRef": {
+            "type": "string",
+            "nullable": true,
+            "description": "Report section anchor this line item cross-references."
+          },
+          "photoRef": {
+            "type": "string",
+            "nullable": true,
+            "description": "Photo key this line item cross-references."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Display order within the bucket."
+          }
+        },
+        "required": [
+          "system",
+          "component",
+          "action",
+          "costMethod",
+          "bucket"
+        ]
+      }
+    },
+    "summary": "Create a cost item for an inspection",
+    "description": "Create a new commercial PCA cost line item on the inspection. When findingKey is set and no explicit cost/remedy is given, the line is best-effort seeded from the finding's recommendation snapshot."
+  },
+  {
     "operationId": "createInspectionInspectorSignature",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/inspector-signature",
@@ -4804,6 +4962,43 @@
     "description": "Permanently remove an inspection record. (DELETE /{id}, inspections domain)."
   },
   {
+    "operationId": "deleteInspectionCostItem",
+    "method": "DELETE",
+    "pathTemplate": "/api/inspections/{id}/cost-items/{itemId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "itemId",
+          "in": "path",
+          "required": true,
+          "description": "Cost item identifier",
+          "schema": {
+            "type": "string",
+            "description": "Cost item identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete an inspection cost item",
+    "description": "Delete a commercial PCA cost line item, tenant-scoped. Removing an item never touches the finding it was linked from."
+  },
+  {
     "operationId": "deleteInspectionItemsPhoto",
     "method": "DELETE",
     "pathTemplate": "/api/inspections/{id}/items/{itemId}/photos/{photoIndex}",
@@ -5769,6 +5964,60 @@
     },
     "summary": "Email a shared repair request link (publish-gated)",
     "description": "Sends the share URL to a contractor or other recipient. Rate-limited. Report must be published."
+  },
+  {
+    "operationId": "exportInspectionCostItemsCsv",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/cost-export.csv",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Export cost items as CSV",
+    "description": "Flat CSV export of every commercial PCA cost item recorded for the inspection, including the derived total_cents column, for spreadsheet import or offline review."
+  },
+  {
+    "operationId": "exportInspectionCostItemsXlsx",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/cost-export.xlsx",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Export cost items as XLSX",
+    "description": "Multi-sheet XLSX export of the commercial PCA cost tables (Opinion of Cost +, when enabled, the Reserve Schedule), reconciled against the same tenant reserve configuration the rendered report uses."
   },
   {
     "operationId": "exportMyAccount",
@@ -8230,6 +8479,33 @@
     },
     "summary": "List scheduling event types",
     "description": "Lists the tenant scheduling event types (Radon, Sewer Scope, etc.) used by the calendar + booking flow, ordered by sortOrder."
+  },
+  {
+    "operationId": "listInspectionCostItems",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/cost-items",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List cost items for an inspection",
+    "description": "List every commercial PCA cost line item recorded for the inspection, in display order, for the editor panel and downstream export routes."
   },
   {
     "operationId": "listInspectionInspectors",
@@ -14957,6 +15233,167 @@
     },
     "summary": "Update a scheduling event type",
     "description": "Partially updates a scheduling event type by id (tenant-scoped) and returns the fresh row for the settings list."
+  },
+  {
+    "operationId": "updateInspectionCostItem",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/cost-items/{itemId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "itemId",
+          "in": "path",
+          "required": true,
+          "description": "Cost item identifier",
+          "schema": {
+            "type": "string",
+            "description": "Cost item identifier"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "buildingId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Phase F building/instance scope soft-ref."
+          },
+          "instanceIndex": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Phase F instance index within the building."
+          },
+          "unitId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Phase U per-unit scope soft-ref; null = common/tagged scope."
+          },
+          "findingKey": {
+            "type": "string",
+            "nullable": true,
+            "description": "Originating finding key (unitId:sectionId:itemId), if linked."
+          },
+          "system": {
+            "type": "string",
+            "minLength": 1,
+            "description": "ASTM system grouping, e.g. \"roof\"."
+          },
+          "component": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Component within the system, e.g. \"membrane\"."
+          },
+          "location": {
+            "type": "string",
+            "description": "Tagged-mode scope location label."
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "repair",
+              "replace",
+              "further_study"
+            ],
+            "description": "Remedial action for this line item."
+          },
+          "costMethod": {
+            "type": "string",
+            "enum": [
+              "unit",
+              "lump_sum"
+            ],
+            "description": "Whether the cost is quantity x unit cost or a flat lump sum."
+          },
+          "quantity": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Unit-method quantity (null for lump_sum)."
+          },
+          "uom": {
+            "type": "string",
+            "nullable": true,
+            "description": "Unit of measure for the quantity, e.g. \"sf\"."
+          },
+          "unitCostCents": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Per-unit cost in integer cents (unit method only)."
+          },
+          "lumpSumCents": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Flat total cost in integer cents (lump_sum method only)."
+          },
+          "eul": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Expected Useful Life in years, for the reserve schedule."
+          },
+          "effAge": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Effective Age in years, for the reserve schedule."
+          },
+          "rul": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0,
+            "description": "Remaining Useful Life in years, for the reserve schedule."
+          },
+          "suggestedRemedy": {
+            "type": "string",
+            "description": "Free-text remedy description shown on the report line."
+          },
+          "bucket": {
+            "type": "string",
+            "enum": [
+              "immediate",
+              "short_term",
+              "long_term"
+            ],
+            "description": "Deferred maintenance vs. capital reserve bucket."
+          },
+          "sectionRef": {
+            "type": "string",
+            "nullable": true,
+            "description": "Report section anchor this line item cross-references."
+          },
+          "photoRef": {
+            "type": "string",
+            "nullable": true,
+            "description": "Photo key this line item cross-references."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Display order within the bucket."
+          }
+        }
+      }
+    },
+    "summary": "Update an existing inspection cost item",
+    "description": "Patch any subset of fields on an existing commercial PCA cost line item, tenant-scoped and restricted to the inspection it already belongs to."
   },
   {
     "operationId": "updateInspectionMediaAnnotation",

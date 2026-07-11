@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { Modal, Button } from "@core/shared-ui";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL } from "~/lib/severity";
+import { MoneyInput } from "~/components/MoneyInput";
 
 export interface CommentEditorProps {
   open: boolean;
@@ -127,12 +128,16 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="ce-min" className={labelCls}>Est. low ($)</label>
-                <input id="ce-min" type="number" min="0" value={estimateMin} onChange={(e) => setEstimateMin(e.target.value)} className={inputCls} />
+                <label htmlFor="ce-min" className={labelCls}>Est. low</label>
+                <MoneyInput id="ce-min" ariaLabel="Est. low"
+                  cents={estimateMin === "" ? null : Math.round(Number(estimateMin) * 100)}
+                  onChange={(c) => setEstimateMin(c == null ? "" : String(c / 100))} className={inputCls} />
               </div>
               <div>
-                <label htmlFor="ce-max" className={labelCls}>Est. high ($)</label>
-                <input id="ce-max" type="number" min="0" value={estimateMax} onChange={(e) => setEstimateMax(e.target.value)} className={inputCls} />
+                <label htmlFor="ce-max" className={labelCls}>Est. high</label>
+                <MoneyInput id="ce-max" ariaLabel="Est. high"
+                  cents={estimateMax === "" ? null : Math.round(Number(estimateMax) * 100)}
+                  onChange={(c) => setEstimateMax(c == null ? "" : String(c / 100))} className={inputCls} />
               </div>
               <div>
                 <label htmlFor="ce-ct" className={labelCls}>Contractor type</label>

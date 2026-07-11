@@ -185,6 +185,14 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // provider for 'own' mode). Default 'twilio' for D1 safety; inert in
     // standalone / unconfigured SaaS (no ISV env → resolver fails closed).
     managedProvider: text('managed_provider', { enum: ['twilio', 'telnyx'] }).notNull().default('twilio'),
+    // Commercial PCA Phase C — Capital Replacement Reserve Schedule (TABLE 2).
+    // Opt-in (default off): ASTM baseline reports render TABLE 1 only.
+    reserveScheduleEnabled: integer('reserve_schedule_enabled', { mode: 'boolean' }).notNull().default(false),
+    // Projected term in years. Default 12 is INDUSTRY CONVENTION, not ASTM —
+    // the term is user-defined (see roadmap terminology correction).
+    reserveTermYears: integer('reserve_term_years').notNull().default(12),
+    // Optional inflation factor in basis points (250 = 2.5%). NULL = no inflation.
+    inflationRateBps: integer('inflation_rate_bps'),
 });
 
 /**

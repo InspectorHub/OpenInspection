@@ -1,0 +1,44 @@
+#!/usr/bin/env sh
+# .githooks/pre-push — openinspection
+#
+# Worker bundle-size gate. Moved here from pre-commit: Workers FREE caps the
+# script at 3 MiB gzipped and OpenInspection promises one-click Free-plan
+# deploys, so an oversized bundle breaks every self-hoster — but the bundle can
+# only actually break at DEPLOY, and the check runs the REAL build pipeline
+# (~1-2 min). Paying that on every commit was overkill; here it runs once per
+# push. CI's required "verify" check remains the authoritative final gate.
+#
+# Activated via core.hooksPath .githooks (set by the "prepare" npm script).
+# Bypass (discouraged): git push --no-verify
+
+# Never run in CI / non-interactive contexts (CI does not push, but guard anyway).
+[ -n "$CI" ] && exit 0
+
+# Bound the node build step so it doesn't exhaust RAM on this machine.
+case " $NODE_OPTIONS " in *"--max-old-space-size"*) : ;; *) export NODE_OPTIONS="${NODE_OPTIONS:+$NODE_OPTIONS }--max-old-space-size=4096" ;; esac
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+# printf, not echo: POSIX sh echo does not interpret \n or \033 escapes.
+pass() { printf '  ✓  %b\n' "$1"; }
+fail() { printf '  ✗  %b\n' "$1"; }
+step() { printf '\n  →  %b\n' "$1"; }
+
+printf '%b\n' "${BOLD}── OpenInspection (Pre-push Checks) ─────────────────────────────${NC}"
+
+step "Worker bundle size"
+BUNDLE_OUT=$(node scripts/check-bundle-size.mjs 2>&1)
+BUNDLE_RC=$?
+BUNDLE_LINE=$(echo "$BUNDLE_OUT" | grep -E '^\[bundle-size\] (worker upload|FAIL|WARNING)' | tail -2 | tr '\n' ' ')
+if [ "$BUNDLE_RC" -eq 0 ]; then
+    pass "Bundle size OK — ${BUNDLE_LINE:-see node scripts/check-bundle-size.mjs}"
+    printf '\n%b\n' "${GREEN}Pre-push checks passed.${NC}"
+    exit 0
+else
+    fail "Bundle size gate failed — ${BUNDLE_LINE:-run node scripts/check-bundle-size.mjs}"
+    printf '\n%b\n' "${RED}Pre-push checks failed. Fix the errors before pushing.${NC}"
+    exit 1
+fi

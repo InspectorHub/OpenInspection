@@ -2,6 +2,7 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/recommendations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { PageHeader } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Repair Items - OpenInspection" }];
@@ -53,21 +54,23 @@ export default function AgentRecommendationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[28px] font-bold tracking-tight text-ih-fg-1">Repair Items</h1>
-          <p className="text-[14px] text-ih-fg-3 mt-1">
+      <PageHeader
+        title="Repair Items"
+        meta={
+          <>
             Every defect flagged in delivered inspection reports, grouped by category.
             {total > 0 && ` ${total} total items.`}
-          </p>
-        </div>
-        <button
-          onClick={() => window.print()}
-          className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors shrink-0"
-        >
-          Print as PDF
-        </button>
-      </div>
+          </>
+        }
+        actions={
+          <button
+            onClick={() => window.print()}
+            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors shrink-0"
+          >
+            Print as PDF
+          </button>
+        }
+      />
 
       {GROUP_META.map(({ key, label, color }) => {
         const items = groups[key];

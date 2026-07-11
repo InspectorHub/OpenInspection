@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
-import { Modal, Button } from "@core/shared-ui";
+import { Modal, Button, Icon } from "@core/shared-ui";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL, SEVERITY_DOT } from "~/lib/severity";
 
@@ -294,8 +294,8 @@ export function RatingSystemEditor({
 
                 {/* Reorder + remove */}
                 <div className="flex items-center shrink-0">
-                  <button type="button" onClick={() => moveLevel(i, -1)} disabled={i === 0} className="w-6 h-7 text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 disabled:hover:text-ih-fg-4" title="Move up">↑</button>
-                  <button type="button" onClick={() => moveLevel(i, 1)} disabled={i === levels.length - 1} className="w-6 h-7 text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 disabled:hover:text-ih-fg-4" title="Move down">↓</button>
+                  <button type="button" onClick={() => moveLevel(i, -1)} disabled={i === 0} className="w-6 h-7 text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 disabled:hover:text-ih-fg-4" title="Move up"><Icon name="chevU" size={14} /></button>
+                  <button type="button" onClick={() => moveLevel(i, 1)} disabled={i === levels.length - 1} className="w-6 h-7 text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 disabled:hover:text-ih-fg-4" title="Move down"><Icon name="chevD" size={14} /></button>
                   <button type="button" onClick={() => setLevels((prev) => prev.filter((_, j) => j !== i))} disabled={levels.length <= 2} className="w-6 h-7 text-ih-fg-4 hover:text-ih-bad-fg disabled:opacity-30 disabled:hover:text-ih-fg-4" title="Remove level">✕</button>
                 </div>
               </div>

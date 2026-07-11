@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLoaderData, useFetcher } from "react-router";
+import { Icon } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-contractor-types";
 import { requireToken } from "~/lib/session.server";
@@ -64,8 +65,8 @@ function ContractorTypeRow({ t, idx, count, onMove, onRequestDelete }: { t: Cont
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex flex-col">
-        <button onClick={() => onMove(idx, -1)} disabled={idx === 0} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={`Move ${t.name} up`}>▲</button>
-        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={`Move ${t.name} down`}>▼</button>
+        <button onClick={() => onMove(idx, -1)} disabled={idx === 0} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={`Move ${t.name} up`}><Icon name="chevU" size={14} /></button>
+        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={`Move ${t.name} down`}><Icon name="chevD" size={14} /></button>
       </div>
       {editing ? (
         <fetcher.Form method="POST" className="flex-1 flex gap-2" onSubmit={() => setEditing(false)}>

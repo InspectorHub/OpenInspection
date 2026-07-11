@@ -1,0 +1,106 @@
+import { formatDollars } from "~/lib/money";
+import type { CostTables as CT, Table1Row } from "./types";
+
+/**
+ * Commercial PCA Phase C — TABLE 1 (Opinion of Cost: Immediate + Short-Term)
+ * and the opt-in TABLE 2 (Capital Replacement Reserve Schedule). Renders
+ * nothing when costs are hidden or both tables are empty. No %-replace / code
+ * columns (removed per the roadmap correction). Money via the shared
+ * app/lib/money.ts formatDollars (whole dollars, cents shown only when present).
+ * Wide reserve grid reuses the existing print
+ * landscape/scaling.
+ */
+export function CostTables({ data, show }: { data: CT | null; show: boolean }) {
+  if (!show || !data) return null;
+  const { table1, reserveSchedule } = data;
+  const hasTable1 = table1.immediate.length > 0 || table1.shortTerm.length > 0;
+  if (!hasTable1 && !reserveSchedule) return null;
+
+  const Row = ({ r }: { r: Table1Row }) => (
+    <tr className="border-b border-ih-border">
+      <td className="py-1 pr-4">{r.item.component}{r.item.location ? ` — ${r.item.location}` : ""}</td>
+      <td className="py-1 pr-4 text-right">{r.item.quantity ?? ""}</td>
+      <td className="py-1 pr-4">{r.item.uom ?? ""}</td>
+      <td className="py-1 pr-4 text-right">{r.item.unitCostCents != null ? formatDollars(r.item.unitCostCents) : ""}</td>
+      <td className="py-1 pr-4 text-right">{r.item.bucket === "immediate" ? formatDollars(r.total) : ""}</td>
+      <td className="py-1 pr-4 text-right">{r.item.bucket === "short_term" ? formatDollars(r.total) : ""}</td>
+      <td className="py-1 text-ih-fg-3">{r.item.suggestedRemedy}</td>
+    </tr>
+  );
+
+  return (
+    <section className="mt-8 print:break-inside-avoid">
+      {hasTable1 && (
+        <div className="mb-8">
+          <h2 className="mb-2 text-base font-semibold text-ih-fg-1">Opinion of Cost — Deferred Maintenance</h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-ih-border text-left text-xs uppercase tracking-wide text-ih-fg-3">
+                <th className="py-1 pr-4">Item</th><th className="py-1 pr-4 text-right">Qty</th>
+                <th className="py-1 pr-4">Unit</th><th className="py-1 pr-4 text-right">Unit Cost</th>
+                <th className="py-1 pr-4 text-right">Immediate</th><th className="py-1 pr-4 text-right">Short Term</th>
+                <th className="py-1">Comments</th>
+              </tr>
+            </thead>
+            <tbody>
+              {table1.immediate.map((r) => <Row key={r.item.id} r={r} />)}
+              {table1.shortTerm.map((r) => <Row key={r.item.id} r={r} />)}
+            </tbody>
+            <tfoot>
+              <tr className="font-medium text-ih-fg-1">
+                <td className="pt-2" colSpan={4}>Totals</td>
+                <td className="pt-2 text-right">{formatDollars(table1.immediateTotalCents)}</td>
+                <td className="pt-2 text-right">{formatDollars(table1.shortTermTotalCents)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+
+      {reserveSchedule && (
+        <div className="overflow-x-auto print:overflow-visible">
+          <h2 className="mb-2 text-base font-semibold text-ih-fg-1">Capital Replacement Reserve Schedule</h2>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-ih-border text-left uppercase tracking-wide text-ih-fg-3">
+                <th className="py-1 pr-3">Item</th><th className="py-1 pr-2 text-right">EUL</th>
+                <th className="py-1 pr-2 text-right">Eff Age</th><th className="py-1 pr-2 text-right">RUL</th>
+                {reserveSchedule.years.map((y) => <th key={y} className="py-1 pr-2 text-right">{y}</th>)}
+                <th className="py-1 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reserveSchedule.rows.map((row) => (
+                <tr key={row.item.id} className="border-b border-ih-border">
+                  <td className="py-1 pr-3">{row.item.component}</td>
+                  <td className="py-1 pr-2 text-right">{row.item.eul ?? ""}</td>
+                  <td className="py-1 pr-2 text-right">{row.item.effAge ?? ""}</td>
+                  <td className="py-1 pr-2 text-right">{row.item.rul ?? ""}</td>
+                  {reserveSchedule.years.map((y) => (
+                    <td key={y} className="py-1 pr-2 text-right">
+                      {y === row.placementYear ? formatDollars(row.replacementCents) : ""}
+                    </td>
+                  ))}
+                  <td className="py-1 text-right">{formatDollars(row.replacementCents)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="text-ih-fg-1">
+              <tr className="font-medium">
+                <td className="pt-2" colSpan={4}>Total Uninflated</td>
+                {reserveSchedule.uninflatedByYear.map((c, i) => <td key={i} className="pt-2 pr-2 text-right">{formatDollars(c)}</td>)}
+                <td className="pt-2 text-right">{formatDollars(reserveSchedule.totalUninflatedCents)}</td>
+              </tr>
+              <tr className="font-medium">
+                <td className="pt-1" colSpan={4}>Cumulative Inflated</td>
+                {reserveSchedule.cumulativeInflatedByYear.map((c, i) => <td key={i} className="pt-1 pr-2 text-right">{formatDollars(c)}</td>)}
+                <td className="pt-1 text-right">{formatDollars(reserveSchedule.totalInflatedCents)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}

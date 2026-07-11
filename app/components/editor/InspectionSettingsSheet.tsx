@@ -5,6 +5,7 @@ import { TemplateCombobox } from "~/components/TemplateCombobox";
 import { CoverCropper } from "~/components/media-studio/CoverCropper";
 import { fullResUrl } from "~/components/media-studio/cropImage";
 import { ORIGINAL_QUALITY_KEY } from "~/routes/inspection-edit";
+import { MoneyInput } from "~/components/MoneyInput";
 
 interface SettingsForm {
   date: string;
@@ -312,8 +313,8 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                 <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Pricing & gates</legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
-                    <span className={labelClass}>Price (cents)</span>
-                    <input type="number" min={0} step={100} value={form.price} onChange={(e) => updateForm("price", Number(e.target.value))} className={inputClass} />
+                    <span className={labelClass}>Price</span>
+                    <MoneyInput cents={form.price} onChange={(c) => updateForm("price", c ?? 0)} className={inputClass} ariaLabel="Price" />
                   </label>
                   <div className="flex flex-col gap-2 pt-5">
                     <label className="inline-flex items-center gap-2 text-[13px] text-ih-fg-3">

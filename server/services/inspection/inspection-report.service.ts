@@ -22,6 +22,8 @@ import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
 import { InspectionSubService } from './base';
 import { DefectCategoryService } from './defect-category.service';
+import { buildCostTables } from '../../lib/pca-costs';
+import { CostItemService } from '../cost-item.service';
 import type {
     PhotoEntry,
     CannedState,
@@ -412,12 +414,20 @@ export class InspectionReportService extends InspectionSubService {
         // entries. Read live here (not part of the cached report content).
         let enableRepairList = false;
         let enableCustomerRepairExport = false;
+        // Commercial PCA Phase C — tenant-level Reserve Schedule (TABLE 2) opt-in
+        // + its assumptions. Read alongside the other tenant report flags.
+        let reserveScheduleEnabled = false;
+        let reserveTermYears = 12;
+        let inflationRateBps: number | null = null;
         try {
             const cfg = await db.select({
                 showEstimates: tenantConfigs.showEstimates,
                 reportTheme:   tenantConfigs.reportTheme,
                 enableRepairList: tenantConfigs.enableRepairList,
                 enableCustomerRepairExport: tenantConfigs.enableCustomerRepairExport,
+                reserveScheduleEnabled: tenantConfigs.reserveScheduleEnabled,
+                reserveTermYears: tenantConfigs.reserveTermYears,
+                inflationRateBps: tenantConfigs.inflationRateBps,
             })
                 .from(tenantConfigs)
                 .where(eq(tenantConfigs.tenantId, tenantId))
@@ -426,6 +436,9 @@ export class InspectionReportService extends InspectionSubService {
                 showEstimates = Boolean(cfg.showEstimates);
                 enableRepairList = Boolean(cfg.enableRepairList);
                 enableCustomerRepairExport = Boolean(cfg.enableCustomerRepairExport);
+                reserveScheduleEnabled = Boolean(cfg.reserveScheduleEnabled);
+                reserveTermYears = cfg.reserveTermYears ?? 12;
+                inflationRateBps = cfg.inflationRateBps ?? null;
                 if (cfg.reportTheme === 'classic' || cfg.reportTheme === 'minimal') {
                     reportTheme = cfg.reportTheme;
                 }
@@ -453,6 +466,16 @@ export class InspectionReportService extends InspectionSubService {
             bedrooms:       (inspection as { bedrooms?: number | null }).bedrooms             ?? null,
             bathrooms:      (inspection as { bathrooms?: number | null }).bathrooms           ?? null,
         };
+
+        // Commercial PCA Phase C — manual cost line items -> two render tables
+        // (Opinion of Cost + opt-in Reserve Schedule) + the Phase S ES roll-up.
+        const costItemRows = await new CostItemService(this.db).listByInspection(inspectionId, tenantId);
+        const costTables = buildCostTables(
+            costItemRows,
+            { reserveScheduleEnabled, reserveTermYears, inflationRateBps },
+            new Date().getFullYear(),
+            (inspection as { sqft?: number | null }).sqft ?? null,
+        );
 
         // Commercial PCA Phase F — server-resolved Building Profile rows (presets
         // stay server-only). Renders only when propertyType is set + a field is
@@ -607,6 +630,7 @@ export class InspectionReportService extends InspectionSubService {
             enableRepairList,
             enableCustomerRepairExport,
             propertyFacts,
+            costTables,
             propertyType:        (inspection as { propertyType?: string | null }).propertyType ?? null,
             commercialSubtype:   (inspection as { commercialSubtype?: string | null }).commercialSubtype ?? null,
             buildingProfile,

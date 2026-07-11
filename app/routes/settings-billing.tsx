@@ -1,4 +1,5 @@
 import { Link, useLoaderData } from "react-router";
+import { Icon } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
 import type { Route } from "./+types/settings-billing";
 import { createApi } from "~/lib/api-client.server";
@@ -132,8 +133,8 @@ export default function SettingsBillingPage() {
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-ih-border">
-                <Link to="/settings/usage" className="text-ih-primary text-[13px] font-medium hover:underline">
-                  View SMS, email &amp; storage usage &rarr;
+                <Link to="/settings/usage" className="inline-flex items-center gap-1 text-ih-primary text-[13px] font-medium hover:underline">
+                  View SMS, email &amp; storage usage <Icon name="arrowR" size={13} />
                 </Link>
               </div>
             </section>
@@ -157,8 +158,8 @@ export default function SettingsBillingPage() {
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t border-ih-border">
-                <Link to="/settings/usage" className="text-ih-primary text-[13px] font-medium hover:underline">
-                  View SMS, email &amp; storage usage &rarr;
+                <Link to="/settings/usage" className="inline-flex items-center gap-1 text-ih-primary text-[13px] font-medium hover:underline">
+                  View SMS, email &amp; storage usage <Icon name="arrowR" size={13} />
                 </Link>
               </div>
             </section>

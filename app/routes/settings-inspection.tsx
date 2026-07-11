@@ -1,4 +1,5 @@
 import { useLoaderData } from 'react-router';
+import { Icon } from "@core/shared-ui";
 import { SettingsCrumb } from '~/components/SettingsCrumb';
 import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
@@ -135,7 +136,7 @@ export default function SettingsInspectionPage() {
                         );
                     })}
                 </ul>
-                <a href="/library/tags" className="text-[12px] text-ih-primary hover:underline mt-3 inline-block">Manage tag library →</a>
+                <a href="/library/tags" className="text-[12px] text-ih-primary hover:underline mt-3 inline-flex items-center gap-1">Manage tag library <Icon name="arrowR" size={12} /></a>
             </section>
         </div>
     );
