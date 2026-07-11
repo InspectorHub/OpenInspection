@@ -32,6 +32,7 @@ import { PcaSkeleton } from "./report/PcaSkeleton";
 import { ReportToc } from "./report/ReportToc";
 import { PerUnitReportBlock } from "./report/PerUnitReportBlock";
 import { CostTables } from "./report/CostTables";
+import { WordExportButton } from "./report/WordExportButton";
 import {
   PRINT_CARD_CLASS,
   PRINT_SECTION_HEADING_CLASS,
@@ -337,18 +338,29 @@ export function ReportView(props: ReportViewProps) {
 
   return (
     <div className={standalone ? "min-h-screen bg-ih-bg-card" : undefined} data-theme={data.reportTheme || undefined} style={brandTokens(data.brand.primaryColor)}>
-      {/* Download PDF FAB */}
-      <button
-        type="button"
-        onClick={downloadPdf}
-        disabled={generating}
-        className="print:hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-        </svg>
-        {generating ? "Generating…" : "Download PDF"}
-      </button>
+      {/* Download PDF FAB + Export to Word (Commercial PCA Phase W Task 6 —
+          owner-only, commercial reports only; the public token viewer never
+          has ownerPreview true, and `<ReportView>` is rendered standalone in
+          plenty of router-less unit tests, so <WordExportButton> — which
+          calls useFetcher() and therefore requires a data-router context —
+          is only mounted into the tree at all when the gate is satisfied,
+          rather than always-mounted-but-internally-hidden. */}
+      <div className="print:hidden fixed bottom-6 right-6 z-50 flex items-center gap-2">
+        {Boolean(data.ownerPreview) && Boolean(data.reportTier) ? (
+          <WordExportButton inspectionId={data.inspectionId} />
+        ) : null}
+        <button
+          type="button"
+          onClick={downloadPdf}
+          disabled={generating}
+          className="px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+          </svg>
+          {generating ? "Generating…" : "Download PDF"}
+        </button>
+      </div>
 
       {/* Header */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-6">

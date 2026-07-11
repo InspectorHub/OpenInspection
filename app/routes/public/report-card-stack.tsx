@@ -180,6 +180,72 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Action — Commercial PCA Phase W Task 6 "Export to Word" BFF relay.   */
+/* Owner-only: <WordExportButton> only mounts when the loader's         */
+/* `ownerPreview` is true, but this action independently requires a     */
+/* session token (defense in depth — the same route also serves the     */
+/* public token viewer, which never renders the button but could in     */
+/* principle POST here directly).                                       */
+/* ------------------------------------------------------------------ */
+
+type ExportWordActionResult =
+ | { ok: true; intent: "export-word-enqueue"; exportId: string }
+ | { ok: false; intent: "export-word-enqueue"; code?: string; error?: string }
+ | { ok: true; intent: "export-word-status"; status: "queued" | "building" | "ready" | "failed"; error?: string | null }
+ | { ok: false; intent: "export-word-status"; error?: string };
+
+export async function action({ request, params, context }: Route.ActionArgs) {
+ const formData = await request.formData();
+ const intent = formData.get("intent");
+ const id = params.id ?? "";
+
+ const sessionToken = (await getToken(context, request)) ?? undefined;
+ if (!sessionToken) {
+ return { ok: false, intent: String(intent ?? "") } as ExportWordActionResult;
+ }
+ const api = createApi(context, { token: sessionToken });
+
+ if (intent === "export-word-enqueue") {
+ const res = await api.inspections[":id"].export.word.$post({ param: { id } });
+ if (!res.ok) {
+ const bodyText = await res.text().catch(() => "");
+ let code: string | undefined;
+ let message = "Couldn't start the Word export. Please try again.";
+ try {
+ const parsed = JSON.parse(bodyText) as { error?: { code?: string; message?: string } };
+ code = parsed?.error?.code;
+ message = parsed?.error?.message ?? message;
+ } catch {
+ /* non-JSON body — keep the default message */
+ }
+ return { ok: false, intent: "export-word-enqueue", code, error: message } satisfies ExportWordActionResult;
+ }
+ const body = await res.json();
+ return { ok: true, intent: "export-word-enqueue", exportId: body.data.exportId } satisfies ExportWordActionResult;
+ }
+
+ if (intent === "export-word-status") {
+ const exportId = String(formData.get("exportId") ?? "");
+ if (!exportId) {
+ return { ok: false, intent: "export-word-status", error: "Missing exportId" } satisfies ExportWordActionResult;
+ }
+ const res = await api.inspections[":id"].export[":exportId"].$get({ param: { id, exportId } });
+ if (!res.ok) {
+ return { ok: false, intent: "export-word-status", error: "Export not found" } satisfies ExportWordActionResult;
+ }
+ const body = await res.json();
+ return {
+ ok: true,
+ intent: "export-word-status",
+ status: body.data.status,
+ error: body.data.error ?? null,
+ } satisfies ExportWordActionResult;
+ }
+
+ return { ok: false, intent: String(intent ?? "") } as ExportWordActionResult;
+}
+
+/* ------------------------------------------------------------------ */
 /* Page — thin wrapper around <ReportView> */
 /* ------------------------------------------------------------------ */
 
