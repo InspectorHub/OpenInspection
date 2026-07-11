@@ -19,6 +19,7 @@ backups/
 .dev.vars*
 !.dev.vars.example
 test-results/
+tests/e2e/.editor-seed.json
 
 # Cloudflare config — wrangler.jsonc (standalone, PLACEHOLDER ids) IS committed as the
 # public OSS / one-click-deploy default (CF auto-provisions resources + injects real ids).

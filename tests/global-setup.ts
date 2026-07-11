@@ -3,6 +3,7 @@ import { readFileSync, writeFileSync, rmSync, existsSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { seedFixtures } from './seed-fixtures';
+import { clearEditorSeed } from './e2e/helpers/editor-seed';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,6 +21,11 @@ const __dirname = path.dirname(__filename);
  */
 export default function globalSetup() {
     const appDir = path.resolve(__dirname, '..');
+
+    // Drop last run's editor-seed handoff so a stale inspection id (whose D1 rows
+    // are wiped below) can never leak into a run where the seed project is not in
+    // the selected set. The `editor-seed` setup project rewrites it when it runs.
+    clearEditorSeed();
 
     // Resolve the SAME wrangler config the webServer builds/runs against
     // (vite `configPath`: WRANGLER_CONFIG > wrangler.local.jsonc > wrangler.jsonc)

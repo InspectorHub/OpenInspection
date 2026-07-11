@@ -138,9 +138,18 @@ export default defineConfig({
         // Design System 0520 subsystem A E2E suites. Skipped automatically
         // when TEST_INSPECTOR_EMAIL / _PASSWORD / TEST_INSPECTION_ID are not
         // set, so local CI passes without seed data.
+        // Seeds one editable inspection (with items) + writes the editor-seed
+        // handoff the editor subsystem specs read. Depends on `api` so the
+        // admin it logs in as already exists. Runs whenever any editor spec runs.
+        {
+            name: 'editor-seed',
+            testMatch: 'editor-seed.setup.ts',
+            dependencies: ['api'],
+        },
         {
             name: 'subsystem-a-speed-mode',
             testMatch: 'subsystem-a-speed-mode.spec.ts',
+            dependencies: ['editor-seed'],
         },
         {
             name: 'subsystem-a-photo-studio',
@@ -149,6 +158,7 @@ export default defineConfig({
         {
             name: 'subsystem-a-inspector-tools-dock',
             testMatch: 'subsystem-a-inspector-tools-dock.spec.ts',
+            dependencies: ['editor-seed'],
         },
         // Design System 0520 subsystem B — auto-skipped when env vars unset.
         {
@@ -169,8 +179,8 @@ export default defineConfig({
         { name: 'branding', testMatch: 'branding.spec.ts' },
         { name: 'repair-list', testMatch: 'repair-list.spec.ts' },
         { name: 'report-viewer', testMatch: 'report-viewer.spec.ts' },
-        { name: 'inspection-edit-hotkeys', testMatch: 'inspection-edit-hotkeys.spec.ts' },
-        { name: 'inspection-lifecycle', testMatch: 'inspection-lifecycle.spec.ts' },
+        { name: 'inspection-edit-hotkeys', testMatch: 'inspection-edit-hotkeys.spec.ts', dependencies: ['editor-seed'] },
+        { name: 'inspection-lifecycle', testMatch: 'inspection-lifecycle.spec.ts', dependencies: ['editor-seed'] },
         // Destructive (reset/restore DB) — env-gated inside the specs:
         { name: 'backup-restore-seed', testMatch: 'backup-restore-seed.spec.ts' },
         { name: 'backup-restore-verify', testMatch: 'backup-restore-verify.spec.ts' },
