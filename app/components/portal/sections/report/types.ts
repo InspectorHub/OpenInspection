@@ -243,7 +243,14 @@ export interface Table1 {
   immediate: Table1Row[]; shortTerm: Table1Row[];
   immediateTotalCents: number; shortTermTotalCents: number;
 }
-export interface ReserveRow { item: CostItemView; placementYear: number; replacementCents: number }
+export interface ReserveRow {
+  item: CostItemView; placementYear: number; replacementCents: number;
+  /** Commercial PCA Phase P/C seam — resolved appendix photo number for
+   *  `item.photoRef` (server resolves via buildPhotoRefIndex/resolvePhotoRef).
+   *  Optional/absent when the producer skipped resolution; null when the ref
+   *  didn't resolve; the PHOTO NO. cell renders nothing in either case. */
+  photoNo?: number | null;
+}
 export interface ReserveSchedule {
   startYear: number; termYears: number; years: number[]; rows: ReserveRow[];
   uninflatedByYear: number[]; inflatedByYear: number[]; cumulativeInflatedByYear: number[];

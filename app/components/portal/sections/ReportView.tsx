@@ -680,7 +680,7 @@ export function ReportView(props: ReportViewProps) {
             Phase T seam: today gated on `showEstimates`; when report_tier
             lands, gate on `reportTier === 'full_pca' || (reportTier ===
             'light_commercial' && showEstimates)` instead. */}
-        <CostTables data={data.costTables ?? null} show={data.showEstimates} />
+        <CostTables data={data.costTables ?? null} show={data.showEstimates} isPrint={data.printMode} />
       </div>
 
       {/* Commercial PCA Phase P — Appendix B: centralized numbered photo

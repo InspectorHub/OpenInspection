@@ -132,6 +132,11 @@ export interface ReserveRow {
   item: CostItem;
   placementYear: number;
   replacementCents: number;
+  /** Commercial PCA Phase P/C seam — resolved appendix photo number for
+   *  `item.photoRef` (PHOTO NO. column). Never computed here (this module
+   *  stays IO/photo-free); the service attaches it once `photoAppendix` is
+   *  available. Optional/absent for any producer that skips resolution. */
+  photoNo?: number | null;
 }
 
 export interface ReserveSchedule {

@@ -25,7 +25,7 @@ import { DefectCategoryService } from './defect-category.service';
 import { buildCostTables } from '../../lib/pca-costs';
 import { CostItemService } from '../cost-item.service';
 import { resolveReportTier } from '../../lib/report-tier';
-import { assignPhotoNumbers, derivePhotoMode, type AppendixPhoto, type PhotoMode } from '../../lib/report-photos';
+import { assignPhotoNumbers, derivePhotoMode, buildPhotoRefIndex, resolvePhotoRef, type AppendixPhoto, type PhotoMode } from '../../lib/report-photos';
 import { computeConformance, deriveConformanceInput, type AstmConformance } from '../../lib/pca-conformance';
 import { RELIANCE_TEMPLATES } from '../../lib/pca-reliance-text';
 import { ComplianceService } from '../compliance/pca-compliance.service';
@@ -532,6 +532,24 @@ export class InspectionReportService extends InspectionSubService {
             (inspection as { sqft?: number | null }).sqft ?? null,
         );
 
+        // Commercial PCA Phase P/C seam — resolve each reserve row's photo_ref to
+        // its assigned appendix photo number for the PHOTO NO. column. Built once
+        // here (not threaded into pca-costs.ts, which stays IO/photo-free) now
+        // that both the reserve schedule and photoAppendix are available.
+        const photoRefIndex = buildPhotoRefIndex(photoAppendix);
+        const resolvedCostTables = costTables.reserveSchedule
+            ? {
+                ...costTables,
+                reserveSchedule: {
+                    ...costTables.reserveSchedule,
+                    rows: costTables.reserveSchedule.rows.map((row) => ({
+                        ...row,
+                        photoNo: resolvePhotoRef(photoRefIndex, row.item.photoRef),
+                    })),
+                },
+            }
+            : costTables;
+
         // Commercial PCA Phase F — server-resolved Building Profile rows (presets
         // stay server-only). Renders only when propertyType is set + a field is
         // populated; the report layer decides visibility.
@@ -736,7 +754,7 @@ export class InspectionReportService extends InspectionSubService {
             enableCustomerRepairExport,
             propertyFacts,
             reportTier,
-            costTables,
+            costTables: resolvedCostTables,
             propertyType:        (inspection as { propertyType?: string | null }).propertyType ?? null,
             commercialSubtype:   (inspection as { commercialSubtype?: string | null }).commercialSubtype ?? null,
             buildingProfile,
