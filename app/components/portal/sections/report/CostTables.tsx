@@ -57,7 +57,7 @@ export function CostTables({ data, show, isPrint = false }: { data: CT | null; s
             </tbody>
             <tfoot>
               <tr className="font-medium text-ih-fg-1">
-                <td className="pt-2" colSpan={5}>Totals</td>
+                <td className="pt-2" colSpan={4}>Totals</td>
                 <td className="pt-2 text-right">{formatDollars(table1.immediateTotalCents)}</td>
                 <td className="pt-2 text-right">{formatDollars(table1.shortTermTotalCents)}</td>
                 <td />
