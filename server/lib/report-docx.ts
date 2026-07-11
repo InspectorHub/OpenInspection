@@ -43,6 +43,35 @@ export interface DocxSection {
     deviations?: DocxDeviationRow[];
 }
 
+/** Commercial PCA Phase C — TABLE 1 (Deferred Maintenance / Opinion of Cost) line. */
+export interface DocxCostLine {
+    system: string;
+    description: string;
+    bucket: 'immediate' | 'short_term' | 'long_term';
+    quantity?: number | null;
+    unitCostCents?: number | null;
+    totalCents: number;
+}
+
+/** One year's placed cost within a TABLE 2 reserve-schedule row. */
+export interface DocxReserveYearCost {
+    year: number;
+    costCents: number;
+}
+
+/** Commercial PCA Phase C — TABLE 2 (Capital Replacement Reserve Schedule) row. */
+export interface DocxReserveScheduleRow {
+    system: string;
+    description: string;
+    years: DocxReserveYearCost[];
+}
+
+export interface DocxCostTables {
+    table1: DocxCostLine[];
+    /** Opt-in (tenant Reserve Schedule config); TABLE 2 renders only when non-null. */
+    reserveSchedule: DocxReserveScheduleRow[] | null;
+}
+
 export interface ReportDocxInput {
     inspection: { propertyAddress?: string | null; companyName?: string | null };
     tier: 'light_commercial' | 'full_pca';
@@ -52,8 +81,8 @@ export interface ReportDocxInput {
     systemsSummary: Array<{ system: string; condition: string; priority: string }>;
     buildingProfile: DocxProfileRow[];
     sections: DocxSection[];
-    // wired in Tasks 3b-3c:
-    costTables: unknown | null;
+    costTables: DocxCostTables | null;
+    // wired in Task 3c:
     appendixPhotos: unknown[];
 }
 
@@ -171,6 +200,79 @@ function buildSections(sections: DocxSection[]): Array<Paragraph | Table> {
     return out;
 }
 
+const BUCKET_LABEL: Record<DocxCostLine['bucket'], string> = {
+    immediate: 'Immediate',
+    short_term: 'Short-Term',
+    long_term: 'Long-Term',
+};
+
+/** Integer cents -> `$1,234.56`. Locale-independent (no Intl dependency). */
+function formatCents(cents: number): string {
+    const sign = cents < 0 ? '-' : '';
+    const abs = Math.round(Math.abs(cents));
+    const whole = Math.floor(abs / 100);
+    const frac = String(abs % 100).padStart(2, '0');
+    const withCommas = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${sign}$${withCommas}.${frac}`;
+}
+
+/** TABLE 1 — Deferred Maintenance / Opinion of Cost (Immediate + Short-Term lines). */
+function buildTable1(lines: DocxCostLine[]): Array<Paragraph | Table> {
+    const header = new TableRow({
+        children: ['System', 'Description', 'Priority', 'Total'].map(
+            (t) => new TableCell({ children: [new Paragraph(t)] }),
+        ),
+    });
+    const rows = lines
+        .filter((l) => l.bucket === 'immediate' || l.bucket === 'short_term')
+        .map((l) => new TableRow({
+            children: [l.system, l.description, BUCKET_LABEL[l.bucket], formatCents(l.totalCents)].map(
+                (v) => new TableCell({ children: [new Paragraph(v)] }),
+            ),
+        }));
+    return [
+        new Paragraph({ text: 'TABLE 1 — Deferred Maintenance / Opinion of Cost', heading: HeadingLevel.HEADING_2 }),
+        new Table({ rows: [header, ...rows], width: { size: 100, type: WidthType.PERCENTAGE } }),
+    ];
+}
+
+/** TABLE 2 — Capital Replacement Reserve Schedule, one column per year across all rows. */
+function buildTable2(rows: DocxReserveScheduleRow[]): Array<Paragraph | Table> {
+    const years = Array.from(new Set(rows.flatMap((r) => r.years.map((y) => y.year)))).sort((a, b) => a - b);
+    const header = new TableRow({
+        children: ['System', 'Description', ...years.map(String)].map(
+            (t) => new TableCell({ children: [new Paragraph(t)] }),
+        ),
+    });
+    const body = rows.map((r) => {
+        const byYear = new Map(r.years.map((y) => [y.year, y.costCents]));
+        const cells = years.map((y) => (byYear.has(y) ? formatCents(byYear.get(y) as number) : ''));
+        return new TableRow({
+            children: [r.system, r.description, ...cells].map(
+                (v) => new TableCell({ children: [new Paragraph(v)] }),
+            ),
+        });
+    });
+    return [
+        new Paragraph({ text: 'TABLE 2 — Capital Replacement Reserve Schedule', heading: HeadingLevel.HEADING_2 }),
+        new Table({ rows: [header, ...body], width: { size: 100, type: WidthType.PERCENTAGE } }),
+    ];
+}
+
+/**
+ * TABLE 1 always renders when `costTables` is present; TABLE 2 (the Reserve
+ * Schedule) only when `reserveSchedule` is non-null (tenant opt-in). Money is
+ * formatted from integer cents. `[]` when `costTables` is null (light tier
+ * with no cost items, or a report with no cost data at all).
+ */
+function buildCostTables(costTables: DocxCostTables | null): Array<Paragraph | Table> {
+    if (!costTables) return [];
+    return [
+        ...buildTable1(costTables.table1),
+        ...(costTables.reserveSchedule ? buildTable2(costTables.reserveSchedule) : []),
+    ];
+}
+
 export async function buildReportDocx(input: ReportDocxInput): Promise<Uint8Array> {
     const summary = buildSystemsSummary(input);
     const children = [
@@ -180,7 +282,8 @@ export async function buildReportDocx(input: ReportDocxInput): Promise<Uint8Arra
         ...buildTransmittal(input),
         ...(Array.isArray(summary) ? summary : [summary]),
         ...buildSections(input.sections),
-        // Task 3b-3c append cost tables and appendices here in canonical order.
+        ...buildCostTables(input.costTables),
+        // Task 3c appends the Appendix B photo gallery here, last.
     ];
     const doc = new Document({ features: { updateFields: true }, sections: [{ children }] });
     const buf = await Packer.toBuffer(doc);

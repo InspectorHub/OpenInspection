@@ -145,3 +145,59 @@ describe('buildReportDocx — building profile + sections', () => {
         expect(body).not.toContain('Mechanical, Electrical');
     });
 });
+
+const costedInput: ReportDocxInput = {
+    ...sectionedInput,
+    costTables: {
+        table1: [
+            {
+                system: 'Roofing', description: 'Replace membrane', bucket: 'immediate',
+                quantity: 1, unitCostCents: 500_000, totalCents: 500_000,
+            },
+            {
+                system: 'Parking', description: 'Seal coat', bucket: 'short_term',
+                quantity: 1, unitCostCents: 200_000, totalCents: 200_000,
+            },
+        ],
+        reserveSchedule: [
+            { system: 'HVAC', description: 'Chiller replacement', years: [{ year: 2027, costCents: 1_500_000 }] },
+            { system: 'Elevator', description: 'Modernization', years: [{ year: 2028, costCents: 3_000_000 }] },
+        ],
+    },
+};
+
+describe('buildReportDocx — cost tables', () => {
+    it('emits TABLE 1 heading + the immediate and short-term lines with money from cents', async () => {
+        const body = await xml(costedInput);
+        expect(body).toContain('TABLE 1');
+        expect(body).toContain('Replace membrane');
+        expect(body).toContain('$5,000.00');
+        expect(body).toContain('Seal coat');
+        expect(body).toContain('$2,000.00');
+    });
+
+    it('emits TABLE 2 heading + reserve schedule year columns when reserveSchedule is present', async () => {
+        const body = await xml(costedInput);
+        expect(body).toContain('TABLE 2');
+        expect(body).toContain('2027');
+        expect(body).toContain('2028');
+        expect(body).toContain('Chiller replacement');
+        expect(body).toContain('$30,000.00');
+    });
+
+    it('omits TABLE 2 when reserveSchedule is null', async () => {
+        const noReserve: ReportDocxInput = {
+            ...costedInput,
+            costTables: { ...costedInput.costTables!, reserveSchedule: null },
+        };
+        const body = await xml(noReserve);
+        expect(body).toContain('TABLE 1');
+        expect(body).not.toContain('TABLE 2');
+    });
+
+    it('emits no cost tables when costTables is null', async () => {
+        const body = await xml(sectionedInput); // costTables: null (inherited from baseInput)
+        expect(body).not.toContain('TABLE 1');
+        expect(body).not.toContain('TABLE 2');
+    });
+});
