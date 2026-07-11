@@ -628,7 +628,8 @@ export class InspectionReportService extends InspectionSubService {
         // separate `.list()` call.
         const isFullPca = reportTier === 'full_pca';
         let astmConformance: AstmConformance | null = null;
-        let reportSignoffs: Awaited<ReturnType<ComplianceService['getCompliance']>>['reportSignoffs'] = [];
+        type RawReportSignoff = Awaited<ReturnType<ComplianceService['getCompliance']>>['reportSignoffs'][number];
+        let reportSignoffs: Array<Omit<RawReportSignoff, 'signedAt'> & { signedAt: number }> = [];
         let psq: { status: string; responses: Record<string, unknown> | null } | null = null;
         let documentReview: Awaited<ReturnType<ComplianceService['getCompliance']>>['documentReview'] = [];
         let relianceText: typeof RELIANCE_TEMPLATES = { ...RELIANCE_TEMPLATES };
@@ -636,7 +637,16 @@ export class InspectionReportService extends InspectionSubService {
             const compliance = new ComplianceService(this.db, this.encryptionSecret ?? '');
             const c = await compliance.getCompliance(tenantId, inspectionId);
             const deviations = (inspection as { deviations?: Deviation[] | null }).deviations ?? [];
-            reportSignoffs = c.reportSignoffs;
+            // `signedAt` is a drizzle `timestamp_ms` column — reads yield Date
+            // instances at runtime. The wire contract (ReportSignoffView.signedAt
+            // in app/components/portal/sections/report/types.ts) is epoch-ms
+            // number; normalize here the same way the admin compliance route
+            // does (server/api/inspections/compliance.ts's toMs/serializeSignoff)
+            // so both paths agree on the wire shape.
+            reportSignoffs = c.reportSignoffs.map((row) => ({
+                ...row,
+                signedAt: row.signedAt instanceof Date ? row.signedAt.getTime() : Number(row.signedAt),
+            }));
             psq = c.psq ? { status: c.psq.status, responses: (c.psq.responses as Record<string, unknown> | null) ?? null } : null;
             documentReview = c.documentReview;
             astmConformance = computeConformance(deriveConformanceInput({

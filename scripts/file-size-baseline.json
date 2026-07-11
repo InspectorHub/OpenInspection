@@ -8,7 +8,7 @@
   "server/services/booking.service.ts": 848,
   "server/index.ts": 833,
   "server/api/sms.ts": 818,
-  "server/services/inspection/inspection-report.service.ts": 807,
+  "server/services/inspection/inspection-report.service.ts": 817,
   "server/services/inspection.service.ts": 755,
   "app/routes/settings-communication-templates.tsx": 728,
   "app/routes/settings-communication.tsx": 716,
