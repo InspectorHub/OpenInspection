@@ -163,17 +163,25 @@ export default function InspectionEditPage() {
   narrativeFetcher.submit({ intent: "save-pca-narrative", key, value }, { method: "POST" });
  }, [narrativeFetcher]);
  // Commercial PCA Phase T — the commercial subtype + report tier selectors
- // (CommercialReportControls) get their own fetcher for the same reason the
+ // (CommercialReportControls) get their own fetchers for the same reason the
  // narrative panel does: a selector change must not be aborted by an
- // unrelated in-flight mutation. Dispatches "save-property-facts" through
- // the route action (BFF pattern), which PATCHes the real
+ // unrelated in-flight mutation. They sit side by side in the same panel, so
+ // a shared fetcher would let a quick tier click abort an in-flight subtype
+ // save (or vice versa) — React Router cancels the previous submission when
+ // the same useFetcher instance re-submits (see
+ // feedback_rr_shared_fetcher_abort). Dispatches "save-property-facts"
+ // through the route action (BFF pattern), which PATCHes the real
  // /api/inspections/:id/property-facts endpoint — PropertyInfoForm's onSave
  // above only mutates local state and does not persist (pre-existing gap,
  // out of scope here); these two fields must actually round-trip.
- const propertyFactsFetcher = useFetcher();
- const savePropertyFacts = useCallback((patch: { commercialSubtype?: string | null; reportTier?: "light_commercial" | "full_pca" }) => {
-  propertyFactsFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify(patch) }, { method: "POST" });
- }, [propertyFactsFetcher]);
+ const subtypeFetcher = useFetcher();
+ const tierFetcher = useFetcher();
+ const saveSubtype = useCallback((subtype: string | null) => {
+  subtypeFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify({ commercialSubtype: subtype }) }, { method: "POST" });
+ }, [subtypeFetcher]);
+ const saveTier = useCallback((tier: "light_commercial" | "full_pca") => {
+  tierFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify({ reportTier: tier }) }, { method: "POST" });
+ }, [tierFetcher]);
  // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
  // (create/rename/delete/duplicate/bulk/mode-switch) and the lazy per-unit
  // results-slice fetcher (scope switch → merge missing findings).
@@ -2127,14 +2135,14 @@ export default function InspectionEditPage() {
     <CommercialReportControls
      commercialSubtype={((state.inspection as Record<string, unknown>).commercialSubtype as string | null | undefined) ?? null}
      reportTier={((state.inspection as Record<string, unknown>).reportTier as ReportTier | null | undefined) ?? null}
-     saving={propertyFactsFetcher.state !== "idle"}
+     saving={subtypeFetcher.state !== "idle" || tierFetcher.state !== "idle"}
      onChangeSubtype={(subtype) => {
       state.setInspection((prev) => ({ ...prev, commercialSubtype: subtype }));
-      savePropertyFacts({ commercialSubtype: subtype });
+      saveSubtype(subtype);
      }}
      onChangeTier={(tier) => {
       state.setInspection((prev) => ({ ...prev, reportTier: tier }));
-      savePropertyFacts({ reportTier: tier });
+      saveTier(tier);
      }}
     />
    </div>
