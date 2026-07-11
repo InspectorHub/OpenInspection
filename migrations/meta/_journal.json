@@ -162,6 +162,13 @@
       "when": 1783789413548,
       "tag": "0022_aberrant_shatterstar",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1783798002139,
+      "tag": "0023_overconfident_king_cobra",
+      "breakpoints": true
     }
   ]
 }

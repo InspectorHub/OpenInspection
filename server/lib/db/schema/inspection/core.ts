@@ -158,6 +158,10 @@ export const inspections = sqliteTable('inspections', {
     // Commercial PCA Phase S — structured Deviations-from-the-Guide store
     // (ASTM §11.4.3). S owns it; C/T/M append via appendDeviation(). NULL = none.
     deviations:          text('deviations', { mode: 'json' }).$type<{ id: string; area: string; baselineRequirement: string; deviation: string; reason: string }[]>(),
+    // Commercial PCA Phase P — per-inspection photo-mode override. Null = derive
+    // from the report tier (full_pca -> appendix, else inline); set = force a mode.
+    // See server/lib/report-photos.ts derivePhotoMode.
+    reportPhotoMode:     text('report_photo_mode', { enum: ['appendix', 'inline'] }),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),
