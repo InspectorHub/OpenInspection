@@ -6,7 +6,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
-import { Modal } from "@core/shared-ui";
+import { Modal, Icon } from "@core/shared-ui";
 
 export function meta() {
   return [{ title: "Automations - Settings - OpenInspection" }];
@@ -356,8 +356,8 @@ function AutomationEditor({
                 {emailTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <Link to="/settings/communication/templates"
-                className="inline-block text-[12px] text-ih-primary hover:underline mt-0.5">
-                Edit / New template &rarr;
+                className="inline-flex items-center gap-1 text-[12px] text-ih-primary hover:underline mt-0.5">
+                Edit / New template <Icon name="arrowR" size={12} />
               </Link>
             </div>
           )}
@@ -373,8 +373,8 @@ function AutomationEditor({
                 {smsTemplates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
               <Link to="/settings/communication/templates"
-                className="inline-block text-[12px] text-ih-primary hover:underline mt-0.5">
-                Edit / New template &rarr;
+                className="inline-flex items-center gap-1 text-[12px] text-ih-primary hover:underline mt-0.5">
+                Edit / New template <Icon name="arrowR" size={12} />
               </Link>
             </div>
           )}
