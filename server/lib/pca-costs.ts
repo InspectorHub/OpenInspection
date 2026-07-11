@@ -295,3 +295,27 @@ export function buildCostTables(
     : null;
   return { table1: t1, reserveSchedule: reserve, rollup, droppedCount: dropped.length };
 }
+
+const CSV_COLUMNS = [
+  'system', 'component', 'location', 'action', 'cost_method', 'quantity', 'uom',
+  'unit_cost_cents', 'lump_sum_cents', 'eul', 'eff_age', 'rul', 'bucket',
+  'section_ref', 'photo_ref', 'suggested_remedy', 'total_cents',
+] as const;
+
+function csvCell(v: string | number | null): string {
+  const s = v == null ? '' : String(v);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Flat CSV dump of cost items + derived total_cents. Zero-dependency. */
+export function costItemsToCsv(items: CostItem[]): string {
+  const lines = [CSV_COLUMNS.join(',')];
+  for (const it of items) {
+    lines.push([
+      it.system, it.component, it.location, it.action, it.costMethod, it.quantity, it.uom,
+      it.unitCostCents, it.lumpSumCents, it.eul, it.effAge, it.rul, it.bucket,
+      it.sectionRef, it.photoRef, it.suggestedRemedy, lineTotal(it),
+    ].map(csvCell).join(','));
+  }
+  return lines.join('\n') + '\n';
+}
