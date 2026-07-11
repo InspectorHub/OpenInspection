@@ -791,10 +791,22 @@ export default {
     scheduled: async (event: ScheduledEvent, env: HonoConfig['Bindings'], ctx: ExecutionContext) => {
         await baseScheduled(event, env, ctx);
     },
-    // Queue consumers: the cmd queue (`inspectorhub-cmd-saas`, portal→core
-    // commands — A-21) and the sync DLQ (`inspectorhub-sync-dlq-saas`, dead
-    // core→portal envelopes → outbox `failed` writeback). Never throws.
+    // Queue consumers: the Word export queue (`openinspection-word-export`,
+    // Commercial PCA Phase W — async .docx build), the cmd queue
+    // (`inspectorhub-cmd-saas`, portal→core commands — A-21), and the sync DLQ
+    // (`inspectorhub-sync-dlq-saas`, dead core→portal envelopes → outbox
+    // `failed` writeback). Never throws.
     queue: async (batch: MessageBatch<unknown>, env: HonoConfig['Bindings'], _ctx: ExecutionContext) => {
+        if (batch.queue.includes('word-export')) {
+            const { handleWordExportBatch } = await import('./services/report-export-consumer');
+            const images = (env as unknown as { IMAGES?: import('./lib/media/strip-exif').ImagesBinding }).IMAGES;
+            await handleWordExportBatch({
+                DB: env.DB, PHOTOS: env.PHOTOS, TENANT_CACHE: env.TENANT_CACHE,
+                KEY_ENCRYPTION_SECRET: env.KEY_ENCRYPTION_SECRET, JWT_SECRET: env.JWT_SECRET,
+                ...(images ? { IMAGES: images } : {}),
+            }, batch);
+            return;
+        }
         if (batch.queue.includes('-cmd-') && !batch.queue.includes('cmd-dlq')) {
             const { handleCmdBatch } = await import('./portal/cmd-consumer');
             // SYNC_QUEUE carries command replies back to portal (A-21 batch 2);

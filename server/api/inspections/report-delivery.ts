@@ -27,6 +27,7 @@ import { eq, and } from 'drizzle-orm';
 import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { resolveReportTier } from '../../lib/report-tier';
 
 export const sendReportPdfRoute = createRoute(withMcpMetadata({
     method: 'post',
@@ -268,6 +269,30 @@ export const getExportStatusRoute = createRoute(withMcpMetadata({
     operationId: "getInspectionExportStatus",
     description: "Poll the status of a queued/building .docx export (Commercial PCA Phase W).",
 }, { scopes: ['read'], tier: 'extended' }));
+
+// Commercial PCA Phase W Task 5 — enqueue the async .docx build. Async-only
+// (no synchronous fast path — see the plan's Global Constraints): this route
+// only writes a `queued` status row and sends the job envelope; the queue
+// consumer (server/services/report-export-consumer.ts) does all the work.
+export const enqueueWordExportRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/{id}/export/word',
+    tags: ["inspections"],
+    summary: 'Enqueue a .docx export of the commercial PCA report',
+    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
+    request: {
+        params: z.object({ id: z.string().min(1).describe('Inspection identifier') }),
+    },
+    responses: {
+        202: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ exportId: z.string() })) } },
+            description: 'Export enqueued',
+        },
+        400: { description: 'Word export is only available for commercial PCA reports' },
+        503: { description: 'Word export queue not configured on this deployment' },
+    },
+    operationId: "createInspectionExportWord",
+    description: "Enqueue an async .docx export build (Commercial PCA Phase W). Async-only — every export goes through the queue regardless of size.",
+}, { scopes: ['write'], tier: 'extended' }));
 
 export const downloadExportRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/export/{exportId}/download',
@@ -571,6 +596,27 @@ const reportDeliveryRoutes = createApiRouter()
                 'Cache-Control': 'private, max-age=300',
             },
         });
+    })
+    .openapi(enqueueWordExportRoute, async (c) => {
+        const tenantId = c.get('tenantId') as string;
+        const { id } = c.req.valid('param');
+        // Fail-closed / graceful degrade — same pattern as the BROWSER/PDF gate:
+        // the producer binding is optional (standalone + one-click get it via the
+        // committed wrangler.jsonc; a deploy that stripped it degrades cleanly).
+        if (!c.env.WORD_EXPORT_QUEUE) {
+            return c.json({ success: false, error: { code: 'EXPORT_UNAVAILABLE', message: 'Word export is not configured on this deployment.' } }, 503);
+        }
+        const { inspection } = await c.var.services.inspection.getInspection(id, tenantId);
+        const tier = resolveReportTier({
+            propertyType: (inspection as { propertyType?: string | null }).propertyType ?? null,
+            storedTier: (inspection as { reportTier?: 'light_commercial' | 'full_pca' | null }).reportTier ?? null,
+        });
+        if (!tier) {
+            throw Errors.BadRequest('Word export is only available for commercial PCA reports.');
+        }
+        const { id: exportId } = await c.var.services.reportExport.create(tenantId, id, 'docx');
+        await c.env.WORD_EXPORT_QUEUE.send({ exportId, tenantId, inspectionId: id, format: 'docx' });
+        return c.json({ success: true, data: { exportId } }, 202);
     })
     .openapi(getExportStatusRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;

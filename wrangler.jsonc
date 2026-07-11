@@ -41,6 +41,20 @@
   "r2_buckets": [
     { "binding": "PHOTOS", "bucket_name": "openinspection-photos" }
   ],
+  // Commercial PCA Phase W — async .docx export. Unlike the SaaS-only cmd/sync
+  // queues (which live solely in the gitignored wrangler.saas.jsonc, since
+  // they carry portal<->core traffic that doesn't exist standalone), Word
+  // export is a standalone + one-click feature, so its producer AND consumer
+  // are committed here. A SaaS deploy adds a second `*-saas`-named
+  // producer/consumer pair to wrangler.saas.jsonc (not committed).
+  "queues": {
+    "producers": [
+      { "queue": "openinspection-word-export", "binding": "WORD_EXPORT_QUEUE" }
+    ],
+    "consumers": [
+      { "queue": "openinspection-word-export", "max_batch_size": 1, "max_retries": 3 }
+    ]
+  },
   "browser": { "binding": "BROWSER" },
   // Cloudflare Stream — video walk-through storage (Media Studio, Plan 7).
   // No resource id: Stream is account-scoped; the binding is name-only. A real

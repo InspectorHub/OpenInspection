@@ -1229,6 +1229,34 @@
     "description": "Create a new commercial PCA cost line item on the inspection. When findingKey is set and no explicit cost/remedy is given, the line is best-effort seeded from the finding's recommendation snapshot."
   },
   {
+    "operationId": "createInspectionExportWord",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/export/word",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Enqueue a .docx export of the commercial PCA report",
+    "description": "Enqueue an async .docx export build (Commercial PCA Phase W). Async-only — every export goes through the queue regardless of size."
+  },
+  {
     "operationId": "createInspectionInspectorSignature",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/inspector-signature",
