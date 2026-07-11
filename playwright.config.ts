@@ -164,6 +164,7 @@ export default defineConfig({
         {
             name: 'subsystem-b-wizard',
             testMatch: 'subsystem-b-wizard.spec.ts',
+            dependencies: ['editor-seed'],
         },
         {
             name: 'subsystem-b-team-strip',
