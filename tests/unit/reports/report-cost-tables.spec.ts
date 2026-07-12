@@ -35,4 +35,15 @@ describe('buildCostTables', () => {
     expect(out.reserveSchedule!.years[0]).toBe(2026);
     expect(out.reserveSchedule!.rows[0]!.placementYear).toBe(2030);
   });
+
+  it('omits the reserve schedule when enabled but there are no long-term items', () => {
+    // Regression: an enabled-but-empty reserve schedule rendered a bare TABLE 2
+    // (headers + $0 totals) even with zero long-term items — e.g. on every
+    // report of a tenant that turned the flag on. Emit it only when it has rows.
+    const out = buildCostTables(
+      [item({ id: 'i', bucket: 'immediate', lumpSumCents: 500000 })],
+      { reserveScheduleEnabled: true, reserveTermYears: 12, inflationRateBps: 250 }, 2026, 1000,
+    );
+    expect(out.reserveSchedule).toBeNull();
+  });
 });

@@ -32,4 +32,23 @@ describe('PcaSkeleton', () => {
     // no standalone methodology heading
     expect(queryByText(/^Methodology$/)).toBeNull();
   });
+
+  it('omits the full-tier-only Transmittal Letter and Systems Summary for light_commercial', () => {
+    // Regression: light_commercial must NOT render the Transmittal Letter or
+    // Systems Summary — the TOC (gatedSectionRegistry) and the docx builder both
+    // drop them for light, so the HTML body must agree. See #234 follow-up.
+    const { container, queryByText } = render(<PcaSkeleton data={data} tier="light_commercial" />);
+    expect(queryByText('TL copy')).toBeNull();
+    expect(container.querySelector('#transmittal-letter')).toBeNull();
+    expect(container.querySelector('#systems-summary')).toBeNull();
+    // but the shared front matter still renders
+    expect(queryByText('LIMITS')).toBeTruthy();
+  });
+
+  it('renders the Transmittal Letter and Systems Summary for full_pca', () => {
+    const { getByText, container } = render(<PcaSkeleton data={data} tier="full_pca" />);
+    expect(getByText('TL copy')).toBeTruthy();
+    expect(container.querySelector('#transmittal-letter')).toBeTruthy();
+    expect(container.querySelector('#systems-summary')).toBeTruthy();
+  });
 });
