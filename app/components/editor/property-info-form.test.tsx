@@ -4,8 +4,9 @@ import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
 
 // PropertyInfoForm takes plain callback props (onSave/onCommit) and no
 // fetcher, so it renders directly without a router (unlike CompliancePanel).
-// `onSave` fires optimistically on every change; `onCommit` fires the durable
-// save — on blur for text/number/date, on change for select/boolean.
+// `onSave` fires optimistically on every change with the RAW value typed;
+// `onCommit` fires the durable save with a FULL coerced snapshot of every field
+// — on blur for text/number/date, on change for select/boolean.
 
 function labelInput(container: HTMLElement, labelText: string): HTMLInputElement | null {
   const spans = Array.from(container.querySelectorAll("label span span")) as HTMLElement[];
@@ -17,8 +18,9 @@ function labelInput(container: HTMLElement, labelText: string): HTMLInputElement
 // PropertyInfoForm is fully controlled by the `inspection` prop, so a blur can
 // only read an edited value if `onSave` updated that prop first. This harness
 // mirrors the production wiring in inspection-edit.tsx: onSave → optimistic
-// setInspection; onCommit → the durable save (spied on here).
-function Harness({ initial, onCommit }: { initial: Record<string, unknown>; onCommit: (id: string, v: unknown) => void }) {
+// setInspection (stores the RAW value); onCommit → the durable save (spied on
+// here), receiving the full facts object.
+function Harness({ initial, onCommit }: { initial: Record<string, unknown>; onCommit: (facts: Record<string, unknown>) => void }) {
   const [inspection, setInspection] = useState(initial);
   return (
     <PropertyInfoForm
@@ -30,7 +32,7 @@ function Harness({ initial, onCommit }: { initial: Record<string, unknown>; onCo
 }
 
 describe("PropertyInfoForm field sets", () => {
-  it("renders bedrooms/bathrooms for a residential inspection", () => {
+  it("renders bedrooms/bathrooms plus unit + county for a residential inspection", () => {
     const { getByText } = render(
       <PropertyInfoForm inspection={{ propertyType: "residential" }} />,
     );
@@ -38,40 +40,102 @@ describe("PropertyInfoForm field sets", () => {
     expect(getByText("Bathrooms")).toBeTruthy();
     expect(getByText("Year Built")).toBeTruthy();
     expect(getByText("Sq Ft")).toBeTruthy();
+    expect(getByText("Unit / Suite")).toBeTruthy();
+    expect(getByText("County")).toBeTruthy();
   });
 
-  it("omits bedrooms/bathrooms and shows Building Area for a commercial inspection", () => {
+  it("omits bedrooms/bathrooms + unit but shows Building Area and County for a commercial inspection", () => {
     const { queryByText, getByText } = render(
       <PropertyInfoForm inspection={{ propertyType: "commercial" }} />,
     );
     expect(queryByText("Bedrooms")).toBeNull();
     expect(queryByText("Bathrooms")).toBeNull();
+    // Commercial properties have a county but no unit/suite.
+    expect(queryByText("Unit / Suite")).toBeNull();
+    expect(getByText("County")).toBeTruthy();
     expect(getByText("Building Area (Sq Ft)")).toBeTruthy();
     // The plain "Sq Ft" label is relabeled for commercial.
     expect(queryByText("Sq Ft")).toBeNull();
   });
 
-  it("no longer renders unit/county and does render lotSize (Lot Size)", () => {
-    const { queryByText, getByText } = render(
+  it("renders lotSize (Lot Size)", () => {
+    const { getByText } = render(
       <PropertyInfoForm inspection={{ propertyType: "residential" }} />,
     );
-    expect(queryByText("Unit")).toBeNull();
-    expect(queryByText("County")).toBeNull();
     expect(getByText("Lot Size")).toBeTruthy();
   });
 });
 
-describe("PropertyInfoForm commit timing", () => {
-  it("commits a number field on blur with the coerced Number value", () => {
+describe("PropertyInfoForm raw-string typing (Finding 4)", () => {
+  it("keeps a fractional Bathrooms value ('2.5') verbatim — onChange is the raw string, not coerced to 2", () => {
+    const onSave = vi.fn();
+    const { container } = render(
+      <PropertyInfoForm inspection={{ propertyType: "residential" }} onSave={onSave} />,
+    );
+    const input = labelInput(container, "Bathrooms")!;
+    expect(input).toBeTruthy();
+    fireEvent.change(input, { target: { value: "2.5" } });
+    // onSave gets the RAW string, never Number("2.5") === 2.5-typed / null.
+    expect(onSave).toHaveBeenCalledWith("bathrooms", "2.5");
+  });
+
+  it("does not clear the input on the transient mid-decimal '2.' keystroke", () => {
+    const onCommit = vi.fn();
+    const { container } = render(<Harness initial={{ propertyType: "residential" }} onCommit={onCommit} />);
+    const input = labelInput(container, "Bathrooms")!;
+    fireEvent.change(input, { target: { value: "2." } });
+    // Controlled value retains "2." — a coerce here would snap it to "2" or "".
+    expect(input.value).toBe("2.");
+    fireEvent.change(input, { target: { value: "2.5" } });
+    expect(input.value).toBe("2.5");
+  });
+});
+
+describe("PropertyInfoForm full-snapshot commit (Finding 1)", () => {
+  it("commits the WHOLE facts object on blur with the changed field coerced and empty fields → null", () => {
     const onCommit = vi.fn();
     const { container } = render(<Harness initial={{ propertyType: "residential" }} onCommit={onCommit} />);
     const input = labelInput(container, "Year Built")!;
-    expect(input).toBeTruthy();
     fireEvent.change(input, { target: { value: "1990" } });
     // onChange must NOT commit (no keystroke persistence).
     expect(onCommit).not.toHaveBeenCalled();
     fireEvent.blur(input);
-    expect(onCommit).toHaveBeenCalledWith("yearBuilt", 1990);
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(onCommit).toHaveBeenCalledWith({
+      yearBuilt: 1990,
+      sqft: null,
+      foundationType: null,
+      lotSize: null,
+      bedrooms: null,
+      bathrooms: null,
+      unit: null,
+      county: null,
+    });
+  });
+
+  it("commits a fractional bathrooms value coerced to a Number within the full object", () => {
+    const onCommit = vi.fn();
+    const { container } = render(<Harness initial={{ propertyType: "residential" }} onCommit={onCommit} />);
+    const input = labelInput(container, "Bathrooms")!;
+    fireEvent.change(input, { target: { value: "2.5" } });
+    fireEvent.blur(input);
+    const facts = onCommit.mock.calls.at(-1)![0] as Record<string, unknown>;
+    expect(facts.bathrooms).toBe(2.5);
+  });
+
+  it("preserves already-entered sibling fields when a second field commits (superset PATCH)", () => {
+    const onCommit = vi.fn();
+    const { container } = render(<Harness initial={{ propertyType: "residential" }} onCommit={onCommit} />);
+    const year = labelInput(container, "Year Built")!;
+    fireEvent.change(year, { target: { value: "1990" } });
+    fireEvent.blur(year);
+    const county = labelInput(container, "County")!;
+    fireEvent.change(county, { target: { value: "Travis County" } });
+    fireEvent.blur(county);
+    const facts = onCommit.mock.calls.at(-1)![0] as Record<string, unknown>;
+    // The county commit still carries the earlier yearBuilt value.
+    expect(facts.yearBuilt).toBe(1990);
+    expect(facts.county).toBe("Travis County");
   });
 
   it("commits null when a number field is cleared to empty on blur", () => {
@@ -80,7 +144,8 @@ describe("PropertyInfoForm commit timing", () => {
     const input = labelInput(container, "Year Built")!;
     fireEvent.change(input, { target: { value: "" } });
     fireEvent.blur(input);
-    expect(onCommit).toHaveBeenCalledWith("yearBuilt", null);
+    const facts = onCommit.mock.calls.at(-1)![0] as Record<string, unknown>;
+    expect(facts.yearBuilt).toBeNull();
   });
 
   it("commits null when a text field (lotSize) is blurred empty", () => {
@@ -90,7 +155,8 @@ describe("PropertyInfoForm commit timing", () => {
     expect(input).toBeTruthy();
     fireEvent.change(input, { target: { value: "" } });
     fireEvent.blur(input);
-    expect(onCommit).toHaveBeenCalledWith("lotSize", null);
+    const facts = onCommit.mock.calls.at(-1)![0] as Record<string, unknown>;
+    expect(facts.lotSize).toBeNull();
   });
 
   it("commits a text field (lotSize) value on blur", () => {
@@ -99,22 +165,23 @@ describe("PropertyInfoForm commit timing", () => {
     const input = labelInput(container, "Lot Size")!;
     fireEvent.change(input, { target: { value: "0.25 acres" } });
     fireEvent.blur(input);
-    expect(onCommit).toHaveBeenCalledWith("lotSize", "0.25 acres");
+    const facts = onCommit.mock.calls.at(-1)![0] as Record<string, unknown>;
+    expect(facts.lotSize).toBe("0.25 acres");
   });
 
-  it("still fires onSave optimistically on change", () => {
+  it("still fires onSave optimistically on change with the raw string", () => {
     const onSave = vi.fn();
     const { container } = render(
       <PropertyInfoForm inspection={{ propertyType: "residential" }} onSave={onSave} />,
     );
     const input = labelInput(container, "Year Built")!;
     fireEvent.change(input, { target: { value: "1985" } });
-    expect(onSave).toHaveBeenCalledWith("yearBuilt", 1985);
+    expect(onSave).toHaveBeenCalledWith("yearBuilt", "1985");
   });
 });
 
 describe("PropertyInfoForm select commit", () => {
-  it("commits foundationType on change (discrete select, no blur needed)", () => {
+  it("commits foundationType on change (discrete select) with the full facts object", () => {
     const onCommit = vi.fn();
     const { container } = render(
       <PropertyInfoForm inspection={{ propertyType: "residential" }} onCommit={onCommit} />,
@@ -122,6 +189,15 @@ describe("PropertyInfoForm select commit", () => {
     const select = container.querySelector("select") as HTMLSelectElement;
     expect(select).toBeTruthy();
     fireEvent.change(select, { target: { value: "slab" } });
-    expect(onCommit).toHaveBeenCalledWith("foundationType", "slab");
+    expect(onCommit).toHaveBeenCalledWith({
+      yearBuilt: null,
+      sqft: null,
+      foundationType: "slab",
+      lotSize: null,
+      bedrooms: null,
+      bathrooms: null,
+      unit: null,
+      county: null,
+    });
   });
 });

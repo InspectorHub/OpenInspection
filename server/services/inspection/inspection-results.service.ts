@@ -62,6 +62,11 @@ export class InspectionResultsService extends InspectionSubService {
         lotSize?:        string | null | undefined;
         bedrooms?:       number | null | undefined;
         bathrooms?:      number | null | undefined;
+        // Real text columns on `inspections`, autofilled at intake and editable
+        // in the Property Facts strip. `unit` is the suite/unit designation;
+        // `county` the property's county. Mirror lotSize's write path.
+        unit?:           string | null | undefined;
+        county?:         string | null | undefined;
         // Commercial PCA Phase T — tier elevation from the editor.
         reportTier?:     'light_commercial' | 'full_pca' | null | undefined;
         // Commercial PCA Phase T — commercial subtype capture from the editor.
@@ -82,6 +87,8 @@ export class InspectionResultsService extends InspectionSubService {
         if (facts.lotSize        !== undefined) update.lotSize        = facts.lotSize;
         if (facts.bedrooms       !== undefined) update.bedrooms       = facts.bedrooms;
         if (facts.bathrooms      !== undefined) update.bathrooms      = facts.bathrooms;
+        if (facts.unit           !== undefined) update.unit           = facts.unit;
+        if (facts.county         !== undefined) update.county         = facts.county;
         if (facts.reportTier     !== undefined) update.reportTier     = facts.reportTier;
         if (facts.commercialSubtype !== undefined) update.commercialSubtype = facts.commercialSubtype;
 

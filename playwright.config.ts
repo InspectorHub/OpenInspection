@@ -193,7 +193,7 @@ export default defineConfig({
         // proof. Fully self-contained (page.setContent + node_modules Paged.js):
         // needs no dev worker, no D1 seed, no login. Proves target-counter fills
         // increasing TOC page numbers in a real browser. Does NOT exercise the CF
-        // integration (deferred — see scripts/spike/pagedjs-cf-runbook.md).
+        // integration (deferred — see scripts/spike/pagedjs-cf-spike.md).
         { name: 'report-toc-pagednumbers', testMatch: 'report-toc-pagednumbers.spec.ts' },
     ],
 });

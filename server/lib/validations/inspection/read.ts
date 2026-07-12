@@ -17,6 +17,8 @@ export const PropertyFactsSchema = z.object({
     lotSize:        z.string().max(50).nullable().optional().openapi({ example: '0.25 acres' }).describe('TODO describe lotSize field for the OpenInspection MCP integration'),
     bedrooms:       z.number().int().min(0).max(50).nullable().optional().openapi({ example: 3 }).describe('TODO describe bedrooms field for the OpenInspection MCP integration'),
     bathrooms:      z.number().min(0).max(50).nullable().optional().openapi({ example: 2.5 }).describe('TODO describe bathrooms field for the OpenInspection MCP integration'),
+    unit:           z.string().max(120).nullable().optional().openapi({ example: 'Suite 200' }).describe('Unit / suite designation for the subject property (maps to the inspections.unit column). Null on properties with no unit.'),
+    county:         z.string().max(120).nullable().optional().openapi({ example: 'Travis County' }).describe('County the subject property sits in (maps to the inspections.county column). Autofilled at intake; editable in the Property Facts strip.'),
     // Commercial PCA Phase T — tier elevation from the editor. Validated
     // against REPORT_TIERS; never accepted un-validated (CLAUDE.md Input
     // Validation Rules).

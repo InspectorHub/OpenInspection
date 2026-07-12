@@ -519,7 +519,7 @@ export function ReportView(props: ReportViewProps) {
             no re-pagination). Client layer only: this proves Paged.js fills the
             TOC page numbers via `target-counter` in a real browser. The CF-side
             readiness wait + @page/pdfOptions reconciliation are still unverified;
-            see scripts/spike/pagedjs-cf-runbook.md. */}
+            see scripts/spike/pagedjs-cf-spike.md. */}
         {data.pagedToc === true && <PagedTocInjection />}
         <PcaSkeleton
           data={data.pcaReport ?? null}

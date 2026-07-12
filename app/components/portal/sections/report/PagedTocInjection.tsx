@@ -15,7 +15,7 @@
  * `window.__pagedReady = true` and stamp `data-paged-done="1"` on <html>. The CF
  * follow-up will wait on that signal before capturing the PDF (the spike's
  * Step-3 risk: `quickAction('pdf')` may not expose an in-page wait hook — see
- * scripts/spike/pagedjs-cf-runbook.md). The inline PagedConfig script MUST
+ * scripts/spike/pagedjs-cf-spike.md). The inline PagedConfig script MUST
  * precede the polyfill <script> because the bundle reads `window.PagedConfig`
  * synchronously at eval time.
  */

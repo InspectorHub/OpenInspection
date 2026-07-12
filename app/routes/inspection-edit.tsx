@@ -183,15 +183,18 @@ export default function InspectionEditPage() {
  const saveTier = useCallback((tier: "light_commercial" | "full_pca") => {
   tierFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify({ reportTier: tier }) }, { method: "POST" });
  }, [tierFetcher]);
- // Property Facts strip (PropertyInfoForm) durable save. Its own fetcher for the
- // same isolation reason as subtype/tier above — a blur-commit on one field must
- // not abort an in-flight save of another (see feedback_rr_shared_fetcher_abort).
- // Rides the same "save-property-facts" route intent (PATCHes
- // /api/inspections/:id/property-facts). The form's onSave keeps the optimistic
- // local-state update; onCommit (this) persists.
+ // Property Facts strip (PropertyInfoForm) durable save. A SINGLE shared fetcher
+ // is abort-safe here — unlike subtype/tier above — because onCommit hands us a
+ // FULL snapshot of every field each time, so a later PATCH is a strict superset
+ // of any in-flight one. React Router cancels the previous submission when the
+ // same useFetcher re-submits, but cancelling loses no data when the survivor
+ // already carries the earlier field's value (mirrors PsqPanel.commitResponses;
+ // see feedback_rr_shared_fetcher_abort). Rides the same "save-property-facts"
+ // route intent (PATCHes /api/inspections/:id/property-facts). The form's onSave
+ // keeps the optimistic local-state update; onCommit (this) persists.
  const propertyFactsFetcher = useFetcher();
- const savePropertyFacts = useCallback((fieldId: string, value: unknown) => {
-  propertyFactsFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify({ [fieldId]: value }) }, { method: "POST" });
+ const savePropertyFacts = useCallback((facts: Record<string, unknown>) => {
+  propertyFactsFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify(facts) }, { method: "POST" });
  }, [propertyFactsFetcher]);
  // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
  // (create/rename/delete/duplicate/bulk/mode-switch) and the lazy per-unit
@@ -2135,7 +2138,7 @@ export default function InspectionEditPage() {
    [fieldId]: value,
   }));
   }}
-  onCommit={(fieldId, value) => savePropertyFacts(fieldId, value)}
+  onCommit={savePropertyFacts}
   />
   {/* Commercial PCA Phase T — subtype + report tier selectors. Gated on the
      same propertyType === 'commercial' flag section-applicability.ts uses

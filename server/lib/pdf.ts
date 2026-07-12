@@ -26,7 +26,7 @@ import type { PdfSettings } from './pdf-settings';
  * 'r6' - Commercial PCA Phase O Tasks 7-9: GATED Paged.js TOC page-number
  * path. Only active when the render URL carries `?print=1&pagedtoc=1` (this
  * helper does NOT send it yet - the CF integration is deferred; see
- * scripts/spike/pagedjs-cf-runbook.md). Bumped defensively so that once the
+ * scripts/spike/pagedjs-cf-spike.md). Bumped defensively so that once the
  * gate is enabled, previously content-hashed PDFs re-render.
  */
 export const RENDER_VERSION = 'r6';

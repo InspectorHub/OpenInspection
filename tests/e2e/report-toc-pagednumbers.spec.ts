@@ -13,7 +13,7 @@
  * dev worker, the report route, or Cloudflare Browser Rendering. It therefore
  * does NOT prove the CF integration (the deferred risk — networkidle0 racing
  * re-pagination, @page vs pdfOptions double-pagination, and the missing in-page
- * readiness wait). Those remain open; see scripts/spike/pagedjs-cf-runbook.md.
+ * readiness wait). Those remain open; see scripts/spike/pagedjs-cf-spike.md.
  *
  * Readiness signal mirrors production exactly: `window.PagedConfig.after` raises
  * `window.__pagedReady = true` and stamps `data-paged-done="1"` on <html>.
@@ -77,7 +77,7 @@ const FIXTURE = /* html */ `<!doctype html>
 </body>
 </html>`;
 
-test('Paged.js fills TOC page numbers via target-counter, increasing down the list', async ({ page }) => {
+test('Paged.js fills TOC page numbers via target-counter, increasing down the list', async ({ page }, testInfo) => {
   await page.setContent(FIXTURE, { waitUntil: 'load' });
   // Inject the vendored polyfill bundle. It auto-runs on document-ready, reads
   // window.PagedConfig (already set by the fixture's inline script), paginates,
@@ -133,5 +133,7 @@ test('Paged.js fills TOC page numbers via target-counter, increasing down the li
   expect(rows[2].page).toBeGreaterThan(rows[1].page);
 
   // Capture proof for human signoff: the paginated fixture with visible numbers.
-  await page.screenshot({ path: 'D:/tmp/oi-paged-toc-proof.png', fullPage: true });
+  // Write into Playwright's per-test output dir (cross-platform; a hardcoded
+  // Windows path fails on the Linux CI runner) and attach it to the report.
+  await page.screenshot({ path: testInfo.outputPath('paged-toc-proof.png'), fullPage: true });
 });
