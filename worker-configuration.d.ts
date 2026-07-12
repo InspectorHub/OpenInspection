@@ -8,6 +8,11 @@ declare namespace Cloudflare {
 	interface Env {
 		TENANT_CACHE: KVNamespace;
 		PHOTOS: R2Bucket;
+		// Commercial PCA Phase W — async .docx export producer (queue
+		// `openinspection-word-export`). Hand-added because `wrangler types` was
+		// not re-run in this worktree after the wrangler.jsonc `queues` block was
+		// added; regenerate to confirm once provisioned remotely.
+		WORD_EXPORT_QUEUE: Queue<unknown>;
 		// Cloudflare Stream — video walk-through (Media Studio, Plan 7). Hand-added
 		// because `wrangler types` was not run against a Stream-provisioned account
 		// in this worktree; regenerate to confirm once the binding is live remotely.

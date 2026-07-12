@@ -190,6 +190,13 @@ export interface AppEnv {
     // portal serves the download. Absent in standalone (no portal).
     EXPORTS_BUCKET?: R2Bucket;
 
+    // Commercial PCA Phase W — async .docx export producer binding (queue
+    // `openinspection-word-export`; declared in the COMMITTED wrangler.jsonc,
+    // unlike SYNC_QUEUE/EXPORTS_BUCKET above — standalone + one-click deploys
+    // get Word export too). Optional/fail-closed: the enqueue route returns
+    // 503 EXPORT_UNAVAILABLE when a deploy strips the binding.
+    WORD_EXPORT_QUEUE?: Queue<import('../lib/sync-events/word-export-job').WordExportJob>;
+
     // Spec 5D — Address Autofill. Server-side proxy holds the API key so it
     // never leaks to the client. Optional: when absent, dashboard.tsx falls
     // back to a free-text address input (no autocomplete dropdown).
@@ -236,6 +243,7 @@ import { InspectionTypeService } from '../services/inspection-type.service';
 import { TotpService } from '../services/totp.service';
 import { TemplateSeedService } from '../services/template-seed.service';
 import { ReportPdfService } from '../services/report-pdf.service';
+import { ReportExportService } from '../services/report-export.service';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
 import { TemplateMigrationService } from '../services/template-migration.service';
@@ -286,6 +294,7 @@ export interface AppServices {
     totp: TotpService;
     templateSeed: TemplateSeedService;
     reportPdf: ReportPdfService;
+    reportExport: ReportExportService;
     signingKey: SigningKeyService;
     auditLog: AuditLogService;
     templateMigration: TemplateMigrationService;
@@ -312,6 +321,7 @@ export interface AppServices {
     analytics: import('../services/analytics.service').AnalyticsService;
     repairRequest: import('../services/repair-request.service').RepairRequestService;
     clientDocument: import('../services/client-document.service').ClientDocumentService;
+    compliance: import('../services/compliance/pca-compliance.service').ComplianceService;
 }
 
 /**

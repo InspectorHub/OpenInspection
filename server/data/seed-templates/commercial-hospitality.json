@@ -502,6 +502,105 @@
         ]
       },
       {
+        "id": "vertical-transportation",
+        "title": "Vertical Transportation",
+        "applicableTo": { "propertyTypes": ["commercial"], "commercialSubtypes": ["office", "retail", "hospitality", "institutional"] },
+        "items": [
+          {
+            "id": "vt-elevators",
+            "label": "Elevators / Escalators",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_vt_cert", "title": "Inspection certificate", "comment": "Current elevator inspection certificate was observed and within its valid period.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_vt_visual", "title": "Visual scope", "comment": "Vertical transportation evaluated visually; not test-operated through full cycle. Refer to the maintenance contractor's records.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_vt_repair", "title": "Service needed", "category": "recommendation", "location": "", "comment": "Vertical transportation requires service or further evaluation by a licensed elevator contractor.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "site-flatwork",
+        "title": "Site, Flatwork, Parking & Stormwater",
+        "applicableTo": { "propertyTypes": ["commercial"], "commercialSubtypes": ["office", "retail", "hospitality", "industrial", "institutional", "mixed-use"] },
+        "items": [
+          {
+            "id": "sf-flatwork",
+            "label": "Flatwork & Stormwater",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_sf_flatwork_ok", "title": "Condition", "comment": "Sidewalks, curbs, and drive aisles were inspected and appear in serviceable condition; stormwater drains freely toward designed collection points.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_sf_flatwork_visual", "title": "Visual scope", "comment": "Inspection limited to visible surface conditions; sub-grade drainage capacity and retention pond sizing were not calculated.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_sf_flatwork_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Flatwork/stormwater components show cracking, ponding, or settlement; recommend repair by a qualified site contractor.", "photos": [], "default": false },
+                { "id": "rd_sf_flatwork_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Flatwork/stormwater deficiency presents a trip or ponding safety hazard; recommend immediate correction.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "wood-decks-balconies",
+        "title": "Wood Decks & Balconies",
+        "applicableTo": { "propertyTypes": ["commercial"], "commercialSubtypes": ["hospitality", "mixed-use"] },
+        "items": [
+          {
+            "id": "wd-structure",
+            "label": "Deck / Balcony Structure",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_wd_structure_ok", "title": "Condition", "comment": "Wood decks and balconies — framing, ledger connections, and guardrails — were inspected and appear in serviceable condition.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_wd_structure_visual", "title": "Visual scope", "comment": "Inspection limited to visible framing and connections; concealed ledger fasteners and flashing were not exposed.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_wd_structure_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Wood deck/balcony shows rot, corroded fasteners, or deteriorated guardrails; recommend evaluation by a qualified contractor.", "photos": [], "default": false },
+                { "id": "rd_wd_structure_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Wood deck/balcony structural or guardrail deficiency presents a fall hazard; recommend immediate correction and restricted access until repaired.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "cooking-areas",
+        "title": "Cooking Areas",
+        "applicableTo": { "propertyTypes": ["commercial"], "commercialSubtypes": ["hospitality", "institutional", "mixed-use", "retail"] },
+        "items": [
+          {
+            "id": "ca-suppression",
+            "label": "Commercial Cooking Suppression",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_ca_suppression_ok", "title": "Condition", "comment": "Commercial cooking exhaust, hood, and fire suppression system were inspected and appear in serviceable condition with current service tags per NFPA 96.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_ca_suppression_visual", "title": "Visual scope", "comment": "Inspection limited to visible hood, ductwork access panels, and suppression tags; internal duct condition and agent charge not verified.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_ca_suppression_repair", "title": "Service needed", "category": "recommendation", "location": "", "comment": "Cooking area exhaust/suppression system requires cleaning or service per NFPA 96 by a licensed contractor.", "photos": [], "default": false },
+                { "id": "rd_ca_suppression_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Cooking area exhaust/suppression system shows lapsed certification or excessive grease accumulation, presenting a fire hazard; recommend immediate professional service.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
         "id": "summary-commercial",
         "title": "Summary & Recommendations",
         "items": [

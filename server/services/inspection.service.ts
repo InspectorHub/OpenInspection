@@ -4,6 +4,7 @@ import type { AgreementService } from './agreement.service';
 import { type ReportMediaContext } from '../lib/report-video';
 import { type ImagesBinding } from '../lib/media/strip-exif';
 import { type PdfSettings } from '../lib/pdf-settings';
+import { type DeviationInput } from '../lib/pca-deviations';
 
 // Module-level types, constants, and pure helpers now live in
 // ./inspection/shared.ts (single source of truth shared by the facade + every
@@ -72,14 +73,17 @@ export class InspectionService {
     private readonly publish: InspectionPublishService;
     private readonly core: InspectionCoreService;
 
-    constructor(db: D1Database, r2?: R2Bucket, sdb?: ScopedDB, kv?: KVNamespace, images?: ImagesBinding, planQuota?: PlanQuotaGuard) {
+    constructor(db: D1Database, r2?: R2Bucket, sdb?: ScopedDB, kv?: KVNamespace, images?: ImagesBinding, planQuota?: PlanQuotaGuard, encryptionSecret?: string) {
         this.sharing = new InspectionSharingService(db, r2, sdb, kv, images);
         this.analytics = new InspectionAnalyticsService(db, r2, sdb, kv, images, this);
         this.status = new InspectionStatusService(db, r2, sdb, kv, images);
         this.annotations = new InspectionAnnotationsService(db, r2, sdb, kv, images, this);
         this.photo = new InspectionPhotoService(db, r2, sdb, kv, images, this);
         this.results = new InspectionResultsService(db, r2, sdb, kv, images);
-        this.report = new InspectionReportService(db, r2, sdb, kv, images);
+        // Commercial PCA Phase M — encryptionSecret only feeds the ComplianceService
+        // this sub-service constructs internally for full_pca reports (§ signoff
+        // key material); every other sub-service is unaffected by this param.
+        this.report = new InspectionReportService(db, r2, sdb, kv, images, encryptionSecret);
         this.publish = new InspectionPublishService(db, r2, sdb, kv, images, this);
         // Only the create/clone/reinspection paths (owned by InspectionCoreService)
         // consume the free-tier quota — no other sub-service needs the guard.
@@ -222,6 +226,10 @@ export class InspectionService {
         lotSize?:        string | null | undefined;
         bedrooms?:       number | null | undefined;
         bathrooms?:      number | null | undefined;
+        // Commercial PCA Phase T — tier elevation from the editor.
+        reportTier?:     'light_commercial' | 'full_pca' | null | undefined;
+        // Commercial PCA Phase T — commercial subtype capture from the editor.
+        commercialSubtype?: string | null | undefined;
     }): Promise<PropertyFacts> {
         return this.results.updatePropertyFacts(id, tenantId, facts);
     }
@@ -232,6 +240,14 @@ export class InspectionService {
      */
     async updatePcaNarrative(id: string, tenantId: string, value: Record<string, string>): Promise<void> {
         return this.results.updatePcaNarrative(id, tenantId, value);
+    }
+
+    /**
+     * Commercial PCA Phase M — append a deviation disclosure. See
+     * InspectionResultsService.appendDeviation.
+     */
+    async appendDeviation(id: string, tenantId: string, input: DeviationInput): Promise<void> {
+        return this.results.appendDeviation(id, tenantId, input);
     }
 
     async updateResults(id: string, tenantId: string, data: Record<string, unknown>) {

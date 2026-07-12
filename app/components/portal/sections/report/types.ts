@@ -9,8 +9,30 @@
 import type { TenantBrand } from "~/lib/brand";
 import type { ReportMedia } from "../../../../../server/lib/report-video";
 
-/** Plan 7 — a report photo object may carry a resolved media kind (video). */
-export type ReportPhoto = { key: string; url: string; media?: ReportMedia };
+/** Plan 7 — a report photo object may carry a resolved media kind (video).
+ *  Commercial PCA Phase P — `photoNo` is the render-order stamp assigned
+ *  server-side (Appendix B back-references + inline numbering); absent when
+ *  the server hasn't assigned one yet. */
+export type ReportPhoto = { key: string; url: string; media?: ReportMedia; photoNo?: number };
+
+/** Commercial PCA Phase P — whether report photos render inline (per-item,
+ *  legacy behavior) or are collected into a numbered Appendix B (server
+ *  resolves this from report_tier + the per-inspection override; app/ cannot
+ *  import server/lib/report-photo-mode, so it's re-declared here). */
+type PhotoMode = "appendix" | "inline";
+
+/** Commercial PCA Phase P — a single Appendix B entry (server produces these
+ *  in render order; app/ cannot import server/lib/pca-photo-appendix). */
+export interface AppendixPhoto {
+  photoNo: number;
+  key: string;
+  url: string;
+  caption: string | null;
+  sectionId: string;
+  sectionTitle: string;
+  itemId: string;
+  itemLabel: string;
+}
 
 /** Commercial PCA Phase F — a resolved Building Profile display row (server produces these). */
 export interface ProfileRow {
@@ -83,6 +105,10 @@ export interface ReportSection {
 
 export type FilterKey = "all" | "defects" | "summary";
 
+/** Commercial PCA Phase T — the resolved report tier (server produces this;
+ *  app/ cannot import server/lib/report-tier, so it's re-declared here). */
+type ReportTier = 'light_commercial' | 'full_pca';
+
 /* ------------------------------------------------------------------ */
 /* Print layout constants (exported for tests + re-exported via the    */
 /* standalone route). PRINT-ONLY — on-screen rendering is unchanged.   */
@@ -119,6 +145,17 @@ export interface PcaSectionEntry {
   level: number;
   title: string;
   tiers: ('light' | 'full')[];
+}
+
+/* Commercial PCA Phase O — TOC projection re-declared across the server/app
+   boundary (app/ cannot import server/lib/report-outline.ts). Shape mirrors
+   server/lib/report-outline.ts's ReportOutlineEntry exactly. */
+export interface ReportOutlineEntry {
+  id: string;
+  level: number;
+  title: string;
+  /** Filled by the PDF measurement pass; undefined/null on the web. */
+  page?: number | null;
 }
 export interface PcaNarrativeData {
   transmittalLetter: string;
@@ -157,6 +194,23 @@ export interface ReportVerification {
   verifyToken: string;
   publishedAt: number; // unix seconds
 }
+
+/* Commercial PCA Phase M — compliance-record view types re-declared across the
+   server/app boundary (app/ cannot import server/lib/). Shapes mirror the M7
+   compliance payload (ASTM conformance flag, dual-role signoffs, PSQ,
+   document-review checklist, reliance language) exactly. */
+export interface AstmConformance { standard: 'E2018-24'; conforms: boolean }
+export interface ReportSignoffView {
+  role: 'field_observer' | 'pcr_reviewer';
+  name: string; license: string | null; qualificationsRef: string | null;
+  signedAt: number; dualRole: boolean;
+}
+export interface PsqView { status: 'sent' | 'received' | 'declined'; responses: Record<string, unknown> | null }
+export interface DocReviewView {
+  documentKey: string; label: string;
+  requested: boolean; received: boolean; reviewed: boolean; na: boolean; notes: string | null;
+}
+export interface RelianceText { userReliance: string; pointInTime: string; siteSpecific: string }
 
 /* Commercial PCA Phase U — per-unit matrix types re-declared across the
    server/app boundary (app/ cannot import server/lib/). Shapes mirror
@@ -200,7 +254,14 @@ export interface Table1 {
   immediate: Table1Row[]; shortTerm: Table1Row[];
   immediateTotalCents: number; shortTermTotalCents: number;
 }
-export interface ReserveRow { item: CostItemView; placementYear: number; replacementCents: number }
+export interface ReserveRow {
+  item: CostItemView; placementYear: number; replacementCents: number;
+  /** Commercial PCA Phase P/C seam — resolved appendix photo number for
+   *  `item.photoRef` (server resolves via buildPhotoRefIndex/resolvePhotoRef).
+   *  Optional/absent when the producer skipped resolution; null when the ref
+   *  didn't resolve; the PHOTO NO. cell renders nothing in either case. */
+  photoNo?: number | null;
+}
 export interface ReserveSchedule {
   startYear: number; termYears: number; years: number[]; rows: ReserveRow[];
   uninflatedByYear: number[]; inflatedByYear: number[]; cumulativeInflatedByYear: number[];
@@ -240,10 +301,24 @@ export interface ReportLoaderResult {
   isPublished: boolean;
   signature: ReportSignature | null;
   verification: ReportVerification | null;
+  /* Commercial PCA Phase M — compliance record surfaces (ASTM conformance
+     statement, dual-role signoffs, PSQ status, document-review checklist,
+     reliance language). Empty/null-safe in every fallback path. */
+  astmConformance: AstmConformance | null;
+  reportSignoffs: ReportSignoffView[];
+  psq: PsqView | null;
+  documentReview: DocReviewView[];
+  relianceText: RelianceText;
   ownerPreview: boolean;
   baseUrl: string;
+  /* Commercial PCA Phase P — photo rendering mode (inline vs. numbered
+     Appendix B) and the resolved appendix entries. Empty/'inline' in every
+     fallback path so non-appendix reports render byte-identically. */
+  photoMode: PhotoMode;
+  photoAppendix: AppendixPhoto[];
   propertyType: string | null;
   commercialSubtype: string | null;
+  reportTier: ReportTier | null;
   buildingProfile: ProfileRow[];
   pcaReport: PcaReportData | null;
   /* Commercial PCA Phase U — per-unit inspection mode + the unit tree,
@@ -253,4 +328,8 @@ export interface ReportLoaderResult {
   units: ReportUnit[];
   unitConditionMatrix: UnitMatrixRow[];
   defectCountsByUnit: Record<string, number>;
+  /* Commercial PCA Phase O — the TOC projection over the tier-gated section
+     registry. Empty for residential/no-tier reports (no PCA front matter to
+     project a TOC over). */
+  outline: ReportOutlineEntry[];
 }

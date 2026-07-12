@@ -87,6 +87,13 @@ export const inspections = sqliteTable('inspections', {
     unit:                text('unit'),
     propertyType:        text('property_type'),
     commercialSubtype:   text('commercial_subtype'),
+    // Commercial PCA Phase T — report tier. Meaningful only for commercial
+    // inspections (NULL on residential/multi-unit). Drives which report
+    // sections / cost tables / compliance modules / photo mode apply. A
+    // commercial inspection defaults to 'light_commercial' (see report-tier.ts
+    // resolveReportTier — "auto light, user elevates"); 'full_pca' is the
+    // ASTM E2018 deliverable. See "Commercial PCA Phase T".
+    reportTier:          text('report_tier', { enum: ['light_commercial', 'full_pca'] }),
     county:              text('county'),
     sellingAgentId:      text('selling_agent_id').references(() => contacts.id),
     disableAutomations:  integer('disable_automations', { mode: 'boolean' }).notNull().default(false),
@@ -151,6 +158,10 @@ export const inspections = sqliteTable('inspections', {
     // Commercial PCA Phase S — structured Deviations-from-the-Guide store
     // (ASTM §11.4.3). S owns it; C/T/M append via appendDeviation(). NULL = none.
     deviations:          text('deviations', { mode: 'json' }).$type<{ id: string; area: string; baselineRequirement: string; deviation: string; reason: string }[]>(),
+    // Commercial PCA Phase P — per-inspection photo-mode override. Null = derive
+    // from the report tier (full_pca -> appendix, else inline); set = force a mode.
+    // See server/lib/report-photos.ts derivePhotoMode.
+    reportPhotoMode:     text('report_photo_mode', { enum: ['appendix', 'inline'] }),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),

@@ -1229,6 +1229,34 @@
     "description": "Create a new commercial PCA cost line item on the inspection. When findingKey is set and no explicit cost/remedy is given, the line is best-effort seeded from the finding's recommendation snapshot."
   },
   {
+    "operationId": "createInspectionExportWord",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/export/word",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Enqueue a .docx export of the commercial PCA report",
+    "description": "Enqueue an async .docx export build (Commercial PCA Phase W). Async-only — every export goes through the queue regardless of size."
+  },
+  {
     "operationId": "createInspectionInspectorSignature",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/inspector-signature",
@@ -5795,6 +5823,45 @@
     "description": "Returns evidence.zip from R2 (signed.pdf + certificate.pdf + audit-trail.json + public-key.pem)."
   },
   {
+    "operationId": "downloadInspectionExport",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/export/{exportId}/download",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "exportId",
+          "in": "path",
+          "required": true,
+          "description": "report_exports row id",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "report_exports row id"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Download the built .docx export",
+    "description": "Stream the .docx bytes for a ready export from R2 (Commercial PCA Phase W)."
+  },
+  {
     "operationId": "downloadMessageAttachmentInspection",
     "method": "GET",
     "pathTemplate": "/api/inspections/{inspectionId}/messages/attachments/{attachmentId}",
@@ -6350,6 +6417,72 @@
     },
     "summary": "Get inspection for current tenant",
     "description": "Retrieve detailed information about a single inspection."
+  },
+  {
+    "operationId": "getInspectionCompliance",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/compliance",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get inspection compliance artifacts",
+    "description": "Returns the ASTM E2018 compliance artifacts for the inspection — dual sign-off attestations, the Pre-Survey Questionnaire, the Document Review checklist, and the derived conformance verdict computed from all three plus the Deviations store."
+  },
+  {
+    "operationId": "getInspectionExportStatus",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/export/{exportId}",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "exportId",
+          "in": "path",
+          "required": true,
+          "description": "report_exports row id",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "report_exports row id"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Get Word export status",
+    "description": "Poll the status of a queued/building .docx export (Commercial PCA Phase W)."
   },
   {
     "operationId": "getInspectionHub",
@@ -10745,6 +10878,70 @@
     "description": "Partially update an inspection record. (PATCH /{id}, inspections domain)."
   },
   {
+    "operationId": "patchInspectionComplianceDocReviewItem",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/compliance/doc-review/{documentKey}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "documentKey",
+          "in": "path",
+          "required": true,
+          "description": "Document Review catalog key",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Document Review catalog key"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "requested": {
+            "type": "boolean",
+            "description": "Whether the document was requested from the point-of-contact."
+          },
+          "received": {
+            "type": "boolean",
+            "description": "Whether the requested document was received."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "description": "Whether the received document was reviewed by the inspector."
+          },
+          "na": {
+            "type": "boolean",
+            "description": "Whether this document does not apply to this property."
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "description": "Free-text notes on the request/receipt/review status."
+          }
+        },
+        "description": "Partial patch — omitted keys are left unchanged."
+      }
+    },
+    "summary": "Patch a Document Review checklist item",
+    "description": "Patches requested/received/reviewed/na/notes on a single Document Review checklist item."
+  },
+  {
     "operationId": "patchInspectionPcaNarrative",
     "method": "PATCH",
     "pathTemplate": "/api/inspections/{id}/pca-narrative",
@@ -13645,6 +13842,47 @@
     "description": "Re-send the agreement-request email to a single signer using their persistent link. Rate-limited to once per hour; terminal signers reject with 409."
   },
   {
+    "operationId": "removeInspectionComplianceSignoff",
+    "method": "DELETE",
+    "pathTemplate": "/api/inspections/{id}/compliance/signoff/{role}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "role",
+          "in": "path",
+          "required": true,
+          "description": "Sign-off role to remove",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "field_observer",
+              "pcr_reviewer"
+            ],
+            "description": "Sign-off role to remove"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Remove a dual sign-off attestation",
+    "description": "Removes the sign-off attestation for the given role. Requires report_tier=full_pca."
+  },
+  {
     "operationId": "removeRepairItem",
     "method": "DELETE",
     "pathTemplate": "/api/public/repair-builder/{tenant}/{id}/lists/{rrId}/items/{itemId}",
@@ -14445,6 +14683,33 @@
     "description": "Auto-generated placeholder for seedDefaultsRecommendation (POST /seed-defaults, recommendations domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "seedInspectionComplianceDocReview",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/compliance/doc-review/seed",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Seed the Document Review checklist",
+    "description": "Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched."
+  },
+  {
     "operationId": "sendTenant",
     "method": "POST",
     "pathTemplate": "/api/admin/agreements/send",
@@ -14519,6 +14784,53 @@
     },
     "summary": "Serve an inspection photo (tenant-scoped)",
     "description": "Streams an inspection item/pool photo from R2, scoped to the caller's tenant + inspection via the key prefix. Sets Content-Disposition from the stored original filename; ?download=1 forces an attachment."
+  },
+  {
+    "operationId": "setInspectionCompliancePsqStatus",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/compliance/psq/status",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "received",
+              "declined"
+            ],
+            "description": "New PSQ lifecycle status: sent to the point-of-contact, received back, or declined outright."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Required context when status=declined — carried into the auto-disclosed Deviations entry."
+          }
+        },
+        "required": [
+          "status"
+        ]
+      }
+    },
+    "summary": "Set Pre-Survey Questionnaire status",
+    "description": "Sets the PSQ status (sent/received/declined). Declining automatically appends a Deviations disclosure (ASTM §11.4.3) so the omission is stated, not silently dropped. Requires report_tier=full_pca."
   },
   {
     "operationId": "setInspectionCover",
@@ -14671,6 +14983,74 @@
     },
     "summary": "Replace inspector restriction list for a service",
     "description": "Full-replace the qualified inspector list for a service. An empty userIds array clears all restrictions (back to all-qualified). Every userId must be a non-deleted, non-agent member of the caller's tenant. Admin or owner only."
+  },
+  {
+    "operationId": "signInspectionCompliance",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/compliance/signoff",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "field_observer",
+              "pcr_reviewer"
+            ],
+            "description": "Sign-off role: the field observer who performed the walk-through, or the PCR reviewer exercising responsible control."
+          },
+          "personId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The signer's user/identity id (accountability record)."
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The signer's display name, as rendered in the Appendix D qualifications block."
+          },
+          "license": {
+            "type": "string",
+            "nullable": true,
+            "description": "Professional license number, if applicable."
+          },
+          "qualificationsRef": {
+            "type": "string",
+            "nullable": true,
+            "description": "Pointer to the qualifications narrative/exhibit."
+          },
+          "dualRole": {
+            "type": "boolean",
+            "description": "True when one person holds both sign-off roles (ASTM §7.6)."
+          }
+        },
+        "required": [
+          "role",
+          "personId",
+          "name"
+        ]
+      }
+    },
+    "summary": "Record a dual sign-off attestation",
+    "description": "Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca."
   },
   {
     "operationId": "skipOnboardingWizard",
@@ -18075,6 +18455,47 @@
     },
     "summary": "Upload inspector profile photo",
     "description": "Accepts a jpg/png/webp photo (max 2 MB) as multipart form data, stores it in R2 under a tenant-scoped key, and saves the public photoUrl on the user record."
+  },
+  {
+    "operationId": "upsertInspectionCompliancePsq",
+    "method": "PUT",
+    "pathTemplate": "/api/inspections/{id}/compliance/psq",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "responses": {
+            "type": "object",
+            "additionalProperties": {
+              "nullable": true
+            },
+            "description": "Structured Pre-Survey Questionnaire responses (ASTM §8.5)."
+          }
+        },
+        "required": [
+          "responses"
+        ]
+      }
+    },
+    "summary": "Upsert Pre-Survey Questionnaire responses",
+    "description": "Stores the Pre-Survey Questionnaire responses (ASTM §8.5) and transitions status to received. Requires report_tier=full_pca."
   },
   {
     "operationId": "validateEmailProviderCredentials",

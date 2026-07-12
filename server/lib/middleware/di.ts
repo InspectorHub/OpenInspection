@@ -36,6 +36,7 @@ import { InspectionTypeService } from '../../services/inspection-type.service';
 import { TotpService } from '../../services/totp.service';
 import { TemplateSeedService } from '../../services/template-seed.service';
 import { ReportPdfService } from '../../services/report-pdf.service';
+import { ReportExportService } from '../../services/report-export.service';
 import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
 import { TemplateMigrationService } from '../../services/template-migration.service';
@@ -55,6 +56,7 @@ import { IntegrationsService } from '../../services/integrations.service';
 import { AnalyticsService } from '../../services/analytics.service';
 import { RepairRequestService } from '../../services/repair-request.service';
 import { ClientDocumentService } from '../../services/client-document.service';
+import { ComplianceService } from '../../services/compliance/pca-compliance.service';
 import { StandaloneProvider } from '../integration/standalone';
 import { PortalProvider } from '../../portal/portal.provider';
 import { PlanQuotaGuard, readTenantTier } from '../../features/plan-quota/guard';
@@ -194,13 +196,13 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.email = buildEmailService();
                     break;
                 case 'inspection':
-                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota());
+                    target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
                     break;
                 case 'portal':
                     // PortalService depends on InspectionService — resolve it via the
                     // proxy target the same way auditLog resolves signingKey.
                     if (!target.inspection) {
-                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota());
+                        target.inspection = new InspectionService(c.env.DB, c.env.PHOTOS, c.get('sdb'), c.env.TENANT_CACHE, (c.env as unknown as { IMAGES?: ImagesBinding }).IMAGES, buildPlanQuota(), c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
                     }
                     target.portal = new PortalService(c.env.DB, target.inspection);
                     break;
@@ -287,6 +289,12 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'reportPdf':
                     target.reportPdf = new ReportPdfService(c.env.DB, c.env.BROWSER, c.env.PHOTOS);
+                    break;
+                case 'reportExport':
+                    // Commercial PCA Phase W Task 4 — .docx export status row + R2
+                    // stream. Reuses the PHOTOS bucket binding (same object store as
+                    // report PDFs; see server/lib/r2-keys.ts:reportWordExport).
+                    target.reportExport = new ReportExportService(c.env.DB, c.env.PHOTOS);
                     break;
                 case 'templateMigration':
                     target.templateMigration = new TemplateMigrationService(c.env.DB, c.get('tenantId'));
@@ -393,6 +401,11 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'clientDocument':
                     target.clientDocument = new ClientDocumentService(c.env.DB, c.env.PHOTOS);
+                    break;
+                case 'compliance':
+                    // Commercial PCA Phase M — reuses the tenant Ed25519 signing key
+                    // (same secret as signingKey/reportVersion) for dual sign-off attestations.
+                    target.compliance = new ComplianceService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
                     break;
             }
             return target[prop];

@@ -10,7 +10,16 @@ import type { CostTables as CT, Table1Row } from "./types";
  * Wide reserve grid reuses the existing print
  * landscape/scaling.
  */
-export function CostTables({ data, show }: { data: CT | null; show: boolean }) {
+/** Commercial PCA Phase P/C seam — the reserve-row PHOTO NO. cell: an
+ *  Appendix B anchor on screen, the bare "Photo N" in print/PDF (same
+ *  print-flag convention as PhotoAppendix), nothing when unresolved. */
+function PhotoNoCell({ photoNo, isPrint }: { photoNo: number | null | undefined; isPrint: boolean }) {
+  if (photoNo == null) return null;
+  if (isPrint) return <>Photo {photoNo}</>;
+  return <a href={`#photo-${photoNo}`} className="text-ih-primary hover:underline">Photo {photoNo}</a>;
+}
+
+export function CostTables({ data, show, isPrint = false }: { data: CT | null; show: boolean; isPrint?: boolean }) {
   if (!show || !data) return null;
   const { table1, reserveSchedule } = data;
   const hasTable1 = table1.immediate.length > 0 || table1.shortTerm.length > 0;
@@ -66,6 +75,7 @@ export function CostTables({ data, show }: { data: CT | null; show: boolean }) {
               <tr className="border-b border-ih-border text-left uppercase tracking-wide text-ih-fg-3">
                 <th className="py-1 pr-3">Item</th><th className="py-1 pr-2 text-right">EUL</th>
                 <th className="py-1 pr-2 text-right">Eff Age</th><th className="py-1 pr-2 text-right">RUL</th>
+                <th className="py-1 pr-3">Photo No.</th>
                 {reserveSchedule.years.map((y) => <th key={y} className="py-1 pr-2 text-right">{y}</th>)}
                 <th className="py-1 text-right">Total</th>
               </tr>
@@ -77,6 +87,7 @@ export function CostTables({ data, show }: { data: CT | null; show: boolean }) {
                   <td className="py-1 pr-2 text-right">{row.item.eul ?? ""}</td>
                   <td className="py-1 pr-2 text-right">{row.item.effAge ?? ""}</td>
                   <td className="py-1 pr-2 text-right">{row.item.rul ?? ""}</td>
+                  <td className="py-1 pr-3"><PhotoNoCell photoNo={row.photoNo} isPrint={isPrint} /></td>
                   {reserveSchedule.years.map((y) => (
                     <td key={y} className="py-1 pr-2 text-right">
                       {y === row.placementYear ? formatDollars(row.replacementCents) : ""}
@@ -88,12 +99,12 @@ export function CostTables({ data, show }: { data: CT | null; show: boolean }) {
             </tbody>
             <tfoot className="text-ih-fg-1">
               <tr className="font-medium">
-                <td className="pt-2" colSpan={4}>Total Uninflated</td>
+                <td className="pt-2" colSpan={5}>Total Uninflated</td>
                 {reserveSchedule.uninflatedByYear.map((c, i) => <td key={i} className="pt-2 pr-2 text-right">{formatDollars(c)}</td>)}
                 <td className="pt-2 text-right">{formatDollars(reserveSchedule.totalUninflatedCents)}</td>
               </tr>
               <tr className="font-medium">
-                <td className="pt-1" colSpan={4}>Cumulative Inflated</td>
+                <td className="pt-1" colSpan={5}>Cumulative Inflated</td>
                 {reserveSchedule.cumulativeInflatedByYear.map((c, i) => <td key={i} className="pt-1 pr-2 text-right">{formatDollars(c)}</td>)}
                 <td className="pt-1 text-right">{formatDollars(reserveSchedule.totalInflatedCents)}</td>
               </tr>

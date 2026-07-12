@@ -103,13 +103,32 @@ export function getSubtypeDef(subtypeId: string): PlatformSubtype | null {
     return PLATFORM_SUBTYPES.find(s => s.id === subtypeId) ?? null;
 }
 
+/**
+ * Commercial PCA Phase T — propertyType namespace bridge. Inspections store
+ * the underscore slugs the wizard writes (single_family, multi_unit,
+ * commercial — see app/components/new-inspection/PropertyStep.tsx), but
+ * METADATA_PRESETS (and the report layer built on it) is keyed on hyphen
+ * slugs. Without this bridge getMetadataPreset('single_family') / ('multi_
+ * unit') silently returned [] for every residential/multi-unit inspection —
+ * the Building Profile was dormant. Single source of truth: callers must
+ * route through here (or getMetadataPreset, which applies it internally)
+ * rather than scattering ad hoc `.replace('_', '-')` calls.
+ */
+export function normalizePropertyType(pt: string | null | undefined): string | null {
+    if (!pt) return null;
+    if (pt === 'single_family') return 'single-family';
+    if (pt === 'multi_unit') return 'multi-unit';
+    return pt;
+}
+
 export function getMetadataPreset(
     propertyType: string,
     subtypeId?: string | null,
 ): PropertyMetaField[] {
-    if (propertyType === 'commercial' && subtypeId) {
+    const normalized = normalizePropertyType(propertyType) ?? propertyType;
+    if (normalized === 'commercial' && subtypeId) {
         const key = `commercial:${subtypeId}`;
         if (METADATA_PRESETS[key]) return METADATA_PRESETS[key];
     }
-    return METADATA_PRESETS[propertyType] ?? [];
+    return METADATA_PRESETS[normalized] ?? [];
 }

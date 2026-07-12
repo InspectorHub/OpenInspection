@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { PropertyFactsSchema, UpdateInspectionSchema } from '../../../server/lib/validations/inspection.schema';
 import { createTestDb, setupSchema } from '../db';
@@ -98,6 +99,46 @@ describe('InspectionService.updatePropertyFacts (G1)', () => {
         ).rejects.toThrow(/not found/i);
     });
 
+    // Commercial PCA Phase T — commercial_subtype capture, mirroring the
+    // reportTier write path exactly. Not part of the six-field PropertyFacts
+    // return type (same treatment as reportTier — write-only through this
+    // endpoint; read back via the inspection row / report payload), so we
+    // assert directly against the stored column.
+    it('persists commercialSubtype to the inspections row', async () => {
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { commercialSubtype: 'office' });
+        const row = await testDb.select({ commercialSubtype: schema.inspections.commercialSubtype })
+            .from(schema.inspections)
+            .where(eq(schema.inspections.id, 'insp-A'))
+            .get();
+        expect(row?.commercialSubtype).toBe('office');
+    });
+
+    it('a commercialSubtype-only patch leaves other columns untouched', async () => {
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { yearBuilt: 1990 });
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { commercialSubtype: 'retail' });
+        const after = await svc.getPropertyFacts('insp-A', TENANT_A);
+        expect(after.yearBuilt).toBe(1990);
+    });
+
+    it('null clears a previously set commercialSubtype', async () => {
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { commercialSubtype: 'industrial' });
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { commercialSubtype: null });
+        const row = await testDb.select({ commercialSubtype: schema.inspections.commercialSubtype })
+            .from(schema.inspections)
+            .where(eq(schema.inspections.id, 'insp-A'))
+            .get();
+        expect(row?.commercialSubtype).toBeNull();
+    });
+
+    it('accepts an org-custom commercialSubtype string (not one of the 6 platform ids)', async () => {
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { commercialSubtype: 'custom-boutique-hotel' });
+        const row = await testDb.select({ commercialSubtype: schema.inspections.commercialSubtype })
+            .from(schema.inspections)
+            .where(eq(schema.inspections.id, 'insp-A'))
+            .get();
+        expect(row?.commercialSubtype).toBe('custom-boutique-hotel');
+    });
+
     it('getPropertyFacts returns nulls when never set', async () => {
         const facts = await svc.getPropertyFacts('insp-A', TENANT_A);
         expect(facts).toEqual({
@@ -143,6 +184,30 @@ describe('PropertyFactsSchema (Zod)', () => {
 
     it('rejects negative sqft', () => {
         expect(() => PropertyFactsSchema.parse({ sqft: -1 })).toThrow();
+    });
+
+    // Commercial PCA Phase T — commercial_subtype capture. commercial_subtype
+    // is plain text (not an enum): org-custom subtypes live in the
+    // commercial_subtypes table alongside the 6 locked platform ids, so the
+    // schema is deliberately permissive and must NOT hard-reject unknown
+    // strings.
+    it('accepts a platform commercialSubtype id', () => {
+        const parsed = PropertyFactsSchema.parse({ commercialSubtype: 'office' });
+        expect(parsed.commercialSubtype).toBe('office');
+    });
+
+    it('accepts an org-custom commercialSubtype string', () => {
+        const parsed = PropertyFactsSchema.parse({ commercialSubtype: 'custom-boutique-hotel' });
+        expect(parsed.commercialSubtype).toBe('custom-boutique-hotel');
+    });
+
+    it('accepts null to clear commercialSubtype', () => {
+        const parsed = PropertyFactsSchema.parse({ commercialSubtype: null });
+        expect(parsed.commercialSubtype).toBeNull();
+    });
+
+    it('rejects a commercialSubtype longer than 64 chars', () => {
+        expect(() => PropertyFactsSchema.parse({ commercialSubtype: 'x'.repeat(65) })).toThrow();
     });
 });
 

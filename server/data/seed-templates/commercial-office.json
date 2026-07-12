@@ -412,6 +412,55 @@
         ]
       },
       {
+        "id": "vertical-transportation",
+        "title": "Vertical Transportation",
+        "applicableTo": { "propertyTypes": ["commercial"], "commercialSubtypes": ["office", "retail", "hospitality", "institutional"] },
+        "items": [
+          {
+            "id": "vt-elevators",
+            "label": "Elevators / Escalators",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_vt_cert", "title": "Inspection certificate", "comment": "Current elevator inspection certificate was observed and within its valid period.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_vt_visual", "title": "Visual scope", "comment": "Vertical transportation evaluated visually; not test-operated through full cycle. Refer to the maintenance contractor's records.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_vt_repair", "title": "Service needed", "category": "recommendation", "location": "", "comment": "Vertical transportation requires service or further evaluation by a licensed elevator contractor.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "site-flatwork",
+        "title": "Site, Flatwork, Parking & Stormwater",
+        "applicableTo": { "propertyTypes": ["commercial"], "commercialSubtypes": ["office", "retail", "hospitality", "industrial", "institutional", "mixed-use"] },
+        "items": [
+          {
+            "id": "sf-flatwork",
+            "label": "Flatwork & Stormwater",
+            "type": "rich",
+            "ratingOptions": ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
+            "tabs": {
+              "information": [
+                { "id": "ri_sf_flatwork_ok", "title": "Condition", "comment": "Sidewalks, curbs, and drive aisles were inspected and appear in serviceable condition; stormwater drains freely toward designed collection points.", "default": true }
+              ],
+              "limitations": [
+                { "id": "rl_sf_flatwork_visual", "title": "Visual scope", "comment": "Inspection limited to visible surface conditions; sub-grade drainage capacity and retention pond sizing were not calculated.", "default": false }
+              ],
+              "defects": [
+                { "id": "rd_sf_flatwork_repair", "title": "Repair needed", "category": "recommendation", "location": "", "comment": "Flatwork/stormwater components show cracking, ponding, or settlement; recommend repair by a qualified site contractor.", "photos": [], "default": false },
+                { "id": "rd_sf_flatwork_safety", "title": "Safety concern", "category": "safety", "location": "", "comment": "Flatwork/stormwater deficiency presents a trip or ponding safety hazard; recommend immediate correction.", "photos": [], "default": false }
+              ]
+            }
+          }
+        ]
+      },
+      {
         "id": "summary-commercial",
         "title": "Summary & Recommendations",
         "items": [

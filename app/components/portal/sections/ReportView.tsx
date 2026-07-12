@@ -23,13 +23,16 @@ import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, isDefect } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
 import { ReportDefectCard } from "./report/ReportDefectCard";
+import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
 import { ReportVerificationBlock } from "./report/ReportVerificationBlock";
 import { ReportRepairPanel } from "./report/ReportRepairPanel";
 import { BuildingProfile } from "./report/BuildingProfile";
 import { PcaSkeleton } from "./report/PcaSkeleton";
+import { ReportToc } from "./report/ReportToc";
 import { PerUnitReportBlock } from "./report/PerUnitReportBlock";
 import { CostTables } from "./report/CostTables";
+import { WordExportButton } from "./report/WordExportButton";
 import {
   PRINT_CARD_CLASS,
   PRINT_SECTION_HEADING_CLASS,
@@ -114,6 +117,7 @@ export function reportViewProps(
     coverPhotoUrl: data.coverPhotoUrl ?? null,
     stats: data.stats ?? { total: 0, satisfactory: 0, monitor: 0, defect: 0 },
     sections: data.sections ?? [],
+    outline: data.outline ?? [],
     showEstimates: data.showEstimates ?? false,
     costTables: data.costTables ?? null,
     enableRepairList: data.enableRepairList ?? false,
@@ -128,10 +132,18 @@ export function reportViewProps(
     isPublished: data.isPublished ?? false,
     signature: data.signature ?? null,
     verification: data.verification ?? null,
+    astmConformance: data.astmConformance ?? null,
+    reportSignoffs: data.reportSignoffs ?? [],
+    psq: data.psq ?? null,
+    documentReview: data.documentReview ?? [],
+    relianceText: data.relianceText ?? { userReliance: "", pointInTime: "", siteSpecific: "" },
     ownerPreview: data.ownerPreview ?? false,
     baseUrl: data.baseUrl ?? "",
+    photoMode: data.photoMode ?? "inline",
+    photoAppendix: data.photoAppendix ?? [],
     propertyType: data.propertyType ?? null,
     commercialSubtype: data.commercialSubtype ?? null,
+    reportTier: data.reportTier ?? null,
     buildingProfile: data.buildingProfile ?? [],
     pcaReport: data.pcaReport ?? null,
     unitInspectionMode: data.unitInspectionMode ?? "tagged",
@@ -326,18 +338,29 @@ export function ReportView(props: ReportViewProps) {
 
   return (
     <div className={standalone ? "min-h-screen bg-ih-bg-card" : undefined} data-theme={data.reportTheme || undefined} style={brandTokens(data.brand.primaryColor)}>
-      {/* Download PDF FAB */}
-      <button
-        type="button"
-        onClick={downloadPdf}
-        disabled={generating}
-        className="print:hidden fixed bottom-6 right-6 z-50 px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-        </svg>
-        {generating ? "Generating…" : "Download PDF"}
-      </button>
+      {/* Download PDF FAB + Export to Word (Commercial PCA Phase W Task 6 —
+          owner-only, commercial reports only; the public token viewer never
+          has ownerPreview true, and `<ReportView>` is rendered standalone in
+          plenty of router-less unit tests, so <WordExportButton> — which
+          calls useFetcher() and therefore requires a data-router context —
+          is only mounted into the tree at all when the gate is satisfied,
+          rather than always-mounted-but-internally-hidden. */}
+      <div className="print:hidden fixed bottom-6 right-6 z-50 flex items-center gap-2">
+        {Boolean(data.ownerPreview) && Boolean(data.reportTier) ? (
+          <WordExportButton inspectionId={data.inspectionId} />
+        ) : null}
+        <button
+          type="button"
+          onClick={downloadPdf}
+          disabled={generating}
+          className="px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+          </svg>
+          {generating ? "Generating…" : "Download PDF"}
+        </button>
+      </div>
 
       {/* Header */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-8 pb-6">
@@ -426,8 +449,12 @@ export function ReportView(props: ReportViewProps) {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
+      {/* Stats — Commercial PCA Phase O: this at-a-glance block is the report's
+          "PCA Summary" front-matter page (registry id `pca-summary`), so it
+          carries that anchor for the TOC / PDF bookmarks. It renders
+          unconditionally (data.stats always present), so the anchor is never
+          dangling regardless of tier. */}
+      <div id="pca-summary" className="max-w-4xl mx-auto px-4 sm:px-6 mb-6 scroll-mt-4">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {summaryCards.map((s) => (
             <div key={s.label} className={`bg-ih-bg-card border border-ih-border rounded-lg p-4 text-center ${PRINT_CARD_CLASS}`}>
@@ -469,15 +496,32 @@ export function ReportView(props: ReportViewProps) {
       <div className={`max-w-4xl mx-auto px-4 sm:px-6 ${repairPanel ? "pb-[65vh]" : "pb-32"}`}>
         {/* PCA Skeleton — Commercial PCA Phase S front matter. data.pcaReport is
             null for non-commercial reports (server gates it in getReportData), so
-            PcaSkeleton renders nothing on residential home inspections. */}
-        <PcaSkeleton data={data.pcaReport ?? null} />
+            PcaSkeleton renders nothing on residential home inspections. The
+            compliance prop (Phase M) feeds the conformance/signoff/doc-review/
+            PSQ/reliance slots inside it; every field is empty/null-safe so it
+            only ever adds content when the skeleton itself is already rendering. */}
+        {/* Commercial PCA Phase O — reserved TOC slot: after the cover/header
+            front matter, before the PcaSkeleton body. `?? []` guards the
+            inline-Hub mount that may pass a partial payload during
+            transition; ReportToc itself renders nothing when empty. */}
+        <ReportToc entries={data.outline ?? []} showPageNumbers={false} />
+        <PcaSkeleton
+          data={data.pcaReport ?? null}
+          compliance={{
+            conformance: data.astmConformance ?? null,
+            signoffs: data.reportSignoffs ?? [],
+            psq: data.psq ?? null,
+            documentReview: data.documentReview ?? [],
+            relianceText: data.relianceText ?? { userReliance: "", pointInTime: "", siteSpecific: "" },
+          }}
+        />
         {/* Commercial PCA Phase U — per-unit matrix + exception detail (gated on
             per_unit mode; renders nothing otherwise → report byte-identical). */}
         <PerUnitReportBlock data={data} />
         {filteredSections.map((section, sectionIdx) => {
           if (filter === "defects" && section.items.length === 0) return null;
           return (
-            <div key={section.id} className="mb-6 group/section relative">
+            <div key={section.id} id={section.id} className="mb-6 group/section relative scroll-mt-4">
               <div className={`flex items-center gap-3 mb-4 ${PRINT_SECTION_HEADING_CLASS}`}>
                 <span className="text-2xl">{getSectionIcon(section.title)}</span>
                 <h2 className="text-2xl font-bold italic text-ih-fg-1">
@@ -553,7 +597,12 @@ export function ReportView(props: ReportViewProps) {
                         {/* FE-3/B-20 — findings: included canned + custom defects with their
                         own photos. Previously the viewer rendered neither (field-authored
                         defects never appeared in the published report at all). */}
-                        <ReportDefectCard item={item} mediaVisible={mediaVisible} renderMediaTile={renderMediaTile} />
+                        <ReportDefectCard
+                          item={item}
+                          mediaVisible={mediaVisible}
+                          renderMediaTile={renderMediaTile}
+                          showPhotos={data.photoMode !== "appendix"}
+                        />
 
                         {item.recommendation && (
                           <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -589,7 +638,7 @@ export function ReportView(props: ReportViewProps) {
                           </div>
                         )}
 
-                        {item.photos.filter(mediaVisible).length > 0 && (
+                        {data.photoMode !== "appendix" && item.photos.filter(mediaVisible).length > 0 && (
                           <div className={`mt-3 ${ITEM_PHOTO_GRID_CLASS}`}>
                             {item.photos
                               .filter(mediaVisible)
@@ -654,8 +703,19 @@ export function ReportView(props: ReportViewProps) {
             Phase T seam: today gated on `showEstimates`; when report_tier
             lands, gate on `reportTier === 'full_pca' || (reportTier ===
             'light_commercial' && showEstimates)` instead. */}
-        <CostTables data={data.costTables ?? null} show={data.showEstimates} />
+        <CostTables data={data.costTables ?? null} show={data.showEstimates} isPrint={data.printMode} />
       </div>
+
+      {/* Commercial PCA Phase P — Appendix B: centralized numbered photo
+          appendix. Mounted once at the end of the report body (after every
+          section + the cost tables, before signature/verification) so it
+          reads as the report's final content block, matching the real-PCA
+          layout. Suppressed entirely (renders null) outside 'appendix' mode. */}
+      {data.photoMode === "appendix" && (
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 mb-6">
+          <PhotoAppendix photos={data.photoAppendix ?? []} isPrint={data.printMode} />
+        </div>
+      )}
 
       {/* ── Signature block ──────────────────────────────────────────── */}
       <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} />

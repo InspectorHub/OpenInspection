@@ -148,6 +148,34 @@
       "when": 1783752955383,
       "tag": "0020_stiff_post",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1783782573924,
+      "tag": "0021_stiff_psylocke",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1783789413548,
+      "tag": "0022_aberrant_shatterstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1783798002139,
+      "tag": "0023_overconfident_king_cobra",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1783806245254,
+      "tag": "0024_watery_wolf_cub",
+      "breakpoints": true
     }
   ]
 }

@@ -85,6 +85,7 @@
     "@stripe/stripe-js": "^9.7.0",
     "@types/sortablejs": "^1.15.9",
     "agents": "^0.17.1",
+    "docx": "^9.7.1",
     "dompurify": "^3.4.9",
     "drizzle-orm": "^0.45.2",
     "exceljs": "^4.4.0",

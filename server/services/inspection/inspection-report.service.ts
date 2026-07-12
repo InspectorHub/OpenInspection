@@ -17,6 +17,8 @@ import { isReportPublished } from '../../lib/status/report-status';
 import { resolveBuildingProfile } from '../../lib/building-profile';
 import { buildSystemsSummary } from '../../lib/pca-systems-summary';
 import { buildPcaReportBlock } from '../../lib/pca-report-block';
+import { gatedSectionRegistry } from '../../lib/pca-section-registry';
+import { buildReportOutline } from '../../lib/report-outline';
 import type { Deviation } from '../../lib/pca-deviations';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
@@ -24,6 +26,13 @@ import { InspectionSubService } from './base';
 import { DefectCategoryService } from './defect-category.service';
 import { buildCostTables } from '../../lib/pca-costs';
 import { CostItemService } from '../cost-item.service';
+import { resolveReportTier } from '../../lib/report-tier';
+import { assignPhotoNumbers, derivePhotoMode, buildPhotoRefIndex, resolvePhotoRef, type AppendixPhoto, type PhotoMode } from '../../lib/report-photos';
+import { computeConformance, deriveConformanceInput, type AstmConformance } from '../../lib/pca-conformance';
+import { RELIANCE_TEMPLATES } from '../../lib/pca-reliance-text';
+import { ComplianceService } from '../compliance/pca-compliance.service';
+import type { ScopedDB } from '../../lib/db/scoped';
+import type { ImagesBinding } from '../../lib/media/strip-exif';
 import type {
     PhotoEntry,
     CannedState,
@@ -56,6 +65,26 @@ export function defectDrivesSummary(
  * internally (same service).
  */
 export class InspectionReportService extends InspectionSubService {
+    /**
+     * `encryptionSecret` is only consumed to construct a scoped
+     * `ComplianceService` (Phase M) for full_pca reports — every other method
+     * on this service is unaffected. Optional so existing positional
+     * construction call sites (and unit tests that build this service
+     * directly) keep working unchanged; full_pca reports built without a
+     * secret still resolve sign-off/PSQ/doc-review reads (which don't touch
+     * crypto), just with an empty key material fallback.
+     */
+    constructor(
+        db: D1Database,
+        r2?: R2Bucket,
+        sdb?: ScopedDB,
+        kv?: KVNamespace,
+        images?: ImagesBinding,
+        private readonly encryptionSecret?: string,
+    ) {
+        super(db, r2, sdb, kv, images);
+    }
+
     /**
      * Builds structured report data for a given inspection.
      *
@@ -396,6 +425,26 @@ export class InspectionReportService extends InspectionSubService {
             }),
         }));
 
+        // Commercial PCA Phase P — assign continuous, stable photo numbers in
+        // render order and collect the centralized photo appendix (Appendix B).
+        // photoMode derives from the tier (Phase T) with an optional per-
+        // inspection override; computed unconditionally (cheap + deterministic)
+        // so the renderer can branch. See server/lib/report-photos.ts.
+        const photoMode: PhotoMode = derivePhotoMode({
+            reportTier: (inspection as { reportTier?: string | null }).reportTier ?? null,
+            override:   (inspection as { reportPhotoMode?: string | null }).reportPhotoMode ?? null,
+        });
+        const photoNumbering = assignPhotoNumbers(sections as Parameters<typeof assignPhotoNumbers>[0]);
+        // assignPhotoNumbers's declared return type is the generic SectionLike[]
+        // shape it walks; at runtime each section/item is a shallow copy that
+        // keeps every original field (defectCount, rating, ratingColor, ...)
+        // plus `photoNo` stamped onto photo/defectPhoto entries. Cast back to
+        // the specific literal type of `sections` so downstream consumers of
+        // getReportData's inferred return type (report-delivery route,
+        // inspection-analytics.service) keep their existing field access.
+        const numberedSections = photoNumbering.sections as typeof sections;
+        const photoAppendix: AppendixPhoto[] = photoNumbering.appendix;
+
         let inspectorName: string | null = null;
         let inspectorLicense: string | null = null;
         if (inspection.inspectorId) {
@@ -467,6 +516,14 @@ export class InspectionReportService extends InspectionSubService {
             bathrooms:      (inspection as { bathrooms?: number | null }).bathrooms           ?? null,
         };
 
+        // Commercial PCA Phase T — resolve the report tier from the stored
+        // value (defaults commercial -> light_commercial; null on residential).
+        // Every later phase (sections/cost/compliance/photos) gates on this.
+        const reportTier = resolveReportTier({
+            propertyType: (inspection as { propertyType?: string | null }).propertyType ?? null,
+            storedTier: (inspection as { reportTier?: 'light_commercial' | 'full_pca' | null }).reportTier ?? null,
+        });
+
         // Commercial PCA Phase C — manual cost line items -> two render tables
         // (Opinion of Cost + opt-in Reserve Schedule) + the Phase S ES roll-up.
         const costItemRows = await new CostItemService(this.db).listByInspection(inspectionId, tenantId);
@@ -476,6 +533,24 @@ export class InspectionReportService extends InspectionSubService {
             new Date().getFullYear(),
             (inspection as { sqft?: number | null }).sqft ?? null,
         );
+
+        // Commercial PCA Phase P/C seam — resolve each reserve row's photo_ref to
+        // its assigned appendix photo number for the PHOTO NO. column. Built once
+        // here (not threaded into pca-costs.ts, which stays IO/photo-free) now
+        // that both the reserve schedule and photoAppendix are available.
+        const photoRefIndex = buildPhotoRefIndex(photoAppendix);
+        const resolvedCostTables = costTables.reserveSchedule
+            ? {
+                ...costTables,
+                reserveSchedule: {
+                    ...costTables.reserveSchedule,
+                    rows: costTables.reserveSchedule.rows.map((row) => ({
+                        ...row,
+                        photoNo: resolvePhotoRef(photoRefIndex, row.item.photoRef),
+                    })),
+                },
+            }
+            : costTables;
 
         // Commercial PCA Phase F — server-resolved Building Profile rows (presets
         // stay server-only). Renders only when propertyType is set + a field is
@@ -497,6 +572,15 @@ export class InspectionReportService extends InspectionSubService {
             deviations: (inspection as { deviations?: Deviation[] | null }).deviations ?? null,
             sections: sections as Parameters<typeof buildSystemsSummary>[0],
         });
+
+        // Commercial PCA Phase O — TOC projection over the tier-gated section
+        // registry. No reportTier (residential) -> no PCA front matter -> no
+        // outline. full_pca gets the full registry (Transmittal Letter +
+        // Systems Summary included); light_commercial gets those two dropped
+        // by gatedSectionRegistry.
+        const outline = reportTier
+            ? buildReportOutline(gatedSectionRegistry(reportTier === 'full_pca' ? 'full' : 'light'))
+            : [];
 
         // #120 — amendment trail. Surfaced to the client report page so a
         // re-published report shows "Amended on …" + per-version reasons.
@@ -586,6 +670,51 @@ export class InspectionReportService extends InspectionSubService {
             }
         }
 
+        // Commercial PCA Phase M — ASTM E2018 compliance artifacts (sign-off,
+        // PSQ, document review, computed conformance, and reliance text), gated
+        // to full_pca so light/residential reports keep the fields
+        // null/empty/seeded and pay no extra reads. Deviations reuse the same
+        // `inspection.deviations` array `pcaReport` reads above (Phase S) — no
+        // separate `.list()` call.
+        const isFullPca = reportTier === 'full_pca';
+        let astmConformance: AstmConformance | null = null;
+        type RawReportSignoff = Awaited<ReturnType<ComplianceService['getCompliance']>>['reportSignoffs'][number];
+        let reportSignoffs: Array<Omit<RawReportSignoff, 'signedAt'> & { signedAt: number }> = [];
+        let psq: { status: string; responses: Record<string, unknown> | null } | null = null;
+        let documentReview: Awaited<ReturnType<ComplianceService['getCompliance']>>['documentReview'] = [];
+        let relianceText: typeof RELIANCE_TEMPLATES = { ...RELIANCE_TEMPLATES };
+        if (isFullPca) {
+            const compliance = new ComplianceService(this.db, this.encryptionSecret ?? '');
+            const c = await compliance.getCompliance(tenantId, inspectionId);
+            const deviations = (inspection as { deviations?: Deviation[] | null }).deviations ?? [];
+            // `signedAt` is a drizzle `timestamp_ms` column — reads yield Date
+            // instances at runtime. The wire contract (ReportSignoffView.signedAt
+            // in app/components/portal/sections/report/types.ts) is epoch-ms
+            // number; normalize here the same way the admin compliance route
+            // does (server/api/inspections/compliance.ts's toMs/serializeSignoff)
+            // so both paths agree on the wire shape.
+            reportSignoffs = c.reportSignoffs.map((row) => ({
+                ...row,
+                signedAt: row.signedAt instanceof Date ? row.signedAt.getTime() : Number(row.signedAt),
+            }));
+            psq = c.psq ? { status: c.psq.status, responses: (c.psq.responses as Record<string, unknown> | null) ?? null } : null;
+            documentReview = c.documentReview;
+            astmConformance = computeConformance(deriveConformanceInput({
+                reportSignoffs: c.reportSignoffs,
+                deviations,
+                psqStatus: c.psq?.status ?? null,
+                psqDisclosedInDeviations: deviations.some((d) => d.area === 'PSQ'),
+            }));
+            // Phase S pca_narrative may carry inspector-edited reliance text;
+            // fall back to the seeded ASTM boilerplate per-field.
+            const narr = (inspection as { pcaNarrative?: { userReliance?: string; pointInTime?: string; siteSpecific?: string } }).pcaNarrative;
+            relianceText = {
+                userReliance: narr?.userReliance || RELIANCE_TEMPLATES.userReliance,
+                pointInTime:  narr?.pointInTime  || RELIANCE_TEMPLATES.pointInTime,
+                siteSpecific: narr?.siteSpecific || RELIANCE_TEMPLATES.siteSpecific,
+            };
+        }
+
         // Commercial PCA Phase U — per-unit payload. `unit_inspection_mode` is
         // Phase F's column (default 'tagged'); read defensively so this stays a
         // no-op until Phase F lands and for every non-per_unit inspection.
@@ -619,7 +748,14 @@ export class InspectionReportService extends InspectionSubService {
             // picked a cover. The renderer consumes this directly.
             coverPhotoUrl: resolveCoverUrl(inspection as { coverImageKey?: string | null; coverPhotoId?: string | null }, makePhotoUrl),
             stats: { total: stats.total, satisfactory: stats.satisfactory, monitor: stats.monitor, defect: stats.defect },
-            sections,
+            sections: numberedSections,
+            // Commercial PCA Phase O — TOC projection (empty for residential/no-tier reports).
+            outline,
+            // Commercial PCA Phase P — photo presentation mode + the flat
+            // centralized photo appendix (Appendix B). Computed unconditionally;
+            // the renderer decides whether to display the appendix (mode === 'appendix').
+            photoMode,
+            photoAppendix,
             ratingLevels: levels.length > 0 ? levels : [
                 { id: 'Satisfactory', label: 'Satisfactory', abbreviation: 'SAT', color: '#22c55e', severity: 'good', isDefect: false },
                 { id: 'Monitor', label: 'Monitor', abbreviation: 'MON', color: '#f59e0b', severity: 'marginal', isDefect: false },
@@ -630,7 +766,8 @@ export class InspectionReportService extends InspectionSubService {
             enableRepairList,
             enableCustomerRepairExport,
             propertyFacts,
-            costTables,
+            reportTier,
+            costTables: resolvedCostTables,
             propertyType:        (inspection as { propertyType?: string | null }).propertyType ?? null,
             commercialSubtype:   (inspection as { commercialSubtype?: string | null }).commercialSubtype ?? null,
             buildingProfile,
@@ -652,6 +789,13 @@ export class InspectionReportService extends InspectionSubService {
             isPublished,
             signature,
             verification,
+            // Commercial PCA Phase M — ASTM compliance artifacts (full_pca only;
+            // null/empty/seeded-default otherwise).
+            astmConformance,
+            reportSignoffs,
+            psq,
+            documentReview,
+            relianceText,
         };
     }
 

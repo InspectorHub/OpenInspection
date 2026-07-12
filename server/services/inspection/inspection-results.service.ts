@@ -3,6 +3,7 @@ import { inspections, inspectionResults, templates } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { sanitizeDefectStates, type PropertyFacts, type PropertyFactFoundation } from './shared';
 import { InspectionSubService } from './base';
+import { appendDeviation as appendDeviationPure, type DeviationInput } from '../../lib/pca-deviations';
 
 /**
  * Inspection results writes: field results merge, property-facts read/write,
@@ -61,6 +62,12 @@ export class InspectionResultsService extends InspectionSubService {
         lotSize?:        string | null | undefined;
         bedrooms?:       number | null | undefined;
         bathrooms?:      number | null | undefined;
+        // Commercial PCA Phase T — tier elevation from the editor.
+        reportTier?:     'light_commercial' | 'full_pca' | null | undefined;
+        // Commercial PCA Phase T — commercial subtype capture from the editor.
+        // Plain text column (org-custom subtypes exist alongside the 6 locked
+        // platform ids) — mirrors reportTier's write path exactly.
+        commercialSubtype?: string | null | undefined;
     }): Promise<PropertyFacts> {
         const db = this.getDrizzle();
         const existing = await db.select({ id: inspections.id }).from(inspections)
@@ -75,6 +82,8 @@ export class InspectionResultsService extends InspectionSubService {
         if (facts.lotSize        !== undefined) update.lotSize        = facts.lotSize;
         if (facts.bedrooms       !== undefined) update.bedrooms       = facts.bedrooms;
         if (facts.bathrooms      !== undefined) update.bathrooms      = facts.bathrooms;
+        if (facts.reportTier     !== undefined) update.reportTier     = facts.reportTier;
+        if (facts.commercialSubtype !== undefined) update.commercialSubtype = facts.commercialSubtype;
 
         if (Object.keys(update).length > 0) {
             await db.update(inspections).set(update)
@@ -99,6 +108,26 @@ export class InspectionResultsService extends InspectionSubService {
         if (!existing) throw Errors.NotFound('Inspection not found');
 
         await db.update(inspections).set({ pcaNarrative: value })
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+    }
+
+    /**
+     * Commercial PCA Phase M — append a deviation disclosure to the
+     * inspection's Deviations store (Phase S, ASTM §11.4.3). Read-modify-write
+     * mirrors updatePcaNarrative exactly: whole-column overwrite of
+     * `deviations`, tenant-scoped. The actual merge is delegated to the pure,
+     * idempotent `appendDeviation` helper (server/lib/pca-deviations.ts) so
+     * repeated calls (e.g. re-declining a PSQ) never duplicate rows.
+     */
+    async appendDeviation(id: string, tenantId: string, input: DeviationInput): Promise<void> {
+        const db = this.getDrizzle();
+        const existing = await db.select({ deviations: inspections.deviations }).from(inspections)
+            .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+            .get();
+        if (!existing) throw Errors.NotFound('Inspection not found');
+
+        const next = appendDeviationPure(existing.deviations, input);
+        await db.update(inspections).set({ deviations: next })
             .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
     }
 
