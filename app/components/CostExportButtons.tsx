@@ -67,5 +67,3 @@ export function CostExportButtons({
     </div>
   );
 }
-
-export default CostExportButtons;
