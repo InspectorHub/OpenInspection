@@ -61,4 +61,18 @@ describe('resolveBuildingProfile', () => {
     expect(rows.find((r) => r.id === 'yearBuilt')?.value).toBe(1975);
     expect(rows.find((r) => r.id === 'sqft')?.value).toBe(2100);
   });
+
+  it('resolves the foundation row from the dedicated foundation_type column (single-family)', () => {
+    // Regression: the single-family preset field id must match the dedicated
+    // map key `foundationType` (which carries the inspections.foundation_type
+    // column value), or the Foundation row silently drops from the Building
+    // Profile even when foundation_type is set. See #234 follow-up.
+    const rows = resolveBuildingProfile({
+      propertyType: 'single-family',
+      propertyFacts: null,
+      yearBuilt: 1975,
+      foundationType: 'Basement',
+    });
+    expect(rows.find((r) => r.id === 'foundationType')?.value).toBe('Basement');
+  });
 });

@@ -507,6 +507,7 @@ export function ReportView(props: ReportViewProps) {
         <ReportToc entries={data.outline ?? []} showPageNumbers={false} />
         <PcaSkeleton
           data={data.pcaReport ?? null}
+          tier={data.reportTier ?? null}
           compliance={{
             conformance: data.astmConformance ?? null,
             signoffs: data.reportSignoffs ?? [],

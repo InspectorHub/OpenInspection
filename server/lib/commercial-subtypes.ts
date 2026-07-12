@@ -36,7 +36,10 @@ export const METADATA_PRESETS: Record<string, PropertyMetaField[]> = {
     'single-family': [
         { id: 'yearBuilt',  label: 'Year built',  type: 'number', group: 'identity', required: true },
         { id: 'sqft',       label: 'Sq ft',       type: 'number', unit: 'sqft', group: 'physical' },
-        { id: 'foundation', label: 'Foundation',   type: 'select', group: 'physical',
+        // Field id MUST be `foundationType` to match the dedicated
+        // inspections.foundation_type column (building-profile.ts maps it under
+        // that key); using `foundation` silently dropped the row. See #234 follow-up.
+        { id: 'foundationType', label: 'Foundation',   type: 'select', group: 'physical',
           options: ['Slab on grade', 'Crawl space', 'Basement', 'Pier & beam', 'Other'] },
         { id: 'lotSize',    label: 'Lot size',     type: 'number', unit: 'sqft', group: 'physical' },
         { id: 'garageSize', label: 'Garage',       type: 'select', group: 'physical',

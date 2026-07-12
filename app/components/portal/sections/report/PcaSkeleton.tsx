@@ -75,12 +75,20 @@ function ChapterDivider({ id, title }: { id: string; title: string }) {
 export function PcaSkeleton({
   data,
   compliance,
+  tier,
 }: {
   data: PcaReportData | null;
   compliance?: PcaComplianceProps;
+  /** Commercial PCA Phase T — report tier. `light_commercial` omits the
+   *  full-tier-only Transmittal Letter + Systems Summary front matter (the TOC
+   *  and the docx builder drop them too); null/full_pca render them. */
+  tier?: "light_commercial" | "full_pca" | null;
 }) {
   if (!data) return null;
   const { narrative, deviations } = data;
+  // Mirror the docx builder's `isLight` gate so the HTML body agrees with the
+  // tier-gated TOC and the Word export.
+  const isLight = tier === "light_commercial";
   const conformance = compliance?.conformance ?? null;
   const signoffs = compliance?.signoffs ?? [];
   const psq = compliance?.psq ?? null;
@@ -88,18 +96,23 @@ export function PcaSkeleton({
   const relianceText = compliance?.relianceText ?? null;
   return (
     <div className="mb-8">
-      {/* Transmittal Letter (full tier; gated upstream) */}
-      <Block id="transmittal-letter" title="Transmittal Letter">{narrative.transmittalLetter}</Block>
-      {/* Transmittal signature slot — Phase M dual-role signoffs. */}
-      <SignoffBlock signoffs={signoffs} />
+      {/* Transmittal Letter + dual-role signature block — full tier only.
+          light_commercial drops them (matches the tier-gated TOC + docx). */}
+      {!isLight && (
+        <>
+          <Block id="transmittal-letter" title="Transmittal Letter">{narrative.transmittalLetter}</Block>
+          {/* Transmittal signature slot — Phase M dual-role signoffs. */}
+          <SignoffBlock signoffs={signoffs} />
 
-      {/* Wrapper carries the anchor unconditionally — SystemsSummaryTable
-          itself renders null when there are no systems, which would otherwise
-          leave a dangling #systems-summary TOC link on a full-tier report
-          with an empty rollup. */}
-      <div id="systems-summary" className="scroll-mt-4">
-        <SystemsSummaryTable rows={data.systemsSummary} />
-      </div>
+          {/* Wrapper carries the anchor unconditionally — SystemsSummaryTable
+              itself renders null when there are no systems, which would otherwise
+              leave a dangling #systems-summary TOC link on a full-tier report
+              with an empty rollup. */}
+          <div id="systems-summary" className="scroll-mt-4">
+            <SystemsSummaryTable rows={data.systemsSummary} />
+          </div>
+        </>
+      )}
 
       {/* 1. SUMMARY */}
       <h2 id="summary" className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3 scroll-mt-4">1. Summary</h2>
