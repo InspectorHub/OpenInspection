@@ -1,12 +1,41 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { vi, beforeEach, afterEach } from "vitest";
 import { CostItemsPanel } from "./CostItemsPanel";
+import type { CostItemView } from "~/components/portal/sections/report/types";
 
 describe("CostItemsPanel", () => {
   it("renders an empty-state add affordance with zero running totals", () => {
     const { getByText } = render(<CostItemsPanel inspectionId="i1" items={[]} reserveEnabled={false} />);
     expect(getByText(/Cost Items/i)).toBeTruthy();
     expect(getByText(/\$0/)).toBeTruthy(); // running total
+  });
+
+  describe("cost export control", () => {
+    const oneItem: CostItemView[] = [
+      {
+        id: "a", system: "roof", component: "membrane", location: "",
+        action: "replace", costMethod: "lump_sum",
+        quantity: null, uom: null, unitCostCents: null, lumpSumCents: 500000,
+        eul: null, effAge: null, rul: null,
+        suggestedRemedy: "", bucket: "immediate",
+        sectionRef: null, photoRef: null, sortOrder: 0,
+      },
+    ];
+
+    it("hides the CSV/Excel export links when there are no cost items", () => {
+      render(<CostItemsPanel inspectionId="i1" items={[]} reserveEnabled={false} />);
+      expect(screen.queryByTestId("cost-export-panel")).toBeNull();
+    });
+
+    it("shows CSV + Excel links pointing at the /resources/cost-export relay once an item exists", () => {
+      render(<CostItemsPanel inspectionId="insp-9" items={oneItem} reserveEnabled={false} />);
+      const csv = screen.getByTestId("cost-export-csv") as HTMLAnchorElement;
+      const xlsx = screen.getByTestId("cost-export-xlsx") as HTMLAnchorElement;
+      expect(csv.getAttribute("href")).toBe("/resources/cost-export?inspectionId=insp-9&format=csv");
+      expect(xlsx.getAttribute("href")).toBe("/resources/cost-export?inspectionId=insp-9&format=xlsx");
+      expect(csv.hasAttribute("download")).toBe(true);
+      expect(xlsx.hasAttribute("download")).toBe(true);
+    });
   });
 
   it("shows a threshold warning for an under-$3k item", () => {

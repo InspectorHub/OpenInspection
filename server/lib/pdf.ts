@@ -23,8 +23,13 @@ import type { PdfSettings } from './pdf-settings';
  * 'r5' — Commercial PCA Phase P: 'appendix' photoMode suppresses inline
  * item/defect photo grids and renders a single end-of-report Appendix B
  * instead (template output structurally differs from 'inline').
+ * 'r6' - Commercial PCA Phase O Tasks 7-9: GATED Paged.js TOC page-number
+ * path. Only active when the render URL carries `?print=1&pagedtoc=1` (this
+ * helper does NOT send it yet - the CF integration is deferred; see
+ * scripts/spike/pagedjs-cf-spike.md). Bumped defensively so that once the
+ * gate is enabled, previously content-hashed PDFs re-render.
  */
-export const RENDER_VERSION = 'r5';
+export const RENDER_VERSION = 'r6';
 
 export async function generatePdfFromUrl(
     browser: BrowserRun | undefined,

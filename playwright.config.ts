@@ -189,5 +189,11 @@ export default defineConfig({
         { name: 'subsystem-c-stripe-smoke', testMatch: 'subsystem-c-stripe-cross-repo-smoke.spec.ts' },
         { name: 'subsystem-d-flows', testMatch: 'subsystem-d-flows.spec.ts' },
         { name: 'subsystem-e-flows', testMatch: 'subsystem-e-flows.spec.ts' },
+        // Commercial PCA Phase O 7-9 — Paged.js TOC page-number CLIENT-LAYER
+        // proof. Fully self-contained (page.setContent + node_modules Paged.js):
+        // needs no dev worker, no D1 seed, no login. Proves target-counter fills
+        // increasing TOC page numbers in a real browser. Does NOT exercise the CF
+        // integration (deferred — see scripts/spike/pagedjs-cf-spike.md).
+        { name: 'report-toc-pagednumbers', testMatch: 'report-toc-pagednumbers.spec.ts' },
     ],
 });

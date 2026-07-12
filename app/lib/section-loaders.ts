@@ -71,6 +71,9 @@ export async function loadReportSection(
   const baseUrl = parsedUrl.origin;
   const initialFilter: FilterKey = "all";
   const printMode = false;
+  // The inline client-portal Hub mount never runs the headless PDF path, so the
+  // Paged.js TOC page-number gate is always off here (mirrors printMode = false).
+  const pagedToc = false;
   try {
     const api = createApi(context);
     const [res, brand] = await Promise.all([
@@ -107,6 +110,7 @@ export async function loadReportSection(
       reportTheme: (raw?.reportTheme as string | undefined) ?? meta?.theme,
       initialFilter,
       printMode,
+      pagedToc,
       isPublished: (raw?.isPublished as boolean | undefined) ?? false,
       signature: (raw?.signature as ReportLoaderResult["signature"] | undefined) ?? null,
       verification: (raw?.verification as ReportLoaderResult["verification"] | undefined) ?? null,
@@ -149,6 +153,7 @@ export async function loadReportSection(
       notPublished: false,
       initialFilter,
       printMode,
+      pagedToc,
       isPublished: false,
       signature: null,
       verification: null,

@@ -172,9 +172,9 @@ export default function InspectionEditPage() {
  // the same useFetcher instance re-submits (see
  // feedback_rr_shared_fetcher_abort). Dispatches "save-property-facts"
  // through the route action (BFF pattern), which PATCHes the real
- // /api/inspections/:id/property-facts endpoint — PropertyInfoForm's onSave
- // above only mutates local state and does not persist (pre-existing gap,
- // out of scope here); these two fields must actually round-trip.
+ // /api/inspections/:id/property-facts endpoint. (PropertyInfoForm now persists
+ // its own strip fields via propertyFactsFetcher below — same intent, separate
+ // fetcher.)
  const subtypeFetcher = useFetcher();
  const tierFetcher = useFetcher();
  const saveSubtype = useCallback((subtype: string | null) => {
@@ -183,6 +183,19 @@ export default function InspectionEditPage() {
  const saveTier = useCallback((tier: "light_commercial" | "full_pca") => {
   tierFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify({ reportTier: tier }) }, { method: "POST" });
  }, [tierFetcher]);
+ // Property Facts strip (PropertyInfoForm) durable save. A SINGLE shared fetcher
+ // is abort-safe here — unlike subtype/tier above — because onCommit hands us a
+ // FULL snapshot of every field each time, so a later PATCH is a strict superset
+ // of any in-flight one. React Router cancels the previous submission when the
+ // same useFetcher re-submits, but cancelling loses no data when the survivor
+ // already carries the earlier field's value (mirrors PsqPanel.commitResponses;
+ // see feedback_rr_shared_fetcher_abort). Rides the same "save-property-facts"
+ // route intent (PATCHes /api/inspections/:id/property-facts). The form's onSave
+ // keeps the optimistic local-state update; onCommit (this) persists.
+ const propertyFactsFetcher = useFetcher();
+ const savePropertyFacts = useCallback((facts: Record<string, unknown>) => {
+  propertyFactsFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify(facts) }, { method: "POST" });
+ }, [propertyFactsFetcher]);
  // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
  // (create/rename/delete/duplicate/bulk/mode-switch) and the lazy per-unit
  // results-slice fetcher (scope switch → merge missing findings).
@@ -2125,6 +2138,7 @@ export default function InspectionEditPage() {
    [fieldId]: value,
   }));
   }}
+  onCommit={savePropertyFacts}
   />
   {/* Commercial PCA Phase T — subtype + report tier selectors. Gated on the
      same propertyType === 'commercial' flag section-applicability.ts uses

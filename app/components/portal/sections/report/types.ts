@@ -298,6 +298,14 @@ export interface ReportLoaderResult {
   reportTheme?: string;
   initialFilter: FilterKey;
   printMode: boolean;
+  /* Opt-in gate for the Paged.js commercial-PCA TOC page-number path. Set ONLY
+     when the render URL carries `?pagedtoc=1` (alongside `print=1`). Default
+     false — when false NO Paged.js script, CSS, or re-pagination is injected and
+     the report renders byte-for-byte as before. The production
+     `generatePdfFromUrl` does NOT send the param, so production PDFs are
+     untouched until the CF follow-up (see scripts/spike/pagedjs-cf-spike.md)
+     wires it up and verifies a real CF PDF. */
+  pagedToc: boolean;
   isPublished: boolean;
   signature: ReportSignature | null;
   verification: ReportVerification | null;
