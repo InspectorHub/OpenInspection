@@ -523,7 +523,7 @@
   "types:server/lib/referral-sources.ts:SeedReferralSource",
   "types:server/lib/report-docx.ts:DocxCostTables",
   "types:server/lib/report-docx.ts:DocxDeviationRow",
-  "types:server/lib/report-docx.ts:DocxReserveYearCost",
+  "types:server/lib/report-docx.ts:DocxReserveScheduleRow",
   "types:server/lib/report-docx.ts:DocxSectionItem",
   "types:server/lib/report-docx.ts:DocxSignatory",
   "types:server/lib/response.ts:ApiResponse",

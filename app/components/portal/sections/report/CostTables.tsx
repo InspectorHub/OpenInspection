@@ -108,6 +108,27 @@ export function CostTables({ data, show, isPrint = false }: { data: CT | null; s
                 {reserveSchedule.cumulativeInflatedByYear.map((c, i) => <td key={i} className="pt-1 pr-2 text-right">{formatDollars(c)}</td>)}
                 <td className="pt-1 text-right">{formatDollars(reserveSchedule.totalInflatedCents)}</td>
               </tr>
+              {reserveSchedule.perSfUninflatedAllYears != null && (
+                <tr className="font-medium">
+                  <td className="pt-1" colSpan={5}>Per-SF (Uninflated, all years)</td>
+                  {reserveSchedule.years.map((y) => <td key={y} className="pt-1 pr-2" />)}
+                  <td className="pt-1 text-right">{formatDollars(reserveSchedule.perSfUninflatedAllYears)}</td>
+                </tr>
+              )}
+              {reserveSchedule.perSfInflatedAllYears != null && (
+                <tr className="font-medium">
+                  <td className="pt-1" colSpan={5}>Per-SF (Inflated, all years)</td>
+                  {reserveSchedule.years.map((y) => <td key={y} className="pt-1 pr-2" />)}
+                  <td className="pt-1 text-right">{formatDollars(reserveSchedule.perSfInflatedAllYears)}</td>
+                </tr>
+              )}
+              {reserveSchedule.perSfInflatedPerYear != null && (
+                <tr className="font-medium">
+                  <td className="pt-1" colSpan={5}>Per-SF (Inflated, per year)</td>
+                  {reserveSchedule.years.map((y) => <td key={y} className="pt-1 pr-2" />)}
+                  <td className="pt-1 text-right">{formatDollars(reserveSchedule.perSfInflatedPerYear)}</td>
+                </tr>
+              )}
             </tfoot>
           </table>
         </div>

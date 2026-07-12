@@ -21,4 +21,18 @@ describe('PcaNarrativePatchSchema', () => {
     expect(r.success).toBe(true);
     if (r.success) expect('methodology' in r.data).toBe(false);
   });
+
+  it('preserves the three reliance text keys (ASTM §4.2.1–4.2.4)', () => {
+    const r = PcaNarrativePatchSchema.safeParse({
+      userReliance: 'reliance text',
+      pointInTime: 'point-in-time text',
+      siteSpecific: 'site-specific text',
+    });
+    expect(r.success).toBe(true);
+    if (r.success) {
+      expect(r.data.userReliance).toBe('reliance text');
+      expect(r.data.pointInTime).toBe('point-in-time text');
+      expect(r.data.siteSpecific).toBe('site-specific text');
+    }
+  });
 });

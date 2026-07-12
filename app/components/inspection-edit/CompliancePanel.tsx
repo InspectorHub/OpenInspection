@@ -516,6 +516,69 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Reliance & Limitations (M10)                                       */
+/* ------------------------------------------------------------------ */
+
+const RELIANCE_FIELDS: { key: keyof RelianceTextView; label: string }[] = [
+  { key: "userReliance", label: "Reliance — entitled parties (§4.2.1)" },
+  { key: "pointInTime", label: "Point-in-time limitation (§4.2.3)" },
+  { key: "siteSpecific", label: "Site-specific scope (§4.2.4)" },
+];
+
+// One fetcher PER reliance clause — the three clauses save independently, so a
+// save of one must never abort another's in-flight PATCH. This is the file-wide
+// own-fetcher rule (see the header comment + the B-17 notes-vs-rating bug this
+// project already hit): a single fetcher shared across the three would cancel
+// the first field's save the moment the second field blurs.
+function RelianceFieldRow({ fieldKey, label, initial }: { fieldKey: keyof RelianceTextView; label: string; initial: string }) {
+  const fetcher = useFetcher();
+  const [value, setValue] = useState(initial);
+  // Last value we actually persisted — lets us skip a no-op save when a field
+  // is blurred without an edit (e.g. tabbing through just to read it), which
+  // would otherwise write a redundant PATCH + pca_narrative.update audit entry
+  // on every pass. POSTs skip revalidation, so the local copy is the optimistic
+  // source of truth like PsqPanel / DocReviewRow.
+  const savedRef = useRef(initial);
+  const busy = fetcher.state !== "idle";
+
+  const commit = () => {
+    if (value === savedRef.current) return;
+    savedRef.current = value;
+    fetcher.submit({ intent: "save-pca-narrative", key: fieldKey, value }, { method: "POST" });
+  };
+
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-medium text-ih-fg-3">{label}</span>
+      <textarea
+        rows={2}
+        value={value}
+        disabled={busy}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={commit}
+        className="w-full rounded border border-ih-border bg-ih-bg-app p-2 text-[12px] text-ih-fg-1"
+      />
+    </label>
+  );
+}
+
+function RelianceSection({ relianceText }: { relianceText: RelianceTextView }) {
+  return (
+    <section className="space-y-1.5" data-testid="reliance-section">
+      <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Reliance &amp; Limitations</h3>
+      <div className="space-y-2">
+        {RELIANCE_FIELDS.map((f) => (
+          <RelianceFieldRow key={f.key} fieldKey={f.key} label={f.label} initial={relianceText[f.key]} />
+        ))}
+      </div>
+      <p className="text-[11px] text-ih-fg-4 italic">
+        Seeded ASTM §4.2.1–4.2.4 boilerplate. Edit any field to override how it renders in the report; changes save on blur.
+      </p>
+    </section>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* Panel                                                              */
 /* ------------------------------------------------------------------ */
 
@@ -547,15 +610,7 @@ export function CompliancePanel({ inspectionId, data }: { inspectionId: string; 
         <DocReviewSection items={data.documentReview} />
       </section>
 
-      <section className="space-y-1.5">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Reliance &amp; Limitations</h3>
-        <p className="text-[11px] text-ih-fg-4">{data.relianceText.userReliance}</p>
-        <p className="text-[11px] text-ih-fg-4">{data.relianceText.pointInTime}</p>
-        <p className="text-[11px] text-ih-fg-4">{data.relianceText.siteSpecific}</p>
-        <p className="text-[11px] text-ih-fg-4 italic">
-          Seeded ASTM §4.2.1–4.2.4 boilerplate, shown here read-only as it will render in the report.
-        </p>
-      </section>
+      <RelianceSection relianceText={data.relianceText} />
     </div>
   );
 }

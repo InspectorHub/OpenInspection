@@ -53,23 +53,36 @@ export interface DocxCostLine {
     totalCents: number;
 }
 
-/** One year's placed cost within a TABLE 2 reserve-schedule row. */
-export interface DocxReserveYearCost {
-    year: number;
-    costCents: number;
-}
-
-/** Commercial PCA Phase C — TABLE 2 (Capital Replacement Reserve Schedule) row. */
+/** Commercial PCA Phase C — TABLE 2 (Capital Replacement Reserve Schedule) row.
+ *  One item placed in a single reserve year (`placementYear`). */
 export interface DocxReserveScheduleRow {
     system: string;
     description: string;
-    years: DocxReserveYearCost[];
+    placementYear: number;
+    replacementCents: number;
+}
+
+/** TABLE 2 — full Capital Replacement Reserve Schedule: the shared year grid,
+ *  the per-item placement rows, and the per-year + total + Per-SF summary
+ *  metrics. Mirrors the HTML report's CostTables reserve grid (server/lib/
+ *  pca-costs.ts ReserveSchedule). Per-SF values are null when building area is
+ *  unknown; those rows are then omitted. */
+export interface DocxReserveSchedule {
+    years: number[];
+    rows: DocxReserveScheduleRow[];
+    uninflatedByYear: number[];
+    cumulativeInflatedByYear: number[];
+    totalUninflatedCents: number;
+    totalInflatedCents: number;
+    perSfUninflatedAllYears: number | null;
+    perSfInflatedAllYears: number | null;
+    perSfInflatedPerYear: number | null;
 }
 
 export interface DocxCostTables {
     table1: DocxCostLine[];
     /** Opt-in (tenant Reserve Schedule config); TABLE 2 renders only when non-null. */
-    reserveSchedule: DocxReserveScheduleRow[] | null;
+    reserveSchedule: DocxReserveSchedule | null;
 }
 
 /**
@@ -250,26 +263,57 @@ function buildTable1(lines: DocxCostLine[]): Array<Paragraph | Table> {
     ];
 }
 
-/** TABLE 2 — Capital Replacement Reserve Schedule, one column per year across all rows. */
-function buildTable2(rows: DocxReserveScheduleRow[]): Array<Paragraph | Table> {
-    const years = Array.from(new Set(rows.flatMap((r) => r.years.map((y) => y.year)))).sort((a, b) => a - b);
-    const header = new TableRow({
-        children: ['System', 'Description', ...years.map(String)].map(
-            (t) => new TableCell({ children: [new Paragraph(t)] }),
-        ),
+/**
+ * TABLE 2 — Capital Replacement Reserve Schedule. One shared year grid across
+ * all rows: each item's replacement cost lands in its placement-year column
+ * (empty in the others), with a per-item Total. The tfoot mirrors the HTML
+ * report (CostTables.tsx): a "Total Uninflated" row (per-year uninflated + the
+ * grand total), a "Cumulative Inflated" row (running inflated totals), and up
+ * to three Per-SF summary rows — each rendered ONLY when its value is non-null
+ * (null => building area unknown). Every row emits the same number of cells as
+ * the header (a docx table requires a consistent column count per row).
+ */
+function buildTable2(schedule: DocxReserveSchedule): Array<Paragraph | Table> {
+    const { years } = schedule;
+    const textRow = (cells: string[]): TableRow => new TableRow({
+        children: cells.map((v) => new TableCell({ children: [new Paragraph(v)] })),
     });
-    const body = rows.map((r) => {
-        const byYear = new Map(r.years.map((y) => [y.year, y.costCents]));
-        const cells = years.map((y) => (byYear.has(y) ? formatCents(byYear.get(y) as number) : ''));
-        return new TableRow({
-            children: [r.system, r.description, ...cells].map(
-                (v) => new TableCell({ children: [new Paragraph(v)] }),
-            ),
-        });
+
+    const header = textRow(['System', 'Description', ...years.map(String), 'Total']);
+
+    const body = schedule.rows.map((r) => {
+        const yearCells = years.map((y) => (y === r.placementYear ? formatCents(r.replacementCents) : ''));
+        return textRow([r.system, r.description, ...yearCells, formatCents(r.replacementCents)]);
     });
+
+    const footer: TableRow[] = [
+        textRow([
+            'Total Uninflated', '',
+            ...years.map((_y, i) => formatCents(schedule.uninflatedByYear[i] ?? 0)),
+            formatCents(schedule.totalUninflatedCents),
+        ]),
+        textRow([
+            'Cumulative Inflated', '',
+            ...years.map((_y, i) => formatCents(schedule.cumulativeInflatedByYear[i] ?? 0)),
+            formatCents(schedule.totalInflatedCents),
+        ]),
+    ];
+    // Per-SF summary rows — label in the System cell, formatted value in the
+    // Total cell, intervening cells blank so the column count matches the
+    // header. Rendered only when the corresponding metric is non-null.
+    const perSfRows: Array<[string, number | null]> = [
+        ['Per-SF (Uninflated, all years)', schedule.perSfUninflatedAllYears],
+        ['Per-SF (Inflated, all years)', schedule.perSfInflatedAllYears],
+        ['Per-SF (Inflated, per year)', schedule.perSfInflatedPerYear],
+    ];
+    for (const [label, value] of perSfRows) {
+        if (value === null) continue;
+        footer.push(textRow([label, '', ...years.map(() => ''), formatCents(value)]));
+    }
+
     return [
         new Paragraph({ text: 'TABLE 2 — Capital Replacement Reserve Schedule', heading: HeadingLevel.HEADING_2 }),
-        new Table({ rows: [header, ...body], width: { size: 100, type: WidthType.PERCENTAGE } }),
+        new Table({ rows: [header, ...body, ...footer], width: { size: 100, type: WidthType.PERCENTAGE } }),
     ];
 }
 

@@ -38,4 +38,31 @@ describe('CostTables', () => {
     const { getByText } = render(<CostTables data={withReserve} show={true} />);
     expect(getByText(/Reserve Schedule/i)).toBeTruthy();
   });
+  it('renders the three Per-SF footer rows with formatted values when perSf* are non-null', () => {
+    const withPerSf: CT = { ...base, reserveSchedule: {
+      startYear: 2026, termYears: 2, years: [2026, 2027],
+      rows: [{ item: base.table1.immediate[0].item, placementYear: 2026, replacementCents: 500000 }],
+      uninflatedByYear: [500000, 0], inflatedByYear: [500000, 0], cumulativeInflatedByYear: [500000, 500000],
+      totalUninflatedCents: 500000, totalInflatedCents: 500000,
+      perSfUninflatedAllYears: 45000, perSfInflatedAllYears: 46000, perSfInflatedPerYear: 23000,
+    } };
+    const { getByText } = render(<CostTables data={withPerSf} show={true} />);
+    expect(getByText(/Per-SF \(Uninflated, all years\)/)).toBeTruthy();
+    expect(getByText(/Per-SF \(Inflated, all years\)/)).toBeTruthy();
+    expect(getByText(/Per-SF \(Inflated, per year\)/)).toBeTruthy();
+    expect(getByText(/\$450/)).toBeTruthy();
+    expect(getByText(/\$460/)).toBeTruthy();
+    expect(getByText(/\$230/)).toBeTruthy();
+  });
+  it('omits the Per-SF footer rows when perSf* are null', () => {
+    const withReserve: CT = { ...base, reserveSchedule: {
+      startYear: 2026, termYears: 2, years: [2026, 2027],
+      rows: [{ item: base.table1.immediate[0].item, placementYear: 2026, replacementCents: 500000 }],
+      uninflatedByYear: [500000, 0], inflatedByYear: [500000, 0], cumulativeInflatedByYear: [500000, 500000],
+      totalUninflatedCents: 500000, totalInflatedCents: 500000,
+      perSfUninflatedAllYears: null, perSfInflatedAllYears: null, perSfInflatedPerYear: null,
+    } };
+    const { queryByText } = render(<CostTables data={withReserve} show={true} />);
+    expect(queryByText(/Per-SF/)).toBeNull();
+  });
 });
