@@ -58,6 +58,12 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  // mode load images eagerly: Browser Rendering never scrolls, so loading={data.printMode ? "eager" : "lazy"}
  // images below the fold would never load and the PDF would have blank photos.
  const printMode = new URL(request.url).searchParams.get("print") === "1";
+ // Opt-in gate for the Paged.js commercial-PCA TOC page-number path. Only
+ // meaningful together with print=1. When absent (the DEFAULT — the production
+ // generatePdfFromUrl does NOT append it) the report renders byte-for-byte
+ // unchanged: no Paged.js script, CSS, or re-pagination. See
+ // scripts/spike/pagedjs-cf-runbook.md for the remaining CF verification.
+ const pagedToc = new URL(request.url).searchParams.get("pagedtoc") === "1";
  const parsedUrl = new URL(request.url);
  const baseUrl = parsedUrl.origin;
  try {
@@ -112,6 +118,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  reportTheme: (raw?.reportTheme as string | undefined) ?? meta?.theme,
  initialFilter,
  printMode,
+ pagedToc,
  isPublished: (raw?.isPublished as boolean | undefined) ?? false,
  signature: (raw?.signature as LoaderResult["signature"] | undefined) ?? null,
  verification: (raw?.verification as LoaderResult["verification"] | undefined) ?? null,
@@ -154,6 +161,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  notPublished: false,
  initialFilter,
  printMode,
+ pagedToc,
  isPublished: false,
  signature: null,
  verification: null,

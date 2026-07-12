@@ -50,6 +50,7 @@
   "ignoreDependencies": [
     "@fontsource/.+",
     "swagger-ui-dist",
+    "pagedjs",
     "tailwindcss",
     "miniflare",
     "lint-staged",

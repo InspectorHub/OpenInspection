@@ -25,6 +25,12 @@ const jsFiles = [
   // (script injection, NEVER bundled: ~940KB must stay out of both the worker
   // bundle and the initial client chunk).
   ['exceljs/dist/exceljs.min.js', 'exceljs.min.js'],
+  // Paged.js polyfill — script-injected ONLY on the gated commercial-PCA PDF
+  // TOC page-number path (?print=1&pagedtoc=1). Provides CSS `target-counter()`
+  // (unsupported by headless Chrome) so TOC entries get real page numbers.
+  // Never bundled; loaded via <script src="/vendor/pagedjs.polyfill.js"> and
+  // only when the pagedtoc gate is on — default renders never fetch it.
+  ['pagedjs/dist/paged.polyfill.js', 'pagedjs.polyfill.js'],
 ];
 
 for (const [src, dest] of jsFiles) {

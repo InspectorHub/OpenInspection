@@ -172,9 +172,9 @@ export default function InspectionEditPage() {
  // the same useFetcher instance re-submits (see
  // feedback_rr_shared_fetcher_abort). Dispatches "save-property-facts"
  // through the route action (BFF pattern), which PATCHes the real
- // /api/inspections/:id/property-facts endpoint — PropertyInfoForm's onSave
- // above only mutates local state and does not persist (pre-existing gap,
- // out of scope here); these two fields must actually round-trip.
+ // /api/inspections/:id/property-facts endpoint. (PropertyInfoForm now persists
+ // its own strip fields via propertyFactsFetcher below — same intent, separate
+ // fetcher.)
  const subtypeFetcher = useFetcher();
  const tierFetcher = useFetcher();
  const saveSubtype = useCallback((subtype: string | null) => {
@@ -183,6 +183,16 @@ export default function InspectionEditPage() {
  const saveTier = useCallback((tier: "light_commercial" | "full_pca") => {
   tierFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify({ reportTier: tier }) }, { method: "POST" });
  }, [tierFetcher]);
+ // Property Facts strip (PropertyInfoForm) durable save. Its own fetcher for the
+ // same isolation reason as subtype/tier above — a blur-commit on one field must
+ // not abort an in-flight save of another (see feedback_rr_shared_fetcher_abort).
+ // Rides the same "save-property-facts" route intent (PATCHes
+ // /api/inspections/:id/property-facts). The form's onSave keeps the optimistic
+ // local-state update; onCommit (this) persists.
+ const propertyFactsFetcher = useFetcher();
+ const savePropertyFacts = useCallback((fieldId: string, value: unknown) => {
+  propertyFactsFetcher.submit({ intent: "save-property-facts", payload: JSON.stringify({ [fieldId]: value }) }, { method: "POST" });
+ }, [propertyFactsFetcher]);
  // Commercial PCA Phase U (Batch C2b) — the units-manager mutation fetcher
  // (create/rename/delete/duplicate/bulk/mode-switch) and the lazy per-unit
  // results-slice fetcher (scope switch → merge missing findings).
@@ -2125,6 +2135,7 @@ export default function InspectionEditPage() {
    [fieldId]: value,
   }));
   }}
+  onCommit={(fieldId, value) => savePropertyFacts(fieldId, value)}
   />
   {/* Commercial PCA Phase T — subtype + report tier selectors. Gated on the
      same propertyType === 'commercial' flag section-applicability.ts uses
