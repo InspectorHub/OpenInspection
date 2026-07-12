@@ -290,7 +290,9 @@ export function buildCostTables(
   const t1 = table1(kept);
   const rollup = bucketRollup(kept);
   const longTerm = kept.filter((it) => it.bucket === 'long_term');
-  const reserve = cfg.reserveScheduleEnabled
+  // Emit the reserve schedule only when it has rows — an enabled-but-empty
+  // schedule is just headers + $0 totals and should render nothing. See #234.
+  const reserve = cfg.reserveScheduleEnabled && longTerm.length > 0
     ? reserveSchedule(longTerm, {
         currentYear,
         termYears: cfg.reserveTermYears,

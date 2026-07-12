@@ -524,22 +524,30 @@ export class InspectionReportService extends InspectionSubService {
             storedTier: (inspection as { reportTier?: 'light_commercial' | 'full_pca' | null }).reportTier ?? null,
         });
 
-        // Commercial PCA Phase C — manual cost line items -> two render tables
+        // Commercial PCA Phase C/T — manual cost line items -> two render tables
         // (Opinion of Cost + opt-in Reserve Schedule) + the Phase S ES roll-up.
-        const costItemRows = await new CostItemService(this.db).listByInspection(inspectionId, tenantId);
-        const costTables = buildCostTables(
-            costItemRows,
-            { reserveScheduleEnabled, reserveTermYears, inflationRateBps },
-            new Date().getFullYear(),
-            (inspection as { sqft?: number | null }).sqft ?? null,
-        );
+        // Cost tables are a commercial-PCA construct, gated on report tier: a
+        // residential inspection (reportTier null) must NOT surface them — else,
+        // e.g., a tenant with reserveScheduleEnabled on would render an empty
+        // Reserve Schedule on every residential report. See #234 follow-up.
+        const costItemRows = reportTier
+            ? await new CostItemService(this.db).listByInspection(inspectionId, tenantId)
+            : [];
+        const costTables = reportTier
+            ? buildCostTables(
+                costItemRows,
+                { reserveScheduleEnabled, reserveTermYears, inflationRateBps },
+                new Date().getFullYear(),
+                (inspection as { sqft?: number | null }).sqft ?? null,
+            )
+            : null;
 
         // Commercial PCA Phase P/C seam — resolve each reserve row's photo_ref to
         // its assigned appendix photo number for the PHOTO NO. column. Built once
         // here (not threaded into pca-costs.ts, which stays IO/photo-free) now
         // that both the reserve schedule and photoAppendix are available.
         const photoRefIndex = buildPhotoRefIndex(photoAppendix);
-        const resolvedCostTables = costTables.reserveSchedule
+        const resolvedCostTables = costTables?.reserveSchedule
             ? {
                 ...costTables,
                 reserveSchedule: {
