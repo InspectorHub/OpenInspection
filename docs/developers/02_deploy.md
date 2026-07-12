@@ -25,6 +25,8 @@ The recommended path is the one-click button in the README:
 
 For the manual flow, see the **Quick start** section in the [README](../../README.md).
 
+> **Already deployed?** To move an existing deployment to a newer release, see [`12_upgrade.md`](12_upgrade.md) — it covers backups, applying new migrations, and verifying the deployed version.
+
 ### Required Cloudflare resources
 
 | Resource         | Binding         | Purpose                                                    |

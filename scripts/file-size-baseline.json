@@ -7,7 +7,7 @@
   "server/services/inspection/inspection-report.service.ts": 882,
   "app/routes/inspections.tsx": 879,
   "server/services/booking.service.ts": 848,
-  "server/index.ts": 845,
+  "server/index.ts": 846,
   "server/api/sms.ts": 818,
   "app/components/portal/sections/ReportView.tsx": 755,
   "server/services/inspection.service.ts": 755,

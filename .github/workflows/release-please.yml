@@ -1,0 +1,29 @@
+name: release-please
+
+# Automated versioning for self-hosters: release-please reads the Conventional
+# Commits landed on `main`, maintains a Release PR that bumps the version and
+# updates CHANGELOG.md, and on merge tags `vX.Y.Z` + cuts a GitHub Release.
+# See docs/developers/12_upgrade.md and the Versioning & Deprecation Policy in
+# CONTRIBUTING.md.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # A Release PR opened by the default GITHUB_TOKEN does not re-trigger
+          # other workflows (e.g. CI), so its checks stay empty. To run CI on the
+          # Release PR, provide a PAT or GitHub App token as RELEASE_PLEASE_TOKEN
+          # and uncomment the line below; otherwise the Release PR carries no CI.
+          # token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
