@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { formatDollars } from "~/lib/money";
 import { MoneyInput } from "~/components/MoneyInput";
+import { CostExportButtons } from "~/components/CostExportButtons";
 import type { CostItemView } from "~/components/portal/sections/report/types";
 
 /**
@@ -181,15 +182,20 @@ export function CostItemsPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <h2 className="text-[13px] font-bold uppercase tracking-widest text-ih-fg-4">Cost Items</h2>
-        <button
-          type="button"
-          onClick={addRow}
-          className="text-[12px] text-ih-primary font-bold hover:underline"
-        >
-          + Add cost item
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Export the current Opinion of Cost — only worth offering once at
+              least one line exists (empty exports are just a header row). */}
+          {rows.length > 0 && <CostExportButtons inspectionId={inspectionId} variant="panel" />}
+          <button
+            type="button"
+            onClick={addRow}
+            className="text-[12px] text-ih-primary font-bold hover:underline"
+          >
+            + Add cost item
+          </button>
+        </div>
       </div>
 
       <div className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3">

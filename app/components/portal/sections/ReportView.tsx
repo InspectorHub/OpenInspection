@@ -34,6 +34,7 @@ import { PagedTocInjection } from "./report/PagedTocInjection";
 import { PerUnitReportBlock } from "./report/PerUnitReportBlock";
 import { CostTables } from "./report/CostTables";
 import { WordExportButton } from "./report/WordExportButton";
+import { CostExportButtons } from "~/components/CostExportButtons";
 import {
   PRINT_CARD_CLASS,
   PRINT_SECTION_HEADING_CLASS,
@@ -351,7 +352,14 @@ export function ReportView(props: ReportViewProps) {
           calls useFetcher() and therefore requires a data-router context —
           is only mounted into the tree at all when the gate is satisfied,
           rather than always-mounted-but-internally-hidden. */}
-      <div className="print:hidden fixed bottom-6 right-6 z-50 flex items-center gap-2">
+      <div className="print:hidden fixed bottom-6 right-6 z-50 flex flex-wrap items-center justify-end gap-2 max-w-[calc(100vw-3rem)]">
+        {/* Cost export (Commercial PCA) — owner-preview only, commercial reports
+            with at least one cost table row. Public token viewers never have
+            ownerPreview, residential reports have no reportTier, and reports
+            with zero cost items have no costTables — so all three are hidden. */}
+        {Boolean(data.ownerPreview) && Boolean(data.reportTier) && data.costTables ? (
+          <CostExportButtons inspectionId={data.inspectionId} variant="fab" />
+        ) : null}
         {Boolean(data.ownerPreview) && Boolean(data.reportTier) ? (
           <WordExportButton inspectionId={data.inspectionId} />
         ) : null}
