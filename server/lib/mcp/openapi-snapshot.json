@@ -11002,6 +11002,18 @@
           "additionalConsiderations": {
             "type": "string",
             "description": "Additional Considerations narrative block"
+          },
+          "userReliance": {
+            "type": "string",
+            "description": "Reliance §4.2.1 — parties entitled to rely on the report"
+          },
+          "pointInTime": {
+            "type": "string",
+            "description": "Reliance §4.2.3 — point-in-time assessment limitation"
+          },
+          "siteSpecific": {
+            "type": "string",
+            "description": "Reliance §4.2.4 — site-specific scope limitation"
           }
         }
       }

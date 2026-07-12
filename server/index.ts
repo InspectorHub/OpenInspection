@@ -157,6 +157,7 @@ app.use('*', async (c, next) => {
 app.get('/status', (c) => c.json({
     status: 'ok',
     app: 'openinspection-core',
+    version: BUILD.version,
     commit: BUILD.shortCommit,
     branch: BUILD.branch,
     buildTime: BUILD.buildTime,

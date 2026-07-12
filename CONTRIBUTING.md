@@ -53,6 +53,15 @@ bucket adds 5. Avoids the case where Roof comments dominate the
 panel when active item is Gutters & Downspouts.
 ```
 
+## Versioning & Deprecation Policy
+
+OpenInspection follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`). Releases are automated with [release-please](https://github.com/googleapis/release-please), which reads the [Conventional Commits](https://www.conventionalcommits.org/) history (see [Commit style](#commit-style)) to compute the next version and generate the `CHANGELOG`. This is a contract for self-hosters deciding when and how to upgrade.
+
+- **Breaking changes** ship only in a **major** version bump. A `feat!:` / `fix!:` commit or a `BREAKING CHANGE:` footer drives the major increment; the change is described in the release's breaking-change section.
+- **Deprecations** are announced in the `CHANGELOG` and kept for **at least one minor version** before removal, giving self-hosters a window to migrate.
+- **Migrations are forward-only** — there is no down migration and no downgrade path (matching the schema-first Drizzle policy). Back up D1 before upgrading. See the [upgrade guide](docs/developers/12_upgrade.md).
+- **Security fixes** are called out explicitly in the release notes so operators can prioritize the upgrade. Report vulnerabilities privately (see [Security disclosures](#security-disclosures)).
+
 ## Pull requests
 
 1. Fork → branch off `master` → make your changes

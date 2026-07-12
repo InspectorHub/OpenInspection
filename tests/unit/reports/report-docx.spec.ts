@@ -159,10 +159,20 @@ const costedInput: ReportDocxInput = {
                 quantity: 1, unitCostCents: 200_000, totalCents: 200_000,
             },
         ],
-        reserveSchedule: [
-            { system: 'HVAC', description: 'Chiller replacement', years: [{ year: 2027, costCents: 1_500_000 }] },
-            { system: 'Elevator', description: 'Modernization', years: [{ year: 2028, costCents: 3_000_000 }] },
-        ],
+        reserveSchedule: {
+            years: [2027, 2028],
+            rows: [
+                { system: 'HVAC', description: 'Chiller replacement', placementYear: 2027, replacementCents: 1_500_000 },
+                { system: 'Elevator', description: 'Modernization', placementYear: 2028, replacementCents: 3_000_000 },
+            ],
+            uninflatedByYear: [1_500_000, 3_000_000],
+            cumulativeInflatedByYear: [1_500_000, 4_500_000],
+            totalUninflatedCents: 4_500_000,
+            totalInflatedCents: 4_500_000,
+            perSfUninflatedAllYears: 45_000,
+            perSfInflatedAllYears: 46_000,
+            perSfInflatedPerYear: 23_000,
+        },
     },
 };
 
@@ -182,7 +192,44 @@ describe('buildReportDocx — cost tables', () => {
         expect(body).toContain('2027');
         expect(body).toContain('2028');
         expect(body).toContain('Chiller replacement');
-        expect(body).toContain('$30,000.00');
+        expect(body).toContain('$15,000.00'); // HVAC row placed at 2027
+        expect(body).toContain('$30,000.00'); // Elevator row placed at 2028
+    });
+
+    it('emits TABLE 2 summary footer rows (Total Uninflated + Cumulative Inflated) with totals', async () => {
+        const body = await xml(costedInput);
+        expect(body).toContain('Total Uninflated');
+        expect(body).toContain('Cumulative Inflated');
+        expect(body).toContain('$45,000.00'); // totalUninflatedCents / totalInflatedCents
+    });
+
+    it('emits TABLE 2 Per-SF summary rows with formatted values when non-null', async () => {
+        const body = await xml(costedInput);
+        expect(body).toContain('Per-SF (Uninflated, all years)');
+        expect(body).toContain('$450.00');
+        expect(body).toContain('Per-SF (Inflated, all years)');
+        expect(body).toContain('$460.00');
+        expect(body).toContain('Per-SF (Inflated, per year)');
+        expect(body).toContain('$230.00');
+    });
+
+    it('omits a Per-SF row when its value is null (building area unknown)', async () => {
+        const noPerSf: ReportDocxInput = {
+            ...costedInput,
+            costTables: {
+                ...costedInput.costTables!,
+                reserveSchedule: {
+                    ...costedInput.costTables!.reserveSchedule!,
+                    perSfUninflatedAllYears: null,
+                    perSfInflatedAllYears: null,
+                    perSfInflatedPerYear: null,
+                },
+            },
+        };
+        const body = await xml(noPerSf);
+        expect(body).not.toContain('Per-SF');
+        // Summary rows still render.
+        expect(body).toContain('Total Uninflated');
     });
 
     it('omits TABLE 2 when reserveSchedule is null', async () => {

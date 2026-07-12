@@ -93,9 +93,10 @@ Deep dive: [`docs/developers/02_deploy.md`](docs/developers/02_deploy.md). Archi
 ## Documentation
 
 - [Deploy](docs/developers/02_deploy.md) — first-time setup on Cloudflare
+- [Upgrading](docs/developers/12_upgrade.md) — upgrade an existing deployment to a newer release
 - [Architecture](docs/developers/01_architecture.md) — module map, request flow, cost model
 - [Design System](docs/developers/11_design_system.md) — tokens, shared-ui components, dark mode, `lint:ds`
-- [Contributing](CONTRIBUTING.md) — code conventions and PR process
+- [Contributing](CONTRIBUTING.md) — code conventions and PR process, including the [Versioning & Deprecation Policy](CONTRIBUTING.md#versioning--deprecation-policy)
 - [Community](docs/community.md) — Discussions categories and where to talk
 
 ## Tech stack

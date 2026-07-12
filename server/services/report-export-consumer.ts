@@ -24,7 +24,7 @@ import { r2Keys } from '../lib/r2-keys';
 import { InspectionService } from './inspection.service';
 import { ReportExportService } from './report-export.service';
 import { BrandingService } from './branding.service';
-import { buildReportDocx, type ReportDocxInput, type DocxAppendixPhoto, type DocxCostLine, type DocxReserveScheduleRow, type DocxSection, type DocxProfileRow } from '../lib/report-docx';
+import { buildReportDocx, type ReportDocxInput, type DocxAppendixPhoto, type DocxCostLine, type DocxReserveSchedule, type DocxSection, type DocxProfileRow } from '../lib/report-docx';
 import { parseWordExportJob } from '../lib/sync-events/word-export-job';
 import { sniffImageDimensions } from '../lib/media/image-dimensions';
 import type { ImagesBinding } from '../lib/media/strip-exif';
@@ -138,17 +138,16 @@ function costLineDescription(item: { component: string; location: string; sugges
  * `CostLine[]` with a `description` field — `CostItem` splits that across
  * `component`/`location`/`suggestedRemedy`.
  *
- * TABLE 2 (Reserve Schedule) is a bigger pivot: the real `ReserveSchedule` is
- * ONE shared year grid (`years: number[]`) with a FLAT `rows: ReserveRow[]`,
- * each row a single item placed in ONE year (`placementYear`), plus separate
- * per-year total/cumulative/per-SF summary arrays. The builder's
- * `DocxReserveScheduleRow` instead expects one row PER SYSTEM spanning
- * multiple year columns. This adapter emits one `DocxReserveScheduleRow` per
- * real `ReserveRow` with a single-entry `years` array at its placement year —
- * faithful for the per-item placement, but it does NOT carry the summary
- * total/cumulative/per-SF rows or force zero-cost years into the column set
- * (the builder's `buildTable2` has no totals-row concept to receive them).
- * Documented as a known deviation — see the Task 5 report.
+ * TABLE 2 (Reserve Schedule) maps the real `ReserveSchedule` — ONE shared year
+ * grid (`years: number[]`) with a FLAT `rows: ReserveRow[]` (each a single item
+ * placed in ONE `placementYear`) plus the per-year uninflated/cumulative-
+ * inflated arrays, grand totals, and Per-SF metrics — straight onto the
+ * builder's `DocxReserveSchedule`, which carries the same shared grid + summary
+ * rows. Each `ReserveRow` becomes a `DocxReserveScheduleRow` (system +
+ * flattened description + placement year + replacement cents); the summary
+ * arrays and Per-SF values pass through unchanged so `buildTable2` can render
+ * the "Total Uninflated" / "Cumulative Inflated" / Per-SF footer rows exactly
+ * like the HTML report.
  */
 function adaptCostTables(costTables: {
     table1: {
@@ -156,7 +155,15 @@ function adaptCostTables(costTables: {
         shortTerm: Array<{ item: { system: string; component: string; location: string; suggestedRemedy: string; quantity: number | null; unitCostCents: number | null }; total: number }>;
     };
     reserveSchedule: {
+        years: number[];
         rows: Array<{ item: { system: string; component: string; location: string; suggestedRemedy: string }; placementYear: number; replacementCents: number }>;
+        uninflatedByYear: number[];
+        cumulativeInflatedByYear: number[];
+        totalUninflatedCents: number;
+        totalInflatedCents: number;
+        perSfUninflatedAllYears: number | null;
+        perSfInflatedAllYears: number | null;
+        perSfInflatedPerYear: number | null;
     } | null;
 } | null): ReportDocxInput['costTables'] {
     if (!costTables) return null;
@@ -173,12 +180,24 @@ function adaptCostTables(costTables: {
         ...costTables.table1.immediate.map(toLine('immediate')),
         ...costTables.table1.shortTerm.map(toLine('short_term')),
     ];
-    const reserveSchedule: DocxReserveScheduleRow[] | null = costTables.reserveSchedule
-        ? costTables.reserveSchedule.rows.map((row): DocxReserveScheduleRow => ({
-            system: row.item.system,
-            description: costLineDescription(row.item),
-            years: [{ year: row.placementYear, costCents: row.replacementCents }],
-        }))
+    const rs = costTables.reserveSchedule;
+    const reserveSchedule: DocxReserveSchedule | null = rs
+        ? {
+            years: rs.years,
+            rows: rs.rows.map((row) => ({
+                system: row.item.system,
+                description: costLineDescription(row.item),
+                placementYear: row.placementYear,
+                replacementCents: row.replacementCents,
+            })),
+            uninflatedByYear: rs.uninflatedByYear,
+            cumulativeInflatedByYear: rs.cumulativeInflatedByYear,
+            totalUninflatedCents: rs.totalUninflatedCents,
+            totalInflatedCents: rs.totalInflatedCents,
+            perSfUninflatedAllYears: rs.perSfUninflatedAllYears,
+            perSfInflatedAllYears: rs.perSfInflatedAllYears,
+            perSfInflatedPerYear: rs.perSfInflatedPerYear,
+        }
         : null;
     return { table1, reserveSchedule };
 }
