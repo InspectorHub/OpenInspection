@@ -11,8 +11,8 @@ export const marketplaceTemplates = sqliteTable('marketplace_templates', {
   changelog:     text('changelog'),
   downloadCount: integer('download_count').notNull().default(0),
   featured:      integer('featured', { mode: 'boolean' }).notNull().default(false),
-  createdAt:     text('created_at').notNull(),
-  updatedAt:     text('updated_at').notNull(),
+  createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt:     integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 export const tenantMarketplaceImports = sqliteTable('tenant_marketplace_imports', {
@@ -21,7 +21,7 @@ export const tenantMarketplaceImports = sqliteTable('tenant_marketplace_imports'
   marketplaceTemplateId: text('marketplace_template_id').notNull().references(() => marketplaceTemplates.id),
   importedSemver:        text('imported_semver').notNull(),
   localTemplateId:       text('local_template_id').notNull().references(() => templates.id),
-  importedAt:            text('imported_at').notNull(),
+  importedAt:            integer('imported_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
   index('idx_mkt_imports_tmpl').on(t.marketplaceTemplateId),
   index('idx_mkt_imports_tenant').on(t.tenantId),
@@ -40,8 +40,8 @@ export const marketplaceLibraries = sqliteTable('marketplace_libraries', {
   changelog:     text('changelog'),
   downloadCount: integer('download_count').notNull().default(0),
   featured:      integer('featured', { mode: 'boolean' }).notNull().default(false),
-  createdAt:     text('created_at').notNull(),
-  updatedAt:     text('updated_at').notNull(),
+  createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  updatedAt:     integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
   index('idx_marketplace_libraries_kind_featured').on(t.kind, t.featured),
 ]);
@@ -51,7 +51,7 @@ export const tenantLibraryImports = sqliteTable('tenant_library_imports', {
   tenantId:       text('tenant_id').notNull(),
   libraryId:      text('library_id').notNull(),
   importedSemver: text('imported_semver').notNull(),
-  importedAt:     text('imported_at').notNull(),
+  importedAt:     integer('imported_at', { mode: 'timestamp_ms' }).notNull(),
   rowCount:       integer('row_count').notNull().default(0),
 }, (t) => [
   uniqueIndex('uq_tenant_library_import').on(t.tenantId, t.libraryId),
@@ -74,7 +74,7 @@ export const tenantMarketplaceImportHistory = sqliteTable('tenant_marketplace_im
   // JSON-encoded action-specific context (deleted ids, migration counts, …).
   // Stored as TEXT so we can keep parity with raw SQL inserts in tests.
   metadata:      text('metadata'),
-  createdAt:     integer('created_at').notNull(),
+  createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   createdBy:     text('created_by').notNull(),
 }, (t) => [
   index('idx_marketplace_history_tenant').on(t.tenantId, t.createdAt),

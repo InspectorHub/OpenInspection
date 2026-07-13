@@ -29,7 +29,7 @@ export interface IdentityLinkRow {
     linkedTenantId:     string;
     linkedRole:         string;
     linkedDisplayName:  string;
-    createdAt:          string;
+    createdAt:          Date;
 }
 
 export type SwitchResult =
@@ -95,7 +95,7 @@ export class IdentityService {
             linkedTenantId:    target.tenantId ?? '',
             linkedRole:        target.role,
             linkedDisplayName: target.name ?? target.email,
-            createdAt:         new Date().toISOString(),
+            createdAt:         new Date(),
         });
         return { id };
     }

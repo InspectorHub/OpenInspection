@@ -91,7 +91,7 @@ describe('PortalAccessService — token hash-at-rest (tier-2)', () => {
         const id = crypto.randomUUID();
         await testDb.insert(schema.inspectionAccessTokens).values({
             id, tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: 'old@x.com',
-            role: 'client', token: legacyToken, createdAt: Date.now(),
+            role: 'client', token: legacyToken, createdAt: new Date(),
             expiresAt: null, revokedAt: null,
         });
         const grant = await svc.resolveToken(legacyToken);
@@ -108,7 +108,7 @@ describe('PortalAccessService — token hash-at-rest (tier-2)', () => {
         const id = crypto.randomUUID();
         await testDb.insert(schema.inspectionAccessTokens).values({
             id, tenantId: TENANT, inspectionId: INSPECTION, recipientEmail: 'old@x.com',
-            role: 'client', token: legacyToken, createdAt: Date.now(),
+            role: 'client', token: legacyToken, createdAt: new Date(),
             expiresAt: null, revokedAt: null,
         });
         await svc.resolveToken(legacyToken); // triggers upgrade + enc seal

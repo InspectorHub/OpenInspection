@@ -45,7 +45,7 @@ function makeCtx(recipientOverride = 'selling_agent') {
             inspectionId: 'insp-1',
             recipient: '+15551234567',
             channel: 'sms',
-            sendAt: new Date().toISOString(),
+            sendAt: new Date(),
             status: 'pending',
             error: null,
             deliveredAt: null,

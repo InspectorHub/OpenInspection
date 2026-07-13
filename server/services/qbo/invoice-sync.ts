@@ -49,7 +49,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
 
             await db.update(qboEntityMap).set({
                 qboSyncToken: inv.SyncToken,
-                syncedAt:     Math.floor(Date.now() / 1000),
+                syncedAt:     new Date(),
             }).where(eq(qboEntityMap.id, mapped.id));
 
             if (inv.Balance === 0) {
@@ -123,7 +123,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                             );
                             await db.update(qboEntityMap).set({
                                 qboSyncToken: updated.Invoice.SyncToken,
-                                syncedAt:     Math.floor(Date.now() / 1000),
+                                syncedAt:     new Date(),
                             }).where(eq(qboEntityMap.id, existing.id));
                             return;
                         } catch (err: unknown) {
@@ -143,7 +143,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                     const created = await this.apiCall<{ Invoice: { Id: string; SyncToken: string } }>(
                         tenantId, 'POST', 'invoice', payload,
                     );
-                    const now = Math.floor(Date.now() / 1000);
+                    const now = new Date();
                     await db.insert(qboEntityMap).values({
                         id: crypto.randomUUID(), tenantId,
                         oiType: 'invoice', oiId: invoice.id,
@@ -178,7 +178,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                 );
                 await db.update(qboEntityMap).set({
                     qboSyncToken: voided.Invoice.SyncToken,
-                    syncedAt:     Math.floor(Date.now() / 1000),
+                    syncedAt:     new Date(),
                 }).where(eq(qboEntityMap.id, mapped.id));
             } catch (e) {
                 logger.error('QBO voidInvoice failed', { tenantId, invoiceId }, e instanceof Error ? e : undefined);
@@ -236,7 +236,7 @@ export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base:
                         }],
                     },
                 );
-                const now = Math.floor(Date.now() / 1000);
+                const now = new Date();
                 await db.insert(qboEntityMap).values({
                     id:           crypto.randomUUID(),
                     tenantId,

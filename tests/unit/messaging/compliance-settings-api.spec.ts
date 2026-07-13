@@ -136,7 +136,7 @@ describe('GET /api/admin/compliance/erasure-log (G4)', () => {
 
     afterEach(() => sqlite.close());
 
-    async function seedRow(over: Partial<typeof erasureLog.$inferInsert> = {}) {
+    async function seedRow(over: Partial<Omit<typeof erasureLog.$inferInsert, 'createdAt'>> & { createdAt?: number } = {}) {
         await db.insert(erasureLog).values({
             id: over.id ?? crypto.randomUUID(),
             tenantId: over.tenantId ?? TENANT_ID,
@@ -149,7 +149,7 @@ describe('GET /api/admin/compliance/erasure-log (G4)', () => {
             anonymizedCount: over.anonymizedCount ?? 0,
             deletedCount: over.deletedCount ?? 2,
             responseNote: over.responseNote ?? null,
-            createdAt: over.createdAt ?? Date.now(),
+            createdAt: new Date(over.createdAt ?? Date.now()),
         });
     }
 

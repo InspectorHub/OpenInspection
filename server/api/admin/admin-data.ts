@@ -383,7 +383,7 @@ export const adminDataRoutes = createApiRouter()
                 anonymizedCount: r.anonymizedCount,
                 deletedCount:    r.deletedCount,
                 decisions,
-                createdAt:       r.createdAt,
+                createdAt:       r.createdAt.getTime(),
             };
         });
 

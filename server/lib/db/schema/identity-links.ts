@@ -12,7 +12,7 @@
  * tenant + display name at link-time so the menu can render without a
  * per-row join.
  */
-import { sqliteTable, text, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 
 export const userIdentityLinks = sqliteTable('user_identity_links', {
@@ -22,7 +22,7 @@ export const userIdentityLinks = sqliteTable('user_identity_links', {
     linkedTenantId:     text('linked_tenant_id').notNull(),
     linkedRole:         text('linked_role').notNull(),
     linkedDisplayName:  text('linked_display_name').notNull(),
-    createdAt:          text('created_at').notNull().default(sql`(datetime('now'))`),
+    createdAt:          integer('created_at', { mode: 'timestamp_ms' }).notNull().default(sql`(unixepoch() * 1000)`),
 }, (t) => [
     index('idx_user_identity_links_primary').on(t.primaryUserId),
     uniqueIndex('uq_user_identity_links_primary_linked').on(t.primaryUserId, t.linkedUserId),

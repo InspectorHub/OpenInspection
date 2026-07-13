@@ -1,1 +1,0 @@
-ALTER TABLE `tenant_configs` ADD `email_byo_provider` text DEFAULT 'resend' NOT NULL;

@@ -151,7 +151,7 @@ export class TemplateService {
             groups.get(key)!.push({
                 localId:        imp.localId as string,
                 importedSemver: imp.importedSemver as string,
-                importedAt:     imp.importedAt as string,
+                importedAt:     (imp.importedAt as Date).toISOString(),
             });
         }
 

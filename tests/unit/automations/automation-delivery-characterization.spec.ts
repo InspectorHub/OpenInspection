@@ -69,7 +69,7 @@ describe('SP2 delivery characterization — Report Ready output unchanged after 
             id: 'log-chartest-1', tenantId: T,
             automationId: rule!.id, inspectionId: inspId,
             recipient: 'client@example.com', channel: 'email',
-            sendAt: new Date(0).toISOString(), status: 'pending',
+            sendAt: new Date(0), status: 'pending',
         } as never);
 
         // Capture what EmailService.sendEmail receives.

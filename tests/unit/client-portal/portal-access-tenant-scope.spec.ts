@@ -63,7 +63,7 @@ describe('PortalAccessService tenant scoping', () => {
             token: deadTokenSentinel(id),
             tokenHash: t1TokenHash,
             tokenEnc: t1TokenEnc,
-            createdAt: Date.now(),
+            createdAt: new Date(),
             expiresAt: null,
             revokedAt: null,
         });
@@ -98,7 +98,7 @@ describe('PortalAccessService tenant scoping', () => {
             recipientEmail: 'jane@x.com',
             role: 'client',
             token: `dead:${id}`,
-            createdAt: Date.now(),
+            createdAt: new Date(),
             expiresAt: null,
             revokedAt: null,
         });
@@ -122,7 +122,7 @@ describe('PortalAccessService tenant scoping', () => {
             recipientEmail: 'jane@x.com',
             role: 'client',
             token: `dead:${id}`,
-            createdAt: Date.now(),
+            createdAt: new Date(),
             expiresAt: null,
             revokedAt: null,
         });

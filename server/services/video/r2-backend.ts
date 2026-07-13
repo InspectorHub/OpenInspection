@@ -159,7 +159,7 @@ export class R2VideoBackend implements VideoBackend {
             posterKey,
             url: '',        // R2 URLs are served via the worker — no CDN URL stored
             streamUid: null,
-            uploadedAt: Date.now(),
+            uploadedAt: new Date(),
             mediaType: 'video',
         });
 

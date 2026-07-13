@@ -375,7 +375,7 @@ export class InspectionCoreService extends InspectionSubService {
             addressCounty:     (data.addressCounty as string | null) || null,
             addressLat:        (data.addressLat as number | null) ?? null,
             addressLng:        (data.addressLng as number | null) ?? null,
-            addressGeocodedAt: data.addressPlaceId ? Date.now() : null,
+            addressGeocodedAt: data.addressPlaceId ? new Date() : null,
             // #180 — discount columns set after atomic redemption above.
             // null/0 when no code was supplied or the cap blocked redemption.
             discountCodeId:    persistedDiscountCodeId,

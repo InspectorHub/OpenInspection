@@ -49,7 +49,7 @@ describe('portal API', () => {
             recipientEmail,
             role,
             token: crypto.randomUUID(),
-            createdAt: Date.now(),
+            createdAt: new Date(),
             expiresAt: null,
             revokedAt,
         });
@@ -69,8 +69,8 @@ describe('portal API', () => {
                     tenantId: row.tenantId,
                     role: row.role as 'client' | 'co_client' | 'agent',
                     recipientEmail: row.recipientEmail,
-                    revokedAt: row.revokedAt,
-                    expiresAt: row.expiresAt,
+                    revokedAt: row.revokedAt ? row.revokedAt.getTime() : null,
+                    expiresAt: row.expiresAt ? row.expiresAt.getTime() : null,
                 };
             },
             // Idempotent get-or-create stub: returns the seeded row's plaintext
@@ -92,7 +92,7 @@ describe('portal API', () => {
                     recipientEmail: input.recipientEmail,
                     role: 'client',
                     token,
-                    createdAt: Date.now(),
+                    createdAt: new Date(),
                     expiresAt: null,
                     revokedAt: null,
                 });
@@ -132,7 +132,7 @@ describe('portal API', () => {
             recipientEmail,
             role,
             token,
-            createdAt: Date.now(),
+            createdAt: new Date(),
             expiresAt: null,
             revokedAt: null,
         });

@@ -673,7 +673,7 @@ export class InspectionReportService extends InspectionSubService {
                     versionNumber: vrow.versionNumber,
                     contentHash:   vrow.contentHash ?? null,
                     verifyToken:   vrow.verificationToken,
-                    publishedAt:   vrow.publishedAt ?? null,
+                    publishedAt:   vrow.publishedAt ? Math.floor(vrow.publishedAt.getTime() / 1000) : null,
                 };
             }
         }

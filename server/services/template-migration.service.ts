@@ -276,7 +276,7 @@ export class TemplateMigrationService {
                     compatibleItems: preview.compatibleItems.length,
                     oldTemplateDeleted,
                 }),
-                createdAt:     now,
+                createdAt:     nowDate,
                 createdBy:     userId,
             }).run();
         } catch (err) {

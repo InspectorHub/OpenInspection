@@ -1,1 +1,0 @@
-ALTER TABLE `inspection_results` ADD `ydoc_state` blob;

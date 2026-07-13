@@ -98,9 +98,9 @@ export class ReportVersionService {
             versionNumber:  nextVersion,
             snapshotJson,
             summary:        summary ?? null,
-            publishedAt:    Math.floor(Date.now() / 1000),
+            publishedAt:    new Date(),
             publishedBy,
-            createdAt:      new Date().toISOString(),
+            createdAt:      new Date(),
             contentHash,
             prevHash,
             signature,
@@ -151,7 +151,9 @@ export class ReportVersionService {
             inspectionId:  row.inspectionId,
             versionNumber: row.versionNumber,
             isAmendment:   row.isAmendment,
-            publishedAt:   row.publishedAt,
+            // Public contract (app/routes/public/v.$token.tsx formatDate) is
+            // unix SECONDS — independent of the column's own Date storage type.
+            publishedAt:   Math.floor(row.publishedAt.getTime() / 1000),
             contentHash:   row.contentHash ?? null,
             keyFingerprint: row.keyFingerprint ?? null,
             legacy,
@@ -188,7 +190,8 @@ export class ReportVersionService {
             versionNumber:     row.versionNumber,
             contentHash:       row.contentHash ?? null,
             verificationToken: row.verificationToken,
-            publishedAt:       row.publishedAt ?? null,
+            // Unix SECONDS — mirrors verifyByToken's public contract above.
+            publishedAt:       row.publishedAt ? Math.floor(row.publishedAt.getTime() / 1000) : null,
         };
     }
 
@@ -203,7 +206,11 @@ export class ReportVersionService {
             .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, inspectionId)))
             .orderBy(desc(reportVersions.versionNumber))
             .all();
-        return rows;
+        return rows.map((row) => ({
+            ...row,
+            // Unix SECONDS — mirrors verifyByToken/getLatestPublished's public contract above.
+            publishedAt: row.publishedAt ? Math.floor(row.publishedAt.getTime() / 1000) : null,
+        }));
     }
 
     async get(tenantId: string, inspectionId: string, versionNumber: number): Promise<Snapshot | null> {

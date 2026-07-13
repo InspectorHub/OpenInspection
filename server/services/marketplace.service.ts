@@ -114,7 +114,7 @@ export class MarketplaceService {
         targetVersion: input.targetVersion ?? null,
         rowsAffected:  input.rowsAffected,
         metadata:      input.metadata ? JSON.stringify(input.metadata) : null,
-        createdAt:     Date.now(),
+        createdAt:     new Date(),
         createdBy:     input.userId,
       }).run();
     } catch (err) {
@@ -213,7 +213,7 @@ export class MarketplaceService {
     this.assertV2Schema(mkt.schema);
 
     const newTemplateId = crypto.randomUUID();
-    const now = new Date().toISOString();
+    const now = new Date();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await this.db.insert(templates as any).values({
@@ -221,7 +221,7 @@ export class MarketplaceService {
       tenantId:  this.tenantId,
       name:      mkt.name,
       schema:    mkt.schema,
-      createdAt: new Date(now),
+      createdAt: now,
     });
 
     await this.db.insert(tenantMarketplaceImports).values({
@@ -301,7 +301,7 @@ export class MarketplaceService {
     this.assertV2Schema(mkt.schema);
 
     const newTemplateId = crypto.randomUUID();
-    const now = new Date().toISOString();
+    const now = new Date();
     const newName = `${mkt.name} (v${mkt.semver})`;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -310,7 +310,7 @@ export class MarketplaceService {
       tenantId:  this.tenantId,
       name:      newName,
       schema:    mkt.schema,
-      createdAt: new Date(now),
+      createdAt: now,
     });
 
     const oldLocalId = existing.localTemplateId;
@@ -401,7 +401,7 @@ export class MarketplaceService {
       return { rowCount: existing.rowCount, localFirstId: existing.id };
     }
 
-    const now = new Date().toISOString();
+    const now = new Date();
     let rowCount = 0;
     const firstId = crypto.randomUUID();
 
@@ -491,7 +491,7 @@ export class MarketplaceService {
     }
 
     const fromSemver = existing.importedSemver;
-    const now = new Date().toISOString();
+    const now = new Date();
     let rowsAdded = 0;
     let rowsDeleted = 0;
 

@@ -148,7 +148,7 @@ export class EventService {
             automationId:   rule.id as string,
             inspectionId,
             recipient:      insp.clientEmail as string,
-            sendAt:         new Date(sendAt).toISOString(),
+            sendAt:         new Date(sendAt),
             status:         'pending',
             eventId,
         }).run();
@@ -169,7 +169,7 @@ export class EventService {
             automationId:   rule.id as string,
             inspectionId,
             recipient:      insp.clientEmail as string,
-            sendAt:         new Date(sendAt).toISOString(),
+            sendAt:         new Date(sendAt),
             status:         'pending',
             eventId,
         }).run();

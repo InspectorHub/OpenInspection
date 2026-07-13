@@ -73,9 +73,9 @@ describe('PortalService', () => {
             token: crypto.randomUUID(), status: 'signed', createdAt: new Date(),
         });
         await testDb.insert(schema.inspectionMessages).values([
-            { id: crypto.randomUUID(), tenantId: TENANT, inspectionId: 'insp1', fromRole: 'inspector', body: 'hi', readAt: null, createdAt: Date.now() },
-            { id: crypto.randomUUID(), tenantId: TENANT, inspectionId: 'insp1', fromRole: 'inspector', body: 'read', readAt: Date.now(), createdAt: Date.now() },
-            { id: crypto.randomUUID(), tenantId: TENANT, inspectionId: 'insp1', fromRole: 'client', body: 'mine', readAt: null, createdAt: Date.now() },
+            { id: crypto.randomUUID(), tenantId: TENANT, inspectionId: 'insp1', fromRole: 'inspector', body: 'hi', readAt: null, createdAt: new Date() },
+            { id: crypto.randomUUID(), tenantId: TENANT, inspectionId: 'insp1', fromRole: 'inspector', body: 'read', readAt: new Date(), createdAt: new Date() },
+            { id: crypto.randomUUID(), tenantId: TENANT, inspectionId: 'insp1', fromRole: 'client', body: 'mine', readAt: null, createdAt: new Date() },
         ]);
 
         const ov = await svc.hubOverview(TENANT, 'insp1');

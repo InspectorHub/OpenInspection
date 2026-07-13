@@ -30,7 +30,7 @@ async function insertHistory(testDb: BetterSQLite3Database<typeof schema>, opts:
         targetVersion: '1.0.0',
         rowsAffected:  1,
         metadata:      opts.metadata ? JSON.stringify(opts.metadata) : null,
-        createdAt:     opts.createdAt ?? Date.now(),
+        createdAt:     new Date(opts.createdAt ?? Date.now()),
         createdBy:     USER,
     });
 }

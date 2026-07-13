@@ -21,7 +21,7 @@ export class MessageService {
 
     async createMessage(input: CreateMessageInput) {
         const id = crypto.randomUUID();
-        const now = Date.now();
+        const now = new Date();
         await this.db().insert(inspectionMessages).values({
             id,
             tenantId: input.tenantId,
@@ -69,7 +69,7 @@ export class MessageService {
 
     async markAllReadForRole(inspectionId: string, tenantId: string, fromRole: 'client' | 'inspector') {
         await this.db().update(inspectionMessages)
-            .set({ readAt: Date.now() })
+            .set({ readAt: new Date() })
             .where(and(
                 eq(inspectionMessages.inspectionId, inspectionId),
                 eq(inspectionMessages.tenantId, tenantId),

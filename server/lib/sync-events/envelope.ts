@@ -158,8 +158,8 @@ export interface OutboxRowLike {
     eventType: string;
     /** JSON-encoded payload string (as stored in `sync_outbox.payload`). */
     payload: string;
-    /** Unix seconds (as stored in `sync_outbox.created_at`). */
-    createdAt: number;
+    /** Epoch ms (as stored in `sync_outbox.created_at`). */
+    createdAt: Date;
 }
 
 /**
@@ -173,7 +173,7 @@ export function toCloudEvent(row: OutboxRowLike): SyncEnvelope {
         id: row.id,
         type: `io.inspectorhub.${row.eventType as SyncEventType}`,
         source: 'core',
-        time: new Date(row.createdAt * 1000).toISOString(),
+        time: row.createdAt.toISOString(),
         dataschema: dataschemaFor(row.eventType),
         data: JSON.parse(row.payload) as Record<string, unknown>,
     };

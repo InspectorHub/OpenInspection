@@ -8,7 +8,7 @@ export const agreements = sqliteTable('agreements', {
     name: text('name').notNull(),
     content: text('content').notNull(),
     version: integer('version').notNull().default(1),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_agreements_tenant').on(t.tenantId),
 ]);
@@ -37,13 +37,13 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     // (admin.service.ts). Migrate those readers to signer-level data before
     // freezing/retiring these columns.
     signatureBase64: text('signature_base64'),
-    signedAt: integer('signed_at', { mode: 'timestamp' }),
-    viewedAt: integer('viewed_at', { mode: 'timestamp' }),
-    sentAt: integer('sent_at', { mode: 'timestamp' }),
+    signedAt: integer('signed_at', { mode: 'timestamp_ms' }),
+    viewedAt: integer('viewed_at', { mode: 'timestamp_ms' }),
+    sentAt: integer('sent_at', { mode: 'timestamp_ms' }),
     lastError: text('last_error'),
     // Spec 5H D1 — optional inspector pre-sign. NULL until inspector signs.
     inspectorSignatureBase64: text('inspector_signature_base64'),
-    inspectorSignedAt:        integer('inspector_signed_at', { mode: 'timestamp' }),
+    inspectorSignedAt:        integer('inspector_signed_at', { mode: 'timestamp_ms' }),
     inspectorUserId:          text('inspector_user_id').references(() => users.id),
     // Spec 5H P2 — opaque public-verifier token. Set on the sign event.
     verificationToken: text('verification_token'),
@@ -62,7 +62,7 @@ export const agreementRequests = sqliteTable('agreement_requests', {
     // and the esign_audit_logs chain still attests it); this is the idempotency
     // guard so a re-run skips already-purged rows. No PII.
     purgedAt:        integer('purged_at', { mode: 'timestamp_ms' }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     uniqueIndex('idx_agreement_requests_verify_token').on(t.verificationToken),
     index('idx_agreement_requests_tenant').on(t.tenantId),

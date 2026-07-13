@@ -13,8 +13,8 @@ import { withInvoiceSync } from './invoice-sync';
 
 export function withCdc<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends withInvoiceSync(Base) {
-        protected toIso8601(unixSeconds: number): string {
-            return new Date(unixSeconds * 1000).toISOString();
+        protected toIso8601(when: Date): string {
+            return when.toISOString();
         }
 
         async runCDCSync(
@@ -52,7 +52,7 @@ export function withCdc<TBase extends Constructor<QBOServiceBase>>(Base: TBase) 
                 startPosition += CDC_PAGE_SIZE;
             }
 
-            await db.update(qboConnections).set({ lastSyncAt: Math.floor(Date.now() / 1000) })
+            await db.update(qboConnections).set({ lastSyncAt: new Date() })
                 .where(eq(qboConnections.tenantId, tenantId));
 
             return { processed };

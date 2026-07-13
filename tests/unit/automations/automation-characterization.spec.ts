@@ -76,7 +76,7 @@ async function seedRuleAndLog(opts: {
     id: logId, tenantId: TENANT, automationId: ruleId, inspectionId: opts.inspectionId,
     recipient: opts.channel === 'sms' ? '+15551234567' : 'jane@example.com',
     channel: opts.channel ?? 'email',
-    sendAt: new Date(Date.now() - 1000).toISOString(), status: 'pending',
+    sendAt: new Date(Date.now() - 1000), status: 'pending',
   } as never);
   return logId;
 }

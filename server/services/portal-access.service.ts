@@ -79,7 +79,7 @@ export class PortalAccessService {
                     revokedAt: null,
                     expiresAt: null,
                     role: input.role ?? existing.role,
-                    createdAt: Date.now(),
+                    createdAt: new Date(),
                 })
                 .where(eq(inspectionAccessTokens.id, existing.id))
                 .run();
@@ -96,7 +96,7 @@ export class PortalAccessService {
             token: deadTokenSentinel(id),
             tokenHash,
             tokenEnc,
-            createdAt: Date.now(),
+            createdAt: new Date(),
             expiresAt: null,
             revokedAt: null,
         }).run();
@@ -134,8 +134,11 @@ export class PortalAccessService {
             tenantId: row.tenantId,
             role: row.role as PortalRole,
             recipientEmail: row.recipientEmail,
-            revokedAt: row.revokedAt,
-            expiresAt: row.expiresAt,
+            // PortalAccessRow keeps the epoch-ms number contract (consistent
+            // with Date.now(), consumed by resolvePortalAccess) independent of
+            // the column's own Date storage type.
+            revokedAt: row.revokedAt ? row.revokedAt.getTime() : null,
+            expiresAt: row.expiresAt ? row.expiresAt.getTime() : null,
         };
     }
 
@@ -157,7 +160,7 @@ export class PortalAccessService {
                 eq(inspectionAccessTokens.inspectionId, inspectionId),
             )).get();
         if (!row || row.revokedAt != null) return null;
-        if (row.expiresAt != null && row.expiresAt <= now) return null;
+        if (row.expiresAt != null && row.expiresAt.getTime() <= now) return null;
         return { tenantId: row.tenantId, role: row.role as 'client' | 'co_client' | 'agent', recipientEmail: row.recipientEmail };
     }
 
@@ -165,7 +168,7 @@ export class PortalAccessService {
     async revokeForRecipient(tenantId: string, inspectionId: string, recipientEmail: string): Promise<void> {
         const db = this.getDrizzle();
         await db.update(inspectionAccessTokens)
-            .set({ revokedAt: Date.now() })
+            .set({ revokedAt: new Date() })
             .where(and(
                 eq(inspectionAccessTokens.tenantId, tenantId),
                 eq(inspectionAccessTokens.inspectionId, inspectionId),
@@ -178,7 +181,7 @@ export class PortalAccessService {
     async setExpiryForInspection(tenantId: string, inspectionId: string, expiresAt: number): Promise<void> {
         const db = this.getDrizzle();
         await db.update(inspectionAccessTokens)
-            .set({ expiresAt })
+            .set({ expiresAt: new Date(expiresAt) })
             .where(and(
                 eq(inspectionAccessTokens.tenantId, tenantId),
                 eq(inspectionAccessTokens.inspectionId, inspectionId),

@@ -1,1 +1,0 @@
-ALTER TABLE `inspections` ADD `report_photo_mode` text;

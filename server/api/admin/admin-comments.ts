@@ -243,8 +243,7 @@ export const adminCommentsRoutes = createApiRouter()
         const data = rows.map(r => ({
             ...commentRowToResponse(r),
             useCount:   r.useCount ?? 0,
-            // commentUsage.lastUsedAt is a UNIX seconds integer (see touch handler).
-            lastUsedAt: r.lastUsedAt != null ? new Date(r.lastUsedAt * 1000).toISOString() : null,
+            lastUsedAt: r.lastUsedAt != null ? r.lastUsedAt.toISOString() : null,
         }));
         return c.json({
             success: true as const,
@@ -337,7 +336,7 @@ export const adminCommentsRoutes = createApiRouter()
         // the 'user' key with `.sub` as the user id (see lines ~866, ~2169).
         const userId = c.get('user')?.sub ?? '';
         if (!userId) throw Errors.Unauthorized();
-        const now = Math.floor(Date.now() / 1000);
+        const now = new Date();
         const db = drizzle(c.env.DB);
 
         const existing = await db.select().from(commentUsage)

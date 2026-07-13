@@ -20,8 +20,8 @@ export const inspectionMessages = sqliteTable('inspection_messages', {
     fromName:     text('from_name'),
     body:         text('body').notNull(),
     attachments:  text('attachments', { mode: 'json' }).$type<MessageAttachment[]>(),
-    readAt:       integer('read_at'),
-    createdAt:    integer('created_at').notNull(),
+    readAt:       integer('read_at', { mode: 'timestamp_ms' }),
+    createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     inspectionIdx: index('idx_msg_inspection').on(t.inspectionId, t.createdAt),
     unreadIdx:     index('idx_msg_unread')

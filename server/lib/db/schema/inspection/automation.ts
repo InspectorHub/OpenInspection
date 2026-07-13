@@ -48,7 +48,7 @@ export const automations = sqliteTable('automations', {
     smsTemplateId: text('sms_template_id'),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
     isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_automations_tenant').on(t.tenantId),
 ]);
@@ -62,8 +62,8 @@ export const automationLogs = sqliteTable('automation_logs', {
     recipient: text('recipient').notNull(),   // RENAMED from recipient_email (0025)
     // Track L — the log's own delivery channel (a multi-channel rule emits one log each).
     channel: text('channel', { enum: ['email', 'sms'] }).notNull().default('email'),
-    sendAt: text('send_at').notNull(),
-    deliveredAt: text('delivered_at'),
+    sendAt: integer('send_at', { mode: 'timestamp_ms' }).notNull(),
+    deliveredAt: integer('delivered_at', { mode: 'timestamp_ms' }),
     status: text('status', { enum: ['pending', 'sent', 'failed', 'skipped'] }).notNull().default('pending'),
     error: text('error'),
     eventId: text('event_id'),
@@ -90,7 +90,7 @@ export const eventTypes = sqliteTable('event_types', {
     color:              text('color').notNull().default('#6366f1'),
     sortOrder:          integer('sort_order').notNull().default(0),
     active:             integer('active', { mode: 'boolean' }).notNull().default(true),
-    createdAt:          integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt:          integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     uniqueIndex('uq_event_types_tenant_slug').on(t.tenantId, t.slug),
 ]);
@@ -118,16 +118,16 @@ export const inspectionEvents = sqliteTable('inspection_events', {
     inspectionId:      text('inspection_id').notNull().references(() => inspections.id, { onDelete: 'cascade' }),
     eventTypeId:       text('event_type_id').notNull().references(() => eventTypes.id),
     inspectorId:       text('inspector_id').references(() => users.id),
-    scheduledAt:       integer('scheduled_at', { mode: 'timestamp' }).notNull(),
+    scheduledAt:       integer('scheduled_at', { mode: 'timestamp_ms' }).notNull(),
     durationMin:       integer('duration_min').notNull(),
     priceCents:        integer('price_cents').notNull().default(0),
     status:            text('status', { enum: ['scheduled', 'completed', 'results_received', 'cancelled'] }).notNull().default('scheduled'),
     notes:             text('notes'),
-    completedAt:       integer('completed_at', { mode: 'timestamp' }),
-    resultsReceivedAt: integer('results_received_at', { mode: 'timestamp' }),
-    cancelledAt:       integer('cancelled_at', { mode: 'timestamp' }),
+    completedAt:       integer('completed_at', { mode: 'timestamp_ms' }),
+    resultsReceivedAt: integer('results_received_at', { mode: 'timestamp_ms' }),
+    cancelledAt:       integer('cancelled_at', { mode: 'timestamp_ms' }),
     gcalEventId:       text('gcal_event_id'),
-    createdAt:         integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt:         integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_inspection_events_scheduled').on(t.tenantId, t.scheduledAt),
     index('idx_inspection_events_inspection').on(t.inspectionId),

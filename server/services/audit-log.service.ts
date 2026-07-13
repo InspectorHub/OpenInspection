@@ -73,7 +73,7 @@ export class AuditLogService {
                 hash,
                 signature,
                 keyFingerprint: fingerprint,
-                createdAt: Date.now(),
+                createdAt: new Date(),
             });
         } catch (e) {
             // Partial UNIQUE INDEX on (tenant_id, request_id, event) for

@@ -134,7 +134,7 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
             if (messagingServiceSid) sendArgs.messagingServiceSid = messagingServiceSid;
             const res = await provider.sendMessage(sendArgs);
             if (res.ok) {
-                await db.update(automationLogs).set({ status: 'sent', deliveredAt: new Date().toISOString() })
+                await db.update(automationLogs).set({ status: 'sent', deliveredAt: new Date() })
                     .where(and(eq(automationLogs.id, log.id), eq(automationLogs.tenantId, inspection.tenantId)));
                 // WH-2 — seed a 'sent' delivery-status row for the returned message id
                 // (non-fatal; the provider status callback advances it later).

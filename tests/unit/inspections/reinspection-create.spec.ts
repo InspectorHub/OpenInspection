@@ -44,8 +44,8 @@ async function seed(testDb: BetterSQLite3Database<typeof schema>) {
     await testDb.insert(schema.reportVersions).values({
         id: crypto.randomUUID(), tenantId: TENANT, inspectionId: ORIGINAL,
         versionNumber: 1, snapshotJson: JSON.stringify(snapshot),
-        publishedAt: Math.floor(Date.now() / 1000), publishedBy: 'user-a',
-        createdAt: new Date().toISOString(),
+        publishedAt: new Date(), publishedBy: 'user-a',
+        createdAt: new Date(),
     });
 
     // DRAFT inspection with NO report_versions row (gate test).

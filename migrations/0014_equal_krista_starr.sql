@@ -1,1 +1,0 @@
-ALTER TABLE `tenant_configs` ADD `managed_provider` text DEFAULT 'twilio' NOT NULL;

@@ -42,12 +42,12 @@ export const users = sqliteTable('users', {
     googleRefreshToken: text('google_refresh_token'),
     googleCalendarId: text('google_calendar_id'),
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled.
     totpSecret:        text('totp_secret'),
     totpEnabled:       integer('totp_enabled', { mode: 'boolean' }).notNull().default(false),
     totpRecoveryCodes: text('totp_recovery_codes'),
-    totpVerifiedAt:    integer('totp_verified_at', { mode: 'timestamp' }),
+    totpVerifiedAt:    integer('totp_verified_at', { mode: 'timestamp_ms' }),
     // Agent Accounts A2 — per-user notification preferences. Default ON for
     // referral + report (high signal); default OFF for paid (high noise — the
     // inspector forwards the receipt manually if the agent wants visibility).
@@ -60,7 +60,7 @@ export const users = sqliteTable('users', {
     // timestamp updated by touch-last-active middleware (30s debounce window
     // per worker isolate). Powers TeamStrip "last active Nm ago" pill and the
     // soft-presence fallback when WebSocket cannot connect.
-    lastActiveAt:     integer('last_active_at'),
+    lastActiveAt:     integer('last_active_at', { mode: 'timestamp_ms' }),
     // Design System 0520 subsystem C phase 1 — role-extension columns.
     //   mentorId            = DEAD (2026-06-13, apprentice subsystem removed).
     //                          Formerly the apprentice's mentor FK → users.id —
@@ -75,11 +75,11 @@ export const users = sqliteTable('users', {
     // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
     assignedSectionIds:   text('assigned_section_ids').notNull().default('[]'),
     // DEAD (2026-06-13, guest removal / specialist deferred) — no reads/writes
-    expiresAt:            integer('expires_at'),
+    expiresAt:            integer('expires_at'), // ts-lint-ok: DEAD frozen column (guest removal), no reads/writes
     // Account soft-delete marker — set by POST /api/account/delete after
     // the user retypes their email to confirm. NULL = active. Kept rather
     // than hard-deleted so audit-linked rows remain referentially intact.
-    deletedAt:            integer('deleted_at', { mode: 'timestamp' }),
+    deletedAt:            integer('deleted_at', { mode: 'timestamp_ms' }),
     // Legal-links feature — set when the account was created through a public
     // form (agent signup / agent invite) while the operator had
     // TERMS_URL/PRIVACY_URL configured. JSON: {at, ip, country, termsUrl, privacyUrl}.
@@ -108,7 +108,7 @@ export const tenantInvites = sqliteTable('tenant_invites', {
     role: text('role', { enum: ROLES }).notNull().default('inspector'),
     // Schema Rules: state-machine column declares its enum (type-layer only).
     status: text('status', { enum: ['pending', 'accepted'] }).notNull().default('pending'),
-    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
     // Design System 0520 subsystem C P5 — carry role-extension fields from the
     // InviteSeatDrawer into the eventual users row at accept time.
     // DEAD (2026-06-13, apprentice subsystem removed) — written on invite but
@@ -138,9 +138,9 @@ export const agentInvites = sqliteTable('agent_invites', {
     inspectorContactId:  text('inspector_contact_id'),
     email:               text('email').notNull(),
     invitedByUserId:     text('invited_by_user_id').notNull().references(() => users.id),
-    expiresAt:           integer('expires_at', { mode: 'timestamp' }).notNull(),
-    acceptedAt:          integer('accepted_at', { mode: 'timestamp' }),
-    createdAt:           integer('created_at', { mode: 'timestamp' }).notNull(),
+    expiresAt:           integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
+    acceptedAt:          integer('accepted_at', { mode: 'timestamp_ms' }),
+    createdAt:           integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_agent_invites_email').on(t.email),
     index('idx_agent_invites_tenant').on(t.tenantId),

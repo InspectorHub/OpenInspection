@@ -1,1 +1,0 @@
-ALTER TABLE `messaging_compliance` ADD `provisioned_number_sid` text;

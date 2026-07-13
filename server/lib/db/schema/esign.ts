@@ -14,8 +14,8 @@ export const signingKeys = sqliteTable('signing_keys', {
     privateKeyIv:  text('private_key_iv').notNull(),
     fingerprint:   text('fingerprint').notNull(),
     algorithm:     text('algorithm').notNull().default('Ed25519'),
-    createdAt:     integer('created_at').notNull(),
-    rotatedAt:     integer('rotated_at'),
+    createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    rotatedAt:     integer('rotated_at', { mode: 'timestamp_ms' }),
 });
 
 /**
@@ -33,7 +33,7 @@ export const esignAuditLogs = sqliteTable('esign_audit_logs', {
     hash:           text('hash').notNull(),
     signature:      text('signature').notNull(),
     keyFingerprint: text('key_fingerprint').notNull(),
-    createdAt:      integer('created_at').notNull(),
+    createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     idxRequest:    index('idx_esign_audit_logs_request').on(t.tenantId, t.requestId, t.createdAt),
     // Track I-a — PARTIAL dedup index. Envelope-level events (request.created,

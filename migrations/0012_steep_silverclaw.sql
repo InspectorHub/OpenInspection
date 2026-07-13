@@ -1,1 +1,0 @@
-ALTER TABLE `messaging_compliance` ADD `sender_attached` integer DEFAULT false NOT NULL;

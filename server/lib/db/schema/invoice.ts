@@ -15,20 +15,22 @@ export const invoices = sqliteTable('invoices', {
     // getEffectivePriceCents() in app/lib/effective-price.ts.
     amountCents: integer('amount_cents').notNull().default(0),
     lineItems: text('line_items', { mode: 'json' }).notNull().$type<Array<{ description: string; amountCents: number; quantity?: number; unitAmountCents?: number }>>().default([]),
+    // Calendar-semantic YYYY-MM-DD (invoice due date, no time component) — intentionally
+    // TEXT per the Schema Rules calendar-field exception, not an epoch timestamp.
     dueDate: text('due_date'),
     notes: text('notes'),
-    sentAt: integer('sent_at', { mode: 'timestamp' }),
-    paidAt: integer('paid_at', { mode: 'timestamp' }),
+    sentAt: integer('sent_at', { mode: 'timestamp_ms' }),
+    paidAt: integer('paid_at', { mode: 'timestamp_ms' }),
     // How the invoice was paid — 'card' (online Stripe) or an offline method
     // (check / cash / offline) recorded by the inspector via "Mark as paid".
     paymentMethod: text('payment_method', { enum: ['card', 'check', 'cash', 'offline', 'other'] }),
-    partialPaidAt: integer('partial_paid_at', { mode: 'timestamp' }),
+    partialPaidAt: integer('partial_paid_at', { mode: 'timestamp_ms' }),
     // Accounting void (QuickBooks-style): a voided invoice stays in the ledger at $0
     // with its audit trail intact and is excluded from all revenue rollups. Distinct
     // from refund (paid->unpaid). See spec 2026-06-22 #182.
-    voidedAt: integer('voided_at', { mode: 'timestamp' }),
+    voidedAt: integer('voided_at', { mode: 'timestamp_ms' }),
     qboSyncStatus: text('qbo_sync_status', { enum: ['synced', 'pending', 'failed'] }),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_invoices_tenant').on(t.tenantId),
     index('idx_invoices_inspection').on(t.inspectionId),

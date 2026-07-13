@@ -18,7 +18,7 @@ interface TestBindings {
 }
 const b = env as unknown as TestBindings;
 
-const NOW = () => Math.floor(Date.now() / 1000);
+const NOW = () => Date.now();
 
 async function seedSchema(): Promise<void> {
     // Minimal-but-faithful DDL for sync_outbox (per schema/tenant.ts) plus the
@@ -36,7 +36,9 @@ async function clearTables(): Promise<void> {
     await b.DB.exec('DELETE FROM test_queue_log;');
 }
 
-async function insertRow(over: Partial<OutboxRow> = {}): Promise<string> {
+async function insertRow(
+    over: Partial<Omit<OutboxRow, 'createdAt'>> & { createdAt?: number } = {},
+): Promise<string> {
     const id = over.id ?? crypto.randomUUID();
     await b.DB.prepare(
         'INSERT INTO sync_outbox (id, event_type, payload, status, attempts, created_at) VALUES (?, ?, ?, ?, ?, ?)',
@@ -84,7 +86,7 @@ describe('core producer — real queue + D1 (C-8)', () => {
             payload: (row as { payload: string }).payload,
             status: 'pending',
             attempts: 0,
-            createdAt: (row as { created_at: number }).created_at,
+            createdAt: new Date((row as { created_at: number }).created_at),
             lastTriedAt: null,
             lastError: null,
         });
@@ -106,7 +108,7 @@ describe('core producer — real queue + D1 (C-8)', () => {
 
     it('sweeper republishes a stale pending row and skips a fresh one', async () => {
         const fresh = await insertRow(); // created_at = now → inside the 120s window
-        const stale = await insertRow({ createdAt: NOW() - 300 });
+        const stale = await insertRow({ createdAt: NOW() - 300_000 });
 
         const res = await flushOutboxOnce(b.DB, b.SYNC_QUEUE, 50);
 

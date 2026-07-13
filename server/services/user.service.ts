@@ -147,7 +147,7 @@ export class UserService {
      */
     async touchLastActive(userId: string, epochSeconds: number): Promise<void> {
         const db = this.getDrizzle();
-        await db.update(users).set({ lastActiveAt: epochSeconds }).where(eq(users.id, userId));
+        await db.update(users).set({ lastActiveAt: new Date(epochSeconds * 1000) }).where(eq(users.id, userId));
     }
 
     /**

@@ -15,7 +15,7 @@ export const tags = sqliteTable('tags', {
     name:      text('name').notNull(),
     color:     text('color'),
     isSeed:    integer('is_seed', { mode: 'boolean' }).notNull().default(false),
-    createdAt: integer('created_at').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     tenantNameUnique: uniqueIndex('idx_tags_tenant_name').on(t.tenantId, t.name),
     tenantIdx:        index('idx_tags_tenant').on(t.tenantId),
@@ -26,7 +26,7 @@ export const inspectionItemTagLinks = sqliteTable('inspection_item_tag_links', {
     itemId:       text('item_id').notNull(),
     tagId:        text('tag_id').notNull(),
     tenantId:     text('tenant_id').notNull(),
-    createdAt:    integer('created_at').notNull(),
+    createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     primaryKey({ columns: [t.inspectionId, t.itemId, t.tagId] }),
     index('idx_tag_links_tenant').on(t.tenantId),
@@ -44,7 +44,7 @@ export const inspectionMediaPool = sqliteTable('inspection_media_pool', {
     tenantId:      text('tenant_id').notNull(),
     r2Key:         text('r2_key').notNull(),
     url:           text('url').notNull(),
-    uploadedAt:    integer('uploaded_at').notNull(),
+    uploadedAt:    integer('uploaded_at', { mode: 'timestamp_ms' }).notNull(),
     // JSON envelope: { takenAt?: number, gps?: {lat,lng}, cameraModel?: string }
     exifData:      text('exif_data', { mode: 'json' }).$type<{
         takenAt?:     number;

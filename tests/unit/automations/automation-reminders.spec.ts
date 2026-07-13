@@ -103,7 +103,7 @@ describe('AutomationService.enqueueReminders (Track J D7)', () => {
         // inspection gets cancelled before the reminder is due
         await db.update(schema.inspections).set({ status: 'cancelled' }).where(eq(schema.inspections.id, i));
         // force the pending log due now
-        await db.update(schema.automationLogs).set({ sendAt: new Date(NOW - 1000).toISOString() })
+        await db.update(schema.automationLogs).set({ sendAt: new Date(NOW - 1000) })
             .where(eq(schema.automationLogs.inspectionId, i));
         await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com');
         const [log] = await logsFor(i);

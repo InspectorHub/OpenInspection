@@ -535,7 +535,7 @@ export class BookingService {
                 clientName:      body.clientName,
                 clientEmail:     body.clientEmail,
                 propertyAddress: body.address,
-                scheduledAt:     startIso,
+                scheduledAt:     new Date(startIso),
                 status:          'pending',
                 totalAmount:     0,
                 paymentStatus:   'unpaid',

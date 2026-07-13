@@ -80,7 +80,7 @@ export class SigningKeyService {
             privateKeyIv: base64UrlEncode(iv),
             fingerprint,
             algorithm: 'Ed25519',
-            createdAt: Date.now(),
+            createdAt: new Date(),
             rotatedAt: null,
         });
 

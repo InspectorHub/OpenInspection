@@ -123,7 +123,7 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
             id: crypto.randomUUID(),
             inspectionId: over.inspectionId ?? INSP_ID,
             tenantId: over.tenantId ?? TENANT,
-            r2Key: over.r2Key ?? POOL_KEY, url: '/p.jpg', uploadedAt: 1,
+            r2Key: over.r2Key ?? POOL_KEY, url: '/p.jpg', uploadedAt: new Date(1),
         } as never);
     }
 

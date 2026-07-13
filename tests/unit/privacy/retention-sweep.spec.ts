@@ -110,7 +110,7 @@ describe('runRetentionSweep', () => {
             hash: 'h',
             signature: 'sig',
             keyFingerprint: 'fp',
-            createdAt: opts.signedAtMs,
+            createdAt: new Date(opts.signedAtMs),
         } as any);
     }
 
