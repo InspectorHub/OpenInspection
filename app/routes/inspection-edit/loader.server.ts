@@ -5,6 +5,7 @@ import { unwrapResultsResponse } from "~/lib/results";
 import type { RatingLevel, ResultMap } from "~/hooks/useInspection";
 import { resolvePcaNarrative } from "../../../server/lib/pca-narrative";
 import { RELIANCE_TEMPLATES } from "../../../server/lib/pca-reliance-text";
+import { METADATA_PRESETS, type PropertyMetaField } from "../../../server/lib/commercial-subtypes";
 import type { CompliancePanelData } from "~/components/inspection-edit/CompliancePanel";
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
@@ -203,5 +204,17 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
    siteSpecific: rawNarrative?.siteSpecific || RELIANCE_TEMPLATES.siteSpecific,
  };
 
- return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText };
+ // Commercial subtype-preset field definitions for PropertyInfoForm (design
+ // 2026-07-13). commercial-subtypes is a server-only module — it never reaches
+ // the client bundle; only these resolved field arrays cross the loader
+ // boundary. Keyed `commercial:<subtype>`; the editor picks the active one off
+ // state.inspection.commercialSubtype so the Property Info field list reacts
+ // live to the Phase T subtype selector with no extra fetch. Commercial subset
+ // only — residential inspections keep PropertyInfoForm's own default fields.
+ const commercialPresets: Record<string, PropertyMetaField[]> = {};
+ for (const [key, fields] of Object.entries(METADATA_PRESETS)) {
+   if (key.startsWith("commercial:")) commercialPresets[key] = fields;
+ }
+
+ return { inspection, schema, results, ratingLevels, token, tagLibrary, tenantSlug, streamCustomerSubdomain, videoProvider, collabEditing, templateSnapshot, pcaNarrative, defectCategories, units, unitProgress, unitInspectionMode, compliance, relianceText, commercialPresets };
 }
