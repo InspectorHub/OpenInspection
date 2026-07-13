@@ -37,6 +37,18 @@ import { logger } from './logger';
  */
 export const RENDER_VERSION = 'r7';
 
+/**
+ * Backoff before the single pass-2 retry when Browser Rendering rate-limits the
+ * back-to-back second render (HTTP 429). The Workers **Free** plan allows only
+ * "1 Quick Action every 10 seconds"
+ * (https://developers.cloudflare.com/browser-run/limits/), so pass 2 — fired
+ * right after pass 1 — is rejected until the 10-second window clears. 11s (10s
+ * window + 1s margin) reliably clears it; this is worker wall-time only and does
+ * NOT consume browser-hours. Paid plans (10 Quick Actions/second) never hit this
+ * path — pass 2 succeeds immediately with no wait.
+ */
+export const TOC_PASS2_RETRY_BACKOFF_MS = 11_000;
+
 export async function generatePdfFromUrl(
     browser: BrowserRun | undefined,
     url: string,
@@ -127,5 +139,32 @@ export async function generatePdfWithTocPages(
 
     const tocParam = encodeURIComponent(btoa(JSON.stringify(pageMap)));
     const pass2Url = url.includes('?') ? `${url}&tocpages=${tocParam}` : `${url}?tocpages=${tocParam}`;
-    return await generatePdfFromUrl(browser, pass2Url, opts);
+
+    // Pass 2 is a SECOND Browser Rendering call fired immediately after pass 1.
+    // On free-tier Browser Rendering the back-to-back call is rate-limited (HTTP
+    // 429, error code 2001) — pass 1 renders, then pass 2's quickAction is
+    // rejected before it even loads the page. The TOC page numbers are an
+    // enhancement, not a requirement, so a pass-2 failure MUST NOT break the
+    // whole download (that would 500 every full-tier PCA PDF on free-tier BR —
+    // see #240 follow-up). Retry once after a short backoff (the limit is a
+    // short rolling window), then degrade to the un-numbered pass-1 PDF, exactly
+    // like the extractAnchorPages catch above.
+    try {
+        return await generatePdfFromUrl(browser, pass2Url, opts);
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes('(429)')) {
+            await new Promise((resolve) => setTimeout(resolve, TOC_PASS2_RETRY_BACKOFF_MS));
+            try {
+                return await generatePdfFromUrl(browser, pass2Url, opts);
+            } catch (retryErr) {
+                logger.warn('[pdf] pass-2 TOC render rate-limited after retry, serving un-numbered TOC', {
+                    error: retryErr instanceof Error ? retryErr.message : String(retryErr),
+                });
+                return pass1;
+            }
+        }
+        logger.warn('[pdf] pass-2 TOC render failed, serving un-numbered TOC', { error: message });
+        return pass1;
+    }
 }

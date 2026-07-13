@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { generatePdfFromUrl, generatePdfWithTocPages } from '../../../server/lib/pdf';
+import { generatePdfFromUrl, generatePdfWithTocPages, TOC_PASS2_RETRY_BACKOFF_MS } from '../../../server/lib/pdf';
 import type { BrowserRun } from '../../../server/types/hono';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -149,5 +149,64 @@ describe('generatePdfWithTocPages', () => {
         const [, pass2Opts] = browser.quickAction.mock.calls[1];
         expect(pass1Opts.pdfOptions.footerTemplate).toContain('123 Main St');
         expect(pass2Opts.pdfOptions.footerTemplate).toContain('123 Main St');
+    });
+
+    // Same fixture helper the passing tests use — a real Chrome-rendered PDF
+    // whose TOC anchors resolve to named destinations (so pass 2 is attempted).
+    const fixtureBuffer = () =>
+        TOC_FIXTURE.buffer.slice(TOC_FIXTURE.byteOffset, TOC_FIXTURE.byteOffset + TOC_FIXTURE.byteLength);
+
+    it('retries pass 2 once after the backoff when Browser Rendering returns 429, then serves the numbered PDF', async () => {
+        vi.useFakeTimers();
+        try {
+            const numbered = new ArrayBuffer(8);
+            const browser = {
+                quickAction: vi.fn()
+                    .mockResolvedValueOnce({ ok: true, arrayBuffer: () => Promise.resolve(fixtureBuffer()) })   // pass 1
+                    .mockResolvedValueOnce({ ok: false, status: 429, text: () => Promise.resolve('{"errors":[{"code":2001,"message":"Rate limit exceeded"}]}') }) // pass 2 (rate-limited)
+                    .mockResolvedValueOnce({ ok: true, arrayBuffer: () => Promise.resolve(numbered) }),          // pass 2 retry
+            };
+            const promise = generatePdfWithTocPages(browser as unknown as BrowserRun, 'https://example.com/report/abc');
+            await vi.advanceTimersByTimeAsync(TOC_PASS2_RETRY_BACKOFF_MS);
+            const result = await promise;
+
+            expect(browser.quickAction).toHaveBeenCalledTimes(3);
+            expect(result).toBe(numbered);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('degrades to the un-numbered pass-1 PDF when pass 2 is still rate-limited after the retry', async () => {
+        vi.useFakeTimers();
+        try {
+            const pass1Bytes = fixtureBuffer();
+            const browser = {
+                quickAction: vi.fn()
+                    .mockResolvedValueOnce({ ok: true, arrayBuffer: () => Promise.resolve(pass1Bytes) })         // pass 1
+                    .mockResolvedValue({ ok: false, status: 429, text: () => Promise.resolve('Rate limit exceeded') }), // pass 2 + retry both 429
+            };
+            const promise = generatePdfWithTocPages(browser as unknown as BrowserRun, 'https://example.com/report/abc');
+            await vi.advanceTimersByTimeAsync(TOC_PASS2_RETRY_BACKOFF_MS);
+            const result = await promise;
+
+            expect(browser.quickAction).toHaveBeenCalledTimes(3);   // pass 1 + pass 2 + one retry
+            expect(result).toBe(pass1Bytes);                        // never throws — un-numbered PDF still downloads
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('degrades to the un-numbered pass-1 PDF (no retry) when pass 2 fails with a non-429 error', async () => {
+        const pass1Bytes = fixtureBuffer();
+        const browser = {
+            quickAction: vi.fn()
+                .mockResolvedValueOnce({ ok: true, arrayBuffer: () => Promise.resolve(pass1Bytes) })             // pass 1
+                .mockResolvedValueOnce({ ok: false, status: 503, text: () => Promise.resolve('quota exceeded') }), // pass 2 non-429
+        };
+        const result = await generatePdfWithTocPages(browser as unknown as BrowserRun, 'https://example.com/report/abc');
+
+        expect(browser.quickAction).toHaveBeenCalledTimes(2);       // no retry on non-429
+        expect(result).toBe(pass1Bytes);
     });
 });
