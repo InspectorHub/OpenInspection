@@ -1,4 +1,4 @@
-import { Modal } from "@core/shared-ui";
+import { Modal, Button } from "@core/shared-ui";
 
 export interface PublishModalProps {
  open: boolean;
@@ -22,12 +22,12 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  title="Publish Report"
  footer={
  <>
- <button onClick={onClose} className="px-4 py-2 text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted rounded-md">Cancel</button>
- <button
+ <Button variant="ghost" onClick={onClose}>Cancel</Button>
+ <Button
+ variant="primary"
  disabled={isSubmitting}
  onClick={onPublish}
- className="px-4 py-2 text-[13px] font-bold text-white bg-ih-ok hover:bg-ih-ok/85 rounded-md disabled:opacity-50 disabled:cursor-not-allowed"
- >{isSubmitting ? "Publishing…" : "Publish Now"}</button>
+ >{isSubmitting ? "Publishing…" : "Publish Now"}</Button>
  </>
  }
  >

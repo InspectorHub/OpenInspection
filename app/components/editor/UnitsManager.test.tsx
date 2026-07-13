@@ -64,7 +64,7 @@ test("bulk floors × stacks form submits a floors_stacks payload", () => {
 
 test("CSV tab submits a csv payload", () => {
   const { submit } = renderManager();
-  fireEvent.click(screen.getByRole("button", { name: "CSV paste" }));
+  fireEvent.click(screen.getByRole("radio", { name: "CSV paste" }));
   fireEvent.change(screen.getByLabelText("CSV units"), { target: { value: "Lobby,\nGarage,B1" } });
   fireEvent.click(screen.getByRole("button", { name: "Create units" }));
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "@core/shared-ui";
 import type { PresenceUser, PresenceStatus } from "~/hooks/usePresence";
 
 interface FooterBarProps {
@@ -30,13 +31,14 @@ export function FooterBar({ connected = false, status, roster = [] }: FooterBarP
   return (
     <div className="hidden md:flex fixed bottom-0 inset-x-0 z-30 bg-ih-bg-card border-t border-ih-border px-4 py-1.5 items-center gap-3 text-[11px] text-ih-fg-3">
       <div className="relative">
-        <button
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={() => setShortcutsOpen(!shortcutsOpen)}
-          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded border border-ih-border font-bold text-[10px] hover:bg-ih-bg-muted"
+          icon={<kbd className="px-1 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">?</kbd>}
         >
-          <kbd className="px-1 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">?</kbd>
           Shortcuts
-        </button>
+        </Button>
 
         {shortcutsOpen && (
           <div className="absolute bottom-full left-0 mb-2 w-[320px] bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover z-50 p-3">

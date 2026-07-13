@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Button } from '@core/shared-ui';
 
 export interface TagPin {
     id:    string;
@@ -44,13 +45,15 @@ export function TagChipRow({ pinnedTags, activeTagIds, onToggle, onOpenLibrary }
                 );
             })}
             {onOpenLibrary && (
-                <button
+                <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={onOpenLibrary}
-                    className="px-2 py-0.5 rounded-full text-[11px] font-bold text-ih-fg-4 border border-dashed border-ih-border hover:bg-ih-bg-muted"
+                    className="h-auto px-2 py-0.5 rounded-full border border-dashed border-ih-border text-ih-fg-4 hover:bg-ih-bg-muted"
                     aria-label="Open tag library"
                 >
                     + more
-                </button>
+                </Button>
             )}
         </div>
     );

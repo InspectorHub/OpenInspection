@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { useInspectionState } from "~/hooks/useInspection";
-import { Icon } from "@core/shared-ui";
+import { Button, IconButton, Icon } from "@core/shared-ui";
 import type { ColorScheme } from "~/lib/ui-prefs";
 import { ProgressStripText } from "~/components/editor/ProgressStripText";
 import { TemplateMenu } from "~/components/editor/TemplateMenu";
@@ -191,24 +191,25 @@ export function EditorHeader({
 
  {/* #181 — Version history (only when collab editing is enabled) */}
  {collabEditing && (
-  <button
+  <IconButton
+  aria-label="Version history"
   onClick={() => onOpenVersionHistory?.()}
-  className="flex w-9 h-9 rounded-md items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
   title="Version history"
   >
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
-  </button>
+  </IconButton>
  )}
  </div>
 
  {/* Right zone: theme + settings + preview + preview PDF + sign now + publish */}
  <div className="flex items-center gap-2">
  {/* Theme cycle: light → dark → field → auto */}
- <button
+ <IconButton
+  aria-label={`Theme: ${scheme}${scheme === 'field' ? ' (high-contrast outdoor)' : ''}`}
   onClick={() => setColorScheme(scheme === 'light' ? 'dark' : scheme === 'dark' ? 'field' : scheme === 'field' ? 'auto' : 'light')}
-  className="w-9 h-9 rounded-md hidden xl:flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
+  className="hidden xl:flex"
   title={`Theme: ${scheme}${scheme === 'field' ? ' (high-contrast outdoor)' : ''}`}
  >
   {scheme === 'dark' ? (
@@ -220,12 +221,12 @@ export function EditorHeader({
   ) : (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
   )}
- </button>
+ </IconButton>
 
  {/* Settings button */}
- <button
+ <IconButton
+  aria-label="Inspection settings"
   onClick={() => state.setSettingsOpen(true)}
-  className="w-9 h-9 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
   title="Inspection settings"
  >
   <svg
@@ -247,7 +248,7 @@ export function EditorHeader({
    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
   />
   </svg>
- </button>
+ </IconButton>
 
  {/* Template menu [config] — global template actions consolidated here
      (swap template · save as new · update source), replacing the buttons
@@ -262,63 +263,75 @@ export function EditorHeader({
  {/* Preview full report — opens the whole report (all sections) in a new tab.
      Owner preview works on drafts (tokenless via the report-view loader). */}
  {tenantSlug && (
-  <button
+  <Button
+  variant="secondary"
+  size="md"
   onClick={() => window.open(`/report-view/${tenantSlug}/${state.inspection.id}`, "_blank", "noopener")}
-  className="hidden 2xl:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+  className="hidden 2xl:inline-flex"
   title="Preview the full report (all sections) in a new tab"
+  icon={
+   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+   </svg>
+  }
   >
-  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-  </svg>
   Preview
-  </button>
+  </Button>
  )}
 
  {/* Preview PDF — opens the real server-rendered PDF deliverable (the exact
      client deliverable) in a new tab. Owner on-demand render works pre-publish
      on drafts via the owner/JWT-authed /api/inspections/:id/pdf endpoint. */}
- <button
+ <Button
+  variant="secondary"
+  size="md"
   onClick={() => window.open(`/api/inspections/${state.inspection.id}/pdf?type=full`, "_blank", "noopener")}
-  className="hidden xl:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+  className="hidden xl:inline-flex"
   title="Preview the real server-rendered PDF (the exact client deliverable) in a new tab"
+  icon={
+   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+   </svg>
+  }
  >
-  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-  </svg>
   Preview PDF
- </button>
+ </Button>
 
  {/* Sign now button */}
- <button
+ <Button
+  variant="secondary"
+  size="md"
   onClick={() => setSignModalOpen(true)}
-  className="hidden xl:inline-flex h-9 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted items-center gap-1.5"
+  className="hidden xl:inline-flex"
   title="Sign this inspection now"
+  icon={<Icon name="edit" className="w-3.5 h-3.5" />}
  >
-  <Icon name="edit" className="w-3.5 h-3.5" />
   Sign now
- </button>
+ </Button>
 
  {/* Publish button */}
- <button
+ <Button
+  variant="primary"
   onClick={handlePublishClick}
-  className="h-9 px-4 rounded-md bg-ih-ok text-white font-bold text-[12px] hover:bg-ih-ok/85 transition-colors inline-flex items-center gap-1.5"
+  icon={
+   <svg
+   className="w-3.5 h-3.5"
+   fill="none"
+   stroke="currentColor"
+   viewBox="0 0 24 24"
+   >
+   <path
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    strokeWidth={2}
+    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+   />
+   </svg>
+  }
  >
-  <svg
-  className="w-3.5 h-3.5"
-  fill="none"
-  stroke="currentColor"
-  viewBox="0 0 24 24"
-  >
-  <path
-   strokeLinecap="round"
-   strokeLinejoin="round"
-   strokeWidth={2}
-   d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-  />
-  </svg>
   Publish
- </button>
+ </Button>
  </div>
 
  </div>

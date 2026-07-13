@@ -1,3 +1,4 @@
+import { Button } from "@core/shared-ui";
 import type { CustomDefectCategory } from "../../lib/custom-defects";
 
 export interface CustomDefectFormProps {
@@ -70,21 +71,21 @@ export function CustomDefectForm({
           </label>
         )}
         <span className="flex-1" />
-        <button
-          type="button"
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onCancel}
-          className="h-8 px-3 rounded-lg text-[12px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted"
         >
           Cancel
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
           onClick={onSubmit}
           disabled={!title.trim()}
-          className="h-8 px-3 rounded-lg bg-ih-primary text-white text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-40"
         >
           Add defect
-        </button>
+        </Button>
       </div>
     </div>
   );

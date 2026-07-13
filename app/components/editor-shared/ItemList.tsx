@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { createPortal } from "react-dom";
+import { Button, IconButton, MenuItem } from "@core/shared-ui";
 import type { EditorMode } from "./editor-mode";
 import { useSortableReorder } from "./useSortableReorder";
 import { InlineRename } from "./InlineRename";
@@ -206,15 +207,16 @@ export function ItemList({
               {/* Reserved ⋯ slot — own column, never overlaps the rating dot. */}
               {structuralEditing && !batchMode && (
                 <div className={`shrink-0 w-6 flex items-center justify-center ${REVEAL}`}>
-                  <button
+                  <IconButton
                     onClick={(e) => { e.stopPropagation(); openItemMenu(item.id, e.currentTarget); }}
-                    className="w-6 h-6 rounded-md flex items-center justify-center text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ih-primary"
+                    size="sm"
+                    className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2"
                     aria-label={`Edit ${item.label}`}
                     aria-haspopup="true"
                     aria-expanded={menuItemId === item.id}
                   >
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></svg>
-                  </button>
+                  </IconButton>
                   {menuItemId === item.id && menuAnchor && createPortal(
                     <>
                       <div className="fixed inset-0 z-[60]" onClick={closeItemMenu} />
@@ -224,19 +226,19 @@ export function ItemList({
                         className="fixed -translate-x-full z-[61] w-36 py-1 bg-ih-bg-card border border-ih-border rounded-md shadow-ih-popover text-[12px]"
                       >
                         {onRenameItem && (
-                          <button role="menuitem" onClick={(e) => { e.stopPropagation(); closeItemMenu(); setEditingId(item.id); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Rename</button>
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); setEditingId(item.id); }}>Rename</MenuItem>
                         )}
                         {onDuplicateItem && (
-                          <button role="menuitem" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDuplicateItem(item.id); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Duplicate</button>
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDuplicateItem(item.id); }}>Duplicate</MenuItem>
                         )}
                         {onMoveItem && fullIdx > 0 && (
-                          <button role="menuitem" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, -1); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Move up</button>
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, -1); }}>Move up</MenuItem>
                         )}
                         {onMoveItem && fullIdx < items.length - 1 && (
-                          <button role="menuitem" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, 1); }} className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted">Move down</button>
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, 1); }}>Move down</MenuItem>
                         )}
                         {onDeleteItem && (
-                          <button role="menuitem" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDeleteItem(item.id); }} className="w-full text-left px-3 py-1.5 text-ih-bad hover:bg-ih-bg-muted">Delete</button>
+                          <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDeleteItem(item.id); }}>Delete</MenuItem>
                         )}
                       </div>
                     </>,
@@ -250,12 +252,14 @@ export function ItemList({
       </div>
       {onAddItem && (
         <div className="p-2 border-t border-ih-border">
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onAddItem}
-            className="w-full py-2 rounded-md border border-dashed border-ih-border-strong text-[12px] font-bold text-ih-fg-3 hover:text-ih-primary hover:border-ih-primary"
+            className="w-full h-auto py-2 border border-dashed border-ih-border-strong font-bold text-ih-fg-3 hover:bg-transparent hover:text-ih-primary hover:border-ih-primary"
           >
             + Add item
-          </button>
+          </Button>
         </div>
       )}
     </div>

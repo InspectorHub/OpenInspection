@@ -8,6 +8,8 @@
  * `{ id, label }[]` + `completedUnitIds` shape below.
  */
 
+import { IconButton } from "@core/shared-ui";
+
 interface UnitProgressUnit {
   id: string;
   label: string;
@@ -48,16 +50,16 @@ export function UnitProgress({ units, completedUnitIds, onSelectUnit, activeUnit
           const title = `${u.label} — ${isDone ? "complete" : "in progress"}`;
 
           return onSelectUnit ? (
-            <button
+            <IconButton
               key={u.id}
-              type="button"
               onClick={() => onSelectUnit(u.id)}
               title={title}
               aria-label={title}
-              className="p-0.5 rounded-ih-button hover:bg-ih-bg-muted"
+              size="sm"
+              className="w-auto h-auto p-0.5"
             >
               <span className={dotClass} />
-            </button>
+            </IconButton>
           ) : (
             <span key={u.id} title={title} aria-label={title}>
               <span className={dotClass} />

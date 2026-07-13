@@ -2,7 +2,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
 import { findRatingLevel, ratingAdvanceDecision } from "~/lib/rating-levels";
 import { makeCustomDefect } from "~/lib/custom-defects";
-import { useInspectionState, type InspectionSchema } from "~/hooks/useInspection";
+import { useInspectionState, type InspectionSchema, type ItemFilter } from "~/hooks/useInspection";
 import { findingKey } from "~/hooks/findings/shared";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
@@ -74,6 +74,7 @@ import { UnitsManager } from "~/components/editor/UnitsManager";
 import { CostItemsHost } from "~/components/editor/CostItemsHost";
 import type { ResultMap } from "~/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
+import { Button, IconButton, SegmentedControl } from "@core/shared-ui";
 
 export function meta() {
  return [{ title: "Edit Inspection - OpenInspection" }];
@@ -202,11 +203,17 @@ export default function InspectionEditPage() {
  const unitsFetcher = useFetcher<{ ok: boolean; intent?: string }>();
  const scopeFetcher = useFetcher<{ ok: boolean; intent?: string; scope?: string; results?: ResultMap }>();
  const navigate = useNavigate();
- const photoInputRef = useRef<HTMLInputElement>(null);
+ // Task 16 — split the single photo input into a camera capture input
+ // (single file, capture=environment — "Take photo") and a library input
+ // (multiple, no capture — "Add from library", desktop's default add-photo
+ // affordance). Both feed the same handlePhotoUpload batch handler.
+ const cameraInputRef = useRef<HTMLInputElement>(null);
+ const libraryInputRef = useRef<HTMLInputElement>(null);
  const { scheme, setColorScheme } = useTheme();
 
  /* Plan 7 — add-media chooser (photo OR video) + video capture overlay. The
-  * add tile opens the chooser; "Photo" triggers the existing photo input,
+  * add tile opens the chooser; Task 16 split "Photo" into "Take photo"
+  * (camera input) and "Add from library" (multi-select library input),
   * "Video" opens VideoCapture. Video upload requires a connection (it does NOT
   * use the offline photo queue — clip sizes make IndexedDB replay impractical). */
  const [addMediaChooser, setAddMediaChooser] = useState<{ itemId: string } | null>(null);
@@ -1007,35 +1014,49 @@ export default function InspectionEditPage() {
  // picker opens, consumed (and cleared) by handlePhotoUpload.
  const pendingPhotoTargetRef = useRef<{ kind: "canned" | "custom"; id: string } | null>(null);
 
+ // Task 16 — Worker subrequest safety: a single submission fans out one
+ // upstream upload call per file (see action.server.ts's mapPool), so an
+ // unbounded selection could blow the per-request subrequest budget. Cap the
+ // batch and tell the user rather than silently dropping the overflow.
+ const MAX_BATCH_PHOTOS = 20;
+
  const handlePhotoUpload = useCallback(
  (e: React.ChangeEvent<HTMLInputElement>) => {
- const file = e.target.files?.[0];
- if (!file || !state.activeItemId) return;
+ const all = Array.from(e.target.files ?? []);
+ if (all.length === 0 || !state.activeItemId) return;
  const itemId = state.activeItemId;
+ const overflow = all.length > MAX_BATCH_PHOTOS;
+ const files = overflow ? all.slice(0, MAX_BATCH_PHOTOS) : all;
 
  // N2+N4 — bake before submit (auto-orient + downscale + EXIF/GPS strip),
  // unless the user opted into original quality. Capture the
  // defect target ref into a local BEFORE the await so a second picker open
- // cannot clobber it. The offline branch above keeps the RAW File (Task 5
- // bakes at replay).
+ // cannot clobber it. The offline branch below keeps the RAW File (Task 5
+ // bakes at replay). Single-file selections take this exact same path with
+ // a one-element array, so behavior is byte-identical to the old code.
  const orig = originalQualityEnabled();
  const target = pendingPhotoTargetRef.current;
  pendingPhotoTargetRef.current = null;
  void (async () => {
- const baked = orig ? file : await preprocessImage(file);
+ const bakedFiles: File[] = [];
+ for (const f of files) {
+ bakedFiles.push(orig ? f : await preprocessImage(f));
+ }
 
- // #181 PR-G — offline: persist the baked photo locally + append a PENDING
- // doc entry (empty key + pendingUpload). The strip renders it from the
- // local blob; the drain (on reconnect / online) uploads it to R2 and swaps
- // in the real key. Defect-targeted offline adds fall back to the online
- // fetcher (the pending-doc model covers item photos; defect pending is out
- // of scope) — they simply re-fire when back online.
+ // #181 PR-G — offline: persist each baked photo locally + append a
+ // PENDING doc entry (empty key + pendingUpload) per file. The strip
+ // renders them from the local blob; the drain (on reconnect / online)
+ // uploads each to R2 and swaps in the real key. Defect-targeted offline
+ // adds fall back to the online fetcher (the pending-doc model covers
+ // item photos; defect pending is out of scope) — they simply re-fire
+ // when back online.
  const doc = collab?.doc ?? null;
  const sid = state.sectionIdForItem(itemId) ?? state.currentSection?.id;
  if (typeof navigator !== "undefined" && navigator.onLine === false && doc && sid && !target) {
   // Phase U (Batch C2a) — key the offline pending-photo doc entry to the active
   // unit. At activeUnitId == null this === the legacy `_default:{sid}:{itemId}`.
   const fk = findingKey(activeUnitId, sid, itemId);
+  for (const baked of bakedFiles) {
   const pendingId = crypto.randomUUID();
   await enqueueMedia({
   pendingId,
@@ -1046,22 +1067,31 @@ export default function InspectionEditPage() {
   enqueuedAt: Date.now(),
   });
   appendPendingPhoto(doc, fk, pendingId);
-  return;
- }
-
- const formData = new FormData();
- formData.append("intent", "upload-photo");
- formData.append("itemId", itemId);
- formData.append("file", baked);
- if (target) {
+  }
+ } else {
+  const formData = new FormData();
+  formData.append("intent", "upload-photo");
+  formData.append("itemId", itemId);
+  for (const baked of bakedFiles) formData.append("file", baked);
+  if (target) {
   formData.append("targetType", "defect");
   formData.append("customId", target.id);
   formData.append("defectKind", target.kind);
+  }
+  uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
  }
- uploadFetcher.submit(formData, { method: "post", encType: "multipart/form-data" });
+
+ if (overflow) {
+  pushToast({
+  message: "Added the first 20 photos; add the rest in another batch.",
+  variant: "warning",
+  durationMs: 6000,
+  });
+ }
  })();
- // Reset input so picking the same file twice re-fires onChange
- if (photoInputRef.current) photoInputRef.current.value = "";
+ // Reset both inputs so re-picking the same file(s) re-fires onChange
+ if (cameraInputRef.current) cameraInputRef.current.value = "";
+ if (libraryInputRef.current) libraryInputRef.current.value = "";
  },
  [state.activeItemId, state.inspection.id, uploadFetcher, collab?.doc, state.sectionIdForItem, state.currentSection, activeUnitId],
  );
@@ -1097,6 +1127,8 @@ export default function InspectionEditPage() {
  | {
  ok?: boolean;
  keys?: string[];
+ // Task 15/16 — per-file status; drives the partial-failure toast below.
+ results?: Array<{ index: number; ok: boolean; key?: string; error?: string }>;
  itemId?: string;
  targetType?: "item" | "defect";
  customId?: string;
@@ -1105,6 +1137,8 @@ export default function InspectionEditPage() {
  | undefined;
  if (uploadFetcher.state !== "idle" || !d || processedUploadData.current === d) return;
  processedUploadData.current = d;
+ // Attach every successful key exactly as before — unchanged regardless of
+ // whether the submission was a single file or a batch.
  if (d.keys?.length && d.itemId) {
  for (const k of d.keys) {
  if (d.targetType === "defect" && d.customId) {
@@ -1117,16 +1151,36 @@ export default function InspectionEditPage() {
  findings.addPhotoToItem(d.itemId, k);
  }
  }
+ }
+ // Task 16 — results[] lets a batch report exactly how many of a large
+ // selection made it, instead of an all-or-nothing toast. d.ok is derived
+ // from results.every(ok) server-side, so without this a single failed file
+ // in a 12-photo batch would fire BOTH the success toast (for the 11 that
+ // attached) and the old generic failure toast — keep them mutually
+ // exclusive here.
+ if (d.results?.length) {
+ const total = d.results.length;
+ const successCount = d.results.filter((r) => r.ok).length;
+ const failCount = total - successCount;
+ if (failCount > 0) {
  pushToast({
- message: `${d.keys.length} photo${d.keys.length === 1 ? "" : "s"} added${d.targetType === "defect" ? " to defect" : ""}`,
-				variant: "success",
+ message: `${successCount} of ${total} photos uploaded — ${failCount} failed.`,
+ variant: "error",
+ durationMs: 8000,
+ });
+ } else {
+ pushToast({
+ message: `${successCount} photo${successCount === 1 ? "" : "s"} added${d.targetType === "defect" ? " to defect" : ""}`,
+ variant: "success",
  durationMs: 2000,
  });
  }
- if (d.ok === false) {
+ } else if (d.ok === false) {
+ // Fallback for a response shape without results[] (e.g. an older/other
+ // action path) — preserves the pre-Task-16 generic failure toast.
  pushToast({
  message: "Photo upload failed — your photo did NOT reach the server.",
-				variant: "error",
+ variant: "error",
  durationMs: 8000,
  });
  }
@@ -1244,8 +1298,15 @@ export default function InspectionEditPage() {
  },
  onLibraryClose: () => state.setShowCommentLibrary(false),
  onPhoto: () => {
- if (!state.activeItemId) return;
- photoInputRef.current?.click();
+ if (!state.activeItemId || uploadFetcher.state !== "idle") return;
+ // Task 16 — desktop file pickers already offer camera-vs-library choice
+ // natively, so go straight to the multi-select library input; mobile
+ // still needs the explicit chooser (camera capture has no multi-select).
+ if (isMobile) {
+ setAddMediaChooser({ itemId: state.activeItemId });
+ } else {
+ libraryInputRef.current?.click();
+ }
  },
  onSave: () => findings.saveNow(),
  onPublish: () => { setPublishError(null); state.setShowPublishModal(true); },
@@ -1284,6 +1345,8 @@ export default function InspectionEditPage() {
  comments,
  commentLibraryItems,
  serverComments,
+ uploadFetcher.state,
+ isMobile,
  ],
  );
 
@@ -1376,11 +1439,18 @@ export default function InspectionEditPage() {
  onAddPhoto={() =>
   state.activeItemId
    ? setAddMediaChooser({ itemId: state.activeItemId })
-   : photoInputRef.current?.click()
+   : libraryInputRef.current?.click()
  }
  onAddDefectPhoto={(target) => {
+ if (uploadFetcher.state !== "idle") return;
  pendingPhotoTargetRef.current = target;
- photoInputRef.current?.click();
+ // Task 16 — same camera/library split as onPhoto above, scoped to a
+ // specific defect row instead of the item.
+ if (isMobile) {
+ setAddMediaChooser({ itemId: state.activeItemId ?? "" });
+ } else {
+ libraryInputRef.current?.click();
+ }
  }}
  photoUploading={uploadFetcher.state !== "idle"}
  onAddCustomDefect={(input) => {
@@ -1541,14 +1611,84 @@ export default function InspectionEditPage() {
  <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
   <p className="text-[15px] font-semibold text-ih-fg-1">This inspection has no template content</p>
   <p className="text-[13px] text-ih-fg-3 max-w-sm">Apply a template to get sections, items and canned comments — or import your Spectora template.</p>
-  <button
+  <Button
+  variant="primary"
   onClick={() => state.setSettingsOpen(true)}
-  className="px-4 h-10 rounded-lg bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600"
   >
   Choose a template
-  </button>
+  </Button>
  </div>
  ) : null;
+
+ // Task 16 — hoisted so the SAME elements mount in both the mobile and
+ // desktop render trees below (they're two separate early-return JSX trees,
+ // not nested). FE-2 already hit this bug once for the old single photo
+ // input (see the comment that used to sit here): a ref/overlay defined only
+ // in the desktop tree is simply null/absent on mobile, so any handler that
+ // targets it silently no-ops. camera/library inputs feed handlePhotoUpload
+ // directly; the add-media chooser (camera vs library vs video) and the
+ // video-capture overlay it can open must mount on both surfaces too, since
+ // onPhoto/onAddPhoto/onAddDefectPhoto now route mobile through the chooser.
+ const photoInputsEl = (
+ <>
+ <input
+ ref={cameraInputRef}
+ type="file"
+ accept="image/*"
+ capture="environment"
+ className="hidden"
+ onChange={handlePhotoUpload}
+ />
+ <input
+ ref={libraryInputRef}
+ type="file"
+ accept="image/*"
+ multiple
+ className="hidden"
+ onChange={handlePhotoUpload}
+ />
+ </>
+ );
+
+ const addMediaOverlaysEl = (
+ <>
+ {/* Plan 7 — add-media chooser: take a photo, add from library, or video.
+ * Video requires a connection (no offline queue); the Video option
+ * disables + hints when offline. */}
+ {addMediaChooser && (
+ <AddMediaChooser
+ onClose={() => setAddMediaChooser(null)}
+ onTakePhoto={() => {
+ setAddMediaChooser(null);
+ cameraInputRef.current?.click();
+ }}
+ onAddFromLibrary={() => {
+ setAddMediaChooser(null);
+ libraryInputRef.current?.click();
+ }}
+ onPickVideo={() => {
+ const t = addMediaChooser;
+ setAddMediaChooser(null);
+ setVideoCaptureTarget(t);
+ }}
+ />
+ )}
+
+ {/* Plan 7 — video capture + pluggable backend upload overlay. */}
+ {videoCaptureTarget && (
+ <VideoCapture
+ inspectionId={String(state.inspection.id)}
+ provider={videoProvider}
+ itemId={videoCaptureTarget.itemId}
+ onClose={() => setVideoCaptureTarget(null)}
+ onUploaded={() => {
+ setVideoCaptureTarget(null);
+ revalidator.revalidate();
+ }}
+ />
+ )}
+ </>
+ );
 
  /* ---------------------------------------------------------------- */
  /* Render */
@@ -1558,17 +1698,8 @@ export default function InspectionEditPage() {
  return (
  <div className="min-h-screen pb-14">
  <ToastPortal />
- {/* FE-2: the hidden photo input previously rendered only in the desktop
- tree — on mobile photoInputRef.current was null and every photo
- entry point was dead. */}
- <input
- ref={photoInputRef}
- type="file"
- accept="image/*"
- capture="environment"
- className="hidden"
- onChange={handlePhotoUpload}
- />
+ {photoInputsEl}
+ {addMediaOverlaysEl}
  <MobileAppBar
  sectionTitle={state.currentSection?.title ?? ''}
  itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? 'Select an item'}
@@ -1622,15 +1753,7 @@ export default function InspectionEditPage() {
   className="flex h-screen bg-ih-bg-card overflow-x-auto"
  >
  <ToastPortal />
- {/* Hidden photo input */}
- <input
- ref={photoInputRef}
- type="file"
- accept="image/*"
- capture="environment"
- className="hidden"
- onChange={handlePhotoUpload}
- />
+ {photoInputsEl}
 
  {/* SpeedMode overlay */}
  {state.speedMode && speedItem && (
@@ -1743,36 +1866,7 @@ export default function InspectionEditPage() {
  />
  )}
 
- {/* Plan 7 — add-media chooser: photo OR video. Video requires a connection
-  * (no offline queue); the Video option disables + hints when offline. */}
- {addMediaChooser && (
- <AddMediaChooser
-  onClose={() => setAddMediaChooser(null)}
-  onPickPhoto={() => {
-   setAddMediaChooser(null);
-   photoInputRef.current?.click();
-  }}
-  onPickVideo={() => {
-   const t = addMediaChooser;
-   setAddMediaChooser(null);
-   setVideoCaptureTarget(t);
-  }}
- />
- )}
-
- {/* Plan 7 — video capture + pluggable backend upload overlay. */}
- {videoCaptureTarget && (
- <VideoCapture
-  inspectionId={String(state.inspection.id)}
-  provider={videoProvider}
-  itemId={videoCaptureTarget.itemId}
-  onClose={() => setVideoCaptureTarget(null)}
-  onUploaded={() => {
-   setVideoCaptureTarget(null);
-   revalidator.revalidate();
-  }}
- />
- )}
+ {addMediaOverlaysEl}
 
  {/* Plan 4 (Task 8) — per-photo crop overlay. Cropping ALWAYS re-derives from
   * the ORIGINAL key. A re-crop that would discard an existing annotation warns
@@ -2008,28 +2102,34 @@ export default function InspectionEditPage() {
     {isPerUnit && (
       <BreadcrumbDropdown units={units} activeUnitId={activeUnitId} onSelect={requestScope} />
     )}
-    <button
-     type="button"
+    <Button
+     variant="secondary"
+     size="sm"
      onClick={() => setUnitsManagerOpen(true)}
-     className="hidden lg:inline-flex h-7 px-2.5 rounded-ih-button bg-ih-bg-muted text-ih-fg-2 text-[12px] font-bold hover:bg-ih-border items-center gap-1.5"
+     className="hidden lg:inline-flex"
      title="Manage units"
+     icon={
+      <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+      </svg>
+     }
     >
-     <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-     </svg>
      Units
-    </button>
-    <button
-     type="button"
+    </Button>
+    <Button
+     variant="secondary"
+     size="sm"
      onClick={() => setCostItemsOpen(true)}
-     className="hidden lg:inline-flex h-7 px-2.5 rounded-ih-button bg-ih-bg-muted text-ih-fg-2 text-[12px] font-bold hover:bg-ih-border items-center gap-1.5"
+     className="hidden lg:inline-flex"
      title="Cost items"
+     icon={
+      <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.66 0-3 .9-3 2s1.34 2 3 2 3 .9 3 2-1.34 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m0-10a4 4 0 100 8 4 4 0 000-8z" />
+      </svg>
+     }
     >
-     <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.66 0-3 .9-3 2s1.34 2 3 2 3 .9 3 2-1.34 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m0-10a4 4 0 100 8 4 4 0 000-8z" />
-     </svg>
      Cost Items
-    </button>
+    </Button>
    </div>
   ) : undefined
  }
@@ -2072,27 +2172,27 @@ export default function InspectionEditPage() {
  <div className="w-[280px] flex-shrink-0 border-r border-ih-border flex flex-col overflow-hidden relative">
  {/* Item filter tabs */}
  <div className="flex items-center gap-1 px-3 py-1.5 border-b border-ih-border">
- {(["all", "unrated", "issues", "flagged"] as const).map((f) => (
- <button
- key={f}
- onClick={() => state.setItemFilter(f)}
- className={`px-2 py-0.5 rounded text-[11px] font-bold capitalize ${
- state.itemFilter === f
- ? "bg-ih-primary-tint text-ih-primary"
- : "text-ih-fg-3 hover:text-ih-fg-2"
- }`}
- >
+ <SegmentedControl
+ ariaLabel="Item filter"
+ value={state.itemFilter}
+ onChange={(v) => state.setItemFilter(v as ItemFilter)}
+ options={(["all", "unrated", "issues", "flagged"] as const).map((f) => ({
+ value: f,
+ label: (
+ <>
  {f === "all" ? "All" : f === "unrated" ? "Unrated" : f === "issues" ? "Issues" : "Flagged"}
  {f !== "all" && (
  <span className="ml-1 text-[10px]">
  {f === "unrated" ? state.filterCounts.unrated : f === "issues" ? state.filterCounts.issues : state.filterCounts.flagged}
  </span>
  )}
- </button>
- ))}
+ </>
+ ),
+ }))}
+ />
  {/* Batch mode toggle — object-scoped action, lives with the items it selects
      (moved out of the global header). */}
- <button
+ <IconButton
  onClick={() => {
   if (state.batchMode) {
   state.setBatchMode(false);
@@ -2101,17 +2201,16 @@ export default function InspectionEditPage() {
   state.setBatchMode(true);
   }
  }}
- className={`ml-auto flex items-center justify-center w-7 h-7 rounded ${
-  state.batchMode ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-3 hover:bg-ih-bg-muted"
- }`}
+ selected={state.batchMode}
+ size="sm"
+ className="ml-auto"
  title={state.batchMode ? "Exit batch mode" : "Batch mode (B)"}
  aria-label={state.batchMode ? "Exit batch mode" : "Batch select items"}
- aria-pressed={state.batchMode}
  >
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
  </svg>
- </button>
+ </IconButton>
  </div>
  {itemListEl}
  </div>
@@ -2197,29 +2296,30 @@ export default function InspectionEditPage() {
  {!state.itemFullscreen && (
   state.sideRailCollapsed ? (
   <div className="w-8 flex-shrink-0 border-l border-ih-border flex flex-col items-center pt-3">
-   <button
-   type="button"
+   <IconButton
+   aria-label="Expand photo rail"
    onClick={() => state.setSideRailCollapsed(false)}
-   className="w-7 h-7 rounded-md flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
+   size="sm"
    title="Expand photo rail"
    >
    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
    </svg>
-   </button>
+   </IconButton>
   </div>
   ) : (
   <div className="relative flex-shrink-0">
-   <button
-   type="button"
+   <IconButton
+   aria-label="Collapse photo rail"
    onClick={() => state.setSideRailCollapsed(true)}
-   className="absolute top-3 left-1 z-10 w-6 h-6 rounded-md flex items-center justify-center text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-fg-2"
+   size="sm"
+   className="absolute top-3 left-1 z-10 w-6 h-6"
    title="Collapse photo rail"
    >
    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
    </svg>
-   </button>
+   </IconButton>
    {sideRailEl}
   </div>
   )

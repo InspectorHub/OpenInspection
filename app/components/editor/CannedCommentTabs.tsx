@@ -1,4 +1,4 @@
-import { TabStrip } from "@core/shared-ui";
+import { TabStrip, Button } from "@core/shared-ui";
 import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import { DefectFieldsRow, type DefectFieldsValue } from "./DefectFieldsRow";
 import { RepairItemsPanel } from "./RepairItemsPanel";
@@ -328,13 +328,14 @@ export function CannedCommentTabs({
                   onSubmit={onSubmitCustomDefect}
                 />
               ) : (
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={onOpenCustomForm}
-                  className="w-full p-2.5 rounded-lg border border-dashed border-ih-border-strong text-[12px] font-bold text-ih-fg-3 hover:border-ih-primary hover:text-ih-primary transition-colors text-left"
+                  className="w-full h-auto py-2.5 justify-start border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
                 >
                   + Add custom defect
-                </button>
+                </Button>
               )
             )}
           </>

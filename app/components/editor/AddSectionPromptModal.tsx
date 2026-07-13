@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Modal } from "@core/shared-ui";
+import { Modal, Button } from "@core/shared-ui";
 
 /**
  * D8 — "Add section" title prompt modal.
@@ -33,18 +33,18 @@ export function AddSectionPromptModal({
       initialFocusRef={inputRef}
       footer={
         <>
-          <button
+          <Button
+            variant="ghost"
             onClick={onCancel}
-            className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
             onClick={onConfirm}
-            className="px-4 py-2 text-[13px] font-bold text-white bg-ih-primary hover:bg-ih-primary/90 rounded-md"
           >
             Add
-          </button>
+          </Button>
         </>
       }
     >

@@ -30,7 +30,6 @@ import { ReportRepairPanel } from "./report/ReportRepairPanel";
 import { BuildingProfile } from "./report/BuildingProfile";
 import { PcaSkeleton } from "./report/PcaSkeleton";
 import { ReportToc } from "./report/ReportToc";
-import { PagedTocInjection } from "./report/PagedTocInjection";
 import { PerUnitReportBlock } from "./report/PerUnitReportBlock";
 import { CostTables } from "./report/CostTables";
 import { WordExportButton } from "./report/WordExportButton";
@@ -131,7 +130,7 @@ export function reportViewProps(
     reportTheme: data.reportTheme,
     initialFilter: data.initialFilter ?? "all",
     printMode: data.printMode ?? false,
-    pagedToc: data.pagedToc ?? false,
+    tocPages: data.tocPages,
     isPublished: data.isPublished ?? false,
     signature: data.signature ?? null,
     verification: data.verification ?? null,
@@ -201,10 +200,6 @@ function mediaTileKey(photo: ReportPhoto, idx: number): string {
       return photo.key;
   }
 }
-
-/* ------------------------------------------------------------------ */
-/* Gated Paged.js TOC page-number injection (Commercial PCA Phase O 7-9) */
-/* ------------------------------------------------------------------ */
 
 /* ------------------------------------------------------------------ */
 /* Component */
@@ -517,18 +512,11 @@ export function ReportView(props: ReportViewProps) {
         {/* Commercial PCA Phase O — reserved TOC slot: after the cover/header
             front matter, before the PcaSkeleton body. `?? []` guards the
             inline-Hub mount that may pass a partial payload during
-            transition; ReportToc itself renders nothing when empty. */}
-        <ReportToc entries={data.outline ?? []} showPageNumbers={data.pagedToc === true} />
-        {/* Commercial PCA Phase O Tasks 7–9 (GATED, opt-in). Injected ONLY when
-            the render URL carried `?print=1&pagedtoc=1`. When the gate is off —
-            the DEFAULT, incl. the current production generatePdfFromUrl which
-            does NOT send the param — none of this renders and the report is
-            byte-for-byte unchanged (no Paged.js script, no target-counter CSS,
-            no re-pagination). Client layer only: this proves Paged.js fills the
-            TOC page numbers via `target-counter` in a real browser. The CF-side
-            readiness wait + @page/pdfOptions reconciliation are still unverified;
-            see scripts/spike/pagedjs-cf-spike.md. */}
-        {data.pagedToc === true && <PagedTocInjection />}
+            transition; ReportToc itself renders nothing when empty.
+            Task 19a — `tocPages` (undefined on the web + PDF pass 1) fills the
+            reserved page-ref slot with real page numbers on pass 2, resolved
+            server-side by extractAnchorPages against the pass-1 render. */}
+        <ReportToc entries={data.outline ?? []} tocPages={data.tocPages} />
         <PcaSkeleton
           data={data.pcaReport ?? null}
           tier={data.reportTier ?? null}

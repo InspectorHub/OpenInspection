@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { useFetcher } from "react-router";
-import { Drawer, Modal, Button, Input } from "@core/shared-ui";
+import { Drawer, Modal, Button, Input, IconButton, SegmentedControl } from "@core/shared-ui";
 import type { UnitScopeRow } from "./BreadcrumbDropdown";
 
 type UnitsFetcher = ReturnType<typeof useFetcher>;
@@ -120,19 +120,16 @@ export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher
         size="sm"
         footer={
           <>
-            <button
-              onClick={() => setShowLossy(false)}
-              className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-ih-button"
-            >
+            <Button variant="ghost" onClick={() => setShowLossy(false)}>
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="danger"
               disabled={busy}
               onClick={() => submit({ intent: "unit-mode-switch", mode: "tagged" })}
-              className="px-4 py-2 text-[13px] font-bold text-ih-fg-inverse bg-ih-bad hover:opacity-90 rounded-ih-button disabled:opacity-50"
             >
               Switch &amp; flatten
-            </button>
+            </Button>
           </>
         }
       >
@@ -188,30 +185,30 @@ function UnitRow({
         maxLength={80}
         className="flex-1 h-8 px-2.5 rounded-ih-input border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1"
       />
-      <button
-        type="button"
+      <IconButton
         disabled={busy}
         onClick={() => onSubmit({ intent: "unit-duplicate", unitId: unit.id })}
         title="Duplicate unit"
         aria-label={`Duplicate ${unit.name}`}
-        className="w-8 h-8 flex items-center justify-center rounded-ih-button text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50"
+        size="md"
+        className="w-8 h-8 text-ih-fg-3"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
         </svg>
-      </button>
-      <button
-        type="button"
+      </IconButton>
+      <IconButton
         disabled={busy}
         onClick={() => onSubmit({ intent: "unit-delete", unitId: unit.id })}
         title="Remove unit"
         aria-label={`Remove ${unit.name}`}
-        className="w-8 h-8 flex items-center justify-center rounded-ih-button text-ih-fg-3 hover:bg-ih-bg-muted hover:text-ih-bad disabled:opacity-50"
+        size="md"
+        className="w-8 h-8 text-ih-fg-3 hover:text-ih-bad"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
-      </button>
+      </IconButton>
     </li>
   );
 }
@@ -288,20 +285,15 @@ function BulkCreateForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: 
 
   return (
     <div className="rounded-ih-card border border-ih-border p-3 space-y-3">
-      <div className="flex gap-1">
-        {(["grid", "csv"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`px-2.5 h-7 rounded-ih-button text-[12px] font-bold ${
-              tab === t ? "bg-ih-primary-tint text-ih-primary" : "text-ih-fg-3 hover:bg-ih-bg-muted"
-            }`}
-          >
-            {t === "grid" ? "Floors × stacks" : "CSV paste"}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        options={[
+          { value: "grid", label: "Floors × stacks" },
+          { value: "csv", label: "CSV paste" },
+        ]}
+        value={tab}
+        onChange={(v) => setTab(v as "grid" | "csv")}
+        ariaLabel="Bulk create method"
+      />
 
       {tab === "grid" ? (
         <div className="space-y-2">

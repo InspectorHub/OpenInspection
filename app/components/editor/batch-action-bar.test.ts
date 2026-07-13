@@ -52,8 +52,10 @@ describe('BatchActionBar', () => {
 
   it('renders one rating button per level', () => {
     const html = render(baseProps);
-    // Two rating levels → two data-rating-id attributes
-    const matches = [...html.matchAll(/data-rating-id="[^"]+"/g)];
+    // Two rating levels → two radiogroup tiles (RatingSegment renders
+    // role="radio" per option; the former data-rating-id attribute was an
+    // implementation detail of the pre-migration hand-rolled tiles).
+    const matches = [...html.matchAll(/role="radio"/g)];
     expect(matches).toHaveLength(2);
   });
 

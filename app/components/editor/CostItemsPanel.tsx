@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Button } from "@core/shared-ui";
 import { formatDollars } from "~/lib/money";
 import { MoneyInput } from "~/components/MoneyInput";
 import { CostExportButtons } from "~/components/CostExportButtons";
@@ -188,13 +189,9 @@ export function CostItemsPanel({
           {/* Export the current Opinion of Cost — only worth offering once at
               least one line exists (empty exports are just a header row). */}
           {rows.length > 0 && <CostExportButtons inspectionId={inspectionId} variant="panel" />}
-          <button
-            type="button"
-            onClick={addRow}
-            className="text-[12px] text-ih-primary font-bold hover:underline"
-          >
+          <Button variant="link" size="sm" onClick={addRow}>
             + Add cost item
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -440,14 +437,9 @@ function CostItemRow({
             </span>
           )}
         </div>
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onRemove}
-          className="text-[11px] text-ih-bad-fg hover:underline disabled:opacity-50"
-        >
+        <Button variant="danger-link" size="sm" disabled={busy} onClick={onRemove}>
           Remove
-        </button>
+        </Button>
       </div>
     </li>
   );

@@ -1,4 +1,4 @@
-import { Icon } from '@core/shared-ui';
+import { Icon, Button, IconButton } from '@core/shared-ui';
 import type { PublishReadiness, PublishBlockingDefect } from '../../lib/types';
 
 export interface PublishGateModalProps {
@@ -36,12 +36,13 @@ function DefectList({ entries, onJump, tone }: {
                             )}
                         </div>
                     </div>
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => onJump(b)}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded bg-ih-primary text-white text-[12px] font-bold hover:opacity-90"
                     >
                         Jump <Icon name="arrowR" size={13} />
-                    </button>
+                    </Button>
                 </li>
             ))}
         </ul>
@@ -65,13 +66,13 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
                             ? <>Publish with warnings? &mdash; {warnings.length} defect{warnings.length === 1 ? '' : 's'} incomplete</>
                             : <>Cannot publish &mdash; {blocking.length} defect{blocking.length === 1 ? '' : 's'} need attention</>}
                     </h2>
-                    <button
+                    <IconButton
                         onClick={onClose}
-                        className="text-ih-fg-4 hover:text-ih-fg-2 w-6 h-6 flex items-center justify-center"
                         aria-label="Close"
+                        size="sm"
                     >
                         &#x2715;
-                    </button>
+                    </IconButton>
                 </div>
                 <div className="flex-1 overflow-y-auto">
                     {blocking.length > 0 && <DefectList entries={blocking} onJump={onJump} tone="blocking" />}
@@ -85,17 +86,18 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
                     )}
                 </div>
                 <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
-                    <button onClick={onClose} className="px-3 py-1 rounded border border-ih-border text-[12px]">
+                    <Button variant="ghost" size="sm" onClick={onClose}>
                         {warningOnly ? 'Cancel' : 'Close'}
-                    </button>
+                    </Button>
                     {warningOnly && onProceed && (
-                        <button
+                        <Button
+                            variant="primary"
+                            size="sm"
                             onClick={onProceed}
-                            className="px-3 py-1 rounded bg-ih-primary text-white text-[12px] font-bold hover:opacity-90"
                             data-testid="publish-anyway"
                         >
                             Publish anyway
-                        </button>
+                        </Button>
                     )}
                 </div>
             </div>

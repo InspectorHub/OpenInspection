@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Button, IconButton, MenuItem } from '@core/shared-ui';
 import { SectionDonut } from '../editor/SectionDonut';
 import { sectionIconFor } from '../editor/section-icons';
 import type { EditorMode } from './editor-mode';
@@ -228,15 +229,16 @@ export function SectionRail({
   {/* Reserved ⋯ slot — its own column, never overlaps the donut. */}
   {hasStructuralOps && (
   <div className={`shrink-0 w-6 flex items-center justify-center ${REVEAL}`}>
-   <button
+   <IconButton
    onClick={(e) => { e.stopPropagation(); openSectionMenu(section.id, e.currentTarget); }}
-   className="w-6 h-6 flex items-center justify-center rounded text-ih-fg-4 hover:text-ih-fg-2 hover:bg-ih-bg-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-ih-primary"
+   size="sm"
+   className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2"
    aria-label={`Section options for ${section.title}`}
    aria-haspopup="true"
    aria-expanded={menuOpen}
    >
    <DotsIcon />
-   </button>
+   </IconButton>
    {menuOpen && menuAnchor && createPortal(
    <>
    <div className="fixed inset-0 z-[60]" onClick={closeSectionMenu} />
@@ -246,51 +248,42 @@ export function SectionRail({
     role="menu"
    >
     {onRenameSection && (
-    <button
-     role="menuitem"
-     className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
+    <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); setEditingId(section.id); }}
     >
      Rename
-    </button>
+    </MenuItem>
     )}
     {onDuplicateSection && (
-    <button
-     role="menuitem"
-     className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
+    <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onDuplicateSection(section.id); }}
     >
      Duplicate
-    </button>
+    </MenuItem>
     )}
     {onMoveSection && idx > 0 && (
-    <button
-     role="menuitem"
-     className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
+    <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onMoveSection(section.id, -1); }}
     >
      Move up
-    </button>
+    </MenuItem>
     )}
     {onMoveSection && idx < sections.length - 1 && (
-    <button
-     role="menuitem"
-     className="w-full text-left px-3 py-1.5 text-ih-fg-2 hover:bg-ih-bg-muted"
+    <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onMoveSection(section.id, 1); }}
     >
      Move down
-    </button>
+    </MenuItem>
     )}
     {onDeleteSection && (
     <>
      <hr className="my-0.5 border-ih-border" />
-     <button
-     role="menuitem"
-     className="w-full text-left px-3 py-1.5 text-ih-bad hover:bg-ih-bg-muted font-bold"
+     <MenuItem
+     tone="danger"
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onDeleteSection(section.id); }}
      >
      Delete
-     </button>
+     </MenuItem>
     </>
     )}
    </div>
@@ -308,13 +301,15 @@ export function SectionRail({
  {/* D8 — "+ Add section" CTA at the rail bottom (only when structural ops are wired) */}
  {onAddSection && (
   <div className="p-2 pt-0">
-  <button
+  <Button
+   variant="ghost"
+   size="sm"
    onClick={onAddSection}
    data-testid="add-section-btn"
-   className="w-full text-left px-3 py-2 rounded-md text-[12px] text-ih-fg-4 border border-dashed border-ih-border hover:border-ih-primary hover:text-ih-primary transition-all"
+   className="w-full justify-start h-auto py-2 border border-dashed border-ih-border text-ih-fg-4 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
   >
    + Add section
-  </button>
+  </Button>
   </div>
  )}
 

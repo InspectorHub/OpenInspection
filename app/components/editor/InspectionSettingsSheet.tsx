@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
-import { Drawer } from "@core/shared-ui";
+import { Drawer, Button } from "@core/shared-ui";
 import { TemplateCombobox } from "~/components/TemplateCombobox";
 import { CoverCropper } from "~/components/media-studio/CoverCropper";
 import { fullResUrl } from "~/components/media-studio/cropImage";
@@ -244,9 +244,9 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
             {saveState === "saving" && <span className="text-[12px] text-ih-watch-fg font-bold self-center">Saving...</span>}
             {saveState === "saved" && <span className="text-[12px] text-ih-ok-fg font-bold self-center">Saved</span>}
             {saveState === "error" && <span className="text-[12px] text-ih-bad-fg font-bold self-center">Error -- try again</span>}
-            <button type="submit" form="inspection-settings-form" disabled={saveState === "saving"} className="h-10 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 disabled:bg-ih-border-strong">
+            <Button variant="primary" type="submit" form="inspection-settings-form" disabled={saveState === "saving"}>
               Save changes
-            </button>
+            </Button>
           </>
         )}
       >
@@ -383,14 +383,9 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                   </div>
                 )}
                 <div className="flex items-center gap-3 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => coverFileRef.current?.click()}
-                    disabled={coverFetcher.state !== "idle"}
-                    className="h-9 px-3 rounded-md border border-ih-border text-ih-fg-2 text-[12px] font-bold hover:border-ih-primary hover:text-ih-primary transition-colors disabled:opacity-50"
-                  >
+                  <Button variant="secondary" size="sm" onClick={() => coverFileRef.current?.click()} disabled={coverFetcher.state !== "idle"} className="hover:border-ih-primary hover:text-ih-primary">
                     {coverFetcher.state !== "idle" && coverFetcher.formData?.get("intent") === "upload-cover" ? "Uploading…" : "Upload cover photo"}
-                  </button>
+                  </Button>
                   <span className="text-[11px] text-ih-fg-4">Shown on the report cover page. Click the selected photo to clear it.</span>
                 </div>
               </fieldset>

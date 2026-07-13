@@ -1,4 +1,4 @@
-import { Modal } from "@core/shared-ui";
+import { Modal, Button } from "@core/shared-ui";
 
 export interface UnsavedChangesBlockerProps {
  open: boolean;
@@ -21,18 +21,18 @@ export function UnsavedChangesBlocker({ open, onStay, onLeave }: UnsavedChangesB
  size="sm"
  footer={
  <>
- <button
+ <Button
+ variant="ghost"
  onClick={onStay}
- className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md"
  >
  Stay
- </button>
- <button
+ </Button>
+ <Button
+ variant="danger"
  onClick={onLeave}
- className="px-4 py-2 text-[13px] font-bold text-white bg-ih-bad hover:bg-ih-bad/85 rounded-md"
  >
  Leave
- </button>
+ </Button>
  </>
  }
  >

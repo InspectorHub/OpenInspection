@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "./cn";
 
 export interface SegmentedControlOption {
   value: string;
@@ -82,7 +83,7 @@ export function SegmentedControl({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className={`inline-flex gap-1 p-1 bg-ih-bg-muted rounded-ih-button ${className}`}
+      className={cn("inline-flex gap-1 p-1 bg-ih-bg-muted rounded-ih-button", className)}
     >
       {options.map((o, i) => {
         const active = o.value === value;

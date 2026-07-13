@@ -181,6 +181,8 @@ export default defineConfig({
         { name: 'repair-list', testMatch: 'repair-list.spec.ts' },
         { name: 'report-viewer', testMatch: 'report-viewer.spec.ts' },
         { name: 'inspection-edit-hotkeys', testMatch: 'inspection-edit-hotkeys.spec.ts', dependencies: ['editor-seed'] },
+        // Phase 3 Task 16 — batch photo upload (library input multi-select).
+        { name: 'batch-photo-upload', testMatch: 'batch-photo-upload.spec.ts', dependencies: ['editor-seed'] },
         { name: 'inspection-lifecycle', testMatch: 'inspection-lifecycle.spec.ts', dependencies: ['editor-seed'] },
         // Destructive (reset/restore DB) — env-gated inside the specs:
         { name: 'backup-restore-seed', testMatch: 'backup-restore-seed.spec.ts' },
@@ -189,11 +191,9 @@ export default defineConfig({
         { name: 'subsystem-c-stripe-smoke', testMatch: 'subsystem-c-stripe-cross-repo-smoke.spec.ts' },
         { name: 'subsystem-d-flows', testMatch: 'subsystem-d-flows.spec.ts' },
         { name: 'subsystem-e-flows', testMatch: 'subsystem-e-flows.spec.ts' },
-        // Commercial PCA Phase O 7-9 — Paged.js TOC page-number CLIENT-LAYER
-        // proof. Fully self-contained (page.setContent + node_modules Paged.js):
-        // needs no dev worker, no D1 seed, no login. Proves target-counter fills
-        // increasing TOC page numbers in a real browser. Does NOT exercise the CF
-        // integration (deferred — see scripts/spike/pagedjs-cf-spike.md).
-        { name: 'report-toc-pagednumbers', testMatch: 'report-toc-pagednumbers.spec.ts' },
+        // Commercial PCA Task 19a — real TOC page numbers (two-pass Chrome +
+        // pdf-lib). Exercises the actual worker report render + BROWSER binding;
+        // see tests/e2e/report-toc-numbers.spec.ts for its harness requirements.
+        { name: 'report-toc-numbers', testMatch: 'report-toc-numbers.spec.ts', dependencies: ['editor-seed'] },
     ],
 });

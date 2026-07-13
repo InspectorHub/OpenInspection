@@ -1,5 +1,5 @@
 import { useRef } from "react";
-import { Drawer } from "@core/shared-ui";
+import { Drawer, IconButton, SegmentedControl } from "@core/shared-ui";
 import { CommentLibraryList } from "./CommentLibraryList";
 
 export interface CommentLibraryDrawerProps {
@@ -83,38 +83,33 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  </span>
  </>
  )}
- <button
+ <IconButton
  onClick={() => comments.setFilterMode('all')}
  className="ml-auto text-ih-fg-4 hover:text-ih-fg-2"
  aria-label="Clear filter"
- >×</button>
+ size="sm"
+ >×</IconButton>
  </div>
  )}
 
  {/* Filter chips */}
- <div className="flex gap-1 px-4 py-2 border-b border-ih-border flex-wrap">
- {[
- { id: "all", label: "All" },
- { id: "good", label: "Satisfactory" },
- { id: "marginal", label: "Monitor" },
- { id: "significant", label: "Defect" },
- { id: "my-snippets", label: "My Snippets" },
- ].map((f) => (
- <button
- key={f.id}
- onClick={() => {
- state.setCommentLibraryFilter(f.id);
+ <div className="px-4 py-2 border-b border-ih-border">
+ <SegmentedControl
+ options={[
+ { value: "all", label: "All" },
+ { value: "good", label: "Satisfactory" },
+ { value: "marginal", label: "Monitor" },
+ { value: "significant", label: "Defect" },
+ { value: "my-snippets", label: "My Snippets" },
+ ]}
+ value={state.commentLibraryFilter}
+ onChange={(id) => {
+ state.setCommentLibraryFilter(id);
  state.setCommentLibrarySelectedIdx(0);
  }}
- className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
- state.commentLibraryFilter === f.id
- ? "bg-ih-primary-tint text-ih-primary"
- : "text-ih-fg-4 hover:text-ih-fg-2"
- }`}
- >
- {f.label}
- </button>
- ))}
+ ariaLabel="Comment severity filter"
+ className="flex-wrap"
+ />
  </div>
 
  {/* Search */}

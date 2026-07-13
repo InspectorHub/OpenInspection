@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Icon } from "@core/shared-ui";
+import { Icon, IconButton, Button } from "@core/shared-ui";
 
 interface Capture {
   id: string;
@@ -129,15 +129,17 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
       {/* Top chrome */}
       {/* ds-allow: fixed-dark camera overlay chrome (light-on-dark) */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-4">
-        <button type="button" onClick={onClose} className="w-10 h-10 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60" aria-label="Close camera">
+        {/* ds-allow: over-video control — stays light-on-dark regardless of theme (legible over arbitrary camera footage) */}
+        <IconButton type="button" onClick={onClose} aria-label="Close camera" className="w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60">
           <Icon name="x" className="w-5 h-5" />
-        </button>
+        </IconButton>
         {captures.length > 0 && (
           <div className="text-white text-xs font-mono px-3 py-1 rounded-full bg-black/40">{captures.length} captured</div>
         )}
-        <button type="button" onClick={switchFacing} className="w-10 h-10 rounded-full bg-black/40 text-white flex items-center justify-center hover:bg-black/60" aria-label="Switch camera">
+        {/* ds-allow: over-video control — stays light-on-dark regardless of theme (legible over arbitrary camera footage) */}
+        <IconButton type="button" onClick={switchFacing} aria-label="Switch camera" className="w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0114-3M20 15a8 8 0 01-14 3" /></svg>
-        </button>
+        </IconButton>
       </div>
 
       <div className="flex-1" />
@@ -150,7 +152,15 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
             {captures.map((c) => (
               <div key={c.id} className="relative flex-shrink-0">
                 <img src={c.url} className="w-16 h-16 object-cover rounded-md border-2 border-white/30" alt="Captured frame" />
-                <button type="button" onClick={() => discardOne(c.id)} className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-ih-bad text-white text-xs font-bold flex items-center justify-center hover:bg-ih-bad/85" aria-label="Discard this frame">x</button>
+                <IconButton
+                  type="button"
+                  onClick={() => discardOne(c.id)}
+                  aria-label="Discard this frame"
+                  variant="danger"
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold"
+                >
+                  x
+                </IconButton>
               </div>
             ))}
           </div>
@@ -159,9 +169,9 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
 
       {/* Bottom action row */}
       <div className="relative z-10 pb-8 px-4 flex items-center justify-between gap-4">
-        {/* ds-allow: fixed-dark camera overlay control (light-on-dark) */}
+        {/* ds-allow: over-video control — rose accent kept for legibility against arbitrary camera footage, theme-independent */}
         {captures.length > 0 ? (
-          <button type="button" onClick={discardAll} className="text-rose-300 text-xs font-semibold hover:text-rose-200">Discard all</button>
+          <Button type="button" variant="danger-link" size="sm" onClick={discardAll} className="text-rose-300 hover:text-rose-200">Discard all</Button>
         ) : <div className="w-20" />}
 
         {/* ds-allow: fixed-dark camera shutter (white button + rose burst ring + dark label, stays fixed in both themes) */}
@@ -186,9 +196,9 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
         </button>
 
         {captures.length > 0 ? (
-          <button type="button" onClick={commit} className="px-5 py-2.5 rounded-full bg-ih-primary text-white text-sm font-bold shadow-ih-popover hover:bg-ih-primary-600" data-testid="burst-done">
+          <Button type="button" variant="primary" onClick={commit} className="rounded-full px-5 py-2.5 shadow-ih-popover" data-testid="burst-done">
             {uploading ? "Uploading..." : "Done"}
-          </button>
+          </Button>
         ) : <div className="w-20" />}
       </div>
     </div>

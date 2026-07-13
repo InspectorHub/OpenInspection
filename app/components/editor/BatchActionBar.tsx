@@ -1,4 +1,6 @@
 import React from "react";
+import { Button } from "@core/shared-ui";
+import { RatingSegment, type RatingOption } from "../editor-shared/RatingSegment";
 
 interface BatchActionBarProps {
   count: number;
@@ -30,6 +32,16 @@ export function BatchActionBar({
   onSetRating,
   onExit,
 }: BatchActionBarProps) {
+  // Numbered tiles, coloured per-tenant via getRatingColor — `color` wins over
+  // the (unused) tone token on every tile, unconditionally, mirroring the
+  // former always-on inline `style={{ background: getRatingColor(...) }}`.
+  const batchRatings: RatingOption[] = ratingLevels.map((level, idx) => ({
+    value: level.id,
+    label: String(idx + 1),
+    tone: "neutral",
+    color: getRatingColor(level.id),
+  }));
+
   return (
     <div className="flex items-center gap-2 bg-ih-bg-card border-t border-ih-border px-4 py-2">
       {/* Selected count */}
@@ -43,47 +55,30 @@ export function BatchActionBar({
       <div className="w-px h-4 bg-ih-border flex-shrink-0" aria-hidden="true" />
 
       {/* Select all / Clear */}
-      <button
-        type="button"
-        onClick={onSelectAll}
-        className="px-2 py-0.5 rounded text-[11px] font-bold text-ih-primary hover:bg-ih-primary-tint"
-      >
+      <Button variant="link" size="sm" onClick={onSelectAll}>
         Select all
-      </button>
-      <button
-        type="button"
-        onClick={onClear}
-        className="px-2 py-0.5 rounded text-[11px] font-bold text-ih-fg-3 hover:text-ih-fg-2"
-      >
+      </Button>
+      <Button variant="link" size="sm" onClick={onClear}>
         Clear
-      </button>
+      </Button>
 
       <div className="w-px h-4 bg-ih-border flex-shrink-0" aria-hidden="true" />
 
-      {/* Rating buttons */}
-      <div className="flex gap-1">
-        {ratingLevels.map((level, idx) => (
-          <button
-            key={level.id}
-            type="button"
-            data-rating-id={level.id}
-            onClick={() => onSetRating(level.id)}
-            className="w-7 h-7 rounded text-[10px] font-bold"
-            style={{ background: getRatingColor(level.id), color: "white" }}
-          >
-            {idx + 1}
-          </button>
-        ))}
-      </div>
+      {/* Rating buttons — dynamic per-tenant colour via RatingSegment's
+          per-option `color` override (wins over the tone token, applies
+          regardless of selection — same pattern as the former inline style). */}
+      <RatingSegment
+        ratings={batchRatings}
+        value={null}
+        onChange={onSetRating}
+        size="sm"
+        ariaLabel="Set rating for selected items"
+      />
 
       {/* Exit batch mode */}
-      <button
-        type="button"
-        onClick={onExit}
-        className="ml-auto text-[11px] text-ih-fg-3 hover:text-ih-fg-1"
-      >
+      <Button variant="ghost" size="sm" onClick={onExit} className="ml-auto">
         Exit
-      </button>
+      </Button>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { Button } from '@core/shared-ui';
 
 export interface SpeedModeUndoToastProps {
     /** Null = hide */
@@ -26,12 +27,14 @@ export function SpeedModeUndoToast({ pending, onDismiss, durationMs = 3000 }: Sp
     return (
         <div className="fixed left-1/2 -translate-x-1/2 bottom-20 z-50 px-4 py-2.5 bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover flex items-center gap-3 text-[13px]">
             <span>{pending.message}</span>
-            <button
+            <Button
+                variant="link"
+                size="sm"
                 onClick={() => { pending.onUndo(); onDismiss(); }}
-                className="font-bold text-ih-primary px-2 py-1 hover:bg-ih-bg-muted rounded"
+                className="px-2 py-1 hover:bg-ih-bg-muted rounded"
             >
                 Undo
-            </button>
+            </Button>
         </div>
     );
 }

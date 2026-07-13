@@ -32,13 +32,19 @@ describe('ReportToc', () => {
     expect(topLi?.getAttribute('data-level')).toBe('1');
   });
 
-  it('omits the page-number column on the web (showPageNumbers=false default)', () => {
+  it('always reserves the page-number slot, empty when tocPages is absent (web + PDF pass 1)', () => {
     const { container } = render(<ReportToc entries={entries} />);
-    expect(container.querySelector('.toc-pageref')).toBeNull();
+    const refs = container.querySelectorAll('.toc-pageref');
+    expect(refs.length).toBe(entries.length);
+    for (const el of refs) expect(el.textContent).toBe('');
   });
 
-  it('renders the page-number column only when showPageNumbers is true', () => {
-    const { container } = render(<ReportToc entries={entries} showPageNumbers />);
-    expect(container.querySelectorAll('.toc-pageref').length).toBe(entries.length);
+  it('fills each reserved slot from tocPages, keyed by entry id (Task 19a pass 2)', () => {
+    const { container } = render(
+      <ReportToc entries={entries} tocPages={{ summary: 3, site: 11 }} />,
+    );
+    const refs = Array.from(container.querySelectorAll('.toc-pageref'));
+    // 'summary' -> 3, 'summary.general-description' has no map entry -> empty, 'site' -> 11.
+    expect(refs.map((el) => el.textContent)).toEqual(['3', '', '11']);
   });
 });

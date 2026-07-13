@@ -28,7 +28,7 @@ export default defineConfig({
                 // so twilio-node's module-load `require('os')` resolves under
                 // nodejs_compat (node:os is compat-date-gated, not force-injected
                 // by the pool). Prod runs 2026-05-22 on CF's newer binary; keep
-                // this at the local cap. See twilio-sdk-fetch.spec.ts.
+                // this at the local cap.
                 compatibilityDate: '2026-04-12',
                 compatibilityFlags: ['nodejs_compat'],
                 d1Databases: { DB: 'test-sync-db' },

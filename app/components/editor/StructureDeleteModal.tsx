@@ -1,4 +1,4 @@
-import { Modal } from "@core/shared-ui";
+import { Modal, Button } from "@core/shared-ui";
 
 export interface StructureDeleteModalProps {
   open: boolean;
@@ -42,19 +42,19 @@ export function StructureDeleteModal({ open, title, noun = 'section', impact, on
       size="sm"
       footer={
         <>
-          <button
+          <Button
+            variant="ghost"
             onClick={onCancel}
-            className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md"
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="danger"
             onClick={onConfirm}
-            className="px-4 py-2 text-[13px] font-bold text-white bg-ih-bad hover:bg-ih-bad/85 rounded-md"
             data-testid="structure-delete-confirm"
           >
             Delete {noun}
-          </button>
+          </Button>
         </>
       }
     >

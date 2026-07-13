@@ -51,8 +51,10 @@ test.describe('Inspection Edit hotkeys (Sprint 1 A-1..A-9)', () => {
         await page.getByRole('button', { name: /Roof/ }).first().click();
         await page.getByRole('heading', { name: 'Roof' }).waitFor({ state: 'visible' });
         await page.keyboard.press('4');
-        // Rating hotkey 4 = "Not Inspected": its rating button becomes pressed.
-        await expect(page.getByRole('button', { name: /Not Inspected/ })).toHaveAttribute('aria-pressed', 'true');
+        // Rating hotkey 4 = "Not Inspected": the rating row is now a RatingSegment
+        // radiogroup, so the matching tile becomes the checked radio (was a
+        // button with aria-pressed before the shared-ui migration).
+        await expect(page.getByRole('radio', { name: /Not Inspected/ })).toHaveAttribute('aria-checked', 'true');
     });
 
     test('press / opens the Comment Library drawer', async ({ page }) => {

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { IconButton } from "@core/shared-ui";
 
 interface ShortcutColumn {
   title: string;
@@ -56,15 +57,14 @@ export function KeyboardHud({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="hidden md:flex fixed inset-0 z-[9999] items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
-      {/* ds-allow: intentional heavier fixed-dark dim (0.85) for the full-screen keyboard-shortcuts overlay */}
-      <div className="absolute inset-0 bg-[rgba(15,23,42,0.85)]" onClick={onClose} />
+      <div className="absolute inset-0 bg-ih-backdrop" onClick={onClose} />
       <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover border border-ih-border max-w-4xl w-full max-h-[85vh] overflow-y-auto">
         <header className="px-6 py-4 border-b border-ih-border flex items-center justify-between">
           <div>
             <h2 className="text-base font-bold text-ih-fg-1">Keyboard shortcuts</h2>
             <p className="text-xs text-ih-fg-3 mt-0.5">Press <kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">?</kbd> to toggle, <kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">Esc</kbd> to close</p>
           </div>
-          <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-xl leading-none" aria-label="Close">&times;</button>
+          <IconButton onClick={onClose} aria-label="Close" size="sm">&times;</IconButton>
         </header>
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {COLUMNS.map((col) => (
