@@ -45,6 +45,19 @@ export interface WordExportConsumerEnv {
 // fidelity without embedding full-resolution originals in the .docx.
 const APPENDIX_PHOTO_DOWNSCALE_WIDTH_PX = 960;
 
+// Hard ceiling on the total bytes embedded into one .docx Appendix B. `docx`'s
+// `Packer.toBuffer` (report-docx.ts) is not streaming — it materializes the whole
+// document, including every embedded image, as one in-memory buffer, so peak
+// memory is ~2x the embedded bytes. When the IMAGES binding is present each photo
+// is a ~200 KB downscaled JPEG and 50-100 photos fit comfortably. When it is
+// absent (env.IMAGES unset — e.g. an account without Images Transformations
+// enabled) photos embed at full resolution (2-4 MB each), and without a cap a
+// large report would blow past the ~128 MB isolate limit and OOM. Photos are
+// embedded in order until this budget is reached; the rest are omitted (logged)
+// so the export always completes. 32 MiB keeps the ~2x peak (~64 MiB + overhead)
+// well under the limit.
+export const APPENDIX_PHOTO_TOTAL_BYTE_BUDGET = 32 * 1024 * 1024;
+
 const ROLE_TITLE: Record<'field_observer' | 'pcr_reviewer', string> = {
     field_observer: 'Field Observer',
     pcr_reviewer: 'PCR Reviewer',
@@ -101,19 +114,32 @@ async function loadAppendixPhotoBytes(
 interface AppendixPhotoRef { photoNo: number; key: string; caption: string | null }
 
 /** Sequentially fetch + downscale every appendix photo. Never parallelizes
- *  the fetch loop — see the module doc comment. */
-async function buildAppendixPhotoInputs(
+ *  the fetch loop — see the module doc comment. Embeds photos in order until
+ *  APPENDIX_PHOTO_TOTAL_BYTE_BUDGET is reached, then omits the rest (logged) so
+ *  a large report can never OOM the isolate — critical when env.IMAGES is unset
+ *  and photos embed at full resolution. Exported for the memory-budget unit test. */
+export async function buildAppendixPhotoInputs(
     photos: R2Bucket,
     images: ImagesBinding | undefined,
     appendix: AppendixPhotoRef[],
 ): Promise<DocxAppendixPhoto[]> {
     const out: DocxAppendixPhoto[] = [];
+    let embeddedBytes = 0;
+    let skipped = 0;
     for (const p of appendix) {
         const loaded = await loadAppendixPhotoBytes(photos, images, p.key);
         if (!loaded) {
             logger.warn('[word-export] appendix photo missing in R2 — skipped', { key: p.key, photoNo: p.photoNo });
             continue;
         }
+        // Always keep at least one photo (out.length === 0) so a single oversized
+        // original never yields an empty appendix; after that, stop once the
+        // running total would exceed the embed budget.
+        if (out.length > 0 && embeddedBytes + loaded.bytes.byteLength > APPENDIX_PHOTO_TOTAL_BYTE_BUDGET) {
+            skipped++;
+            continue;
+        }
+        embeddedBytes += loaded.bytes.byteLength;
         out.push({
             photoNo: String(p.photoNo),
             ...(p.caption ? { caption: p.caption } : {}),
@@ -121,6 +147,14 @@ async function buildAppendixPhotoInputs(
             widthPx: loaded.widthPx,
             heightPx: loaded.heightPx,
             type: loaded.type,
+        });
+    }
+    if (skipped > 0) {
+        logger.warn('[word-export] appendix photo byte budget reached — remaining photos omitted from .docx', {
+            embeddedCount: out.length,
+            skippedCount: skipped,
+            embeddedBytes,
+            budgetBytes: APPENDIX_PHOTO_TOTAL_BYTE_BUDGET,
         });
     }
     return out;
