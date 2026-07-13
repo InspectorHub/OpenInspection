@@ -180,6 +180,61 @@ describe("PropertyInfoForm full-snapshot commit (Finding 1)", () => {
   });
 });
 
+// Commercial subtype-preset persist (design 2026-07-13). When the parent
+// threads a subtype preset via `templateFields`, the extra non-dedicated fields
+// (nra, sprinklered, ...) render AND commit into a `metadata` envelope, while
+// the dedicated columns stay at the top level. A residential/all-dedicated
+// preset still emits a flat object (covered by the Finding-1 suite above).
+describe("PropertyInfoForm commercial preset metadata split", () => {
+  const officePreset = [
+    { id: "yearBuilt", label: "Year built", type: "number" as const, group: "Identity" },
+    { id: "nra", label: "Net rentable area", type: "number" as const, group: "Physical" },
+    { id: "sprinklered", label: "Sprinklered", type: "select" as const, group: "Compliance", options: ["None", "Partial", "Full"] },
+  ];
+
+  it("renders subtype-preset fields passed via templateFields", () => {
+    const { getByText } = render(
+      <PropertyInfoForm inspection={{ propertyType: "commercial" }} templateFields={officePreset} />,
+    );
+    expect(getByText("Net rentable area")).toBeTruthy();
+    expect(getByText("Sprinklered")).toBeTruthy();
+  });
+
+  it("splits non-dedicated preset fields into a metadata envelope on commit", () => {
+    const onCommit = vi.fn();
+    const { container } = render(
+      <PropertyInfoForm
+        inspection={{ propertyType: "commercial", yearBuilt: 1998, nra: 42000 }}
+        templateFields={officePreset}
+        onCommit={onCommit}
+      />,
+    );
+    fireEvent.blur(labelInput(container, "Net rentable area")!);
+    const facts = onCommit.mock.calls.at(-1)![0] as Record<string, unknown>;
+    expect(facts.yearBuilt).toBe(1998);
+    expect(facts.metadata).toEqual({ nra: 42000, sprinklered: null });
+  });
+
+  it("emits a flat object (no metadata key) when every preset field is dedicated", () => {
+    const onCommit = vi.fn();
+    const dedicatedOnly = [
+      { id: "yearBuilt", label: "Year built", type: "number" as const, group: "Identity" },
+      { id: "sqft", label: "Building area", type: "number" as const, group: "Physical" },
+    ];
+    const { container } = render(
+      <PropertyInfoForm
+        inspection={{ propertyType: "commercial", yearBuilt: 2001 }}
+        templateFields={dedicatedOnly}
+        onCommit={onCommit}
+      />,
+    );
+    fireEvent.blur(labelInput(container, "Year built")!);
+    const facts = onCommit.mock.calls.at(-1)![0] as Record<string, unknown>;
+    expect(facts).not.toHaveProperty("metadata");
+    expect(facts.yearBuilt).toBe(2001);
+  });
+});
+
 describe("PropertyInfoForm select commit", () => {
   it("commits foundationType on change (discrete select) with the full facts object", () => {
     const onCommit = vi.fn();
