@@ -11045,18 +11045,11 @@
         }
       ],
       "body": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/PropertyFacts"
-          },
-          {
-            "description": "TODO describe schema field for the OpenInspection MCP integration"
-          }
-        ]
+        "$ref": "#/components/schemas/PropertyFactsWrite"
       }
     },
     "summary": "Patch inspection property fact",
-    "description": "Patches the Property Facts strip. Omitted keys are unchanged; null clears a field."
+    "description": "Patches the Property Facts strip plus the commercial subtype-preset `metadata` envelope. Omitted keys are unchanged; null clears a field."
   },
   {
     "operationId": "patchInspectionTemplateSnapshot",
