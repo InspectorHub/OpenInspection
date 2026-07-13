@@ -10,7 +10,7 @@ import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import {
-    PropertyFactsSchema,
+    PropertyFactsWriteSchema,
     PropertyFactsResponseSchema,
     PropertyFactsAutofillRequestSchema,
     PropertyFactsAutofillResponseSchema,
@@ -62,10 +62,10 @@ export const updatePropertyFactsRoute = createRoute(withMcpMetadata({
     path: '/{id}/property-facts',
     tags: ["inspections"],
     summary: "Patch inspection property fact",
-    description: 'Patches the Property Facts strip. Omitted keys are unchanged; null clears a field.',
+    description: 'Patches the Property Facts strip plus the commercial subtype-preset `metadata` envelope. Omitted keys are unchanged; null clears a field.',
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: PropertyFactsSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
+        body: { content: { 'application/json': { schema: PropertyFactsWriteSchema.describe('Property Facts strip fields plus a metadata envelope for non-dedicated commercial subtype-preset fields.') } } },
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
