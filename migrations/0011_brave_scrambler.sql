@@ -1,1 +1,0 @@
-ALTER TABLE `tenant_configs` ADD `managed_eligible` integer DEFAULT false NOT NULL;

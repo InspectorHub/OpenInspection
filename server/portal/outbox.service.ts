@@ -52,8 +52,8 @@ export interface OutboxRow {
     payload: string;          // JSON-encoded
     status: string;
     attempts: number;
-    createdAt: number;
-    lastTriedAt: number | null;
+    createdAt: Date;
+    lastTriedAt: Date | null;
     lastError: string | null;
 }
 
@@ -89,7 +89,7 @@ export class OutboxService implements UserSyncOutbox {
      */
     async append(event: OutboxEvent): Promise<string> {
         const id = crypto.randomUUID();
-        const now = Math.floor(Date.now() / 1000);
+        const now = new Date();
         await this.getDb().insert(syncOutbox).values({
             id,
             eventType: event.type,
@@ -123,7 +123,7 @@ export class OutboxService implements UserSyncOutbox {
         const rows = await (olderThanSeconds !== undefined
             ? base.where(and(
                 eq(syncOutbox.status, 'pending'),
-                lt(syncOutbox.createdAt, Math.floor(Date.now() / 1000) - olderThanSeconds),
+                lt(syncOutbox.createdAt, new Date(Date.now() - olderThanSeconds * 1000)),
             ))
             : base.where(eq(syncOutbox.status, 'pending')))
             .orderBy(asc(syncOutbox.createdAt))
@@ -146,7 +146,7 @@ export class OutboxService implements UserSyncOutbox {
         });
         await queue.send(envelope);
         await this.getDb().update(syncOutbox)
-            .set({ status: 'published', lastTriedAt: Math.floor(Date.now() / 1000), lastError: null })
+            .set({ status: 'published', lastTriedAt: new Date(), lastError: null })
             .where(eq(syncOutbox.id, row.id));
     }
 
@@ -157,7 +157,7 @@ export class OutboxService implements UserSyncOutbox {
      * 24h DLQ retention is irrelevant). Surfaced by counts() / the console.
      */
     async markFailedFromDlq(id: string, error: string): Promise<void> {
-        const now = Math.floor(Date.now() / 1000);
+        const now = new Date();
         const row = await this.getDb().select({ attempts: syncOutbox.attempts })
             .from(syncOutbox).where(eq(syncOutbox.id, id)).get();
         const attempts = (row?.attempts ?? 0) + 1;
@@ -204,7 +204,7 @@ export class OutboxService implements UserSyncOutbox {
         const pending = pendingRow?.n ?? 0;
         const failed = failedRow?.n ?? 0;
         const oldestPendingAge = oldest
-            ? Math.max(0, Math.floor(Date.now() / 1000) - oldest.createdAt)
+            ? Math.max(0, Math.floor((Date.now() - oldest.createdAt.getTime()) / 1000))
             : null;
         return { pending, failed, oldestPendingAge };
     }

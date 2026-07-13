@@ -36,7 +36,7 @@ describe('sync envelope contract (golden fixtures)', () => {
                 // Reconstruct the raw outbox row that would have produced this
                 // envelope: id + time come from the fixture so equality is exact;
                 // payload is the JSON-encoded `data`.
-                const createdAt = Math.floor(new Date(fixture.time).getTime() / 1000);
+                const createdAt = new Date(fixture.time);
                 const row = {
                     id: fixture.id,
                     eventType,

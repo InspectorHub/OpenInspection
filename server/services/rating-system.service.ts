@@ -150,7 +150,7 @@ export class RatingSystemService {
         if (existing) throw Errors.Conflict(`Rating system with slug '${input.slug}' already exists`);
 
         const id = crypto.randomUUID();
-        const now = Date.now();
+        const now = new Date();
         const levels = normalizeLevels(input.levels);
         await db.insert(ratingSystems).values({
             id,
@@ -194,7 +194,7 @@ export class RatingSystemService {
         if (!existing) throw Errors.NotFound('Rating system not found');
         if (existing.isSeed) throw Errors.Forbidden('Seed rating systems are read-only — clone first to customize');
 
-        const updates: Record<string, unknown> = { updatedAt: Date.now() };
+        const updates: Record<string, unknown> = { updatedAt: new Date() };
         if (input.name !== undefined)        updates.name        = input.name;
         if (input.slug !== undefined)        updates.slug        = input.slug;
         if (input.description !== undefined) updates.description = input.description ?? null;
@@ -255,7 +255,7 @@ export class RatingSystemService {
 
         let inserted = 0;
         let skipped = 0;
-        const now = Date.now();
+        const now = new Date();
         for (const seed of RATING_SYSTEM_SEEDS) {
             if (existingSlugs.has(seed.slug)) { skipped++; continue; }
             const id = crypto.randomUUID();
@@ -294,7 +294,7 @@ export class RatingSystemService {
     private async clearOtherDefaults(tenantId: string, keepId: string): Promise<void> {
         const db = this.getDrizzle();
         await db.update(ratingSystems)
-            .set({ isDefault: false, updatedAt: Date.now() })
+            .set({ isDefault: false, updatedAt: new Date() })
             .where(and(
                 eq(ratingSystems.tenantId, tenantId),
                 eq(ratingSystems.isDefault, true),

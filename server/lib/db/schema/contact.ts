@@ -12,7 +12,7 @@ export const contacts = sqliteTable('contacts', {
     agency: text('agency'),
     notes: text('notes'),
     createdByUserId: text('created_by_user_id'),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // DB-9: soft-delete timestamp. When set, the row is excluded from the
     // active-contact unique index so a replacement active row can coexist.
     archivedAt: integer('archived_at', { mode: 'timestamp_ms' }),

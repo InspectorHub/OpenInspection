@@ -308,7 +308,7 @@ describe('GET /api/public/verify/report/:token — reflects current publish stat
         await db.insert(schema.reportVersions).values({
             id: 'rv1', tenantId: T, inspectionId: ID, versionNumber: 1,
             snapshotJson: '{}', contentHash: 'h', verificationToken: 'vtok',
-            publishedAt: 1000, publishedBy: 'u1', createdAt: new Date().toISOString(),
+            publishedAt: new Date(1000), publishedBy: 'u1', createdAt: new Date(),
         } as any);
 
         const app = buildVerifyApp();

@@ -64,7 +64,7 @@ describe('QBOService.verifyWebhookSignature', () => {
 describe('QBOService.toIso8601', () => {
     it('converts Unix timestamp to ISO 8601 string', () => {
         const svc = new QBOService({} as any, 'cid', 'csec', 'whsec', 'secret32chars_aaaaaaaaaaaaaaaa');
-        const result = (svc as any).toIso8601(0);
+        const result = (svc as any).toIso8601(new Date(0));
         expect(result).toBe('1970-01-01T00:00:00.000Z');
     });
 });

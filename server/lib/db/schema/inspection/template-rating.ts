@@ -13,8 +13,8 @@ export const ratingSystems = sqliteTable('rating_systems', {
     levels:      text('levels', { mode: 'json' }).notNull(),
     isDefault:   integer('is_default', { mode: 'boolean' }).notNull().default(false),
     isSeed:      integer('is_seed',    { mode: 'boolean' }).notNull().default(false),
-    createdAt:   integer('created_at').notNull(),
-    updatedAt:   integer('updated_at').notNull(),
+    createdAt:   integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt:   integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     tenantSlugUnique: uniqueIndex('idx_rating_systems_tenant_slug').on(t.tenantId, t.slug),
     tenantIdx:        index('idx_rating_systems_tenant').on(t.tenantId),
@@ -26,7 +26,7 @@ export const templates = sqliteTable('templates', {
     name: text('name').notNull(),
     version: integer('version').notNull().default(1),
     schema: text('schema', { mode: 'json' }).notNull(),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // Sprint 2 S2-1 — selects the active rating system. Null = use tenant default.
     ratingSystemId: text('rating_system_id'),
     propertyType: text('property_type'),

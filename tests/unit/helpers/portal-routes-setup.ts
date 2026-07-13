@@ -52,8 +52,8 @@ export async function seedToken(
         recipientEmail,
         role,
         token: crypto.randomUUID(),
-        createdAt: Date.now(),
-        expiresAt,
-        revokedAt,
+        createdAt: new Date(),
+        expiresAt: expiresAt != null ? new Date(expiresAt) : null,
+        revokedAt: revokedAt != null ? new Date(revokedAt) : null,
     });
 }

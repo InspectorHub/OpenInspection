@@ -22,7 +22,7 @@ export const inspectionUnits = sqliteTable('inspection_units', {
     type:         text('type', { enum: ['unit', 'common'] }).notNull().default('unit'),
     name:         text('name').notNull(),
     sortOrder:    integer('sort_order').notNull().default(0),
-    createdAt:    text('created_at').notNull().default(sql`(datetime('now'))`),
+    createdAt:    integer('created_at', { mode: 'timestamp_ms' }).notNull().default(sql`(unixepoch() * 1000)`),
     // Commercial PCA Phase F — optional building/floor/unit-level attributes
     // (e.g. primaryUse, yearBuilt, area, areaUom, stories for a 'building'
     // node). Rides here instead of a parallel `buildings` table: the building_id

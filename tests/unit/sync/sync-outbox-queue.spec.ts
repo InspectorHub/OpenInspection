@@ -27,11 +27,11 @@ function mockQueue() {
     };
 }
 
-const NOW = () => Math.floor(Date.now() / 1000);
+const NOW = () => Date.now();
 
 async function insertRow(
     db: BetterSQLite3Database<typeof schema>,
-    over: Partial<typeof syncOutbox.$inferInsert> = {},
+    over: Partial<Omit<typeof syncOutbox.$inferInsert, 'createdAt'>> & { createdAt?: number } = {},
 ) {
     const id = over.id ?? crypto.randomUUID();
     await db.insert(syncOutbox).values({
@@ -40,8 +40,8 @@ async function insertRow(
         payload: JSON.stringify({ tenantId: 't1', email: 'a@example.com', role: 'member', passwordHash: 'h' }),
         status: 'pending',
         attempts: 0,
-        createdAt: NOW(),
         ...over,
+        createdAt: new Date(over.createdAt ?? NOW()),
     });
     return id;
 }
@@ -92,7 +92,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
 
     it('sweeper publishes only rows older than the inline-publish window', async () => {
         const fresh = await insertRow(testDb); // createdAt = now → must NOT sweep
-        const stale = await insertRow(testDb, { createdAt: NOW() - 300 });
+        const stale = await insertRow(testDb, { createdAt: NOW() - 300_000 });
         const { queue, sent } = mockQueue();
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -123,7 +123,7 @@ describe('sync outbox — queue transport (A-13/A-14)', () => {
     });
 
     it('counts reports pending/failed and the oldest pending age', async () => {
-        await insertRow(testDb, { createdAt: NOW() - 600 });
+        await insertRow(testDb, { createdAt: NOW() - 600_000 });
         await insertRow(testDb);
         await insertRow(testDb, { status: 'failed' });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -293,7 +293,7 @@ export async function runErasure(
         anonymizedCount,
         deletedCount,
         responseNote: null,
-        createdAt: Date.now(),
+        createdAt: new Date(),
     });
 
     return { status, anonymizedCount, deletedCount, retainedCount, decisions, logId };

@@ -21,9 +21,9 @@ export const inspectionAccessTokens = sqliteTable('inspection_access_tokens', {
     recipientEmail: text('recipient_email').notNull(),
     role:           text('role', { enum: ['client', 'co_client', 'agent'] }).notNull().default('client'),
     token:          text('token').notNull(),
-    createdAt:      integer('created_at').notNull(),
-    expiresAt:      integer('expires_at'),   // null = open (order active)
-    revokedAt:      integer('revoked_at'),   // null = live
+    createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    expiresAt:      integer('expires_at', { mode: 'timestamp_ms' }),   // null = open (order active)
+    revokedAt:      integer('revoked_at', { mode: 'timestamp_ms' }),   // null = live
     tokenHash:      text('token_hash'),
     tokenEnc:       text('token_enc'),
 }, (t) => [

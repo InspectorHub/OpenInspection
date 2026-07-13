@@ -56,8 +56,7 @@ export class QBOServiceBase {
             .where(eq(qboConnections.tenantId, tenantId)).get();
         if (!row) throw new Error(`No QBO connection for tenant ${tenantId}`);
 
-        const now = Math.floor(Date.now() / 1000);
-        if (row.tokenExpiresAt - now < 300) {
+        if (row.tokenExpiresAt.getTime() - Date.now() < 300_000) {
             return this.refreshToken(tenantId);
         }
         const accessToken = await decryptToken(row.accessToken, this.jwtSecret);
@@ -90,13 +89,13 @@ export class QBOServiceBase {
         }
 
         const data = QBOTokenResponseSchema.parse(await resp.json());
-        const now = Math.floor(Date.now() / 1000);
+        const nowMs = Date.now();
 
         await db.update(qboConnections).set({
             accessToken:           await encryptToken(data.access_token, this.jwtSecret),
             refreshToken:          await encryptToken(data.refresh_token, this.jwtSecret),
-            tokenExpiresAt:        now + ACCESS_TOKEN_TTL_SEC,
-            refreshTokenExpiresAt: now + data.x_refresh_token_expires_in,
+            tokenExpiresAt:        new Date(nowMs + ACCESS_TOKEN_TTL_SEC * 1000),
+            refreshTokenExpiresAt: new Date(nowMs + data.x_refresh_token_expires_in * 1000),
         }).where(eq(qboConnections.tenantId, tenantId));
 
         return { accessToken: data.access_token, realmId: row.realmId, tenantId };
@@ -148,7 +147,7 @@ export class QBOServiceBase {
 
     protected async logSyncError(tenantId: string, oiType: string, oiId: string, error: unknown): Promise<void> {
         const db = this.getDrizzle();
-        const now = Math.floor(Date.now() / 1000);
+        const now = new Date();
         const msg = error instanceof Error ? error.message : String(error);
         const existing = await db.select().from(qboSyncErrors)
             .where(and(

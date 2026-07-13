@@ -87,7 +87,7 @@ export class TagService {
             name,
             color:     input.color ?? null,
             isSeed:    false,
-            createdAt: Date.now(),
+            createdAt: new Date(),
         });
         const created = await this.get(id, tenantId);
         if (!created) throw Errors.Internal('Failed to read back created tag');
@@ -149,7 +149,7 @@ export class TagService {
 
         let inserted = 0;
         let skipped = 0;
-        const now = Date.now();
+        const now = new Date();
         for (const seed of SEED_TAGS) {
             if (existingNames.has(seed.name)) { skipped++; continue; }
             await db.insert(tags).values({
@@ -180,7 +180,7 @@ export class TagService {
                 itemId,
                 tagId,
                 tenantId,
-                createdAt: Date.now(),
+                createdAt: new Date(),
             });
         } catch (e) {
             // PK conflict on re-link is expected — swallow.

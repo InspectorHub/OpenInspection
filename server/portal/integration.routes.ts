@@ -396,7 +396,7 @@ api.get('/tenants/by-email', requireServiceBinding, async (c) => {
     }
     try {
         const d = drizzle(c.env.DB);
-        const now = Date.now();
+        const now = new Date();
 
         const grants = await d
             .select({ tenantId: inspectionAccessTokens.tenantId })

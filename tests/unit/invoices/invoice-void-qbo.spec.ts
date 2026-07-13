@@ -74,7 +74,7 @@ async function seedMapping() {
         qboType:      'Invoice',
         qboId:        QBO_ID,
         qboSyncToken: QBO_SYNC_TOKEN,
-        syncedAt:     Math.floor(Date.now() / 1000),
+        syncedAt:     new Date(),
     });
 }
 

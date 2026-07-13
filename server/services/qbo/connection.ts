@@ -20,7 +20,7 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
             refreshTokenExpiresIn: number;
         }): Promise<void> {
             const db = this.getDrizzle();
-            const now = Math.floor(Date.now() / 1000);
+            const nowMs = Date.now();
             const [encAccess, encRefresh] = await Promise.all([
                 encryptToken(input.accessToken, this.jwtSecret),
                 encryptToken(input.refreshToken, this.jwtSecret),
@@ -30,14 +30,14 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
                 companyName:           input.companyName,
                 accessToken:           encAccess,
                 refreshToken:          encRefresh,
-                tokenExpiresAt:        now + ACCESS_TOKEN_TTL_SEC,
-                refreshTokenExpiresAt: now + input.refreshTokenExpiresIn,
+                tokenExpiresAt:        new Date(nowMs + ACCESS_TOKEN_TTL_SEC * 1000),
+                refreshTokenExpiresAt: new Date(nowMs + input.refreshTokenExpiresIn * 1000),
             };
             await db.insert(qboConnections).values({
                 tenantId:      input.tenantId,
                 syncEnabled:   true,
                 defaultItemId: '1',
-                createdAt:     now,
+                createdAt:     new Date(nowMs),
                 ...baseValues,
             }).onConflictDoUpdate({
                 target: qboConnections.tenantId,
@@ -71,10 +71,14 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
             return {
                 realmId:               row.realmId,
                 companyName:           row.companyName,
-                lastSyncAt:            row.lastSyncAt,
+                // QBOConnectionStatus keeps the epoch-SECONDS contract the
+                // settings UI already reads (timeSince/expiryWarning in
+                // app/routes/settings-integrations-qbo.tsx), independent of
+                // the column's own Date storage type.
+                lastSyncAt:            row.lastSyncAt ? Math.floor(row.lastSyncAt.getTime() / 1000) : null,
                 syncEnabled:           row.syncEnabled,
                 openErrors:            errorRows.length,
-                refreshTokenExpiresAt: row.refreshTokenExpiresAt,
+                refreshTokenExpiresAt: Math.floor(row.refreshTokenExpiresAt.getTime() / 1000),
             };
         }
 
@@ -87,7 +91,7 @@ export function withConnection<TBase extends Constructor<QBOServiceBase>>(Base: 
 
         async linkExistingCustomer(tenantId: string, contactId: string, qboCustomerId: string): Promise<void> {
             const db = this.getDrizzle();
-            const now = Math.floor(Date.now() / 1000);
+            const now = new Date();
             await db.insert(qboEntityMap).values({
                 id:           crypto.randomUUID(),
                 tenantId,

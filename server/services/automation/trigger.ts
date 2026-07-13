@@ -89,7 +89,7 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                             { ruleId: rule.id, recipient: rule.recipient, channel });
                         continue;
                     }
-                    const sendAt = new Date(now.getTime() + rule.delayMinutes * 60_000).toISOString();
+                    const sendAt = new Date(now.getTime() + rule.delayMinutes * 60_000);
                     logs.push({ id: nanoid(), tenantId: ctx.tenantId, automationId: rule.id,
                                 inspectionId: ctx.inspectionId, recipient: addr, channel,
                                 sendAt, deliveredAt: null, status: 'pending' as const, error: null });

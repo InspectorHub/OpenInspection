@@ -18,7 +18,7 @@ describe('MarketplaceService.list', () => {
         testDb = s.db; sqlite = s.sqlite;
         await setupSchema(sqlite);
         (mockDrizzle as any).mockReturnValue(testDb);
-        const now = new Date().toISOString();
+        const now = new Date();
         for (let i = 0; i < 13; i++) {
             await testDb.insert(marketplaceTemplates).values({
                 id: `mkt-${i}`,

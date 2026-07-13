@@ -62,11 +62,16 @@ export class ObserverLinkService {
     }
 
     async mint(tenantId: string, input: MintInput): Promise<MintOutput> {
-        const db        = this.getDrizzle();
-        const id        = crypto.randomUUID();
-        const token     = mintToken();
-        const expiresAt = Math.floor(Date.now() / 1000) + (input.durationSeconds ?? DEFAULT_DURATION_SECONDS);
-        const s         = this.requireSecrets();
+        const db              = this.getDrizzle();
+        const id              = crypto.randomUUID();
+        const token           = mintToken();
+        const durationSeconds = input.durationSeconds ?? DEFAULT_DURATION_SECONDS;
+        const expiresAtDate   = new Date(Date.now() + durationSeconds * 1000);
+        // Public contract (MintOutput.expiresAt) stays epoch SECONDS — matches
+        // the observer-cookie `exp` claim below, independent of the column's
+        // storage unit.
+        const expiresAt       = Math.floor(expiresAtDate.getTime() / 1000);
+        const s               = this.requireSecrets();
 
         await db.insert(observerLinks).values({
             id,
@@ -77,8 +82,8 @@ export class ObserverLinkService {
             tokenHash:    await hashToken(token),
             tokenEnc:     await sealToken(token, tenantId, s.jwtSecret),
             createdBy:    input.createdBy,
-            createdAt:    new Date().toISOString(),
-            expiresAt,
+            createdAt:    new Date(),
+            expiresAt:    expiresAtDate,
         });
 
         return { id, token, expiresAt };
@@ -131,20 +136,22 @@ export class ObserverLinkService {
         });
         if (!link) return { kind: 'not_found' };
         if (link.revokedAt) return { kind: 'revoked' };
-        if (link.expiresAt < Math.floor(Date.now() / 1000)) return { kind: 'expired' };
+        if (link.expiresAt.getTime() < Date.now()) return { kind: 'expired' };
 
         // Bump lastViewedAt for audit. Fire-and-forget would be ideal but
         // D1's writes are sub-ms locally — synchronous keeps the surface
         // simple without a meaningful latency cost.
         await db.update(observerLinks)
-            .set({ lastViewedAt: Math.floor(Date.now() / 1000) })
+            .set({ lastViewedAt: new Date() })
             .where(eq(observerLinks.id, link.id));
 
         return {
             kind:         'ok',
             linkId:       link.id,
             inspectionId: link.inspectionId,
-            exp:          link.expiresAt,
+            // ClaimResult.exp stays epoch SECONDS (mirrors ObserverPayload.exp,
+            // the signed cookie claim — see server/lib/observer-cookie.ts).
+            exp:          Math.floor(link.expiresAt.getTime() / 1000),
             tenantId:     link.tenantId,
         };
     }
@@ -174,7 +181,7 @@ export class ObserverLinkService {
     async revoke(tenantId: string, linkId: string): Promise<void> {
         const db = this.getDrizzle();
         await db.update(observerLinks)
-            .set({ revokedAt: Math.floor(Date.now() / 1000) })
+            .set({ revokedAt: new Date() })
             .where(and(
                 eq(observerLinks.id, linkId),
                 eq(observerLinks.tenantId, tenantId),

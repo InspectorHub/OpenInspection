@@ -13,7 +13,7 @@ export const reportPdfs = sqliteTable('report_pdfs', {
     inspectionId:  text('inspection_id').notNull(),
     type:          text('type', { enum: ['summary', 'full'] }).notNull(),
     r2Key:         text('r2_key').notNull(),
-    renderedAt:    integer('rendered_at').notNull(),
+    renderedAt:    integer('rendered_at', { mode: 'timestamp_ms' }).notNull(),
     sourceVersion: integer('source_version').notNull(),                                              // inspection.updatedAt timestamp at render time
     // #120 — the report_versions.version_number this PDF renders. Nullable for
     // pre-#120 rows; new publishes always set it. The archive is immutable per

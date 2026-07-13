@@ -28,7 +28,7 @@ export class InspectionStatusService extends InspectionSubService {
         if (inspection.status === INSPECTION_STATUS.CANCELLED) throw Errors.BadRequest('Cannot confirm a cancelled inspection');
         await db.update(inspections).set({
             status:      INSPECTION_STATUS.CONFIRMED,
-            confirmedAt: new Date().toISOString(),
+            confirmedAt: new Date(),
         }).where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
         await fireAutomation(this.db, tenantId, id, 'inspection.confirmed');
     }

@@ -249,7 +249,7 @@ export async function seedStarterContent(
         const existing = await d.select({ name: tags.name }).from(tags)
             .where(eq(tags.tenantId, tenantId)).all();
         const existingNames = new Set(existing.map(r => r.name as string));
-        const now = Date.now();
+        const now = new Date();
         const rows = TAGS.filter(tag => !existingNames.has(tag.name)).map(tag => ({
             id:        crypto.randomUUID(),
             tenantId,
@@ -295,7 +295,7 @@ export async function seedStarterContent(
         const existing = await d.select({ slug: ratingSystems.slug }).from(ratingSystems)
             .where(eq(ratingSystems.tenantId, tenantId)).all();
         const existingSlugs = new Set(existing.map(r => r.slug as string));
-        const now = Date.now();
+        const now = new Date();
         const rows = RATING_SYSTEMS.filter(rs => !existingSlugs.has(rs.slug)).map(rs => {
             const levels = rs.levels.map((lvl, idx) => ({
                 id:           crypto.randomUUID(),
@@ -355,7 +355,7 @@ export async function seedStarterContent(
     {
         const existing = await d.select({ name: marketplaceLibraries.name }).from(marketplaceLibraries).all();
         const existingNames = new Set(existing.map(r => r.name as string));
-        const now = new Date().toISOString();
+        const now = new Date();
         const rows = MARKETPLACE_LIBRARIES.filter(lib => !existingNames.has(lib.name)).map(lib => ({
             id:            crypto.randomUUID(),
             name:          lib.name,

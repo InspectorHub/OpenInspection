@@ -206,7 +206,7 @@ describe('InspectionService — Media Center (Round-2 backlog #9)', () => {
             tenantId:     '99999999-9999-9999-9999-999999999999',
             r2Key:        'evil-key',
             url:          '/api/inspections/x/photos/evil-key',
-            uploadedAt:   Date.now(),
+            uploadedAt:   new Date(),
         });
 
         const out = await svc.getMediaCenter(INSPECTION_ID, TENANT);

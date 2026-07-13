@@ -78,7 +78,7 @@ describe('InspectionService.setCroppedCover', () => {
     });
     await testDb.insert(schema.inspectionMediaPool).values({
       id: 'pool-1', inspectionId: INSPECTION_ID, tenantId: TENANT,
-      r2Key: POOL_KEY, url: `/api/photo/${POOL_KEY}`, uploadedAt: Date.now(),
+      r2Key: POOL_KEY, url: `/api/photo/${POOL_KEY}`, uploadedAt: new Date(),
     });
   });
 

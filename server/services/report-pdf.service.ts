@@ -125,7 +125,7 @@ export class ReportPdfService {
                 : `${tenantId}/${inspectionId}/reports/${type}.pdf`;
         await this.r2.put(r2Key, pdfBuffer);
 
-        const now = Date.now();
+        const now = new Date();
         const id = crypto.randomUUID();
         const row = {
             id,
@@ -311,7 +311,7 @@ export class ReportPdfService {
             inspectionId,
             type,
             r2Key: '',
-            renderedAt: 0,
+            renderedAt: new Date(0),
             sourceVersion: 0,
             sizeBytes: null,
             status: 'queued',

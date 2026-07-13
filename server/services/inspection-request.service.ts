@@ -102,8 +102,8 @@ export class InspectionRequestService {
         const db = this.getDrizzle();
         const conds = [eq(inspectionRequests.tenantId, tenantId)];
         if (filter.status) conds.push(eq(inspectionRequests.status, filter.status));
-        if (filter.from)   conds.push(gte(inspectionRequests.scheduledAt, filter.from));
-        if (filter.to)     conds.push(lte(inspectionRequests.scheduledAt, filter.to));
+        if (filter.from)   conds.push(gte(inspectionRequests.scheduledAt, new Date(filter.from)));
+        if (filter.to)     conds.push(lte(inspectionRequests.scheduledAt, new Date(filter.to)));
 
         const limit  = filter.limit  ?? 50;
         const offset = filter.offset ?? 0;
@@ -232,7 +232,7 @@ export class InspectionRequestService {
             propertyCity:    input.propertyCity ?? null,
             propertyState:   input.propertyState ?? null,
             propertyZip:     input.propertyZip ?? null,
-            scheduledAt:     input.scheduledAt,
+            scheduledAt:     new Date(input.scheduledAt),
             notes:           input.notes ?? null,
             status:          'pending',
             totalAmount,
@@ -309,7 +309,7 @@ export class InspectionRequestService {
             templateId:               sub.templateId,
             templateSnapshot:         tpl.schema,
             templateSnapshotVersion:  tpl.version,
-            date:                     req.scheduledAt,
+            date:                     req.scheduledAt.toISOString(),
             status:                   INSPECTION_STATUS.REQUESTED,
             paymentStatus:            'unpaid' as const,
             price:                    sub.price ?? 0,
@@ -348,7 +348,7 @@ export class InspectionRequestService {
         if (patch.propertyCity    !== undefined) update.propertyCity    = patch.propertyCity;
         if (patch.propertyState   !== undefined) update.propertyState   = patch.propertyState;
         if (patch.propertyZip     !== undefined) update.propertyZip     = patch.propertyZip;
-        if (patch.scheduledAt     !== undefined) update.scheduledAt     = patch.scheduledAt;
+        if (patch.scheduledAt     !== undefined) update.scheduledAt     = new Date(patch.scheduledAt);
         if (patch.notes           !== undefined) update.notes           = patch.notes;
         if (patch.status          !== undefined) update.status          = patch.status;
         if (patch.paymentStatus   !== undefined) update.paymentStatus   = patch.paymentStatus;
@@ -374,7 +374,7 @@ export class InspectionRequestService {
             propertyCity:     req.propertyCity,
             propertyState:    req.propertyState,
             propertyZip:      req.propertyZip,
-            scheduledAt:      req.scheduledAt,
+            scheduledAt:      safeISODate(req.scheduledAt),
             status:           req.status,
             notes:            req.notes,
             totalAmount:      req.totalAmount,

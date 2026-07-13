@@ -37,7 +37,7 @@ export interface UnitRow {
     type:         string;
     name:         string;
     sortOrder:    number;
-    createdAt:    string;
+    createdAt:    Date;
     attrs:        UnitAttrs | null;
 }
 
@@ -81,7 +81,7 @@ export class UnitService {
             type:         input.type || 'unit',
             name:         input.name,
             sortOrder:    nextSort,
-            createdAt:    new Date().toISOString(),
+            createdAt:    new Date(),
         });
         return { id };
     }
@@ -124,7 +124,7 @@ export class UnitService {
                 type: opts?.type ?? ('unit' as const),
                 name: d.label,
                 sortOrder: sort,
-                createdAt: new Date().toISOString(),
+                createdAt: new Date(),
                 attrs: (d.floor ? { floor: d.floor } : null) as UnitAttrs | null,
             };
             sort += 10;
@@ -181,7 +181,7 @@ export class UnitService {
             type: src.type,
             name: copyName(src.name, siblings.map((s) => s.name)),
             sortOrder: nextSortOrder(siblings),
-            createdAt: new Date().toISOString(),
+            createdAt: new Date(),
             attrs: src.attrs ?? null,
         });
         return { id };

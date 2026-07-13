@@ -59,7 +59,7 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
                     );
                     await db.update(qboEntityMap).set({
                         qboSyncToken: updated.Customer.SyncToken,
-                        syncedAt:     Math.floor(Date.now() / 1000),
+                        syncedAt:     new Date(),
                     }).where(eq(qboEntityMap.id, existing.id));
                     return;
                 }
@@ -72,7 +72,7 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
                     const matches = found.QueryResponse.Customer ?? [];
                     const match = matches[0];
                     if (match) {
-                        const now = Math.floor(Date.now() / 1000);
+                        const now = new Date();
                         await db.insert(qboEntityMap).values({
                             id: crypto.randomUUID(), tenantId,
                             oiType: 'contact', oiId: contact.id,
@@ -97,7 +97,7 @@ export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base
                         const created = await this.apiCall<{ Customer: { Id: string; SyncToken: string } }>(
                             tenantId, 'POST', 'customer', buildPayload(displayName),
                         );
-                        const now = Math.floor(Date.now() / 1000);
+                        const now = new Date();
                         await db.insert(qboEntityMap).values({
                             id: crypto.randomUUID(), tenantId,
                             oiType: 'contact', oiId: contact.id,

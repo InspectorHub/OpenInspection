@@ -21,7 +21,7 @@ export const tenants = sqliteTable('tenants', {
     // residual). Commands without credseq (legacy in-flight) apply credentials
     // unguarded and do NOT advance this.
     appliedCredSeq: integer('applied_cred_seq').notNull().default(0),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 export const tenantConfigs = sqliteTable('tenant_configs', {
@@ -166,7 +166,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // unless they explicitly opt out. The legacy CAS path stays available until
     // Tasks 14/15 retire it.
     collabEditing: integer('collab_editing', { mode: 'boolean' }).notNull().default(true),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
     // SMS BYO provider choice — which carrier the tenant's own TWILIO_*/TELNYX_*
     // secrets belong to. NULL while not in own/managed mode.
     smsByoProvider: text('sms_byo_provider', { enum: ['twilio', 'telnyx'] }),
@@ -209,7 +209,7 @@ export const emailTemplates = sqliteTable('email_templates', {
     subject:   text('subject'),
     blocks:    text('blocks', { mode: 'json' }).$type<Record<string, string>>(),
     enabled:   integer('enabled', { mode: 'boolean' }).notNull().default(true),
-    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     pk: primaryKey({ columns: [t.tenantId, t.trigger] }),
 }));

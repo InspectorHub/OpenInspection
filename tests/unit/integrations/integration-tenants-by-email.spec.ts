@@ -28,8 +28,8 @@ describe('GET /api/integration/tenants/by-email', () => {
       { id: 't2', name: 'Beta', slug: 'beta', createdAt: new Date() },
     ] as never);
     await testDb.insert(schema.inspectionAccessTokens).values([
-      { id: 'g1', tenantId: 't1', inspectionId: 'i1', recipientEmail: 'jane@x.com', role: 'client', token: 'tok1', createdAt: Date.now() },
-      { id: 'g2', tenantId: 't2', inspectionId: 'i2', recipientEmail: 'jane@x.com', role: 'co_client', token: 'tok2', createdAt: Date.now(), revokedAt: Date.now() }, // revoked → excluded
+      { id: 'g1', tenantId: 't1', inspectionId: 'i1', recipientEmail: 'jane@x.com', role: 'client', token: 'tok1', createdAt: new Date() },
+      { id: 'g2', tenantId: 't2', inspectionId: 'i2', recipientEmail: 'jane@x.com', role: 'co_client', token: 'tok2', createdAt: new Date(), revokedAt: new Date() }, // revoked → excluded
     ] as never);
   });
   afterEach(() => { sqlite.close(); vi.clearAllMocks(); });

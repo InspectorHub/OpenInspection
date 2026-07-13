@@ -60,11 +60,11 @@ describe('deleteInspectionCascade', () => {
         } as never);
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: 'tok-1', tenantId: TENANT, inspectionId: INSP, recipientEmail: 'jane@test.com',
-            role: 'client', token: crypto.randomUUID(), createdAt: Date.now(),
+            role: 'client', token: crypto.randomUUID(), createdAt: new Date(),
         } as never);
         await testDb.insert(schema.inspectionMessages).values({
             id: 'msg-1', tenantId: TENANT, inspectionId: INSP, fromRole: 'client',
-            body: 'hi', createdAt: Date.now(),
+            body: 'hi', createdAt: new Date(),
         } as never);
 
         const photoKey = `${TENANT}/inspections/${INSP}/photos/m-1.jpg`;

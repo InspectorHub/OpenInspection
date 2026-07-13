@@ -60,7 +60,7 @@ async function seedSmsLog(over: { contactId?: string | null; smsBody?: string } 
     await db.insert(schema.automationLogs).values({
         id: logId, tenantId: TENANT, automationId: ruleId, inspectionId: inspId,
         recipient: '+15551234567', channel: 'sms',
-        sendAt: new Date(Date.now() - 1000).toISOString(), status: 'pending',
+        sendAt: new Date(Date.now() - 1000), status: 'pending',
     } as never);
     // SP2 — give the seeded sms rule a referenced template (body == embedded smsBody),
     // so the decoupled SMS delivery renders byte-identical output.
@@ -430,7 +430,7 @@ describe('flush() — derived reminder due-time (Track L Step 3b)', () => {
             id: logId, tenantId: TENANT, automationId: ruleId, inspectionId: inspId,
             recipient: 'jane@example.com', channel: 'email',
             // FAR-FUTURE stored send_at — flush must ignore it for reminders.
-            sendAt: new Date(Date.now() + 365 * 24 * 3600_000).toISOString(),
+            sendAt: new Date(Date.now() + 365 * 24 * 3600_000),
             status: 'pending', eventId: `reminder:${ruleId}:${inspId}:email`,
         } as never);
         return logId;

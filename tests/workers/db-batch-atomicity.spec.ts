@@ -124,7 +124,7 @@ describe('Phase U UnitService.createMany — real D1 bind limit', () => {
     // suite (no such cap) passes. createMany must chunk into db.batch().
     beforeAll(async () => {
         await b.DB.exec(
-            'CREATE TABLE IF NOT EXISTS inspection_units (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, inspection_id TEXT NOT NULL, parent_unit_id TEXT, kind TEXT NOT NULL, type TEXT NOT NULL DEFAULT \'unit\', name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL DEFAULT (datetime(\'now\')), attrs TEXT);',
+            'CREATE TABLE IF NOT EXISTS inspection_units (id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, inspection_id TEXT NOT NULL, parent_unit_id TEXT, kind TEXT NOT NULL, type TEXT NOT NULL DEFAULT \'unit\', name TEXT NOT NULL, sort_order INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL DEFAULT (unixepoch() * 1000), attrs TEXT);',
         );
     });
     beforeEach(async () => {

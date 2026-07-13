@@ -61,7 +61,7 @@ export class ImportHistoryService {
                 targetVersion: (r.targetVersion as string | null) ?? null,
                 rowsAffected:  r.rowsAffected as number,
                 metadata:      meta,
-                createdAt:     r.createdAt as number,
+                createdAt:     (r.createdAt as Date).getTime(),
                 createdBy:     r.createdBy as string,
             };
         });

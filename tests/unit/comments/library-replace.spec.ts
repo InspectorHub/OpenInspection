@@ -55,7 +55,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
 
     async function seedLibrary(opts: { semver: string; entries: Array<{ text: string; section?: string }> }) {
         const libraryId = crypto.randomUUID();
-        const now = new Date().toISOString();
+        const now = new Date();
         await testDb.insert(marketplaceLibraries).values({
             id:            libraryId,
             name:          'Test Library',
@@ -110,7 +110,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
             tenantId:       TENANT,
             libraryId,
             importedSemver: '1.0.0',
-            importedAt:     new Date().toISOString(),
+            importedAt:     new Date(),
             rowCount:       3,
         });
 
@@ -164,7 +164,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
             tenantId:       TENANT,
             libraryId,
             importedSemver: '1.0.0',
-            importedAt:     new Date().toISOString(),
+            importedAt:     new Date(),
             rowCount:       1,
         });
 
@@ -188,7 +188,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
             tenantId:       TENANT,
             libraryId,
             importedSemver: '1.0.0',
-            importedAt:     new Date().toISOString(),
+            importedAt:     new Date(),
             rowCount:       0,
         });
         const result = await svc.updateLibraryImport(libraryId, {
@@ -206,7 +206,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
             tenantId:       TENANT,
             libraryId,
             importedSemver: '1.0.0',
-            importedAt:     new Date().toISOString(),
+            importedAt:     new Date(),
             rowCount:       0,
         });
         await svc.updateLibraryImport(libraryId, { mode: 'replace', userId: USER });
@@ -230,7 +230,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
             tenantId:       TENANT,
             libraryId,
             importedSemver: '1.0.0',
-            importedAt:     new Date().toISOString(),
+            importedAt:     new Date(),
             rowCount:       0,
         });
         await svc.updateLibraryImport(libraryId, { mode: 'append', userId: USER });
@@ -261,7 +261,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
             tenantId:       TENANT,
             libraryId,
             importedSemver: '1.0.0',
-            importedAt:     new Date().toISOString(),
+            importedAt:     new Date(),
             rowCount:       0,
         });
 
@@ -283,7 +283,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
             tenantId:       TENANT,
             libraryId,
             importedSemver: '1.0.0',
-            importedAt:     new Date().toISOString(),
+            importedAt:     new Date(),
             rowCount:       50,
         });
         await svc.updateLibraryImport(libraryId, { mode: 'replace', userId: USER });
@@ -303,7 +303,7 @@ describe('MarketplaceService.updateLibraryImport — replace mode (S2-7)', () =>
         await testDb.insert(tenantLibraryImports).values({
             id: crypto.randomUUID(), tenantId: TENANT,
             libraryId, importedSemver: '1.0.0',
-            importedAt: new Date().toISOString(), rowCount: 0,
+            importedAt: new Date(), rowCount: 0,
         });
         await svc.updateLibraryImport(libraryId, { mode: 'replace', userId: USER });
         const local = await testDb.select().from(schema.comments)

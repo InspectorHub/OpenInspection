@@ -346,7 +346,7 @@ describe('cert-render handler', () => {
         hash: `hash${i}aaaaaaaaaaaaaaa`,
         signature: `sig${i}`,
         keyFingerprint: 'kf-test-fingerprint',
-        createdAt: new Date(Date.UTC(2026, 4, 28, 10, 0, i)).getTime(),
+        createdAt: new Date(Date.UTC(2026, 4, 28, 10, 0, i)),
       });
     }
     const res = await certRenderHandler({} as D1Database, REQ_ID);

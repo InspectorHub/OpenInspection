@@ -66,7 +66,7 @@ async function seedSignedEnvelope(db: BetterSQLite3Database<typeof schema>, sign
         {
             id: 'audit-1', tenantId: TENANT_A, requestId: reqId, event: 'agreement.signed',
             payloadJson: JSON.stringify({ email: SUBJECT_EMAIL }), prevHash: null,
-            hash: 'h1', signature: 'sig-chain-1', keyFingerprint: 'fp', createdAt: signedAtMs,
+            hash: 'h1', signature: 'sig-chain-1', keyFingerprint: 'fp', createdAt: new Date(signedAtMs),
         },
     ]);
     return { inspId, reqId };

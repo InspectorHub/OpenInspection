@@ -75,7 +75,7 @@ export function AutomationReminders<TBase extends Constructor<AutomationBase & H
                             id: nanoid(), tenantId: rule.tenantId, automationId: rule.id,
                             inspectionId: insp.id, recipient: addr, channel,
                             // send_at is a display estimate; flush() derives the real due-time live from inspection.date
-                            sendAt: new Date(sendAt).toISOString(), status: 'pending', eventId,
+                            sendAt: new Date(sendAt), status: 'pending', eventId,
                         });
                         created++;
                     }

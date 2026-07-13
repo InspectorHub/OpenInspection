@@ -122,7 +122,7 @@ export class StreamVideoBackend implements VideoBackend {
                 provider: 'stream',
                 r2Key: '',     // video bytes live in Cloudflare Stream, not R2
                 url: '',       // playback URL is derived from streamUid client-side
-                uploadedAt: Date.now(),
+                uploadedAt: new Date(),
                 mediaType: 'video',
                 streamUid,
                 durationSec,

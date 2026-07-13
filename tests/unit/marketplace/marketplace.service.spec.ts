@@ -34,7 +34,7 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
             sections: [{ id: 's', title: 'S', items: [{ id: 'i', label: 'I', type: 'rating' }] }],
         });
         const marketplaceId = crypto.randomUUID();
-        const now = new Date().toISOString();
+        const now = new Date();
         await testDb.insert(marketplaceTemplates).values({
             id:            marketplaceId,
             name:          'Legacy v1 Template',
@@ -75,7 +75,7 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
     async function seedImportedTemplate(opts: { mktSemver: string; importedSemver: string }) {
         const marketplaceId = crypto.randomUUID();
         const oldLocalId = crypto.randomUUID();
-        const now = new Date().toISOString();
+        const now = new Date();
 
         await testDb.insert(marketplaceTemplates).values({
             id:            marketplaceId,
@@ -149,7 +149,7 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
 
     it('Round 37 — updateTemplateImport: rejects when no prior import exists', async () => {
         const marketplaceId = crypto.randomUUID();
-        const now = new Date().toISOString();
+        const now = new Date();
         await testDb.insert(marketplaceTemplates).values({
             id:            marketplaceId,
             name:          'Brand New Template',
@@ -210,7 +210,7 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
         const svcWithRaw = new MarketplaceService(rawDb, TENANT);
 
         const libraryId = crypto.randomUUID();
-        const now = new Date().toISOString();
+        const now = new Date();
         await testDb.insert(marketplaceLibraries).values({
             id:            libraryId,
             name:          'Standard Comments',
@@ -273,7 +273,7 @@ describe('MarketplaceService.importTemplate (Spec 1 fix verification)', () => {
             ],
         });
         const marketplaceId = crypto.randomUUID();
-        const now = new Date().toISOString();
+        const now = new Date();
         await testDb.insert(marketplaceTemplates).values({
             id:            marketplaceId,
             name:          'Standard Residential Inspection',

@@ -37,7 +37,7 @@ export const comments = sqliteTable('comments', {
     estimateMaxCents:  integer('estimate_max_cents'),
     // Soft ref → contractor_types.id (no DB FK per schema rules). Stale ref acceptable.
     recommendedContractorTypeId: text('recommended_contractor_type_id'),
-    createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_comments_tenant').on(t.tenantId),
     index('idx_comments_rating_bucket').on(t.tenantId, t.ratingBucket),
@@ -52,7 +52,7 @@ export const commentUsage = sqliteTable('comment_usage', {
     userId:     text('user_id').notNull(),
     commentId:  text('comment_id').notNull().references(() => comments.id, { onDelete: 'cascade' }),
     useCount:   integer('use_count').notNull().default(0),
-    lastUsedAt: integer('last_used_at'),
+    lastUsedAt: integer('last_used_at', { mode: 'timestamp_ms' }),
 }, (table) => ({
     pk: primaryKey({ columns: [table.tenantId, table.userId, table.commentId] }),
     userLastUsedIdx: index('idx_comment_usage_user_last_used').on(table.tenantId, table.userId, table.lastUsedAt),

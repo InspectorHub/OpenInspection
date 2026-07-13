@@ -81,10 +81,17 @@ export class ServiceService {
             .where(eq(discountCodes.tenantId, tenantId));
     }
 
-    async updateDiscountCode(tenantId: string, id: string, data: Partial<typeof discountCodes.$inferInsert>) {
+    async updateDiscountCode(
+        tenantId: string,
+        id: string,
+        data: Partial<Omit<typeof discountCodes.$inferInsert, 'expiresAt'>> & { expiresAt?: string | null },
+    ) {
         const db = this.getDrizzle();
+        const { expiresAt, ...rest } = data;
+        const patch: Partial<typeof discountCodes.$inferInsert> = { ...rest };
+        if (expiresAt !== undefined) patch.expiresAt = expiresAt ? new Date(expiresAt) : null;
         const updated = await db.update(discountCodes)
-            .set(data)
+            .set(patch)
             .where(and(eq(discountCodes.id, id), eq(discountCodes.tenantId, tenantId)))
             .returning();
         if (updated.length === 0) throw Errors.NotFound('Discount code not found');
@@ -110,7 +117,7 @@ export class ServiceService {
             value:     data.value,
             maxUses:   data.maxUses ?? null,
             usesCount: 0,
-            expiresAt: data.expiresAt ?? null,
+            expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
             active:    true,
             createdAt: new Date(),
         });
@@ -214,7 +221,7 @@ export class ServiceService {
         const dc = rows.find(r => r.code.toUpperCase() === code.toUpperCase());
 
         if (!dc) return invalid('Code not found');
-        if (dc.expiresAt && new Date(dc.expiresAt) < new Date()) return invalid('Code expired');
+        if (dc.expiresAt && dc.expiresAt < new Date()) return invalid('Code expired');
         if (dc.maxUses !== null && dc.usesCount >= dc.maxUses) return invalid('Code usage limit reached');
 
         const discountAmount = dc.type === 'fixed'

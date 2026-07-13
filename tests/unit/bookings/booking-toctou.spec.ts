@@ -105,7 +105,7 @@ describe('B-28 booking TOCTOU', () => {
             await db.insert(inspectionRequests).values({
                 id: opts.requestId, tenantId: TENANT_ID,
                 clientName: 'Rival', propertyAddress: '9 Other St',
-                scheduledAt: opts.dateIso ?? SLOT_ISO, status: 'pending',
+                scheduledAt: new Date(opts.dateIso ?? SLOT_ISO), status: 'pending',
                 totalAmount: 0, paymentStatus: 'unpaid',
                 createdAt: opts.createdAt, updatedAt: opts.createdAt,
             });

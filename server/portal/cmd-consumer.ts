@@ -40,7 +40,7 @@ type Db = ReturnType<typeof drizzle>;
 
 async function park(db: Db, id: string, envelope: string, reason: string): Promise<void> {
     await db.insert(parkedCmdEvents)
-        .values({ id, envelope, reason, receivedAt: Math.floor(Date.now() / 1000) })
+        .values({ id, envelope, reason, receivedAt: new Date() })
         .onConflictDoNothing();
 }
 
@@ -71,7 +71,7 @@ export async function applyCmdEnvelope(
         await db.insert(processedCmdEvents).values({
             eventId: env.id,
             cmdType: env.type,
-            processedAt: Math.floor(Date.now() / 1000),
+            processedAt: new Date(),
         });
     } catch {
         // A-21 batch 2: a duplicate still re-emits the reply (tenant.update

@@ -1,1 +1,0 @@
-ALTER TABLE `inspections` ADD `report_tier` text;

@@ -74,7 +74,7 @@ export class PortalService {
      */
     async listRecipientInspections(tenantId: string, email: string): Promise<RecipientInspection[]> {
         const db = this.d();
-        const now = Date.now();
+        const now = new Date();
 
         const grants = await db
             .select({ inspectionId: inspectionAccessTokens.inspectionId })
@@ -85,8 +85,7 @@ export class PortalService {
                     eq(inspectionAccessTokens.recipientEmail, email),
                     inArray(inspectionAccessTokens.role, ['client', 'co_client']),
                     isNull(inspectionAccessTokens.revokedAt),
-                    // A grant is live only when not yet expired. `expiresAt` is
-                    // epoch ms (NULL = never expires), consistent with Date.now().
+                    // A grant is live only when not yet expired (NULL = never expires).
                     // Mirrors resolvePortalAccess (server/lib/public-access.ts).
                     or(isNull(inspectionAccessTokens.expiresAt), gt(inspectionAccessTokens.expiresAt, now)),
                 ),

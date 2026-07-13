@@ -50,8 +50,8 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             quotaGuard?: PlanQuotaGuard,
         ): Promise<void> {
             const db = this.getDrizzle();
-            const now = new Date().toISOString();
-            const nowMs = Date.parse(now);
+            const now = new Date();
+            const nowMs = now.getTime();
 
             // Shared 4-table join so both flush queries (non-reminder fast path +
             // reminder live-due path) select the same shape. `inspection` is a
@@ -249,7 +249,7 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                             if (row.status === 'sent') {
                                 await db.update(automationLogs).set({
                                     status: 'sent',
-                                    deliveredAt: new Date(row.deliveredAtMs ?? Date.now()).toISOString(),
+                                    deliveredAt: new Date(row.deliveredAtMs ?? Date.now()),
                                 }).where(eq(automationLogs.id, log.id));
                                 return;
                             }

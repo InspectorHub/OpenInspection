@@ -30,9 +30,9 @@ export const reportVersions = sqliteTable('report_versions', {
     keyFingerprint:    text('key_fingerprint'),
     isAmendment:       integer('is_amendment', { mode: 'boolean' }).notNull().default(false),
     verificationToken: text('verification_token'),
-    publishedAt:    integer('published_at').notNull(),
+    publishedAt:    integer('published_at', { mode: 'timestamp_ms' }).notNull(),
     publishedBy:    text('published_by').notNull(),
-    createdAt:      text('created_at').notNull().default(sql`(datetime('now'))`),
+    createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull().default(sql`(unixepoch() * 1000)`),
 }, (t) => [
     index('idx_report_versions_inspection').on(t.inspectionId, t.versionNumber),
     uniqueIndex('uq_report_versions_inspection_version').on(t.inspectionId, t.versionNumber),

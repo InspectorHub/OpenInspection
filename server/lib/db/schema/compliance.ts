@@ -36,7 +36,7 @@ export const erasureLog = sqliteTable('erasure_log', {
     // What we told the subject (refusal reasons / summary).
     responseNote:    text('response_note'),
     // Unix ms.
-    createdAt:       integer('created_at').notNull(),
+    createdAt:       integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_erasure_log_tenant').on(t.tenantId, t.createdAt),
 ]);

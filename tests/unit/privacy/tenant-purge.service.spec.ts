@@ -149,7 +149,7 @@ describe('TenantPurgeService.purge', () => {
             retainedCount: 0,
             anonymizedCount: 0,
             deletedCount: 0,
-            createdAt: Date.now(),
+            createdAt: new Date(),
         });
 
         const r2 = makeR2([]);
@@ -235,11 +235,11 @@ describe('TenantPurgeService.purge', () => {
         } as never);
         await testDb.insert(schema.inspectionMessages).values({
             id: 'msg-1', tenantId: TENANT, inspectionId: 'i-1', fromRole: 'client',
-            body: 'When is my report ready?', createdAt: Date.now(),
+            body: 'When is my report ready?', createdAt: new Date(),
         } as never);
         await testDb.insert(schema.inspectionAccessTokens).values({
             id: 'tok-1', tenantId: TENANT, inspectionId: 'i-1', recipientEmail: 'jane@test.com',
-            role: 'client', token: crypto.randomUUID(), createdAt: Date.now(),
+            role: 'client', token: crypto.randomUUID(), createdAt: new Date(),
         } as never);
 
         const svc = new TenantPurgeService({} as D1Database, makeR2([]).bucket, makeKv().ns);

@@ -51,7 +51,8 @@ export class DataService {
             r.status, r.paymentStatus, r.price,
             r.yearBuilt, r.sqft, r.foundationType, r.bedrooms, r.bathrooms, r.county,
             r.inspectorId, r.referredByAgentId,
-            r.confirmedAt, r.cancelReason, r.internalNotes,
+            r.confirmedAt instanceof Date ? r.confirmedAt.toISOString() : r.confirmedAt,
+            r.cancelReason, r.internalNotes,
             r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
         ]));
         return [header, ...dataRows].join('\n');

@@ -6,12 +6,12 @@ export const qboConnections = sqliteTable('qbo_connections', {
     companyName:          text('company_name'),
     accessToken:          text('access_token_enc').notNull(),
     refreshToken:         text('refresh_token_enc').notNull(),
-    tokenExpiresAt:       integer('token_expires_at').notNull(),
-    refreshTokenExpiresAt: integer('refresh_token_expires_at').notNull(),
-    lastSyncAt:           integer('last_sync_at'),
+    tokenExpiresAt:       integer('token_expires_at', { mode: 'timestamp_ms' }).notNull(),
+    refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp_ms' }).notNull(),
+    lastSyncAt:           integer('last_sync_at', { mode: 'timestamp_ms' }),
     syncEnabled:          integer('sync_enabled', { mode: 'boolean' }).notNull().default(true),
     defaultItemId:        text('default_item_id').notNull().default('1'),
-    createdAt:            integer('created_at').notNull(),
+    createdAt:            integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
 
 export const qboEntityMap = sqliteTable('qbo_entity_map', {
@@ -22,7 +22,7 @@ export const qboEntityMap = sqliteTable('qbo_entity_map', {
     qboType:      text('qbo_type').notNull(),
     qboId:        text('qbo_id').notNull(),
     qboSyncToken: text('qbo_sync_token').notNull(),
-    syncedAt:     integer('synced_at').notNull(),
+    syncedAt:     integer('synced_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     uniqueIndex('idx_qbo_entity_map_qbo').on(t.tenantId, t.qboType, t.qboId),
     uniqueIndex('idx_qbo_entity_map_oi').on(t.tenantId, t.oiType, t.oiId),
@@ -37,6 +37,6 @@ export const qboSyncErrors = sqliteTable('qbo_sync_errors', {
     errorMsg:  text('error_msg').notNull(),
     retries:   integer('retries').notNull().default(0),
     resolved:  integer('resolved', { mode: 'boolean' }).notNull().default(false),
-    createdAt: integer('created_at').notNull(),
-    updatedAt: integer('updated_at').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });

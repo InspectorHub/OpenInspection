@@ -210,7 +210,7 @@ export class InspectionPhotoService extends InspectionSubService {
             id:          r.id,
             key:         r.r2Key,
             url:         r.url,
-            uploadedAt:  r.uploadedAt,
+            uploadedAt:  r.uploadedAt.getTime(),
             takenAt:     (r.exifData as { takenAt?: number } | null)?.takenAt ?? null,
         }));
 
@@ -255,7 +255,7 @@ export class InspectionPhotoService extends InspectionSubService {
             tenantId,
             r2Key: key,
             url,
-            uploadedAt,
+            uploadedAt: new Date(uploadedAt),
             exifData,
         });
 
