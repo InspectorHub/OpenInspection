@@ -173,7 +173,9 @@ route files.
 
 | Component | Purpose | Key props / variants |
 |---|---|---|
-| `Button` | Primary interactive control | `variant`: `primary` \| `secondary` \| `ghost` \| `danger`; `size`: `sm` \| `md` \| `lg`; `icon` |
+| `Button` | Primary interactive control | `variant`: `primary` \| `secondary` \| `ghost` \| `danger` \| `link` \| `danger-link`; `size`: `sm` \| `md` \| `lg`; `icon`; `selected` (sets `aria-pressed` + a pressed ring — for toggle affordances). `link`/`danger-link` are borderless text actions (no fill/border) |
+| `IconButton` | Square icon-only button — same variants as `Button`, no text padding; `aria-label` is required (TS-enforced) | `aria-label` (**required**), `variant`: `primary` \| `secondary` \| `ghost` (default) \| `danger`; `size`: `sm` (28px) \| `md` (36px) \| `lg` (44px); `selected` (`aria-pressed` toggle). Use for toolbar/close/settings glyph buttons instead of a hand-rolled `w-9 h-9 flex` `<button>` |
+| `MenuItem` | Dropdown-row primitive to pair with `Popover` | `role="menuitem"`, full-width left-aligned; `icon`, `tone`: `default` \| `danger`, `disabled`, `onClick`. Use for popover/dropdown menu rows instead of hand-rolled `w-full text-left px-3 py-1.5 hover:bg-ih-bg-muted` `<button>`s |
 | `Pill` | Small status/tag chip | `tone`: `sat` \| `monitor` \| `defect` \| `ni` \| `np` \| `info` \| `gen` \| `primary` \| `neutral` \| `warning`; `dot` (leading dot) |
 | `Icon` | Inline SVG icon from a fixed named set | `name` (see `ICON_PATHS` in `Icon.tsx` for the full list — dashboard, calendar, check, edit, camera, ...), `size`, `strokeWidth` |
 | `Card` | Bordered/rounded/elevated surface container | no variants — compose with `className` |
@@ -190,7 +192,7 @@ route files.
 | `PageHeader` | Page title row with optional meta line and trailing actions | `title`, `meta`, `actions`; `eyebrow`/`eyebrowColor` are deprecated (same reason as `Eyebrow`) |
 | `Pagination` | Page-number nav + page-size selector | `page`, `pageSize`, `total`, `totalPages`, `onPageChange`, `onPageSizeChange`, `pageSizeOptions` |
 | `Skeleton` | Loading placeholder block | `variant`: `text` \| `block`, `width` |
-| `TabStrip` | Underline-style tab bar with optional counts | `tabs` (`{id, label, count?}[]`), `activeId`, `onChange` |
+| `TabStrip` | Underline-style tab bar with optional counts | `tabs` (`{id, label, count?}[]`), `activeId`, `onChange`, `orientation`: `horizontal` (default, underline) \| `vertical` (left border-accent) |
 | `FileDropzone` | Drag-and-drop / click-to-pick file input with a full state machine (idle → drag-over → busy → selected → error) | `accept`, `onFile`, `fileName`/`fileSize` (controlled selection display), `busy`, `error`, `hint`, `onClear`. Also exports `firstFileFromDrop`, `formatFileSize`, `truncateMiddle` helpers |
 | `Banner` | Full-width inline status/notice strip with ARIA live-region role (`alert` for warn/danger, `status` otherwise) | `tone`: `info` \| `warn` \| `danger` \| `success` \| `brand`; `actions`, `dismissible`/`onDismiss`, `icon`, `sticky`. Use for page-level or section-level messages; use `Pill` for a compact inline badge, a toast for a transient async outcome |
 | `Table` | Generic column-config data table (tokenized header, hover rows, empty-state slot) | `columns` (`TableColumn<T>[]` — `label`, `align`, `cell`, `key`), `rows`, `empty`, `getRowKey`, `onRowClick`. Use for tabular listings instead of hand-rolled `<table>` markup |

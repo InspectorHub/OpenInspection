@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Icon } from '@core/shared-ui';
+import { Icon, Button } from '@core/shared-ui';
 import { usePointerGesture } from '../../hooks/usePointerGesture';
 import { MobileBottomDrawer } from '../MobileBottomDrawer';
 import { SpeedModeUndoToast } from './SpeedModeUndoToast';
@@ -45,15 +45,13 @@ const SPEED_FALLBACK_LEVELS: Array<{ id: string; label?: string; name?: string; 
 
 function ratingButtonClass(severity: string | undefined, isActive: boolean): string {
   if (!isActive) {
-    // ds-allow: fixed-dark surface
-    return "bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700";
+    return "bg-ih-bg-muted text-ih-fg-2 hover:bg-ih-border border border-ih-border";
   }
   switch (severity) {
-    case "good":        return "bg-ih-ok text-white ring-4 ring-ih-ok/50";
-    case "marginal":    return "bg-ih-watch text-white ring-4 ring-ih-watch/50";
-    case "significant": return "bg-ih-bad text-white ring-4 ring-ih-bad/50";
-    // ds-allow: fixed-dark surface
-    default:            return "bg-slate-600 text-white ring-4 ring-slate-400/50";
+    case "good":        return "bg-ih-ok text-ih-fg-inverse ring-4 ring-ih-ok/50";
+    case "marginal":    return "bg-ih-watch text-ih-fg-inverse ring-4 ring-ih-watch/50";
+    case "significant": return "bg-ih-bad text-ih-fg-inverse ring-4 ring-ih-bad/50";
+    default:            return "bg-ih-bg-inverse text-ih-fg-inverse ring-4 ring-ih-fg-4/30";
   }
 }
 
@@ -128,19 +126,17 @@ export function SpeedMode({
   };
 
   return (
-    /* ds-allow: fixed-dark surface */
     <div
       role="dialog"
       aria-modal="true"
       aria-label="Speed-rate inspection items"
-      className="fixed inset-0 z-[100] bg-slate-900 flex flex-col"
+      className="fixed inset-0 z-[100] bg-ih-bg-card flex flex-col"
     >
       {/* Top bar */}
-      {/* ds-allow: fixed-dark surface */}
-      <div className="h-12 flex items-center justify-between px-4 border-b border-slate-700">
-        <span className="text-[12px] text-slate-400 font-bold uppercase tracking-wide">{sectionTitle}</span>
+      <div className="h-12 flex items-center justify-between px-4 border-b border-ih-border">
+        <span className="text-[12px] text-ih-fg-3 font-bold uppercase tracking-wide">{sectionTitle}</span>
         <span className="text-[12px] text-ih-fg-3 font-mono">{currentIndex + 1} / {totalCount}</span>
-        <button onClick={onExit} className="text-[12px] text-slate-400 hover:text-white">Exit Speed Mode</button>
+        <Button variant="ghost" size="sm" onClick={onExit}>Exit Speed Mode</Button>
       </div>
 
       {/* Item — gesture surface wraps the title/status area, NOT the rating buttons */}
@@ -149,9 +145,8 @@ export function SpeedMode({
           className="touch-none select-none w-full flex flex-col items-center pb-6"
           {...gesture}
         >
-          <h2 className="text-2xl font-bold text-white mb-2 text-center">{item.label}</h2>
-          {/* ds-allow: fixed-dark surface */}
-          <p className="text-[11px] text-slate-500 uppercase tracking-wide">
+          <h2 className="text-2xl font-bold text-ih-fg-1 mb-2 text-center">{item.label}</h2>
+          <p className="text-[11px] text-ih-fg-4 uppercase tracking-wide">
             Swipe to navigate · Long-press to jump
           </p>
         </div>
@@ -174,36 +169,31 @@ export function SpeedMode({
         </div>
 
         {/* Nav */}
-        {/* ds-allow: fixed-dark surface */}
         <div className="flex gap-4 mt-8">
-          <button onClick={onPrev} disabled={currentIndex === 0} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30 text-sm"><Icon name="chevL" size={16} /> Prev</button>
-          <button onClick={onNext} disabled={currentIndex >= totalCount - 1} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-30 text-sm">Next <Icon name="chevR" size={16} /></button>
+          <Button variant="secondary" onClick={onPrev} disabled={currentIndex === 0} icon={<Icon name="chevL" size={16} />}>Prev</Button>
+          <Button variant="secondary" onClick={onNext} disabled={currentIndex >= totalCount - 1}>Next <Icon name="chevR" size={16} /></Button>
         </div>
       </div>
 
       {/* Footer */}
-      {/* ds-allow: fixed-dark surface */}
-      <div className="h-10 flex items-center justify-center text-[11px] text-ih-fg-3 border-t border-slate-700">
-        Press <kbd className="mx-1 px-1.5 py-0.5 bg-slate-800 rounded text-[10px] font-mono border border-slate-700">Z</kbd> or <kbd className="mx-1 px-1.5 py-0.5 bg-slate-800 rounded text-[10px] font-mono border border-slate-700">Esc</kbd> to exit
+      <div className="h-10 flex items-center justify-center text-[11px] text-ih-fg-3 border-t border-ih-border">
+        Press <kbd className="mx-1 px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">Z</kbd> or <kbd className="mx-1 px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">Esc</kbd> to exit
       </div>
 
       {/* IA-17 — first-run coach mark: tap anywhere (or press any key) to dismiss */}
       {showCoach && (
-        // ds-allow: fixed-dark surface
         <div
-          className="absolute inset-0 z-10 bg-slate-900/80 flex items-center justify-center cursor-pointer"
+          className="absolute inset-0 z-10 bg-ih-backdrop flex items-center justify-center cursor-pointer"
           onPointerDown={dismissCoach}
           data-testid="speedmode-coach"
           role="dialog"
           aria-label="Speed Mode tips"
         >
-          {/* ds-allow: fixed-dark surface */}
-          <div className="mx-6 max-w-sm rounded-xl border border-slate-600 bg-slate-800/95 px-6 py-5 text-slate-200 shadow-2xl">
-            <h3 className="text-[15px] font-bold text-white mb-3">Speed Mode</h3>
+          <div className="mx-6 max-w-sm rounded-xl border border-ih-border bg-ih-bg-card px-6 py-5 text-ih-fg-2 shadow-ih-popover">
+            <h3 className="text-[15px] font-bold text-ih-fg-1 mb-3">Speed Mode</h3>
             <ul className="space-y-2 text-[13px]">
               <li className="flex items-center gap-3">
-                {/* ds-allow: fixed-dark surface */}
-                <kbd className="px-1.5 py-0.5 bg-slate-700 rounded text-[11px] font-mono border border-slate-600 shrink-0">1–5</kbd>
+                <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[11px] font-mono border border-ih-border shrink-0">1–5</kbd>
                 <span>Rate the current item</span>
               </li>
               <li className="flex items-center gap-3">
@@ -215,8 +205,7 @@ export function SpeedMode({
                 <span>Long-press to jump to a section</span>
               </li>
             </ul>
-            {/* ds-allow: fixed-dark surface */}
-            <p className="mt-4 text-[11px] text-slate-400">Tap anywhere to start</p>
+            <p className="mt-4 text-[11px] text-ih-fg-3">Tap anywhere to start</p>
           </div>
         </div>
       )}

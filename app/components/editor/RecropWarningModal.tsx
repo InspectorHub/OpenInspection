@@ -1,4 +1,4 @@
-import { Modal } from "@core/shared-ui";
+import { Modal, Button } from "@core/shared-ui";
 
 export interface RecropWarningModalProps {
  open: boolean;
@@ -15,8 +15,8 @@ export function RecropWarningModal({ open, onCancel, onConfirm }: RecropWarningM
  size="sm"
  footer={
  <>
- <button onClick={onCancel} className="px-4 py-2 text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted rounded-md">Cancel</button>
- <button onClick={onConfirm} className="px-4 py-2 text-[13px] font-bold text-white bg-ih-bad hover:bg-ih-bad/85 rounded-md">Crop &amp; clear</button>
+ <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+ <Button variant="danger" onClick={onConfirm}>Crop &amp; clear</Button>
  </>
  }
  >

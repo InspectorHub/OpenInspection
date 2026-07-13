@@ -5,9 +5,10 @@
 // + server/lib/messaging/twilio.ts) onto the official `twilio-node` SDK, behind
 // the ComplianceProvider interface, persisting through the injected state store.
 //
-// The constructor takes an ALREADY-BUILT twilio-node client. Production builds it
-// with the edge-safe fetch transport (createFetchHttpClient, Task 3):
-//   twilio(apiKeySid, apiKeySecret, { accountSid, httpClient: createFetchHttpClient() })
+// The constructor takes an ALREADY-BUILT client implementing TwilioComplianceClient.
+// Production builds it with the fetch-based REST client (no twilio-node SDK — the
+// full SDK is dropped to stay under the Workers Free bundle limit):
+//   createTwilioRestClient({ accountSid, apiKeySid, apiKeySecret })  (see resolve-compliance-provider.ts)
 // Tests inject a structural fake recording each resource call.
 //
 // MAPPING — hand-rolled REST call → twilio-node equivalent (URL/method matched

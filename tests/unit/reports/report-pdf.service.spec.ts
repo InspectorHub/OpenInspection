@@ -9,8 +9,9 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 vi.mock('../../../server/lib/pdf', () => ({
     generatePdfFromUrl: vi.fn(async () => new ArrayBuffer(1024)),
+    generatePdfWithTocPages: vi.fn(async () => new ArrayBuffer(4096)),
 }));
-import { generatePdfFromUrl } from '../../../server/lib/pdf';
+import { generatePdfFromUrl, generatePdfWithTocPages } from '../../../server/lib/pdf';
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const INSP_1   = '00000000-0000-0000-0000-0000000000b1';
@@ -38,8 +39,10 @@ describe('ReportPdfService', () => {
         await seed(testDb);
         svc = new ReportPdfService({} as D1Database, mockBrowser, mockR2);
         vi.clearAllMocks();
+        // The service always renders through generatePdfWithTocPages (it
+        // self-short-circuits to a single pass when there are no anchors).
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (generatePdfFromUrl as any).mockResolvedValue(new ArrayBuffer(2048));
+        (generatePdfWithTocPages as any).mockResolvedValue(new ArrayBuffer(2048));
     });
 
     it('returns null when no PDF record exists', async () => {
@@ -67,7 +70,7 @@ describe('ReportPdfService', () => {
             sourceVersion: 1,
         });
         // No footer passed in this path → third arg is undefined (footer is optional).
-        expect(generatePdfFromUrl).toHaveBeenCalledWith(
+        expect(generatePdfWithTocPages).toHaveBeenCalledWith(
             mockBrowser,
             'https://example.com/report/insp-1?summary=1',
             undefined,
@@ -100,6 +103,18 @@ describe('ReportPdfService', () => {
         await expect(
             noStore.renderAndStore(INSP_1, TENANT_A, 'full', { reportUrl: 'u', sourceVersion: 1 })
         ).rejects.toThrow(/storage bucket binding not configured/);
+    });
+
+    it('Task 19a — renderAndStore always renders through the two-pass TOC path', async () => {
+        // generatePdfWithTocPages self-short-circuits to a single pass when the
+        // report has no intra-doc anchors, so the service calls it unconditionally
+        // and never calls generatePdfFromUrl directly.
+        await svc.renderAndStore(INSP_1, TENANT_A, 'full', {
+            reportUrl: 'https://example.com/report/insp-1',
+            sourceVersion: 1,
+        });
+        expect(generatePdfWithTocPages).toHaveBeenCalledWith(mockBrowser, 'https://example.com/report/insp-1', undefined);
+        expect(generatePdfFromUrl).not.toHaveBeenCalled();
     });
 
     it('markQueued creates placeholder when no record exists', async () => {
@@ -150,7 +165,7 @@ describe('ReportPdfService', () => {
             });
             vi.clearAllMocks();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (generatePdfFromUrl as any).mockResolvedValue(new ArrayBuffer(2048));
+            (generatePdfWithTocPages as any).mockResolvedValue(new ArrayBuffer(2048));
             (mockR2 as any).put = vi.fn(async () => undefined);
 
             const rec = await svc.getOrRender(INSP_1, TENANT_A, 'full', {
@@ -159,7 +174,7 @@ describe('ReportPdfService', () => {
                 versionNumber: 1,
             });
 
-            expect(generatePdfFromUrl).toHaveBeenCalledTimes(0);
+            expect(generatePdfWithTocPages).toHaveBeenCalledTimes(0);
             expect(rec.status).toBe('ready');
             expect(rec.contentHash).toBe(HASH_H1);
         });
@@ -174,7 +189,7 @@ describe('ReportPdfService', () => {
             });
             vi.clearAllMocks();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (generatePdfFromUrl as any).mockResolvedValue(new ArrayBuffer(2048));
+            (generatePdfWithTocPages as any).mockResolvedValue(new ArrayBuffer(2048));
             (mockR2 as any).put = vi.fn(async () => undefined);
 
             // Call with different hash H2 → must render.
@@ -184,7 +199,7 @@ describe('ReportPdfService', () => {
                 versionNumber: 2,
             });
 
-            expect(generatePdfFromUrl).toHaveBeenCalledTimes(1);
+            expect(generatePdfWithTocPages).toHaveBeenCalledTimes(1);
             expect(rec.status).toBe('ready');
             expect(rec.contentHash).toBe(HASH_H2);
             // Content-addressed R2 key must incorporate the hash.
@@ -199,7 +214,7 @@ describe('ReportPdfService', () => {
                 versionNumber: null,
             });
 
-            expect(generatePdfFromUrl).toHaveBeenCalledTimes(1);
+            expect(generatePdfWithTocPages).toHaveBeenCalledTimes(1);
             expect(rec.status).toBe('ready');
             expect(rec.contentHash).toBe(HASH_H1);
         });

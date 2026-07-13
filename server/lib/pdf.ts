@@ -12,6 +12,8 @@
  */
 import type { BrowserRun } from '../types/hono';
 import type { PdfSettings } from './pdf-settings';
+import { extractAnchorPages } from './toc-pages';
+import { logger } from './logger';
 
 /**
  * Bump when the report render template/CSS changes so content-hashed PDFs
@@ -23,13 +25,17 @@ import type { PdfSettings } from './pdf-settings';
  * 'r5' — Commercial PCA Phase P: 'appendix' photoMode suppresses inline
  * item/defect photo grids and renders a single end-of-report Appendix B
  * instead (template output structurally differs from 'inline').
- * 'r6' - Commercial PCA Phase O Tasks 7-9: GATED Paged.js TOC page-number
- * path. Only active when the render URL carries `?print=1&pagedtoc=1` (this
- * helper does NOT send it yet - the CF integration is deferred; see
- * scripts/spike/pagedjs-cf-spike.md). Bumped defensively so that once the
- * gate is enabled, previously content-hashed PDFs re-render.
+ * 'r7' — Commercial PCA Task 19a: real two-pass TOC page numbers
+ * (`generatePdfWithTocPages`). Replaces the r6 gated-Paged.js `target-counter`
+ * path (removed — it only worked against a synthetic fixture, never a real
+ * CF render). Pass 1 renders once; `extractAnchorPages` reads the named PDF
+ * destinations Chrome emits for each `<a href="#id">` TOC link back to their
+ * resolved 1-based page numbers; pass 2 re-renders with `?tocpages=<map>` so
+ * `<ReportToc>` fills the reserved page-ref column with real numbers. Bumped
+ * so previously content-hashed PDFs (rendered under the old gated path)
+ * re-render under the new mechanism.
  */
-export const RENDER_VERSION = 'r6';
+export const RENDER_VERSION = 'r7';
 
 export async function generatePdfFromUrl(
     browser: BrowserRun | undefined,
@@ -78,4 +84,48 @@ export async function generatePdfFromUrl(
         throw new Error(`PDF rendering failed (${res.status}): ${detail.slice(0, 200)}`);
     }
     return await res.arrayBuffer();
+}
+
+/**
+ * Two-pass renderer for real TOC page numbers (Commercial PCA Task 19a).
+ *
+ * Pass 1 renders the report exactly like `generatePdfFromUrl`. Pass 2 only
+ * happens when pass 1 actually contains named TOC destinations (residential/
+ * no-tier reports have no TOC and never pay for a second Browser Rendering
+ * call): `extractAnchorPages` reads back the page each `<a href="#id">` TOC
+ * anchor landed on, and pass 2 re-renders the SAME url with `?tocpages=<map>`
+ * appended so `<ReportToc>` fills the already-reserved page-ref column with
+ * real numbers. Because the numbers land in a slot that was already reserved
+ * (same width) during pass 1, pass 2's pagination is identical to pass 1's —
+ * no iteration needed.
+ */
+export async function generatePdfWithTocPages(
+    browser: BrowserRun | undefined,
+    url: string,
+    opts?: { title?: string; address?: string; license?: string | null; settings?: PdfSettings },
+): Promise<ArrayBuffer> {
+    const pass1 = await generatePdfFromUrl(browser, url, opts);
+
+    let pageMap: Record<string, number>;
+    try {
+        pageMap = await extractAnchorPages(pass1);
+    } catch (err) {
+        // extractAnchorPages is defensive and shouldn't throw, but guard the
+        // call site too — a failure to read pass 1 must never break the PDF
+        // download, it should just skip page numbering.
+        logger.warn('[pdf] extractAnchorPages failed, serving un-numbered TOC', {
+            error: err instanceof Error ? err.message : String(err),
+        });
+        return pass1;
+    }
+
+    if (Object.keys(pageMap).length === 0) {
+        // Nothing to number (no TOC in this report, or no anchor resolved) —
+        // avoid a wasted second Browser Rendering pass.
+        return pass1;
+    }
+
+    const tocParam = encodeURIComponent(btoa(JSON.stringify(pageMap)));
+    const pass2Url = url.includes('?') ? `${url}&tocpages=${tocParam}` : `${url}?tocpages=${tocParam}`;
+    return await generatePdfFromUrl(browser, pass2Url, opts);
 }

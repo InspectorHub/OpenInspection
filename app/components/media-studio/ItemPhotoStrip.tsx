@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Sortable from "sortablejs";
+import { Button } from "@core/shared-ui";
 import { resolvePhotoDisplayKey } from "./photo-display-key";
 
 export interface StripPhoto {
@@ -170,13 +171,9 @@ export function ItemPhotoStrip({
         <div className="flex items-center justify-between mb-2">
           {selecting ? (
             <>
-              <button
-                type="button"
-                onClick={exitSelect}
-                className="text-[12px] font-bold text-ih-fg-3 hover:text-ih-fg-1"
-              >
+              <Button variant="ghost" size="sm" onClick={exitSelect}>
                 Cancel
-              </button>
+              </Button>
               <div className="flex items-center gap-3">
                 {onBulkMove && moveTargets && moveTargets.length > 0 && (
                   <label className="flex items-center gap-1 text-[12px] font-bold text-ih-fg-2">
@@ -205,28 +202,24 @@ export function ItemPhotoStrip({
                   </label>
                 )}
                 {onBulkDetach && (
-                  <button
-                    type="button"
+                  <Button
+                    variant="danger-link"
+                    size="sm"
                     disabled={sel.size === 0}
                     onClick={() => {
                       onBulkDetach([...sel].sort((a, b) => b - a));
                       exitSelect();
                     }}
-                    className="text-[12px] font-bold text-ih-danger hover:text-ih-danger/80 disabled:opacity-40"
                   >
                     Delete {sel.size}
-                  </button>
+                  </Button>
                 )}
               </div>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={() => setSelecting(true)}
-              className="ml-auto text-[12px] font-bold text-ih-primary hover:text-ih-primary-600"
-            >
+            <Button variant="link" size="sm" onClick={() => setSelecting(true)} className="ml-auto">
               Select
-            </button>
+            </Button>
           )}
         </div>
       )}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { IconButton, Icon } from "@core/shared-ui";
 import { renderTemplate } from "../../lib/mustache";
 import { DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from "../../lib/defect-fields";
 import { photoDisplayName, withDownload } from "../../lib/photo-name";
@@ -90,7 +91,9 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
         <div className="w-64 border-l border-ih-border bg-ih-bg-card flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-ih-border">
             <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-4 capitalize">{effectiveTab}</span>
-            <button onClick={closePanel} className="w-6 h-6 flex items-center justify-center rounded text-ih-fg-4 hover:text-ih-fg-2">&#x2715;</button>
+            <IconButton onClick={closePanel} aria-label="Close panel" size="sm" className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2">
+              <Icon name="x" size={14} />
+            </IconButton>
           </div>
           <div className="flex-1 overflow-y-auto p-3">
             {effectiveTab === "preview" && (

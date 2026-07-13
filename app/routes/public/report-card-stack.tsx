@@ -58,15 +58,19 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  // mode load images eagerly: Browser Rendering never scrolls, so loading={data.printMode ? "eager" : "lazy"}
  // images below the fold would never load and the PDF would have blank photos.
  const printMode = new URL(request.url).searchParams.get("print") === "1";
- // Opt-in gate for the Paged.js commercial-PCA TOC page-number path. COUPLED to
- // print=1: pagedtoc is only meaningful for the headless PDF render, never for
- // the on-screen web report (Paged.js would re-paginate the live page into fixed
- // Letter blocks and break the responsive view for any visitor who appended
- // ?pagedtoc=1). When absent (the DEFAULT — the production generatePdfFromUrl
- // does NOT append it) the report renders byte-for-byte unchanged: no Paged.js
- // script, CSS, or re-pagination. See scripts/spike/pagedjs-cf-spike.md for the
- // remaining CF verification.
- const pagedToc = printMode && new URL(request.url).searchParams.get("pagedtoc") === "1";
+ // Commercial PCA Task 19a — real TOC page numbers. `generatePdfWithTocPages`
+ // (server/lib/pdf.ts) appends `?tocpages=<base64url(JSON)>` to the pass-2
+ // render URL once `extractAnchorPages` has resolved every TOC anchor's page
+ // from the pass-1 render. Absent on the web and on PDF pass 1 -> undefined,
+ // and <ReportToc> renders its reserved page-ref slot empty either way.
+ // Malformed/truncated params degrade to undefined rather than a 500.
+ const tocPagesParam = new URL(request.url).searchParams.get("tocpages");
+ let tocPages: Record<string, number> | undefined;
+ try {
+   tocPages = tocPagesParam ? JSON.parse(atob(decodeURIComponent(tocPagesParam))) : undefined;
+ } catch {
+   tocPages = undefined;
+ }
  const parsedUrl = new URL(request.url);
  const baseUrl = parsedUrl.origin;
  try {
@@ -121,7 +125,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  reportTheme: (raw?.reportTheme as string | undefined) ?? meta?.theme,
  initialFilter,
  printMode,
- pagedToc,
+ tocPages,
  isPublished: (raw?.isPublished as boolean | undefined) ?? false,
  signature: (raw?.signature as LoaderResult["signature"] | undefined) ?? null,
  verification: (raw?.verification as LoaderResult["verification"] | undefined) ?? null,
@@ -164,7 +168,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  notPublished: false,
  initialFilter,
  printMode,
- pagedToc,
+ tocPages,
  isPublished: false,
  signature: null,
  verification: null,

@@ -1,3 +1,5 @@
+import { IconButton } from "@core/shared-ui";
+
 export interface FullscreenToggleProps {
   active: boolean;
   onToggle: () => void;
@@ -10,17 +12,11 @@ export interface FullscreenToggleProps {
  */
 export function FullscreenToggle({ active, onToggle }: FullscreenToggleProps) {
   return (
-    <button
-      type="button"
-      aria-pressed={active}
+    <IconButton
+      selected={active}
       title={active ? 'Exit fullscreen (Esc)' : 'Fullscreen (F)'}
       aria-label={active ? 'Exit fullscreen' : 'Enter fullscreen'}
       onClick={onToggle}
-      className={`flex w-9 h-9 rounded-md items-center justify-center ${
-        active
-          ? 'bg-ih-primary-tint text-ih-primary'
-          : 'text-ih-fg-3 hover:bg-ih-bg-muted'
-      }`}
     >
       {active ? (
         /* Compress / exit-fullscreen icon */
@@ -55,6 +51,6 @@ export function FullscreenToggle({ active, onToggle }: FullscreenToggleProps) {
           />
         </svg>
       )}
-    </button>
+    </IconButton>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { MenuItem } from "@core/shared-ui";
 
 interface DockTile {
   id: string;
@@ -61,22 +62,23 @@ export function InspectorToolsDock({
       {dockOpen && (
         <div className="absolute bottom-16 right-0 mb-2 ih-card p-2 min-w-[200px] bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover" role="menu" aria-label="Inspector tools">
           {TILES.map((t) => (
-            <button
+            <MenuItem
               key={t.id}
-              type="button"
-              className="w-full flex items-center gap-3 px-3 py-2 rounded hover:bg-ih-bg-muted"
+              icon={
+                <svg aria-hidden="true" className="w-5 h-5 text-ih-fg-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <path d={t.iconPath} />
+                </svg>
+              }
               onClick={handlers[t.id]}
-              role="menuitem"
+              className="gap-3 py-2 rounded"
             >
-              <svg aria-hidden="true" className="w-5 h-5 text-ih-fg-3" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                <path d={t.iconPath} />
-              </svg>
               <span className="flex-1 text-left text-sm">{t.label}</span>
               {t.hotkey && <span className="ih-kbd text-[11px] text-ih-fg-4 bg-ih-bg-muted px-1.5 py-0.5 rounded font-mono">{t.hotkey}</span>}
-            </button>
+            </MenuItem>
           ))}
         </div>
       )}
+      {/* DS exception: intentional gradient FAB */}
       <button
         type="button"
         className="w-14 h-14 rounded-full bg-gradient-to-br from-ih-primary to-ih-primary-600 shadow-ih-popover flex items-center justify-center text-white active:scale-95 transition-transform"

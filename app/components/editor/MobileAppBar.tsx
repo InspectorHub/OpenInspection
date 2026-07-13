@@ -1,4 +1,4 @@
-import { Icon } from "@core/shared-ui";
+import { Icon, IconButton } from "@core/shared-ui";
 
 export interface MobileAppBarProps {
     sectionTitle: string;
@@ -15,20 +15,20 @@ export interface MobileAppBarProps {
 export function MobileAppBar({ sectionTitle, itemLabel, onBack, onMore }: MobileAppBarProps) {
     return (
         <header className="sticky top-0 z-30 h-12 bg-ih-bg-card border-b border-ih-border flex items-center px-2 gap-2">
-            <button
+            <IconButton
                 onClick={onBack}
-                className="w-10 h-10 flex items-center justify-center text-ih-fg-2 hover:bg-ih-bg-muted rounded"
+                className="w-10 h-10"
                 aria-label="Back"
-            ><Icon name="back" size={18} /></button>
+            ><Icon name="back" size={18} /></IconButton>
             <div className="flex-1 min-w-0">
                 <div className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4 truncate">{sectionTitle}</div>
                 <div className="text-[13px] font-bold truncate">{itemLabel}</div>
             </div>
-            <button
+            <IconButton
                 onClick={onMore}
-                className="w-10 h-10 flex items-center justify-center text-ih-fg-2 hover:bg-ih-bg-muted rounded"
+                className="w-10 h-10"
                 aria-label="More actions"
-            >⋮</button>
+            >⋮</IconButton>
         </header>
     );
 }

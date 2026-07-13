@@ -12,11 +12,10 @@
 // SaaS fail closed (the route surfaces this as HTTP 409).
 
 import type { ComplianceProvider, ComplianceProviderId } from '../messaging/compliance-provider';
-import { TwilioComplianceProvider, type TwilioComplianceClient } from '../messaging/providers/twilio-compliance';
-import { TelnyxComplianceProvider, type TelnyxComplianceClient } from '../messaging/providers/telnyx-compliance';
-import { createFetchHttpClient } from '../messaging/twilio-http-client';
-import twilio from 'twilio';
-import Telnyx from 'telnyx';
+import { TwilioComplianceProvider } from '../messaging/providers/twilio-compliance';
+import { TelnyxComplianceProvider } from '../messaging/providers/telnyx-compliance';
+import { createTwilioRestClient } from '../messaging/twilio-rest-client';
+import { createTelnyxRestClient } from '../messaging/telnyx-rest-client';
 
 /** Platform env slice carrying the managed-ISV credentials. Props accept explicit
  *  `undefined` (callers spread straight from a Worker env where each is optional). */
@@ -46,20 +45,17 @@ export function resolveComplianceProvider(
         const apiKeySecret = env.TWILIO_API_KEY_SECRET;
         if (!accountSid || !apiKeySid || !apiKeySecret) throw new Error('managed_not_configured');
         // API-key auth: username = API Key SID, password = API Key Secret, account = master SID.
-        // The edge-safe fetch transport (Task 3) replaces twilio-node's default axios/node-http.
-        const client = twilio(apiKeySid, apiKeySecret, {
-            accountSid,
-            httpClient: createFetchHttpClient() as never,
-        });
-        return new TwilioComplianceProvider(client as unknown as TwilioComplianceClient);
+        // Fetch-based REST client — no twilio-node SDK dependency (bundle diet).
+        const client = createTwilioRestClient({ accountSid, apiKeySid, apiKeySecret });
+        return new TwilioComplianceProvider(client);
     }
     if (providerId === 'telnyx') {
         const apiKey = env.TELNYX_API_KEY;
         if (!apiKey) throw new Error('managed_not_configured');
-        // The telnyx SDK is edge-native (Stainless): it routes through the global
-        // `fetch` with Bearer auth, so no custom httpClient is needed (unlike twilio-node).
-        const client = new Telnyx({ apiKey });
-        return new TelnyxComplianceProvider(client as unknown as TelnyxComplianceClient);
+        // Fetch-based REST client — no `telnyx` SDK dependency (bundle diet). Auth is
+        // Bearer apiKey, matching the SDK's own edge-native transport.
+        const client = createTelnyxRestClient(apiKey);
+        return new TelnyxComplianceProvider(client);
     }
     // Unknown provider id — fail closed.
     throw new Error('managed_not_configured');

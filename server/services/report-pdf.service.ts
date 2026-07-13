@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, isNull, desc } from 'drizzle-orm';
 import { reportPdfs, tenantConfigs } from '../lib/db/schema';
 import type { ReportPdf } from '../lib/db/schema';
-import { generatePdfFromUrl } from '../lib/pdf';
+import { generatePdfWithTocPages } from '../lib/pdf';
 import { Errors } from '../lib/errors';
 import type { BrowserRun } from '../types/hono';
 import type { PdfSettings } from '../lib/pdf-settings';
@@ -111,7 +111,11 @@ export class ReportPdfService {
 
         // ReportPdfFooterOpts is structurally identical to the generatePdfFromUrl
         // opts (settings/address/license, all optional) — forward it directly.
-        const pdfBuffer = await generatePdfFromUrl(this.browser, renderUrl, opts.footer);
+        // Task 19a — every render goes through the two-pass real-TOC-page-number
+        // path. It self-short-circuits to a single pass when the report has no
+        // intra-doc anchors to number (extractAnchorPages returns {}), so
+        // non-commercial reports are behavior-preserving with no extra render.
+        const pdfBuffer = await generatePdfWithTocPages(this.browser, renderUrl, opts.footer);
 
         // Content-addressed key when a hash is available; legacy key for back-compat.
         const r2Key = opts.contentHash != null

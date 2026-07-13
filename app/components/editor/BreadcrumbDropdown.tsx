@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Popover } from "@core/shared-ui";
+import { Button, Popover } from "@core/shared-ui";
 
 /**
  * Commercial PCA Phase U (Batch C2b) — a flat unit row as it arrives from
@@ -56,15 +56,16 @@ export function BreadcrumbDropdown({ units, activeUnitId, onSelect }: Breadcrumb
 
   return (
     <>
-      <button
+      <Button
         ref={anchorRef}
-        type="button"
+        variant="secondary"
+        size="sm"
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={`Inspection scope: ${activeLabel}. Switch scope`}
         title="Switch inspection scope"
-        className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-ih-button bg-ih-bg-muted text-ih-fg-2 text-[12px] font-bold hover:bg-ih-border max-w-[200px]"
+        className="border-none bg-ih-bg-muted hover:bg-ih-border max-w-[200px]"
       >
         <svg className="w-3.5 h-3.5 text-ih-fg-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6l8-3 8 3-8 3-8-3zM4 12l8 3 8-3M4 18l8 3 8-3" />
@@ -73,7 +74,7 @@ export function BreadcrumbDropdown({ units, activeUnitId, onSelect }: Breadcrumb
         <svg className="w-3 h-3 text-ih-fg-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
-      </button>
+      </Button>
 
       <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} align="left">
         <ul role="listbox" aria-label="Inspection scope" className="py-1 min-w-[220px] max-h-[60vh] overflow-y-auto">

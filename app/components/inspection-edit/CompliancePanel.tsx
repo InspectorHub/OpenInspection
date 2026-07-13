@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher, useRevalidator } from "react-router";
-import { Modal } from "@core/shared-ui";
+import { Button, Modal, SegmentedControl } from "@core/shared-ui";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 
 /**
@@ -198,14 +198,9 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
           {existing.signedAt ? (
             <div className="text-[11px] text-ih-fg-4">Signed {new Date(existing.signedAt).toLocaleString()}</div>
           ) : null}
-          <button
-            type="button"
-            disabled={removing}
-            onClick={() => setConfirmOpen(true)}
-            className="text-[11px] text-ih-bad-fg hover:underline disabled:opacity-50"
-          >
+          <Button variant="danger-link" size="sm" disabled={removing} onClick={() => setConfirmOpen(true)}>
             {removing ? "Removing…" : "Remove"}
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="space-y-2">
@@ -239,14 +234,15 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
             />
             Dual role (same person signs both)
           </label>
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="sm"
             onClick={submitSignoff}
             disabled={saving || !personId.trim() || !name.trim()}
-            className="w-full py-2 rounded-md bg-ih-primary text-white text-[12px] font-bold hover:opacity-90 disabled:opacity-50"
+            className="w-full"
           >
             {saving ? "Signing…" : "Sign off"}
-          </button>
+          </Button>
         </div>
       )}
 
@@ -315,22 +311,18 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
     <div className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3 space-y-3" data-testid="psq-panel">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">Status</span>
-        {PSQ_STATUSES.map((s) => (
-          <button
-            key={s.value}
-            type="button"
-            disabled={settingStatus}
-            aria-pressed={status === s.value}
-            onClick={() => (s.value === "declined" ? setDeclineOpen(true) : applyStatus(s.value))}
-            className={`px-3 py-1 rounded-md text-[11px] font-bold border transition-colors disabled:opacity-50 ${
-              status === s.value
-                ? "border-ih-primary bg-ih-primary-tint text-ih-primary"
-                : "border-ih-border text-ih-fg-3"
-            }`}
-          >
-            {s.label}
-          </button>
-        ))}
+        <fieldset disabled={settingStatus} className="contents">
+          <SegmentedControl
+            ariaLabel="PSQ status"
+            value={status ?? ""}
+            onChange={(v) => {
+              const next = v as "sent" | "received" | "declined";
+              if (next === "declined") setDeclineOpen(true);
+              else applyStatus(next);
+            }}
+            options={PSQ_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
+          />
+        </fieldset>
       </div>
 
       <div className="space-y-2">
@@ -356,20 +348,12 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
         size="sm"
         footer={
           <>
-            <button
-              type="button"
-              onClick={() => setDeclineOpen(false)}
-              className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
-            >
+            <Button variant="ghost" onClick={() => setDeclineOpen(false)}>
               Cancel
-            </button>
-            <button
-              type="button"
-              onClick={confirmDecline}
-              className="px-4 py-2 rounded-md bg-ih-bad-fg text-white text-[13px] font-bold hover:opacity-90 transition-opacity"
-            >
+            </Button>
+            <Button variant="danger" onClick={confirmDecline}>
               Decline
-            </button>
+            </Button>
           </>
         }
       >
@@ -495,14 +479,14 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
       {items.length === 0 ? (
         <div className="flex items-center justify-between">
           <p className="text-[12px] text-ih-fg-3">No documents tracked yet.</p>
-          <button
-            type="button"
+          <Button
+            variant="link"
+            size="sm"
             disabled={seeding}
             onClick={() => seedFetcher.submit({ intent: "compliance-doc-review-seed" }, { method: "POST" })}
-            className="text-[12px] text-ih-primary font-bold hover:underline disabled:opacity-50"
           >
             {seeding ? "Loading…" : "Load standard checklist"}
-          </button>
+          </Button>
         </div>
       ) : (
         <ul className="space-y-2">

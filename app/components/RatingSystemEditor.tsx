@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
-import { Modal, Button, Icon } from "@core/shared-ui";
+import { Modal, Button, IconButton, Icon } from "@core/shared-ui";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL, SEVERITY_DOT } from "~/lib/severity";
 
@@ -218,14 +218,15 @@ export function RatingSystemEditor({
             <div className="flex items-center gap-1.5">
               <span className="text-[11px] text-ih-fg-4 mr-1">Start from</span>
               {PRESETS.map((p) => (
-                <button
+                <Button
                   key={p.name}
-                  type="button"
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setLevels(p.levels.map((l) => ({ ...l })))}
-                  className="h-6 px-2 rounded text-[11px] font-bold text-ih-primary border border-ih-border hover:bg-ih-primary-tint transition-colors"
+                  className="h-6 px-2 text-[11px] text-ih-primary hover:bg-ih-primary-tint"
                 >
                   {p.name}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -294,22 +295,53 @@ export function RatingSystemEditor({
 
                 {/* Reorder + remove */}
                 <div className="flex items-center shrink-0">
-                  <button type="button" onClick={() => moveLevel(i, -1)} disabled={i === 0} className="w-6 h-7 text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 disabled:hover:text-ih-fg-4" title="Move up"><Icon name="chevU" size={14} /></button>
-                  <button type="button" onClick={() => moveLevel(i, 1)} disabled={i === levels.length - 1} className="w-6 h-7 text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 disabled:hover:text-ih-fg-4" title="Move down"><Icon name="chevD" size={14} /></button>
-                  <button type="button" onClick={() => setLevels((prev) => prev.filter((_, j) => j !== i))} disabled={levels.length <= 2} className="w-6 h-7 text-ih-fg-4 hover:text-ih-bad-fg disabled:opacity-30 disabled:hover:text-ih-fg-4" title="Remove level">✕</button>
+                  <IconButton
+                    aria-label="Move up"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => moveLevel(i, -1)}
+                    disabled={i === 0}
+                    title="Move up"
+                    className="w-6 text-ih-fg-4 hover:text-ih-fg-1"
+                  >
+                    <Icon name="chevU" size={14} />
+                  </IconButton>
+                  <IconButton
+                    aria-label="Move down"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => moveLevel(i, 1)}
+                    disabled={i === levels.length - 1}
+                    title="Move down"
+                    className="w-6 text-ih-fg-4 hover:text-ih-fg-1"
+                  >
+                    <Icon name="chevD" size={14} />
+                  </IconButton>
+                  <IconButton
+                    aria-label="Remove level"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setLevels((prev) => prev.filter((_, j) => j !== i))}
+                    disabled={levels.length <= 2}
+                    title="Remove level"
+                    className="w-6 text-ih-fg-4 hover:text-ih-bad-fg"
+                  >
+                    <Icon name="x" size={14} />
+                  </IconButton>
                 </div>
               </div>
             ))}
           </div>
 
           {levels.length < 10 && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={() => setLevels((prev) => [...prev, blankLevel()])}
-              className="mt-2 w-full h-8 rounded-lg border border-dashed border-ih-border text-[12px] font-bold text-ih-fg-3 hover:text-ih-primary hover:border-ih-primary transition-colors"
+              className="mt-2 w-full h-8 rounded-lg border-dashed text-[12px] text-ih-fg-3 hover:text-ih-primary hover:border-ih-primary"
             >
               + Add level
-            </button>
+            </Button>
           )}
         </div>
 

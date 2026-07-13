@@ -298,14 +298,15 @@ export interface ReportLoaderResult {
   reportTheme?: string;
   initialFilter: FilterKey;
   printMode: boolean;
-  /* Opt-in gate for the Paged.js commercial-PCA TOC page-number path. Set ONLY
-     when the render URL carries `?pagedtoc=1` (alongside `print=1`). Default
-     false — when false NO Paged.js script, CSS, or re-pagination is injected and
-     the report renders byte-for-byte as before. The production
-     `generatePdfFromUrl` does NOT send the param, so production PDFs are
-     untouched until the CF follow-up (see scripts/spike/pagedjs-cf-spike.md)
-     wires it up and verifies a real CF PDF. */
-  pagedToc: boolean;
+  /* Commercial PCA Task 19a — real TOC page numbers, two-pass Chrome + pdf-lib.
+     Parsed from the `?tocpages=<base64url(JSON)>` param that `generatePdfWithTocPages`
+     appends to the pass-2 render URL (server/lib/pdf.ts): `extractAnchorPages`
+     (server/lib/toc-pages.ts) reads the named PDF destinations Chrome emits for
+     each pass-1 `<a href="#id">` TOC link and resolves them to 1-based page
+     numbers. Undefined on the web and on pass 1 of the PDF render — `<ReportToc>`
+     renders its reserved page-ref slot empty in either case, so the report is
+     byte-identical apart from the filled-in numbers on pass 2. */
+  tocPages?: Record<string, number>;
   isPublished: boolean;
   signature: ReportSignature | null;
   verification: ReportVerification | null;

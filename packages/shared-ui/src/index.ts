@@ -1,4 +1,5 @@
 export { Button } from "./Button";
+export { IconButton } from "./IconButton";
 export { Pill, type PillTone } from "./Pill";
 export { StatCard } from "./StatCard";
 export { Icon, type IconProps } from "./Icon";
@@ -25,3 +26,4 @@ export { Table } from "./Table";
 export type { TableProps, TableColumn, TableAlign } from "./Table";
 export { SegmentedControl, type SegmentedControlOption } from "./SegmentedControl";
 export { Avatar, avatarInitials, type AvatarSize, type AvatarVariant, type AvatarStatus } from "./Avatar";
+export { MenuItem } from "./MenuItem";

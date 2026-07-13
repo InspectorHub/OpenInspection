@@ -1,3 +1,5 @@
+import { SegmentedControl } from "@core/shared-ui";
+
 interface CommercialSubtypeOption {
  id: string;
  label: string;
@@ -77,24 +79,13 @@ export function CommercialReportControls({
 
  <div>
  <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Report tier</label>
- <div className="flex gap-2 max-w-sm">
- {TIERS.map((t) => (
- <button
- key={t.value}
- type="button"
- data-testid={`report-tier-${t.value}`}
- onClick={() => onChangeTier(t.value)}
- aria-pressed={activeTier === t.value}
- className={`flex-1 py-2 rounded-md text-[12px] font-bold border transition-colors ${
- activeTier === t.value
- ? "border-ih-primary bg-ih-primary-tint text-ih-primary"
- : "border-ih-border text-ih-fg-3"
- }`}
- >
- {t.label}
- </button>
- ))}
- </div>
+ <SegmentedControl
+ ariaLabel="Report tier"
+ value={activeTier}
+ onChange={(v) => onChangeTier(v as ReportTier)}
+ options={TIERS.map((t) => ({ value: t.value, label: t.label }))}
+ className="max-w-sm"
+ />
  <p className="mt-1.5 text-[11px] text-ih-fg-4">
  Full PCA adds the ASTM E2018 transmittal, two cost tables, reviewer sign-off and photo appendix.
  </p>

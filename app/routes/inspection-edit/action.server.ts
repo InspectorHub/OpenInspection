@@ -3,6 +3,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { sanitizeSettingsPatch } from "~/lib/settings-patch";
 import { unwrapResultsResponse } from "~/lib/results";
+import { mapPool } from "~/lib/map-pool";
 
 export async function action({ request, params, context }: Route.ActionArgs) {
  const token = await requireToken(context, request);
@@ -413,9 +414,17 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  const customId = String(formData.get("customId") ?? "");
  const defectKind = formData.get("defectKind") === "custom" ? ("custom" as const) : ("canned" as const);
  const files = formData.getAll("file").filter((f): f is File => f instanceof File);
- const keys: string[] = [];
- ok = files.length > 0 && Boolean(itemId);
- for (const file of files) {
+ // Task 15: fan out per-file uploads with bounded concurrency instead of
+ // awaiting them one at a time — burst-camera submissions of a dozen+
+ // files no longer serialize behind each other's upload round trip. The
+ // concurrency cap bounds R2-write / isolate-memory pressure on this
+ // Worker, not the total subrequest count for the submission (the client
+ // is responsible for chunking very large batches to stay under the
+ // Worker subrequest cap).
+ const CONCURRENCY = 4;
+ type UploadResult = { index: number; ok: boolean; key?: string; error?: string };
+ const results: UploadResult[] = await mapPool(files, CONCURRENCY, async (file, index) => {
+ try {
  const res = await api.inspections[":id"].upload.$post({
  param: { id: params.id },
  form: {
@@ -426,13 +435,21 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  });
  if (res.ok) {
  const j = (await res.json()) as { data?: { key?: string } };
- if (j.data?.key) keys.push(j.data.key);
- else ok = false;
- } else {
- ok = false;
+ return j.data?.key ? { index, ok: true, key: j.data.key } : { index, ok: false, error: "NO_KEY" };
  }
+ return { index, ok: false, error: `HTTP_${res.status}` };
+ } catch {
+ return { index, ok: false, error: "EXCEPTION" };
  }
- return { ok, keys, itemId, targetType, customId, defectKind };
+ });
+ // keys[] preserves the pre-existing contract: successful upload keys in
+ // input order — downstream consumers (the client effect that attaches
+ // photos to the store) only ever read this array.
+ const keys = results.filter((r) => r.ok).map((r) => r.key!);
+ ok = files.length > 0 && Boolean(itemId) && results.every((r) => r.ok);
+ // results[] is new: per-file status so a future client can surface which
+ // specific file(s) in a burst failed instead of an all-or-nothing toast.
+ return { ok, keys, results, itemId, targetType, customId, defectKind };
  }
 
  return { ok };

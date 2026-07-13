@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
+import { Button } from "@core/shared-ui";
 import { CommentTypeahead } from "./CommentTypeahead";
 import { useCommentTypeahead } from "../../hooks/useCommentTypeahead";
 import {
@@ -301,24 +302,19 @@ export function ItemEditor({
  };
 
  // Shared per-defect photo chip (canned + custom rows).
- const defectPhotoChip = (target: { kind: "canned" | "custom"; id: string }, count: number) =>
- onAddDefectPhoto ? (
- <button
- type="button"
- onClick={(e) => {
- e.preventDefault();
- e.stopPropagation();
- onAddDefectPhoto(target);
- }}
- disabled={photoUploading}
- aria-label="Add photo to this defect"
- className="inline-flex items-center gap-1 mt-1.5 px-2 py-1 rounded-md border border-dashed border-ih-border-strong text-[11px] font-bold text-ih-fg-3 hover:border-ih-primary hover:text-ih-primary transition-colors disabled:opacity-50"
- >
+ const addPhotoIcon = (
  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
  </svg>
+ );
+ const defectPhotoChip = (target: { kind: "canned" | "custom"; id: string }, count: number) =>
+ onAddDefectPhoto ? (
+ <Button variant="ghost" size="sm" disabled={photoUploading} aria-label="Add photo to this defect" icon={addPhotoIcon}
+ onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddDefectPhoto(target); }}
+ className="mt-1.5 h-auto px-2 py-1 border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
+ >
  {count > 0 ? `${count} photo${count === 1 ? "" : "s"} · add` : "Add photo"}
- </button>
+ </Button>
  ) : null;
 
  const submitCustomDefect = () => {
@@ -431,13 +427,13 @@ export function ItemEditor({
  {contradictions.map((hit) => (
  <li key={hit.id} className="flex items-center justify-between gap-2 text-[12px] text-ih-watch-fg">
  <span className="truncate">“{hit.title}” still says all-clear</span>
- <button
- type="button"
+ <Button
+ variant="link" size="sm"
  onClick={() => onToggleCanned?.(hit.tab, hit.id, false)}
- className="shrink-0 text-[11px] font-bold underline decoration-ih-watch hover:text-ih-fg-1"
+ className="shrink-0 h-auto px-0 py-0 text-[11px] text-ih-watch-fg underline decoration-ih-watch hover:text-ih-fg-1"
  >
  Uncheck it
- </button>
+ </Button>
  </li>
  ))}
  </ul>
@@ -491,13 +487,13 @@ export function ItemEditor({
   placeholder="Add notes — type to see recommended comments, / for library"
   className="w-full h-28 px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] resize-none focus:shadow-ih-focus focus:border-ih-primary outline-none"
  />
- <button
-  type="button"
+ <Button
+  variant="link" size="sm"
   onClick={() => { setTaQuery(""); setTaOpen(true); notesRef.current?.focus(); }}
-  className="absolute right-2 top-2 text-[10px] font-bold text-ih-primary hover:text-ih-primary"
+  className="absolute right-2 top-2 h-auto px-0 py-0 text-[10px]"
  >
   Recommended ▾
- </button>
+ </Button>
  <CommentTypeahead
   entries={taEntries}
   matches={ta.matches}

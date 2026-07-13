@@ -3,7 +3,7 @@ import { useLoaderData, useFetcher, Link, isRouteErrorResponse, useRouteError } 
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { Icon } from "@core/shared-ui";
+import { Icon, Button, TabStrip } from "@core/shared-ui";
 import { RATING_PRESETS } from "~/components/template/types";
 import type { RatingLevel, RatingSystem, TemplateItem, TemplateSchema, TemplateSection, CannedComment } from "~/components/template/types";
 import { RatingSystemEditor } from "~/components/RatingSystemEditor";
@@ -471,7 +471,7 @@ export default function TemplateEditPage() {
   );
 
   return (
-    <div className="flex flex-col h-screen bg-[#f8fafc] dark:bg-[#0f172a]">
+    <div className="flex flex-col h-screen bg-ih-bg-app">
       {/* Toolbar */}
       <header className="flex items-center justify-between h-12 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
         <div className="flex items-center gap-3">
@@ -484,18 +484,19 @@ export default function TemplateEditPage() {
           <span className="text-[10px] font-mono text-ih-fg-4">v{initialVersion}</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Bespoke: active "watch" tone would fight Button's ghost hover/selected treatment. */}
           <button
             onClick={() => setPreviewMode(!previewMode)}
             className={`h-7 px-3 rounded-md text-[12px] font-bold transition-colors ${previewMode ? "bg-ih-watch-bg text-ih-watch-fg" : "bg-ih-bg-muted text-ih-fg-3"}`}
           >
             {previewMode ? "Exit Preview" : "Preview"}
           </button>
-          <button onClick={() => setRatingModalOpen(true)} className="h-7 px-3 rounded-md bg-ih-bg-muted text-ih-fg-3 text-[12px] font-bold">
+          <Button variant="secondary" size="sm" onClick={() => setRatingModalOpen(true)}>
             Rating System
-          </button>
-          <button onClick={handleSave} className="h-7 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600">
+          </Button>
+          <Button variant="primary" size="sm" onClick={handleSave}>
             {fetcher.state === "submitting" ? "Saving..." : saveSuccess ? "Saved!" : "Save"}
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -561,17 +562,15 @@ export default function TemplateEditPage() {
         {selectedItem && !previewMode && (
           <aside className="flex-1 border-l border-ih-border bg-ih-bg-card overflow-y-auto">
             {/* Rail tabs */}
-            <div className="flex border-b border-ih-border">
-              {(["properties", "comments", "preview"] as const).map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setRightRail(tab)}
-                  className={`flex-1 py-2 text-[11px] font-bold capitalize border-b-2 transition-colors ${rightRail === tab ? "border-ih-primary text-ih-primary" : "border-transparent text-ih-fg-4 hover:text-ih-fg-2"}`}
-                >
-                  {tab}
-                </button>
-              ))}
-            </div>
+            <TabStrip
+              tabs={[
+                { id: "properties", label: "Properties" },
+                { id: "comments", label: "Comments" },
+                { id: "preview", label: "Preview" },
+              ]}
+              activeId={rightRail}
+              onChange={(id) => setRightRail(id as "properties" | "comments" | "preview")}
+            />
 
             <div className="p-4 space-y-3 max-w-xl">
               {rightRail === "properties" && (
@@ -687,9 +686,9 @@ export function ErrorBoundary() {
         : "Something went wrong while opening the template editor.";
 
   return (
-    <div className="flex flex-col items-center justify-center h-screen bg-[#f8fafc] dark:bg-[#0f172a] gap-3 px-6 text-center">
+    <div className="flex flex-col items-center justify-center h-screen bg-ih-bg-app gap-3 px-6 text-center">
       <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
-      <Link to="/library/templates" className="h-8 px-4 inline-flex items-center rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600">
+      <Link to="/library/templates" className="h-8 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600">
         Back to Templates
       </Link>
     </div>
