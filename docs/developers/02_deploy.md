@@ -36,10 +36,19 @@ For the manual flow, see the **Quick start** section in the [README](../../READM
 | R2 bucket        | `PHOTOS`        | All object storage — field-form photos, pre-rendered report/certificate PDFs, and e-sign evidence packs. |
 | KV namespace     | `TENANT_CACHE`  | Branding + tenant-config 1-hour cache.                     |
 | Browser binding  | `BROWSER`       | PDF rendering for reports + e-sign certificates.           |
+| Images binding   | `IMAGES` (optional) | Downscales Appendix B photos before embedding them in Word (.docx) exports. |
 | Workflow         | `SIGN_COMPLETION_WORKFLOW` | Async e-sign pipeline (Spec 5H).                           |
 | Durable Objects  | `INSPECTION_PRESENCE`, `TENANT_PRESENCE` | Live presence for the editor.               |
 
 `npm run setup:cloudflare` provisions every binding listed above and writes their real IDs into a gitignored `wrangler.local.jsonc` (bootstrapped from the committed placeholder `wrangler.jsonc`).
+
+> **`IMAGES` is optional.** The committed `wrangler.jsonc` declares it (an
+> account-scoped, name-only binding). If your account has **Images →
+> Transformations** enabled (the Free plan includes 5,000 transformations/month),
+> Word exports embed downscaled ~960px JPEGs. If it is not enabled, the deploy
+> still succeeds, `env.IMAGES` is simply unset, and the Word-export consumer
+> embeds originals up to a hard byte budget (photos beyond it are omitted) so a
+> large report never exceeds the isolate memory limit.
 
 ### Minimum secrets
 

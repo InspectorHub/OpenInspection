@@ -6,6 +6,7 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
+import { usePdfExport, pdfActionLabel, PDF_BUSY_HINT } from "~/hooks/usePdfExport";
 
 interface RepairSharePanelProps {
   shareToken: string | null;
@@ -36,6 +37,8 @@ export function RepairSharePanel({
   onEmailMsgChange,
   onSendEmail,
 }: RepairSharePanelProps) {
+  // Shared Browser Rendering rate-limit UX for the repair-request PDF preview.
+  const pdf = usePdfExport();
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-xl p-5 space-y-4">
       <p className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">Share</p>
@@ -49,17 +52,22 @@ export function RepairSharePanel({
             >
               {copyLabel}
             </button>
-            <a
-              href={`/api/public/repair-request/share/${shareToken}/pdf`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center h-9 px-4 rounded-lg border border-ih-border text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
+            <button
+              type="button"
+              onClick={() => pdf.exportPdf(`/api/public/repair-request/share/${shareToken}/pdf`, { mode: "view", filename: `repair-request-${shareToken}.pdf` })}
+              disabled={pdf.busy}
+              className="inline-flex items-center h-9 px-4 rounded-lg border border-ih-border text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              View as PDF
-            </a>
+              {pdfActionLabel(pdf, "View as PDF")}
+            </button>
           </>
         )}
       </div>
+      {pdf.error || pdf.generating ? (
+        <p role="status" className="text-[12px] leading-snug text-ih-fg-3">
+          {pdf.error ?? PDF_BUSY_HINT}
+        </p>
+      ) : null}
 
       {/* Email form */}
       {shareToken && !emailSent && (

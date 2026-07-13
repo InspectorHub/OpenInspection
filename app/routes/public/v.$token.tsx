@@ -1,4 +1,5 @@
 import { useLoaderData } from "react-router";
+import { usePdfExport, pdfActionLabel, PDF_BUSY_HINT } from "~/hooks/usePdfExport";
 import type { Route } from "./+types/v.$token";
 import { createApi } from "~/lib/api-client.server";
 
@@ -158,6 +159,9 @@ function shortHash(hash: string): string {
 
 export default function VerifyTokenPage() {
   const result = useLoaderData<typeof loader>();
+  // Shared Browser Rendering rate-limit UX for the signed-PDF download. Declared
+  // before the early return below so the hook runs unconditionally.
+  const pdf = usePdfExport();
 
   // Agreement match → redirect hint with link to existing verify page.
   if (result.kind === "agreement") {
@@ -295,13 +299,21 @@ export default function VerifyTokenPage() {
 
       {/* PDF download */}
       {model.versionNumber !== undefined && (
-        <a
-          href={`/api/public/verify/report/${token}/pdf`}
-          className="flex items-center justify-center gap-2 w-full rounded-lg border border-ih-border px-4 py-2.5 text-[13px] font-medium text-ih-fg-1 hover:bg-ih-bg-muted transition-colors"
-          download
-        >
-          Download signed v{model.versionNumber} PDF
-        </a>
+        <>
+          <button
+            type="button"
+            onClick={() => pdf.exportPdf(`/api/public/verify/report/${token}/pdf`, { filename: `signed-report-v${model.versionNumber}.pdf` })}
+            disabled={pdf.busy}
+            className="flex items-center justify-center gap-2 w-full rounded-lg border border-ih-border px-4 py-2.5 text-[13px] font-medium text-ih-fg-1 hover:bg-ih-bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {pdfActionLabel(pdf, `Download signed v${model.versionNumber} PDF`)}
+          </button>
+          {pdf.error || pdf.generating ? (
+            <p role="status" className="mt-2 text-[12px] leading-snug text-ih-fg-3">
+              {pdf.error ?? PDF_BUSY_HINT}
+            </p>
+          ) : null}
+        </>
       )}
     </div>
   );

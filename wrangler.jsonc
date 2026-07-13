@@ -61,6 +61,16 @@
   // deploy must mirror this into the gitignored wrangler.local.jsonc /
   // wrangler.saas.jsonc and set STREAM_CUSTOMER_SUBDOMAIN (no hardcoded fallback).
   "stream": { "binding": "STREAM" },
+  // Cloudflare Images binding — used by the Word-export queue consumer to
+  // downscale Appendix B photos before embedding them in the .docx, so a large
+  // report stays well under the isolate memory limit (see
+  // server/services/report-export-consumer.ts). Account-scoped name-only binding
+  // like STREAM above: on an account without Images Transformations enabled the
+  // deploy still succeeds and env.IMAGES is simply unset at runtime — the
+  // consumer then falls back to a hard byte budget (photos beyond the budget are
+  // omitted) so it never OOMs. Enable Images > Transformations in the dashboard
+  // (Free plan includes 5,000 transformations/month) to get downscaled exports.
+  "images": { "binding": "IMAGES" },
   "workflows": [
     {
       "binding": "SIGN_COMPLETION_WORKFLOW",

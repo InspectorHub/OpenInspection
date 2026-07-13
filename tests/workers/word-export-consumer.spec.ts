@@ -50,6 +50,19 @@ const DISTINCT_PNGS_BASE64 = [
 ];
 const DISTINCT_PNG_COUNT = DISTINCT_PNGS_BASE64.length; // 3
 
+// A GENUINELY-DISTINCT multi-KiB/MiB "photo" blob (real camera originals are all
+// distinct, so the docx never dedups them and buildAppendixPhotoInputs must hold
+// each full buffer as it accumulates). A PNG signature keeps it image-shaped; the
+// body is a single byte that varies by index so every blob is a distinct
+// content-hash (fast native fill). Used to exercise the no-IMAGES memory budget
+// with realistic-size originals instead of the 68-byte 1x1 PNGs.
+function distinctLargeBytes(index: number, byteSize: number): Uint8Array {
+    const buf = new Uint8Array(byteSize);
+    buf.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0); // PNG signature
+    buf.fill((index & 0xff), 8);
+    return buf;
+}
+
 // Replay every migration .sql exactly as production applies them (mirrors
 // tests/workers/report-amendments.spec.ts).
 const migrationSql = import.meta.glob('../../migrations/*.sql', {
@@ -124,7 +137,10 @@ async function seedCommercialInspection(): Promise<void> {
 // numbering yields a gap-free 1..photoCount appendix. The photo BYTES cycle a
 // tiny set of distinct PNGs (so the .docx dedupes to DISTINCT_PNG_COUNT image
 // relationships) while every KEY stays unique (so all photoCount get numbered).
-async function seedLargeCommercialInspection(photoCount: number): Promise<void> {
+async function seedLargeCommercialInspection(
+    photoCount: number,
+    photoBytes: (i: number) => Uint8Array = (i) => pngBytesFromBase64(DISTINCT_PNGS_BASE64[i % DISTINCT_PNG_COUNT]),
+): Promise<void> {
     const db = drizzle(b.DB);
     await db.insert(schema.tenants).values({
         id: TENANT, name: 'Acme PCA', slug: `acme-pca-${TENANT.slice(-4)}`, status: 'active',
@@ -156,7 +172,7 @@ async function seedLargeCommercialInspection(photoCount: number): Promise<void> 
             notes: `Observation ${i + 1}: membrane and flashing inspected; condition documented in photo.`,
             photos: [{ key }],
         };
-        await b.PHOTOS.put(key, pngBytesFromBase64(DISTINCT_PNGS_BASE64[i % DISTINCT_PNG_COUNT]));
+        await b.PHOTOS.put(key, photoBytes(i));
     }
     await db.insert(schema.inspectionResults).values({
         id: crypto.randomUUID(), tenantId: TENANT, inspectionId: INSPECTION,
@@ -280,6 +296,55 @@ describe('Word export consumer — real workerd (Commercial PCA Phase W Task 5)'
         // host files, so the artifact is generated separately from this line.
         // eslint-disable-next-line no-console
         console.log(`[stress] docx sizeBytes=${record!.sizeBytes} images=${imageRelCount} photoNo max=${PHOTO_COUNT}`);
+    }, 60000);
+
+    // Real-isolate memory profile of the dangerous path: env.IMAGES UNSET (an
+    // account without Images Transformations), so buildAppendixPhotoInputs embeds
+    // full-resolution originals. Without the byte budget a 40 x 1 MiB report would
+    // accumulate ~40 MiB of originals + a ~40 MiB docx buffer and OOM a 128 MiB
+    // isolate. The APPENDIX_PHOTO_TOTAL_BYTE_BUDGET (32 MiB) must cap embedding so
+    // the export always completes — proven here in real workerd with real-size,
+    // genuinely-distinct (un-deduped) photo bytes.
+    it('caps embedded photo bytes and still completes on a 40 x 1 MiB report with no IMAGES binding', async () => {
+        const PHOTO_COUNT = 40;
+        const PHOTO_BYTES = 1024 * 1024; // 1 MiB each, distinct → 40 MiB of originals
+        await seedLargeCommercialInspection(PHOTO_COUNT, (i) => distinctLargeBytes(i, PHOTO_BYTES));
+        const exportService = new ReportExportService(b.DB, b.PHOTOS);
+        const { id: exportId } = await exportService.create(TENANT, INSPECTION, 'docx');
+
+        const msg = fakeMessage({ exportId, tenantId: TENANT, inspectionId: INSPECTION, format: 'docx' });
+        const batch = { queue: 'openinspection-word-export', messages: [msg] } as unknown as MessageBatch<unknown>;
+
+        // NOTE: no IMAGES binding passed → full-resolution embed path.
+        await handleWordExportBatch({ DB: b.DB, PHOTOS: b.PHOTOS }, batch);
+
+        // Completed cleanly — an OOM or throw anywhere in the loop would retry,
+        // not ack. This is the "profile passes / no OOM" signal.
+        expect(msg.ack).toHaveBeenCalledOnce();
+        expect(msg.retry).not.toHaveBeenCalled();
+        const record = await exportService.get(exportId, TENANT);
+        expect(record?.status).toBe('ready');
+
+        const obj = await b.PHOTOS.get(record!.r2Key!);
+        const bytes = new Uint8Array(await obj!.arrayBuffer());
+        expect(bytes[0]).toBe(0x50); // PK zip magic
+        expect(bytes[1]).toBe(0x4b);
+
+        const { unzipSync, strFromU8 } = await import('fflate');
+        const files = unzipSync(bytes);
+        const rels = strFromU8(files['word/_rels/document.xml.rels']);
+        const imageRelCount = (rels.match(/relationships\/image"/g) ?? []).length;
+        const doc = strFromU8(files['word/document.xml']);
+
+        // Budget kicked in: NOT all 40 distinct originals embedded (each is a
+        // distinct content-hash → no docx dedup, so imageRelCount == embedded
+        // count), and the tail photo (#40) was omitted. ~32 embedded (32 MiB
+        // budget / 1 MiB each). >=1 keeps the appendix non-empty.
+        expect(imageRelCount).toBeGreaterThan(0);
+        expect(imageRelCount).toBeLessThan(PHOTO_COUNT);
+        expect(doc).not.toContain(`PHOTO NO. ${PHOTO_COUNT}`);
+        // eslint-disable-next-line no-console
+        console.log(`[stress] no-IMAGES budget: embedded=${imageRelCount}/${PHOTO_COUNT} docxBytes=${record!.sizeBytes}`);
     }, 60000);
 
     it('failure path: bad inspectionId marks the row failed and retries the message', async () => {
