@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { useInspectionState } from "~/hooks/useInspection";
 import { Button, IconButton, Icon } from "@core/shared-ui";
+import { usePdfExport, pdfActionLabel } from "~/hooks/usePdfExport";
 import type { ColorScheme } from "~/lib/ui-prefs";
 import { ProgressStripText } from "~/components/editor/ProgressStripText";
 import { TemplateMenu } from "~/components/editor/TemplateMenu";
@@ -56,6 +57,8 @@ export function EditorHeader({
  onUpdateSourceTemplate,
  canUpdateSourceTemplate,
 }: EditorHeaderProps) {
+ // Shared Browser Rendering rate-limit UX for the on-demand PDF preview.
+ const pdf = usePdfExport();
  return (
  // z-40 (below the z-50 overlay layer): this fixed header is page chrome, so
  // modals and right-side Drawers (both z-50) must paint OVER it. At an equal
@@ -286,16 +289,17 @@ export function EditorHeader({
  <Button
   variant="secondary"
   size="md"
-  onClick={() => window.open(`/api/inspections/${state.inspection.id}/pdf?type=full`, "_blank", "noopener")}
+  onClick={() => pdf.exportPdf(`/api/inspections/${state.inspection.id}/pdf?type=full`, { mode: "view", filename: `report-${state.inspection.id}.pdf` })}
+  disabled={pdf.busy}
   className="hidden xl:inline-flex"
-  title="Preview the real server-rendered PDF (the exact client deliverable) in a new tab"
+  title={pdf.error ?? "Preview the real server-rendered PDF (the exact client deliverable) in a new tab"}
   icon={
    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
    </svg>
   }
  >
-  Preview PDF
+  {pdfActionLabel(pdf, "Preview PDF")}
  </Button>
 
  {/* Sign now button */}

@@ -18,6 +18,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { useState } from "react";
+import { usePdfExport, pdfActionLabel, PDF_BUSY_HINT } from "~/hooks/usePdfExport";
 import { brandTokens } from "~/lib/brand";
 import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, isDefect } from "~/lib/report-helpers";
@@ -219,7 +220,8 @@ export function ReportView(props: ReportViewProps) {
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [repairPanel, setRepairPanel] = useState(false);
   const [repairItems, setRepairItems] = useState<Record<string, boolean>>({});
-  const [generating, setGenerating] = useState(false);
+  // Browser Rendering rate-limit UX (shared across every BR-backed PDF surface).
+  const pdf = usePdfExport();
   const [coverFailed, setCoverFailed] = useState(false);
 
   // Photo keys whose thumbnail failed to load. A failed thumbnail is collapsed
@@ -273,29 +275,11 @@ export function ReportView(props: ReportViewProps) {
       .map((l) => ({ label: l.label, value: l.count, color: l.color })),
   ];
 
-  const downloadPdf = async () => {
-    if (generating) return;
-    setGenerating(true);
-    try {
-      const url = urlToken
-        ? `/api/public/report/${tenant}/${id}/pdf?type=full&token=${encodeURIComponent(urlToken)}`
-        : `/api/inspections/${id}/pdf?type=full`;
-      const res = await fetch(url, { credentials: "same-origin" });
-      if (!res.ok) throw new Error(`Download failed (${res.status})`);
-      const blob = await res.blob();
-      const objUrl = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = objUrl;
-      a.download = `report-${id}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(objUrl);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setGenerating(false);
-    }
+  const downloadPdf = () => {
+    const url = urlToken
+      ? `/api/public/report/${tenant}/${id}/pdf?type=full&token=${encodeURIComponent(urlToken)}`
+      : `/api/inspections/${id}/pdf?type=full`;
+    void pdf.exportPdf(url, { filename: `report-${id}.pdf` });
   };
 
   if (data.error) {
@@ -358,17 +342,27 @@ export function ReportView(props: ReportViewProps) {
         {Boolean(data.ownerPreview) && Boolean(data.reportTier) ? (
           <WordExportButton inspectionId={data.inspectionId} />
         ) : null}
-        <button
-          type="button"
-          onClick={downloadPdf}
-          disabled={generating}
-          className="px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-          </svg>
-          {generating ? "Generating…" : "Download PDF"}
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          {pdf.error || pdf.generating ? (
+            <div
+              role="status"
+              className="max-w-[15rem] rounded-lg bg-ih-bg-inverse px-3 py-2 text-[11px] font-medium leading-snug text-ih-fg-inverse shadow-ih-popover"
+            >
+              {pdf.error ?? PDF_BUSY_HINT}
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={downloadPdf}
+            disabled={pdf.busy}
+            className="px-5 py-3 rounded-full bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest shadow-ih-popover hover:bg-ih-primary transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+            </svg>
+            {pdfActionLabel(pdf, "Download PDF")}
+          </button>
+        </div>
       </div>
 
       {/* Header */}

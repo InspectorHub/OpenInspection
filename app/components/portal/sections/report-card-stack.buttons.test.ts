@@ -56,38 +56,43 @@ describe('report-card-stack buttons (Task 9)', () => {
     expect(text).toContain('Download PDF');
   });
 
-  it('FAB button shows "Generating…" label when generating is true', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+  // The fetch→blob download + generating/cooldown state moved into the shared
+  // `usePdfExport` hook (so every Browser-Rendering-backed surface degrades
+  // identically). ReportView now delegates to it; the impl assertions follow the
+  // logic into the hook, while ReportView keeps the URL construction + wiring.
+  it('FAB label is produced by the shared hook ("Generating…" / "Retry in Ns")', async () => {
+    const view = ((await import('~/components/portal/sections/ReportView?raw')) as unknown as { default: string }).default;
+    const hook = ((await import('~/hooks/usePdfExport?raw')) as unknown as { default: string }).default;
 
-    // The conditional label text must appear in source.
-    expect(text).toContain('Generating');
+    expect(view).toContain('pdfActionLabel(pdf, "Download PDF")');
+    expect(hook).toContain('Generating');
+    expect(hook).toContain('Retry in');
   });
 
-  it('generating state variable is declared', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+  it('generating state lives in the shared usePdfExport hook', async () => {
+    const view = ((await import('~/components/portal/sections/ReportView?raw')) as unknown as { default: string }).default;
+    const hook = ((await import('~/hooks/usePdfExport?raw')) as unknown as { default: string }).default;
 
-    expect(text).toContain('generating');
-    expect(text).toContain('setGenerating');
+    expect(view).toContain('usePdfExport()');
+    expect(view).toContain('pdf.busy');
+    expect(hook).toContain('setGenerating');
   });
 
-  it('downloadPdf handler uses fetch (not window.print)', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+  it('downloadPdf delegates to the hook, which uses fetch (not window.print)', async () => {
+    const view = ((await import('~/components/portal/sections/ReportView?raw')) as unknown as { default: string }).default;
+    const hook = ((await import('~/hooks/usePdfExport?raw')) as unknown as { default: string }).default;
 
-    // The async downloadPdf function must call fetch.
-    expect(text).toContain('downloadPdf');
-    expect(text).toContain('await fetch(');
+    expect(view).toContain('downloadPdf');
+    expect(view).toContain('pdf.exportPdf(');
+    expect(hook).toContain('await fetch(');
   });
 
-  it('downloadPdf creates a blob and anchor download (not window.print)', async () => {
-    const src = await import('~/components/portal/sections/ReportView?raw');
-    const text = (src as unknown as { default: string }).default;
+  it('the hook creates a blob and anchor download (not window.print)', async () => {
+    const hook = ((await import('~/hooks/usePdfExport?raw')) as unknown as { default: string }).default;
 
-    expect(text).toContain('res.blob()');
-    expect(text).toContain('URL.createObjectURL');
-    expect(text).toContain('a.download');
+    expect(hook).toContain('res.blob()');
+    expect(hook).toContain('URL.createObjectURL');
+    expect(hook).toContain('a.download');
   });
 
   it('owner URL path: /api/inspections/:id/pdf', async () => {
