@@ -31,6 +31,21 @@ export const PropertyFactsSchema = z.object({
     commercialSubtype: z.string().max(64).nullable().optional().openapi({ example: 'office' }).describe('Commercial subtype id (platform id or org-custom). Only meaningful when propertyType = commercial.'),
 }).openapi('PropertyFacts');
 
+// Write-only superset of PropertyFactsSchema. The `metadata` envelope carries
+// non-dedicated commercial subtype-preset fields (nra, floorCount,
+// occupancyClass, sprinklered, gla, parkingSpaces, roomCount, clearHeight,
+// dockCount, ...). Open-ended id set (org-custom subtypes exist — see the
+// commercial_subtypes table), so a bounded record of primitives rather than a
+// per-id enum. Merged into inspections.property_facts by updatePropertyFacts;
+// null clears a key. The read schema stays strict (no metadata) so responses
+// never leak the raw envelope shape. See design doc
+// 2026-07-13-oi-property-facts-commercial-persist.
+const PropertyFactValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+export const PropertyFactsWriteSchema = PropertyFactsSchema.extend({
+    metadata: z.record(z.string(), PropertyFactValue).optional()
+        .describe('Non-dedicated commercial subtype-preset fields, merged into the property_facts JSON envelope. null clears a key.'),
+}).openapi('PropertyFactsWrite');
+
 export const PropertyFactsResponseSchema = createApiResponseSchema(PropertyFactsSchema).openapi('PropertyFactsResponse');
 
 /**

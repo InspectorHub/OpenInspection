@@ -38,6 +38,7 @@ import { InspectorToolsDock } from "~/components/editor/InspectorToolsDock";
 import { BurstCamera } from "~/components/editor/BurstCamera";
 import { PhotoAnnotator } from "~/components/media-studio/PhotoAnnotator";
 import { PropertyInfoForm } from "~/components/editor/PropertyInfoForm";
+import { resolveActivePropertyPreset } from "~/lib/property-preset";
 import { PcaNarrativePanel } from "~/components/inspection/PcaNarrativePanel";
 import { CompliancePanel } from "~/components/inspection-edit/CompliancePanel";
 import { CommercialReportControls, type ReportTier } from "~/components/editor/CommercialReportControls";
@@ -229,13 +230,41 @@ export default function InspectionEditPage() {
  // byte-identical to before. Batch C2b wires the switcher (per_unit mode).
  const [activeUnitId, setActiveUnitId] = useState<string | null>(null);
 
+ // Commercial subtype-preset fields (nra, floorCount, sprinklered, ...) persist
+ // in the property_facts JSON envelope, but the editor reads facts as flat
+ // inspection[key]. Spread the envelope onto the seeded inspection so those
+ // keys resolve uniformly for PropertyInfoForm and the report preview.
+ // Dedicated columns win when a key exists in both (envelope first, row last).
+ // Design 2026-07-13-oi-property-facts-commercial-persist.
+ const seededInspection = useMemo(() => {
+ const insp = loaderData.inspection as Record<string, unknown>;
+ const envelope = (insp.propertyFacts as Record<string, unknown> | null) ?? {};
+ return { ...envelope, ...insp };
+ }, [loaderData.inspection]);
+
  const state = useInspectionState({
- inspection: loaderData.inspection,
+ inspection: seededInspection,
  schema: loaderData.schema as unknown as InspectionSchema,
  results: loaderData.results,
  ratingLevels: loaderData.ratingLevels,
  activeUnitId,
  });
+
+ // The Property Info field list. For a commercial inspection with a chosen
+ // subtype, thread that subtype's preset (nra/floorCount/... for office, etc.)
+ // so those report-visible fields become editable and persist through the
+ // metadata envelope. Recomputes when the Phase T selector changes
+ // commercialSubtype (live, no fetch). resolveActivePropertyPreset returns
+ // undefined for residential / no-subtype so PropertyInfoForm keeps its own
+ // default field set (no residential regression, non-empty commercial fallback).
+ const activePropertyPreset = useMemo(() => {
+ const insp = state.inspection as Record<string, unknown>;
+ return resolveActivePropertyPreset(
+ insp.propertyType as string | null | undefined,
+ insp.commercialSubtype as string | null | undefined,
+ loaderData.commercialPresets,
+ );
+ }, [state.inspection, loaderData.commercialPresets]);
 
  /* ---------------------------------------------------------------- */
  /* #181 — collab Y.Doc (real-time editing; the only editor write path) */
@@ -2231,6 +2260,7 @@ export default function InspectionEditPage() {
   <>
   <PropertyInfoForm
   inspection={state.inspection}
+  templateFields={activePropertyPreset}
   onSave={(fieldId, value) => {
   state.setInspection((prev) => ({
    ...prev,

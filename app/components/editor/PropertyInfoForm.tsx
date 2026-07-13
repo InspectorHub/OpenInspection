@@ -1,4 +1,5 @@
 import { useMemo, useCallback } from "react";
+import { isDedicatedFactKey } from "~/lib/property-facts-keys";
 
 interface MetadataField {
   id: string;
@@ -98,13 +99,24 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
   // updated). Committing the whole object each time is what makes a single
   // shared fetcher abort-safe — a later PATCH is a superset of any in-flight
   // one, so a cancelled earlier submit loses no data.
+  // Dedicated-column keys (yearBuilt, sqft, ...) go at the top level where the
+  // service writes them to real columns; every other field is a commercial
+  // subtype-preset extra (nra, floorCount, sprinklered, ...) that rides the
+  // `metadata` envelope into the property_facts JSON column. The split is keyed
+  // off the single shared DEDICATED_FACT_KEYS list. When the active preset has
+  // no non-dedicated fields (every residential preset), `metadata` stays empty
+  // and we emit a flat object — byte-for-byte the pre-envelope shape, so the
+  // strip's superset-PATCH abort-safety and existing callers are unchanged.
   function commitAll(changedField: MetadataField, changedValue: unknown) {
-    const facts: Record<string, unknown> = {};
+    const dedicated: Record<string, unknown> = {};
+    const metadata: Record<string, unknown> = {};
     for (const f of metaFields) {
       const raw = f.id === changedField.id ? changedValue : inspection[f.id];
-      facts[f.id] = coerce(f, raw);
+      const value = coerce(f, raw);
+      if (isDedicatedFactKey(f.id)) dedicated[f.id] = value;
+      else metadata[f.id] = value;
     }
-    onCommit?.(facts);
+    onCommit?.(Object.keys(metadata).length ? { ...dedicated, metadata } : dedicated);
   }
 
   return (

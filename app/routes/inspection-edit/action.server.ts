@@ -79,9 +79,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // (CommercialReportControls) persist through the real property-facts PATCH
  // like every other mutation (no raw client fetch — see
  // feedback_core_bff_no_client_fetch). Reuses the same
- // /api/inspections/:id/property-facts endpoint PropertyInfoForm's fields
- // are validated against (PropertyFactsSchema), just with a payload limited
- // to the one or two keys the caller changed.
+ // /api/inspections/:id/property-facts endpoint. PropertyInfoForm's fields are
+ // validated against PropertyFactsWriteSchema (strip keys + the commercial
+ // subtype-preset `metadata` envelope); the whole payload is relayed as-is.
  if (intent === "save-property-facts") {
  const payload = JSON.parse(String(formData.get("payload") ?? "{}"));
  const res = await api.inspections[":id"]["property-facts"].$patch({

@@ -150,6 +150,48 @@ describe('InspectionService.updatePropertyFacts (G1)', () => {
             bathrooms:      null,
         });
     });
+
+    // Commercial subtype-preset persist (design 2026-07-13). Non-dedicated
+    // preset fields (nra, floorCount, ...) ride the property_facts JSON
+    // envelope. Asserted directly against the stored column — same treatment
+    // as commercialSubtype (write-only through this endpoint; read back via the
+    // inspection row / report payload, NOT the 6-field PropertyFacts return).
+    async function readEnvelope(id: string): Promise<Record<string, unknown> | null> {
+        const row = await testDb.select({ propertyFacts: schema.inspections.propertyFacts })
+            .from(schema.inspections)
+            .where(eq(schema.inspections.id, id))
+            .get();
+        return (row?.propertyFacts as Record<string, unknown> | null) ?? null;
+    }
+
+    it('persists metadata into the property_facts envelope', async () => {
+        await svc.updatePropertyFacts('insp-A', TENANT_A, {
+            yearBuilt: 1998,
+            metadata: { nra: 42000, sprinklered: 'Full', floorCount: 4 },
+        });
+        expect(await readEnvelope('insp-A')).toMatchObject({ nra: 42000, sprinklered: 'Full', floorCount: 4 });
+    });
+
+    it('null in metadata clears a key without touching siblings', async () => {
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { metadata: { nra: 42000, floorCount: 4 } });
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { metadata: { nra: null } });
+        const env = await readEnvelope('insp-A');
+        expect(env).not.toHaveProperty('nra');
+        expect(env).toMatchObject({ floorCount: 4 });
+    });
+
+    it('a dedicated key never leaks into the envelope', async () => {
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { yearBuilt: 2001, metadata: { nra: 100 } });
+        const env = await readEnvelope('insp-A');
+        expect(env).not.toHaveProperty('yearBuilt');
+        expect(env).toMatchObject({ nra: 100 });
+    });
+
+    it('a strip-only patch (no metadata) leaves the envelope untouched', async () => {
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { metadata: { nra: 999 } });
+        await svc.updatePropertyFacts('insp-A', TENANT_A, { yearBuilt: 1970 });
+        expect(await readEnvelope('insp-A')).toMatchObject({ nra: 999 });
+    });
 });
 
 describe('PropertyFactsSchema (Zod)', () => {

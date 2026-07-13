@@ -73,6 +73,14 @@ export class InspectionResultsService extends InspectionSubService {
         // Plain text column (org-custom subtypes exist alongside the 6 locked
         // platform ids) — mirrors reportTier's write path exactly.
         commercialSubtype?: string | null | undefined;
+        // Non-dedicated commercial subtype-preset fields (nra, floorCount,
+        // occupancyClass, sprinklered, gla, dockCount, ...). Open-ended id set
+        // (org-custom subtypes), so they persist into the property_facts JSON
+        // envelope rather than dedicated columns. Read-modify-write, mirroring
+        // updatePcaNarrative; null clears a key. building-profile.ts reads the
+        // envelope back (facts[f.id] ?? dedicated[f.id]). See design doc
+        // 2026-07-13-oi-property-facts-commercial-persist.
+        metadata?: Record<string, string | number | boolean | null> | undefined;
     }): Promise<PropertyFacts> {
         const db = this.getDrizzle();
         const existing = await db.select({ id: inspections.id }).from(inspections)
@@ -94,6 +102,23 @@ export class InspectionResultsService extends InspectionSubService {
 
         if (Object.keys(update).length > 0) {
             await db.update(inspections).set(update)
+                .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
+        }
+
+        // Merge the non-dedicated preset fields into the property_facts JSON
+        // envelope (read-modify-write, mirroring updatePcaNarrative). Only
+        // touched when the caller supplies `metadata`, so a strip-only patch
+        // leaves the envelope untouched. null clears a key.
+        if (facts.metadata !== undefined) {
+            const row = await db.select({ propertyFacts: inspections.propertyFacts })
+                .from(inspections)
+                .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)))
+                .get();
+            const merged: Record<string, unknown> = { ...(row?.propertyFacts ?? {}) };
+            for (const [k, v] of Object.entries(facts.metadata)) {
+                if (v === null) delete merged[k]; else merged[k] = v;
+            }
+            await db.update(inspections).set({ propertyFacts: merged })
                 .where(and(eq(inspections.id, id), eq(inspections.tenantId, tenantId)));
         }
 
