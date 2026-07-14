@@ -93,6 +93,9 @@ export const profileSchema = z.object({
   phone: z.string().max(30, "Phone is too long").optional(),
   licenseNumber: z.string().max(50, "License number is too long").optional(),
   signatureEnabled: z.boolean().optional(),
+  // Per-user display-timezone override (IANA name). Empty string = inherit the
+  // tenant default. Constrained to a <select> in the UI.
+  timezone: z.string().optional(),
 });
 
 export type ProfileInput = z.infer<typeof profileSchema>;

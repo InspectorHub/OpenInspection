@@ -10,6 +10,8 @@ import { SignaturePad } from "~/components/SignaturePad";
 import { AvatarCropper } from "~/components/media-studio/AvatarCropper";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { profileSchema } from "~/lib/forms/settings.schema";
+import { Select } from "@core/shared-ui";
+import { TIMEZONE_OPTIONS } from "~/lib/timezones";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -24,6 +26,7 @@ interface Profile {
   photoUrl?: string | null;
   signatureEnabled?: boolean;
   signaturePreviewHtml?: string;
+  timezone?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -93,6 +96,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   for (const key of ["name", "phone", "licenseNumber"] as const) {
     if (v[key] !== undefined) body[key] = v[key];
   }
+  // Per-user timezone override. The <select> always submits a value; an empty
+  // string clears the override (API maps '' -> NULL = inherit tenant).
+  if (v.timezone !== undefined) body.timezone = v.timezone;
   // Email signature toggle: hidden "false" + optional checkbox "true" — last value wins.
   const sigVals = fd.getAll("signatureEnabled");
   body.signatureEnabled = sigVals[sigVals.length - 1] === "true";
@@ -211,6 +217,19 @@ export default function SettingsProfilePage() {
                 <p className="text-[11px] text-ih-fg-3">State inspector license number.</p>
               )}
             </div>
+          </div>
+
+          <div className="max-w-md">
+            <Select
+              label="Your timezone"
+              name="timezone"
+              defaultValue={profile.timezone ?? ""}
+              hint="Overrides how times appear for you only. Reports and calendar events always use the company timezone."
+              options={[
+                { value: "", label: "Use company timezone" },
+                ...TIMEZONE_OPTIONS.map((tz) => ({ value: tz, label: tz.replace(/_/g, " ") })),
+              ]}
+            />
           </div>
         </section>
 
