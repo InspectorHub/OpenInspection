@@ -133,6 +133,9 @@ export const workspaceSchema = z.object({
   pdfShowFooter: z.boolean().optional(),
   pdfShowPageNumbers: z.boolean().optional(),
   pdfShowLicense: z.boolean().optional(),
+  // Tenant display timezone (IANA name). Free-form string validated on the API;
+  // the UI constrains it to a <select> of TIMEZONE_OPTIONS.
+  defaultTimezone: z.string().optional(),
 });
 
 export type WorkspaceInput = z.infer<typeof workspaceSchema>;

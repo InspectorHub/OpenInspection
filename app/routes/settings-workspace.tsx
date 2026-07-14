@@ -11,6 +11,8 @@ import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { workspaceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
+import { Select } from "@core/shared-ui";
+import { TIMEZONE_OPTIONS } from "~/lib/timezones";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -28,6 +30,7 @@ interface Branding {
   pdfShowFooter?: boolean | null;
   pdfShowPageNumbers?: boolean | null;
   pdfShowLicense?: boolean | null;
+  defaultTimezone?: string | null;
 }
 
 const THEMES = ["modern", "classic", "minimal"] as const;
@@ -101,6 +104,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   body.pdfShowFooter = v.pdfShowFooter ?? false;
   body.pdfShowPageNumbers = v.pdfShowPageNumbers ?? false;
   body.pdfShowLicense = v.pdfShowLicense ?? false;
+
+  // Tenant display timezone (IANA). Only sent when a value is present.
+  if (typeof v.defaultTimezone === "string" && v.defaultTimezone) body.defaultTimezone = v.defaultTimezone;
 
   const api = createApi(context, { token });
   // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
@@ -204,6 +210,22 @@ export default function SettingsWorkspacePage() {
                 fd.append("logo", file);
                 logoFetcher.submit(fd, { method: "POST", encType: "multipart/form-data" });
               }}
+            />
+          </div>
+        </section>
+
+        {/* Timezone */}
+        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Timezone</h3>
+          <p className="text-[12px] text-ih-fg-3">
+            Reports, reminders, and calendar events use this timezone. Individual users can override how times appear for them in their profile.
+          </p>
+          <div className="max-w-md">
+            <Select
+              label="Company timezone"
+              name="defaultTimezone"
+              defaultValue={branding.defaultTimezone ?? "UTC"}
+              options={TIMEZONE_OPTIONS.map((tz) => ({ value: tz, label: tz.replace(/_/g, " ") }))}
             />
           </div>
         </section>
