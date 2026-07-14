@@ -28,6 +28,10 @@ import {
     upsertCalendarConnection,
     type PendingCalendarOAuth,
 } from '../lib/calendar/connection';
+import {
+    loadGoogleOAuthMode,
+    resolveGoogleOAuthCredentials,
+} from '../lib/calendar/resolve-google-oauth';
 
 /**
  * DELETE /api/calendar/disconnect
@@ -107,13 +111,18 @@ export const calendarRoutes = createApiRouter()
         }
 
         const provider = getCalendarProvider('google');
+        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+        if (!oauthCreds) {
+            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
+        }
         const timeMin = new Date();
         const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         let busyBlocks;
         try {
             busyBlocks = await provider.listBusy({
-                clientId: c.env.GOOGLE_CLIENT_ID,
-                clientSecret: c.env.GOOGLE_CLIENT_SECRET,
+                clientId: oauthCreds.clientId,
+                clientSecret: oauthCreds.clientSecret,
                 refreshToken: open.credentials.refreshToken,
                 calendarId: open.connection.calendarId,
                 range: { from: timeMin, to: timeMax },
@@ -184,11 +193,17 @@ export const calendarRoutes = createApiRouter()
             }, 403);
         }
 
+        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+        if (!oauthCreds) {
+            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
+        }
+
         const result = await syncEventsToGcal(
             c.env.DB,
             tenantId,
-            c.env.GOOGLE_CLIENT_ID,
-            c.env.GOOGLE_CLIENT_SECRET,
+            oauthCreds.clientId,
+            oauthCreds.clientSecret,
             open.credentials.refreshToken,
             open.connection.calendarId,
         );
@@ -199,10 +214,6 @@ export const calendarRoutes = createApiRouter()
      * Redirects inspector to Google OAuth consent (PKCE S256).
      */
     .get('/connect', async (c) => {
-        if (!c.env.GOOGLE_CLIENT_ID) {
-            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 501);
-        }
-
         const user = c.get('user');
         if (!user) return c.redirect('/login');
 
@@ -216,6 +227,12 @@ export const calendarRoutes = createApiRouter()
         }
 
         const tenantId = c.get('tenantId') as string;
+        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+        if (!oauthCreds) {
+            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 501);
+        }
+
         if (!c.env.TENANT_CACHE) {
             return c.json({ success: false, error: { message: 'Calendar OAuth is unavailable' } }, 503);
         }
@@ -237,7 +254,7 @@ export const calendarRoutes = createApiRouter()
 
         const baseUrl = getBaseUrl(c);
         const authUrl = getCalendarProvider(provider).getAuthUrl({
-            clientId: c.env.GOOGLE_CLIENT_ID,
+            clientId: oauthCreds.clientId,
             redirectUri: getRedirectUri(baseUrl),
             state,
             pkce,
@@ -285,12 +302,17 @@ export const calendarRoutes = createApiRouter()
         }
 
         const baseUrl = getBaseUrl(c);
+        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+        if (!oauthCreds) {
+            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 501);
+        }
         const provider = getCalendarProvider(pending.provider);
         let exchange;
         try {
             exchange = await provider.exchangeCode({
-                clientId: c.env.GOOGLE_CLIENT_ID,
-                clientSecret: c.env.GOOGLE_CLIENT_SECRET,
+                clientId: oauthCreds.clientId,
+                clientSecret: oauthCreds.clientSecret,
                 redirectUri: getRedirectUri(baseUrl),
                 code,
                 verifier: pending.verifier,

@@ -299,6 +299,8 @@ const CommunicationResponseSchema = z.object({
     googleCalendarConnected: z.boolean().describe('Whether the current user has a calendar_connections row.'),
     googleCalendarCapability: z.enum(['availability_read', 'events_read_write']).nullable()
         .describe('Granted capability for the connected calendar, or null when disconnected.'),
+    googleOAuthConfigured: z.boolean().describe('Whether Google OAuth client credentials exist (Worker env or tenant secrets).'),
+    googleOAuthMode:       z.enum(['platform', 'own']).describe('platform = shared Worker OAuth app; own = tenant Google OAuth app.'),
 });
 const CommunicationPatchSchema = z.object({
     senderEmail:          z.string().nullable().describe('From: address, or null to clear.'),
@@ -306,6 +308,7 @@ const CommunicationPatchSchema = z.object({
     emailMode:            z.enum(['platform', 'own']),
     senderDisplayName:    z.string().nullable(),
     pointOfContact:       z.enum(['inspector', 'company']),
+    googleOAuthMode:      z.enum(['platform', 'own']).optional(),
 }).openapi('CommunicationPatch');
 
 /** Shared (testable) rule: reply-to is mandatory when emails come from the company,
@@ -531,6 +534,10 @@ export const adminSettingsRoutes = createApiRouter()
         const calendarRow = user?.sub && googleCalendarConnected
             ? await getCalendarConnection(c.env.DB, tenantId, user.sub, 'google')
             : null;
+        const integrationCfg = await c.var.services.branding.getIntegrationConfig(tenantId);
+        const googleOAuthMode: 'platform' | 'own' = integrationCfg.googleOAuthMode === 'own' ? 'own' : 'platform';
+        const { isGoogleOAuthConfigured } = await import('../../lib/calendar/resolve-google-oauth');
+        const googleOAuthConfigured = await isGoogleOAuthConfigured(c.env, tenantId);
         return c.json({
             success: true as const,
             data: {
@@ -545,6 +552,8 @@ export const adminSettingsRoutes = createApiRouter()
                 icsUrl: icsToken ? `${getBaseUrl(c)}/api/ics/${icsToken}` : null,
                 googleCalendarConnected,
                 googleCalendarCapability: calendarRow?.capabilities ?? null,
+                googleOAuthConfigured,
+                googleOAuthMode,
             },
         }, 200);
     })
@@ -560,6 +569,11 @@ export const adminSettingsRoutes = createApiRouter()
             senderDisplayName: body.senderDisplayName,
             pointOfContact: body.pointOfContact,
         });
+        if (body.googleOAuthMode) {
+            await c.var.services.branding.updateIntegrationConfig(tenantId, {
+                googleOAuthMode: body.googleOAuthMode,
+            });
+        }
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });
 

@@ -5,6 +5,10 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lt } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema/inspection';
 import { loadOpenGoogleConnection } from '../lib/calendar/connection';
+import {
+    loadGoogleOAuthMode,
+    resolveGoogleOAuthCredentials,
+} from '../lib/calendar/resolve-google-oauth';
 import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
 import { getCalendarEventStyle } from '../lib/calendar-event-style';
@@ -112,7 +116,9 @@ export const calendarEventsRoutes = createApiRouter()
     });
 
     // Google Calendar events — best-effort; failures don't break local events
-    if (jwtUser?.sub && c.env.GOOGLE_CLIENT_ID && c.env.GOOGLE_CLIENT_SECRET) {
+    const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+    const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+    if (jwtUser?.sub && oauthCreds) {
         try {
             const open = await loadOpenGoogleConnection(
                 c.env.DB,
@@ -128,8 +134,8 @@ export const calendarEventsRoutes = createApiRouter()
                     : null;
                 if (!accessToken) {
                     accessToken = await refreshGoogleToken(
-                        c.env.GOOGLE_CLIENT_ID,
-                        c.env.GOOGLE_CLIENT_SECRET,
+                        oauthCreds.clientId,
+                        oauthCreds.clientSecret,
                         open.credentials.refreshToken,
                     );
                     if (c.env.TENANT_CACHE) {

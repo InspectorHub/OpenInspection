@@ -10,6 +10,10 @@ import type { PublicBookingSchema } from '../lib/validations/booking.schema';
 import type { z } from '@hono/zod-openapi';
 import { createCalendarEvent } from '../api/calendar';
 import { loadOpenGoogleConnection } from '../lib/calendar/connection';
+import {
+    loadGoogleOAuthMode,
+    resolveGoogleOAuthCredentials,
+} from '../lib/calendar/resolve-google-oauth';
 import { canPushEvents } from '../lib/calendar/provider';
 import { getBookingHost, getBaseUrl } from '../lib/url';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
@@ -665,16 +669,20 @@ export class BookingService {
                 c.env.JWT_SECRET_PREVIOUS,
             );
             if (open && canPushEvents(open.connection.capabilities)) {
-                const startDateTime = `${body.date}T${requestedTime}:00Z`;
-                await createCalendarEvent(
-                    c.env.GOOGLE_CLIENT_ID,
-                    c.env.GOOGLE_CLIENT_SECRET,
-                    open.credentials.refreshToken,
-                    open.connection.calendarId,
-                    `Inspection: ${body.address}`,
-                    startDateTime,
-                    body.address,
-                ).catch(e => logger.error('Calendar sync failed', {}, e instanceof Error ? e : undefined));
+                const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+                const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+                if (oauthCreds) {
+                    const startDateTime = `${body.date}T${requestedTime}:00Z`;
+                    await createCalendarEvent(
+                        oauthCreds.clientId,
+                        oauthCreds.clientSecret,
+                        open.credentials.refreshToken,
+                        open.connection.calendarId,
+                        `Inspection: ${body.address}`,
+                        startDateTime,
+                        body.address,
+                    ).catch(e => logger.error('Calendar sync failed', {}, e instanceof Error ? e : undefined));
+                }
             }
 
             const emailService = c.var.services.email;
