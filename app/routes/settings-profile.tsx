@@ -11,7 +11,7 @@ import { AvatarCropper } from "~/components/media-studio/AvatarCropper";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { profileSchema } from "~/lib/forms/settings.schema";
 import { Select } from "@core/shared-ui";
-import { TIMEZONE_OPTIONS } from "~/lib/timezones";
+import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -227,7 +227,7 @@ export default function SettingsProfilePage() {
               hint="Overrides how times appear for you only. Reports and calendar events always use the company timezone."
               options={[
                 { value: "", label: "Use company timezone" },
-                ...TIMEZONE_OPTIONS.map((tz) => ({ value: tz, label: tz.replace(/_/g, " ") })),
+                ...TIMEZONE_SELECT_OPTIONS,
               ]}
             />
           </div>

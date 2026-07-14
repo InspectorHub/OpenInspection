@@ -12,7 +12,7 @@ import { workspaceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
-import { TIMEZONE_OPTIONS } from "~/lib/timezones";
+import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -225,7 +225,7 @@ export default function SettingsWorkspacePage() {
               label="Company timezone"
               name="defaultTimezone"
               defaultValue={branding.defaultTimezone ?? "UTC"}
-              options={TIMEZONE_OPTIONS.map((tz) => ({ value: tz, label: tz.replace(/_/g, " ") }))}
+              options={TIMEZONE_SELECT_OPTIONS}
             />
           </div>
         </section>
