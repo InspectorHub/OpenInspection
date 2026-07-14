@@ -1,5 +1,6 @@
 import { eq, and, lte, ne } from 'drizzle-orm';
 import { automations, automationLogs, inspections, tenants, tenantConfigs } from '../../lib/db/schema';
+import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
 import { logger } from '../../lib/logger';
 import type { EmailService } from '../email.service';
 import { type Constructor, oiClock } from './shared';
@@ -85,8 +86,19 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     eq(automations.trigger, 'inspection.reminder' as any),
                 ));
+            // Resolve each tenant's timezone once so the LIVE due-time uses the same
+            // 09:00-local anchor as enqueueReminders (else enqueue/flush disagree).
+            const reminderTzByTenant = new Map<string, string>();
+            for (const { inspection } of reminderRows) {
+                if (!reminderTzByTenant.has(inspection.tenantId)) {
+                    const cfg = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+                        .from(tenantConfigs).where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
+                    reminderTzByTenant.set(inspection.tenantId, resolveTenantTimeZone(cfg?.defaultTimezone));
+                }
+            }
             const dueReminders = reminderRows.filter(({ automation, inspection }) => {
-                const inspMs = Date.parse(`${inspection.date}T09:00:00Z`);
+                const tz = reminderTzByTenant.get(inspection.tenantId) ?? 'UTC';
+                const inspMs = wallClockToEpochMs(inspection.date, '09:00', tz);
                 if (Number.isNaN(inspMs)) return false;
                 return inspMs - automation.delayMinutes * 60_000 <= nowMs; // derived due-time
             });

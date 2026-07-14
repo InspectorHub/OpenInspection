@@ -1,5 +1,6 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
+import { isValidTimeZone } from '../../tz';
 
 /**
  * Validation schema for the branding configuration update.
@@ -40,6 +41,10 @@ export const UpdateBrandingSchema = z.object({
     pdfShowFooter: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders the company footer block.'),
     pdfShowPageNumbers: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders page numbers.'),
     pdfShowLicense: z.boolean().optional().openapi({ example: true }).describe('When true, the report PDF renders the inspector license number.'),
+    // Tenant display timezone (IANA name). Anchors reports, reminders, and
+    // calendar events. Validated to a resolvable IANA id; UI constrains it to a
+    // <select> of Intl.supportedValuesOf('timeZone').
+    defaultTimezone: z.string().refine(isValidTimeZone, 'Invalid timezone').optional().openapi({ example: 'America/New_York' }).describe('Tenant default IANA timezone.'),
 }).openapi('UpdateBranding');
 
 /**
@@ -57,6 +62,7 @@ export const BrandingResponseSchema = createApiResponseSchema(z.object({
         logoUrl: z.string().nullable().describe('TODO describe logoUrl field for the OpenInspection MCP integration'),
         supportEmail: z.string().describe('TODO describe supportEmail field for the OpenInspection MCP integration'),
         billingUrl: z.string().nullable().describe('TODO describe billingUrl field for the OpenInspection MCP integration'),
+        defaultTimezone: z.string().describe('Tenant default IANA timezone (e.g. America/New_York); UTC when unset.'),
     }).describe('TODO describe branding field for the OpenInspection MCP integration'),
 })).openapi('BrandingResponse');
 

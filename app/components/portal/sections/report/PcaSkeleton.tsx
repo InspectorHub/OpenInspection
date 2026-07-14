@@ -76,6 +76,7 @@ export function PcaSkeleton({
   data,
   compliance,
   tier,
+  reportTimeZone = "UTC",
 }: {
   data: PcaReportData | null;
   compliance?: PcaComplianceProps;
@@ -83,6 +84,8 @@ export function PcaSkeleton({
    *  full-tier-only Transmittal Letter + Systems Summary front matter (the TOC
    *  and the docx builder drop them too); null/full_pca render them. */
   tier?: "light_commercial" | "full_pca" | null;
+  /** Tenant timezone (IANA) anchoring signoff dates. Defaults to UTC. */
+  reportTimeZone?: string;
 }) {
   if (!data) return null;
   const { narrative, deviations } = data;
@@ -102,7 +105,7 @@ export function PcaSkeleton({
         <>
           <Block id="transmittal-letter" title="Transmittal Letter">{narrative.transmittalLetter}</Block>
           {/* Transmittal signature slot — Phase M dual-role signoffs. */}
-          <SignoffBlock signoffs={signoffs} />
+          <SignoffBlock signoffs={signoffs} timeZone={reportTimeZone} />
 
           {/* Wrapper carries the anchor unconditionally — SystemsSummaryTable
               itself renders null when there are no systems, which would otherwise

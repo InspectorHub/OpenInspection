@@ -15,6 +15,13 @@
       "when": 1783994575393,
       "tag": "0001_boolean_columns_is_has",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784000415747,
+      "tag": "0002_timezone_columns",
+      "breakpoints": true
     }
   ]
 }

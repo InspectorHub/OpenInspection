@@ -1,5 +1,6 @@
 import { eq, and, lte, gte, notInArray, ne } from 'drizzle-orm';
-import { automations, automationLogs, inspections } from '../../lib/db/schema';
+import { automations, automationLogs, inspections, tenantConfigs } from '../../lib/db/schema';
+import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
 import { nanoid } from 'nanoid';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { type Constructor } from './shared';
@@ -19,7 +20,7 @@ export function AutomationReminders<TBase extends Constructor<AutomationBase & H
          * floored to now+5min. Deduped on eventId = reminder:<ruleId>:<inspectionId>
          * so re-scans don't double-create. The existing flush() sends it when due and
          * re-checks conditions per D4. Reminders are day-granular (inspections.date is
-         * date-only); we anchor the appointment at 09:00 UTC.
+         * date-only); we anchor the appointment at 09:00 LOCAL in the tenant timezone.
          */
         async enqueueReminders(nowMs: number): Promise<number> {
             const db = this.getDrizzle();
@@ -31,7 +32,20 @@ export function AutomationReminders<TBase extends Constructor<AutomationBase & H
             const todayStr = new Date(nowMs).toISOString().slice(0, 10);
             let created = 0;
 
+            // Resolve each tenant's display timezone once per sweep (cache by id).
+            const tzCache = new Map<string, string>();
+            const loadTenantTz = async (tenantId: string): Promise<string> => {
+                const cached = tzCache.get(tenantId);
+                if (cached) return cached;
+                const cfg = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+                    .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+                const tz = resolveTenantTimeZone(cfg?.defaultTimezone);
+                tzCache.set(tenantId, tz);
+                return tz;
+            };
+
             for (const rule of rules) {
+                const tenantTz = await loadTenantTz(rule.tenantId);
                 // Window upper bound = lead + 1.5d buffer so a same-day cron still
                 // catches an appointment whose lead window opens within the next day.
                 const upperStr = new Date(nowMs + rule.delayMinutes * 60_000 + 36 * 3600_000)
@@ -60,8 +74,10 @@ export function AutomationReminders<TBase extends Constructor<AutomationBase & H
                             .where(eq(automationLogs.eventId, eventId)).limit(1);
                         if (dup.length > 0) continue;
 
-                        // tz-naive: 09:00 UTC is an approximate anchor (inspections.date is date-only, no tenant tz here).
-                        const inspMs = Date.parse(`${insp.date}T09:00:00Z`);
+                        // Anchor at 09:00 LOCAL in the tenant timezone (was tz-naive 09:00 UTC).
+                        // inspections.date is a calendar date (YYYY-MM-DD, no tz); wallClockToEpochMs
+                        // interprets 09:00 in the tenant zone. 09:00 is clear of the DST gap.
+                        const inspMs = wallClockToEpochMs(insp.date, '09:00', tenantTz);
                         if (Number.isNaN(inspMs)) continue;
                         // send_at here is a DISPLAY ESTIMATE only — flush() derives the real
                         // reminder due-time live from the current inspection.date (Task 7),

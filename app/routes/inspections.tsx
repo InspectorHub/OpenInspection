@@ -467,9 +467,12 @@ export default function InspectionsPage() {
   const onboardingSteps = useMemo(() => {
     const companyName = sessionCtx?.branding?.companyName ?? 'OpenInspection';
     const companyNameSet = companyName !== 'OpenInspection';
+    // A non-UTC tenant timezone means the workspace has configured it (option A).
+    const timezoneSet = (sessionCtx?.branding?.defaultTimezone ?? 'UTC') !== 'UTC';
     const inspectionCount = allInspections.length;
     return computeOnboardingSteps({
       companyNameSet,
+      timezoneSet,
       templateCount,
       serviceCount,
       inspectionCount,

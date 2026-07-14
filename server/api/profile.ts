@@ -9,6 +9,7 @@ import { logger } from '../lib/logger';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { inspectorSignature } from '../lib/inspector-signature';
 import { r2Keys } from '../lib/r2-keys';
+import { isValidTimeZone } from '../lib/tz';
 
 /**
  * Booking #7 Sprint A — authenticated profile endpoint mounted at
@@ -36,6 +37,7 @@ const getProfileRoute = createRoute(withMcpMetadata({
                         photoUrl: z.string().nullable(),
                         signatureEnabled: z.boolean(),
                         signaturePreviewHtml: z.string(),
+                        timezone: z.string().nullable(),
                     })),
                 },
             },
@@ -49,11 +51,12 @@ const getProfileRoute = createRoute(withMcpMetadata({
 // no 400 is raised (unknown keys are ignored via passthrough behavior). Global
 // AGENT slugs use a completely separate endpoint (POST /api/agent/profile) and
 // are unaffected.
-const PatchProfileSchema = z.object({
+export const PatchProfileSchema = z.object({
     name: z.string().max(100).optional().describe('Display name shown on reports and the booking page'),
     phone: z.string().max(30).optional().describe('Contact phone number for the inspector profile'),
     licenseNumber: z.string().max(50).optional().describe('Professional inspector license or certification number'),
     signatureEnabled: z.boolean().optional().describe('Whether the inspector business-card footer is added to outbound emails'),
+    timezone: z.string().refine((v) => v === '' || isValidTimeZone(v), 'Invalid timezone').optional().describe('Per-user display timezone (IANA). Empty string clears the override (inherit tenant).'),
 });
 
 const patchProfileRoute = createRoute(withMcpMetadata({
@@ -127,6 +130,7 @@ export const profileRoutes = createApiRouter()
             slug: users.slug,
             photoUrl: users.photoUrl,
             signatureEnabled: users.signatureEnabled,
+            timezone: users.timezone,
         }).from(users)
           .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
           .get();
@@ -159,6 +163,8 @@ export const profileRoutes = createApiRouter()
         if (body.phone !== undefined) updates.phone = body.phone;
         if (body.licenseNumber !== undefined) updates.licenseNumber = body.licenseNumber;
         if (body.signatureEnabled !== undefined) updates.signatureEnabled = body.signatureEnabled;
+        // Per-user timezone override: empty string clears it (NULL = inherit tenant).
+        if (body.timezone !== undefined) updates.timezone = body.timezone === '' ? null : body.timezone;
         // DB-12 / IA-26 — slug write removed; inspector booking slugs are frozen.
         // Agent slug writes go through POST /api/agent/profile (separate endpoint).
 

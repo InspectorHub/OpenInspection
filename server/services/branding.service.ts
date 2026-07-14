@@ -41,7 +41,8 @@ export class BrandingService {
             primaryColor: defaults.primaryColor,
             logoUrl: null,
             supportEmail: defaults.supportEmail,
-            billingUrl: ''
+            billingUrl: '',
+            defaultTimezone: 'UTC'
         };
     }
 

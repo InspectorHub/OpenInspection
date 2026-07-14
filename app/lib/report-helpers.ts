@@ -106,15 +106,17 @@ export function verificationBlockModel(
 /* Date formatting helpers for signature/verification blocks */
 /* ------------------------------------------------------------------ */
 
-export function formatEpochMs(ms: number | null | undefined): string {
+// Report timestamps anchor to the tenant timezone (passed by the caller). The
+// default 'UTC' preserves behaviour when a caller has no tenant tz to hand.
+export function formatEpochMs(ms: number | null | undefined, timeZone = "UTC"): string {
   if (ms == null) return "";
   const d = new Date(ms);
   if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone });
 }
 
-export function formatUnixSeconds(sec: number): string {
+export function formatUnixSeconds(sec: number, timeZone = "UTC"): string {
   const d = new Date(sec * 1000);
   if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone });
 }
