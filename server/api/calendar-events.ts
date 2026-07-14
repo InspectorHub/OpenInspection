@@ -4,7 +4,7 @@ import { z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lt } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema/inspection';
-import { users } from '../lib/db/schema/tenant';
+import { loadOpenGoogleConnection } from '../lib/calendar/connection';
 import { requireRole } from '../lib/middleware/rbac';
 import { logger } from '../lib/logger';
 import { getCalendarEventStyle } from '../lib/calendar-event-style';
@@ -114,14 +114,14 @@ export const calendarEventsRoutes = createApiRouter()
     // Google Calendar events — best-effort; failures don't break local events
     if (jwtUser?.sub && c.env.GOOGLE_CLIENT_ID && c.env.GOOGLE_CLIENT_SECRET) {
         try {
-            const userRows = await db
-                .select()
-                .from(users)
-                .where(and(eq(users.id, jwtUser.sub), eq(users.tenantId, tenantId)))
-                .limit(1);
-
-            const userRow = userRows[0];
-            if (userRow?.googleRefreshToken) {
+            const open = await loadOpenGoogleConnection(
+                c.env.DB,
+                tenantId,
+                jwtUser.sub,
+                c.env.JWT_SECRET,
+                c.env.JWT_SECRET_PREVIOUS,
+            );
+            if (open?.credentials.refreshToken) {
                 const cacheKey = `gcal_access:${jwtUser.sub}`;
                 let accessToken: string | null = c.env.TENANT_CACHE
                     ? await c.env.TENANT_CACHE.get(cacheKey)
@@ -130,13 +130,13 @@ export const calendarEventsRoutes = createApiRouter()
                     accessToken = await refreshGoogleToken(
                         c.env.GOOGLE_CLIENT_ID,
                         c.env.GOOGLE_CLIENT_SECRET,
-                        userRow.googleRefreshToken,
+                        open.credentials.refreshToken,
                     );
                     if (c.env.TENANT_CACHE) {
                         await c.env.TENANT_CACHE.put(cacheKey, accessToken, { expirationTtl: 3500 });
                     }
                 }
-                const calId = encodeURIComponent(userRow.googleCalendarId ?? 'primary');
+                const calId = encodeURIComponent(open.connection.calendarId);
                 // Google API requires full RFC3339 timestamps. Convert YYYY-MM-DD inputs.
                 const toRfc3339 = (s: string): string =>
                     /^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00Z` : new Date(s).toISOString();

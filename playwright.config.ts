@@ -179,6 +179,9 @@ export default defineConfig({
         { name: 'auth-password-reset', testMatch: 'auth-password-reset.spec.ts', dependencies: ['api'] },
         { name: 'branding', testMatch: 'branding.spec.ts' },
         { name: 'timezone-settings', testMatch: 'timezone-settings.spec.ts' },
+        // Calendar multiprovider (#199) — API-level capability gating; depends on
+        // `api` so admin@autotest.com exists in the shared D1 seed.
+        { name: 'calendar-connect', testMatch: 'calendar-connect.spec.ts', dependencies: ['api'] },
         { name: 'repair-list', testMatch: 'repair-list.spec.ts' },
         { name: 'report-viewer', testMatch: 'report-viewer.spec.ts' },
         { name: 'inspection-edit-hotkeys', testMatch: 'inspection-edit-hotkeys.spec.ts', dependencies: ['editor-seed'] },

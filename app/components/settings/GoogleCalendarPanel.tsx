@@ -1,6 +1,13 @@
 import { Form } from "react-router";
 import { SecretField } from "~/components/SecretField";
 
+type CalendarCapability = "availability_read" | "events_read_write";
+
+const CAPABILITY_LABELS: Record<CalendarCapability, string> = {
+  availability_read: "Read availability only",
+  events_read_write: "Full sync (read + write events)",
+};
+
 /**
  * Settings → Communication: Google OAuth credentials + Calendar sync (Google +
  * Apple ICS) sections. Presentational — the route owns secret values, pending
@@ -12,6 +19,8 @@ export function GoogleCalendarPanel({
   secretFormError,
   savingCalendarSecrets,
   googleCalendarConnected,
+  googleCalendarCapability,
+  disconnectingCalendar,
   icsUrl,
 }: {
   secrets: { GOOGLE_CLIENT_ID: string; GOOGLE_CLIENT_SECRET: string };
@@ -19,15 +28,19 @@ export function GoogleCalendarPanel({
   secretFormError: (intent: string) => string | null;
   savingCalendarSecrets: boolean;
   googleCalendarConnected: boolean;
+  googleCalendarCapability: CalendarCapability | null;
+  disconnectingCalendar: boolean;
   icsUrl: string | null;
 }) {
+  const hasGoogleCreds = Boolean(secrets.GOOGLE_CLIENT_ID?.trim());
+
   return (
     <>
       {/* Google Calendar OAuth secrets */}
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Google OAuth credentials</h3>
         <p className="text-[13px] text-ih-fg-3">
-          Required for Google Calendar two-way sync. Create credentials at{" "}
+          Required for Google Calendar sync. Create credentials at{" "}
           <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">Google Cloud Console</a>.
         </p>
         <Form method="post" className="space-y-4">
@@ -68,22 +81,68 @@ export function GoogleCalendarPanel({
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Google Calendar */}
-          <div className="p-4 border border-ih-border rounded-lg">
-            <div className="flex items-center gap-3 mb-3">
+          <div className="p-4 border border-ih-border rounded-lg space-y-3">
+            <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-ih-primary-tint flex items-center justify-center">
                 <CalendarIcon className="w-4 h-4 text-ih-primary" />
               </div>
               <div>
                 <p className="text-[13px] font-bold text-ih-fg-1">Google Calendar</p>
-                <p className="text-[11px] text-ih-fg-3">Two-way sync via OAuth</p>
+                <p className="text-[11px] text-ih-fg-3">Per-inspector OAuth sync</p>
               </div>
             </div>
             {googleCalendarConnected ? (
-              <span className="text-[11px] font-bold text-ih-ok-fg">Connected</span>
+              <div className="space-y-2">
+                <span className="inline-flex items-center rounded-ih-pill px-2 py-0.5 text-[11px] font-bold bg-ih-ok-bg text-ih-ok-fg">
+                  Connected
+                </span>
+                {googleCalendarCapability && (
+                  <p className="text-[11px] text-ih-fg-3">
+                    Access: {CAPABILITY_LABELS[googleCalendarCapability]}
+                  </p>
+                )}
+                <Form method="post">
+                  <input type="hidden" name="intent" value="disconnect-calendar" />
+                  <button
+                    type="submit"
+                    disabled={disconnectingCalendar}
+                    className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60"
+                  >
+                    {disconnectingCalendar ? "Disconnecting…" : "Disconnect"}
+                  </button>
+                </Form>
+              </div>
             ) : (
-              <button className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
-                Connect Google Calendar
-              </button>
+              <div className="space-y-2">
+                <p className="text-[11px] text-ih-fg-3">Choose what Google may access:</p>
+                <div className="flex flex-col gap-2">
+                  <a
+                    href={hasGoogleCreds ? "/api/calendar/connect?capability=availability_read&provider=google" : undefined}
+                    aria-disabled={!hasGoogleCreds}
+                    className={`h-8 px-3 inline-flex items-center rounded-md border border-ih-border text-[13px] font-medium transition-colors ${
+                      hasGoogleCreds
+                        ? "text-ih-fg-2 hover:bg-ih-bg-muted"
+                        : "text-ih-fg-4 opacity-60 pointer-events-none"
+                    }`}
+                  >
+                    Read availability only
+                  </a>
+                  <a
+                    href={hasGoogleCreds ? "/api/calendar/connect?capability=events_read_write&provider=google" : undefined}
+                    aria-disabled={!hasGoogleCreds}
+                    className={`h-8 px-3 inline-flex items-center rounded-md bg-ih-primary text-white font-bold text-[13px] transition-colors ${
+                      hasGoogleCreds
+                        ? "hover:bg-ih-primary-600"
+                        : "opacity-60 pointer-events-none"
+                    }`}
+                  >
+                    Full sync (read + write events)
+                  </a>
+                </div>
+                {!hasGoogleCreds && (
+                  <p className="text-[11px] text-ih-fg-3">Save Google OAuth credentials above before connecting.</p>
+                )}
+              </div>
             )}
           </div>
 
@@ -105,6 +164,7 @@ export function GoogleCalendarPanel({
                   className="flex-1 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-muted text-[11px] font-mono text-ih-fg-3 outline-none"
                 />
                 <button
+                  type="button"
                   onClick={() => { void navigator.clipboard.writeText(icsUrl); }}
                   className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0"
                 >

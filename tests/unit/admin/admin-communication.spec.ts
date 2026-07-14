@@ -12,6 +12,12 @@ vi.mock('../../../server/lib/secrets-cache', async (importOriginal) => ({
 }));
 import { loadTenantSecrets } from '../../../server/lib/secrets-cache';
 
+vi.mock('../../../server/lib/calendar/connection', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    userHasCalendarConnection: vi.fn(async () => false),
+}));
+import { userHasCalendarConnection } from '../../../server/lib/calendar/connection';
+
 /**
  * C-10 ③-D (B-4 / A-7) — GET+PATCH /api/admin/communication.
  * Tenant transactional-email identity (senderEmail / replyTo) + display flags.
@@ -23,6 +29,7 @@ describe('admin communication config — ③-D (B-4)', () => {
         app.use('*', async (c, next) => {
             c.set('userRole', 'owner');
             c.set('tenantId', 't1');
+            c.set('user', { sub: 'admin-1' } as HonoConfig['Variables']['user']);
             c.set('services', { branding } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
@@ -32,13 +39,15 @@ describe('admin communication config — ③-D (B-4)', () => {
 
     beforeEach(() => {
         vi.mocked(loadTenantSecrets).mockReset().mockResolvedValue(null);
+        vi.mocked(userHasCalendarConnection).mockReset().mockResolvedValue(false);
     });
 
     it('GET returns senderEmail/replyTo + flags from branding config (tenant Resend key in the canonical store)', async () => {
         const getBranding = vi.fn().mockResolvedValue({
-            senderEmail: 'noreply@acme.com', replyTo: 'office@acme.com', icsToken: 'icstok', googleRefreshToken: 'g',
+            senderEmail: 'noreply@acme.com', replyTo: 'office@acme.com', icsToken: 'icstok',
             emailMode: 'own', senderDisplayName: 'Acme Inspections', companyName: 'Acme Home Inspections', pointOfContact: 'inspector',
         });
+        vi.mocked(userHasCalendarConnection).mockResolvedValue(true);
         // C-15: configured via the canonical secrets_enc store.
         vi.mocked(loadTenantSecrets).mockResolvedValue({ RESEND_API_KEY: 're_123' });
         const { app, env } = buildApp({ getBranding });

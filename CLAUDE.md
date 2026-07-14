@@ -19,7 +19,7 @@ npm run dev:hmr      # Vite dev server with HMR (react-router dev). The fast ite
 npm run build        # react-router build — bundles server/ (API) + app/ (RR SSR) into one worker
 npm run deploy       # standalone: build + wrangler deploy (real ids via wrangler.local.jsonc)
 npm run deploy:saas  # saas: build + wrangler deploy with wrangler.saas.jsonc
-npm run type-check   # react-router typegen, then the app + api tsc passes run serially (lower peak RAM)
+npm run type-check   # react-router typegen, then app + api tsc passes serially (lower peak RAM)
 npm run type-check:app   # tsc app side only (tsconfig.json)
 npm run type-check:api   # tsc api side only (tsconfig.api.json) — fastest loop for server/ work
 npm run type-check:fast  # tsgo (@typescript/native-preview) both passes; tsc stays the CI gate
@@ -45,7 +45,7 @@ One file per deploy target; the build bakes whichever config wins (vite `configP
 |---|---|---|
 | `wrangler.jsonc` | committed (PLACEHOLDER ids) | standalone + the **Deploy to Cloudflare** one-click default — CF auto-provisions D1/KV/R2 and injects real ids (no real ids in the repo). |
 | `wrangler.local.jsonc` | gitignored | your real standalone ids (written by `scripts/setup-cloudflare.js`). |
-| `wrangler.saas.jsonc` | gitignored | SaaS-mode deployment config (`APP_MODE=saas`, `SYNC_QUEUE` producer + sync-DLQ consumer, crons, `*-saas` resources). Used for multi-tenant deployments; absent in standalone. |
+| `wrangler.saas.jsonc` | gitignored | SaaS-mode config (`APP_MODE=saas`, `SYNC_QUEUE` producer + sync-DLQ consumer, crons, `*-saas` resources). Multi-tenant; absent in standalone. |
 
 `wrangler deploy` runs against the built `build/server/wrangler.json`. `scripts/wrangler.mjs`
 applies the same config resolution to direct wrangler commands (db:migrate).
@@ -85,15 +85,14 @@ Directory = suite; a spec's location alone decides which config runs it
 | `tests/e2e/` | `test:e2e` (+ integration/remote modes) | `playwright.config.ts` (local, seeds D1) / `.integration` / `.remote` |
 
 Choosing a home for a new spec:
-1. Frontend component/unit test? → **co-locate** it beside the component as
-   `Foo.test.tsx` (or `__tests__/Foo.test.tsx`) under `app/` (R2). Never in
-   `tests/`.
+1. Frontend component/unit test? → **co-locate** beside the component as
+   `Foo.test.tsx` (or `__tests__/Foo.test.tsx`) under `app/` (R2). Never in `tests/`.
 2. Server-side, no browser: depends on real CF runtime semantics (Queue
    delivery, Durable Objects, workerd-only APIs)? Yes → `tests/workers/`
    (real workerd via vitest-pool-workers); no → `tests/unit/<domain>/`
    (node env, stubs + better-sqlite3).
 3. Full-stack / browser / anything hitting a running worker → `tests/e2e/`
-   (R8). One directory; the default `playwright.config.ts` seeds real D1 via
+   (R8). One directory; default `playwright.config.ts` seeds real D1 via
    `globalSetup` so every E2E exercises the actual database. `*.integration.spec.ts`
    (self-resetting, serial) and remote/staging runs are just other configs
    over the same dir — not separate directories.
@@ -127,11 +126,11 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 **Token Relay BFF** pattern: the React Router v7 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token.
 
 ### Authentication
-- JWT-based authentication (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header support for safe rotation — see `server/lib/jwt-keyring.ts`.
-- Supports both Cookie (for dashboard) and Bearer Header (for API) token delivery.
+- JWT-based (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header for safe rotation — see `server/lib/jwt-keyring.ts`.
+- Supports both Cookie (dashboard) and Bearer Header (API) token delivery.
 - PBKDF2-SHA256 password hashing (100k iterations, 16-byte salt). Legacy SHA-256 hashes auto-rehashed on login.
-- **SaaS login is portal-only.** When `APP_MODE=saas` (regardless of topology, after silo-deconvergence 2026-05-29), `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: SaaS deploys have a single core D1 holding users for many tenants and `users.email` is unique per-`(tenant_id, email)` (composite unique index in `schema/tenant.ts`), so a local form cannot disambiguate which tenant the user means. Entry into core in saas mode is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone deploys are unchanged — the local form still works because the single-tenant mapping is unambiguous.
-- **Switch workspace UI.** `MainLayout` renders a "Switch workspace" entry in the sidebar (desktop bottom section + mobile drawer) whenever `branding.isSaas` is true and `PORTAL_API_URL` is set. The link points at `${PORTAL_API_URL}/company/switch`. Because the JWT carries a single `custom:tenantId`, this portal bounce is the only correct way to swap tenants without losing the session — portal will SSO us back here with the new tenant's cookie (which overwrites the old one).
+- **SaaS login is portal-only.** When `APP_MODE=saas` (regardless of topology, after silo-deconvergence 2026-05-29), `GET /login` and `GET /forgot-password` 302 to `${PORTAL_API_URL}/login` (resp. `/forgot-password`), and `POST /api/auth/login` returns HTTP 410 `LOGIN_MOVED_TO_PORTAL`. Reason: SaaS deploys have a single core D1 holding users for many tenants and `users.email` is unique per-`(tenant_id, email)` (composite unique index in `schema/tenant.ts`), so a local form cannot disambiguate the tenant. Entry into core in saas mode is exclusively via portal's `POST /api/account/handoff` → `GET /sso?code=` flow. Standalone deploys are unchanged (single-tenant mapping is unambiguous).
+- **Switch workspace UI.** `MainLayout` renders a "Switch workspace" entry in the sidebar (desktop bottom + mobile drawer) whenever `branding.isSaas` is true and `PORTAL_API_URL` is set. The link points at `${PORTAL_API_URL}/company/switch`. Because the JWT carries a single `custom:tenantId`, this portal bounce is the only correct way to swap tenants without losing the session — portal SSOs back with the new tenant's cookie (overwrites the old one).
 
 ### Standalone Engine (Single-Tenant)
 - Optimized for single-tenant deployments (Private Instances).
@@ -148,9 +147,9 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 ## Frontend Architecture
 
 - **Framework**: React Router v7 on Cloudflare Workers with Vite.
-- **Rendering**: Full SSR — React Router v7 server renders on the edge, hydrates on the client.
-- **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); there is no separate server-side CSS build.
-- **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. The React Router v7 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
+- **Rendering**: Full SSR — RR v7 server renders on the edge, hydrates on the client.
+- **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); no separate server-side CSS build.
+- **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. RR v7 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
 - **State management**: React hooks — `useInspection` (~900 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
 - **Component library**: `packages/shared-ui/` provides 25 design-system components consumed by the frontend — Button, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar. See `docs/developers/11_design_system.md`.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
@@ -184,7 +183,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 | `STRIPE_SECRET_KEY` | No | Stripe Connect (each tenant's OWN account; the platform never collects payments). Resolution is tenant-DB-preferred: a tenant's stored key always beats this env, so a platform-level binding can never hijack tenant payments. |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook HMAC verification |
 | `GOOGLE_PLACES_API_KEY` | No | Google Places API key powering address autocomplete on the dashboard new-inspection wizard and the public `/book` page (proxied via `/api/places/*` and `/public/geocode`). When unset, both endpoints return `{ data: [], reason: 'NO_API_KEY' }` and the address inputs degrade gracefully to plain text — the customer can still type a free-form address and submit. |
-| `ESTATED_API_KEY` | No | Estated.io public-records key for the `POST /api/inspections/:id/property-facts/autofill` endpoint. Resolves year built / sqft / foundation / lot size / bedrooms / bathrooms by address. When unset, the endpoint returns `{ data: null, reason: 'NO_API_KEY' }` and the Property Facts card displays a polite "auto-fill not configured" hint while still accepting manual entry. Same graceful-degrade pattern as `GOOGLE_PLACES_API_KEY`. |
+| `ESTATED_API_KEY` | No | Estated.io public-records key for the `POST /api/inspections/:id/property-facts/autofill` endpoint. Resolves year built / sqft / foundation / lot size / bedrooms / bathrooms by address. When unset, returns `{ data: null, reason: 'NO_API_KEY' }` and the Property Facts card shows a polite "auto-fill not configured" hint while still accepting manual entry. Same graceful-degrade pattern as `GOOGLE_PLACES_API_KEY`. |
 | `STREAM` | No | Cloudflare Stream binding (binding name `STREAM`). Required only when the video backend is set to Stream (self-host: Settings → Integrations → Video; SaaS: paid tier). Absent in the default R2 configuration. |
 | `STREAM_CUSTOMER_SUBDOMAIN` | No | Your Cloudflare Stream customer subdomain (e.g. `customer-abc123`, the prefix before `.cloudflarestream.com`). Required in SaaS mode for paid tenants (plan-gated; free/trial tenants use R2). In self-host mode this is stored per-tenant in `integrationConfig` via Settings → Integrations → Video, not as an env var. |
 
@@ -198,10 +197,10 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 
 ## JWT & Auth Security Rules
 
-These rules are **mandatory** for any code that touches authentication. Violations reintroduce critical vulnerabilities.
+**Mandatory** for any code that touches authentication. Violations reintroduce critical vulnerabilities.
 
 - **ES256 keyring**: All JWT signing and verification MUST go through `server/lib/jwt-keyring.ts`. Direct `sign()` / `verify()` calls from `hono/jwt` are FORBIDDEN — the keyring pins the algorithm to ES256 (ECDSA P-256 SHA-256), stamps the `kid` header, and enforces multi-version verification. Per-request keyrings are pre-built in `diMiddleware` and exposed as `await c.var.keyringPromise`.
-- **kid required**: Every JWT MUST carry a `kid` header. `signJwt()` sets it from `JWT_CURRENT_KID`; `verifyJwt()` rejects tokens with no kid, or with a kid that is not in the keyring.
+- **kid required**: Every JWT MUST carry a `kid` header. `signJwt()` sets it from `JWT_CURRENT_KID`; `verifyJwt()` rejects tokens with no kid, or with a kid not in the keyring.
 - **iat claim**: `signJwt()` auto-injects `iat: Math.floor(Date.now() / 1000)` when the caller omits it. Without `iat`, KV session invalidation (`pwchanged:{userId}`) cannot work.
 - **No HS256 fallback**: There is NO legacy HS256 path. Pre-launch architectural choice — see rotation scripts and docs. The remaining `JWT_SECRET` env binding is now used only as KDF input for `config-crypto`, `qbo-crypto`, and audit signing-key encryption — never for JWT signing.
 - **Key rotation flow**: To rotate, provision `JWT_PRIVATE_KEY_V<N+1>` + `JWT_PUBLIC_KEY_V<N+1>` first (verify-only window), then flip `JWT_CURRENT_KID` to the new version. Old tokens remain verifiable until V<N> is retired.
@@ -217,13 +216,13 @@ These rules are **mandatory** for any code that touches authentication. Violatio
 
 - **Zod required**: Every API endpoint that accepts user input (body, query, params) MUST validate using a Zod schema. No manual `if (!field)` or TypeScript generics-only validation.
 - **OpenAPIHono routes**: Use `createRoute()` with `request.body/query/params` schemas and access validated data via `c.req.valid('json')`, `c.req.valid('query')`, `c.req.valid('param')`.
-- **Non-OpenAPIHono routes**: Use `schema.safeParse(await c.req.json())` and return 400 on failure. This applies to workaround routes that cannot use `createRoute()`.
+- **Non-OpenAPIHono routes**: Use `schema.safeParse(await c.req.json())` and return 400 on failure. Applies to workaround routes that cannot use `createRoute()`.
 - **Schema location**: All Zod schemas live in `server/lib/validations/*.schema.ts`. Do not define schemas inline in route handlers.
 - **No raw c.req.json()**: Never use `c.req.json<T>()` with only TypeScript generics — generics provide zero runtime protection.
 
 ## Language Rules
 
-- **English only**: All source code, comments, documentation, commit messages, and user-facing strings in this project MUST be written in English. No Chinese or other non-English text is permitted.
+- **English only**: All source code, comments, documentation, commit messages, and user-facing strings MUST be written in English. No Chinese or other non-English text is permitted.
 
 ## Structured Logging Rules
 
@@ -252,7 +251,7 @@ These rules are **mandatory** for any code that touches authentication. Violatio
 DB design policies (2026-06-04 DBA review). These apply to ALL new tables/columns; legacy columns converge opportunistically when a table is already being touched — no big-bang migrations.
 
 - **Timestamps**: new columns MUST be `integer(..., { mode: 'timestamp_ms' })` (epoch milliseconds). Calendar-semantic fields with no time component (e.g. `due_date`) MAY be `YYYY-MM-DD` TEXT but must say so in a comment. Never introduce new raw `integer` or text-datetime timestamp columns.
-- **Foreign keys**: referential integrity is enforced at the APPLICATION layer (ScopedDB + tenant filters), not the database. New tables MUST NOT declare `.references()` — D1 cannot rebuild a table that is referenced by an FK (no `PRAGMA foreign_keys=OFF` outside a transaction), so every FK is a permanent migration liability. Existing FKs are frozen as legacy; do not extend them. Delete-ordering in purge/cascade paths is the service layer's responsibility.
+- **Foreign keys**: referential integrity is enforced at the APPLICATION layer (ScopedDB + tenant filters), not the database. New tables MUST NOT declare `.references()` — D1 cannot rebuild a table referenced by an FK (no `PRAGMA foreign_keys=OFF` outside a transaction), so every FK is a permanent migration liability. Existing FKs are frozen as legacy; do not extend them. Delete-ordering in purge/cascade paths is the service layer's responsibility.
 - **Naming**: money columns end in `_cents` (integer cents, never floats); encrypted-at-rest columns end in `_enc`; booleans always use `integer(..., { mode: 'boolean' })` (never raw 0/1); index names are prefixed `idx_`.
 - **Money authority chain**: when an invoice exists it is authoritative; otherwise the sum of `inspection_services` price snapshots; `inspections.price` is a denormalized cache only — never reconcile the other way.
 - **Status fields**: any column that models a state machine MUST declare a drizzle `{ enum: [...] }` (type-layer only, no DDL cost).
@@ -268,7 +267,7 @@ Pre-commit and CI run the same logical checks; CI's `verify` job is the authorit
 
 ## Comment Rules
 
-Migration sequence numbers are an unstable, positional ordering token — squash/consolidation renumbers them, leaving comments dangling at files that no longer exist (the `0000_baseline.sql` consolidation made every `migration 00NN` comment in the codebase point to nothing). Annotate the durable artifact, not the transient migration.
+Migration sequence numbers are an unstable, positional ordering token — squash/consolidation renumbers them, leaving comments dangling at files that no longer exist (the `0000_baseline.sql` consolidation made every `migration 00NN` comment point to nothing). Annotate the durable artifact, not the transient migration.
 
 - **No migration sequence numbers in code comments** (`migration 0045`, `0052_inspector_slug.sql`, `pre-migration 0040`, …). The only allowed reference is `0000_baseline.sql` — it never renumbers. Enforced by `npm run lint:migrefs` (`scripts/check-migration-refs.mjs`); also runs in `npm run lint` and pre-commit.
 - **State the invariant, not the history.** Put *why a column/index exists* next to its definition in `server/lib/db/schema/` (it travels with the field and survives any renumber). "the `lot_size` column on `inspections`" beats "the `lot_size` column added in migration 0045". History lives in `git blame`.

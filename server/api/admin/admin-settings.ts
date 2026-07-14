@@ -12,6 +12,7 @@
 // keep resolving.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
+import { userHasCalendarConnection, getCalendarConnection } from '../../lib/calendar/connection';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { requireRole } from '../../lib/middleware/rbac';
@@ -295,7 +296,9 @@ const CommunicationResponseSchema = z.object({
         active:  z.boolean().describe('Whether the template is active.'),
     })).describe('Email templates (empty until template management ships).'),
     icsUrl:                  z.string().nullable().describe('Calendar subscription (ICS) URL, when a token exists.'),
-    googleCalendarConnected: z.boolean().describe('Whether a Google Calendar refresh token is stored.'),
+    googleCalendarConnected: z.boolean().describe('Whether the current user has a calendar_connections row.'),
+    googleCalendarCapability: z.enum(['availability_read', 'events_read_write']).nullable()
+        .describe('Granted capability for the connected calendar, or null when disconnected.'),
 });
 const CommunicationPatchSchema = z.object({
     senderEmail:          z.string().nullable().describe('From: address, or null to clear.'),
@@ -506,6 +509,7 @@ export const adminSettingsRoutes = createApiRouter()
     })
     .openapi(getCommunicationRoute, async (c) => {
         const tenantId = c.get('tenantId');
+        const user = c.get('user');
         const cfg = await c.var.services.branding.getBranding(tenantId, { companyName: '', primaryColor: '', supportEmail: '' }) as Record<string, unknown>;
         // Resend is "configured" if a key is in env OR stored in tenant secrets.
         // C-15: reads the CANONICAL `secrets_enc` store (ENV-name keys).
@@ -521,6 +525,12 @@ export const adminSettingsRoutes = createApiRouter()
             } catch { /* no decryptable secrets — leave false */ }
         }
         const icsToken = cfg.icsToken as string | null | undefined;
+        const googleCalendarConnected = user?.sub
+            ? await userHasCalendarConnection(c.env.DB, tenantId, user.sub, 'google')
+            : false;
+        const calendarRow = user?.sub && googleCalendarConnected
+            ? await getCalendarConnection(c.env.DB, tenantId, user.sub, 'google')
+            : null;
         return c.json({
             success: true as const,
             data: {
@@ -533,7 +543,8 @@ export const adminSettingsRoutes = createApiRouter()
                 resendConfigured,
                 templates: [],
                 icsUrl: icsToken ? `${getBaseUrl(c)}/api/ics/${icsToken}` : null,
-                googleCalendarConnected: !!cfg.googleRefreshToken,
+                googleCalendarConnected,
+                googleCalendarCapability: calendarRow?.capabilities ?? null,
             },
         }, 200);
     })

@@ -269,8 +269,24 @@ test.describe.serial('Integration: Google Calendar', () => {
         expect([301, 302].includes(connectRes.status())).toBe(true);
         const location = connectRes.headers()['location'] ?? '';
         expect(location).toContain('accounts.google.com');
+        expect(location).toContain('code_challenge=');
         expect(location).toContain('calendar.events');
     });
+
+    test('GET /api/calendar/connect?capability=availability_read requests freebusy scope', async ({ request }) => {
+        const clientId = env.GOOGLE_CLIENT_ID;
+        test.skip(!clientId || clientId.includes('your_'), 'GOOGLE_CLIENT_ID not configured');
+
+        await request.post(`${BASE_URL}/api/auth/login`, {
+            data: { email: 'admin@integration.test', password: 'TestPass123!' },
+        });
+
+        const connectRes = await request.get(`${BASE_URL}/api/calendar/connect?capability=availability_read`, {
+            maxRedirects: 0,
+        });
+        expect([301, 302].includes(connectRes.status())).toBe(true);
+        const location = connectRes.headers()['location'] ?? '';
+        expect(location).toContain('calendar.freebusy');
 
     test('POST /api/calendar/sync with pre-obtained refresh token creates blocked dates', async ({ request }) => {
         const refreshToken = env.INTEGRATION_GOOGLE_REFRESH_TOKEN;
@@ -278,8 +294,19 @@ test.describe.serial('Integration: Google Calendar', () => {
         const clientSecret = env.GOOGLE_CLIENT_SECRET;
         test.skip(!refreshToken || !clientId || !clientSecret, 'Google Calendar sandbox credentials not configured — set INTEGRATION_GOOGLE_REFRESH_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET in .dev.vars');
 
-        // Seed the google_refresh_token for the test user via wrangler SQL
-        const seedSql = `UPDATE users SET google_refresh_token = '${refreshToken}', google_calendar_id = 'primary' WHERE id = '${userId}';`;
+        // Seed calendar_connections for the test user (encrypted envelope).
+        const { sealCredentials } = await import('../../server/lib/calendar/credentials');
+        const jwtSecret = env.JWT_SECRET || 'dev-jwt-secret-change-me-in-production';
+        const sealed = await sealCredentials(
+            { refreshToken, scopes: ['https://www.googleapis.com/auth/calendar.events'] },
+            tenantId,
+            jwtSecret,
+        );
+        const now = Date.now();
+        const connId = crypto.randomUUID();
+        const seedSql = `DELETE FROM calendar_connections WHERE user_id = '${userId}';
+INSERT INTO calendar_connections (id, tenant_id, user_id, provider, auth_type, credentials_enc, credentials_dek_enc, capabilities, calendar_id, connected_at, updated_at)
+VALUES ('${connId}', '${tenantId}', '${userId}', 'google', 'oauth', '${sealed.credentialsEnc}', '${sealed.credentialsDekEnc}', 'events_read_write', 'primary', ${now}, ${now});`;
         const seedFile = resolve(os.tmpdir(), 'seed-google-token.sql');
         writeFileSync(seedFile, seedSql, 'utf8');
         try {
