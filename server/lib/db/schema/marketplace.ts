@@ -10,7 +10,7 @@ export const marketplaceTemplates = sqliteTable('marketplace_templates', {
   authorId:      text('author_id').notNull().default('system'),
   changelog:     text('changelog'),
   downloadCount: integer('download_count').notNull().default(0),
-  featured:      integer('featured', { mode: 'boolean' }).notNull().default(false),
+  featured:      integer('is_featured', { mode: 'boolean' }).notNull().default(false),
   createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt:     integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
@@ -39,7 +39,7 @@ export const marketplaceLibraries = sqliteTable('marketplace_libraries', {
   authorId:      text('author_id').notNull().default('system'),
   changelog:     text('changelog'),
   downloadCount: integer('download_count').notNull().default(0),
-  featured:      integer('featured', { mode: 'boolean' }).notNull().default(false),
+  featured:      integer('is_featured', { mode: 'boolean' }).notNull().default(false),
   createdAt:     integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt:     integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [

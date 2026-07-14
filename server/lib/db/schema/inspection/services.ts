@@ -14,7 +14,7 @@ export const services = sqliteTable('services', {
     durationMinutes: integer('duration_minutes'),
     templateId: text('template_id').references(() => templates.id),
     agreementId: text('agreement_id').references(() => agreements.id),
-    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
@@ -46,7 +46,7 @@ export const discountCodes = sqliteTable('discount_codes', {
     maxUses: integer('max_uses'),
     usesCount: integer('uses_count').notNull().default(0),
     expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
-    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     index('idx_discount_codes_tenant').on(t.tenantId),

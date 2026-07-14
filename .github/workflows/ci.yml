@@ -1,12 +1,18 @@
 name: CI
 
-# Quality gate for pull requests. Every check below must pass before a PR is
-# merged — wire this up as a required status check in branch protection
-# (Settings → Branches → Require status checks → "verify").
+# Quality gate for pull requests. `verify` (below) is the authoritative merge
+# gate — wire it as a required status check in branch protection.
+#
+# This workflow runs ONLY on pull_request, not on push-to-main. Re-running the
+# full suite on the merge commit is redundant: branch protection requires
+# "branches up to date before merging" (strict), so a PR's tested tree equals
+# the post-squash main tree. Default-branch security scanning still runs via
+# codeql.yml (push + PR + schedule); release automation runs via
+# release-please.yml (push). If a future job here genuinely needs the merge
+# commit (e.g. a deploy gated on main's status), re-add a scoped push trigger
+# for that job only.
 on:
   pull_request:
-    branches: [master, main]
-  push:
     branches: [master, main]
 
 # Cancel superseded runs on the same ref to save CI minutes.

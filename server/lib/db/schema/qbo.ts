@@ -9,7 +9,7 @@ export const qboConnections = sqliteTable('qbo_connections', {
     tokenExpiresAt:       integer('token_expires_at', { mode: 'timestamp_ms' }).notNull(),
     refreshTokenExpiresAt: integer('refresh_token_expires_at', { mode: 'timestamp_ms' }).notNull(),
     lastSyncAt:           integer('last_sync_at', { mode: 'timestamp_ms' }),
-    syncEnabled:          integer('sync_enabled', { mode: 'boolean' }).notNull().default(true),
+    syncEnabled:          integer('is_sync_enabled', { mode: 'boolean' }).notNull().default(true),
     defaultItemId:        text('default_item_id').notNull().default('1'),
     createdAt:            integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 });
@@ -36,7 +36,7 @@ export const qboSyncErrors = sqliteTable('qbo_sync_errors', {
     errorCode: text('error_code').notNull(),
     errorMsg:  text('error_msg').notNull(),
     retries:   integer('retries').notNull().default(0),
-    resolved:  integer('resolved', { mode: 'boolean' }).notNull().default(false),
+    resolved:  integer('is_resolved', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });

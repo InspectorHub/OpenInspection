@@ -48,11 +48,11 @@ export const inspections = sqliteTable('inspections', {
     confirmedAt:         integer('confirmed_at', { mode: 'timestamp_ms' }),
     cancelReason:        text('cancel_reason'),
     cancelNotes:         text('cancel_notes'),  // Spec 3A
-    paymentRequired:     integer('payment_required', { mode: 'boolean' }).notNull().default(false),
-    agreementRequired:   integer('agreement_required', { mode: 'boolean' }).notNull().default(false),
+    paymentRequired:     integer('is_payment_required', { mode: 'boolean' }).notNull().default(false),
+    agreementRequired:   integer('is_agreement_required', { mode: 'boolean' }).notNull().default(false),
     // Spec 5H D2 — when true, InspectionService.publish() auto-injects the
     // inspector's users.default_signature_base64 into inspection_results.data._inspector_signature.
-    autoSignOnPublish:   integer('auto_sign_on_publish', { mode: 'boolean' }).notNull().default(false),
+    autoSignOnPublish:   integer('is_auto_sign_on_publish', { mode: 'boolean' }).notNull().default(false),
     discountCodeId:      text('discount_code_id').references(() => discountCodes.id),
     discountAmount:      integer('discount_amount_cents'),
     // Calendar-semantic YYYY-MM-DD (real-estate closing date, no time) — intentionally
@@ -100,7 +100,7 @@ export const inspections = sqliteTable('inspections', {
     reportTier:          text('report_tier', { enum: ['light_commercial', 'full_pca'] }),
     county:              text('county'),
     sellingAgentId:      text('selling_agent_id').references(() => contacts.id),
-    disableAutomations:  integer('disable_automations', { mode: 'boolean' }).notNull().default(false),
+    disableAutomations:  integer('is_automations_disabled', { mode: 'boolean' }).notNull().default(false),
     templateSnapshot:    text('template_snapshot', { mode: 'json' }),
     templateSnapshotVersion: integer('template_snapshot_version').default(1),
     reportThemeOverride: text('report_theme_override', { enum: ['modern', 'classic', 'minimal'] }),
@@ -123,7 +123,7 @@ export const inspections = sqliteTable('inspections', {
     //                          (see InspectionService.patchItem) for offline-queue staleness checks.
     //                          Superseded by the Yjs state vector under collab editing (#181);
     //                          column frozen — stop writes once the DO is the authority.
-    teamMode:            integer('team_mode', { mode: 'boolean' }).notNull().default(false),
+    teamMode:            integer('is_team_mode', { mode: 'boolean' }).notNull().default(false),
     leadInspectorId:     text('lead_inspector_id'),
     helperInspectorIds:  text('helper_inspector_ids').notNull().default('[]'),
     dataVersion:         integer('data_version').notNull().default(0),

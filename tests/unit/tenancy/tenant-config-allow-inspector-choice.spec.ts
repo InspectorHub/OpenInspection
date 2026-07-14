@@ -8,14 +8,14 @@ import * as schema from '../../../server/lib/db/schema';
  * IA-26 — tenant-config allowInspectorChoice column + PATCH/GET round-trip.
  *
  * Verifies:
- *   1. tenantConfigs schema has allowInspectorChoice column mapped to allow_inspector_choice.
+ *   1. tenantConfigs schema has allowInspectorChoice column mapped to is_inspector_choice_allowed.
  *   2. Default value is false (migration default).
  *   3. Updating to true and reading back returns true (PATCH → GET round-trip).
  */
 describe('tenant-config allowInspectorChoice — IA-26', () => {
-    it('tenantConfigs schema has allowInspectorChoice column mapping allow_inspector_choice', () => {
+    it('tenantConfigs schema has allowInspectorChoice column mapping is_inspector_choice_allowed', () => {
         const t = tenantConfigs as unknown as Record<string, { name: string }>;
-        expect(t.allowInspectorChoice?.name).toBe('allow_inspector_choice');
+        expect(t.allowInspectorChoice?.name).toBe('is_inspector_choice_allowed');
     });
 
     it('default for allowInspectorChoice is false, and PATCH → GET round-trip reads back true', async () => {

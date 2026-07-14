@@ -163,7 +163,7 @@ export const integrationTestResults = sqliteTable('integration_test_results', {
     // Optional provider variant within a target (e.g. twilio/telnyx, resend/sendgrid/
     // postmark/mailgun). NULL for single-provider targets (stripe, gemini).
     provider:       text('provider'),
-    ok:             integer('ok', { mode: 'boolean' }).notNull(),
+    ok:             integer('is_ok', { mode: 'boolean' }).notNull(),
     // Non-sensitive outcome summary (success blurb or provider error message).
     detail:         text('detail'),
     // User who ran the probe (JWT sub); NULL if unknown.

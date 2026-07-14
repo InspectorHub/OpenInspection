@@ -25,7 +25,7 @@ export const users = sqliteTable('users', {
     defaultSignatureBase64: text('default_signature_base64'),
     // 2026-06-14 — per-inspector opt-in for the business-card email footer
     // (independent of Point of Contact). Default true preserves prior behaviour.
-    signatureEnabled: integer('signature_enabled', { mode: 'boolean' }).notNull().default(true),
+    signatureEnabled: integer('is_signature_enabled', { mode: 'boolean' }).notNull().default(true),
     // FROZEN for inspectors (2026-06-06, DB-12/IA-26): the per-inspector
     // booking slug is retired — /book/:tenant is the canonical public entry
     // and no inspector-facing route writes this column anymore. Live READERS
@@ -45,7 +45,7 @@ export const users = sqliteTable('users', {
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled.
     totpSecret:        text('totp_secret'),
-    totpEnabled:       integer('totp_enabled', { mode: 'boolean' }).notNull().default(false),
+    totpEnabled:       integer('is_totp_enabled', { mode: 'boolean' }).notNull().default(false),
     totpRecoveryCodes: text('totp_recovery_codes'),
     totpVerifiedAt:    integer('totp_verified_at', { mode: 'timestamp_ms' }),
     // Agent Accounts A2 — per-user notification preferences. Default ON for
@@ -53,9 +53,9 @@ export const users = sqliteTable('users', {
     // inspector forwards the receipt manually if the agent wants visibility).
     // Read by EmailService.sendNewReferral / sendReportReady / sendInvoicePaid
     // before delivery; written from /agent-settings/profile (agent-side toggles).
-    notifyOnReferral: integer('notify_on_referral', { mode: 'boolean' }).notNull().default(true),
-    notifyOnReport:   integer('notify_on_report',   { mode: 'boolean' }).notNull().default(true),
-    notifyOnPaid:     integer('notify_on_paid',     { mode: 'boolean' }).notNull().default(false),
+    notifyOnReferral: integer('is_referral_notification_enabled', { mode: 'boolean' }).notNull().default(true),
+    notifyOnReport:   integer('is_report_notification_enabled',   { mode: 'boolean' }).notNull().default(true),
+    notifyOnPaid:     integer('is_paid_notification_enabled',     { mode: 'boolean' }).notNull().default(false),
     // Design System 0520 subsystem B phase 1 — debounced "user last active"
     // timestamp updated by touch-last-active middleware (30s debounce window
     // per worker isolate). Powers TeamStrip "last active Nm ago" pill and the

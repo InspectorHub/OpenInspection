@@ -12,7 +12,7 @@ export const defectCategories = sqliteTable('defect_categories', {
     name:      text('name').notNull(),
     color:     text('color').notNull().default('#6b7280'),
     // When true, defects in this category are pulled into the report Summary.
-    drivesSummary: integer('drives_summary', { mode: 'boolean' }).notNull().default(true),
+    drivesSummary: integer('is_summary_driver', { mode: 'boolean' }).notNull().default(true),
     sortOrder: integer('sort_order').notNull().default(0),
     // Seed rows (maintenance/recommendation/safety) — not user-deletable in the UI.
     isSeed:    integer('is_seed', { mode: 'boolean' }).notNull().default(false),

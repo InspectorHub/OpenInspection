@@ -32,7 +32,7 @@ export const templates = sqliteTable('templates', {
     propertyType: text('property_type'),
     commercialSubtype: text('commercial_subtype'),
     description: text('description'),
-    featured: integer('featured', { mode: 'boolean' }).notNull().default(false),
+    featured: integer('is_featured', { mode: 'boolean' }).notNull().default(false),
 }, (t) => [
     index('idx_templates_tenant').on(t.tenantId),
     index('idx_templates_rating_system').on(t.ratingSystemId),

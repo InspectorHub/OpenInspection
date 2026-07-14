@@ -35,9 +35,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // booleans gate footer / page-number / inspector-license rendering. Defaults
     // preserve the prior always-on behaviour.
     companyAddress: text('company_address'),
-    pdfShowFooter: integer('pdf_show_footer', { mode: 'boolean' }).notNull().default(true),
-    pdfShowPageNumbers: integer('pdf_show_page_numbers', { mode: 'boolean' }).notNull().default(true),
-    pdfShowLicense: integer('pdf_show_license', { mode: 'boolean' }).notNull().default(true),
+    pdfShowFooter: integer('is_pdf_footer_shown', { mode: 'boolean' }).notNull().default(true),
+    pdfShowPageNumbers: integer('is_pdf_page_numbers_shown', { mode: 'boolean' }).notNull().default(true),
+    pdfShowLicense: integer('is_pdf_license_shown', { mode: 'boolean' }).notNull().default(true),
     // C-10 ③-D (B-4 / A-7) — tenant transactional-email identity. `senderEmail`
     // is the From: address; `replyTo` is the Reply-To: header. Both null until
     // the workspace configures them in Settings → Communication.
@@ -97,23 +97,23 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
         .$type<{ cloneDefault: 'rating' | 'rating_notes' | 'all'; autoAdvanceDelayMs: number; pinnedTagIds: string[] }>(),
     // Sprint 2 S2-4 — when true, published reports render the per-defect
     // "Estimated cost: $X – $Y" badge.
-    showEstimates: integer('show_estimates', { mode: 'boolean' }).notNull().default(false),
+    showEstimates: integer('is_estimates_shown', { mode: 'boolean' }).notNull().default(false),
     // Track E1 (ITB §11, UC-ITB-07) — when true, the published report sub-nav
     // exposes a "Repair List" tab. Default OFF — opt-in for realtors who want
     // a separate punch-list view rather than the full narrative report.
-    enableRepairList: integer('enable_repair_list', { mode: 'boolean' }).notNull().default(false),
+    enableRepairList: integer('is_repair_list_enabled', { mode: 'boolean' }).notNull().default(false),
     // Sprint 3 S3-2 — when true, the public report viewer surfaces a
     // "Generate repair request" link that takes the customer to a print-
     // friendly export they can hand off to a contractor (or email back to
     // themselves). Defaults OFF so existing tenants opt in deliberately.
-    enableCustomerRepairExport: integer('enable_customer_repair_export', { mode: 'boolean' }).notNull().default(false),
+    enableCustomerRepairExport: integer('is_customer_repair_export_enabled', { mode: 'boolean' }).notNull().default(false),
     // Round-2 backlog #10 — when true, every NEW inspection inherits
     // paymentRequired = true at creation time. Per-inspection override
     // remains; Stripe webhook auto-flips paymentStatus to 'paid'.
-    blockUnpaid: integer('block_unpaid', { mode: 'boolean' }).notNull().default(false),
+    blockUnpaid: integer('is_unpaid_blocked', { mode: 'boolean' }).notNull().default(false),
     // Round-2 backlog #10 — when true, every NEW inspection inherits
     // agreementRequired = true at creation time.
-    blockUnsignedAgreement: integer('block_unsigned_agreement', { mode: 'boolean' }).notNull().default(false),
+    blockUnsignedAgreement: integer('is_unsigned_agreement_blocked', { mode: 'boolean' }).notNull().default(false),
     // Round-2 backlog G3 (Spectora §4.1, ITB UC-ITB-10) — tenant-defined
     // referral sources that extend the seven seeds (Realtor / Past Client /
     // Google Search / Facebook / Yelp / Walk-in / Other). NULL = no extras.
@@ -127,24 +127,24 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Default 0 (false) = HomeGauge-style auto-confirm: agent submits ->
     // magic-link goes to client immediately. 1 (true) = Spectora reviewer
     // mode: inspector must approve the draft before the client gets the link.
-    conciergeReviewRequired: integer('concierge_review_required', { mode: 'boolean' }).notNull().default(false),
+    conciergeReviewRequired: integer('is_concierge_review_required', { mode: 'boolean' }).notNull().default(false),
     // IA-26 — company-level booking page: when true the public /book/:tenant
     // wizard shows an inspector dropdown ("Allow choice of inspectors",
     // Spectora-style). Default OFF = pure auto-assign (first available).
-    allowInspectorChoice: integer('allow_inspector_choice', { mode: 'boolean' }).notNull().default(false),
+    allowInspectorChoice: integer('is_inspector_choice_allowed', { mode: 'boolean' }).notNull().default(false),
     // Workers Paid PDF pipeline opt-in.
     // Default 0 (OFF) — keeps the Free-plan path cost-free (window.print()
     // fallback in the viewer is unaffected). Tenants on Workers Paid flip
     // this in Settings -> Reports to enable Browser-Rendering background
     // PDF generation at publish time + the Refresh PDFs / Download PDF
     // dropdown in the report viewer.
-    enablePdfPipeline: integer('enable_pdf_pipeline', { mode: 'boolean' }).notNull().default(false),
+    enablePdfPipeline: integer('is_pdf_pipeline_enabled', { mode: 'boolean' }).notNull().default(false),
     // Design System 0520 subsystem C P10 — /team Defaults section toggles.
-    teamModeDefault:          integer('team_mode_default',          { mode: 'boolean' }).notNull().default(false),
+    teamModeDefault:          integer('is_team_mode_default',          { mode: 'boolean' }).notNull().default(false),
     // DEAD (2026-06-13, apprentice subsystem removed) — no reads/writes
-    apprenticeReviewRequired: integer('apprentice_review_required', { mode: 'boolean' }).notNull().default(false),
+    apprenticeReviewRequired: integer('is_apprentice_review_required', { mode: 'boolean' }).notNull().default(false),
     // DEAD (2026-06-13, guest removal) — no reads/writes
-    guestInvitesEnabled:      integer('guest_invites_enabled',      { mode: 'boolean' }).notNull().default(true),
+    guestInvitesEnabled:      integer('is_guest_invites_enabled',      { mode: 'boolean' }).notNull().default(true),
     // Track H (IA-7 / P-6②) — which defect fields the publish gate REQUIRES.
     // Tenant default; per-inspection override on inspections.require_defect_
     // fields_override (the blockUnpaid → paymentRequired inheritance pattern).
@@ -165,7 +165,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Per-tenant operator toggle; default ON (#181 Phase 5) — new tenants get collab
     // unless they explicitly opt out. The legacy CAS path stays available until
     // Tasks 14/15 retire it.
-    collabEditing: integer('collab_editing', { mode: 'boolean' }).notNull().default(true),
+    collabEditing: integer('is_collab_editing_enabled', { mode: 'boolean' }).notNull().default(true),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
     // SMS BYO provider choice — which carrier the tenant's own TWILIO_*/TELNYX_*
     // secrets belong to. NULL while not in own/managed mode.
@@ -178,7 +178,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Managed SMS eligibility flag — set true by portal billing sync or a platform
     // admin to enable managed compliance for the tenant. Default false =
     // not eligible; provision routes fail closed until this is explicitly set.
-    managedEligible: integer('managed_eligible', { mode: 'boolean' }).notNull().default(false),
+    managedEligible: integer('is_managed_eligible', { mode: 'boolean' }).notNull().default(false),
     // Managed-compliance carrier choice — which ISV provider runs the tenant's
     // managed (managed_shared / managed_dedicated) compliance provisioning + cron
     // sweep + webhook reception. Distinct from `smsByoProvider` (the BYO SEND
@@ -187,7 +187,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     managedProvider: text('managed_provider', { enum: ['twilio', 'telnyx'] }).notNull().default('twilio'),
     // Commercial PCA Phase C — Capital Replacement Reserve Schedule (TABLE 2).
     // Opt-in (default off): ASTM baseline reports render TABLE 1 only.
-    reserveScheduleEnabled: integer('reserve_schedule_enabled', { mode: 'boolean' }).notNull().default(false),
+    reserveScheduleEnabled: integer('is_reserve_schedule_enabled', { mode: 'boolean' }).notNull().default(false),
     // Projected term in years. Default 12 is INDUSTRY CONVENTION, not ASTM —
     // the term is user-defined (see roadmap terminology correction).
     reserveTermYears: integer('reserve_term_years').notNull().default(12),
@@ -208,7 +208,7 @@ export const emailTemplates = sqliteTable('email_templates', {
     trigger:   text('trigger').notNull(),
     subject:   text('subject'),
     blocks:    text('blocks', { mode: 'json' }).$type<Record<string, string>>(),
-    enabled:   integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    enabled:   integer('is_enabled', { mode: 'boolean' }).notNull().default(true),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => ({
     pk: primaryKey({ columns: [t.tenantId, t.trigger] }),

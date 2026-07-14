@@ -32,7 +32,7 @@ export const reportSignoff = sqliteTable('report_signoff', {
     signedAt:          integer('signed_at', { mode: 'timestamp_ms' }).notNull(),
     // base64url Ed25519 signature over the attestation payload.
     signatureRef:      text('signature_ref').notNull(),
-    dualRole:          integer('dual_role', { mode: 'boolean' }).notNull().default(false),
+    dualRole:          integer('is_dual_role', { mode: 'boolean' }).notNull().default(false),
 }, (t) => [
     index('idx_report_signoff_inspection').on(t.tenantId, t.inspectionId),
     uniqueIndex('uq_report_signoff_role').on(t.inspectionId, t.role),
@@ -77,10 +77,10 @@ export const documentReviewItems = sqliteTable('document_review_items', {
     // Stable key from the seed catalog (server/lib/pca-document-catalog.ts).
     documentKey:  text('document_key').notNull(),
     label:        text('label').notNull(),
-    requested:    integer('requested', { mode: 'boolean' }).notNull().default(false),
-    received:     integer('received', { mode: 'boolean' }).notNull().default(false),
-    reviewed:     integer('reviewed', { mode: 'boolean' }).notNull().default(false),
-    na:           integer('na', { mode: 'boolean' }).notNull().default(false),
+    requested:    integer('is_requested', { mode: 'boolean' }).notNull().default(false),
+    received:     integer('is_received', { mode: 'boolean' }).notNull().default(false),
+    reviewed:     integer('is_reviewed', { mode: 'boolean' }).notNull().default(false),
+    na:           integer('is_na', { mode: 'boolean' }).notNull().default(false),
     notes:        text('notes'),
     sortOrder:    integer('sort_order').notNull().default(0),
 }, (t) => [

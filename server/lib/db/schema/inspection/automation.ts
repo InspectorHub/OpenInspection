@@ -46,7 +46,7 @@ export const automations = sqliteTable('automations', {
     // SP2 — references a message_templates(channel='sms') row for the SMS channel.
     // Null = no SMS template selected.
     smsTemplateId: text('sms_template_id'),
-    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    active: integer('is_active', { mode: 'boolean' }).notNull().default(true),
     isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
@@ -89,7 +89,7 @@ export const eventTypes = sqliteTable('event_types', {
     defaultPriceCents:  integer('default_price_cents').notNull().default(0),
     color:              text('color').notNull().default('#6366f1'),
     sortOrder:          integer('sort_order').notNull().default(0),
-    active:             integer('active', { mode: 'boolean' }).notNull().default(true),
+    active:             integer('is_active', { mode: 'boolean' }).notNull().default(true),
     createdAt:          integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [
     uniqueIndex('uq_event_types_tenant_slug').on(t.tenantId, t.slug),
@@ -105,7 +105,7 @@ export const inspectionTypes = sqliteTable('inspection_types', {
     name:        text('name').notNull(),
     basedOn:     text('based_on'),
     description: text('description'),
-    enabled:     integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    enabled:     integer('is_enabled', { mode: 'boolean' }).notNull().default(true),
     sortOrder:   integer('sort_order').notNull().default(0),
     createdAt:   integer('created_at', { mode: 'timestamp_ms' }).notNull(),
 }, (t) => [

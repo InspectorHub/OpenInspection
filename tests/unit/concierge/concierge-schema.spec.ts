@@ -8,7 +8,7 @@ import * as schema from '../../../server/lib/db/schema';
  *
  * Verifies:
  *   1. inspections.concierge_status (nullable text)
- *   2. tenant_configs.concierge_review_required (boolean default false)
+ *   2. tenant_configs.is_concierge_review_required (boolean default false)
  *   3. concierge_confirm_tokens table with expected columns + index
  */
 describe('concierge schema — A3', () => {
@@ -17,9 +17,9 @@ describe('concierge schema — A3', () => {
         expect(t.conciergeStatus?.name).toBe('concierge_status');
     });
 
-    it('tenant_configs has conciergeReviewRequired column mapping concierge_review_required', () => {
+    it('tenant_configs has conciergeReviewRequired column mapping is_concierge_review_required', () => {
         const t = tenantConfigs as unknown as Record<string, { name: string }>;
-        expect(t.conciergeReviewRequired?.name).toBe('concierge_review_required');
+        expect(t.conciergeReviewRequired?.name).toBe('is_concierge_review_required');
     });
 
     it('concierge_confirm_tokens table is exported with token primary key', () => {
@@ -56,7 +56,7 @@ describe('concierge schema — A3', () => {
 
         const cfg = await fixture.db.select().from(schema.tenantConfigs).all();
         expect(cfg.length).toBeGreaterThan(0);
-        // Default for concierge_review_required is 0 (false) per migration.
+        // Default for is_concierge_review_required is 0 (false) per migration.
         expect(!!cfg[0].conciergeReviewRequired).toBe(false);
 
         // Insert a token row to confirm the new table is wired and queryable.
