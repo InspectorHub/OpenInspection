@@ -178,6 +178,7 @@ export default defineConfig({
         // read back from the E2E email sink (E2E_EMAIL_SINK, wired on the worker).
         { name: 'auth-password-reset', testMatch: 'auth-password-reset.spec.ts', dependencies: ['api'] },
         { name: 'branding', testMatch: 'branding.spec.ts' },
+        { name: 'timezone-settings', testMatch: 'timezone-settings.spec.ts' },
         { name: 'repair-list', testMatch: 'repair-list.spec.ts' },
         { name: 'report-viewer', testMatch: 'report-viewer.spec.ts' },
         { name: 'inspection-edit-hotkeys', testMatch: 'inspection-edit-hotkeys.spec.ts', dependencies: ['editor-seed'] },
