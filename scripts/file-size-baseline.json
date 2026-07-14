@@ -5,7 +5,7 @@
   "server/lib/collab/results-doc.ts": 917,
   "server/durable-objects/inspection-doc.ts": 896,
   "server/services/inspection/inspection-report.service.ts": 889,
-  "app/routes/inspections.tsx": 879,
+  "app/routes/inspections.tsx": 882,
   "server/services/booking.service.ts": 848,
   "server/index.ts": 846,
   "server/api/sms.ts": 818,

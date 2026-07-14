@@ -14,10 +14,12 @@ export interface OnboardingInput {
   serviceCount: number;
   /** Number of inspections created for this tenant (any status). */
   inspectionCount: number;
+  /** True when the tenant set a non-UTC default_timezone. */
+  timezoneSet: boolean;
 }
 
 export interface OnboardingStep {
-  id: 'company' | 'template' | 'services' | 'first-inspection';
+  id: 'company' | 'timezone' | 'template' | 'services' | 'first-inspection';
   label: string;
   done: boolean;
   /** Navigation href for the step. '#new-inspection' is a magic value the
@@ -35,6 +37,12 @@ export function computeOnboardingSteps(input: OnboardingInput): OnboardingStep[]
       id: 'company',
       label: 'Set your company name',
       done: input.companyNameSet,
+      href: '/settings/workspace',
+    },
+    {
+      id: 'timezone',
+      label: 'Set your timezone',
+      done: input.timezoneSet,
       href: '/settings/workspace',
     },
     {
