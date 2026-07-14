@@ -4,6 +4,7 @@ import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { Modal, PageHeader, Icon } from "@core/shared-ui";
+import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { startOfWeek, addDays, type CalendarEvent, type ViewMode } from "~/components/calendar/calendar-helpers";
 import { MonthView } from "~/components/calendar/MonthView";
 import { WeekView } from "~/components/calendar/WeekView";
@@ -60,6 +61,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
 export default function CalendarPage() {
   const { events } = useLoaderData<typeof loader>();
+  const displayTz = useDisplayTimeZone();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const navigation = useNavigation();
@@ -284,7 +286,7 @@ export default function CalendarPage() {
           <div className="space-y-2 text-[13px] text-ih-fg-3">
             <p>
               <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Date:</span>{" "}
-              {selectedEvent.start ? new Date(selectedEvent.start).toLocaleString() : "N/A"}
+              {selectedEvent.start ? new Date(selectedEvent.start).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: displayTz, timeZoneName: 'short' }) : "N/A"}
             </p>
             {selectedEvent.status && (
               <p>

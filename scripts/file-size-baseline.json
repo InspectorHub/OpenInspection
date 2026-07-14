@@ -1,7 +1,7 @@
 {
   "app/routes/inspection-edit.tsx": 2433,
   "server/services/inspection/inspection-core.service.ts": 991,
-  "app/routes/inspection-hub.tsx": 988,
+  "app/routes/inspection-hub.tsx": 990,
   "server/lib/collab/results-doc.ts": 917,
   "server/durable-objects/inspection-doc.ts": 896,
   "server/services/inspection/inspection-report.service.ts": 882,
@@ -20,7 +20,7 @@
   "server/api/inspections/report-delivery.ts": 656,
   "server/services/inspection/inspection-analytics.service.ts": 628,
   "app/components/editor/ItemEditor.tsx": 627,
-  "app/components/inspection-edit/CompliancePanel.tsx": 601,
+  "app/components/inspection-edit/CompliancePanel.tsx": 603,
   "app/hooks/useInspection.ts": 598,
   "app/components/portal/sections/RepairBuilderSection.tsx": 588,
   "server/services/marketplace.service.ts": 587,

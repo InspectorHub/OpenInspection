@@ -67,8 +67,8 @@ vi.mock('react-router', async () => {
 
 vi.mock('~/hooks/useSessionContext', () => ({
     useSessionContext: vi.fn(() => ({
-        user: { role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A' },
-        branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, reportTheme: 'default', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null },
+        user: { role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A', timezone: null },
+        branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, reportTheme: 'default', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, defaultTimezone: 'UTC' },
         deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false },
         seatUsage: null,
     })),
@@ -138,8 +138,8 @@ beforeEach(() => {
     );
     vi.mocked(useLoaderData).mockReturnValue({ mcpEnabled: true, self: [SAMPLE_GRANT], all: null, role: 'inspector', isSaas: false } as never);
     vi.mocked(useSessionContext).mockReturnValue({
-        user: { role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A' },
-        branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, reportTheme: 'default', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null },
+        user: { role: 'inspector', name: 'Alice', email: 'alice@example.com', initials: 'A', timezone: null },
+        branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, reportTheme: 'default', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, defaultTimezone: 'UTC' },
         deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true },
         seatUsage: null,
     });
@@ -281,7 +281,7 @@ describe('SettingsConnectedApps component render', () => {
         } as never);
         vi.mocked(useSessionContext).mockReturnValue({
             user: { role: 'owner', name: 'Admin', email: 'admin@example.com', initials: 'A' },
-            branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, reportTheme: 'default', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null },
+            branding: { isSaas: false, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, reportTheme: 'default', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null, defaultTimezone: 'UTC' },
             deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false, mcpEnabled: true },
             seatUsage: null,
         });

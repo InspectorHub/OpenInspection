@@ -4,6 +4,7 @@ import type { Route } from "./+types/inspection-hub";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
+import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { deriveBlockStates, formatCents, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
 import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
@@ -301,6 +302,7 @@ export function reportActions(
 export default function InspectionHubPage() {
   const { hub, smsConsent, reinspectCandidates, canPublishCap, documents } = useLoaderData<typeof loader>();
   const { inspection, people, services, tenantSlug } = hub;
+  const displayTz = useDisplayTimeZone();
   const blocks = deriveBlockStates(hub);
   const navigate = useNavigate();
   const revalidator = useRevalidator();
@@ -630,7 +632,7 @@ export default function InspectionHubPage() {
                   <span className="text-ih-fg-4 shrink-0">
                     {humanizeStatus(req.status)}
                     {(req.signedAt || req.createdAt) && (
-                      <> &middot; {formatInspectionDateTime(req.signedAt || req.createdAt)}</>
+                      <> &middot; {formatInspectionDateTime(req.signedAt || req.createdAt, undefined, displayTz)}</>
                     )}
                   </span>
                 </div>

@@ -14,6 +14,8 @@ export function formatInspectionDateTime(
     const year = d.toLocaleDateString('en-US', { year: 'numeric', timeZone: tz });
     const yearPart = Number(year) === now.getUTCFullYear() ? '' : `, ${year}`;
     if (dateOnly) return `${md}${yearPart}`;
-    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz });
+    // Include the short zone name so a displayed time-of-day is unambiguous
+    // (e.g. "9:00 AM EDT") — matters once tenants/users configure a timezone.
+    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' });
     return `${md}${yearPart} · ${time}`;
 }

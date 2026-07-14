@@ -33,20 +33,29 @@ export const sessionContextRoutes = createApiRouter()
         const profile = c.var.profile;
         const tenantId = c.get('tenantId');
 
-        // Look up the user's name and email from DB
+        // Look up the user's name, email, and timezone override from DB, plus the
+        // tenant's default timezone (both drive the client display-timezone hook).
         let userName: string | null = null;
         let userEmail: string | null = null;
+        let userTimezone: string | null = null;
+        let tenantTimezone = 'UTC';
         if (tenantId) {
             try {
                 const db = drizzle(c.env.DB);
-                const row = await db.select({ name: users.name, email: users.email })
+                const row = await db.select({ name: users.name, email: users.email, timezone: users.timezone })
                     .from(users)
                     .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
                     .get();
                 if (row) {
                     userName = row.name;
                     userEmail = row.email;
+                    userTimezone = row.timezone;
                 }
+                const cfg = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+                    .from(tenantConfigs)
+                    .where(eq(tenantConfigs.tenantId, tenantId))
+                    .get();
+                if (cfg?.defaultTimezone) tenantTimezone = cfg.defaultTimezone;
             } catch (e) {
                 logger.warn('[session-context] user lookup failed', { userId: user.sub, error: (e as Error).message });
             }
@@ -161,12 +170,14 @@ export const sessionContextRoutes = createApiRouter()
                     currentUserSlug: branding?.currentUserSlug || null,
                     bookingHost: branding?.bookingHost || null,
                     privacyUrl,
+                    defaultTimezone: tenantTimezone,
                 },
                 user: {
                     name: userName,
                     email: userEmail,
                     role: user.role || 'inspector',
                     initials,
+                    timezone: userTimezone,
                 },
                 deployment: {
                     mode: profile.mode || 'standalone',
