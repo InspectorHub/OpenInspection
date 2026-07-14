@@ -193,6 +193,12 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     reserveTermYears: integer('reserve_term_years').notNull().default(12),
     // Optional inflation factor in basis points (250 = 2.5%). NULL = no inflation.
     inflationRateBps: integer('inflation_rate_bps'),
+    // Tenant display timezone (IANA name, e.g. 'America/New_York'). The anchor
+    // for reports, reminders, and calendar events; UI display uses the user's
+    // override when set (see users.timezone). Existing tenants default to 'UTC'
+    // and are nudged to set it via the onboarding checklist. Appended at END of
+    // the table per the D1 add-column-at-end rule (tenant_configs is FK-referenced).
+    defaultTimezone: text('default_timezone').notNull().default('UTC'),
 });
 
 /**
