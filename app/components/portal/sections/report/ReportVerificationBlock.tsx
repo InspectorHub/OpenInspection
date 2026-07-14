@@ -15,9 +15,11 @@ import type { ReportVerification } from "./types";
 export interface ReportVerificationBlockProps {
   verification: ReportVerification | null;
   baseUrl: string;
+  /** Tenant timezone (IANA) that anchors report times. Defaults to UTC. */
+  timeZone?: string;
 }
 
-export function ReportVerificationBlock({ verification, baseUrl }: ReportVerificationBlockProps) {
+export function ReportVerificationBlock({ verification, baseUrl, timeZone = "UTC" }: ReportVerificationBlockProps) {
   const vb = verificationBlockModel({ verification }, baseUrl);
   if (!vb.show) return null;
   let qrSvg: string | null = null;
@@ -43,7 +45,7 @@ export function ReportVerificationBlock({ verification, baseUrl }: ReportVerific
           <div className="text-sm space-y-1.5">
             <div className="font-semibold text-ih-fg-1">
               Published &amp; signed — version v{vb.versionNumber}
-              <span className="text-ih-fg-4 font-normal"> · {formatUnixSeconds(vb.publishedAt)}</span>
+              <span className="text-ih-fg-4 font-normal"> · {formatUnixSeconds(vb.publishedAt, timeZone)}</span>
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mr-2">Verify at</span>

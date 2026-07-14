@@ -291,6 +291,8 @@ export interface ReportLoaderResult {
   costTables: CostTables | null;
   enableRepairList: boolean;
   enableCustomerRepairExport: boolean;
+  /** Tenant timezone (IANA) that anchors ALL report times. 'UTC' when unset. */
+  reportTimeZone: string;
   isDelivered: boolean;
   brand: TenantBrand;
   error: string | null;

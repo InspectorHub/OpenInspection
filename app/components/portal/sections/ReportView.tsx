@@ -124,6 +124,7 @@ export function reportViewProps(
     costTables: data.costTables ?? null,
     enableRepairList: data.enableRepairList ?? false,
     enableCustomerRepairExport: data.enableCustomerRepairExport ?? false,
+    reportTimeZone: data.reportTimeZone ?? "UTC",
     isDelivered: data.isDelivered ?? false,
     brand: data.brand,
     error: data.error ?? null,
@@ -514,6 +515,7 @@ export function ReportView(props: ReportViewProps) {
         <PcaSkeleton
           data={data.pcaReport ?? null}
           tier={data.reportTier ?? null}
+          reportTimeZone={data.reportTimeZone}
           compliance={{
             conformance: data.astmConformance ?? null,
             signoffs: data.reportSignoffs ?? [],
@@ -725,10 +727,10 @@ export function ReportView(props: ReportViewProps) {
       )}
 
       {/* ── Signature block ──────────────────────────────────────────── */}
-      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} />
+      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} timeZone={data.reportTimeZone} />
 
       {/* ── Verification block ───────────────────────────────────────── */}
-      <ReportVerificationBlock verification={data.verification} baseUrl={data.baseUrl} />
+      <ReportVerificationBlock verification={data.verification} baseUrl={data.baseUrl} timeZone={data.reportTimeZone} />
 
       {/* Repair Request Panel */}
       {repairPanel && (

@@ -3,6 +3,7 @@ import { eq, and, desc, asc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
+import { resolveTenantTimeZone } from '../../lib/tz';
 import { parseReinspectionStatuses } from '../../lib/reinspection-status';
 import { computeReportStats, getRatingColor, getRatingBucket, getNaKind, mapCustomDefectsForReport, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
@@ -468,6 +469,9 @@ export class InspectionReportService extends InspectionSubService {
         let reserveScheduleEnabled = false;
         let reserveTermYears = 12;
         let inflationRateBps: number | null = null;
+        // The tenant timezone anchors ALL report times (a report is a shared
+        // artifact — never the viewer's browser tz). 'UTC' until resolved.
+        let reportTimeZone = 'UTC';
         try {
             const cfg = await db.select({
                 showEstimates: tenantConfigs.showEstimates,
@@ -477,6 +481,7 @@ export class InspectionReportService extends InspectionSubService {
                 reserveScheduleEnabled: tenantConfigs.reserveScheduleEnabled,
                 reserveTermYears: tenantConfigs.reserveTermYears,
                 inflationRateBps: tenantConfigs.inflationRateBps,
+                defaultTimezone: tenantConfigs.defaultTimezone,
             })
                 .from(tenantConfigs)
                 .where(eq(tenantConfigs.tenantId, tenantId))
@@ -488,6 +493,7 @@ export class InspectionReportService extends InspectionSubService {
                 reserveScheduleEnabled = Boolean(cfg.reserveScheduleEnabled);
                 reserveTermYears = cfg.reserveTermYears ?? 12;
                 inflationRateBps = cfg.inflationRateBps ?? null;
+                reportTimeZone = resolveTenantTimeZone(cfg.defaultTimezone);
                 if (cfg.reportTheme === 'classic' || cfg.reportTheme === 'minimal') {
                     reportTheme = cfg.reportTheme;
                 }
@@ -773,6 +779,7 @@ export class InspectionReportService extends InspectionSubService {
             showEstimates,
             enableRepairList,
             enableCustomerRepairExport,
+            reportTimeZone,
             propertyFacts,
             reportTier,
             costTables: resolvedCostTables,

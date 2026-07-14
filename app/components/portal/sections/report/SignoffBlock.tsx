@@ -1,4 +1,5 @@
 import type { ReportSignoffView } from "./types";
+import { formatEpochMs } from "~/lib/report-helpers";
 
 const ROLE_LABEL: Record<ReportSignoffView["role"], string> = {
   field_observer: "Field Observer",
@@ -12,7 +13,7 @@ const ROLE_LABEL: Record<ReportSignoffView["role"], string> = {
  * both roles) with an attestation note, per ASTM E2018 §11.4.3. Renders
  * nothing when there are no signoffs (light/residential reports).
  */
-export function SignoffBlock({ signoffs }: { signoffs: ReportSignoffView[] }) {
+export function SignoffBlock({ signoffs, timeZone = "UTC" }: { signoffs: ReportSignoffView[]; timeZone?: string }) {
   if (!signoffs.length) return null;
   return (
     <section data-pca-signoffs className="mb-5 print:break-inside-avoid">
@@ -23,7 +24,7 @@ export function SignoffBlock({ signoffs }: { signoffs: ReportSignoffView[] }) {
             <span className="font-medium">{ROLE_LABEL[s.role]}:</span> {s.name}
             {s.license ? <span className="text-ih-fg-3"> — License {s.license}</span> : null}
             <span className="block text-ih-fg-3">
-              Signed {new Date(s.signedAt).toLocaleDateString()}
+              Signed {formatEpochMs(s.signedAt, timeZone)}
               {s.qualificationsRef ? ` · ${s.qualificationsRef}` : ""}
             </span>
             {s.dualRole ? (

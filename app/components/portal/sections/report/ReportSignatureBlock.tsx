@@ -15,9 +15,11 @@ export interface ReportSignatureBlockProps {
   isPublished: boolean;
   signature: ReportSignature | null;
   ownerPreview: boolean;
+  /** Tenant timezone (IANA) that anchors report times. Defaults to UTC. */
+  timeZone?: string;
 }
 
-export function ReportSignatureBlock({ isPublished, signature, ownerPreview }: ReportSignatureBlockProps) {
+export function ReportSignatureBlock({ isPublished, signature, ownerPreview, timeZone = "UTC" }: ReportSignatureBlockProps) {
   const sig = signatureBlockModel({ isPublished, signature, ownerPreview });
   if (sig.variant === "draft") {
     return (
@@ -54,7 +56,10 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview }: R
               <div className="text-ih-fg-4 text-xs">License #{sig.license}</div>
             )}
             {sig.signedAt != null && (
-              <div className="text-ih-fg-4 text-xs">Signed {formatEpochMs(sig.signedAt)}</div>
+              <div className="text-ih-fg-4 text-xs">Signed {formatEpochMs(sig.signedAt, timeZone)}</div>
+            )}
+            {sig.signedAt != null && (
+              <div className="text-[10px] text-ih-fg-4">All report times shown in {timeZone.replace(/_/g, " ")}.</div>
             )}
             {sig.variant === "typed" && (
               <div className="text-[10px] text-ih-fg-4">Electronically signed by {sig.inspectorName}</div>
