@@ -13262,6 +13262,10 @@
           "signatureEnabled": {
             "type": "boolean",
             "description": "Whether the inspector business-card footer is added to outbound emails"
+          },
+          "timezone": {
+            "type": "string",
+            "description": "Per-user display timezone (IANA). Empty string clears the override (inherit tenant)."
           }
         }
       }
