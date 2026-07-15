@@ -32,6 +32,25 @@ import {
     loadGoogleOAuthMode,
     resolveGoogleOAuthCredentials,
 } from '../lib/calendar/resolve-google-oauth';
+import {
+    CALENDAR_OAUTH_MESSAGE,
+    renderCalendarOAuthPopupLanding,
+} from '../lib/calendar/oauth-popup-landing';
+import type { Context } from 'hono';
+import type { HonoConfig } from '../types/hono';
+
+function oauthErrorLanding(c: Context<HonoConfig>, message: string) {
+    return c.html(renderCalendarOAuthPopupLanding({
+        type: CALENDAR_OAUTH_MESSAGE.ERROR,
+        error: message,
+    }), 200);
+}
+
+function oauthConnectedLanding(c: Context<HonoConfig>) {
+    return c.html(renderCalendarOAuthPopupLanding({
+        type: CALENDAR_OAUTH_MESSAGE.CONNECTED,
+    }), 200);
+}
 
 /**
  * DELETE /api/calendar/disconnect
@@ -265,6 +284,11 @@ export const calendarRoutes = createApiRouter()
     /**
      * GET /api/calendar/callback
      * Exchanges OAuth code, stores encrypted credentials in calendar_connections.
+     *
+     * Identity comes from the one-time KV state minted at GET /connect (when the
+     * user was same-site authenticated). Google returns here via a cross-site
+     * top-level navigation, so __Host-inspector_token (SameSite=Strict) is not
+     * sent — same pattern as portal OIDC / core SSO handoff.
      */
     .get('/callback', async (c) => {
         const parsed = CalendarCallbackQuerySchema.safeParse(c.req.query());
@@ -274,38 +298,34 @@ export const calendarRoutes = createApiRouter()
         const { code, state, error } = parsed.data;
 
         if (error) {
-            return c.redirect(`/settings/communication?calendar_error=${encodeURIComponent(error)}`, 302);
+            return oauthErrorLanding(c, error);
         }
-        if (!code || !state) return c.json({ success: false, error: { message: 'Missing code or state' } }, 400);
-
-        const user = c.get('user');
-        if (!user) return c.redirect('/login');
+        if (!code || !state) return oauthErrorLanding(c, 'Missing authorization code or state');
 
         if (!c.env.TENANT_CACHE) {
-            return c.json({ success: false, error: { message: 'Calendar OAuth is unavailable' } }, 503);
+            return oauthErrorLanding(c, 'Calendar OAuth is unavailable');
         }
 
         const pendingRaw = await c.env.TENANT_CACHE.get(calendarOAuthKvKey(state));
         if (!pendingRaw) {
-            return c.json({ success: false, error: { message: 'OAuth session expired or invalid' } }, 403);
+            return oauthErrorLanding(c, 'OAuth session expired or invalid');
         }
         const pending = JSON.parse(pendingRaw) as PendingCalendarOAuth;
         await c.env.TENANT_CACHE.delete(calendarOAuthKvKey(state));
 
-        if (pending.userId !== user.sub) {
-            return c.json({ success: false, error: { message: 'OAuth state mismatch' } }, 403);
+        const sessionUser = c.get('user');
+        if (sessionUser && sessionUser.sub !== pending.userId) {
+            return oauthErrorLanding(c, 'OAuth state mismatch');
         }
 
-        const tenantId = c.get('tenantId') as string;
-        if (pending.tenantId !== tenantId) {
-            return c.json({ success: false, error: { message: 'OAuth tenant mismatch' } }, 403);
-        }
+        const tenantId = pending.tenantId;
+        const userId = pending.userId;
 
         const baseUrl = getBaseUrl(c);
         const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
         const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
         if (!oauthCreds) {
-            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 501);
+            return oauthErrorLanding(c, 'Google Calendar integration is not configured');
         }
         const provider = getCalendarProvider(pending.provider);
         let exchange;
@@ -319,23 +339,23 @@ export const calendarRoutes = createApiRouter()
             });
         } catch (e) {
             logger.error('[calendar] Token exchange failed', {}, e instanceof Error ? e : undefined);
-            return c.json({ success: false, error: { message: 'Failed to exchange authorization code' } }, 500);
+            return oauthErrorLanding(c, 'Failed to exchange authorization code');
         }
 
         if (!exchange.credentials.refreshToken) {
-            return c.json({ success: false, error: { message: 'Google did not return a refresh token' } }, 500);
+            return oauthErrorLanding(c, 'Google did not return a refresh token');
         }
 
         const derivedCapability = exchange.scopes.length
             ? capabilityFromScopes(exchange.scopes)
             : pending.capability;
 
-        const existing = await getCalendarConnection(c.env.DB, tenantId, user.sub, 'google');
+        const existing = await getCalendarConnection(c.env.DB, tenantId, userId, 'google');
 
         await upsertCalendarConnection({
             db: c.env.DB,
             tenantId,
-            userId: user.sub,
+            userId,
             provider: pending.provider,
             authType: 'oauth',
             capability: derivedCapability,
@@ -351,7 +371,7 @@ export const calendarRoutes = createApiRouter()
             ...(existing?.credentialsDekEnc ? { existingDekEnc: existing.credentialsDekEnc } : {}),
         });
 
-        return c.redirect('/settings/communication?calendar=connected');
+        return oauthConnectedLanding(c);
     });
 
 export type CalendarApi = typeof calendarRoutes;

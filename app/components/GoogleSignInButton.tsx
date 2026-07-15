@@ -6,7 +6,8 @@
  * ds-allow: Google's exact brand palette is required — steps outside ihp-* tokens.
  */
 interface GoogleSignInButtonProps {
-  href: string;
+  href?: string;
+  onClick?: () => void;
   label?: string;
   disabled?: boolean;
 }
@@ -36,6 +37,7 @@ function GoogleGMark() {
 
 export function GoogleSignInButton({
   href,
+  onClick,
   label = "Continue with Google",
   disabled = false,
 }: GoogleSignInButtonProps) {
@@ -43,13 +45,38 @@ export function GoogleSignInButton({
   const buttonClass =
     "flex w-full items-center justify-center gap-3 h-[46px] rounded-lg border border-[#747775] bg-white px-4 text-[15px] font-medium text-[#1f1f1f] transition-colors hover:bg-[#f7f8fa] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4285f4] disabled:opacity-60 disabled:pointer-events-none disabled:cursor-not-allowed";
 
+  const style = { fontFamily: "'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif" };
+
   if (disabled) {
     return (
       <span
         aria-disabled="true"
         className={buttonClass}
-        style={{ fontFamily: "'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif" }}
+        style={style}
       >
+        <GoogleGMark />
+        <span>{label}</span>
+      </span>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={buttonClass}
+        style={style}
+      >
+        <GoogleGMark />
+        <span>{label}</span>
+      </button>
+    );
+  }
+
+  if (!href) {
+    return (
+      <span aria-disabled="true" className={buttonClass} style={style}>
         <GoogleGMark />
         <span>{label}</span>
       </span>
@@ -60,7 +87,7 @@ export function GoogleSignInButton({
     <a
       href={href}
       className={buttonClass}
-      style={{ fontFamily: "'Roboto', system-ui, -apple-system, 'Segoe UI', sans-serif" }}
+      style={style}
     >
       <GoogleGMark />
       <span>{label}</span>

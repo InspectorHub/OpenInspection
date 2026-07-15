@@ -1,7 +1,11 @@
-import { useState } from "react";
-import { Form } from "react-router";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Form, useRevalidator, useSearchParams } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { GoogleSignInButton } from "~/components/GoogleSignInButton";
+import {
+  listenCalendarOAuthPopup,
+  openCalendarOAuthPopup,
+} from "~/lib/calendar-oauth-popup";
 
 type CalendarCapability = "availability_read" | "events_read_write";
 type GoogleOAuthMode = "platform" | "own";
@@ -44,6 +48,11 @@ export function GoogleCalendarPanel({
 }) {
   const [oauthMode, setOauthMode] = useState<GoogleOAuthMode>(isSaas ? googleOAuthMode : "own");
   const [capability, setCapability] = useState<CalendarCapability>("events_read_write");
+  const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const popupPollRef = useRef<number | null>(null);
+  const revalidator = useRevalidator();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const ownCredsConfigured = Boolean(secrets.GOOGLE_CLIENT_ID?.trim());
   const canConnect = isSaas
@@ -53,6 +62,78 @@ export function GoogleCalendarPanel({
     : googleOAuthConfigured || ownCredsConfigured;
 
   const connectHref = `/api/calendar/connect?capability=${capability}&provider=google`;
+
+  useEffect(() => {
+    return listenCalendarOAuthPopup({
+      onConnected: () => {
+        if (popupPollRef.current !== null) {
+          window.clearInterval(popupPollRef.current);
+          popupPollRef.current = null;
+        }
+        setConnecting(false);
+        setConnectError(null);
+        revalidator.revalidate();
+      },
+      onError: (message) => {
+        if (popupPollRef.current !== null) {
+          window.clearInterval(popupPollRef.current);
+          popupPollRef.current = null;
+        }
+        setConnecting(false);
+        setConnectError(message);
+      },
+    });
+  }, [revalidator]);
+
+  // Full-page fallback when the popup is blocked or on mobile without opener.
+  useEffect(() => {
+    const calendar = searchParams.get("calendar");
+    const calendarError = searchParams.get("calendar_error");
+    if (!calendar && !calendarError) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("calendar");
+    next.delete("calendar_error");
+    setSearchParams(next, { replace: true });
+
+    if (calendar === "connected") {
+      setConnectError(null);
+      revalidator.revalidate();
+    } else if (calendarError) {
+      setConnectError(calendarError);
+    }
+  }, [searchParams, setSearchParams, revalidator]);
+
+  const handleConnect = useCallback(() => {
+    setConnectError(null);
+    setConnecting(true);
+
+    const popup = openCalendarOAuthPopup(connectHref);
+    if (!popup) {
+      window.location.href = connectHref;
+      return;
+    }
+
+    if (popupPollRef.current !== null) {
+      window.clearInterval(popupPollRef.current);
+    }
+    popupPollRef.current = window.setInterval(() => {
+      if (!popup.closed) return;
+      if (popupPollRef.current !== null) {
+        window.clearInterval(popupPollRef.current);
+        popupPollRef.current = null;
+      }
+      setConnecting(false);
+    }, 400);
+  }, [connectHref]);
+
+  useEffect(() => {
+    return () => {
+      if (popupPollRef.current !== null) {
+        window.clearInterval(popupPollRef.current);
+      }
+    };
+  }, []);
 
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
@@ -216,10 +297,15 @@ export function GoogleCalendarPanel({
                 ))}
               </div>
               <GoogleSignInButton
-                href={connectHref}
-                label="Continue with Google"
-                disabled={!canConnect}
+                onClick={handleConnect}
+                label={connecting ? "Connecting…" : "Continue with Google"}
+                disabled={!canConnect || connecting}
               />
+              {connectError && (
+                <p className="text-[11px] text-ih-bad-fg" role="alert">
+                  {connectError}
+                </p>
+              )}
               {!canConnect && (
                 <p className="text-[11px] text-ih-fg-3">
                   {isSaas && oauthMode === "platform"
