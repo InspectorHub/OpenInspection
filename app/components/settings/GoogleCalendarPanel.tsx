@@ -2,10 +2,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Form, useRevalidator, useSearchParams } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { GoogleSignInButton } from "~/components/GoogleSignInButton";
+import { CalendarGlyph } from "~/components/settings/CalendarGlyph";
+import { InspectionCalendarPanel } from "~/components/settings/InspectionCalendarPanel";
 import {
   listenCalendarOAuthPopup,
   openCalendarOAuthPopup,
 } from "~/lib/calendar-oauth-popup";
+import { calendarOAuthErrorToast } from "~/lib/calendar-oauth-errors";
+import { pushToast } from "~/hooks/useToast";
 
 type CalendarCapability = "availability_read" | "events_read_write";
 type GoogleOAuthMode = "platform" | "own";
@@ -16,7 +20,7 @@ const CAPABILITY_LABELS: Record<CalendarCapability, string> = {
 };
 
 /**
- * Settings → Communication: Calendar sync (Google + Apple ICS).
+ * Settings → Communication: Google Calendar OAuth sync.
  * SaaS tenants default to the platform Google OAuth app; self-host must BYO.
  */
 export function GoogleCalendarPanel({
@@ -31,7 +35,9 @@ export function GoogleCalendarPanel({
   googleCalendarConnected,
   googleCalendarCapability,
   disconnectingCalendar,
+  generatingIcsUrl,
   icsUrl,
+  icsFormError,
 }: {
   isSaas: boolean;
   googleOAuthConfigured: boolean;
@@ -44,12 +50,13 @@ export function GoogleCalendarPanel({
   googleCalendarConnected: boolean;
   googleCalendarCapability: CalendarCapability | null;
   disconnectingCalendar: boolean;
+  generatingIcsUrl: boolean;
   icsUrl: string | null;
+  icsFormError: string | null;
 }) {
   const [oauthMode, setOauthMode] = useState<GoogleOAuthMode>(isSaas ? googleOAuthMode : "own");
   const [capability, setCapability] = useState<CalendarCapability>("events_read_write");
   const [connecting, setConnecting] = useState(false);
-  const [connectError, setConnectError] = useState<string | null>(null);
   const popupPollRef = useRef<number | null>(null);
   const revalidator = useRevalidator();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -71,7 +78,11 @@ export function GoogleCalendarPanel({
           popupPollRef.current = null;
         }
         setConnecting(false);
-        setConnectError(null);
+        pushToast({
+          message: "Google Calendar connected.",
+          variant: "success",
+          durationMs: 4000,
+        });
         revalidator.revalidate();
       },
       onError: (message) => {
@@ -80,7 +91,12 @@ export function GoogleCalendarPanel({
           popupPollRef.current = null;
         }
         setConnecting(false);
-        setConnectError(message);
+        const toast = calendarOAuthErrorToast(message);
+        pushToast({
+          message: toast.message,
+          variant: toast.variant,
+          durationMs: 5000,
+        });
       },
     });
   }, [revalidator]);
@@ -97,15 +113,23 @@ export function GoogleCalendarPanel({
     setSearchParams(next, { replace: true });
 
     if (calendar === "connected") {
-      setConnectError(null);
+      pushToast({
+        message: "Google Calendar connected.",
+        variant: "success",
+        durationMs: 4000,
+      });
       revalidator.revalidate();
     } else if (calendarError) {
-      setConnectError(calendarError);
+      const toast = calendarOAuthErrorToast(calendarError);
+      pushToast({
+        message: toast.message,
+        variant: toast.variant,
+        durationMs: 5000,
+      });
     }
   }, [searchParams, setSearchParams, revalidator]);
 
   const handleConnect = useCallback(() => {
-    setConnectError(null);
     setConnecting(true);
 
     const popup = openCalendarOAuthPopup(connectHref);
@@ -242,7 +266,7 @@ export function GoogleCalendarPanel({
         <div className="p-4 border border-ih-border rounded-lg space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-ih-primary-tint flex items-center justify-center">
-              <CalendarIcon className="w-4 h-4 text-ih-primary" />
+              <CalendarGlyph className="w-4 h-4 text-ih-primary" />
             </div>
             <div>
               <p className="text-[13px] font-bold text-ih-fg-1">Google Calendar</p>
@@ -301,11 +325,6 @@ export function GoogleCalendarPanel({
                 label={connecting ? "Connecting…" : "Continue with Google"}
                 disabled={!canConnect || connecting}
               />
-              {connectError && (
-                <p className="text-[11px] text-ih-bad-fg" role="alert">
-                  {connectError}
-                </p>
-              )}
               {!canConnect && (
                 <p className="text-[11px] text-ih-fg-3">
                   {isSaas && oauthMode === "platform"
@@ -317,53 +336,12 @@ export function GoogleCalendarPanel({
           )}
         </div>
 
-        {/* Apple Calendar (ICS) */}
-        <div className="p-4 border border-ih-border rounded-lg">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-lg bg-ih-bg-muted flex items-center justify-center">
-              <CalendarIcon className="w-4 h-4 text-ih-fg-3" />
-            </div>
-            <div>
-              <p className="text-[13px] font-bold text-ih-fg-1">Apple Calendar</p>
-              <p className="text-[11px] text-ih-fg-3">Read-only ICS feed</p>
-            </div>
-          </div>
-          {icsUrl ? (
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                readOnly
-                value={icsUrl}
-                className="flex-1 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-muted text-[11px] font-mono text-ih-fg-3 outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  void navigator.clipboard.writeText(icsUrl);
-                }}
-                className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0"
-              >
-                Copy
-              </button>
-            </div>
-          ) : (
-            <p className="text-[11px] text-ih-fg-3">ICS feed URL will appear once calendar sync is configured.</p>
-          )}
-        </div>
+        <InspectionCalendarPanel
+          icsUrl={icsUrl}
+          generatingIcsUrl={generatingIcsUrl}
+          formError={icsFormError}
+        />
       </div>
     </section>
-  );
-}
-
-function CalendarIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={1.5}
-        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-      />
-    </svg>
   );
 }

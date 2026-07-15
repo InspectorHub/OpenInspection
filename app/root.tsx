@@ -22,6 +22,7 @@ import {
 } from "~/lib/sw-bootstrap";
 import { ErrorState } from "~/components/ErrorState";
 import { NavProgress } from "~/components/NavProgress";
+import { ToastPortal } from "~/components/Toast";
 
 export function loader({ request }: Route.LoaderArgs): UiPrefs {
   return parseUiPrefs(request.headers.get("Cookie"));
@@ -114,6 +115,7 @@ export default function Root() {
     <>
       <NavProgress />
       <Outlet />
+      <ToastPortal />
     </>
   );
 }

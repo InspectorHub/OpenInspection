@@ -12,7 +12,7 @@
   "app/components/portal/sections/ReportView.tsx": 763,
   "server/services/inspection.service.ts": 755,
   "app/routes/settings-communication-templates.tsx": 728,
-  "app/routes/settings-communication.tsx": 780,
+  "app/routes/settings-communication.tsx": 795,
   "app/routes/template-edit.tsx": 697,
   "app/components/media-studio/PhotoAnnotator.tsx": 689,
   "app/hooks/usePhotoOps.ts": 661,

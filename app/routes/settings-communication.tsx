@@ -339,6 +339,18 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, ok: true, error: null, field: null, test: null };
   }
 
+  if (intent === "generate-ics-url") {
+    const res = await api.admin["ics-token"].$get();
+    if (!res.ok) {
+      return { intent, ok: false, error: "Failed to generate subscription URL.", field: null, test: null };
+    }
+    const body = (await res.json().catch(() => null)) as { data?: { url?: string } } | null;
+    if (!body?.data?.url) {
+      return { intent, ok: false, error: "Failed to generate subscription URL.", field: null, test: null };
+    }
+    return { intent, ok: true, error: null, field: null, test: null };
+  }
+
   // ─── Track L — SMS settings ───────────────────────────────────────────────
   if (intent === "save-sms-config") {
     // Pass through the three valid tenant modes; never submit "platform" (first-party only).
@@ -560,6 +572,8 @@ export default function SettingsCommunication() {
     nav.state !== "idle" && nav.formData?.get("intent") === "save-google-oauth-mode";
   const disconnectingCalendar =
     nav.state !== "idle" && nav.formData?.get("intent") === "disconnect-calendar";
+  const generatingIcsUrl =
+    nav.state !== "idle" && nav.formData?.get("intent") === "generate-ics-url";
   const savingSmsSecrets =
     nav.state !== "idle" && nav.formData?.get("intent") === "save-sms-secrets";
   const savingSmsConfig =
@@ -752,7 +766,7 @@ export default function SettingsCommunication() {
         )}
       </section>
 
-      {/* Google Calendar + Apple ICS */}
+      {/* Google Calendar + Inspection Calendar (ICS) */}
       <GoogleCalendarPanel
         isSaas={isSaas}
         googleOAuthConfigured={googleOAuthConfigured}
@@ -765,7 +779,9 @@ export default function SettingsCommunication() {
         googleCalendarConnected={googleCalendarConnected}
         googleCalendarCapability={googleCalendarCapability}
         disconnectingCalendar={disconnectingCalendar}
+        generatingIcsUrl={generatingIcsUrl}
         icsUrl={icsUrl}
+        icsFormError={secretFormError("generate-ics-url")}
       />
     </div>
   );
