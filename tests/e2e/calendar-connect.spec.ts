@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import { loadDevVars } from '../helpers/dev-vars';
 import { sealCredentials } from '../../server/lib/calendar/credentials';
+import { csrfHeaders } from './helpers/csrf';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_DIR = resolve(__dirname, '../..');
@@ -34,16 +35,30 @@ function decodeJwtPayload(token: string): { sub: string; 'custom:tenantId'?: str
     return JSON.parse(json) as { sub: string; 'custom:tenantId'?: string };
 }
 
+/** Auth cookie + matching CSRF double-submit pair for mutating API calls. */
+function authedHeaders(sessionCookie: string): Record<string, string> {
+    const { token, headers } = csrfHeaders();
+    return {
+        'X-CSRF-Token': token,
+        Cookie: `${headers.Cookie}; ${sessionCookie}`,
+    };
+}
+
 async function loginSession(request: import('@playwright/test').APIRequestContext): Promise<{
     cookie: string;
     token: string;
     userId: string;
     tenantId: string;
 }> {
+    const csrf = csrfHeaders();
     const res = await request.post(`${BASE_URL}/api/auth/login`, {
         data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+        headers: {
+            'Content-Type': 'application/json',
+            ...csrf.headers,
+        },
     });
-    expect(res.ok()).toBe(true);
+    expect(res.status(), `login expected 200, got ${res.status()}`).toBe(200);
     const setCookie = res.headers()['set-cookie'] ?? '';
     const match = setCookie.match(/__Host-inspector_token=([^;]+)/);
     expect(match?.[1]).toBeTruthy();
@@ -122,7 +137,7 @@ test.describe('Calendar connect — capability gating', () => {
         const session = await loginSession(request);
         await seedConnection(session.tenantId, session.userId, 'availability_read');
         const res = await request.post(`${BASE_URL}/api/calendar/sync-events`, {
-            headers: { Cookie: session.cookie },
+            headers: authedHeaders(session.cookie),
         });
         expect(res.status()).toBe(403);
     });
@@ -131,12 +146,12 @@ test.describe('Calendar connect — capability gating', () => {
         const session = await loginSession(request);
         await seedConnection(session.tenantId, session.userId, 'events_read_write');
         const del = await request.delete(`${BASE_URL}/api/calendar/disconnect`, {
-            headers: { Cookie: session.cookie },
+            headers: authedHeaders(session.cookie),
         });
         expect(del.ok()).toBe(true);
 
         const sync = await request.post(`${BASE_URL}/api/calendar/sync-events`, {
-            headers: { Cookie: session.cookie },
+            headers: authedHeaders(session.cookie),
         });
         expect(sync.status()).toBe(400);
     });
