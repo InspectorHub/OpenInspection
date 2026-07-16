@@ -1,6 +1,8 @@
 import { eq, and, lte, ne } from 'drizzle-orm';
 import { automations, automationLogs, inspections, tenants, tenantConfigs } from '../../lib/db/schema';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
+import { resolveLocale } from '../../lib/locale';
+import { formatDateTime } from '../../lib/format';
 import { logger } from '../../lib/logger';
 import type { EmailService } from '../email.service';
 import { type Constructor, oiClock } from './shared';
@@ -179,7 +181,17 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                             if (ev) {
                                 const et = await db.select().from(eventTypes).where(eq(eventTypes.id, ev.eventTypeId as string)).get();
                                 vars.event_type_name    = (et?.name as string) ?? '';
-                                vars.event_scheduled_at = ev.scheduledAt ? new Date(ev.scheduledAt as Date).toLocaleString() : '';
+                                // Format the client-facing scheduled time in the RECIPIENT
+                                // tenant's locale + timezone (external client -> tenant defaults),
+                                // not the server default (which anchored UTC with no locale).
+                                const cfg = await db.select({ defaultLocale: tenantConfigs.defaultLocale, defaultTimezone: tenantConfigs.defaultTimezone })
+                                    .from(tenantConfigs).where(eq(tenantConfigs.tenantId, inspection.tenantId)).get();
+                                vars.event_scheduled_at = ev.scheduledAt
+                                    ? formatDateTime(ev.scheduledAt as Date, {
+                                          locale: resolveLocale(cfg?.defaultLocale),
+                                          timeZone: resolveTenantTimeZone(cfg?.defaultTimezone),
+                                      })
+                                    : '';
                             }
                         } catch (err) {
                             logger.error('Failed to load event vars for automation log', { logId: log.id, eventId: log.eventId }, err instanceof Error ? err : undefined);

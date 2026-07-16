@@ -21,7 +21,7 @@
   "server/api/admin/admin-settings.ts": 635,
   "server/services/inspection/inspection-analytics.service.ts": 628,
   "app/components/editor/ItemEditor.tsx": 627,
-  "app/components/inspection-edit/CompliancePanel.tsx": 603,
+  "app/components/inspection-edit/CompliancePanel.tsx": 605,
   "app/hooks/useInspection.ts": 598,
   "app/components/portal/sections/RepairBuilderSection.tsx": 588,
   "server/services/marketplace.service.ts": 587,

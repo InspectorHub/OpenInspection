@@ -12,14 +12,14 @@ import {
 } from '../lib/validations/invoice.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { normalizePaymentMethod } from '../lib/payment-method';
-import { inspections, inspectionServices } from '../lib/db/schema';
+import { inspections, inspectionServices, tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { getBookingHost } from '../lib/url';
 import { paymentUrl } from '../lib/public-urls';
 import { resolveSignatureInspector } from '../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../lib/route-helpers';
-
-const USD = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+import { resolveLocale } from '../lib/locale';
+import { formatCurrency } from '../lib/format';
 
 const listInvoicesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
@@ -270,7 +270,16 @@ export const invoiceRoutes = createApiRouter()
         // Build the public pay URL exactly like the agreement send path's host
         // resolution; `/invoice/:id` is keyed by inspection id (no slug).
         const payUrl = paymentUrl(getBookingHost(c), inspectionId);
-        const amountLabel = USD.format(amountCents / 100);
+        // Format the amount in the RECIPIENT's locale/currency. The recipient is an
+        // external client (no user row), so this resolves to the tenant defaults.
+        const cfg = await db.select({ defaultLocale: tenantConfigs.defaultLocale, currency: tenantConfigs.currency })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        const amountLabel = formatCurrency(amountCents, {
+            locale: resolveLocale(cfg?.defaultLocale),
+            currency: cfg?.currency ?? 'USD',
+        });
 
         // Sign the email with the assigned inspector's rebooking footer (B-4).
         const sigInspector = await resolveSignatureInspector(c, inspection.inspectorId, tenantId);
