@@ -112,6 +112,28 @@ export function civilDateOf(year: number, month: number, day: number): string {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+export interface BlockFormSeed {
+  date: string;
+  startTime: string;
+  endTime: string;
+  allDay: boolean;
+}
+
+/** Seed values for the Block Time create/edit form. Reads the block's
+ *  effective-tz civil fields (civilDate/startTime/endTime) — NEVER slices the
+ *  UTC `start` instant, which would show a tz-shifted time (e.g. 01:00 for a
+ *  09:00 block viewed at UTC+8). A new block parses the day-click seed string
+ *  (`YYYY-MM-DDTHH:MM`). */
+export function blockFormSeed(block: CalendarEvent | null, dateSeed: string | null): BlockFormSeed {
+  const allDay = block?.extendedProps?.allDay === true;
+  return {
+    date: block?.civilDate ?? dateSeed?.slice(0, 10) ?? "",
+    startTime: allDay ? "09:00" : block?.startTime ?? dateSeed?.slice(11, 16) ?? "09:00",
+    endTime: allDay ? "10:00" : block?.endTime ?? "10:00",
+    allDay,
+  };
+}
+
 /** Groups events by their server-provided `civilDate`. Views look cells up by
  *  the same civil string (see `civilDateOf`) — no Date/UTC math on either side. */
 export function bucketEventsByCivilDate(events: CalendarEvent[]): Map<string, CalendarEvent[]> {

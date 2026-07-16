@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  blockFormSeed,
   bucketEventsByCivilDate,
   calendarItemToEvent,
   civilDateOf,
@@ -102,6 +103,46 @@ describe("civilDateOf", () => {
     expect(civilDateOf(2026, 6, 18)).toBe("2026-07-18");
     expect(civilDateOf(2026, 0, 1)).toBe("2026-01-01");
     expect(civilDateOf(2026, 11, 31)).toBe("2026-12-31");
+  });
+});
+
+describe("blockFormSeed", () => {
+  it("populates the edit form from the block's effective-tz civil fields, not the UTC instant", () => {
+    // A block authored 09:00 on 2026-07-17 in a UTC+8 tz has instant 01:00Z.
+    // Slicing the instant would wrongly show 01:00; the form must show 09:00.
+    const block: CalendarEvent = {
+      id: "block-1",
+      title: "Dentist",
+      start: "2026-07-17T01:00:00.000Z",
+      end: "2026-07-17T02:00:00.000Z",
+      civilDate: "2026-07-17",
+      startTime: "09:00",
+      endTime: "10:00",
+      extendedProps: { allDay: false },
+    };
+    expect(blockFormSeed(block, null)).toEqual({
+      date: "2026-07-17",
+      startTime: "09:00",
+      endTime: "10:00",
+      allDay: false,
+    });
+  });
+
+  it("seeds an all-day block with default times", () => {
+    const block: CalendarEvent = {
+      id: "b2", title: "Vacation", start: "2026-07-20", civilDate: "2026-07-20",
+      extendedProps: { allDay: true },
+    };
+    expect(blockFormSeed(block, null)).toMatchObject({ date: "2026-07-20", allDay: true });
+  });
+
+  it("seeds a new block from a day-click civil string", () => {
+    expect(blockFormSeed(null, "2026-07-21T14:00")).toEqual({
+      date: "2026-07-21",
+      startTime: "14:00",
+      endTime: "10:00",
+      allDay: false,
+    });
   });
 });
 
