@@ -31,6 +31,11 @@ export const invoices = sqliteTable('invoices', {
     voidedAt: integer('voided_at', { mode: 'timestamp_ms' }),
     qboSyncStatus: text('qbo_sync_status', { enum: ['synced', 'pending', 'failed'] }),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // i18n Phase B — the currency (ISO 4217) this invoice was created in, snapshot
+    // from tenant_configs.currency at creation. Amounts stay integer cents; this is
+    // the metadata that keeps a historical record self-describing, so a later tenant
+    // currency change never re-labels a paid invoice. Appended at table end.
+    currency: text('currency').notNull().default('USD'),
 }, (t) => [
     index('idx_invoices_tenant').on(t.tenantId),
     index('idx_invoices_inspection').on(t.inspectionId),
