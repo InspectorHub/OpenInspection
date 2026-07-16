@@ -29,6 +29,27 @@
       "when": 1784035151899,
       "tag": "0003_fine_marrow",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1784170453120,
+      "tag": "0004_far_quicksilver",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1784175185970,
+      "tag": "0005_flaky_romulus",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1784176137404,
+      "tag": "0006_old_doomsday",
+      "breakpoints": true
     }
   ]
 }

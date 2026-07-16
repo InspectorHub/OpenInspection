@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
-import type { action } from "~/routes/settings-booking";
+import type { action } from "~/routes/settings-schedule";
 
 interface AvailabilitySlot {
   id: number;
@@ -17,7 +17,18 @@ interface DayState {
   endTime: string;
 }
 
+/** Mon–Fri 08:00–17:00 draft when the inspector has never saved weekly hours. */
+function defaultDraftDays(): DayState[] {
+  return Array.from({ length: 7 }, (_, dayOfWeek) => ({
+    enabled: dayOfWeek >= 1 && dayOfWeek <= 5,
+    startTime: "08:00",
+    endTime: "17:00",
+  }));
+}
+
 function buildDayMap(slots: AvailabilitySlot[]): DayState[] {
+  if (slots.length === 0) return defaultDraftDays();
+
   const days: DayState[] = Array.from({ length: 7 }, () => ({
     enabled: false,
     startTime: "08:00",

@@ -30,6 +30,7 @@ import { MeteringService } from '../../services/metering.service';
 import { readTenantTier } from '../../features/plan-quota/guard';
 import { noticeFor } from '../../features/plan-quota/notice';
 import { loadTenantEmailConfig, assembleTenantEmailService } from '../../lib/email/build-email-service';
+import { resolveInternalHolidayEffect } from '../../lib/holidays/load-tenant-holidays';
 
 /**
  * Free-tier usage quotas (2026-07), Task 8 — after a successful inspection
@@ -348,6 +349,19 @@ const coreRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         const service = c.var.services.inspection;
         const contactService = c.var.services.contact;
+
+        const civilDate = String(body.date ?? '').slice(0, 10);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(civilDate)) {
+            const holiday = await resolveInternalHolidayEffect(c.env.DB, tenantId, civilDate);
+            if (holiday.effect === 'block') {
+                throw Errors.BadRequest(
+                    holiday.name
+                        ? `Cannot schedule on ${holiday.name} — company holidays are blocked.`
+                        : 'Cannot schedule on a company closed day.',
+                    'HOLIDAY_BLOCKED',
+                );
+            }
+        }
 
         // Filter undefined values and handle inspectorId logic
         const createData = Object.fromEntries(

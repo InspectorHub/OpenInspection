@@ -56,7 +56,7 @@ describe('BookingService tenant aggregation (IA-26)', () => {
     });
 
     it('getTenantSlots unions windows and tracks free inspectors per slot', async () => {
-        const slots = await svc.getTenantSlots('t1', MONDAY, []);
+        const { slots } = await svc.getTenantSlots('t1', MONDAY, []);
         const at = (time: string) => slots.find(s => s.time === time)!;
         expect(at('09:00').available).toBe(true);            // u2 busy (i1) but u1 free
         expect(at('09:00').inspectorIds).toEqual(['u1']);
@@ -65,7 +65,7 @@ describe('BookingService tenant aggregation (IA-26)', () => {
     });
 
     it('getTenantSlots respects qualification: radon-only day belongs to u2', async () => {
-        const slots = await svc.getTenantSlots('t1', MONDAY, ['s2']);
+        const { slots } = await svc.getTenantSlots('t1', MONDAY, ['s2']);
         expect(slots.find(s => s.time === '08:00')!.inspectorIds).toEqual(['u2']);
         expect(slots.find(s => s.time === '09:00')!.available).toBe(false); // only qualified is busy
     });
@@ -76,7 +76,7 @@ describe('BookingService tenant aggregation (IA-26)', () => {
     });
 
     it('solo degenerate case: single configured inspector behaves like the legacy path', async () => {
-        const slots = await svc.getTenantSlots('t1', MONDAY, ['s2']);
+        const { slots } = await svc.getTenantSlots('t1', MONDAY, ['s2']);
         const legacy = await svc.getAvailableSlots('t1', 'u2', MONDAY);
         expect(slots.map(s => ({ time: s.time, available: s.available }))).toEqual(legacy);
     });
@@ -102,11 +102,11 @@ describe('BookingService tenant aggregation (IA-26)', () => {
         });
 
         // s2 is sole-qualified to u2 — with blocking override u2 yields no effective windows
-        const s2Slots = await svc.getTenantSlots('t1', MONDAY, ['s2']);
+        const { slots: s2Slots } = await svc.getTenantSlots('t1', MONDAY, ['s2']);
         expect(s2Slots).toEqual([]);
 
         // All-staff: u1 still has 08:00-10:00 windows; 08:00 must be available via u1
-        const allSlots = await svc.getTenantSlots('t1', MONDAY, []);
+        const { slots: allSlots } = await svc.getTenantSlots('t1', MONDAY, []);
         const slot0800 = allSlots.find(s => s.time === '08:00')!;
         expect(slot0800.available).toBe(true);
         expect(slot0800.inspectorIds).toEqual(['u1']);
@@ -126,7 +126,7 @@ describe('BookingService tenant aggregation (IA-26)', () => {
         ]);
 
         // s2 sole-qualified to u2: effective windows = just 12:00-13:00 (two 30-min slots)
-        const slots = await svc.getTenantSlots('t1', MONDAY, ['s2']);
+        const { slots } = await svc.getTenantSlots('t1', MONDAY, ['s2']);
         const times = slots.map(s => s.time);
 
         // Must have 12:00 and 12:30

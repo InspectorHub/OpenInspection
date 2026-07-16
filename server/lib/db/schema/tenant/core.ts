@@ -199,6 +199,22 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // and are nudged to set it via the onboarding checklist. Appended at END of
     // the table per the D1 add-column-at-end rule (tenant_configs is FK-referenced).
     defaultTimezone: text('default_timezone').notNull().default('UTC'),
+    // Public booking slot grid: open = clock-aligned starts within windows;
+    // fixed = window-aligned starts (default; matches legacy 30-min fill).
+    bookingSlotMode: text('booking_slot_mode', { enum: ['open', 'fixed'] }).notNull().default('fixed'),
+    // Slot grid step in minutes for buildSlotGrid (15 / 30 / 60).
+    bookingSlotIntervalMin: integer('booking_slot_interval_min').notNull().default(30),
+    // Company holiday catalog region: NULL = catalog off (legacy behavior).
+    // `US` = federal only; `US-{ST}` = federal + state (e.g. US-TX).
+    holidayRegion: text('holiday_region'),
+    // How public `/book` treats resolved closed dates when region is set.
+    holidayPublicPolicy: text('holiday_public_policy', {
+        enum: ['open', 'block', 'advisory'],
+    }).notNull().default('open'),
+    // How internal scheduling (wizard / reschedule) treats closed dates.
+    holidayInternalPolicy: text('holiday_internal_policy', {
+        enum: ['advisory', 'block'],
+    }).notNull().default('advisory'),
 });
 
 /**

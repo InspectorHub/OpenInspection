@@ -1,8 +1,16 @@
 import type { useFetcher } from "react-router";
+import { Banner } from "@core/shared-ui";
 
 type ConflictFetcher = ReturnType<
   typeof useFetcher<{
     conflicts: Array<{ inspectionId: string; propertyAddress: string; date: string }>;
+  }>
+>;
+
+type HolidayFetcher = ReturnType<
+  typeof useFetcher<{
+    effect: "none" | "block" | "advisory";
+    name: string | null;
   }>
 >;
 
@@ -12,13 +20,18 @@ export function ScheduleStep({
   time,
   setTime,
   conflictFetcher,
+  holidayFetcher,
 }: {
   date: string;
   setDate: (v: string) => void;
   time: string;
   setTime: (v: string) => void;
   conflictFetcher: ConflictFetcher;
+  holidayFetcher: HolidayFetcher;
 }) {
+  const holidayEffect = holidayFetcher.data?.effect ?? "none";
+  const holidayName = holidayFetcher.data?.name;
+
   return (
     <div className="space-y-4">
       <div>
@@ -29,6 +42,18 @@ export function ScheduleStep({
         <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Time</label>
         <input type="time" value={time} onChange={(e) => setTime(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
       </div>
+      {holidayEffect === "advisory" && holidayName && (
+        <Banner tone="warn">
+          Scheduling on {holidayName}. You can still save this inspection.
+        </Banner>
+      )}
+      {holidayEffect === "block" && (
+        <Banner tone="danger">
+          {holidayName
+            ? `Cannot schedule on ${holidayName} — company holidays are blocked.`
+            : "Cannot schedule on a company closed day."}
+        </Banner>
+      )}
       {/* IA-6 — advisory conflict warning; non-blocking. With no team
           step (solo tenants) the inspection goes to the creator, and
           the conflict check covers them by default. */}

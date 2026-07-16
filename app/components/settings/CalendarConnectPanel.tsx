@@ -1,0 +1,226 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useFetcher, useRevalidator, useSearchParams } from "react-router";
+import { GoogleSignInButton } from "~/components/GoogleSignInButton";
+import { CalendarGlyph } from "~/components/settings/CalendarGlyph";
+import { calendarOAuthErrorToast } from "~/lib/calendar-oauth-errors";
+import {
+  listenCalendarOAuthPopup,
+  openCalendarOAuthPopup,
+} from "~/lib/calendar-oauth-popup";
+import { pushToast } from "~/hooks/useToast";
+import type { action } from "~/routes/settings-schedule";
+
+export type CalendarCapability = "availability_read" | "events_read_write";
+
+const CAPABILITY_LABELS: Record<CalendarCapability, string> = {
+  availability_read: "Read availability only",
+  events_read_write: "Full sync (read and write events)",
+};
+
+export function CalendarConnectPanel({
+  connected,
+  capability: connectedCapability,
+  oauthConfigured,
+  disabled = false,
+}: {
+  connected: boolean;
+  capability: CalendarCapability | null;
+  oauthConfigured: boolean;
+  disabled?: boolean;
+}) {
+  const [capability, setCapability] = useState<CalendarCapability>("events_read_write");
+  const [connecting, setConnecting] = useState(false);
+  const popupPollRef = useRef<number | null>(null);
+  const syncFetcher = useFetcher<typeof action>();
+  const disconnectFetcher = useFetcher<typeof action>();
+  const revalidator = useRevalidator();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const connectHref = `/api/calendar/connect?capability=${capability}&provider=google`;
+
+  useEffect(() => {
+    return listenCalendarOAuthPopup({
+      onConnected: () => {
+        if (popupPollRef.current !== null) {
+          window.clearInterval(popupPollRef.current);
+          popupPollRef.current = null;
+        }
+        setConnecting(false);
+        pushToast({ message: "Google Calendar connected.", variant: "success", durationMs: 4000 });
+        revalidator.revalidate();
+      },
+      onError: (message) => {
+        if (popupPollRef.current !== null) {
+          window.clearInterval(popupPollRef.current);
+          popupPollRef.current = null;
+        }
+        setConnecting(false);
+        const toast = calendarOAuthErrorToast(message);
+        pushToast({ message: toast.message, variant: toast.variant, durationMs: 5000 });
+      },
+    });
+  }, [revalidator]);
+
+  useEffect(() => {
+    const calendar = searchParams.get("calendar");
+    const calendarError = searchParams.get("calendar_error");
+    if (!calendar && !calendarError) return;
+
+    const next = new URLSearchParams(searchParams);
+    next.delete("calendar");
+    next.delete("calendar_error");
+    setSearchParams(next, { replace: true });
+
+    if (calendar === "connected") {
+      pushToast({ message: "Google Calendar connected.", variant: "success", durationMs: 4000 });
+      revalidator.revalidate();
+    } else if (calendarError) {
+      const toast = calendarOAuthErrorToast(calendarError);
+      pushToast({ message: toast.message, variant: toast.variant, durationMs: 5000 });
+    }
+  }, [searchParams, setSearchParams, revalidator]);
+
+  useEffect(() => {
+    if (
+      disconnectFetcher.state === "idle" &&
+      disconnectFetcher.data?.intent === "calendar-disconnect" &&
+      disconnectFetcher.data.ok
+    ) {
+      revalidator.revalidate();
+    }
+  }, [disconnectFetcher.state, disconnectFetcher.data, revalidator]);
+
+  useEffect(() => {
+    return () => {
+      if (popupPollRef.current !== null) window.clearInterval(popupPollRef.current);
+    };
+  }, []);
+
+  const handleConnect = useCallback(() => {
+    setConnecting(true);
+    const popup = openCalendarOAuthPopup(connectHref);
+    if (!popup) {
+      window.location.href = connectHref;
+      return;
+    }
+
+    if (popupPollRef.current !== null) window.clearInterval(popupPollRef.current);
+    popupPollRef.current = window.setInterval(() => {
+      if (!popup.closed) return;
+      if (popupPollRef.current !== null) {
+        window.clearInterval(popupPollRef.current);
+        popupPollRef.current = null;
+      }
+      setConnecting(false);
+    }, 400);
+  }, [connectHref]);
+
+  const syncing = syncFetcher.state !== "idle";
+  const disconnecting = disconnectFetcher.state !== "idle";
+  const syncResult =
+    syncFetcher.state === "idle" && syncFetcher.data?.intent === "calendar-sync"
+      ? syncFetcher.data
+      : null;
+
+  return (
+    <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-ih-primary-tint flex items-center justify-center">
+          <CalendarGlyph className="w-5 h-5 text-ih-primary" />
+        </div>
+        <div>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
+            Google Calendar
+          </h3>
+          <p className="text-[12px] text-ih-fg-3">
+            Keep external busy time out of your available booking hours.
+          </p>
+        </div>
+      </div>
+
+      {disabled ? (
+        <p className="text-[12px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
+          Calendar connections are personal. Select Myself above to manage your Google Calendar.
+        </p>
+      ) : connected ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center rounded-ih-pill px-2 py-0.5 text-[11px] font-bold bg-ih-ok-bg text-ih-ok-fg">
+              Connected
+            </span>
+            {connectedCapability && (
+              <span className="text-[11px] text-ih-fg-3">
+                {CAPABILITY_LABELS[connectedCapability]}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={syncing}
+              onClick={() => syncFetcher.submit({ intent: "calendar-sync" }, { method: "post" })}
+              className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
+            >
+              {syncing ? "Syncing…" : "Sync now"}
+            </button>
+            <button
+              type="button"
+              disabled={disconnecting}
+              onClick={() =>
+                disconnectFetcher.submit({ intent: "calendar-disconnect" }, { method: "post" })
+              }
+              className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60"
+            >
+              {disconnecting ? "Disconnecting…" : "Disconnect"}
+            </button>
+          </div>
+          {syncResult && (
+            <p
+              role={syncResult.ok ? "status" : "alert"}
+              className={`text-[11px] ${syncResult.ok ? "text-ih-ok-fg" : "text-ih-bad-fg"}`}
+            >
+              {syncResult.ok
+                ? `Sync complete. ${syncResult.totalEvents ?? 0} calendar events checked.`
+                : syncResult.message ?? "Calendar sync failed."}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-[12px] text-ih-fg-3">Choose what Google may access:</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {(["availability_read", "events_read_write"] as const).map((option) => (
+              <label
+                key={option}
+                className={`flex items-center gap-2 p-3 rounded-md border cursor-pointer text-[12px] ${
+                  capability === option
+                    ? "border-ih-primary bg-ih-primary-tint text-ih-fg-1"
+                    : "border-ih-border text-ih-fg-2"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="calendarCapability"
+                  value={option}
+                  checked={capability === option}
+                  onChange={() => setCapability(option)}
+                  className="h-3.5 w-3.5"
+                />
+                {CAPABILITY_LABELS[option]}
+              </label>
+            ))}
+          </div>
+          <GoogleSignInButton
+            onClick={handleConnect}
+            label={connecting ? "Connecting…" : "Continue with Google"}
+            disabled={!oauthConfigured || connecting}
+          />
+          {!oauthConfigured && (
+            <p className="text-[11px] text-ih-fg-3">
+              Google OAuth is not configured. Ask a company admin to configure it under Communication.
+            </p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}

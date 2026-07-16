@@ -197,6 +197,10 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
                                 time: z.string().describe('Slot start time, HH:MM (24h)'),
                                 available: z.boolean().describe('Whether at least one qualified inspector is free at this time'),
                             })).describe('Bookable 30-minute slot grid for the requested date'),
+                            holidayAdvisory: z.object({
+                                date: z.string().describe('Civil date YYYY-MM-DD'),
+                                name: z.string().describe('Holiday display name'),
+                            }).optional().describe('Present when public holiday policy is advisory and the date is in the catalog'),
                         }).describe('Aggregated slot data'),
                     }).describe('Tenant slots response'),
                 },
@@ -337,11 +341,17 @@ export const bookingsRoutes = createApiRouter()
         if (!tenantRow) throw Errors.NotFound('Tenant not found.');
         const ids = serviceIds ? serviceIds.split(',').filter(Boolean) : [];
         const all = await c.var.services.booking.getTenantSlots(tenantRow.id, date, ids);
-        const slots = all.map(s => ({
+        const slots = all.slots.map(s => ({
             time: s.time,
             available: inspectorId ? s.inspectorIds.includes(inspectorId) : s.available,
         }));
-        return c.json({ success: true, data: { slots } }, 200);
+        return c.json({
+            success: true,
+            data: {
+                slots,
+                ...(all.holidayAdvisory ? { holidayAdvisory: all.holidayAdvisory } : {}),
+            },
+        }, 200);
     })
     /**
      * GET /api/public/book/:tenant — company-level booking profile (IA-26).
@@ -372,7 +382,10 @@ export const bookingsRoutes = createApiRouter()
                 durationMinutes: servicesTable.durationMinutes, templateId: servicesTable.templateId,
                 active: servicesTable.active,
             }).from(servicesTable).where(eq(servicesTable.tenantId, tenantRow.id)).all(),
-            db.select({ allowInspectorChoice: tenantConfigs.allowInspectorChoice })
+            db.select({
+                allowInspectorChoice: tenantConfigs.allowInspectorChoice,
+                conciergeReviewRequired: tenantConfigs.conciergeReviewRequired,
+            })
                 .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantRow.id)).get(),
             booking.getQualifiedInspectorIds(tenantRow.id, []),
         ]);
@@ -403,6 +416,7 @@ export const bookingsRoutes = createApiRouter()
                 turnstileSiteKey: c.env.TURNSTILE_SITE_KEY || null,
                 bookingOpen,
                 allowInspectorChoice: allowChoice,
+                conciergeReviewRequired: !!config?.conciergeReviewRequired,
                 inspectors,
                 services: visible.map(s => ({
                     id: s.id, name: s.name, price: Number(s.price || 0), duration: Number(s.durationMinutes || 60),

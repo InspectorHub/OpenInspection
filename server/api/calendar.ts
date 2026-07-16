@@ -32,10 +32,13 @@ import {
     loadGoogleOAuthMode,
     resolveGoogleOAuthCredentials,
 } from '../lib/calendar/resolve-google-oauth';
+import { getGoogleCalendarStatus } from '../lib/calendar/status';
 import {
     CALENDAR_OAUTH_MESSAGE,
     renderCalendarOAuthPopupLanding,
 } from '../lib/calendar/oauth-popup-landing';
+import calendarBlockRoutes from './calendar-blocks';
+import calendarItemsRoutes from './calendar-items';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
 
@@ -105,6 +108,8 @@ const syncRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const calendarRoutes = createApiRouter()
+    .route('/', calendarBlockRoutes)
+    .route('/', calendarItemsRoutes)
     .openapi(disconnectRoute, async (c) => {
         const user = c.get('user');
         if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
@@ -185,6 +190,12 @@ export const calendarRoutes = createApiRouter()
             success: true,
             data: { blockedDatesCreated: created, totalEvents: busyBlocks.length },
         }, 200);
+    })
+    .get('/status', async (c) => {
+        const user = c.get('user');
+        if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
+        const tenantId = c.get('tenantId') as string;
+        return c.json({ success: true, data: await getGoogleCalendarStatus(c.env, tenantId, user.sub) });
     })
     /**
      * POST /api/calendar/sync-events

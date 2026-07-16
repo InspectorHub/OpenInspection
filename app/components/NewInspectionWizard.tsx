@@ -83,6 +83,10 @@ export function NewInspectionWizard({
   const conflictFetcher = useFetcher<{
     conflicts: Array<{ inspectionId: string; propertyAddress: string; date: string }>;
   }>();
+  const holidayFetcher = useFetcher<{
+    effect: "none" | "block" | "advisory";
+    name: string | null;
+  }>();
 
   const [stepIdx, setStepIdx] = useState(0);
   const [propertyType, setPropertyType] = useState("single_family");
@@ -238,6 +242,15 @@ export function NewInspectionWizard({
   // conflictFetcher is stable across renders — intentionally omitted per RR convention.
   }, [inspectorId, date, time]);
 
+  // Company holiday advisory / block for the selected civil date.
+  useEffect(() => {
+    if (!date) return;
+    const t = setTimeout(() => {
+      holidayFetcher.load(`/resources/holiday-check?date=${encodeURIComponent(date)}`);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [date]);
+
   // IA-1 — agent typeahead: debounce ~300 ms, then POST search-agents intent
   // via the dedicated agentFetcher (BFF pattern, no direct client fetch).
   function handleAgentSearchChange(value: string) {
@@ -327,7 +340,7 @@ export function NewInspectionWizard({
       case "services":
         return services.size > 0;
       case "schedule":
-        return date.length > 0;
+        return date.length > 0 && holidayFetcher.data?.effect !== "block";
       default:
         return true;
     }
@@ -459,6 +472,7 @@ export function NewInspectionWizard({
               time={time}
               setTime={setTime}
               conflictFetcher={conflictFetcher}
+              holidayFetcher={holidayFetcher}
             />
           )}
 

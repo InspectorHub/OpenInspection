@@ -182,6 +182,8 @@ export default defineConfig({
         // Calendar multiprovider (#199) — API-level capability gating; depends on
         // `api` so admin@autotest.com exists in the shared D1 seed.
         { name: 'calendar-connect', testMatch: 'calendar-connect.spec.ts', dependencies: ['api'] },
+        // Scheduling Phase A-core — G1–G3 acceptance gates (holidays + schedule + slots).
+        { name: 'scheduling-phase-a-core', testMatch: 'scheduling-phase-a-core.spec.ts', dependencies: ['api'] },
         { name: 'repair-list', testMatch: 'repair-list.spec.ts' },
         { name: 'report-viewer', testMatch: 'report-viewer.spec.ts' },
         { name: 'inspection-edit-hotkeys', testMatch: 'inspection-edit-hotkeys.spec.ts', dependencies: ['editor-seed'] },

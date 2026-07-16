@@ -12,6 +12,7 @@ import { SeatBanner } from "~/components/SeatBanner";
 import { QuotaBanner } from "~/components/QuotaBanner";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
+import { getScheduleSet } from "~/lib/schedule-onboarding.server";
 import { INSPECTION_STATUS, isReportPublished } from "~/lib/status";
 import { PageHeader, TabStrip, Pill, Card, EmptyState, Button, Icon } from "@core/shared-ui";
 import {
@@ -68,6 +69,7 @@ function emptyDashboard() {
     checklistDismissed: false,
     templateCount: 0,
     serviceCount: 0,
+    scheduleSet: false,
     quotaCaps: null as { inspections: number; sms: number; email: number } | null,
     quotaUsage: null as { inspections: number; sms: number; email: number } | null,
   };
@@ -84,7 +86,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // The TODO(C-10) cast mirrors settings-account.tsx — hono/client collapses
     // the typed union; assertion is localized here and does not affect safety.
     const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
-    const [dashRes, tagsRes, templatesRes, servicesRes, meRes, membersRes, usageRes] = await Promise.all([
+    const [dashRes, tagsRes, templatesRes, servicesRes, meRes, membersRes, usageRes, scheduleSet] = await Promise.all([
       api.inspections.dashboard.$get(),
       api.tags.index.$get().catch(() => null),
       api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
@@ -95,6 +97,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       // Promise.all entries above. `caps` comes back null for non-free
       // tenants and for standalone deploys, so QuotaBanner renders nothing.
       api.usage.summary.$get().catch(() => null),
+      getScheduleSet(api),
     ]);
     const json = dashRes.ok ? ((await dashRes.json()) as Record<string, unknown>) : {};
     const d = (json.data ?? {}) as unknown as DashboardData | undefined;
@@ -165,10 +168,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       services: svcOptions,
       teamMembers,
       checklistDismissed,
-      // Pass raw template/service counts for the onboarding checklist. The
-      // dashboard buckets already have the inspection counts we need.
+      // Raw counts/flags for the onboarding checklist.
       templateCount: templates.length,
       serviceCount: svcOptions.length,
+      scheduleSet,
       quotaCaps,
       quotaUsage,
     };
@@ -269,7 +272,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function InspectionsPage() {
-  const { buckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, quotaCaps, quotaUsage } = useLoaderData<typeof loader>();
+  const { buckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   const [greeting, setGreeting] = useState(_ssrGreeting);
   useEffect(() => { setGreeting(getGreeting()); }, []);
@@ -459,11 +462,7 @@ export default function InspectionsPage() {
   }, [searchFetcher.state, searchFetcher.data]);
 
   /* ---- IA-12: Onboarding steps ---- */
-  // companyNameSet: the session context always returns a non-null companyName
-  // (falling back to 'OpenInspection' when not configured). If the value
-  // differs from the system default, the user has deliberately set a name.
-  // This is correct for virtually all real tenants; someone who names their
-  // company exactly "OpenInspection" would still need the other three steps.
+  // Session branding falls back to OpenInspection until the company sets a name.
   const onboardingSteps = useMemo(() => {
     const companyName = sessionCtx?.branding?.companyName ?? 'OpenInspection';
     const companyNameSet = companyName !== 'OpenInspection';
@@ -476,8 +475,9 @@ export default function InspectionsPage() {
       templateCount,
       serviceCount,
       inspectionCount,
+      scheduleSet,
     });
-  }, [sessionCtx, templateCount, serviceCount, allInspections]);
+  }, [sessionCtx, templateCount, serviceCount, scheduleSet, allInspections]);
 
   /* ---- Stats ---- */
   const counts = useMemo(() => ({

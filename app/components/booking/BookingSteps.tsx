@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { TIME_WINDOWS, type CompanyProfile } from "./booking-constants";
+import { HolidayAdvisoryBanner } from "./HolidayAdvisoryBanner";
 
 export function PropertyStep({
   address,
@@ -114,6 +116,9 @@ export function ScheduleStep({
   privacyUrl,
   termsUrl,
   companyName,
+  tenant,
+  serviceIds,
+  conciergeReviewRequired = false,
 }: {
   inspectionDate: string;
   setInspectionDate: (v: string) => void;
@@ -134,9 +139,39 @@ export function ScheduleStep({
   privacyUrl: string | null;
   termsUrl: string | null;
   companyName: string;
+  tenant?: string;
+  serviceIds?: string[];
+  conciergeReviewRequired?: boolean;
 }) {
   // Twilio/CTIA require the opt-in to be branded with the end business name.
   const company = companyName?.trim() || "your inspection company";
+  const [holidayAdvisory, setHolidayAdvisory] = useState<{ date: string; name: string } | null>(null);
+
+  useEffect(() => {
+    if (!tenant || !/^\d{4}-\d{2}-\d{2}$/.test(inspectionDate)) {
+      setHolidayAdvisory(null);
+      return;
+    }
+    const params = new URLSearchParams({ tenant, date: inspectionDate });
+    if (serviceIds?.length) params.set("serviceIds", serviceIds.join(","));
+    const ctrl = new AbortController();
+    const t = setTimeout(() => {
+      fetch(`/api/public/slots?${params.toString()}`, { signal: ctrl.signal })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((body) => {
+          const advisory = (body as {
+            data?: { holidayAdvisory?: { date: string; name: string } };
+          } | null)?.data?.holidayAdvisory;
+          setHolidayAdvisory(advisory ?? null);
+        })
+        .catch(() => setHolidayAdvisory(null));
+    }, 300);
+    return () => {
+      clearTimeout(t);
+      ctrl.abort();
+    };
+  }, [tenant, inspectionDate, serviceIds]);
+
   return (
     <section className="space-y-8">
       <div className="space-y-5">
@@ -153,6 +188,12 @@ export function ScheduleStep({
             className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium tabular-nums transition-colors"
           />
         </label>
+        {holidayAdvisory && (
+          <HolidayAdvisoryBanner
+            name={holidayAdvisory.name}
+            conciergeReviewRequired={conciergeReviewRequired}
+          />
+        )}
         <div>
           <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Time window</span>
           <div className="grid grid-cols-2 gap-2 mt-1">

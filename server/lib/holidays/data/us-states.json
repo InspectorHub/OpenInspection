@@ -1,0 +1,66 @@
+{
+  "TX": {
+    "2026": [
+      { "date": "2026-03-02", "name": "Texas Independence Day" },
+      { "date": "2026-04-21", "name": "San Jacinto Day" },
+      { "date": "2026-08-27", "name": "Lyndon Baines Johnson Day" }
+    ],
+    "2027": [
+      { "date": "2027-03-02", "name": "Texas Independence Day" },
+      { "date": "2027-04-21", "name": "San Jacinto Day" },
+      { "date": "2027-08-27", "name": "Lyndon Baines Johnson Day" }
+    ],
+    "2028": [
+      { "date": "2028-03-02", "name": "Texas Independence Day" },
+      { "date": "2028-04-21", "name": "San Jacinto Day" },
+      { "date": "2028-08-27", "name": "Lyndon Baines Johnson Day" }
+    ]
+  },
+  "CA": {
+    "2026": [
+      { "date": "2026-03-31", "name": "Cesar Chavez Day" }
+    ],
+    "2027": [
+      { "date": "2027-03-31", "name": "Cesar Chavez Day" }
+    ],
+    "2028": [
+      { "date": "2028-03-31", "name": "Cesar Chavez Day" }
+    ]
+  },
+  "NY": {
+    "2026": [
+      { "date": "2026-02-12", "name": "Lincoln's Birthday" }
+    ],
+    "2027": [
+      { "date": "2027-02-12", "name": "Lincoln's Birthday" }
+    ],
+    "2028": [
+      { "date": "2028-02-12", "name": "Lincoln's Birthday" }
+    ]
+  },
+  "FL": {
+    "2026": [
+      { "date": "2026-04-02", "name": "Pascua Florida Day" }
+    ],
+    "2027": [
+      { "date": "2027-04-02", "name": "Pascua Florida Day" }
+    ],
+    "2028": [
+      { "date": "2028-04-02", "name": "Pascua Florida Day" }
+    ]
+  },
+  "IL": {
+    "2026": [
+      { "date": "2026-02-12", "name": "Lincoln's Birthday" },
+      { "date": "2026-03-02", "name": "Casimir Pulaski Day" }
+    ],
+    "2027": [
+      { "date": "2027-02-12", "name": "Lincoln's Birthday" },
+      { "date": "2027-03-01", "name": "Casimir Pulaski Day" }
+    ],
+    "2028": [
+      { "date": "2028-02-12", "name": "Lincoln's Birthday" },
+      { "date": "2028-03-06", "name": "Casimir Pulaski Day" }
+    ]
+  }
+}

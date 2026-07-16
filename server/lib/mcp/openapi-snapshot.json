@@ -476,6 +476,34 @@
     "description": "Updates the authenticated user's password after verifying the current one. Invalidates all outstanding session JWTs for this user on success."
   },
   {
+    "operationId": "checkInternalHoliday",
+    "method": "GET",
+    "pathTemplate": "/api/admin/holidays/check",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "query",
+          "required": true,
+          "description": "Civil date to check against internal holiday policy",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date to check against internal holiday policy"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Check internal holiday policy for a date",
+    "description": "Used by the New Inspection wizard to show advisory/block UI for company closed days."
+  },
+  {
     "operationId": "cloneInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/clone",
@@ -924,6 +952,69 @@
     "description": "Auto-generated placeholder for createBookingBook (POST /book, bookings domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "createCalendarBlock",
+    "method": "POST",
+    "pathTemplate": "/api/calendar/blocks",
+    "scopes": [
+      "write"
+    ],
+    "tag": "calendar",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target user. Only owners and managers may select another user."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Short label shown on the calendar block"
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date in YYYY-MM-DD format"
+          },
+          "startTime": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "Start time when the block is not all-day; null otherwise"
+          },
+          "endTime": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "End time when the block is not all-day; null otherwise"
+          },
+          "allDay": {
+            "type": "boolean",
+            "default": false,
+            "description": "When true, the block covers the full civil date"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 2000,
+            "description": "Optional free-text notes for the calendar block"
+          }
+        },
+        "required": [
+          "title",
+          "date"
+        ]
+      }
+    },
+    "summary": "Create a calendar block",
+    "description": "Creates an all-day or timed calendar block. Inspectors can create blocks for themselves; owners and managers can create blocks for any user in their company."
+  },
+  {
     "operationId": "createContact",
     "method": "POST",
     "pathTemplate": "/api/contacts",
@@ -958,6 +1049,24 @@
     },
     "summary": "Create contractor type for current tenant",
     "description": "Auto-generated placeholder for createContractorType (POST /, contractor-types domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "createCustomHoliday",
+    "method": "POST",
+    "pathTemplate": "/api/admin/custom-holidays",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/CreateCustomHoliday"
+      }
+    },
+    "summary": "Create a custom holiday",
+    "description": "Adds a single-date custom closed day to the tenant holiday catalog."
   },
   {
     "operationId": "createDefectCategory",
@@ -4850,6 +4959,34 @@
     "description": "Removes the specified availability override entry, restoring the default recurring schedule for that date."
   },
   {
+    "operationId": "deleteCalendarBlock",
+    "method": "DELETE",
+    "pathTemplate": "/api/calendar/blocks/{id}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "calendar",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Calendar block id within the tenant",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Calendar block id within the tenant"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a calendar block",
+    "description": "Deletes an owned calendar block. Owners and managers can delete any block in their company."
+  },
+  {
     "operationId": "deleteContact",
     "method": "DELETE",
     "pathTemplate": "/api/contacts/{id}",
@@ -4904,6 +5041,34 @@
     },
     "summary": "Delete contractor type for current tenant",
     "description": "Auto-generated placeholder for deleteContractorType (DELETE /{id}, contractor-types domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "deleteCustomHoliday",
+    "method": "DELETE",
+    "pathTemplate": "/api/admin/custom-holidays/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Custom holiday id within the tenant",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Custom holiday id within the tenant"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a custom holiday",
+    "description": "Removes a custom closed day from the tenant holiday catalog."
   },
   {
     "operationId": "deleteDefectCategory",
@@ -8426,6 +8591,56 @@
     "description": "Auto-generated placeholder for listBookingServices (GET /services, bookings domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "listCalendarBlocks",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/blocks",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "start",
+          "in": "query",
+          "required": true,
+          "description": "Inclusive range start as a civil date",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Inclusive range start as a civil date"
+          }
+        },
+        {
+          "name": "end",
+          "in": "query",
+          "required": true,
+          "description": "Inclusive range end as a civil date",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Inclusive range end as a civil date"
+          }
+        },
+        {
+          "name": "userId",
+          "in": "query",
+          "required": false,
+          "description": "Target user. Inspectors may only list their own blocks.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target user. Inspectors may only list their own blocks."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List calendar blocks in range",
+    "description": "Lists calendar blocks within an inclusive civil-date range. Inspectors can list their own blocks; owners and managers can select another user."
+  },
+  {
     "operationId": "listCalendarEvents",
     "method": "GET",
     "pathTemplate": "/api/calendar/events",
@@ -8463,6 +8678,87 @@
     },
     "summary": "Get calendar events for FullCalendar",
     "description": "Returns combined calendar events (local inspections + Google Calendar busy blocks) in FullCalendar-compatible format. Used by the dashboard month/week views."
+  },
+  {
+    "operationId": "listCalendarItems",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/items",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "start",
+          "in": "query",
+          "required": true,
+          "description": "Range start as a civil date or ISO instant",
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Civil date in YYYY-MM-DD format"
+              },
+              {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO-8601 instant with timezone offset"
+              }
+            ],
+            "description": "Range start as a civil date or ISO instant"
+          }
+        },
+        {
+          "name": "end",
+          "in": "query",
+          "required": true,
+          "description": "Range end as a civil date or ISO instant",
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Civil date in YYYY-MM-DD format"
+              },
+              {
+                "type": "string",
+                "format": "date-time",
+                "description": "ISO-8601 instant with timezone offset"
+              }
+            ],
+            "description": "Range end as a civil date or ISO instant"
+          }
+        },
+        {
+          "name": "userId",
+          "in": "query",
+          "required": false,
+          "description": "Single user id to include in the feed",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Single user id to include in the feed"
+          }
+        },
+        {
+          "name": "userIds",
+          "in": "query",
+          "required": false,
+          "description": "Comma-separated user ids for team calendar views",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Comma-separated user ids for team calendar views"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List unified calendar items",
+    "description": "Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers may select multiple users; inspectors are restricted to themselves."
   },
   {
     "operationId": "listComplianceErasureLog",
@@ -8564,6 +8860,35 @@
     },
     "summary": "List contractor types for current tenant",
     "description": "Auto-generated placeholder for listContractorTypes (GET /, contractor-types domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "listCustomHolidays",
+    "method": "GET",
+    "pathTemplate": "/api/admin/custom-holidays",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "year",
+          "in": "query",
+          "required": false,
+          "description": "Limit to a civil year; omit to return all custom holidays",
+          "schema": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100,
+            "description": "Limit to a civil year; omit to return all custom holidays"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List tenant custom holidays",
+    "description": "Returns custom company closed days for the holiday catalog."
   },
   {
     "operationId": "listDefectCategories",
@@ -13637,6 +13962,35 @@
     "description": "Renders a template with unsaved edits against sample data, returning the subject and full HTML for preview. Does not persist anything."
   },
   {
+    "operationId": "previewHolidays",
+    "method": "GET",
+    "pathTemplate": "/api/admin/holidays/preview",
+    "scopes": [
+      "read"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "year",
+          "in": "query",
+          "required": true,
+          "description": "Civil year to preview",
+          "schema": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100,
+            "description": "Civil year to preview"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Preview resolved closed dates for a year",
+    "description": "Returns the union of federal, state, and custom holidays for the configured region. Readable by inspectors for the My Schedule company-closed strip."
+  },
+  {
     "operationId": "previewMessageTemplate",
     "method": "POST",
     "pathTemplate": "/api/message-templates/preview",
@@ -15515,6 +15869,76 @@
     },
     "summary": "Count unread notifications for current user",
     "description": "Auto-generated placeholder for unreadCountNotification (GET /unread-count, notifications domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "updateCalendarBlock",
+    "method": "PATCH",
+    "pathTemplate": "/api/calendar/blocks/{id}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "calendar",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Calendar block id within the tenant",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Calendar block id within the tenant"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Target user. Only owners and managers may reassign a block."
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "Short label shown on the calendar block"
+          },
+          "date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date in YYYY-MM-DD format"
+          },
+          "startTime": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "Start time when the block is not all-day; null otherwise"
+          },
+          "endTime": {
+            "type": "string",
+            "nullable": true,
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "End time when the block is not all-day; null otherwise"
+          },
+          "allDay": {
+            "type": "boolean",
+            "description": "When true, the block covers the full civil date"
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 2000,
+            "description": "Optional free-text notes for the calendar block"
+          }
+        }
+      }
+    },
+    "summary": "Update a calendar block",
+    "description": "Updates an owned calendar block. Owners and managers can update or reassign any block in their company."
   },
   {
     "operationId": "updateCommunicationConfig",

@@ -19,3 +19,20 @@ export const calendarConnections = sqliteTable('calendar_connections', {
     uniqueIndex('uq_calendar_connections_user_provider').on(t.userId, t.provider),
     index('idx_calendar_connections_tenant_user').on(t.tenantId, t.userId),
 ]);
+
+export const calendarBlocks = sqliteTable('calendar_blocks', {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    userId: text('user_id').notNull(),
+    title: text('title').notNull(),
+    /** Calendar-semantic civil date stored as YYYY-MM-DD, without a time zone. */
+    date: text('date').notNull(),
+    startTime: text('start_time'),
+    endTime: text('end_time'),
+    allDay: integer('is_all_day', { mode: 'boolean' }).notNull().default(false),
+    notes: text('notes'),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    index('idx_calendar_blocks_tenant_user_date').on(t.tenantId, t.userId, t.date),
+]);

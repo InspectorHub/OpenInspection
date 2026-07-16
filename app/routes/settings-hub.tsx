@@ -45,9 +45,9 @@ const GROUPS: Group[] = [
         icon: "M4 6h16M4 12h10M4 18h7M18 14v6m-3-3h6",
       },
       {
-        to: "/settings/booking",
-        title: "Online Booking",
-        desc: "Schedule, availability, booking page.",
+        to: "/settings/schedule",
+        title: "My Schedule",
+        desc: "Weekly hours, time off, calendar sync.",
         icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
       },
     ],
@@ -61,6 +61,12 @@ const GROUPS: Group[] = [
         title: "Company",
         desc: "Company name, logo, brand color, report theme.",
         icon: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+      },
+      {
+        to: "/settings/booking",
+        title: "Online Booking",
+        desc: "Booking policies and embeddable widget.",
+        icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
       },
       {
         to: "/settings/services",
@@ -125,7 +131,7 @@ const GROUPS: Group[] = [
       {
         to: "/settings/communication",
         title: "Communication",
-        desc: "Email delivery, calendar sync.",
+        desc: "Email and SMS delivery. Inspectors connect calendars under My Schedule.",
         icon: "M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
       },
       {

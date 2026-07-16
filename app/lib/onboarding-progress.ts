@@ -16,10 +16,12 @@ export interface OnboardingInput {
   inspectionCount: number;
   /** True when the tenant set a non-UTC default_timezone. */
   timezoneSet: boolean;
+  /** True when the user has weekly availability or a connected calendar. */
+  scheduleSet: boolean;
 }
 
 export interface OnboardingStep {
-  id: 'company' | 'timezone' | 'template' | 'services' | 'first-inspection';
+  id: 'company' | 'timezone' | 'template' | 'services' | 'schedule' | 'first-inspection';
   label: string;
   done: boolean;
   /** Navigation href for the step. '#new-inspection' is a magic value the
@@ -28,8 +30,8 @@ export interface OnboardingStep {
 }
 
 /**
- * Derives the four ordered onboarding steps from raw counts/flags.
- * Always returns all four steps in fixed order so the UI never shifts.
+ * Derives the ordered onboarding steps from raw counts/flags.
+ * Always returns every step in fixed order so the UI never shifts.
  */
 export function computeOnboardingSteps(input: OnboardingInput): OnboardingStep[] {
   return [
@@ -56,6 +58,12 @@ export function computeOnboardingSteps(input: OnboardingInput): OnboardingStep[]
       label: 'Price your services',
       done: input.serviceCount > 0,
       href: '/settings/services',
+    },
+    {
+      id: 'schedule',
+      label: 'Set up your schedule',
+      done: input.scheduleSet,
+      href: '/settings/schedule',
     },
     {
       id: 'first-inspection',

@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
-import { availability, availabilityOverrides, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, users, services as servicesTable, agentTenantLinks } from '../lib/db/schema';
+import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, users, services as servicesTable, agentTenantLinks } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
@@ -19,7 +19,10 @@ import { getBookingHost, getBaseUrl } from '../lib/url';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { buildSlotGrid } from '../lib/booking/slot-grid';
+import { loadSlotGridOptions } from '../lib/booking/slot-rules';
 import { computeBusyTimes } from '../lib/booking/busy-times';
+import { buildTenantSlotMap } from '../lib/booking/tenant-slot-map';
+import { resolvePublicHolidayEffect } from '../lib/holidays/load-tenant-holidays';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
 /**
@@ -126,8 +129,8 @@ export class BookingService {
         const effectiveWindows = blocked ? overrides.filter(o => o.isAvailable) : windows;
         if (effectiveWindows.length === 0) return [];
 
-        // Build 30-minute slot grid from each window
-        const slots = buildSlotGrid(effectiveWindows);
+        const gridOpts = await loadSlotGridOptions(this.db, tenantId);
+        const slots = buildSlotGrid(effectiveWindows, gridOpts);
 
         const busyTimes = computeBusyTimes(existingInsp);
         return slots.map(time => ({ time, available: !busyTimes.has(time) }));
@@ -185,13 +188,28 @@ export class BookingService {
         dateStr: string,
         serviceIds: string[],
         qualifiedIds?: string[],
-    ): Promise<Array<{ time: string; available: boolean; inspectorIds: string[] }>> {
+    ): Promise<{
+        slots: Array<{ time: string; available: boolean; inspectorIds: string[] }>;
+        holidayAdvisory?: { date: string; name: string };
+    }> {
+        const holiday = await resolvePublicHolidayEffect(this.db, tenantId, dateStr);
+        if (holiday.effect === 'block') {
+            return { slots: [] };
+        }
+
         const db = this.getDrizzle();
         const qualified = qualifiedIds ?? await this.getQualifiedInspectorIds(tenantId, serviceIds);
-        if (qualified.length === 0) return [];
+        if (qualified.length === 0) {
+            return {
+                slots: [],
+                ...(holiday.effect === 'advisory' && holiday.name
+                    ? { holidayAdvisory: { date: dateStr, name: holiday.name } }
+                    : {}),
+            };
+        }
         const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
 
-        const [windows, overrides, busy] = await Promise.all([
+        const [windows, overrides, busy, blocks] = await Promise.all([
             db.select().from(availability).where(and(
                 eq(availability.tenantId, tenantId),
                 inArray(availability.inspectorId, qualified),
@@ -211,34 +229,26 @@ export class BookingService {
                     sql`date(${inspections.date}) = ${dateStr}`,
                     sql`${inspections.status} not in ('cancelled')`,
                 )).all(),
+            db.select().from(calendarBlocks).where(and(
+                eq(calendarBlocks.tenantId, tenantId),
+                inArray(calendarBlocks.userId, qualified),
+                eq(calendarBlocks.date, dateStr),
+            )).all(),
         ]);
 
-        // slotMap: time -> set of free inspector ids (inspectors WITH a window but NOT busy at that time)
-        const slotMap = new Map<string, Set<string>>();
+        const gridOpts = await loadSlotGridOptions(this.db, tenantId);
+        const slotMap = buildTenantSlotMap(qualified, windows, overrides, busy, blocks, gridOpts);
 
-        for (const inspectorId of qualified) {
-            const myWindows = windows.filter(w => w.inspectorId === inspectorId);
-            const myOverrides = overrides.filter(o => o.inspectorId === inspectorId);
-            const blocked = myOverrides.some(o => !o.isAvailable);
-            const effective = blocked ? myOverrides.filter(o => o.isAvailable) : myWindows;
-            if (effective.length === 0) continue;
-
-            const busyTimes = computeBusyTimes(busy.filter(b => b.userId === inspectorId));
-
-            // Collect all time slots from this inspector's effective windows
-            const mySlots = buildSlotGrid(effective);
-
-            for (const time of mySlots) {
-                if (!slotMap.has(time)) slotMap.set(time, new Set());
-                if (!busyTimes.has(time)) {
-                    slotMap.get(time)!.add(inspectorId);
-                }
-            }
-        }
-
-        return [...slotMap.entries()]
+        const slots = [...slotMap.entries()]
             .sort(([a], [b]) => (a < b ? -1 : 1))
             .map(([time, ids]) => ({ time, available: ids.size > 0, inspectorIds: [...ids].sort() }));
+
+        return {
+            slots,
+            ...(holiday.effect === 'advisory' && holiday.name
+                ? { holidayAdvisory: { date: dateStr, name: holiday.name } }
+                : {}),
+        };
     }
 
     /**
@@ -458,6 +468,16 @@ export class BookingService {
             throw Errors.Conflict('Online booking is not open yet. Please contact the company directly to schedule.');
         }
 
+        const holiday = await resolvePublicHolidayEffect(this.db, tenantId, body.date);
+        if (holiday.effect === 'block') {
+            throw Errors.BadRequest(
+                holiday.name
+                    ? `The office is closed on ${holiday.name}. Please pick another date.`
+                    : 'The office is closed on this date. Please pick another date.',
+                'HOLIDAY_BLOCKED',
+            );
+        }
+
         // Spec 3C / IA-26 — availability enforcement now runs on the tenant
         // aggregation: a slot is bookable iff at least one QUALIFIED inspector
         // is free (or the requested one, when the client chose).
@@ -475,7 +495,7 @@ export class BookingService {
         // Accepted for launch traffic; a post-insert recheck/compensation is
         // tracked in the backlog. Do NOT "fix" by randomizing the pick — the
         // determinism is intentional (idempotent re-submits).
-        const slots = await service.getTenantSlots(tenantId, body.date, serviceIdsForQual, qualifiedIds);
+        const { slots } = await service.getTenantSlots(tenantId, body.date, serviceIdsForQual, qualifiedIds);
         const target = slots.find(s => s.time === requestedTime);
         const freeIds = (target?.inspectorIds ?? []).filter(id => !inspectorId || id === inspectorId);
         if (freeIds.length === 0) {

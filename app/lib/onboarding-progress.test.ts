@@ -7,17 +7,18 @@ import type { OnboardingStep } from '~/lib/onboarding-progress';
 // ---------------------------------------------------------------------------
 
 describe('computeOnboardingSteps', () => {
-  it('returns all five steps in fixed order', () => {
+  it('returns all six steps in fixed order', () => {
     const steps = computeOnboardingSteps({
       companyNameSet: false,
       timezoneSet: false,
       templateCount: 0,
       serviceCount: 0,
       inspectionCount: 0,
+      scheduleSet: false,
     });
-    expect(steps).toHaveLength(5);
+    expect(steps).toHaveLength(6);
     const ids = steps.map((s) => s.id);
-    expect(ids).toEqual(['company', 'timezone', 'template', 'services', 'first-inspection']);
+    expect(ids).toEqual(['company', 'timezone', 'template', 'services', 'schedule', 'first-inspection']);
   });
 
   it('marks all steps done when all criteria are met', () => {
@@ -27,6 +28,7 @@ describe('computeOnboardingSteps', () => {
       templateCount: 3,
       serviceCount: 2,
       inspectionCount: 5,
+      scheduleSet: true,
     });
     expect(steps.every((s) => s.done)).toBe(true);
   });
@@ -38,21 +40,22 @@ describe('computeOnboardingSteps', () => {
       templateCount: 0,
       serviceCount: 0,
       inspectionCount: 0,
+      scheduleSet: false,
     });
     expect(steps.every((s) => !s.done)).toBe(true);
   });
 
   it('company step: done when companyNameSet=true, not done when false', () => {
-    const withName = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
-    const withoutName = computeOnboardingSteps({ companyNameSet: false, timezoneSet: true, templateCount: 1, serviceCount: 1, inspectionCount: 1 });
+    const withName = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0, scheduleSet: false });
+    const withoutName = computeOnboardingSteps({ companyNameSet: false, timezoneSet: true, templateCount: 1, serviceCount: 1, inspectionCount: 1, scheduleSet: true });
 
     expect(withName.find((s) => s.id === 'company')!.done).toBe(true);
     expect(withoutName.find((s) => s.id === 'company')!.done).toBe(false);
   });
 
   it('timezone step: done when timezoneSet=true, not done when false; links to /settings/workspace', () => {
-    const setTz = computeOnboardingSteps({ companyNameSet: true, timezoneSet: true, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
-    const noTz = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const setTz = computeOnboardingSteps({ companyNameSet: true, timezoneSet: true, templateCount: 0, serviceCount: 0, inspectionCount: 0, scheduleSet: false });
+    const noTz = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0, scheduleSet: false });
 
     const tzStep = noTz.find((s) => s.id === 'timezone')!;
     expect(tzStep.done).toBe(false);
@@ -62,47 +65,59 @@ describe('computeOnboardingSteps', () => {
   });
 
   it('template step: done when templateCount >= 1, not done at 0', () => {
-    const done = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 1, serviceCount: 0, inspectionCount: 0 });
-    const notDone = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 0, serviceCount: 1, inspectionCount: 1 });
+    const done = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 1, serviceCount: 0, inspectionCount: 0, scheduleSet: false });
+    const notDone = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 0, serviceCount: 1, inspectionCount: 1, scheduleSet: true });
 
     expect(done.find((s) => s.id === 'template')!.done).toBe(true);
     expect(notDone.find((s) => s.id === 'template')!.done).toBe(false);
   });
 
   it('services step: done when serviceCount >= 1, not done at 0', () => {
-    const done = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 1, inspectionCount: 0 });
-    const notDone = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 1, serviceCount: 0, inspectionCount: 1 });
+    const done = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 1, inspectionCount: 0, scheduleSet: false });
+    const notDone = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 1, serviceCount: 0, inspectionCount: 1, scheduleSet: true });
 
     expect(done.find((s) => s.id === 'services')!.done).toBe(true);
     expect(notDone.find((s) => s.id === 'services')!.done).toBe(false);
   });
 
   it('first-inspection step: done when inspectionCount >= 1, not done at 0', () => {
-    const done = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 1 });
-    const notDone = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 1, serviceCount: 1, inspectionCount: 0 });
+    const done = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 1, scheduleSet: false });
+    const notDone = computeOnboardingSteps({ companyNameSet: true, timezoneSet: false, templateCount: 1, serviceCount: 1, inspectionCount: 0, scheduleSet: true });
 
     expect(done.find((s) => s.id === 'first-inspection')!.done).toBe(true);
     expect(notDone.find((s) => s.id === 'first-inspection')!.done).toBe(false);
   });
 
   it('first-inspection step has href "#new-inspection"', () => {
-    const steps = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const steps = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0, scheduleSet: false });
     expect(steps.find((s) => s.id === 'first-inspection')!.href).toBe('#new-inspection');
   });
 
   it('company step links to /settings/workspace', () => {
-    const steps = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const steps = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0, scheduleSet: false });
     expect(steps.find((s) => s.id === 'company')!.href).toBe('/settings/workspace');
   });
 
   it('template step links to /library/templates', () => {
-    const steps = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const steps = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0, scheduleSet: false });
     expect(steps.find((s) => s.id === 'template')!.href).toBe('/library/templates');
   });
 
   it('services step links to /settings/services', () => {
-    const steps = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0 });
+    const steps = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0, scheduleSet: false });
     expect(steps.find((s) => s.id === 'services')!.href).toBe('/settings/services');
+  });
+
+  it('includes a schedule step driven by scheduleSet', () => {
+    const pending = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0, scheduleSet: false });
+    const done = computeOnboardingSteps({ companyNameSet: false, timezoneSet: false, templateCount: 0, serviceCount: 0, inspectionCount: 0, scheduleSet: true });
+
+    expect(pending.find((s) => s.id === 'schedule')).toMatchObject({
+      label: 'Set up your schedule',
+      done: false,
+      href: '/settings/schedule',
+    });
+    expect(done.find((s) => s.id === 'schedule')?.done).toBe(true);
   });
 
   it('partial completion: only matching steps are done', () => {
@@ -112,6 +127,7 @@ describe('computeOnboardingSteps', () => {
       templateCount: 0,
       serviceCount: 2,
       inspectionCount: 0,
+      scheduleSet: false,
     });
     const doneIds = steps.filter((s) => s.done).map((s) => s.id);
     expect(doneIds).toEqual(['company', 'services']);
@@ -152,6 +168,7 @@ describe('allDone', () => {
       templateCount: 0,
       serviceCount: 0,
       inspectionCount: 0,
+      scheduleSet: false,
     });
     expect(allDone(steps)).toBe(false);
   });
@@ -163,6 +180,7 @@ describe('allDone', () => {
       templateCount: 1,
       serviceCount: 1,
       inspectionCount: 1,
+      scheduleSet: true,
     });
     expect(allDone(steps)).toBe(true);
   });

@@ -26,6 +26,7 @@ import adminDataRoutes from './admin/admin-data';
 import adminDataImportRoutes from './admin/admin-data-import';
 import adminSettingsRoutes from './admin/admin-settings';
 import adminConfigRoutes from './admin/admin-config';
+import adminHolidayRoutes from './admin/admin-holidays';
 
 export const adminRoutes = createApiRouter()
     .route('/', adminAgreementsRoutes)
@@ -34,7 +35,8 @@ export const adminRoutes = createApiRouter()
     .route('/', adminDataRoutes)
     .route('/', adminDataImportRoutes)
     .route('/', adminSettingsRoutes)
-    .route('/', adminConfigRoutes);
+    .route('/', adminConfigRoutes)
+    .route('/', adminHolidayRoutes);
 
 export type AdminApi = typeof adminRoutes;
 
