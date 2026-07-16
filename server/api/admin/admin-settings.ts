@@ -132,6 +132,8 @@ const TenantConfigGetResponseSchema = z.object({
         smsByoProvider: z.enum(['twilio', 'telnyx']).nullable().describe('BYO SMS provider selection (null = default Twilio).'),
         managedProvider: z.enum(['twilio', 'telnyx']).describe('Managed-compliance carrier (managed_shared/managed_dedicated). Default Twilio.'),
         emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).nullable().describe('BYO email provider selection (null = default Resend).'),
+        bookingSlotMode: z.enum(['open', 'fixed']).describe('Public booking slot grid: open = clock-aligned starts; fixed = window-aligned starts (default).'),
+        bookingSlotIntervalMin: z.union([z.literal(15), z.literal(30), z.literal(60)]).describe('Slot grid step in minutes (15, 30, or 60). Default 30.'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -170,6 +172,8 @@ const TenantConfigPatchSchema = z.object({
     smsByoProvider: z.enum(['twilio', 'telnyx']).optional().describe('BYO SMS provider selection — which provider adapter to use when smsMode is "own".'),
     managedProvider: z.enum(['twilio', 'telnyx']).optional().describe('Managed-compliance carrier — which ISV provider runs managed provisioning/sweep/webhook when smsMode is "managed_shared"/"managed_dedicated". Separate from smsByoProvider.'),
     emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).optional().describe('BYO email provider — which adapter to use when email mode is "own".'),
+    bookingSlotMode: z.enum(['open', 'fixed']).optional().describe('Public booking slot grid mode: open (clock-aligned) or fixed (window-aligned).'),
+    bookingSlotIntervalMin: z.union([z.literal(15), z.literal(30), z.literal(60)]).optional().describe('Slot grid step in minutes.'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -423,6 +427,12 @@ export const adminSettingsRoutes = createApiRouter()
                 smsByoProvider: (config?.smsByoProvider as 'twilio' | 'telnyx' | null) ?? null,
                 managedProvider: (config?.managedProvider as 'twilio' | 'telnyx') ?? 'twilio',
                 emailByoProvider: (config?.emailByoProvider as 'resend' | 'sendgrid' | 'postmark' | 'mailgun' | null) ?? 'resend',
+                bookingSlotMode: config?.bookingSlotMode === 'open' ? 'open' : 'fixed',
+                bookingSlotIntervalMin: ([15, 30, 60] as const).includes(
+                    config?.bookingSlotIntervalMin as 15 | 30 | 60,
+                )
+                    ? (config?.bookingSlotIntervalMin as 15 | 30 | 60)
+                    : 30,
             },
         }, 200);
     })
@@ -474,6 +484,12 @@ export const adminSettingsRoutes = createApiRouter()
         }
         if (body.emailByoProvider !== undefined) {
             update.emailByoProvider = body.emailByoProvider;
+        }
+        if (body.bookingSlotMode !== undefined) {
+            update.bookingSlotMode = body.bookingSlotMode;
+        }
+        if (body.bookingSlotIntervalMin !== undefined) {
+            update.bookingSlotIntervalMin = body.bookingSlotIntervalMin;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);

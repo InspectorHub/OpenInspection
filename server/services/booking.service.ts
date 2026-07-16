@@ -19,6 +19,7 @@ import { getBookingHost, getBaseUrl } from '../lib/url';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { buildSlotGrid } from '../lib/booking/slot-grid';
+import { loadSlotGridOptions } from '../lib/booking/slot-rules';
 import { computeBusyTimes } from '../lib/booking/busy-times';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
@@ -126,8 +127,8 @@ export class BookingService {
         const effectiveWindows = blocked ? overrides.filter(o => o.isAvailable) : windows;
         if (effectiveWindows.length === 0) return [];
 
-        // Build 30-minute slot grid from each window
-        const slots = buildSlotGrid(effectiveWindows);
+        const gridOpts = await loadSlotGridOptions(this.db, tenantId);
+        const slots = buildSlotGrid(effectiveWindows, gridOpts);
 
         const busyTimes = computeBusyTimes(existingInsp);
         return slots.map(time => ({ time, available: !busyTimes.has(time) }));
@@ -215,6 +216,7 @@ export class BookingService {
 
         // slotMap: time -> set of free inspector ids (inspectors WITH a window but NOT busy at that time)
         const slotMap = new Map<string, Set<string>>();
+        const gridOpts = await loadSlotGridOptions(this.db, tenantId);
 
         for (const inspectorId of qualified) {
             const myWindows = windows.filter(w => w.inspectorId === inspectorId);
@@ -226,7 +228,7 @@ export class BookingService {
             const busyTimes = computeBusyTimes(busy.filter(b => b.userId === inspectorId));
 
             // Collect all time slots from this inspector's effective windows
-            const mySlots = buildSlotGrid(effective);
+            const mySlots = buildSlotGrid(effective, gridOpts);
 
             for (const time of mySlots) {
                 if (!slotMap.has(time)) slotMap.set(time, new Set());
