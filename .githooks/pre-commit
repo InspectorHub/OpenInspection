@@ -122,6 +122,15 @@ else
     fail "Duplicate-code gate failed  →  npm run lint:dup"
 fi
 
+# 3e. Calendar timezone-safety — no UTC-day bucketing / hardcoded-Z instants on
+#     the calendar surface (fast scoped scan; also gated in CI via npm run lint).
+step "Calendar timezone-safety"
+if node scripts/check-tz-safety.mjs > /dev/null 2>&1; then
+    pass "Calendar timezone-safety passed"
+else
+    fail "Timezone-safety gate failed  →  npm run lint:tz"
+fi
+
 # NOTE: the Worker bundle-size gate lives in .githooks/pre-push, not here. The
 #    bundle can only break at deploy, and its check runs the REAL build pipeline
 #    (~1-2 min), so paying it on every commit was overkill. pre-push builds it

@@ -1,4 +1,4 @@
-import { eventColor, isEventDraggable, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+import { civilDateOf, eventColor, isEventDraggable, type CalendarEvent } from "~/components/calendar/calendar-helpers";
 
 export function MonthView({
   firstDay,
@@ -16,7 +16,7 @@ export function MonthView({
   daysInMonth: number;
   year: number;
   month: number;
-  getEventsForDate: (d: Date) => CalendarEvent[];
+  getEventsForDate: (civilDate: string) => CalendarEvent[];
   isToday: (day: number) => boolean;
   handleDayClick: (dateStr: string) => void;
   setDragTarget: (target: string | null) => void;
@@ -36,9 +36,10 @@ export function MonthView({
             ))}
             {Array.from({ length: daysInMonth }).map((_, i) => {
               const day = i + 1;
-              const dateObj = new Date(year, month, day);
-              const dateStr = dateObj.toISOString().slice(0, 10);
-              const dayEvents = getEventsForDate(dateObj);
+              // Civil date of this cell, built from parts — never via toISOString()
+              // (which shifts a day in UTC-positive zones).
+              const dateStr = civilDateOf(year, month, day);
+              const dayEvents = getEventsForDate(dateStr);
               return (
                 <div
                   key={day}
@@ -49,7 +50,7 @@ export function MonthView({
                   onDrop={(e) => {
                     e.preventDefault();
                     const evId = e.dataTransfer.getData("text/plain");
-                    if (evId) handleDrop(evId, `${dateStr}T09:00:00.000Z`);
+                    if (evId) handleDrop(evId, dateStr);
                     setDragTarget(null);
                   }}
                 >

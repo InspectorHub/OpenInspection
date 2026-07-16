@@ -1,4 +1,4 @@
-import { eventColor, formatTime, isEventDraggable, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+import { civilDateOf, eventColor, isEventDraggable, type CalendarEvent } from "~/components/calendar/calendar-helpers";
 
 export function DayView({
   hours,
@@ -10,13 +10,13 @@ export function DayView({
 }: {
   hours: number[];
   currentDate: Date;
-  getEventsForDate: (d: Date) => CalendarEvent[];
+  getEventsForDate: (civilDate: string) => CalendarEvent[];
   handleDayClick: (dateStr: string) => void;
   handleDrop: (eventId: string, newDate: string) => void;
   handleEventClick: (ev: CalendarEvent) => void;
 }) {
-  const dateStr = currentDate.toISOString().slice(0, 10);
-  const allDayEvents = getEventsForDate(currentDate).filter((ev) => ev.extendedProps?.allDay === true);
+  const dateStr = civilDateOf(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+  const allDayEvents = getEventsForDate(dateStr).filter((ev) => ev.extendedProps?.allDay === true);
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <div className="flex min-h-[48px] border-b border-ih-border">
@@ -40,10 +40,9 @@ export function DayView({
           </div>
           <div className="max-h-[600px] overflow-y-auto">
             {hours.map((h) => {
-              const dayEvents = getEventsForDate(currentDate).filter((ev) => {
+              const dayEvents = getEventsForDate(dateStr).filter((ev) => {
                 if (ev.extendedProps?.allDay === true) return false;
-                const evDate = new Date(ev.start);
-                return evDate.getHours() === h;
+                return ev.startTime ? parseInt(ev.startTime.slice(0, 2), 10) === h : false;
               });
               return (
                 <div key={h} className="flex border-b border-ih-border min-h-[56px]">
@@ -57,7 +56,7 @@ export function DayView({
                     onDrop={(e) => {
                       e.preventDefault();
                       const evId = e.dataTransfer.getData("text/plain");
-                      if (evId) handleDrop(evId, `${dateStr}T${String(h).padStart(2, "0")}:00:00.000Z`);
+                      if (evId) handleDrop(evId, dateStr);
                     }}
                   >
                     {dayEvents.map((ev) => (
@@ -69,7 +68,7 @@ export function DayView({
                         className={`w-full text-left px-3 py-2 rounded-lg text-[12px] font-bold text-white mb-1 ${eventColor(ev)}`}
                       >
                         {ev.title}
-                        {ev.start && <span className="ml-2 opacity-80 text-[10px]">{formatTime(new Date(ev.start))}</span>}
+                        {ev.startTime && <span className="ml-2 opacity-80 text-[10px]">{ev.startTime}</span>}
                       </button>
                     ))}
                   </div>

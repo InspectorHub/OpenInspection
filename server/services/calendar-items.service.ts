@@ -13,6 +13,13 @@ import {
     loadTenantHolidayConfig,
     resolveCompanyClosedDatesInRange,
 } from '../lib/holidays/load-tenant-holidays';
+import { epochMsToRfc3339, resolveTenantTimeZone, wallClockToEpochMs } from '../lib/tz';
+
+/** Civil date (YYYY-MM-DD) + wall-clock (HH:MM) of an instant in `tz`. */
+function civilPartsInTz(ms: number, tz: string): { civilDate: string; time: string } {
+    const rfc = epochMsToRfc3339(ms, tz); // e.g. 2026-07-18T04:00:00+08:00
+    return { civilDate: rfc.slice(0, 10), time: rfc.slice(11, 16) };
+}
 
 type CalendarItemKind =
     | 'inspection'
@@ -27,6 +34,17 @@ export interface CalendarItem {
     title: string;
     start: string;
     end: string;
+    /**
+     * Civil day this item belongs to (YYYY-MM-DD) in the viewer's effective
+     * timezone. The frontend buckets calendar cells by this string alone — it
+     * MUST NOT re-derive the day from `start` via `toISOString()`, which rolls
+     * back a day in UTC-positive zones (the calendar off-by-one bug).
+     */
+    civilDate: string;
+    /** Wall-clock start (HH:MM) in the effective timezone; omitted for all-day. */
+    startTime?: string;
+    /** Wall-clock end (HH:MM) in the effective timezone; omitted for all-day. */
+    endTime?: string;
     allDay: boolean;
     color?: string;
     inspectionId?: string;
@@ -38,6 +56,13 @@ export interface ListCalendarItemsInput {
     start: string;
     end: string;
     userIds?: string[];
+    /**
+     * IANA timezone the viewer sees the calendar in (user override ?? tenant
+     * default). Instant-based items (inspection events) are converted into this
+     * zone for `civilDate`/`startTime`; civil-stored items pass through. Defaults
+     * to 'UTC' for legacy callers.
+     */
+    effectiveTz?: string;
 }
 
 interface CalendarRange {
@@ -53,13 +78,22 @@ function toRange(input: Pick<ListCalendarItemsInput, 'start' | 'end'>): Calendar
     return {
         startDate: input.start.slice(0, 10),
         endDate: input.end.slice(0, 10),
-        startInstant: new Date(startIsCivil ? `${input.start}T00:00:00.000Z` : input.start),
-        endInstant: new Date(endIsCivil ? `${input.end}T23:59:59.999Z` : input.end),
+        // Coarse UTC window bounds for the event-instant range only; civil rows are
+        // filtered by string date and the loader over-fetches ±a month, so UTC-vs-
+        // tenant-tz edges never drop an in-view item.
+        startInstant: new Date(startIsCivil ? `${input.start}T00:00:00.000Z` : input.start), // tz-lint-ok: coarse window
+        endInstant: new Date(endIsCivil ? `${input.end}T23:59:59.999Z` : input.end), // tz-lint-ok: coarse window
     };
 }
 
-function timedIso(date: string, time: string): string {
-    return new Date(`${date}T${time}:00.000Z`).toISOString();
+/**
+ * Instant for a civil date + wall-clock time interpreted in `tz`. Blocks and
+ * busy overrides store a floating wall clock (the inspector's own tz); anchoring
+ * via `wallClockToEpochMs` means the detail modal, formatting this instant back
+ * in the same effective tz, shows the stored HH:MM — not a UTC-shifted time.
+ */
+function timedIso(date: string, time: string, tz: string): string {
+    return new Date(wallClockToEpochMs(date, time, tz)).toISOString();
 }
 
 /**
@@ -96,6 +130,7 @@ async function listCompanyHolidayItems(
             title: name,
             start: date,
             end: date,
+            civilDate: date,
             allDay: true,
             meta: { holidayName: name },
         }));
@@ -108,6 +143,7 @@ export async function listCalendarItems(
 ): Promise<CalendarItem[]> {
     const db = drizzle(database);
     const range = toRange(input);
+    const effectiveTz = resolveTenantTimeZone(input.effectiveTz);
     const selectedUsers = input.userIds?.length ? input.userIds : undefined;
 
     const inspectionWhere = and(
@@ -149,6 +185,7 @@ export async function listCalendarItems(
             title: row.propertyAddress,
             start: row.date,
             end: row.date,
+            civilDate: row.date,
             allDay: true,
             inspectionId: row.id,
             ...(userId ? { userId } : {}),
@@ -183,12 +220,17 @@ export async function listCalendarItems(
     const eventItems: CalendarItem[] = eventRows.map((row) => {
         const start = row.scheduledAt;
         const end = new Date(start.getTime() + row.durationMin * 60_000);
+        const startParts = civilPartsInTz(start.getTime(), effectiveTz);
+        const endParts = civilPartsInTz(end.getTime(), effectiveTz);
         return {
             id: row.id,
             kind: 'inspection_event',
             title: row.eventTypeName ?? 'Inspection event',
             start: start.toISOString(),
             end: end.toISOString(),
+            civilDate: startParts.civilDate,
+            startTime: startParts.time,
+            endTime: endParts.time,
             allDay: false,
             ...(row.color ? { color: row.color } : {}),
             inspectionId: row.inspectionId,
@@ -217,8 +259,15 @@ export async function listCalendarItems(
             id: row.id,
             kind: 'calendar_block',
             title: row.title,
-            start: allDay ? row.date : timedIso(row.date, row.startTime!),
-            end: allDay || !row.endTime ? row.date : timedIso(row.date, row.endTime),
+            // Blocks are authored in the inspector's own wall clock and stored
+            // as a civil date + HH:MM, so they pass through unchanged in any
+            // viewer timezone — no instant round-trip.
+            start: allDay ? row.date : timedIso(row.date, row.startTime!, effectiveTz),
+            end: allDay || !row.endTime ? row.date : timedIso(row.date, row.endTime, effectiveTz),
+            civilDate: row.date,
+            ...(allDay
+                ? {}
+                : { startTime: row.startTime!, ...(row.endTime ? { endTime: row.endTime } : {}) }),
             allDay,
             userId: row.userId,
             ...(row.notes ? { meta: { notes: row.notes } } : {}),
@@ -248,8 +297,12 @@ export async function listCalendarItems(
             id: row.id,
             kind: 'external_busy',
             title: 'Busy',
-            start: allDay ? row.date : timedIso(row.date, row.startTime!),
-            end: allDay || !row.endTime ? row.date : timedIso(row.date, row.endTime),
+            start: allDay ? row.date : timedIso(row.date, row.startTime!, effectiveTz),
+            end: allDay || !row.endTime ? row.date : timedIso(row.date, row.endTime, effectiveTz),
+            civilDate: row.date,
+            ...(allDay
+                ? {}
+                : { startTime: row.startTime!, ...(row.endTime ? { endTime: row.endTime } : {}) }),
             allDay,
             userId: row.inspectorId,
         };

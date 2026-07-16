@@ -9,6 +9,7 @@ import { isAdminRole } from "~/lib/access";
 import {
   startOfWeek,
   addDays,
+  bucketEventsByCivilDate,
   calendarItemToEvent,
   defaultCalendarScope,
   type CalendarEvent,
@@ -207,20 +208,13 @@ export default function CalendarPage() {
     return currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }, [currentDate, viewMode]);
 
-  const eventsByDate = useMemo(() => {
-    const map = new Map<string, CalendarEvent[]>();
-    for (const ev of events) {
-      const d = ev.start ? new Date(ev.start) : null;
-      if (!d || isNaN(d.getTime())) continue;
-      const key = d.toISOString().slice(0, 10);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(ev);
-    }
-    return map;
-  }, [events]);
+  // Bucket by the server-provided civilDate (already in the viewer's effective
+  // tz). NEVER re-derive the day from `start` via toISOString() — that rolls
+  // back a day in UTC-positive zones (the calendar off-by-one bug).
+  const eventsByDate = useMemo(() => bucketEventsByCivilDate(events), [events]);
 
-  function getEventsForDate(d: Date) {
-    return eventsByDate.get(d.toISOString().slice(0, 10)) || [];
+  function getEventsForDate(civilDate: string) {
+    return eventsByDate.get(civilDate) || [];
   }
 
   const now = new Date();

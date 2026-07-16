@@ -53,8 +53,10 @@ export function useSessionContext(): SessionContext | null {
 /**
  * The resolved display timezone for the current viewer: the user's override
  * when set, otherwise the tenant default, otherwise 'UTC'. Values are already
- * validated to real IANA ids on write (branding/profile APIs). Reports and
- * calendar events do NOT use this — they always anchor to the tenant tz.
+ * validated to real IANA ids on write (branding/profile APIs). The calendar
+ * renders in this zone — the server buckets calendar items into the same
+ * effective tz (GET /api/calendar/items), so the client never re-derives days.
+ * Reports still anchor to the tenant tz, not this per-viewer value.
  */
 export function useDisplayTimeZone(): string {
   const ctx = useSessionContext();
