@@ -96,6 +96,9 @@ export const profileSchema = z.object({
   // Per-user display-timezone override (IANA name). Empty string = inherit the
   // tenant default. Constrained to a <select> in the UI.
   timezone: z.string().optional(),
+  // Per-user display-locale override (BCP-47). Empty string = inherit the tenant
+  // default. Constrained to a <Select> in the UI.
+  locale: z.string().optional(),
 });
 
 export type ProfileInput = z.infer<typeof profileSchema>;
