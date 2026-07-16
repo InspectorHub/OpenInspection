@@ -146,7 +146,9 @@ describe('GET /api/public/checkout/:token (Track I-a Task 7)', () => {
         expect(d.envelope.status).toEqual(expect.any(String));
         expect(d.envelope.completionPolicy).toBe('all');
         expect(d.envelope.progress).toEqual({ signed: 0, total: 1 });
-        expect(d.invoice).toEqual({ id: INV_ID, amountCents: 45000, status: expect.any(String) });
+        // Phase B — the checkout payload now carries the invoice's snapshot
+        // currency (defaults to USD for this seed) so the pay UI renders it.
+        expect(d.invoice).toEqual({ id: INV_ID, amountCents: 45000, currency: 'USD', status: expect.any(String) });
         expect(d.payment).toEqual({ required: true, paid: false });
         expect(d.inspection).toEqual({ id: INSP_ID, propertyAddress: '1 Main St' });
         expect(d.branding).toEqual({ companyName: 'Acme Inspections', primaryColor: '#ff5500' });
