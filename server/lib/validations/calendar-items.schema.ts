@@ -1,9 +1,11 @@
 import { z } from '@hono/zod-openapi';
 
 const CivilDateSchema = z.string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must use YYYY-MM-DD format');
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must use YYYY-MM-DD format')
+    .describe('Civil date in YYYY-MM-DD format');
 
-const IsoInstantSchema = z.string().datetime({ offset: true });
+const IsoInstantSchema = z.string().datetime({ offset: true })
+    .describe('ISO-8601 instant with timezone offset');
 
 const CalendarRangeValueSchema = z.union([CivilDateSchema, IsoInstantSchema]);
 
@@ -15,12 +17,16 @@ function rangeTimestamp(value: string, edge: 'start' | 'end'): number {
 }
 
 export const ListCalendarItemsQuerySchema = z.object({
-    start: CalendarRangeValueSchema,
-    end: CalendarRangeValueSchema,
-    userId: z.string().trim().min(1).optional(),
+    start: CalendarRangeValueSchema
+        .describe('Range start as a civil date or ISO instant'),
+    end: CalendarRangeValueSchema
+        .describe('Range end as a civil date or ISO instant'),
+    userId: z.string().trim().min(1).optional()
+        .describe('Single user id to include in the feed'),
     userIds: z.string().trim().min(1).transform((value) =>
         [...new Set(value.split(',').map((id) => id.trim()).filter(Boolean))],
-    ).pipe(z.array(z.string().min(1)).min(1)).optional(),
+    ).pipe(z.array(z.string().min(1)).min(1)).optional()
+        .describe('Comma-separated user ids for team calendar views'),
 }).refine((value) => !(value.userId && value.userIds), {
     message: 'Use either userId or userIds, not both',
 }).refine((value) => rangeTimestamp(value.start, 'start') <= rangeTimestamp(value.end, 'end'), {
@@ -36,16 +42,17 @@ const CalendarItemKindSchema = z.enum([
 ]);
 
 const CalendarItemSchema = z.object({
-    id: z.string(),
-    kind: CalendarItemKindSchema,
-    title: z.string(),
-    start: z.string(),
-    end: z.string(),
-    allDay: z.boolean(),
-    color: z.string().optional(),
-    inspectionId: z.string().optional(),
-    userId: z.string().optional(),
-    meta: z.record(z.string(), z.unknown()).optional(),
+    id: z.string().describe('Stable item id within the feed'),
+    kind: CalendarItemKindSchema.describe('Item kind for calendar rendering'),
+    title: z.string().describe('Display title for the calendar item'),
+    start: z.string().describe('Item start as civil date or ISO instant'),
+    end: z.string().describe('Item end as civil date or ISO instant'),
+    allDay: z.boolean().describe('Whether the item spans a full civil date'),
+    color: z.string().optional().describe('Optional accent color for the item'),
+    inspectionId: z.string().optional().describe('Linked inspection id when applicable'),
+    userId: z.string().optional().describe('Owning user id when the item is personal'),
+    meta: z.record(z.string(), z.unknown()).optional()
+        .describe('Optional kind-specific metadata for the client'),
 });
 
 export const CalendarItemsResponseSchema = z.object({

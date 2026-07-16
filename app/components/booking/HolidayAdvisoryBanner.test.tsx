@@ -15,7 +15,8 @@ describe("HolidayAdvisoryBanner", () => {
     const html = renderToStaticMarkup(
       <HolidayAdvisoryBanner name="Thanksgiving Day" conciergeReviewRequired={false} />,
     );
-    expect(html).toContain("We'll confirm availability.");
+    // SSR escapes the apostrophe as &#x27;
+    expect(html).toContain("We&#x27;ll confirm availability.");
     expect(html).not.toContain("Request received — office will confirm.");
   });
 });

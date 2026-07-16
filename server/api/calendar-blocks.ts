@@ -58,7 +58,7 @@ const listBlocksRoute = createRoute(withMcpMetadata({
     path: '/blocks',
     operationId: 'listCalendarBlocks',
     tags: ['calendar'],
-    summary: 'List calendar blocks',
+    summary: 'List calendar blocks in range',
     description: 'Lists calendar blocks within an inclusive civil-date range. Inspectors can list their own blocks; owners and managers can select another user.',
     middleware: [allowedRoles],
     request: { query: ListCalendarBlocksQuerySchema },

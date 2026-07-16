@@ -973,30 +973,36 @@
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 200,
+            "description": "Short label shown on the calendar block"
           },
           "date": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date in YYYY-MM-DD format"
           },
           "startTime": {
             "type": "string",
             "nullable": true,
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "Start time when the block is not all-day; null otherwise"
           },
           "endTime": {
             "type": "string",
             "nullable": true,
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "End time when the block is not all-day; null otherwise"
           },
           "allDay": {
             "type": "boolean",
-            "default": false
+            "default": false,
+            "description": "When true, the block covers the full civil date"
           },
           "notes": {
             "type": "string",
             "nullable": true,
-            "maxLength": 2000
+            "maxLength": 2000,
+            "description": "Optional free-text notes for the calendar block"
           }
         },
         "required": [
@@ -4967,10 +4973,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "",
+          "description": "Calendar block id within the tenant",
           "schema": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Calendar block id within the tenant"
           }
         }
       ],
@@ -5050,10 +5057,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "",
+          "description": "Custom holiday id within the tenant",
           "schema": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Custom holiday id within the tenant"
           }
         }
       ],
@@ -8597,20 +8605,22 @@
           "name": "start",
           "in": "query",
           "required": true,
-          "description": "",
+          "description": "Inclusive range start as a civil date",
           "schema": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Inclusive range start as a civil date"
           }
         },
         {
           "name": "end",
           "in": "query",
           "required": true,
-          "description": "",
+          "description": "Inclusive range end as a civil date",
           "schema": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Inclusive range end as a civil date"
           }
         },
         {
@@ -8627,7 +8637,7 @@
       ],
       "body": null
     },
-    "summary": "List calendar blocks",
+    "summary": "List calendar blocks in range",
     "description": "Lists calendar blocks within an inclusive civil-date range. Inspectors can list their own blocks; owners and managers can select another user."
   },
   {
@@ -8684,56 +8694,64 @@
           "name": "start",
           "in": "query",
           "required": true,
-          "description": "",
+          "description": "Range start as a civil date or ISO instant",
           "schema": {
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Civil date in YYYY-MM-DD format"
               },
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date-time",
+                "description": "ISO-8601 instant with timezone offset"
               }
-            ]
+            ],
+            "description": "Range start as a civil date or ISO instant"
           }
         },
         {
           "name": "end",
           "in": "query",
           "required": true,
-          "description": "",
+          "description": "Range end as a civil date or ISO instant",
           "schema": {
             "anyOf": [
               {
                 "type": "string",
-                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Civil date in YYYY-MM-DD format"
               },
               {
                 "type": "string",
-                "format": "date-time"
+                "format": "date-time",
+                "description": "ISO-8601 instant with timezone offset"
               }
-            ]
+            ],
+            "description": "Range end as a civil date or ISO instant"
           }
         },
         {
           "name": "userId",
           "in": "query",
           "required": false,
-          "description": "",
+          "description": "Single user id to include in the feed",
           "schema": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Single user id to include in the feed"
           }
         },
         {
           "name": "userIds",
           "in": "query",
           "required": false,
-          "description": "",
+          "description": "Comma-separated user ids for team calendar views",
           "schema": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Comma-separated user ids for team calendar views"
           }
         }
       ],
@@ -13948,7 +13966,7 @@
     "method": "GET",
     "pathTemplate": "/api/admin/holidays/preview",
     "scopes": [
-      "admin"
+      "read"
     ],
     "tag": "admin",
     "tier": "extended",
@@ -13970,7 +13988,7 @@
       "body": null
     },
     "summary": "Preview resolved closed dates for a year",
-    "description": "Returns the union of federal, state, and custom holidays for the configured region."
+    "description": "Returns the union of federal, state, and custom holidays for the configured region. Readable by inspectors for the My Schedule company-closed strip."
   },
   {
     "operationId": "previewMessageTemplate",
@@ -15867,10 +15885,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "",
+          "description": "Calendar block id within the tenant",
           "schema": {
             "type": "string",
-            "minLength": 1
+            "minLength": 1,
+            "description": "Calendar block id within the tenant"
           }
         }
       ],
@@ -15885,29 +15904,35 @@
           "title": {
             "type": "string",
             "minLength": 1,
-            "maxLength": 200
+            "maxLength": 200,
+            "description": "Short label shown on the calendar block"
           },
           "date": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date in YYYY-MM-DD format"
           },
           "startTime": {
             "type": "string",
             "nullable": true,
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "Start time when the block is not all-day; null otherwise"
           },
           "endTime": {
             "type": "string",
             "nullable": true,
-            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$"
+            "pattern": "^([01]\\d|2[0-3]):[0-5]\\d$",
+            "description": "End time when the block is not all-day; null otherwise"
           },
           "allDay": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "When true, the block covers the full civil date"
           },
           "notes": {
             "type": "string",
             "nullable": true,
-            "maxLength": 2000
+            "maxLength": 2000,
+            "description": "Optional free-text notes for the calendar block"
           }
         }
       }

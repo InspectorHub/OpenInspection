@@ -30,7 +30,7 @@ export const CustomHolidayResponseSchema = z.object({
 }).openapi('CustomHolidayResponse');
 
 export const CustomHolidayParamsSchema = z.object({
-    id: z.string().min(1),
+    id: z.string().min(1).describe('Custom holiday id within the tenant'),
 }).openapi('CustomHolidayParams');
 
 export const DeleteCustomHolidayResponseSchema = z.object({
