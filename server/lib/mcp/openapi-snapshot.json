@@ -8597,6 +8597,79 @@
     "description": "Returns combined calendar events (local inspections + Google Calendar busy blocks) in FullCalendar-compatible format. Used by the dashboard month/week views."
   },
   {
+    "operationId": "listCalendarItems",
+    "method": "GET",
+    "pathTemplate": "/api/calendar/items",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "start",
+          "in": "query",
+          "required": true,
+          "description": "",
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
+          }
+        },
+        {
+          "name": "end",
+          "in": "query",
+          "required": true,
+          "description": "",
+          "schema": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
+          }
+        },
+        {
+          "name": "userId",
+          "in": "query",
+          "required": false,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        {
+          "name": "userIds",
+          "in": "query",
+          "required": false,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List unified calendar items",
+    "description": "Combines inspections, inspection events, calendar blocks, and external busy time for a civil-date or instant range. Owners and managers may select multiple users; inspectors are restricted to themselves."
+  },
+  {
     "operationId": "listComplianceErasureLog",
     "method": "GET",
     "pathTemplate": "/api/admin/compliance/erasure-log",
