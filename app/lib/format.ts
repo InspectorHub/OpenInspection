@@ -32,13 +32,18 @@ export function formatDate(
   }).format(d);
 }
 
-export function formatTime(value: DateInput, opts: { locale: string; timeZone?: string }): string {
+export function formatTime(
+  value: DateInput,
+  opts: { locale: string; timeZone?: string; timeZoneName?: "short" | "long" },
+): string {
   const d = toDate(value);
   if (!d) return "";
   return new Intl.DateTimeFormat(opts.locale, {
     hour: "numeric",
     minute: "2-digit",
-    ...(opts.timeZone ? { timeZone: opts.timeZone } : {}),
+    ...(opts.timeZone
+      ? { timeZone: opts.timeZone, ...(opts.timeZoneName ? { timeZoneName: opts.timeZoneName } : {}) }
+      : {}),
   }).format(d);
 }
 

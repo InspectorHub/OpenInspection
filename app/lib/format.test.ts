@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCurrency, formatDate, formatDateTime, formatNumber } from "./format";
+import { formatCurrency, formatDate, formatDateTime, formatNumber, formatTime } from "./format";
 
 describe("shared formatter", () => {
   it("formats a civil date in the given locale + tz", () => {
@@ -20,6 +20,14 @@ describe("shared formatter", () => {
   it("returns empty string for missing/invalid date input", () => {
     expect(formatDate(null, { locale: "en-US" })).toBe("");
     expect(formatDate("nope", { locale: "en-US" })).toBe("");
+  });
+
+  it("formats a time in the given tz, optionally with a zone label", () => {
+    expect(formatTime("2026-07-17T09:00:00.000Z", { locale: "en-US", timeZone: "UTC" }))
+      .toMatch(/9:00\s?AM/);
+    expect(formatTime("2026-07-17T09:00:00.000Z", { locale: "en-US", timeZone: "UTC", timeZoneName: "short" }))
+      .toContain("UTC");
+    expect(formatTime(null, { locale: "en-US" })).toBe("");
   });
 
   it("formats numbers per locale", () => {

@@ -8,6 +8,11 @@ describe('formatCents', () => {
     expect(formatCents(500000)).toBe('$5,000.00');
     expect(formatCents(185000000)).toBe('$1,850,000.00');
   });
+  // Delegation to the shared formatter is behavior-preserving for the en-US/USD
+  // default (Phase F reference migration; Phase B threads real currency through).
+  it('formats USD in en-US by default (unchanged)', () => {
+    expect(formatCents(123450)).toBe('$1,234.50');
+  });
 });
 
 describe('parseDollarsToCents', () => {

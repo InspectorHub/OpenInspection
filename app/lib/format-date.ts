@@ -1,5 +1,12 @@
+import { formatDate, formatTime } from './format';
+
 /** C-14 part 1: humanize raw ISO timestamps on dashboard rows. en-US (US-market product).
- *  `now`/`timeZone` are injectable for deterministic tests; callers omit them. */
+ *  `now`/`timeZone` are injectable for deterministic tests; callers omit them.
+ *
+ *  Date/time rendering delegates to the shared formatter (app/lib/format); this
+ *  wrapper keeps the dashboard-specific composition — drop the year in the current
+ *  year, and join `date · time` with a short zone label. locale is pinned to
+ *  'en-US'; Phase A threads the viewer's effective locale through. */
 export function formatInspectionDateTime(
     iso: string | null | undefined,
     now: Date = new Date(),
@@ -10,12 +17,14 @@ export function formatInspectionDateTime(
     const d = new Date(dateOnly ? `${iso}T00:00:00Z` : iso);
     if (isNaN(d.getTime())) return 'no date';
     const tz = dateOnly ? 'UTC' : timeZone;
-    const md = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: tz });
-    const year = d.toLocaleDateString('en-US', { year: 'numeric', timeZone: tz });
-    const yearPart = Number(year) === now.getUTCFullYear() ? '' : `, ${year}`;
-    if (dateOnly) return `${md}${yearPart}`;
+    // en-US formatDate always ends in `, YYYY`; strip it when the year matches now.
+    const full = formatDate(iso, { locale: 'en-US', timeZone: tz, month: 'short' });
+    const yearMatch = full.match(/,\s*(\d{4})$/);
+    const year = yearMatch ? Number(yearMatch[1]) : NaN;
+    const datePart = year === now.getUTCFullYear() ? full.replace(/,\s*\d{4}$/, '') : full;
+    if (dateOnly) return datePart;
     // Include the short zone name so a displayed time-of-day is unambiguous
     // (e.g. "9:00 AM EDT") — matters once tenants/users configure a timezone.
-    const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz, timeZoneName: 'short' });
-    return `${md}${yearPart} · ${time}`;
+    const time = formatTime(iso, { locale: 'en-US', timeZone: tz, timeZoneName: 'short' });
+    return `${datePart} · ${time}`;
 }

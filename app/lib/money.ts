@@ -4,14 +4,17 @@
  * these convert to/from a user-facing `$` string only at the UI boundary.
  * Extracted from RepairBuilderSection.tsx / repair-request.$shareToken.tsx so the
  * Repair Request Builder and the Commercial PCA cost engine format money identically.
+ *
+ * Currency rendering delegates to the shared locale-aware formatter (app/lib/format).
+ * These wrappers pin locale='en-US' + currency='USD' to preserve current behavior;
+ * Phase B threads the tenant's effective currency through instead.
  */
+
+import { formatCurrency } from './format';
 
 /** Integer cents -> `$X,XXX.XX` (en-US, two decimals, thousands separators). */
 export function formatCents(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+  return formatCurrency(cents, { locale: 'en-US', currency: 'USD' });
 }
 
 /** User dollar string -> integer cents. Empty / non-numeric -> null. */
@@ -31,11 +34,10 @@ export function parseDollarsToCents(input: string): number | null {
  * enters are preserved. Storage stays in integer cents.
  */
 export function formatDollars(cents: number): string {
-  const hasCents = cents % 100 !== 0;
-  return `$${(cents / 100).toLocaleString('en-US', {
-    minimumFractionDigits: hasCents ? 2 : 0,
-    maximumFractionDigits: 2,
-  })}`;
+  const formatted = formatCurrency(cents, { locale: 'en-US', currency: 'USD' });
+  // Opinion-of-Cost convention is whole dollars: drop the redundant `.00` when
+  // the amount has no cents; keep any cents the user actually entered.
+  return cents % 100 === 0 ? formatted.replace(/\.00$/, '') : formatted;
 }
 
 /**
