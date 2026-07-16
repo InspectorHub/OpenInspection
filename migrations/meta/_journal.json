@@ -57,6 +57,13 @@
       "when": 1784198482703,
       "tag": "0007_large_exiles",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784207480662,
+      "tag": "0008_swift_stryfe",
+      "breakpoints": true
     }
   ]
 }
