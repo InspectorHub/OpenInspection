@@ -43,7 +43,7 @@ export const CalendarBlockParamsSchema = z.object({
     id: z.string().min(1),
 });
 
-export const CalendarBlockSchema = z.object({
+const CalendarBlockSchema = z.object({
     id: z.string(),
     tenantId: z.string(),
     userId: z.string(),

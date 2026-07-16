@@ -27,7 +27,7 @@ export const ListCalendarItemsQuerySchema = z.object({
     message: 'Start must be on or before end',
 });
 
-export const CalendarItemKindSchema = z.enum([
+const CalendarItemKindSchema = z.enum([
     'inspection',
     'inspection_event',
     'calendar_block',
@@ -35,7 +35,7 @@ export const CalendarItemKindSchema = z.enum([
     'company_holiday',
 ]);
 
-export const CalendarItemSchema = z.object({
+const CalendarItemSchema = z.object({
     id: z.string(),
     kind: CalendarItemKindSchema,
     title: z.string(),

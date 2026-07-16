@@ -28,6 +28,7 @@ import {
 } from '../../lib/validations/admin.schema';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import { tenantConfigs } from '../../lib/db/schema';
+import { defaultPoliciesOnFirstEnable } from '../../lib/holidays/apply-holiday-policy';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 
 
@@ -516,12 +517,9 @@ export const adminSettingsRoutes = createApiRouter()
             update.holidayRegion = body.holidayRegion;
             // First enable: default public block + internal advisory unless explicitly patched.
             if (wasOff && body.holidayRegion !== null) {
-                if (body.holidayPublicPolicy === undefined) {
-                    update.holidayPublicPolicy = 'block';
-                }
-                if (body.holidayInternalPolicy === undefined) {
-                    update.holidayInternalPolicy = 'advisory';
-                }
+                const defaults = defaultPoliciesOnFirstEnable();
+                if (body.holidayPublicPolicy === undefined) update.holidayPublicPolicy = defaults.holidayPublicPolicy;
+                if (body.holidayInternalPolicy === undefined) update.holidayInternalPolicy = defaults.holidayInternalPolicy;
             }
         }
         if (body.holidayPublicPolicy !== undefined) {

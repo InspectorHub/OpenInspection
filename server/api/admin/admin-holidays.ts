@@ -128,7 +128,7 @@ const checkRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['admin'], tier: 'extended' }));
 
-export const adminHolidayRoutes = createApiRouter()
+const adminHolidayRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { year } = c.req.valid('query');
@@ -224,5 +224,4 @@ export const adminHolidayRoutes = createApiRouter()
         }, 200);
     });
 
-export type AdminHolidaysApi = typeof adminHolidayRoutes;
 export default adminHolidayRoutes;

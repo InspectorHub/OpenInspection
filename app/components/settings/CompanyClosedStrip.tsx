@@ -11,7 +11,7 @@ const PUBLIC_POLICY_LABELS: Record<HolidayPublicPolicy, string> = {
   open: "Allowed",
 };
 
-export function publicPolicyLabel(policy: HolidayPublicPolicy): string {
+function publicPolicyLabel(policy: HolidayPublicPolicy): string {
   return PUBLIC_POLICY_LABELS[policy];
 }
 

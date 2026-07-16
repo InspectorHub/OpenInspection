@@ -14,7 +14,7 @@ import {
     resolveCompanyClosedDatesInRange,
 } from '../lib/holidays/load-tenant-holidays';
 
-export type CalendarItemKind =
+type CalendarItemKind =
     | 'inspection'
     | 'inspection_event'
     | 'calendar_block'
@@ -66,7 +66,7 @@ function timedIso(date: string, time: string): string {
  * Virtual company-holiday calendar items whenever holiday_region is set and
  * the civil date is in the resolved catalog (independent of public policy).
  */
-export async function listCompanyHolidayItems(
+async function listCompanyHolidayItems(
     database: D1Database,
     tenantId: string,
     input: ListCalendarItemsInput,

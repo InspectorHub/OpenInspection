@@ -146,7 +146,7 @@ async function tenantUserExists(
     return Boolean(user);
 }
 
-export const calendarBlockRoutes = createApiRouter()
+const calendarBlockRoutes = createApiRouter()
     .openapi(createBlockRoute, async (c) => {
         const user = c.get('user');
         const tenantId = c.get('tenantId');
@@ -279,7 +279,5 @@ export const calendarBlockRoutes = createApiRouter()
             .where(and(eq(calendarBlocks.tenantId, tenantId), eq(calendarBlocks.id, id)));
         return c.json({ success: true as const }, 200);
     });
-
-export type CalendarBlocksApi = typeof calendarBlockRoutes;
 
 export default calendarBlockRoutes;

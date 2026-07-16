@@ -50,7 +50,7 @@ function isAdmin(role: string | undefined): boolean {
     return role === 'owner' || role === 'manager';
 }
 
-export const calendarItemsRoutes = createApiRouter()
+const calendarItemsRoutes = createApiRouter()
     .openapi(listItemsRoute, async (c) => {
         const user = c.get('user');
         const role = c.get('userRole');
@@ -80,7 +80,5 @@ export const calendarItemsRoutes = createApiRouter()
             data: { items },
         }, 200);
     });
-
-export type CalendarItemsApi = typeof calendarItemsRoutes;
 
 export default calendarItemsRoutes;

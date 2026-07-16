@@ -4,23 +4,12 @@ const CivilDateSchema = z.string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must use YYYY-MM-DD format')
     .describe('Civil date YYYY-MM-DD');
 
-export const HolidayRegionSchema = z.union([
-    z.literal('US'),
-    z.string().regex(/^US-[A-Z]{2}$/),
-]).nullable().describe('Holiday catalog region: US, US-{ST}, or null to disable');
-
-export const HolidayPublicPolicySchema = z.enum(['open', 'block', 'advisory'])
-    .describe('How public booking treats catalog closed dates');
-
-export const HolidayInternalPolicySchema = z.enum(['advisory', 'block'])
-    .describe('How internal scheduling treats catalog closed dates');
-
 export const CreateCustomHolidaySchema = z.object({
     date: CivilDateSchema,
     name: z.string().trim().min(1).max(200).describe('Display name for the closed day'),
 }).openapi('CreateCustomHoliday');
 
-export const CustomHolidaySchema = z.object({
+const CustomHolidaySchema = z.object({
     id: z.string().describe('Custom holiday id'),
     date: CivilDateSchema,
     name: z.string().describe('Display name'),

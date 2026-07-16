@@ -16,7 +16,7 @@ export interface CalendarEvent {
   extendedProps?: Record<string, unknown>;
 }
 
-export type CalendarItemKind =
+type CalendarItemKind =
   | "inspection"
   | "inspection_event"
   | "calendar_block"

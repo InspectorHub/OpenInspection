@@ -70,12 +70,14 @@ export function resolveCompanyClosedDatesInRange(input: {
     return merged;
 }
 
-export const SUPPORTED_STATE_CODES = ['TX', 'CA', 'NY', 'FL', 'IL'] as const;
+const SUPPORTED_STATE_CODES = ['TX', 'CA', 'NY', 'FL', 'IL'] as const;
 
 export function parseHolidayRegion(raw: string | null | undefined): HolidayRegion | null {
     if (!raw) return null;
     if (raw === 'US') return 'US';
     const m = /^US-([A-Z]{2})$/.exec(raw);
     if (!m) return null;
-    return `US-${m[1]}` as HolidayRegion;
+    const state = m[1] as (typeof SUPPORTED_STATE_CODES)[number];
+    if (!(SUPPORTED_STATE_CODES as readonly string[]).includes(state)) return null;
+    return `US-${state}`;
 }
