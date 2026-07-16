@@ -162,6 +162,3 @@ export const googleCalendarProvider: CalendarProvider = {
         }
     },
 };
-
-// Re-export for tests that import capability helpers from google module path.
-export { capabilityToScopes };

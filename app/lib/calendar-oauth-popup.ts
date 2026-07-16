@@ -4,7 +4,6 @@ import {
 } from '../../server/lib/calendar/oauth-popup-landing';
 
 export { CALENDAR_OAUTH_MESSAGE };
-export type { CalendarOAuthPopupPayload };
 
 export const CALENDAR_OAUTH_POPUP_NAME = 'oi-google-calendar-oauth';
 

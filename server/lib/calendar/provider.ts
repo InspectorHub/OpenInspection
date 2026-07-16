@@ -1,5 +1,5 @@
 export type CalendarProviderId = 'google' | 'microsoft' | 'apple';
-export type CalendarAuthType = 'oauth' | 'caldav';
+type CalendarAuthType = 'oauth' | 'caldav';
 export type CalendarCapability = 'availability_read' | 'events_read_write';
 
 export interface BusyBlock {
@@ -7,7 +7,7 @@ export interface BusyBlock {
     end: string;
 }
 
-export interface CalendarPushEventInput {
+interface CalendarPushEventInput {
     summary: string;
     location?: string;
     description?: string;

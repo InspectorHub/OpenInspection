@@ -9,7 +9,7 @@ export interface CalendarOAuthCredentials {
 }
 
 /** CalDAV app-password shape (Apple / iCloud — future). */
-export interface CalendarCalDavCredentials {
+interface CalendarCalDavCredentials {
     appPassword: string;
     url: string;
 }
