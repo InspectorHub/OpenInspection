@@ -36,6 +36,7 @@ import {
     CALENDAR_OAUTH_MESSAGE,
     renderCalendarOAuthPopupLanding,
 } from '../lib/calendar/oauth-popup-landing';
+import calendarBlockRoutes from './calendar-blocks';
 import type { Context } from 'hono';
 import type { HonoConfig } from '../types/hono';
 
@@ -105,6 +106,7 @@ const syncRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 export const calendarRoutes = createApiRouter()
+    .route('/', calendarBlockRoutes)
     .openapi(disconnectRoute, async (c) => {
         const user = c.get('user');
         if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
