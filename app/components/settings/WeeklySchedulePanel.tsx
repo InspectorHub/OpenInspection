@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
-import type { action } from "~/routes/settings-booking";
+import type { action } from "~/routes/settings-schedule";
 
 interface AvailabilitySlot {
   id: number;
