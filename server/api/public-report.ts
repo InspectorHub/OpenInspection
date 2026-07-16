@@ -487,7 +487,9 @@ export const publicReportRoutes = createApiRouter()
             const svc = new StripeService(secretKey);
             const { clientSecret } = await svc.createPaymentIntent(
                 { id: inv.id, amountCents: inv.amountCents, inspectionId: inv.inspectionId, status: inv.status, paidAt: inv.paidAt },
-                { tenantId, descriptionPrefix: 'Inspection invoice' },
+                // Phase B — charge in the invoice's snapshot currency (Stripe lowercases,
+                // e.g. 'cad'), not a hardcoded USD, so the charge matches the billed amount.
+                { tenantId, currency: inv.currency, descriptionPrefix: 'Inspection invoice' },
             );
             return c.json({ success: true as const, data: { clientSecret, publishableKey, amountCents: inv.amountCents } }, 200);
         } catch (err) {
