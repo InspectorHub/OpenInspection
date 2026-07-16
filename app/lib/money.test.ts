@@ -13,6 +13,11 @@ describe('formatCents', () => {
   it('formats USD in en-US by default (unchanged)', () => {
     expect(formatCents(123450)).toBe('$1,234.50');
   });
+  // Phase A: optional locale/currency threads the viewer's effective values.
+  it('accepts a locale override, still $ for USD', () => {
+    expect(formatCents(123450, { locale: 'es-419', currency: 'USD' })).toContain('$');
+    expect(formatCents(123450, { locale: 'es-419', currency: 'USD' })).toContain('1,234.50');
+  });
 });
 
 describe('parseDollarsToCents', () => {

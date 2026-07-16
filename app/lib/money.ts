@@ -6,15 +6,19 @@
  * Repair Request Builder and the Commercial PCA cost engine format money identically.
  *
  * Currency rendering delegates to the shared locale-aware formatter (app/lib/format).
- * These wrappers pin locale='en-US' + currency='USD' to preserve current behavior;
- * Phase B threads the tenant's effective currency through instead.
+ * `locale`/`currency` are optional and default to en-US/USD so unmigrated callers
+ * stay byte-identical; migrated call sites thread the viewer's effective values
+ * (useDisplayLocale/useDisplayCurrency on the client, tenant defaults on the server).
  */
 
 import { formatCurrency } from './format';
 
-/** Integer cents -> `$X,XXX.XX` (en-US, two decimals, thousands separators). */
-export function formatCents(cents: number): string {
-  return formatCurrency(cents, { locale: 'en-US', currency: 'USD' });
+/** Optional locale/currency override; both default to en-US/USD. */
+export type MoneyOpts = { locale?: string; currency?: string };
+
+/** Integer cents -> `$X,XXX.XX` (defaults en-US/USD, two decimals, thousands separators). */
+export function formatCents(cents: number, opts?: MoneyOpts): string {
+  return formatCurrency(cents, { locale: opts?.locale ?? 'en-US', currency: opts?.currency ?? 'USD' });
 }
 
 /** User dollar string -> integer cents. Empty / non-numeric -> null. */
@@ -33,8 +37,8 @@ export function parseDollarsToCents(input: string): number | null {
  * so the common case never carries a redundant `.00`, but any cents the user
  * enters are preserved. Storage stays in integer cents.
  */
-export function formatDollars(cents: number): string {
-  const formatted = formatCurrency(cents, { locale: 'en-US', currency: 'USD' });
+export function formatDollars(cents: number, opts?: MoneyOpts): string {
+  const formatted = formatCurrency(cents, { locale: opts?.locale ?? 'en-US', currency: opts?.currency ?? 'USD' });
   // Opinion-of-Cost convention is whole dollars: drop the redundant `.00` when
   // the amount has no cents; keep any cents the user actually entered.
   return cents % 100 === 0 ? formatted.replace(/\.00$/, '') : formatted;
