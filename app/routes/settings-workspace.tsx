@@ -13,6 +13,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
+import { LOCALE_OPTIONS, CURRENCY_OPTIONS } from "~/lib/locales";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -31,6 +32,8 @@ interface Branding {
   pdfShowPageNumbers?: boolean | null;
   pdfShowLicense?: boolean | null;
   defaultTimezone?: string | null;
+  defaultLocale?: string | null;
+  currency?: string | null;
 }
 
 const THEMES = ["modern", "classic", "minimal"] as const;
@@ -107,6 +110,9 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   // Tenant display timezone (IANA). Only sent when a value is present.
   if (typeof v.defaultTimezone === "string" && v.defaultTimezone) body.defaultTimezone = v.defaultTimezone;
+  // Tenant display locale (BCP-47) + currency (ISO 4217). Only sent when present.
+  if (typeof v.defaultLocale === "string" && v.defaultLocale) body.defaultLocale = v.defaultLocale;
+  if (typeof v.currency === "string" && v.currency) body.currency = v.currency;
 
   const api = createApi(context, { token });
   // Body is runtime-assembled from Zod-validated form values matching UpdateBrandingSchema;
@@ -226,6 +232,28 @@ export default function SettingsWorkspacePage() {
               name="defaultTimezone"
               defaultValue={branding.defaultTimezone ?? "UTC"}
               options={TIMEZONE_SELECT_OPTIONS}
+            />
+          </div>
+        </section>
+
+        {/* Locale & Currency */}
+        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Locale &amp; Currency</h3>
+          <p className="text-[12px] text-ih-fg-3">
+            Controls how dates, times, numbers, and money are formatted across reports and the dashboard. Individual users can override the language/locale in their profile; currency is company-wide.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl">
+            <Select
+              label="Company locale"
+              name="defaultLocale"
+              defaultValue={branding.defaultLocale ?? "en-US"}
+              options={LOCALE_OPTIONS}
+            />
+            <Select
+              label="Currency"
+              name="currency"
+              defaultValue={branding.currency ?? "USD"}
+              options={CURRENCY_OPTIONS}
             />
           </div>
         </section>

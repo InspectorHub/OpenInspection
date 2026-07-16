@@ -116,7 +116,9 @@ export const adminBrandingRoutes = createApiRouter()
             supportEmail: branding.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
             logoUrl: branding.logoUrl || null,
             billingUrl: branding.billingUrl || null,
-            defaultTimezone: branding.defaultTimezone || 'UTC'
+            defaultTimezone: branding.defaultTimezone || 'UTC',
+            defaultLocale: branding.defaultLocale || 'en-US',
+            currency: branding.currency || 'USD'
         };
 
         return c.json({ success: true, data: { branding: formattedBranding } }, 200);
@@ -133,7 +135,9 @@ export const adminBrandingRoutes = createApiRouter()
             supportEmail: result.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
             logoUrl: result.logoUrl || null,
             billingUrl: result.billingUrl || null,
-            defaultTimezone: result.defaultTimezone || 'UTC'
+            defaultTimezone: result.defaultTimezone || 'UTC',
+            defaultLocale: result.defaultLocale || 'en-US',
+            currency: result.currency || 'USD'
         };
 
         return c.json({ success: true, data: { branding: formattedResult } }, 200);

@@ -44,7 +44,9 @@ export class BrandingService {
             logoUrl: null,
             supportEmail: defaults.supportEmail,
             billingUrl: '',
-            defaultTimezone: 'UTC'
+            defaultTimezone: 'UTC',
+            defaultLocale: 'en-US',
+            currency: 'USD'
         };
     }
 
