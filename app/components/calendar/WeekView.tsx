@@ -1,4 +1,4 @@
-import { eventColor, isSameDay, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+import { eventColor, isEventDraggable, isSameDay, type CalendarEvent } from "~/components/calendar/calendar-helpers";
 
 export function WeekView({
   weekDays,
@@ -33,6 +33,32 @@ export function WeekView({
               </div>
             ))}
           </div>
+          <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border min-h-[42px]">
+            <div className="text-[10px] font-bold text-ih-fg-4 text-right pr-2 pt-2">All day</div>
+            {weekDays.map((d) => {
+              const dateStr = d.toISOString().slice(0, 10);
+              const allDayEvents = getEventsForDate(d).filter((ev) => ev.extendedProps?.allDay === true);
+              return (
+                <div
+                  key={`all-day-${d.toISOString()}`}
+                  className="border-l border-ih-border p-0.5 cursor-pointer hover:bg-ih-primary-tint"
+                  onClick={() => handleDayClick(`${dateStr}T09:00`)}
+                >
+                  {allDayEvents.map((ev) => (
+                    <button
+                      key={ev.id}
+                      onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }}
+                      draggable={isEventDraggable(ev)}
+                      onDragStart={(e) => e.dataTransfer.setData("text/plain", ev.id)}
+                      className={`w-full text-left px-1 py-0.5 rounded text-[10px] font-medium text-white truncate mb-0.5 ${eventColor(ev)}`}
+                    >
+                      {ev.title}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
           {/* Time slots */}
           <div className="max-h-[500px] overflow-y-auto">
             {hours.map((h) => (
@@ -42,6 +68,7 @@ export function WeekView({
                 </div>
                 {weekDays.map((d) => {
                   const dayEvents = getEventsForDate(d).filter((ev) => {
+                    if (ev.extendedProps?.allDay === true) return false;
                     const evDate = new Date(ev.start);
                     return evDate.getHours() === h;
                   });
@@ -62,7 +89,7 @@ export function WeekView({
                         <button
                           key={ev.id}
                           onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }}
-                          draggable
+                          draggable={isEventDraggable(ev)}
                           onDragStart={(e) => e.dataTransfer.setData("text/plain", ev.id)}
                           className={`w-full text-left px-1 py-0.5 rounded text-[10px] font-medium text-white truncate mb-0.5 ${eventColor(ev)}`}
                         >

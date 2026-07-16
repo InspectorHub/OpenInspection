@@ -3,9 +3,24 @@ import { useLoaderData, useFetcher, useNavigate, useNavigation } from "react-rou
 import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { Modal, PageHeader, Icon } from "@core/shared-ui";
+import { PageHeader } from "@core/shared-ui";
 import { useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { startOfWeek, addDays, type CalendarEvent, type ViewMode } from "~/components/calendar/calendar-helpers";
+import { isAdminRole } from "~/lib/access";
+import {
+  startOfWeek,
+  addDays,
+  calendarItemToEvent,
+  defaultCalendarScope,
+  type CalendarEvent,
+  type CalendarItem,
+  type CalendarScope,
+  type ViewMode,
+} from "~/components/calendar/calendar-helpers";
+import { BlockTimeDrawer, type CalendarMember } from "~/components/calendar/BlockTimeDrawer";
+import { CalendarScopeToolbar } from "~/components/calendar/CalendarScopeToolbar";
+import { CalendarNavBar } from "~/components/calendar/CalendarNavBar";
+import { CalendarEventModal } from "~/components/calendar/CalendarEventModal";
+import { CalendarLoadingSkeleton } from "~/components/calendar/CalendarLoadingSkeleton";
 import { MonthView } from "~/components/calendar/MonthView";
 import { WeekView } from "~/components/calendar/WeekView";
 import { DayView } from "~/components/calendar/DayView";
@@ -14,69 +29,163 @@ export function meta() {
   return [{ title: "Calendar - OpenInspection" }];
 }
 
-/* ------------------------------------------------------------------ */
-/*  Loader                                                             */
-/* ------------------------------------------------------------------ */
-
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
+  const api = createApi(context, { token });
+  const url = new URL(request.url);
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
   const end = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString();
+
   try {
-    const api = createApi(context, { token });
-    const res = await api.calendarEvents.index.$get({ query: { start, end } });
-    const body = res.ok ? ((await res.json()) as unknown as Record<string, unknown>) : { data: [] };
-    const events = (body.data ?? []) as CalendarEvent[];
-    return { events };
+    const meGet = api.auth.me.$get as unknown as (args?: unknown) => Promise<Response>;
+    const [meRes, membersRes] = await Promise.all([
+      meGet().catch(() => null),
+      api.admin.members.$get().catch(() => null),
+    ]);
+    if (!meRes?.ok) throw new Error("Current user unavailable");
+
+    const meBody = (await meRes.json()) as { data?: { user?: { id?: string; role?: string } } };
+    const currentUserId = meBody.data?.user?.id ?? "";
+    const role = meBody.data?.user?.role ?? "inspector";
+    const canManageTeam = isAdminRole(role);
+    const requestedScope = url.searchParams.get("scope");
+    // Admins default to Team; honor an explicit ?scope=my. Inspectors always My.
+    const scope: CalendarScope = !canManageTeam
+      ? "my"
+      : requestedScope === "my"
+        ? "my"
+        : requestedScope === "team"
+          ? "team"
+          : defaultCalendarScope(role);
+
+    let members: CalendarMember[] = [];
+    if (canManageTeam && membersRes?.ok) {
+      const membersBody = (await membersRes.json()) as {
+        data?: Array<{ id: string; email: string; name?: string | null; role: string }>;
+      };
+      members = (membersBody.data ?? [])
+        .filter((member) => ["owner", "manager", "inspector"].includes(member.role))
+        .map((member) => ({
+          id: member.id,
+          email: member.email,
+          name: member.name?.trim() || member.email,
+          role: member.role,
+        }));
+    }
+
+    const hasUserSelection = url.searchParams.has("userIds");
+    const selectedUserIds = scope === "team"
+      ? hasUserSelection
+        ? (url.searchParams.get("userIds") ?? "").split(",").filter((id) => members.some((member) => member.id === id))
+        : members.map((member) => member.id)
+      : [currentUserId];
+
+    if (selectedUserIds.length === 0) {
+      return { events: [] as CalendarEvent[], members, currentUserId, role, scope, selectedUserIds };
+    }
+
+    const query = scope === "my"
+      ? { start, end, userId: currentUserId }
+      : { start, end, userIds: selectedUserIds.join(",") };
+    const itemsRes = await api.calendar.items.$get({ query });
+    const body = itemsRes.ok
+      ? ((await itemsRes.json()) as { data?: { items?: CalendarItem[] } })
+      : { data: { items: [] as CalendarItem[] } };
+    const events = (body.data?.items ?? []).map(calendarItemToEvent);
+    return { events, members, currentUserId, role, scope, selectedUserIds };
   } catch {
-    return { events: [] as CalendarEvent[] };
+    return {
+      events: [] as CalendarEvent[],
+      members: [] as CalendarMember[],
+      currentUserId: "",
+      role: "inspector",
+      scope: "my" as const,
+      selectedUserIds: [] as string[],
+    };
   }
 }
 
-/* ------------------------------------------------------------------ */
-/*  Action (reschedule)                                                */
-/* ------------------------------------------------------------------ */
+async function responseMessage(response: { json: () => Promise<unknown> }, fallback: string): Promise<string> {
+  const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+  return body?.error?.message ?? fallback;
+}
 
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
   const formData = await request.formData();
-  const intent = formData.get("intent");
+  const intent = String(formData.get("intent") ?? "");
+  const api = createApi(context, { token });
+
   if (intent === "reschedule") {
     const id = formData.get("id") as string;
     const date = formData.get("date") as string;
-    const api = createApi(context, { token });
     const res = await api.inspections[":id"].$patch({
       param: { id },
       json: { date },
     });
     return { ok: res.ok };
   }
-  return { ok: false };
+
+  if (intent === "block-create" || intent === "block-update") {
+    const allDay = formData.get("allDay") === "true";
+    const payload = {
+      title: String(formData.get("title") ?? ""),
+      date: String(formData.get("date") ?? ""),
+      allDay,
+      startTime: allDay ? null : String(formData.get("startTime") ?? ""),
+      endTime: allDay ? null : String(formData.get("endTime") ?? ""),
+      notes: String(formData.get("notes") ?? "") || null,
+      userId: String(formData.get("userId") ?? ""),
+    };
+    const res = intent === "block-create"
+      ? await api.calendar.blocks.$post({ json: payload })
+      : await api.calendar.blocks[":id"].$patch({
+          param: { id: String(formData.get("id") ?? "") },
+          json: payload,
+        });
+    return {
+      ok: res.ok,
+      intent,
+      message: res.ok ? null : await responseMessage(res, "Unable to save blocked time."),
+    };
+  }
+
+  if (intent === "block-delete") {
+    const res = await api.calendar.blocks[":id"].$delete({
+      param: { id: String(formData.get("id") ?? "") },
+    });
+    return {
+      ok: res.ok,
+      intent,
+      message: res.ok ? null : await responseMessage(res, "Unable to delete blocked time."),
+    };
+  }
+
+  return { ok: false, intent, message: "Unknown calendar action." };
 }
 
-/* ------------------------------------------------------------------ */
-/*  Component                                                          */
-/* ------------------------------------------------------------------ */
-
 export default function CalendarPage() {
-  const { events } = useLoaderData<typeof loader>();
+  const { events, members, currentUserId, role, scope, selectedUserIds } = useLoaderData<typeof loader>();
   const displayTz = useDisplayTimeZone();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const navigation = useNavigation();
   const isLoading = navigation.state === "loading";
+  const canManageTeam = isAdminRole(role);
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [eventModalOpen, setEventModalOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [blockDrawerOpen, setBlockDrawerOpen] = useState(false);
+  const [selectedBlock, setSelectedBlock] = useState<CalendarEvent | null>(null);
+  const [blockDateSeed, setBlockDateSeed] = useState<string | null>(null);
   const [, setDragTarget] = useState<string | null>(null);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  /* ---- Navigation ---- */
   const prev = () => {
     if (viewMode === "month") setCurrentDate(new Date(year, month - 1, 1));
     else if (viewMode === "week") setCurrentDate(addDays(currentDate, -7));
@@ -87,7 +196,6 @@ export default function CalendarPage() {
     else if (viewMode === "week") setCurrentDate(addDays(currentDate, 7));
     else setCurrentDate(addDays(currentDate, 1));
   };
-  const goToday = () => setCurrentDate(new Date());
 
   const headerTitle = useMemo(() => {
     if (viewMode === "month") return currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -99,7 +207,6 @@ export default function CalendarPage() {
     return currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
   }, [currentDate, viewMode]);
 
-  /* ---- Events lookup ---- */
   const eventsByDate = useMemo(() => {
     const map = new Map<string, CalendarEvent[]>();
     for (const ev of events) {
@@ -116,7 +223,6 @@ export default function CalendarPage() {
     return eventsByDate.get(d.toISOString().slice(0, 10)) || [];
   }
 
-  /* ---- Meta ---- */
   const now = new Date();
   const weekEnd = addDays(now, 7);
   const thisWeekEvents = events.filter((e) => {
@@ -126,36 +232,52 @@ export default function CalendarPage() {
   const drafts = thisWeekEvents.filter((e) => e.status === "draft" || e.isDraft);
   const confirmed = thisWeekEvents.length - drafts.length;
 
-  /* ---- Month grid ---- */
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDay = new Date(year, month, 1).getDay();
   const today = new Date();
   const isToday = (day: number) => today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
-
-  /* ---- Week view ---- */
   const weekStart = startOfWeek(viewMode === "week" ? currentDate : today);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const hours = Array.from({ length: 14 }, (_, i) => i + 7); // 7 AM to 8 PM
+  const hours = Array.from({ length: 14 }, (_, i) => i + 7);
 
-  /* ---- Event click ---- */
   const handleEventClick = (ev: CalendarEvent) => {
-    if (ev.source === "google" || ev.extendedProps?.source === "google") return;
+    if (ev.extendedProps?.kind === "calendar_block") {
+      setSelectedBlock(ev);
+      setBlockDateSeed(null);
+      setBlockDrawerOpen(true);
+      return;
+    }
+    if (ev.extendedProps?.kind === "external_busy") return;
     setSelectedEvent(ev);
     setEventModalOpen(true);
   };
 
-  /* ---- Day click (create) ---- */
-  const handleDayClick = (_dateStr: string) => {
-    // Opens the dedicated New Inspection page. (The former ?date= seed was
-    // never consumed by the wizard — it always defaults to today — so no date
-    // is forwarded; behavior is unchanged.)
-    navigate("/inspections/new");
+  const handleDayClick = (dateStr: string) => {
+    setSelectedBlock(null);
+    setBlockDateSeed(dateStr);
+    setBlockDrawerOpen(true);
   };
 
-  /* ---- Drag reschedule ---- */
   const handleDrop = (eventId: string, newDate: string) => {
     fetcher.submit({ intent: "reschedule", id: eventId, date: newDate }, { method: "post" });
   };
+
+  function setScope(nextScope: CalendarScope) {
+    const params = new URLSearchParams();
+    params.set("scope", nextScope);
+    if (nextScope === "team") params.set("userIds", members.map((member) => member.id).join(","));
+    navigate(`/calendar?${params.toString()}`);
+  }
+
+  function toggleMember(memberId: string) {
+    const next = selectedUserIds.includes(memberId)
+      ? selectedUserIds.filter((id) => id !== memberId)
+      : [...selectedUserIds, memberId];
+    const params = new URLSearchParams();
+    params.set("scope", "team");
+    params.set("userIds", next.join(","));
+    navigate(`/calendar?${params.toString()}`);
+  }
 
   return (
     <div className="space-y-ih-list">
@@ -170,56 +292,26 @@ export default function CalendarPage() {
         }
       />
 
-      {/* Navigation */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <button onClick={prev} aria-label="Previous" className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted">
-            <Icon name="chevL" size={18} />
-          </button>
-          <button onClick={next} aria-label="Next" className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted">
-            <Icon name="chevR" size={18} />
-          </button>
-          <button onClick={goToday} className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
-            Today
-          </button>
-        </div>
-        <h2 className="text-xl font-bold text-ih-fg-1">{headerTitle}</h2>
-        <div className="flex items-center gap-1">
-          {(["month", "week", "day"] as const).map((v) => (
-            <button
-              key={v}
-              onClick={() => setViewMode(v)}
-              className={`h-9 px-3 rounded-md text-[13px] font-bold capitalize border transition-colors ${viewMode === v ? "border-ih-primary text-ih-primary bg-ih-primary-tint" : "border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"}`}
-            >
-              {v}
-            </button>
-          ))}
-        </div>
-      </div>
+      <CalendarScopeToolbar
+        scope={scope}
+        role={role}
+        members={members}
+        selectedUserIds={selectedUserIds}
+        onScopeChange={setScope}
+        onToggleMember={toggleMember}
+      />
 
-      {/* Loading skeleton */}
-      {isLoading && (
-        <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
-          <div className="grid grid-cols-7">
-            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
-              <div key={d} className="py-2 px-3 text-center text-[11px] font-bold uppercase tracking-wide text-ih-fg-4 border-b border-ih-border">
-                {d}
-              </div>
-            ))}
-            {Array.from({ length: 35 }).map((_, i) => (
-              <div key={i} className="min-h-[90px] p-1.5 border-b border-r border-ih-border">
-                <div className="w-6 h-6 rounded-full bg-ih-bg-muted animate-pulse" />
-                <div className="mt-2 space-y-1">
-                  {i % 3 === 0 && <div className="h-4 w-full rounded bg-ih-bg-muted animate-pulse" />}
-                  {i % 5 === 0 && <div className="h-4 w-3/4 rounded bg-ih-bg-muted animate-pulse" />}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <CalendarNavBar
+        title={headerTitle}
+        viewMode={viewMode}
+        onPrev={prev}
+        onNext={next}
+        onToday={() => setCurrentDate(new Date())}
+        onViewModeChange={setViewMode}
+      />
 
-      {/* Month grid */}
+      {isLoading && <CalendarLoadingSkeleton />}
+
       {!isLoading && viewMode === "month" && (
         <MonthView
           firstDay={firstDay}
@@ -235,7 +327,6 @@ export default function CalendarPage() {
         />
       )}
 
-      {/* Week view */}
       {!isLoading && viewMode === "week" && (
         <WeekView
           weekDays={weekDays}
@@ -248,7 +339,6 @@ export default function CalendarPage() {
         />
       )}
 
-      {/* Day view */}
       {!isLoading && viewMode === "day" && (
         <DayView
           hours={hours}
@@ -260,43 +350,24 @@ export default function CalendarPage() {
         />
       )}
 
-      {/* Event detail modal */}
       {selectedEvent && (
-        <Modal
+        <CalendarEventModal
+          event={selectedEvent}
           open={eventModalOpen}
+          displayTz={displayTz}
           onClose={() => setEventModalOpen(false)}
-          title={selectedEvent.title}
-          size="sm"
-          footer={
-            <>
-              <button onClick={() => setEventModalOpen(false)} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3">
-                Close
-              </button>
-              {selectedEvent.id && (
-                <button
-                  onClick={() => { navigate(`/inspections/${selectedEvent.id}`); setEventModalOpen(false); }}
-                  className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
-                >
-                  Open Inspection
-                </button>
-              )}
-            </>
-          }
-        >
-          <div className="space-y-2 text-[13px] text-ih-fg-3">
-            <p>
-              <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Date:</span>{" "}
-              {selectedEvent.start ? new Date(selectedEvent.start).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: displayTz, timeZoneName: 'short' }) : "N/A"}
-            </p>
-            {selectedEvent.status && (
-              <p>
-                <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Status:</span>{" "}
-                {selectedEvent.status.replace(/_/g, " ")}
-              </p>
-            )}
-          </div>
-        </Modal>
+        />
       )}
+
+      <BlockTimeDrawer
+        open={blockDrawerOpen}
+        block={selectedBlock}
+        dateSeed={blockDateSeed}
+        currentUserId={currentUserId}
+        members={members}
+        canManageTeam={canManageTeam}
+        onClose={() => setBlockDrawerOpen(false)}
+      />
     </div>
   );
 }

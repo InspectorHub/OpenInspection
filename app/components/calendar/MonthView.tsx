@@ -1,4 +1,4 @@
-import { eventColor, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+import { eventColor, isEventDraggable, type CalendarEvent } from "~/components/calendar/calendar-helpers";
 
 export function MonthView({
   firstDay,
@@ -61,7 +61,7 @@ export function MonthView({
                       <button
                         key={ev.id}
                         onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }}
-                        draggable={ev.source !== "google" && ev.extendedProps?.source !== "google"}
+                        draggable={isEventDraggable(ev)}
                         onDragStart={(e) => e.dataTransfer.setData("text/plain", ev.id)}
                         className={`w-full text-left px-1 py-0.5 rounded text-[10px] font-medium text-white truncate ${eventColor(ev)} ${ev.isDraft ? "border border-dashed border-white/40 opacity-80" : ""}`}
                       >
