@@ -93,6 +93,8 @@
   "exports:app/hooks/inspection/helpers.ts:fKey",
   "exports:app/hooks/useFindings.ts:cloneByScope",
   "exports:app/hooks/useFindings.ts:findingKey",
+  "exports:app/hooks/useSessionContext.ts:useDisplayCurrency",
+  "exports:app/hooks/useSessionContext.ts:useDisplayLocale",
   "exports:app/lib/collab/results-binding.ts:findPhotoEntry",
   "exports:app/lib/collab/results-binding.ts:replacePhoto",
   "exports:app/lib/collab/snapshot-diff.ts:SCALAR_FIELDS",

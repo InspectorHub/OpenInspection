@@ -13591,6 +13591,10 @@
           "timezone": {
             "type": "string",
             "description": "Per-user display timezone (IANA). Empty string clears the override (inherit tenant)."
+          },
+          "locale": {
+            "type": "string",
+            "description": "Per-user display locale (BCP-47). Empty string clears the override (inherit tenant)."
           }
         }
       }
