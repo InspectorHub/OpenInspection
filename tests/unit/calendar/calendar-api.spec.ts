@@ -206,4 +206,32 @@ describe('calendar API — calendar_connections', () => {
         const rows = await testDb.select().from(schema.calendarConnections);
         expect(rows).toHaveLength(0);
     });
+
+    it('status reports the current inspector calendar connection', async () => {
+        await upsertCalendarConnection({
+            db: {} as D1Database,
+            tenantId: TENANT,
+            userId: USER,
+            provider: 'google',
+            authType: 'oauth',
+            capability: 'availability_read',
+            calendarId: 'primary',
+            credentials: { refreshToken: 'rt-status', scopes: ['calendar.freebusy'] },
+            jwtSecret: JWT_SECRET,
+        });
+
+        const { app, env } = buildApp(testDb, kv);
+        const res = await app.request('/api/calendar/status', {}, env);
+
+        expect(res.status).toBe(200);
+        expect(await res.json()).toEqual({
+            success: true,
+            data: {
+                connected: true,
+                capability: 'availability_read',
+                provider: 'google',
+                oauthConfigured: true,
+            },
+        });
+    });
 });

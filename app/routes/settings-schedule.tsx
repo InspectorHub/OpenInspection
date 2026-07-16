@@ -4,11 +4,15 @@ import type { Route } from "./+types/settings-schedule";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
-import { useCopyClipboard } from "~/hooks/useCopyClipboard";
 import { SCHEDULING_ROLES } from "~/lib/settings/constants";
 import { isAdminRole } from "~/lib/access";
 import { WeeklySchedulePanel } from "~/components/settings/WeeklySchedulePanel";
 import { DateOverridesPanel } from "~/components/settings/DateOverridesPanel";
+import {
+  CalendarConnectPanel,
+  type CalendarCapability,
+} from "~/components/settings/CalendarConnectPanel";
+import { ScheduleLinksPanel } from "~/components/settings/ScheduleLinksPanel";
 
 interface AvailabilitySlot {
   id: number;
@@ -43,10 +47,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const inspectorId = url.searchParams.get("inspectorId") ?? undefined;
 
-  const [availRes, overridesRes, membersRes] = await Promise.all([
+  const [availRes, overridesRes, membersRes, calendarStatusRes] = await Promise.all([
     api.availability.index.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
     api.availability.overrides.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
     api.admin.members.$get().catch(() => null),
+    api.calendar.status.$get().catch(() => null),
   ]);
 
   let slots: AvailabilitySlot[] = [];
@@ -67,11 +72,26 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     members = (body.data ?? []) as Member[];
   }
 
+  const calendarStatus = calendarStatusRes?.ok
+    ? ((await calendarStatusRes.json()) as {
+        data?: {
+          connected?: boolean;
+          capability?: CalendarCapability | null;
+          oauthConfigured?: boolean;
+        };
+      }).data
+    : null;
+
   return {
     slots,
     overrides,
     members,
     managedInspectorId: inspectorId ?? null,
+    calendar: {
+      connected: calendarStatus?.connected ?? false,
+      capability: calendarStatus?.capability ?? null,
+      oauthConfigured: calendarStatus?.oauthConfigured ?? false,
+    },
   };
 }
 
@@ -122,6 +142,29 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res.ok, intent };
   }
 
+  if (intent === "calendar-sync") {
+    const res = await api.calendar.sync.$post();
+    const body = (await res.json().catch(() => null)) as
+      | { data?: { totalEvents?: number }; error?: { message?: string } }
+      | null;
+    return {
+      ok: res.ok,
+      intent,
+      totalEvents: body?.data?.totalEvents ?? 0,
+      message: res.ok ? null : body?.error?.message ?? "Calendar sync failed.",
+    };
+  }
+
+  if (intent === "calendar-disconnect") {
+    const res = await api.calendar.disconnect.$delete();
+    const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    return {
+      ok: res.ok,
+      intent,
+      message: res.ok ? null : body?.error?.message ?? "Failed to disconnect Google Calendar.",
+    };
+  }
+
   return { ok: false, intent };
 }
 
@@ -144,12 +187,16 @@ export default function SettingsSchedulePage() {
         Weekly hours, time off, and your personal booking link.
       </p>
 
-      <PersonalLinks tenant={tenant} slug={slug} />
-
       {pickerMembers.length > 0 && (
         <ManageOthersPicker members={pickerMembers} managedInspectorId={data.managedInspectorId} />
       )}
 
+      <CalendarConnectPanel
+        connected={data.calendar.connected}
+        capability={data.calendar.capability}
+        oauthConfigured={data.calendar.oauthConfigured}
+        disabled={data.managedInspectorId !== null}
+      />
       <WeeklySchedulePanel
         key={data.managedInspectorId ?? "self"}
         initialSlots={data.slots}
@@ -160,6 +207,7 @@ export default function SettingsSchedulePage() {
         initialOverrides={data.overrides}
         inspectorId={data.managedInspectorId}
       />
+      <ScheduleLinksPanel tenant={tenant} slug={slug} />
     </div>
   );
 }
@@ -190,42 +238,6 @@ function ManageOthersPicker({
           </option>
         ))}
       </select>
-    </section>
-  );
-}
-
-function PersonalLinks({
-  tenant,
-  slug,
-}: {
-  tenant: string | null | undefined;
-  slug: string | null | undefined;
-}) {
-  const { copied: copiedField, copy } = useCopyClipboard();
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const deepLink = tenant && slug ? `${origin}/book/${tenant}/${slug}` : null;
-
-  if (!deepLink) return null;
-
-  return (
-    <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-      <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Your links</h3>
-      <div className="flex items-center gap-3">
-        <span className="text-[12px] font-bold text-ih-fg-2 w-36 shrink-0">Personal deep link</span>
-        <span className="text-[12px] text-ih-fg-1 truncate flex-1 font-mono bg-ih-bg-muted rounded px-2 py-1.5 border border-ih-border">
-          {deepLink}
-        </span>
-        <button
-          type="button"
-          onClick={() => copy(deepLink, "deep")}
-          className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0"
-        >
-          {copiedField === "deep" ? "Copied!" : "Copy"}
-        </button>
-      </div>
-      <p className="text-[12px] text-ih-fg-3">
-        The personal deep link pre-selects you on the company booking page.
-      </p>
     </section>
   );
 }

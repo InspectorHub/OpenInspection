@@ -32,6 +32,7 @@ import {
     loadGoogleOAuthMode,
     resolveGoogleOAuthCredentials,
 } from '../lib/calendar/resolve-google-oauth';
+import { getGoogleCalendarStatus } from '../lib/calendar/status';
 import {
     CALENDAR_OAUTH_MESSAGE,
     renderCalendarOAuthPopupLanding,
@@ -189,6 +190,12 @@ export const calendarRoutes = createApiRouter()
             success: true,
             data: { blockedDatesCreated: created, totalEvents: busyBlocks.length },
         }, 200);
+    })
+    .get('/status', async (c) => {
+        const user = c.get('user');
+        if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
+        const tenantId = c.get('tenantId') as string;
+        return c.json({ success: true, data: await getGoogleCalendarStatus(c.env, tenantId, user.sub) });
     })
     /**
      * POST /api/calendar/sync-events

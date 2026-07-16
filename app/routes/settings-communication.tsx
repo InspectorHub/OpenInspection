@@ -122,9 +122,6 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       pointOfContact: ((d?.pointOfContact as string) === "inspector" ? "inspector" : "company") as "inspector" | "company",
     } as CommConfig,
     emailTemplates,
-    icsUrl: (d?.icsUrl as string) || null,
-    googleCalendarConnected: Boolean(d?.googleCalendarConnected),
-    googleCalendarCapability: (d?.googleCalendarCapability as "availability_read" | "events_read_write" | null) ?? null,
     googleOAuthConfigured: Boolean(d?.googleOAuthConfigured),
     googleOAuthMode: (d?.googleOAuthMode as "platform" | "own") || "platform",
     secrets: {
@@ -324,33 +321,6 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, ok: true, error: null, field: null, test: null };
   }
 
-  if (intent === "disconnect-calendar") {
-    const res = await api.calendar.disconnect.$delete();
-    if (!res.ok) {
-      const errBody = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return {
-        intent,
-        ok: false,
-        error: errBody?.error?.message ?? "Failed to disconnect Google Calendar.",
-        field: null,
-        test: null,
-      };
-    }
-    return { intent, ok: true, error: null, field: null, test: null };
-  }
-
-  if (intent === "generate-ics-url") {
-    const res = await api.admin["ics-token"].$get();
-    if (!res.ok) {
-      return { intent, ok: false, error: "Failed to generate subscription URL.", field: null, test: null };
-    }
-    const body = (await res.json().catch(() => null)) as { data?: { url?: string } } | null;
-    if (!body?.data?.url) {
-      return { intent, ok: false, error: "Failed to generate subscription URL.", field: null, test: null };
-    }
-    return { intent, ok: true, error: null, field: null, test: null };
-  }
-
   // ─── Track L — SMS settings ───────────────────────────────────────────────
   if (intent === "save-sms-config") {
     // Pass through the three valid tenant modes; never submit "platform" (first-party only).
@@ -495,9 +465,6 @@ export default function SettingsCommunication() {
   };
   const config = denied ? EMPTY_CONFIG : loaderResult.config;
   const emailTemplates = denied ? [] : loaderResult.emailTemplates;
-  const icsUrl = denied ? null : loaderResult.icsUrl;
-  const googleCalendarConnected = denied ? false : loaderResult.googleCalendarConnected;
-  const googleCalendarCapability = denied ? null : loaderResult.googleCalendarCapability;
   const googleOAuthConfigured = denied ? false : loaderResult.googleOAuthConfigured;
   const googleOAuthMode = denied ? ("platform" as const) : loaderResult.googleOAuthMode;
   const testResults = denied ? [] : loaderResult.testResults;
@@ -570,10 +537,6 @@ export default function SettingsCommunication() {
     nav.state !== "idle" && nav.formData?.get("intent") === "save-calendar-secrets";
   const savingGoogleOAuthMode =
     nav.state !== "idle" && nav.formData?.get("intent") === "save-google-oauth-mode";
-  const disconnectingCalendar =
-    nav.state !== "idle" && nav.formData?.get("intent") === "disconnect-calendar";
-  const generatingIcsUrl =
-    nav.state !== "idle" && nav.formData?.get("intent") === "generate-ics-url";
   const savingSmsSecrets =
     nav.state !== "idle" && nav.formData?.get("intent") === "save-sms-secrets";
   const savingSmsConfig =
@@ -598,7 +561,7 @@ export default function SettingsCommunication() {
   // Errors persist until the next attempt (no auto-dismiss).
   const flashIntent = actionData && "intent" in actionData ? actionData.intent : null;
   const { flashVisible } = useFlash(
-    (flashIntent === "save-email-secrets" || flashIntent === "save-calendar-secrets" || flashIntent === "save-google-oauth-mode" || flashIntent === "disconnect-calendar") &&
+    (flashIntent === "save-email-secrets" || flashIntent === "save-calendar-secrets" || flashIntent === "save-google-oauth-mode") &&
       !!actionData &&
       "ok" in actionData &&
       actionData.ok,
@@ -766,7 +729,7 @@ export default function SettingsCommunication() {
         )}
       </section>
 
-      {/* Google Calendar + Inspection Calendar (ICS) */}
+      {/* Company-level Google OAuth app configuration */}
       <GoogleCalendarPanel
         isSaas={isSaas}
         googleOAuthConfigured={googleOAuthConfigured}
@@ -776,12 +739,6 @@ export default function SettingsCommunication() {
         secretFormError={secretFormError}
         savingCalendarSecrets={savingCalendarSecrets}
         savingOAuthMode={savingGoogleOAuthMode}
-        googleCalendarConnected={googleCalendarConnected}
-        googleCalendarCapability={googleCalendarCapability}
-        disconnectingCalendar={disconnectingCalendar}
-        generatingIcsUrl={generatingIcsUrl}
-        icsUrl={icsUrl}
-        icsFormError={secretFormError("generate-ics-url")}
       />
     </div>
   );
