@@ -4,6 +4,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { users, tenantConfigs, tenants } from '../lib/db/schema';
 import { getSeatUsage } from '../features/seat-quota';
+import { resolveLocale } from '../lib/locale';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { mcpEnabled } from '../lib/mcp/flag';
@@ -38,11 +39,14 @@ export const sessionContextRoutes = createApiRouter()
         let userName: string | null = null;
         let userEmail: string | null = null;
         let userTimezone: string | null = null;
+        let userLocale: string | null = null;
         let tenantTimezone = 'UTC';
+        let tenantLocale = 'en-US';
+        let tenantCurrency = 'USD';
         if (tenantId) {
             try {
                 const db = drizzle(c.env.DB);
-                const row = await db.select({ name: users.name, email: users.email, timezone: users.timezone })
+                const row = await db.select({ name: users.name, email: users.email, timezone: users.timezone, locale: users.locale })
                     .from(users)
                     .where(and(eq(users.id, user.sub), eq(users.tenantId, tenantId)))
                     .get();
@@ -50,12 +54,19 @@ export const sessionContextRoutes = createApiRouter()
                     userName = row.name;
                     userEmail = row.email;
                     userTimezone = row.timezone;
+                    userLocale = row.locale;
                 }
-                const cfg = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+                const cfg = await db.select({
+                    defaultTimezone: tenantConfigs.defaultTimezone,
+                    defaultLocale: tenantConfigs.defaultLocale,
+                    currency: tenantConfigs.currency,
+                })
                     .from(tenantConfigs)
                     .where(eq(tenantConfigs.tenantId, tenantId))
                     .get();
                 if (cfg?.defaultTimezone) tenantTimezone = cfg.defaultTimezone;
+                tenantLocale = resolveLocale(cfg?.defaultLocale);
+                if (cfg?.currency) tenantCurrency = cfg.currency;
             } catch (e) {
                 logger.warn('[session-context] user lookup failed', { userId: user.sub, error: (e as Error).message });
             }
@@ -171,6 +182,8 @@ export const sessionContextRoutes = createApiRouter()
                     bookingHost: branding?.bookingHost || null,
                     privacyUrl,
                     defaultTimezone: tenantTimezone,
+                    defaultLocale: tenantLocale,
+                    currency: tenantCurrency,
                 },
                 user: {
                     name: userName,
@@ -178,6 +191,7 @@ export const sessionContextRoutes = createApiRouter()
                     role: user.role || 'inspector',
                     initials,
                     timezone: userTimezone,
+                    locale: userLocale,
                 },
                 deployment: {
                     mode: profile.mode || 'standalone',
