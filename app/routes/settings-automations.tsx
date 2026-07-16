@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Link, useLoaderData, Form, useNavigation, useFetcher } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
-import { useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { formatDateTime } from "~/lib/format";
 import type { Route } from "./+types/settings-automations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
@@ -138,6 +139,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function SettingsAutomations() {
   const data = useLoaderData<typeof loader>();
   const displayTz = useDisplayTimeZone();
+  const locale = useDisplayLocale();
   const nav = useNavigation();
   const [editing, setEditing] = useState<Rule | null | "new">(null);
 
@@ -210,7 +212,7 @@ export default function SettingsAutomations() {
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
                   l.channel === "sms" ? "bg-ih-primary-tint text-ih-primary" : "bg-ih-bg-muted text-ih-fg-3"}`}>{l.channel ?? "email"}</span>
                 <span className="text-ih-fg-2 flex-1 min-w-0 truncate">{l.recipient}</span>
-                <span className="text-ih-fg-3">{new Date(l.sendAt).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: displayTz, timeZoneName: 'short' })}</span>
+                <span className="text-ih-fg-3">{formatDateTime(l.sendAt, { locale, timeZone: displayTz })}</span>
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
                   l.status === "sent" ? "bg-ih-ok-bg text-ih-ok-fg" :
                   l.status === "failed" ? "bg-ih-bad-bg text-ih-bad-fg" :

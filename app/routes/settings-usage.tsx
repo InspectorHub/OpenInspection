@@ -5,6 +5,7 @@ import { createApi } from "~/lib/api-client.server";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
+import { formatNumber } from "~/lib/format";
 
 export function meta() {
   return [{ title: "Usage - Settings - OpenInspection" }];
@@ -73,6 +74,10 @@ export default function SettingsUsagePage() {
   if ("forbidden" in data) return <AccessDenied />;
   const { usage } = data;
   const isSaas = session?.branding?.isSaas ?? false;
+  // Viewer display locale (matches useDisplayLocale): user override, else tenant
+  // default, else en-US. Derived from the session already in scope rather than
+  // the useDisplayLocale hook so counts stay locale-aware without a second hook.
+  const locale = session?.user.locale || session?.branding.defaultLocale || "en-US";
   const caps = usage.caps ?? null;
   const u = usage.usage ?? {};
 
@@ -96,29 +101,29 @@ export default function SettingsUsagePage() {
           paid SaaS tenants still see the lifetime-analytics count. */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isSaas ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         {isSaas && (caps ? (
-          <CappedMetricCard label="Inspections" used={u.inspections ?? 0} cap={caps.inspections} />
+          <CappedMetricCard label="Inspections" used={u.inspections ?? 0} cap={caps.inspections} locale={locale} />
         ) : (
           <MetricCard
             label="Inspections"
-            value={(u.inspections ?? 0).toLocaleString()}
+            value={formatNumber(u.inspections ?? 0, { locale })}
             sub="Inspections created — cumulative"
           />
         ))}
         {caps ? (
-          <CappedMetricCard label="SMS sent" used={u.sms ?? 0} cap={caps.sms} byo={u.smsByo ?? 0} />
+          <CappedMetricCard label="SMS sent" used={u.sms ?? 0} cap={caps.sms} byo={u.smsByo ?? 0} locale={locale} />
         ) : (
           <MetricCard
             label="SMS sent"
-            value={(u.sms ?? 0).toLocaleString()}
+            value={formatNumber(u.sms ?? 0, { locale })}
             sub="Text messages sent — cumulative"
           />
         )}
         {caps ? (
-          <CappedMetricCard label="Emails sent" used={u.email ?? 0} cap={caps.email} byo={u.emailByo ?? 0} />
+          <CappedMetricCard label="Emails sent" used={u.email ?? 0} cap={caps.email} byo={u.emailByo ?? 0} locale={locale} />
         ) : (
           <MetricCard
             label="Emails sent"
-            value={(u.email ?? 0).toLocaleString()}
+            value={formatNumber(u.email ?? 0, { locale })}
             sub="Emails delivered — cumulative"
           />
         )}
@@ -166,6 +171,7 @@ function CappedMetricCard({
   used,
   cap,
   byo,
+  locale,
 }: {
   label: string;
   used: number;
@@ -173,6 +179,8 @@ function CappedMetricCard({
   /** Bring-your-own volume for this metric (sms_byo/email_byo) — uncapped,
    *  metered separately, does not count against the free-plan limit. */
   byo?: number;
+  /** Viewer display locale for number grouping (threaded from the page). */
+  locale: string;
 }) {
   const atCap = used >= cap;
   const pct = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
@@ -181,8 +189,8 @@ function CappedMetricCard({
     <div className="bg-ih-bg-card border border-ih-border rounded-lg p-5">
       <div className="text-[12px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{label}</div>
       <div className="text-[28px] font-bold text-ih-fg-1 mt-1 tabular-nums">
-        {used.toLocaleString()}
-        <span className="text-[14px] font-medium text-ih-fg-4"> / {cap.toLocaleString()}</span>
+        {formatNumber(used, { locale })}
+        <span className="text-[14px] font-medium text-ih-fg-4"> / {formatNumber(cap, { locale })}</span>
       </div>
       <div className="mt-2 h-1.5 rounded-full bg-ih-bg-muted overflow-hidden">
         <div
@@ -194,7 +202,7 @@ function CappedMetricCard({
         {atCap ? "Free plan limit reached" : `${cap - used} left on the free plan`}
       </div>
       {byo !== undefined && (
-        <div className="text-[11px] text-ih-fg-4 mt-1">via your own account: {byo.toLocaleString()}</div>
+        <div className="text-[11px] text-ih-fg-4 mt-1">via your own account: {formatNumber(byo, { locale })}</div>
       )}
     </div>
   );

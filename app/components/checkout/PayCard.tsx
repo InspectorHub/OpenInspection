@@ -2,9 +2,8 @@ import { useState } from "react";
 import { loadStripe, type Stripe as StripeJs } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import type { StepState } from "~/lib/checkout-steps";
-
-const money = (cents: number) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
+import { formatCurrency } from "~/lib/format";
+import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 
 /* ------------------------------------------------------------------ */
 /*  Step 2 — Pay card (reuses the invoice page's Stripe pay flow)       */
@@ -77,6 +76,8 @@ function PayPanel({
     const [phase, setPhase] = useState<PayPhase>("idle");
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [stripePromise, setStripePromise] = useState<Promise<StripeJs | null> | null>(null);
+    const locale = useDisplayLocale();
+    const currency = useDisplayCurrency();
 
     async function startPayment() {
         setPhase("loading");
@@ -111,7 +112,7 @@ function PayPanel({
         <div className="rounded-xl border border-ih-border bg-ih-bg-muted p-4">
             <div className="flex items-center justify-between mb-3">
                 <span className="text-[13px] font-semibold text-ih-fg-1">Pay for your inspection</span>
-                <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{money(amountCents)}</span>
+                <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{formatCurrency(amountCents, { locale, currency })}</span>
             </div>
 
             {(phase === "idle" || phase === "loading") && (
@@ -122,7 +123,7 @@ function PayPanel({
                         disabled={phase === "loading"}
                         className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
                     >
-                        {phase === "loading" ? "Starting secure checkout…" : `Pay ${money(amountCents)}`}
+                        {phase === "loading" ? "Starting secure checkout…" : `Pay ${formatCurrency(amountCents, { locale, currency })}`}
                     </button>
                     <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-4">
                         <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -170,6 +171,8 @@ function CheckoutPayForm({ amountCents, returnUrl }: { amountCents: number; retu
     const elements = useElements();
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const locale = useDisplayLocale();
+    const currency = useDisplayCurrency();
 
     async function onSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -194,7 +197,7 @@ function CheckoutPayForm({ amountCents, returnUrl }: { amountCents: number; retu
                 disabled={!stripe || submitting}
                 className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
             >
-                {submitting ? "Processing…" : `Pay ${money(amountCents)}`}
+                {submitting ? "Processing…" : `Pay ${formatCurrency(amountCents, { locale, currency })}`}
             </button>
             {error && <p className="text-[12px] text-ih-bad-fg font-medium">{error}</p>}
         </form>

@@ -4,6 +4,7 @@
  * sub-components (InvoiceDisplay / StripePayPanel).
  */
 import type { PillTone } from "@core/shared-ui";
+import { formatDollars } from "~/lib/money";
 
 export interface InvoiceData {
   number: string;
@@ -45,12 +46,11 @@ export function paymentSectionState(data: {
   return { mode: "none", amountCents: cents };
 }
 
-export function money(n: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: n % 1 === 0 ? 0 : 2,
-  }).format(n);
+/** Dollars -> currency string; whole dollars drop the `.00` (whole-dollar
+ *  convention). locale/currency default to en-US/USD; callers thread the viewer
+ *  values to localize. Delegates to the shared formatter (integer-cents in). */
+export function money(n: number, opts?: { locale?: string; currency?: string }): string {
+  return formatDollars(Math.round(n * 100), { locale: opts?.locale ?? "en-US", currency: opts?.currency ?? "USD" });
 }
 
 export const STATUS_TONE: Record<InvoiceData["status"], PillTone> = {

@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher, useRevalidator } from "react-router";
 import { Button, Modal, SegmentedControl } from "@core/shared-ui";
-import { useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { formatDateTime } from "~/lib/format";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 
 /**
@@ -127,6 +128,7 @@ function ConformancePreview({ data }: { data: CompliancePanelData }) {
 
 function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: ReportSignoffView | null }) {
   const displayTz = useDisplayTimeZone();
+  const locale = useDisplayLocale();
   // Independent fetchers per role AND per mutation type — a remove on one
   // role must never abort an in-flight sign-off submit on the other.
   const signFetcher = useFetcher();
@@ -198,7 +200,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
         <div className="text-[12px] text-ih-fg-2 space-y-1">
           <div>{existing.name}{existing.license ? ` — License ${existing.license}` : ""}</div>
           {existing.signedAt ? (
-            <div className="text-[11px] text-ih-fg-4">Signed {new Date(existing.signedAt).toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: displayTz, timeZoneName: 'short' })}</div>
+            <div className="text-[11px] text-ih-fg-4">Signed {formatDateTime(existing.signedAt, { locale, timeZone: displayTz })}</div>
           ) : null}
           <Button variant="danger-link" size="sm" disabled={removing} onClick={() => setConfirmOpen(true)}>
             {removing ? "Removing…" : "Remove"}

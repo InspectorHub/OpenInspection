@@ -72,6 +72,8 @@ vi.mock('~/hooks/useSessionContext', () => ({
         deployment: { mode: 'standalone', hasBilling: false, hasSeatQuota: false },
         seatUsage: null,
     })),
+    useDisplayLocale: vi.fn(() => 'en-US'),
+    useDisplayTimeZone: vi.fn(() => 'UTC'),
 }));
 
 import { loader, action } from '~/routes/settings-connected-apps';

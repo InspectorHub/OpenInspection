@@ -4,7 +4,7 @@ import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader } from "@core/shared-ui";
-import { useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { isAdminRole } from "~/lib/access";
 import {
   startOfWeek,
@@ -169,6 +169,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function CalendarPage() {
   const { events, members, currentUserId, role, scope, selectedUserIds } = useLoaderData<typeof loader>();
   const displayTz = useDisplayTimeZone();
+  const locale = useDisplayLocale();
   const navigate = useNavigate();
   const fetcher = useFetcher();
   const navigation = useNavigation();
@@ -199,14 +200,17 @@ export default function CalendarPage() {
   };
 
   const headerTitle = useMemo(() => {
-    if (viewMode === "month") return currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    // Header labels use varied option sets the curated formatter can't express
+    // (month+year, weekday+…); format with the viewer locale directly. These are
+    // wall-clock month/week/day labels off the local `currentDate`, so no timeZone.
+    if (viewMode === "month") return currentDate.toLocaleDateString(locale, { month: "long", year: "numeric" });
     if (viewMode === "week") {
       const ws = startOfWeek(currentDate);
       const we = addDays(ws, 6);
-      return `${ws.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${we.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+      return `${ws.toLocaleDateString(locale, { month: "short", day: "numeric" })} - ${we.toLocaleDateString(locale, { month: "short", day: "numeric", year: "numeric" })}`;
     }
-    return currentDate.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
-  }, [currentDate, viewMode]);
+    return currentDate.toLocaleDateString(locale, { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  }, [currentDate, viewMode, locale]);
 
   // Bucket by the server-provided civilDate (already in the viewer's effective
   // tz). NEVER re-derive the day from `start` via toISOString() — that rolls
@@ -326,6 +330,7 @@ export default function CalendarPage() {
           weekDays={weekDays}
           today={today}
           hours={hours}
+          locale={locale}
           getEventsForDate={getEventsForDate}
           handleDayClick={handleDayClick}
           handleDrop={handleDrop}
@@ -349,6 +354,7 @@ export default function CalendarPage() {
           event={selectedEvent}
           open={eventModalOpen}
           displayTz={displayTz}
+          locale={locale}
           onClose={() => setEventModalOpen(false)}
         />
       )}

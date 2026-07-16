@@ -449,7 +449,10 @@ export function useInspectionState(opts: UseInspectionOptions) {
       inspection.date || inspection.scheduledDate || inspection.createdAt;
     if (!d) return "";
     try {
-      return new Date(d as string).toLocaleDateString("en-US", {
+      // Browser-default locale (viewer-responsive) — useInspection is a
+      // router-agnostic core hook, so it deliberately avoids the data-router-bound
+      // useDisplayLocale(); a consuming component can thread a locale if needed.
+      return new Date(d as string).toLocaleDateString(undefined, {
         month: "short",
         day: "numeric",
         year: "numeric",

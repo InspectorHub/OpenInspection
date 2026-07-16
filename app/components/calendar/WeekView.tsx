@@ -9,6 +9,7 @@ export function WeekView({
   weekDays,
   today,
   hours,
+  locale,
   getEventsForDate,
   handleDayClick,
   handleDrop,
@@ -17,6 +18,7 @@ export function WeekView({
   weekDays: Date[];
   today: Date;
   hours: number[];
+  locale: string;
   getEventsForDate: (civilDate: string) => CalendarEvent[];
   handleDayClick: (dateStr: string) => void;
   handleDrop: (eventId: string, newDate: string) => void;
@@ -30,7 +32,7 @@ export function WeekView({
             {weekDays.map((d) => (
               <div key={civilDateOf(d.getFullYear(), d.getMonth(), d.getDate())} className={`py-2 px-2 text-center border-l border-ih-border ${isSameDay(d, today) ? "bg-ih-primary-tint" : ""}`}>
                 <span className="text-[10px] font-bold uppercase text-ih-fg-4 block">
-                  {d.toLocaleDateString("en-US", { weekday: "short" })}
+                  {d.toLocaleDateString(locale, { weekday: "short" })}
                 </span>
                 <span className={`text-[14px] font-bold ${isSameDay(d, today) ? "text-ih-primary" : "text-ih-fg-2"}`}>
                   {d.getDate()}

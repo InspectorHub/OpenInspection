@@ -14,6 +14,8 @@
  */
 import { useRef, useState } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 
 /* ------------------------------------------------------------------ */
 /* Allowlist (mirrors server/services/client-document.service.ts) */
@@ -146,14 +148,6 @@ function isDeletable(item: DocumentItem, allowDeleteAny: boolean, currentUserRef
   );
 }
 
-function formatDate(ms: number): string {
-  try {
-    return new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
-  } catch {
-    return "";
-  }
-}
-
 function uploaderLabel(item: DocumentItem): string {
   if (item.uploadedByName) return item.uploadedByName;
   return item.uploadedByKind === "inspector" ? "Inspector" : "Client";
@@ -171,6 +165,8 @@ export default function DocumentsSection({
   uploading = false,
   error = null,
 }: DocumentsSectionProps) {
+  const locale = useDisplayLocale();
+  const tz = useDisplayTimeZone();
   const [category, setCategory] = useState<DocumentCategory>("prior_reports");
   const [visibility, setVisibility] = useState<DocumentVisibility>("client_visible");
   const [label, setLabel] = useState("");
@@ -318,7 +314,7 @@ export default function DocumentsSection({
                           <span aria-hidden>·</span>
                           <span>{uploaderLabel(item)}</span>
                           <span aria-hidden>·</span>
-                          <span>{formatDate(item.createdAt)}</span>
+                          <span>{formatDate(item.createdAt, { locale, timeZone: tz, month: "short" })}</span>
                           {item.visibility === "internal" && (
                             <span className="rounded bg-ih-watch-bg px-1.5 py-0.5 font-bold text-ih-watch-fg">
                               Internal

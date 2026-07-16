@@ -1,15 +1,17 @@
 import { useNavigate } from "react-router";
 import { Modal } from "@core/shared-ui";
 import type { CalendarEvent } from "~/components/calendar/calendar-helpers";
+import { formatDateTime } from "~/lib/format";
 
 interface CalendarEventModalProps {
   event: CalendarEvent;
   open: boolean;
   displayTz: string;
+  locale: string;
   onClose: () => void;
 }
 
-export function CalendarEventModal({ event, open, displayTz, onClose }: CalendarEventModalProps) {
+export function CalendarEventModal({ event, open, displayTz, locale, onClose }: CalendarEventModalProps) {
   const navigate = useNavigate();
 
   return (
@@ -47,15 +49,7 @@ export function CalendarEventModal({ event, open, displayTz, onClose }: Calendar
         <p>
           <span className="font-bold text-ih-fg-3 text-[11px] uppercase">Date:</span>{" "}
           {event.start
-            ? new Date(event.start).toLocaleString("en-US", {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-                timeZone: displayTz,
-                timeZoneName: "short",
-              })
+            ? formatDateTime(event.start, { locale, timeZone: displayTz })
             : "N/A"}
         </p>
         {event.status && (
