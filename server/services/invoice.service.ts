@@ -22,6 +22,19 @@ export class InvoiceService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private getDrizzle() { return drizzle(this.db as any); }
 
+    /**
+     * Phase B — number of invoices a tenant has (any status, void included). Used
+     * by the currency-change guard: switching the tenant currency once invoices
+     * exist is a data-integrity hazard, so the Workspace save requires an explicit
+     * confirm when this is > 0.
+     */
+    async countInvoices(tenantId: string): Promise<number> {
+        const db = this.getDrizzle();
+        const row = await db.select({ n: sql<number>`count(*)` })
+            .from(invoices).where(eq(invoices.tenantId, tenantId)).get();
+        return row?.n ?? 0;
+    }
+
     async listInvoices(tenantId: string) {
         const db = this.getDrizzle();
         const rows = await db.select().from(invoices).where(eq(invoices.tenantId, tenantId)).orderBy(desc(invoices.createdAt)).all();

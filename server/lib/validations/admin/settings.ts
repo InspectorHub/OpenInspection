@@ -53,6 +53,11 @@ export const UpdateBrandingSchema = z.object({
     // Tenant transaction/display currency (ISO 4217). Constrained to the
     // supported set; tenant-scoped only (no per-user override).
     currency: z.enum(['USD']).optional().openapi({ example: 'USD' }).describe('Tenant currency (ISO 4217).'),
+    // Phase B — transient (NOT persisted) acknowledgement that the caller accepts
+    // changing the tenant currency while invoices already exist. Without it the
+    // save is blocked (409 CURRENCY_CHANGE_NEEDS_CONFIRM); existing invoices keep
+    // their snapshot currency, new ones use the new tenant currency.
+    confirmCurrencyChange: z.boolean().optional().openapi({ example: true }).describe('Acknowledge changing tenant currency with invoices present.'),
 }).openapi('UpdateBranding');
 
 /**
