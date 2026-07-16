@@ -214,17 +214,19 @@ export function SmsDeliveryPanel({
           </div>
         </Form>
 
-        <SmsSecretsPanel
-          secrets={secrets}
-          secretFieldError={secretFieldError}
-          secretFormError={secretFormError}
-          savingSmsSecrets={savingSmsSecrets}
-          showInboundUrl={showInboundUrl}
-          inboundUrl={inboundUrl}
-          smsTestFetcher={smsTestFetcher}
-          initialProvider={byoProvider ?? "twilio"}
-          testResults={testResults}
-        />
+        {(!isSaas || smsMode === "own") && (
+          <SmsSecretsPanel
+            secrets={secrets}
+            secretFieldError={secretFieldError}
+            secretFormError={secretFormError}
+            savingSmsSecrets={savingSmsSecrets}
+            showInboundUrl={showInboundUrl}
+            inboundUrl={inboundUrl}
+            smsTestFetcher={smsTestFetcher}
+            initialProvider={byoProvider ?? "twilio"}
+            testResults={testResults}
+          />
+        )}
       </section>
   );
 }

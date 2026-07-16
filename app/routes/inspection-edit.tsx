@@ -65,7 +65,6 @@ import { SignModal } from "~/components/editor/SignModal";
 import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
 import { SectionPickerModal } from "~/components/editor/SectionPickerModal";
 import { TagPickerModal } from "~/components/editor/TagPickerModal";
-import { ToastPortal } from "~/components/Toast";
 import { useIsMobile } from "~/hooks/useBreakpoint";
 import { MobileAppBar } from "~/components/editor/MobileAppBar";
 import { MobileDrawerTriggers, type MobileDrawerId } from "~/components/editor/MobileDrawerTriggers";
@@ -1726,7 +1725,6 @@ export default function InspectionEditPage() {
  if (isMobile) {
  return (
  <div className="min-h-screen pb-14">
- <ToastPortal />
  {photoInputsEl}
  {addMediaOverlaysEl}
  <MobileAppBar
@@ -1781,7 +1779,6 @@ export default function InspectionEditPage() {
      pinned to the viewport and always cover the visible area. */
   className="flex h-screen bg-ih-bg-card overflow-x-auto"
  >
- <ToastPortal />
  {photoInputsEl}
 
  {/* SpeedMode overlay */}

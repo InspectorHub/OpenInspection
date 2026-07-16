@@ -15,7 +15,15 @@ export const CalendarSyncResponseSchema = createApiResponseSchema(
  * Query schema for the Google OAuth callback.
  */
 export const CalendarCallbackQuerySchema = z.object({
-    code: z.string().optional().describe('TODO describe code field for the OpenInspection MCP integration'),
-    state: z.string().optional().describe('TODO describe state field for the OpenInspection MCP integration'),
-    error: z.string().optional().describe('TODO describe error field for the OpenInspection MCP integration'),
+    code: z.string().optional().describe('Authorization code from the OAuth provider'),
+    state: z.string().optional().describe('Opaque OAuth state token'),
+    error: z.string().optional().describe('OAuth error code when consent is denied'),
+});
+
+/**
+ * Query schema for initiating calendar OAuth connect.
+ */
+export const CalendarConnectQuerySchema = z.object({
+    capability: z.enum(['availability_read', 'events_read_write']).default('events_read_write'),
+    provider: z.enum(['google']).default('google'),
 });

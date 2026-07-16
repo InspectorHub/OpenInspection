@@ -12,6 +12,21 @@ vi.mock('../../../server/lib/secrets-cache', async (importOriginal) => ({
 }));
 import { loadTenantSecrets } from '../../../server/lib/secrets-cache';
 
+vi.mock('../../../server/lib/calendar/connection', async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    userHasCalendarConnection: vi.fn(async () => false),
+    getCalendarConnection: vi.fn(async () => null),
+}));
+import { userHasCalendarConnection, getCalendarConnection } from '../../../server/lib/calendar/connection';
+
+vi.mock('../../../server/lib/calendar/resolve-google-oauth', () => ({
+    isGoogleOAuthConfigured: vi.fn(async (env: { GOOGLE_CLIENT_ID?: string }) =>
+        !!(env.GOOGLE_CLIENT_ID?.trim()),
+    ),
+    loadGoogleOAuthMode: vi.fn(async () => 'platform'),
+    resolveGoogleOAuthCredentials: vi.fn(),
+}));
+
 /**
  * C-10 ③-D (B-4 / A-7) — GET+PATCH /api/admin/communication.
  * Tenant transactional-email identity (senderEmail / replyTo) + display flags.
@@ -23,6 +38,7 @@ describe('admin communication config — ③-D (B-4)', () => {
         app.use('*', async (c, next) => {
             c.set('userRole', 'owner');
             c.set('tenantId', 't1');
+            c.set('user', { sub: 'admin-1' } as HonoConfig['Variables']['user']);
             c.set('services', { branding } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
@@ -32,23 +48,32 @@ describe('admin communication config — ③-D (B-4)', () => {
 
     beforeEach(() => {
         vi.mocked(loadTenantSecrets).mockReset().mockResolvedValue(null);
+        vi.mocked(userHasCalendarConnection).mockReset().mockResolvedValue(false);
+        vi.mocked(getCalendarConnection).mockReset().mockResolvedValue(null);
     });
 
     it('GET returns senderEmail/replyTo + flags from branding config (tenant Resend key in the canonical store)', async () => {
         const getBranding = vi.fn().mockResolvedValue({
-            senderEmail: 'noreply@acme.com', replyTo: 'office@acme.com', icsToken: 'icstok', googleRefreshToken: 'g',
+            senderEmail: 'noreply@acme.com', replyTo: 'office@acme.com', icsToken: 'icstok',
             emailMode: 'own', senderDisplayName: 'Acme Inspections', companyName: 'Acme Home Inspections', pointOfContact: 'inspector',
         });
+        const getIntegrationConfig = vi.fn().mockResolvedValue({ googleOAuthMode: 'platform' });
+        vi.mocked(userHasCalendarConnection).mockResolvedValue(true);
+        vi.mocked(getCalendarConnection).mockResolvedValue({
+            capabilities: 'events_read_write',
+        } as never);
         // C-15: configured via the canonical secrets_enc store.
         vi.mocked(loadTenantSecrets).mockResolvedValue({ RESEND_API_KEY: 're_123' });
-        const { app, env } = buildApp({ getBranding });
+        const { app, env } = buildApp({ getBranding, getIntegrationConfig }, { JWT_SECRET: 'x', GOOGLE_CLIENT_ID: 'g-client', GOOGLE_CLIENT_SECRET: 'g-secret' });
         const res = await app.request('/api/admin/communication', {}, env);
         expect(res.status).toBe(200);
-        const body = await res.json() as { data: { senderEmail: string; replyTo: string; resendConfigured: boolean; googleCalendarConnected: boolean; icsUrl: string | null; templates: unknown[]; emailMode: string; senderDisplayName: string; companyName: string | null; pointOfContact: string } };
+        const body = await res.json() as { data: { senderEmail: string; replyTo: string; resendConfigured: boolean; googleCalendarConnected: boolean; googleOAuthConfigured: boolean; googleOAuthMode: string; icsUrl: string | null; templates: unknown[]; emailMode: string; senderDisplayName: string; companyName: string | null; pointOfContact: string } };
         expect(body.data.senderEmail).toBe('noreply@acme.com');
         expect(body.data.replyTo).toBe('office@acme.com');
         expect(body.data.resendConfigured).toBe(true);
         expect(body.data.googleCalendarConnected).toBe(true);
+        expect(body.data.googleOAuthConfigured).toBe(true);
+        expect(body.data.googleOAuthMode).toBe('platform');
         expect(body.data.icsUrl).toContain('icstok');
         expect(Array.isArray(body.data.templates)).toBe(true);
         expect(body.data.emailMode).toBe('own');
@@ -60,7 +85,8 @@ describe('admin communication config — ③-D (B-4)', () => {
 
     it('GET reports resendConfigured=false when neither env nor tenant secret has a Resend key', async () => {
         const getBranding = vi.fn().mockResolvedValue({ senderEmail: null, replyTo: null });
-        const { app, env } = buildApp({ getBranding });
+        const getIntegrationConfig = vi.fn().mockResolvedValue({});
+        const { app, env } = buildApp({ getBranding, getIntegrationConfig });
         const res = await app.request('/api/admin/communication', {}, env);
         const body = await res.json() as { data: { resendConfigured: boolean; senderEmail: string | null; googleCalendarConnected: boolean } };
         expect(body.data.resendConfigured).toBe(false);
@@ -70,7 +96,8 @@ describe('admin communication config — ③-D (B-4)', () => {
 
     it('PATCH persists senderEmail/replyTo + identity fields via branding.updateBranding', async () => {
         const updateBranding = vi.fn().mockResolvedValue(undefined);
-        const { app, env } = buildApp({ updateBranding });
+        const updateIntegrationConfig = vi.fn().mockResolvedValue(undefined);
+        const { app, env } = buildApp({ updateBranding, updateIntegrationConfig });
         const res = await app.request('/api/admin/communication', {
             method: 'PATCH',
             headers: { 'content-type': 'application/json' },
@@ -78,6 +105,22 @@ describe('admin communication config — ③-D (B-4)', () => {
         }, env);
         expect(res.status).toBe(200);
         expect(updateBranding).toHaveBeenCalledWith('t1', { senderEmail: 'noreply@acme.com', replyTo: 'office@acme.com', emailMode: 'platform', senderDisplayName: 'Acme', pointOfContact: 'company' });
+    });
+
+    it('PATCH persists googleOAuthMode via updateIntegrationConfig', async () => {
+        const updateBranding = vi.fn().mockResolvedValue(undefined);
+        const updateIntegrationConfig = vi.fn().mockResolvedValue(undefined);
+        const { app, env } = buildApp({ updateBranding, updateIntegrationConfig });
+        const res = await app.request('/api/admin/communication', {
+            method: 'PATCH',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+                senderEmail: null, replyTo: 'office@acme.com', emailMode: 'platform',
+                senderDisplayName: null, pointOfContact: 'company', googleOAuthMode: 'own',
+            }),
+        }, env);
+        expect(res.status).toBe(200);
+        expect(updateIntegrationConfig).toHaveBeenCalledWith('t1', { googleOAuthMode: 'own' });
     });
 
     it('PATCH accepts nulls (clearing the addresses)', async () => {

@@ -9,6 +9,8 @@ export interface IntegrationConfig {
     appBaseUrl?: string;
     turnstileSiteKey?: string;
     googleClientId?: string;
+    /** SaaS: platform Worker OAuth app (default) vs tenant BYO Google OAuth app. */
+    googleOAuthMode?: 'platform' | 'own';
     /** Cloudflare Stream customer subdomain for the self-host Stream video backend. */
     streamCustomerSubdomain?: string;
 }

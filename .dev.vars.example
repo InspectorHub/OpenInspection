@@ -56,6 +56,7 @@ CF_API_TOKEN=your_cloudflare_api_token_here
 
 # Integration tests only: a pre-obtained Google OAuth refresh token for a test Google account.
 # Used by npm run test:integration to seed the DB and test POST /api/calendar/sync end-to-end.
-# Obtain by completing the Google OAuth flow (/api/calendar/connect) and noting the refresh_token
-# stored in the users table (wrangler d1 execute openinspection-db --local --command "SELECT google_refresh_token FROM users LIMIT 1").
+# Obtain by completing the Google OAuth flow (/api/calendar/connect) — credentials
+# are stored encrypted in calendar_connections (not on the users row).
+# For integration tests, set INTEGRATION_GOOGLE_REFRESH_TOKEN directly (see core.integration.spec.ts).
 INTEGRATION_GOOGLE_REFRESH_TOKEN=your_test_google_refresh_token_here

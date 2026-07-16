@@ -5752,7 +5752,7 @@
       "body": null
     },
     "summary": "Disconnect Google Calendar integration",
-    "description": "Removes the stored Google Calendar OAuth refresh token and calendar ID for the current inspector. Future syncs will fail until they reconnect."
+    "description": "Deletes the encrypted calendar_connections row for the current inspector. Future syncs fail until they reconnect."
   },
   {
     "operationId": "dismissOnboardingChecklist",
@@ -15278,7 +15278,7 @@
       "body": null
     },
     "summary": "Sync busy blocks from Google Calendar",
-    "description": "Pulls the upcoming busy time blocks from the inspector's connected Google Calendar and merges them into availability overrides so booking pages skip those slots."
+    "description": "Pulls upcoming busy time blocks from the inspector's connected calendar and merges them into availability overrides."
   },
   {
     "operationId": "testGeminiConnection",

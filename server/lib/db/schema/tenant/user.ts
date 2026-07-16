@@ -39,8 +39,6 @@ export const users = sqliteTable('users', {
     // table rebuild and users is FK-referenced). Every insert path MUST pass an
     // explicit role — audited 2026-06-05; enforced by review, not DDL.
     role: text('role', { enum: ROLES }).notNull().default('manager'),
-    googleRefreshToken: text('google_refresh_token'),
-    googleCalendarId: text('google_calendar_id'),
     onboardingState: text('onboarding_state', { mode: 'json' }).$type<Record<string, boolean>>(),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     // Spec 4A — TOTP 2FA. All fields are per-user opt-in; nullable until enabled.

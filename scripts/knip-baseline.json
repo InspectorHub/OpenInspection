@@ -254,7 +254,6 @@
   "exports:server/api/inspections/results.ts:resultsBatchRoute",
   "exports:server/api/inspections/results.ts:switchRatingSystemRoute",
   "exports:server/api/inspections/results.ts:updatePcaNarrativeRoute",
-  "exports:server/api/inspections/results.ts:updatePropertyFactsRoute",
   "exports:server/api/inspections/results.ts:updateTemplateSnapshotRoute",
   "exports:server/api/inspections/templates.ts:createTemplateRoute",
   "exports:server/api/inspections/templates.ts:deleteTemplateRoute",
