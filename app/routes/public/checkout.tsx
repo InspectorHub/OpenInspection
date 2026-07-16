@@ -23,7 +23,7 @@ interface CheckoutData {
         completionPolicy: "all" | "one";
         progress: { signed: number; total: number };
     };
-    invoice: { id: string; amountCents: number; status: "paid" | "partial" | "unpaid" } | null;
+    invoice: { id: string; amountCents: number; currency?: string; status: "paid" | "partial" | "unpaid" } | null;
     payment: { required: boolean; paid: boolean };
     inspection: { id: string; propertyAddress: string | null };
     branding: { companyName: string; primaryColor: string | null };

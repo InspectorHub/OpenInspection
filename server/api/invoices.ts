@@ -223,10 +223,14 @@ export const invoiceRoutes = createApiRouter()
 
         let invoiceId: string;
         let amountCents: number;
+        // Currency label comes from the invoice's own snapshot (Phase B), not the
+        // live tenant setting — a paid CAD invoice keeps reading CAD after a switch.
+        let invoiceCurrency: string;
         if (existing) {
             // Existing draft/sent/partial — reuse it as-is (authority already set).
             invoiceId = existing.id;
             amountCents = existing.amountCents;
+            invoiceCurrency = existing.currency;
         } else {
             // No invoice yet — resolve the amount via the money authority chain:
             // Σ service snapshots (override ?? snapshot) when any exist, else the
@@ -262,6 +266,7 @@ export const invoiceRoutes = createApiRouter()
                 lineItems,
             });
             invoiceId = created.id;
+            invoiceCurrency = created.currency;
         }
 
         // Mark sent (tenant-scoped inside the service) before notifying.
@@ -270,15 +275,15 @@ export const invoiceRoutes = createApiRouter()
         // Build the public pay URL exactly like the agreement send path's host
         // resolution; `/invoice/:id` is keyed by inspection id (no slug).
         const payUrl = paymentUrl(getBookingHost(c), inspectionId);
-        // Format the amount in the RECIPIENT's locale/currency. The recipient is an
-        // external client (no user row), so this resolves to the tenant defaults.
-        const cfg = await db.select({ defaultLocale: tenantConfigs.defaultLocale, currency: tenantConfigs.currency })
+        // Format the amount in the RECIPIENT's locale (external client, no user row,
+        // so the tenant default locale) but in the INVOICE's snapshot currency (Phase B).
+        const cfg = await db.select({ defaultLocale: tenantConfigs.defaultLocale })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
         const amountLabel = formatCurrency(amountCents, {
             locale: resolveLocale(cfg?.defaultLocale),
-            currency: cfg?.currency ?? 'USD',
+            currency: invoiceCurrency,
         });
 
         // Sign the email with the assigned inspector's rebooking footer (B-4).

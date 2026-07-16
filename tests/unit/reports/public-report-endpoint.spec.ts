@@ -309,6 +309,22 @@ describe('InspectionService.getReportGate — combined checkout routing (Task 7)
         expect(gate!.actionLabel).toBe('Pay invoice');
         expect(gate!.actionUrl).toBe(`/invoice/${INSP_ID}`);
     });
+
+    // Phase B — the gate surfaces the INVOICE's snapshot currency, not the
+    // tenant's live setting. seed() leaves tenant_configs.currency at its default
+    // ('USD'); the invoice is stamped 'CAD', and the gate must report 'CAD'.
+    it('payment gate reports the invoice snapshot currency, not the tenant setting', async () => {
+        await seed({ agreementRequired: false, paymentRequired: true, paymentStatus: 'unpaid' });
+        await db.insert(schema.invoices).values({
+            id: '00000000-0000-0000-0000-0000000000f1', tenantId: TENANT_ID, inspectionId: INSP_ID,
+            amountCents: 50000, currency: 'CAD', lineItems: [], createdAt: new Date(),
+        } as any);
+        const { inspection, agreement } = makeService();
+
+        const gate = await inspection.getReportGate(INSP_ID, TENANT_ID, SLUG, agreement);
+        expect(gate!.amountCents).toBe(50000);
+        expect(gate!.currency).toBe('CAD');
+    });
 });
 
 /**

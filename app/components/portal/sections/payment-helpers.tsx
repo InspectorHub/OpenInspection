@@ -15,6 +15,9 @@ export interface InvoiceData {
   inspectorName: string;
   lineItems: { description: string; amount: number }[];
   total: number;
+  // Phase B — the invoice's snapshot currency (ISO 4217). Optional so callers that
+  // predate the snapshot (or build a bare estimate) fall back to USD in `money()`.
+  currency?: string;
 }
 
 /**

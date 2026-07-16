@@ -145,14 +145,19 @@ export class InspectionPublishService extends InspectionSubService {
         // Surface the invoice amount whenever payment is part of the gate (the
         // payment-only page AND the combined Sign & pay page both show it).
         let amountCents: number | null = null;
+        // Phase B — carry the invoice's snapshot currency onto the gate so the
+        // amount renders in the currency it was billed in, not the tenant's
+        // current setting. Null when there is no outstanding invoice.
+        let currency: string | null = null;
         if (paymentOutstanding) {
-            const invoice = await db.select({ amountCents: invoices.amountCents })
+            const invoice = await db.select({ amountCents: invoices.amountCents, currency: invoices.currency })
                 .from(invoices)
                 .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId)))
                 .orderBy(desc(invoices.createdAt))
                 .limit(1)
                 .get();
             amountCents = invoice?.amountCents ?? null;
+            currency = invoice?.currency ?? null;
         }
 
         // Reconstruct the first outstanding signer's tier-2 link token
@@ -199,9 +204,11 @@ export class InspectionPublishService extends InspectionSubService {
             inspectorLicense: inspector?.licenseNumber ?? null,
             scheduledDate: insp.date ?? null,
             amountCents,
-            currency: amountCents != null ? 'USD' : null,
+            // Snapshot currency from the invoice (Phase B); fall back to USD only
+            // when an amount exists without a resolvable currency.
+            currency: amountCents != null ? (currency ?? 'USD') : null,
             // Tenant default display locale for the public gate page (external
-            // client has no user override). Currency stays USD until Phase B.
+            // client has no user override).
             locale: resolveLocale(branding?.defaultLocale),
         };
     }

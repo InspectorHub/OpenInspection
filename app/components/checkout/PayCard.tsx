@@ -18,7 +18,7 @@ export function PayCard({
     companyName,
 }: {
     state: StepState;
-    invoice: { id: string; amountCents: number; status: "paid" | "partial" | "unpaid" } | null;
+    invoice: { id: string; amountCents: number; currency?: string; status: "paid" | "partial" | "unpaid" } | null;
     inspectionId: string;
     brandColor: string | null;
     justPaid: boolean;
@@ -51,6 +51,7 @@ export function PayCard({
                 <PayPanel
                     inspectionId={inspectionId}
                     amountCents={invoice.amountCents}
+                    currency={invoice.currency}
                     brandColor={brandColor}
                     companyName={companyName}
                 />
@@ -64,12 +65,15 @@ type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
 function PayPanel({
     inspectionId,
     amountCents,
+    currency: invoiceCurrency,
     brandColor,
     companyName,
 }: {
     /** Inspection id — the pay-intent endpoint is inspection-keyed (/api/public/inspections/:id/pay-intent), NOT invoice-keyed. */
     inspectionId: string;
     amountCents: number;
+    /** The invoice's snapshot currency (Phase B) — wins over the session default. */
+    currency?: string;
     brandColor: string | null;
     companyName: string;
 }) {
@@ -77,7 +81,8 @@ function PayPanel({
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [stripePromise, setStripePromise] = useState<Promise<StripeJs | null> | null>(null);
     const locale = useDisplayLocale();
-    const currency = useDisplayCurrency();
+    const sessionCurrency = useDisplayCurrency();
+    const currency = invoiceCurrency || sessionCurrency;
 
     async function startPayment() {
         setPhase("loading");
@@ -146,7 +151,7 @@ function PayPanel({
                         },
                     }}
                 >
-                    <CheckoutPayForm amountCents={amountCents} returnUrl={returnUrl} />
+                    <CheckoutPayForm amountCents={amountCents} returnUrl={returnUrl} currency={currency} />
                 </Elements>
             )}
 
@@ -166,13 +171,14 @@ function PayPanel({
     );
 }
 
-function CheckoutPayForm({ amountCents, returnUrl }: { amountCents: number; returnUrl: string }) {
+function CheckoutPayForm({ amountCents, returnUrl, currency: invoiceCurrency }: { amountCents: number; returnUrl: string; currency?: string }) {
     const stripe = useStripe();
     const elements = useElements();
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const locale = useDisplayLocale();
-    const currency = useDisplayCurrency();
+    const sessionCurrency = useDisplayCurrency();
+    const currency = invoiceCurrency || sessionCurrency;
 
     async function onSubmit(e: React.FormEvent) {
         e.preventDefault();

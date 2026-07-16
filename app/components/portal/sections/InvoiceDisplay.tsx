@@ -30,6 +30,9 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
   const amountPaid = isPaid ? total : 0;
   const balanceDue = isPaid ? 0 : total;
   const payable = !isPaid && !isVoid && balanceDue > 0;
+  // Phase B — every amount on this document renders in the invoice's snapshot
+  // currency, not the tenant's live setting. `money()` defaults to USD when absent.
+  const cur = { currency: invoice.currency };
 
   return (
     <div className="relative bg-ih-bg-card border border-ih-border rounded-2xl shadow-ih-card overflow-hidden print:shadow-none print:border-0">
@@ -75,21 +78,21 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
           <div key={i} className="flex items-baseline justify-between py-2.5 border-b border-ih-border/60 last:border-b-0">
             <span className={`text-[13px] ${item.amount < 0 ? "text-ih-ok-fg" : "text-ih-fg-1"}`}>{item.description}</span>
             <span className={`text-[13px] font-mono tabular-nums ${item.amount < 0 ? "text-ih-ok-fg" : "text-ih-fg-1"}`}>
-              {item.amount < 0 ? `−${money(Math.abs(item.amount))}` : money(item.amount)}
+              {item.amount < 0 ? `−${money(Math.abs(item.amount), cur)}` : money(item.amount, cur)}
             </span>
           </div>
         ))}
 
         {/* Totals */}
         <div className="mt-4 pt-4 border-t border-ih-border space-y-1.5 text-[13px]">
-          <Row label="Subtotal" value={money(subtotal)} muted />
-          {discountTotal < 0 && <Row label="Discount" value={`−${money(Math.abs(discountTotal))}`} muted tone="ok" />}
-          <Row label="Total" value={money(total)} strong />
-          {isPaid && <Row label="Amount paid" value={`−${money(amountPaid)}`} muted tone="ok" />}
+          <Row label="Subtotal" value={money(subtotal, cur)} muted />
+          {discountTotal < 0 && <Row label="Discount" value={`−${money(Math.abs(discountTotal), cur)}`} muted tone="ok" />}
+          <Row label="Total" value={money(total, cur)} strong />
+          {isPaid && <Row label="Amount paid" value={`−${money(amountPaid, cur)}`} muted tone="ok" />}
           <div className="flex items-baseline justify-between pt-2 mt-1 border-t border-ih-border">
             <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">{isPaid ? "Balance" : "Balance due"}</span>
             <span className={`font-serif text-[24px] font-semibold tracking-tight ${balanceDue > 0 ? "text-ih-fg-1" : "text-ih-ok-fg"}`}>
-              {money(balanceDue)}
+              {money(balanceDue, cur)}
             </span>
           </div>
         </div>
@@ -98,7 +101,7 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
       {/* Pay panel — Stripe Payment Element (bring-your-own-keys) */}
       {payable && !justPaid && (
         <div className="px-7 pb-7 print:hidden">
-          <StripePayPanel id={inspectionId} balanceDue={balanceDue} inspectorName={invoice.inspectorName} brandColor={brand.primaryColor} />
+          <StripePayPanel id={inspectionId} balanceDue={balanceDue} inspectorName={invoice.inspectorName} brandColor={brand.primaryColor} currency={invoice.currency} />
         </div>
       )}
 

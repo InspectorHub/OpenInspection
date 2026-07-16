@@ -154,6 +154,9 @@ const reportPdfDownloadRoute = createRoute(withMcpMetadata({
 const PublicInvoiceSchema = z.object({
     id: z.string(),
     amountCents: z.number(),
+    // Phase B — the invoice's snapshot currency (ISO 4217); the pay page renders
+    // this, not the tenant's live setting, so history stays self-describing.
+    currency: z.string().optional(),
     status: z.string(),
     createdAt: z.string().nullable().optional(),
     dueDate: z.string().nullable().optional(),

@@ -20,6 +20,9 @@ type InvoiceRow = {
   status: "draft" | "sent" | "paid" | "partial" | "void";
   paymentMethod: "card" | "check" | "cash" | "offline" | "other" | null;
   inspectionId: string | null;
+  // Phase B — the invoice's own snapshot currency; wins over the live tenant
+  // setting so a historical record never gets re-labelled after a switch.
+  currency: string;
 };
 
 type InspectionOption = {
@@ -261,7 +264,7 @@ export default function InvoicesPage() {
           empty={<EmptyState title="No invoices yet" />}
           columns={[
             { label: "Client", cell: (invoice) => <span className="font-medium text-ih-fg-1">{invoice.clientName || "—"}</span> },
-            { label: "Amount", cell: (invoice) => <span className="font-mono text-ih-fg-1">{formatCurrency(invoice.amountCents, { locale, currency })}</span> },
+            { label: "Amount", cell: (invoice) => <span className="font-mono text-ih-fg-1">{formatCurrency(invoice.amountCents, { locale, currency: invoice.currency || currency })}</span> },
             { label: "Due Date", cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate || "—"}</span> },
             {
               label: "Status",
