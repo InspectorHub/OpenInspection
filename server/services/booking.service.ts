@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
-import { availability, availabilityOverrides, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, users, services as servicesTable, agentTenantLinks } from '../lib/db/schema';
+import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, users, services as servicesTable, agentTenantLinks } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
@@ -21,6 +21,7 @@ import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { buildSlotGrid } from '../lib/booking/slot-grid';
 import { loadSlotGridOptions } from '../lib/booking/slot-rules';
 import { computeBusyTimes } from '../lib/booking/busy-times';
+import { buildTenantSlotMap } from '../lib/booking/tenant-slot-map';
 import { resolvePublicHolidayEffect } from '../lib/holidays/load-tenant-holidays';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
@@ -208,7 +209,7 @@ export class BookingService {
         }
         const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
 
-        const [windows, overrides, busy] = await Promise.all([
+        const [windows, overrides, busy, blocks] = await Promise.all([
             db.select().from(availability).where(and(
                 eq(availability.tenantId, tenantId),
                 inArray(availability.inspectorId, qualified),
@@ -228,31 +229,15 @@ export class BookingService {
                     sql`date(${inspections.date}) = ${dateStr}`,
                     sql`${inspections.status} not in ('cancelled')`,
                 )).all(),
+            db.select().from(calendarBlocks).where(and(
+                eq(calendarBlocks.tenantId, tenantId),
+                inArray(calendarBlocks.userId, qualified),
+                eq(calendarBlocks.date, dateStr),
+            )).all(),
         ]);
 
-        // slotMap: time -> set of free inspector ids (inspectors WITH a window but NOT busy at that time)
-        const slotMap = new Map<string, Set<string>>();
         const gridOpts = await loadSlotGridOptions(this.db, tenantId);
-
-        for (const inspectorId of qualified) {
-            const myWindows = windows.filter(w => w.inspectorId === inspectorId);
-            const myOverrides = overrides.filter(o => o.inspectorId === inspectorId);
-            const blocked = myOverrides.some(o => !o.isAvailable);
-            const effective = blocked ? myOverrides.filter(o => o.isAvailable) : myWindows;
-            if (effective.length === 0) continue;
-
-            const busyTimes = computeBusyTimes(busy.filter(b => b.userId === inspectorId));
-
-            // Collect all time slots from this inspector's effective windows
-            const mySlots = buildSlotGrid(effective, gridOpts);
-
-            for (const time of mySlots) {
-                if (!slotMap.has(time)) slotMap.set(time, new Set());
-                if (!busyTimes.has(time)) {
-                    slotMap.get(time)!.add(inspectorId);
-                }
-            }
-        }
+        const slotMap = buildTenantSlotMap(qualified, windows, overrides, busy, blocks, gridOpts);
 
         const slots = [...slotMap.entries()]
             .sort(([a], [b]) => (a < b ? -1 : 1))
