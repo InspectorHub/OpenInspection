@@ -8,6 +8,12 @@ import { SCHEDULING_ROLES } from "~/lib/settings/constants";
 import { isAdminRole } from "~/lib/access";
 import { WeeklySchedulePanel } from "~/components/settings/WeeklySchedulePanel";
 import { DateOverridesPanel } from "~/components/settings/DateOverridesPanel";
+import { TimeOffListPanel, type TimeOffBlock } from "~/components/settings/TimeOffListPanel";
+import {
+  CompanyClosedStrip,
+  type ClosedDate,
+  type HolidayPublicPolicy,
+} from "~/components/settings/CompanyClosedStrip";
 import {
   CalendarConnectPanel,
   type CalendarCapability,
@@ -36,6 +42,21 @@ interface Member {
   createdAt: string;
 }
 
+function civilToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addCivilDays(isoDate: string, days: number): string {
+  const d = new Date(`${isoDate}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function parsePublicPolicy(raw: unknown): HolidayPublicPolicy {
+  if (raw === "block" || raw === "advisory" || raw === "open") return raw;
+  return "open";
+}
+
 export function meta() {
   return [{ title: "My Schedule - Settings - OpenInspection" }];
 }
@@ -47,12 +68,32 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const inspectorId = url.searchParams.get("inspectorId") ?? undefined;
 
-  const [availRes, overridesRes, membersRes, calendarStatusRes] = await Promise.all([
-    api.availability.index.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
-    api.availability.overrides.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
-    api.admin.members.$get().catch(() => null),
-    api.calendar.status.$get().catch(() => null),
-  ]);
+  const start = civilToday();
+  const end = addCivilDays(start, 365);
+  const year = Number(start.slice(0, 4));
+
+  const [availRes, overridesRes, membersRes, calendarStatusRes, blocksRes, configRes, previewRes] =
+    await Promise.all([
+      api.availability.index.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
+      api.availability.overrides.$get({ query: inspectorId ? { inspectorId } : {} }).catch(() => null),
+      api.admin.members.$get().catch(() => null),
+      api.calendar.status.$get().catch(() => null),
+      api.calendar.blocks
+        .$get({
+          query: {
+            start,
+            end,
+            ...(inspectorId ? { userId: inspectorId } : {}),
+          },
+        })
+        .catch(() => null),
+      api.admin["tenant-config"].$get().catch(() => null),
+      (api.admin as unknown as {
+        holidays: { preview: { $get: (args?: unknown) => Promise<Response> } };
+      }).holidays.preview
+        .$get({ query: { year } })
+        .catch(() => null),
+    ]);
 
   let slots: AvailabilitySlot[] = [];
   if (availRes?.ok) {
@@ -82,11 +123,54 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       }).data
     : null;
 
+  let timeOffBlocks: TimeOffBlock[] = [];
+  if (blocksRes?.ok) {
+    const body = (await blocksRes.json()) as { data?: { blocks?: TimeOffBlock[] } };
+    timeOffBlocks = body.data?.blocks ?? [];
+  }
+
+  let holidayRegion: string | null = null;
+  let holidayPublicPolicy: HolidayPublicPolicy = "open";
+  if (configRes?.ok) {
+    const body = (await configRes.json()) as Record<string, unknown>;
+    const d = (body.data ?? {}) as Record<string, unknown>;
+    holidayRegion = typeof d.holidayRegion === "string" ? d.holidayRegion : null;
+    holidayPublicPolicy = parsePublicPolicy(d.holidayPublicPolicy);
+  }
+
+  let upcomingClosed: ClosedDate[] = [];
+  if (holidayRegion && previewRes?.ok) {
+    const body = (await previewRes.json()) as {
+      data?: { dates?: ClosedDate[] };
+    };
+    upcomingClosed = (body.data?.dates ?? [])
+      .filter((d) => d.date >= start)
+      .slice(0, 3);
+  }
+
+  // If preview year rolled past Dec, also pull next year for the strip.
+  if (holidayRegion && upcomingClosed.length < 3) {
+    const nextYearRes = await (api.admin as unknown as {
+      holidays: { preview: { $get: (args?: unknown) => Promise<Response> } };
+    }).holidays.preview
+      .$get({ query: { year: year + 1 } })
+      .catch(() => null);
+    if (nextYearRes?.ok) {
+      const body = (await nextYearRes.json()) as { data?: { dates?: ClosedDate[] } };
+      const more = (body.data?.dates ?? []).filter((d) => d.date >= start);
+      upcomingClosed = [...upcomingClosed, ...more].slice(0, 3);
+    }
+  }
+
   return {
     slots,
     overrides,
     members,
     managedInspectorId: inspectorId ?? null,
+    timeOffBlocks,
+    companyClosed: holidayRegion
+      ? { holidayRegion, holidayPublicPolicy, upcomingClosed }
+      : null,
     calendar: {
       connected: calendarStatus?.connected ?? false,
       capability: calendarStatus?.capability ?? null,
@@ -120,19 +204,6 @@ export async function action({ request, context }: Route.ActionArgs) {
       return { ok: false, intent, message };
     }
     return { ok: res.ok, intent };
-  }
-
-  if (intent === "override-add") {
-    const inspectorId = String(form.get("inspectorId") ?? "") || undefined;
-    const res = await api.availability.overrides.$post({
-      json: {
-        date: String(form.get("date")),
-        isAvailable: false,
-        ...(inspectorId ? { inspectorId } : {}),
-      },
-    });
-    const body = res.ok ? ((await res.json()) as { data?: { override?: unknown } }) : null;
-    return { ok: res.ok, intent, override: body?.data?.override ?? null };
   }
 
   if (intent === "override-remove") {
@@ -202,8 +273,19 @@ export default function SettingsSchedulePage() {
         initialSlots={data.slots}
         inspectorId={data.managedInspectorId}
       />
+      {data.companyClosed && (
+        <CompanyClosedStrip
+          holidayRegion={data.companyClosed.holidayRegion}
+          holidayPublicPolicy={data.companyClosed.holidayPublicPolicy}
+          upcomingClosed={data.companyClosed.upcomingClosed}
+        />
+      )}
+      <TimeOffListPanel
+        key={`time-off-${data.managedInspectorId ?? "self"}`}
+        blocks={data.timeOffBlocks}
+      />
       <DateOverridesPanel
-        key={data.managedInspectorId ?? "self"}
+        key={`overrides-${data.managedInspectorId ?? "self"}`}
         initialOverrides={data.overrides}
         inspectorId={data.managedInspectorId}
       />

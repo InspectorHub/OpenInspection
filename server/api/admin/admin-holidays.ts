@@ -100,8 +100,8 @@ const previewRoute = createRoute(withMcpMetadata({
     operationId: 'previewHolidays',
     tags: ['admin'],
     summary: 'Preview resolved closed dates for a year',
-    description: 'Returns the union of federal, state, and custom holidays for the configured region.',
-    middleware: [adminRoles] as const,
+    description: 'Returns the union of federal, state, and custom holidays for the configured region. Readable by inspectors for the My Schedule company-closed strip.',
+    middleware: [readRoles] as const,
     request: { query: HolidayPreviewQuerySchema },
     responses: {
         200: {
@@ -109,7 +109,7 @@ const previewRoute = createRoute(withMcpMetadata({
             description: 'Resolved closed dates',
         },
     },
-}, { scopes: ['admin'], tier: 'extended' }));
+}, { scopes: ['read'], tier: 'extended' }));
 
 const checkRoute = createRoute(withMcpMetadata({
     method: 'get',
