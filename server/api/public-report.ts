@@ -251,6 +251,7 @@ const ReportGateResponseSchema = z.object({
     scheduledDate: z.string().nullable(),
     amountCents: z.number().nullable(),
     currency: z.string().nullable(),
+    locale: z.string(),
 }).nullable();
 
 const reportGateRoute = createRoute(withMcpMetadata({

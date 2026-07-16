@@ -2,6 +2,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, invoices } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
+import { resolveLocale } from '../../lib/locale';
 import { InvoiceService } from '../invoice.service';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
@@ -76,6 +77,7 @@ export class InspectionPublishService extends InspectionSubService {
         scheduledDate: string | null;
         amountCents: number | null;
         currency: string | null;
+        locale: string;
     } | null> {
         const db = this.getDrizzle();
         const insp = await db.select({
@@ -128,7 +130,7 @@ export class InspectionPublishService extends InspectionSubService {
         // Track I-a Task 7 — both gates outstanding → combined "Sign & pay".
         const bothOutstanding = reason === 'agreement' && paymentOutstanding;
 
-        const branding = await db.select({ companyName: tenantConfigs.companyName, primaryColor: tenantConfigs.primaryColor })
+        const branding = await db.select({ companyName: tenantConfigs.companyName, primaryColor: tenantConfigs.primaryColor, defaultLocale: tenantConfigs.defaultLocale })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 
         let inspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null } | undefined;
@@ -198,6 +200,9 @@ export class InspectionPublishService extends InspectionSubService {
             scheduledDate: insp.date ?? null,
             amountCents,
             currency: amountCents != null ? 'USD' : null,
+            // Tenant default display locale for the public gate page (external
+            // client has no user override). Currency stays USD until Phase B.
+            locale: resolveLocale(branding?.defaultLocale),
         };
     }
 
