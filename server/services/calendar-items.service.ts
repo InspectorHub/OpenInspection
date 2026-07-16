@@ -8,6 +8,11 @@ import {
     inspectionInspectors,
     inspections,
 } from '../lib/db/schema';
+import {
+    loadCustomHolidaysInRange,
+    loadTenantHolidayConfig,
+    resolveCompanyClosedDatesInRange,
+} from '../lib/holidays/load-tenant-holidays';
 
 export type CalendarItemKind =
     | 'inspection'
@@ -58,14 +63,42 @@ function timedIso(date: string, time: string): string {
 }
 
 /**
- * Hook point for the holiday catalog introduced by Task 7.
+ * Virtual company-holiday calendar items whenever holiday_region is set and
+ * the civil date is in the resolved catalog (independent of public policy).
  */
 export async function listCompanyHolidayItems(
-    _db: D1Database,
-    _tenantId: string,
-    _input: ListCalendarItemsInput,
+    database: D1Database,
+    tenantId: string,
+    input: ListCalendarItemsInput,
 ): Promise<CalendarItem[]> {
-    return [];
+    const config = await loadTenantHolidayConfig(database, tenantId);
+    if (!config.holidayRegion) return [];
+
+    const range = toRange(input);
+    const custom = await loadCustomHolidaysInRange(
+        database,
+        tenantId,
+        range.startDate,
+        range.endDate,
+    );
+    const catalog = resolveCompanyClosedDatesInRange({
+        region: config.holidayRegion,
+        customRows: custom,
+        startDate: range.startDate,
+        endDate: range.endDate,
+    });
+
+    return [...catalog.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([date, name]) => ({
+            id: `holiday:${date}`,
+            kind: 'company_holiday' as const,
+            title: name,
+            start: date,
+            end: date,
+            allDay: true,
+            meta: { holidayName: name },
+        }));
 }
 
 export async function listCalendarItems(

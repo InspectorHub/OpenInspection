@@ -38,11 +38,13 @@ export function BookingWizard({
     inspectorOptions,
     chosenInspectorName,
     handleSubmit,
+    tenant,
   } = form;
 
   useTurnstileWidget(profile.turnstileSiteKey, turnstileRef, step, setTurnstileToken);
 
   const showInspectorDropdown = inspectorOptions.length > 0;
+  const serviceIds = [...selectedServices];
 
   return (
     <div className="bg-ih-bg-card rounded-lg shadow-ih-card border border-ih-border p-6 md:p-10">
@@ -111,6 +113,9 @@ export function BookingWizard({
           privacyUrl={privacyUrl}
           termsUrl={termsUrl}
           companyName={profile.company}
+          tenant={tenant}
+          serviceIds={serviceIds}
+          conciergeReviewRequired={!!profile.conciergeReviewRequired}
         />
       )}
 

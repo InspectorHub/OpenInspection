@@ -121,5 +121,6 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     inspectorOptions,
     chosenInspectorName,
     handleSubmit,
+    tenant,
   };
 }

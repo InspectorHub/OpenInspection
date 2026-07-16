@@ -14,6 +14,12 @@ import {
   type BookingSlotIntervalMin,
   type BookingSlotMode,
 } from "~/components/settings/BookingSlotRulesPanel";
+import {
+  HolidayClosedPanel,
+  type CustomHoliday,
+  type HolidayInternalPolicy,
+  type HolidayPublicPolicy,
+} from "~/components/settings/HolidayClosedPanel";
 
 interface TenantConfig {
   conciergeReviewRequired: boolean;
@@ -21,6 +27,9 @@ interface TenantConfig {
   allowInspectorChoice: boolean;
   bookingSlotMode: BookingSlotMode;
   bookingSlotIntervalMin: BookingSlotIntervalMin;
+  holidayRegion: string | null;
+  holidayPublicPolicy: HolidayPublicPolicy;
+  holidayInternalPolicy: HolidayInternalPolicy;
 }
 
 interface Member {
@@ -34,6 +43,14 @@ function parseSlotInterval(raw: unknown): BookingSlotIntervalMin {
   return raw === 15 || raw === 60 ? raw : 30;
 }
 
+function parsePublicPolicy(raw: unknown): HolidayPublicPolicy {
+  return raw === "block" || raw === "advisory" || raw === "open" ? raw : "open";
+}
+
+function parseInternalPolicy(raw: unknown): HolidayInternalPolicy {
+  return raw === "block" ? "block" : "advisory";
+}
+
 export function meta() {
   return [{ title: "Online Booking - Settings - OpenInspection" }];
 }
@@ -45,9 +62,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const api = createApi(context, { token });
 
-  const [configRes, membersRes] = await Promise.all([
+  const [configRes, membersRes, holidaysRes] = await Promise.all([
     api.admin["tenant-config"].$get().catch(() => null),
     api.admin.members.$get().catch(() => null),
+    (api.admin as unknown as {
+      ["custom-holidays"]: { $get: (args?: unknown) => Promise<Response> };
+    })["custom-holidays"].$get().catch(() => null),
   ]);
 
   let config: TenantConfig = {
@@ -56,6 +76,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     allowInspectorChoice: false,
     bookingSlotMode: "fixed",
     bookingSlotIntervalMin: 30,
+    holidayRegion: null,
+    holidayPublicPolicy: "open",
+    holidayInternalPolicy: "advisory",
   };
   if (configRes?.ok) {
     const body = (await configRes.json()) as Record<string, unknown>;
@@ -66,6 +89,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       allowInspectorChoice: Boolean(d.allowInspectorChoice),
       bookingSlotMode: d.bookingSlotMode === "open" ? "open" : "fixed",
       bookingSlotIntervalMin: parseSlotInterval(d.bookingSlotIntervalMin),
+      holidayRegion: typeof d.holidayRegion === "string" ? d.holidayRegion : null,
+      holidayPublicPolicy: parsePublicPolicy(d.holidayPublicPolicy),
+      holidayInternalPolicy: parseInternalPolicy(d.holidayInternalPolicy),
     };
   }
 
@@ -75,7 +101,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     members = (body.data ?? []) as Member[];
   }
 
-  return { config, members };
+  let customHolidays: CustomHoliday[] = [];
+  if (holidaysRes?.ok) {
+    const body = (await holidaysRes.json()) as {
+      data?: { holidays?: CustomHoliday[] };
+    };
+    customHolidays = body.data?.holidays ?? [];
+  }
+
+  return { config, members, customHolidays };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -124,6 +158,71 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res.ok, intent };
   }
 
+  if (intent === "holidays-save") {
+    const regionRaw = String(form.get("holidayRegion") ?? "").trim();
+    const holidayRegion = regionRaw === "" ? null : regionRaw;
+    const holidayPublicPolicy = parsePublicPolicy(form.get("holidayPublicPolicy"));
+    const holidayInternalPolicy = parseInternalPolicy(form.get("holidayInternalPolicy"));
+    const conciergeReviewRequired = form.get("conciergeReviewRequired") === "true";
+
+    const res = await api.admin["tenant-config"].$patch({
+      json: {
+        holidayRegion,
+        holidayPublicPolicy,
+        holidayInternalPolicy,
+        conciergeReviewRequired,
+      },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
+        | string
+        | undefined;
+      return { ok: false, intent, message };
+    }
+    return { ok: true, intent };
+  }
+
+  if (intent === "holiday-custom-add") {
+    const date = String(form.get("date") ?? "");
+    const name = String(form.get("name") ?? "");
+    const customApi = (api.admin as unknown as {
+      ["custom-holidays"]: {
+        $post: (args: { json: { date: string; name: string } }) => Promise<Response>;
+      };
+    })["custom-holidays"];
+    const res = await customApi.$post({ json: { date, name } });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
+        | string
+        | undefined;
+      return { ok: false, intent, message };
+    }
+    const body = (await res.json()) as { data?: { holiday?: CustomHoliday } };
+    return { ok: true, intent, holiday: body.data?.holiday };
+  }
+
+  if (intent === "holiday-custom-delete") {
+    const id = String(form.get("id") ?? "");
+    const customApi = (api.admin as unknown as {
+      ["custom-holidays"]: {
+        [":id"]: {
+          $delete: (args: { param: { id: string } }) => Promise<Response>;
+        };
+      };
+    })["custom-holidays"];
+    const res = await customApi[":id"].$delete({ param: { id } });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      const message = ((err as Record<string, Record<string, unknown>> | null)?.error?.message) as
+        | string
+        | undefined;
+      return { ok: false, intent, message };
+    }
+    return { ok: true, intent, deletedId: id };
+  }
+
   return { ok: false, intent };
 }
 
@@ -148,6 +247,15 @@ export default function SettingsBookingPage() {
       />
       <CompanyBookingLinksPanel tenant={tenant} />
       <BookingPoliciesPanel initialConfig={data.config} />
+      <HolidayClosedPanel
+        initialConfig={{
+          holidayRegion: data.config.holidayRegion,
+          holidayPublicPolicy: data.config.holidayPublicPolicy,
+          holidayInternalPolicy: data.config.holidayInternalPolicy,
+          conciergeReviewRequired: data.config.conciergeReviewRequired,
+        }}
+        initialCustomHolidays={data.customHolidays}
+      />
       <BookingSlotRulesPanel
         initial={{
           bookingSlotMode: data.config.bookingSlotMode,

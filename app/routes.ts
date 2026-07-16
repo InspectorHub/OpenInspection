@@ -107,6 +107,7 @@ export default [
     // Loaded via useFetcher; no UI rendered; must be inside the auth layout so
     // requireToken() can redirect to /login when unauthenticated.
     route("resources/schedule-conflicts", "routes/resources/schedule-conflicts.ts"),
+    route("resources/holiday-check", "routes/resources/holiday-check.ts"),
     // Inspections workspace — the primary list/stats/wizard surface (formerly
     // /dashboard). The thin status-grouped list was retired; this is the one
     // canonical inspections route.

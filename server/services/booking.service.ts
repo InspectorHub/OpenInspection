@@ -21,6 +21,7 @@ import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { buildSlotGrid } from '../lib/booking/slot-grid';
 import { loadSlotGridOptions } from '../lib/booking/slot-rules';
 import { computeBusyTimes } from '../lib/booking/busy-times';
+import { resolvePublicHolidayEffect } from '../lib/holidays/load-tenant-holidays';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
 /**
@@ -186,10 +187,25 @@ export class BookingService {
         dateStr: string,
         serviceIds: string[],
         qualifiedIds?: string[],
-    ): Promise<Array<{ time: string; available: boolean; inspectorIds: string[] }>> {
+    ): Promise<{
+        slots: Array<{ time: string; available: boolean; inspectorIds: string[] }>;
+        holidayAdvisory?: { date: string; name: string };
+    }> {
+        const holiday = await resolvePublicHolidayEffect(this.db, tenantId, dateStr);
+        if (holiday.effect === 'block') {
+            return { slots: [] };
+        }
+
         const db = this.getDrizzle();
         const qualified = qualifiedIds ?? await this.getQualifiedInspectorIds(tenantId, serviceIds);
-        if (qualified.length === 0) return [];
+        if (qualified.length === 0) {
+            return {
+                slots: [],
+                ...(holiday.effect === 'advisory' && holiday.name
+                    ? { holidayAdvisory: { date: dateStr, name: holiday.name } }
+                    : {}),
+            };
+        }
         const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
 
         const [windows, overrides, busy] = await Promise.all([
@@ -238,9 +254,16 @@ export class BookingService {
             }
         }
 
-        return [...slotMap.entries()]
+        const slots = [...slotMap.entries()]
             .sort(([a], [b]) => (a < b ? -1 : 1))
             .map(([time, ids]) => ({ time, available: ids.size > 0, inspectorIds: [...ids].sort() }));
+
+        return {
+            slots,
+            ...(holiday.effect === 'advisory' && holiday.name
+                ? { holidayAdvisory: { date: dateStr, name: holiday.name } }
+                : {}),
+        };
     }
 
     /**
@@ -460,6 +483,16 @@ export class BookingService {
             throw Errors.Conflict('Online booking is not open yet. Please contact the company directly to schedule.');
         }
 
+        const holiday = await resolvePublicHolidayEffect(this.db, tenantId, body.date);
+        if (holiday.effect === 'block') {
+            throw Errors.BadRequest(
+                holiday.name
+                    ? `The office is closed on ${holiday.name}. Please pick another date.`
+                    : 'The office is closed on this date. Please pick another date.',
+                'HOLIDAY_BLOCKED',
+            );
+        }
+
         // Spec 3C / IA-26 — availability enforcement now runs on the tenant
         // aggregation: a slot is bookable iff at least one QUALIFIED inspector
         // is free (or the requested one, when the client chose).
@@ -477,7 +510,7 @@ export class BookingService {
         // Accepted for launch traffic; a post-insert recheck/compensation is
         // tracked in the backlog. Do NOT "fix" by randomizing the pick — the
         // determinism is intentional (idempotent re-submits).
-        const slots = await service.getTenantSlots(tenantId, body.date, serviceIdsForQual, qualifiedIds);
+        const { slots } = await service.getTenantSlots(tenantId, body.date, serviceIdsForQual, qualifiedIds);
         const target = slots.find(s => s.time === requestedTime);
         const freeIds = (target?.inspectorIds ?? []).filter(id => !inspectorId || id === inspectorId);
         if (freeIds.length === 0) {

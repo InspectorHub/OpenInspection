@@ -13,6 +13,7 @@ export interface CompanyProfile {
   turnstileSiteKey?: string | null;
   bookingOpen?: boolean;
   allowInspectorChoice?: boolean;
+  conciergeReviewRequired?: boolean;
   inspectors: { id: string; name: string | null; photoUrl: string | null }[];
   services: { id: string; name: string; price: number; duration: number }[];
 }

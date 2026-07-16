@@ -73,7 +73,7 @@ function buildApp(
         const fakeBooking = {
             hasAnyHours: bookingStubs.hasAnyHours ?? vi.fn().mockResolvedValue(true),
             getQualifiedInspectorIds: bookingStubs.getQualifiedInspectorIds ?? vi.fn().mockResolvedValue([]),
-            getTenantSlots: bookingStubs.getTenantSlots ?? vi.fn().mockResolvedValue([]),
+            getTenantSlots: bookingStubs.getTenantSlots ?? vi.fn().mockResolvedValue({ slots: [] }),
         };
         c.set('services', { booking: fakeBooking } as unknown as HonoConfig['Variables']['services']);
         await next();
@@ -282,7 +282,7 @@ describe('GET /slots — aggregated tenant slots (IA-26)', () => {
             { time: '08:30', available: true, inspectorIds: ['u1'] },
             { time: '09:00', available: false, inspectorIds: [] },
         ];
-        const getTenantSlots = vi.fn().mockResolvedValue(slots);
+        const getTenantSlots = vi.fn().mockResolvedValue({ slots });
         const app = buildApp(db, { getTenantSlots });
 
         const res = await app.request(`/slots?tenant=${TENANT_SLUG}&date=${TEST_DATE}`, {}, FAKE_ENV);
@@ -298,7 +298,7 @@ describe('GET /slots — aggregated tenant slots (IA-26)', () => {
     });
 
     it('passes serviceIds as a parsed array to getTenantSlots', async () => {
-        const getTenantSlots = vi.fn().mockResolvedValue([]);
+        const getTenantSlots = vi.fn().mockResolvedValue({ slots: [] });
         const app = buildApp(db, { getTenantSlots });
         const res = await app.request(`/slots?tenant=${TENANT_SLUG}&date=${TEST_DATE}&serviceIds=svc-1,svc-2`, {}, FAKE_ENV);
         expect(res.status).toBe(200);
@@ -312,7 +312,7 @@ describe('GET /slots — aggregated tenant slots (IA-26)', () => {
             { time: '08:00', available: true, inspectorIds: [INSPECTOR_ID, OTHER_INSPECTOR] },
             { time: '08:30', available: true, inspectorIds: [OTHER_INSPECTOR] }, // target inspector not free here
         ];
-        const getTenantSlots = vi.fn().mockResolvedValue(slots);
+        const getTenantSlots = vi.fn().mockResolvedValue({ slots });
         const app = buildApp(db, { getTenantSlots });
 
         const res = await app.request(`/slots?tenant=${TENANT_SLUG}&date=${TEST_DATE}&inspectorId=${INSPECTOR_ID}`, {}, FAKE_ENV);

@@ -476,6 +476,34 @@
     "description": "Updates the authenticated user's password after verifying the current one. Invalidates all outstanding session JWTs for this user on success."
   },
   {
+    "operationId": "checkInternalHoliday",
+    "method": "GET",
+    "pathTemplate": "/api/admin/holidays/check",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "date",
+          "in": "query",
+          "required": true,
+          "description": "Civil date to check against internal holiday policy",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Civil date to check against internal holiday policy"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Check internal holiday policy for a date",
+    "description": "Used by the New Inspection wizard to show advisory/block UI for company closed days."
+  },
+  {
     "operationId": "cloneInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/clone",
@@ -1015,6 +1043,24 @@
     },
     "summary": "Create contractor type for current tenant",
     "description": "Auto-generated placeholder for createContractorType (POST /, contractor-types domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "createCustomHoliday",
+    "method": "POST",
+    "pathTemplate": "/api/admin/custom-holidays",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/CreateCustomHoliday"
+      }
+    },
+    "summary": "Create a custom holiday",
+    "description": "Adds a single-date custom closed day to the tenant holiday catalog."
   },
   {
     "operationId": "createDefectCategory",
@@ -4990,6 +5036,33 @@
     "description": "Auto-generated placeholder for deleteContractorType (DELETE /{id}, contractor-types domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "deleteCustomHoliday",
+    "method": "DELETE",
+    "pathTemplate": "/api/admin/custom-holidays/{id}",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a custom holiday",
+    "description": "Removes a custom closed day from the tenant holiday catalog."
+  },
+  {
     "operationId": "deleteDefectCategory",
     "method": "DELETE",
     "pathTemplate": "/api/admin/defect-categories/{id}",
@@ -8769,6 +8842,35 @@
     },
     "summary": "List contractor types for current tenant",
     "description": "Auto-generated placeholder for listContractorTypes (GET /, contractor-types domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "listCustomHolidays",
+    "method": "GET",
+    "pathTemplate": "/api/admin/custom-holidays",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "year",
+          "in": "query",
+          "required": false,
+          "description": "Limit to a civil year; omit to return all custom holidays",
+          "schema": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100,
+            "description": "Limit to a civil year; omit to return all custom holidays"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List tenant custom holidays",
+    "description": "Returns custom company closed days for the holiday catalog."
   },
   {
     "operationId": "listDefectCategories",
@@ -13840,6 +13942,35 @@
     },
     "summary": "Preview email template with unsaved edits",
     "description": "Renders a template with unsaved edits against sample data, returning the subject and full HTML for preview. Does not persist anything."
+  },
+  {
+    "operationId": "previewHolidays",
+    "method": "GET",
+    "pathTemplate": "/api/admin/holidays/preview",
+    "scopes": [
+      "admin"
+    ],
+    "tag": "admin",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "year",
+          "in": "query",
+          "required": true,
+          "description": "Civil year to preview",
+          "schema": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100,
+            "description": "Civil year to preview"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Preview resolved closed dates for a year",
+    "description": "Returns the union of federal, state, and custom holidays for the configured region."
   },
   {
     "operationId": "previewMessageTemplate",

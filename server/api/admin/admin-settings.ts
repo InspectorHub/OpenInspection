@@ -134,6 +134,9 @@ const TenantConfigGetResponseSchema = z.object({
         emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).nullable().describe('BYO email provider selection (null = default Resend).'),
         bookingSlotMode: z.enum(['open', 'fixed']).describe('Public booking slot grid: open = clock-aligned starts; fixed = window-aligned starts (default).'),
         bookingSlotIntervalMin: z.union([z.literal(15), z.literal(30), z.literal(60)]).describe('Slot grid step in minutes (15, 30, or 60). Default 30.'),
+        holidayRegion: z.string().nullable().describe('Holiday catalog region (US / US-{ST}) or null when catalog is off.'),
+        holidayPublicPolicy: z.enum(['open', 'block', 'advisory']).describe('Public booking policy for catalog closed dates.'),
+        holidayInternalPolicy: z.enum(['advisory', 'block']).describe('Internal scheduling policy for catalog closed dates.'),
     }).describe('Current tenant configuration flags'),
 }).openapi('TenantConfigGetResponse');
 
@@ -174,6 +177,13 @@ const TenantConfigPatchSchema = z.object({
     emailByoProvider: z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']).optional().describe('BYO email provider — which adapter to use when email mode is "own".'),
     bookingSlotMode: z.enum(['open', 'fixed']).optional().describe('Public booking slot grid mode: open (clock-aligned) or fixed (window-aligned).'),
     bookingSlotIntervalMin: z.union([z.literal(15), z.literal(30), z.literal(60)]).optional().describe('Slot grid step in minutes.'),
+    holidayRegion: z.union([
+        z.literal('US'),
+        z.string().regex(/^US-[A-Z]{2}$/),
+        z.null(),
+    ]).optional().describe('Holiday catalog region. null disables the catalog.'),
+    holidayPublicPolicy: z.enum(['open', 'block', 'advisory']).optional().describe('Public booking holiday policy.'),
+    holidayInternalPolicy: z.enum(['advisory', 'block']).optional().describe('Internal scheduling holiday policy.'),
 }).openapi('TenantConfigPatch');
 
 const TenantConfigPatchResponseSchema = z.object({
@@ -433,6 +443,13 @@ export const adminSettingsRoutes = createApiRouter()
                 )
                     ? (config?.bookingSlotIntervalMin as 15 | 30 | 60)
                     : 30,
+                holidayRegion: (config?.holidayRegion as string | null | undefined) ?? null,
+                holidayPublicPolicy: (['open', 'block', 'advisory'] as const).includes(
+                    config?.holidayPublicPolicy as 'open' | 'block' | 'advisory',
+                )
+                    ? (config?.holidayPublicPolicy as 'open' | 'block' | 'advisory')
+                    : 'open',
+                holidayInternalPolicy: config?.holidayInternalPolicy === 'block' ? 'block' : 'advisory',
             },
         }, 200);
     })
@@ -490,6 +507,28 @@ export const adminSettingsRoutes = createApiRouter()
         }
         if (body.bookingSlotIntervalMin !== undefined) {
             update.bookingSlotIntervalMin = body.bookingSlotIntervalMin;
+        }
+        if (body.holidayRegion !== undefined) {
+            const previous = await c.var.services.branding.getBranding(tenantId, {
+                companyName: '', primaryColor: '', supportEmail: '',
+            }) as Record<string, unknown> | undefined;
+            const wasOff = !previous?.holidayRegion;
+            update.holidayRegion = body.holidayRegion;
+            // First enable: default public block + internal advisory unless explicitly patched.
+            if (wasOff && body.holidayRegion !== null) {
+                if (body.holidayPublicPolicy === undefined) {
+                    update.holidayPublicPolicy = 'block';
+                }
+                if (body.holidayInternalPolicy === undefined) {
+                    update.holidayInternalPolicy = 'advisory';
+                }
+            }
+        }
+        if (body.holidayPublicPolicy !== undefined) {
+            update.holidayPublicPolicy = body.holidayPublicPolicy;
+        }
+        if (body.holidayInternalPolicy !== undefined) {
+            update.holidayInternalPolicy = body.holidayInternalPolicy;
         }
         if (Object.keys(update).length === 0) {
             return c.json({ success: true as const, data: { ok: true as const } }, 200);
