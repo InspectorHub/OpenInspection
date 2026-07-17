@@ -4,14 +4,21 @@
  * these convert to/from a user-facing `$` string only at the UI boundary.
  * Extracted from RepairBuilderSection.tsx / repair-request.$shareToken.tsx so the
  * Repair Request Builder and the Commercial PCA cost engine format money identically.
+ *
+ * Currency rendering delegates to the shared locale-aware formatter (app/lib/format).
+ * `locale`/`currency` are optional and default to en-US/USD so unmigrated callers
+ * stay byte-identical; migrated call sites thread the viewer's effective values
+ * (useDisplayLocale/useDisplayCurrency on the client, tenant defaults on the server).
  */
 
-/** Integer cents -> `$X,XXX.XX` (en-US, two decimals, thousands separators). */
-export function formatCents(cents: number): string {
-  return `$${(cents / 100).toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+import { formatCurrency } from './format';
+
+/** Optional locale/currency override; both default to en-US/USD. */
+export type MoneyOpts = { locale?: string; currency?: string };
+
+/** Integer cents -> `$X,XXX.XX` (defaults en-US/USD, two decimals, thousands separators). */
+export function formatCents(cents: number, opts?: MoneyOpts): string {
+  return formatCurrency(cents, { locale: opts?.locale ?? 'en-US', currency: opts?.currency ?? 'USD' });
 }
 
 /** User dollar string -> integer cents. Empty / non-numeric -> null. */
@@ -30,12 +37,11 @@ export function parseDollarsToCents(input: string): number | null {
  * so the common case never carries a redundant `.00`, but any cents the user
  * enters are preserved. Storage stays in integer cents.
  */
-export function formatDollars(cents: number): string {
-  const hasCents = cents % 100 !== 0;
-  return `$${(cents / 100).toLocaleString('en-US', {
-    minimumFractionDigits: hasCents ? 2 : 0,
-    maximumFractionDigits: 2,
-  })}`;
+export function formatDollars(cents: number, opts?: MoneyOpts): string {
+  const formatted = formatCurrency(cents, { locale: opts?.locale ?? 'en-US', currency: opts?.currency ?? 'USD' });
+  // Opinion-of-Cost convention is whole dollars: drop the redundant `.00` when
+  // the amount has no cents; keep any cents the user actually entered.
+  return cents % 100 === 0 ? formatted.replace(/\.00$/, '') : formatted;
 }
 
 /**

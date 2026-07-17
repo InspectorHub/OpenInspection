@@ -94,6 +94,9 @@ export const users = sqliteTable('users', {
     // tenant's default_timezone. Affects only this user's UI; never reports or
     // calendar events (those always anchor to the tenant tz). Appended at END.
     timezone: text('timezone'),
+    // Per-user display-locale override (BCP-47). NULL = inherit the tenant's
+    // default_locale. Affects only this user's UI.
+    locale: text('locale'),
 }, (t) => [
     index('idx_users_deleted_at').on(t.deletedAt),
     // DB-2: soft-deleted rows must not block re-inviting the same email.

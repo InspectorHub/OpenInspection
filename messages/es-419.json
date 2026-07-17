@@ -1,0 +1,18 @@
+{
+  "$schema": "https://inlang.com/schema/inlang-message-format",
+  "auth_login_meta_title": "Iniciar sesión — OpenInspection",
+  "auth_login_heading": "Inicia sesión en tu espacio de trabajo",
+  "auth_login_subtitle": "Ingresa tus credenciales para acceder a inspecciones, informes y herramientas de equipo.",
+  "auth_login_email_label": "Correo electrónico",
+  "auth_login_password_label": "Contraseña",
+  "auth_login_forgot_link": "¿Olvidaste tu contraseña?",
+  "auth_login_submit": "Iniciar sesión",
+  "auth_login_submit_pending": "Iniciando sesión…",
+  "auth_login_error_failed_with_status": "Error al iniciar sesión ({status})",
+  "auth_login_error_2fa_unsupported": "La verificación en dos pasos aún no es compatible con la nueva interfaz.",
+  "auth_login_error_no_token": "La autenticación se realizó correctamente, pero no se recibió ningún token.",
+  "auth_login_error_network": "Error de red: ¿el servidor de la API está en ejecución?",
+  "auth_validation_email_required": "El correo electrónico es obligatorio",
+  "auth_validation_email_invalid": "Correo electrónico no válido",
+  "auth_validation_password_required": "La contraseña es obligatoria"
+}

@@ -6,6 +6,8 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { isAdminRole } from "~/lib/access";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import type { McpGrant } from "../../server/lib/validations/mcp.schema";
 import { MODULE_GROUPS } from "../../server/lib/mcp/tag-catalog";
 
@@ -165,12 +167,8 @@ function Badge({ kind }: { kind: "R" | "W" }) {
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
-function formatUnixDate(ts: number): string {
-  return new Date(ts * 1000).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+function formatUnixDate(ts: number, locale: string, tz: string): string {
+  return formatDate(ts * 1000, { locale, timeZone: tz, month: "short" });
 }
 
 // ─── Grant row ────────────────────────────────────────────────────────────────
@@ -185,6 +183,8 @@ function GrantRow({
   showUser?: boolean;
   onRequestRevoke: () => void;
 }) {
+  const locale = useDisplayLocale();
+  const tz = useDisplayTimeZone();
   return (
     <div className="flex items-start gap-4 px-4 py-3">
       <div className="flex-1 min-w-0">
@@ -201,9 +201,9 @@ function GrantRow({
           <ScopesSummary scopes={grant.scopes} />
         </div>
         <p className="text-[11px] text-ih-fg-4 mt-1">
-          Created {formatUnixDate(grant.createdAt)}{" "}
+          Created {formatUnixDate(grant.createdAt, locale, tz)}{" "}
           {grant.expiresAt != null
-            ? `· Expires ${formatUnixDate(grant.expiresAt)}`
+            ? `· Expires ${formatUnixDate(grant.expiresAt, locale, tz)}`
             : "· No expiry"}
         </p>
       </div>

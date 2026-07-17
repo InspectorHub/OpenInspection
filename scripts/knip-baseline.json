@@ -308,6 +308,8 @@
   "exports:server/lib/dashboard-columns.ts:DASHBOARD_COLUMNS",
   "exports:server/lib/dashboard-columns.ts:DASHBOARD_COLUMN_IDS",
   "exports:server/lib/file-validation.ts:ALLOWED_MIMES",
+  "exports:server/lib/format.ts:formatDate",
+  "exports:server/lib/format.ts:formatTime",
   "exports:server/lib/jwt-keyring.ts:getKeyringFromEnv",
   "exports:server/lib/legal-links.ts:tenantLegalUrl",
   "exports:server/lib/logger.ts:Logger",

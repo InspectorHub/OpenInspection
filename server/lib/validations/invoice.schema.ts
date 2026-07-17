@@ -53,4 +53,5 @@ export const InvoiceResponseSchema = z.object({
     paidAt: z.string().nullable().describe('TODO describe paidAt field for the OpenInspection MCP integration'),
     createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
     status: z.enum(['draft', 'sent', 'paid', 'partial', 'void']).describe('TODO describe status field for the OpenInspection MCP integration'),
+    currency: z.string().describe('ISO 4217 currency this invoice was created in (snapshot from tenant at creation).'),
 }).openapi('Invoice');

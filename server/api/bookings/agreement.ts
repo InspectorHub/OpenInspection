@@ -287,6 +287,7 @@ export const agreementRoutes = createApiRouter()
         const invoiceRow = await db.select({
             id: invoices.id,
             amountCents: invoices.amountCents,
+            currency: invoices.currency,
             paidAt: invoices.paidAt,
             partialPaidAt: invoices.partialPaidAt,
         }).from(invoices)
@@ -321,7 +322,7 @@ export const agreementRoutes = createApiRouter()
                     progress: { signed: signedCount, total: signers.length },
                 },
                 invoice: invoiceRow && invoiceStatus
-                    ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, status: invoiceStatus }
+                    ? { id: invoiceRow.id, amountCents: invoiceRow.amountCents, currency: invoiceRow.currency, status: invoiceStatus }
                     : null,
                 payment: {
                     required: inspectionRow.paymentRequired === true,

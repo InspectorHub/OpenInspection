@@ -4,6 +4,8 @@ import type { Route } from "./+types/metrics";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Table } from "@core/shared-ui";
+import { formatDollars } from "~/lib/money";
+import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 
 export function meta() {
   return [{ title: "Metrics - OpenInspection" }];
@@ -36,14 +38,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
 const PERIODS = ["3m", "6m", "12m"] as const;
 
-function fmt(n: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0 }).format(n);
-}
-
 export default function MetricsPage() {
   const { data, period: initialPeriod } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
+  const locale = useDisplayLocale();
+  const currency = useDisplayCurrency();
   const [period, setPeriod] = useState<string>(initialPeriod || "6m");
+
+  // Revenue/order values arrive as integer money units summed from
+  // inspections.price; `fmt` formerly rendered them as whole-dollar currency
+  // (minimumFractionDigits:0). formatDollars takes integer cents and drops the
+  // redundant `.00`, so scale by 100 to keep the rendered string identical.
+  const fmt = (n: number) => formatDollars(n * 100, { locale, currency });
 
   const changePeriod = (p: string) => {
     setPeriod(p);

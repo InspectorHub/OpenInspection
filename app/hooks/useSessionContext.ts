@@ -21,6 +21,10 @@ export interface SessionContext {
     privacyUrl: string | null;
     /** Tenant default display timezone (IANA name; 'UTC' when unset). */
     defaultTimezone: string;
+    /** Tenant default display locale (BCP-47; 'en-US' when unset). */
+    defaultLocale: string;
+    /** Tenant transaction/display currency (ISO 4217; 'USD' when unset). */
+    currency: string;
   };
   user: {
     name: string | null;
@@ -29,6 +33,8 @@ export interface SessionContext {
     initials: string;
     /** Per-user timezone override (IANA name), or null to inherit the tenant. */
     timezone: string | null;
+    /** Per-user locale override (BCP-47), or null to inherit the tenant. */
+    locale: string | null;
   };
   deployment: {
     mode: string;
@@ -53,10 +59,25 @@ export function useSessionContext(): SessionContext | null {
 /**
  * The resolved display timezone for the current viewer: the user's override
  * when set, otherwise the tenant default, otherwise 'UTC'. Values are already
- * validated to real IANA ids on write (branding/profile APIs). Reports and
- * calendar events do NOT use this — they always anchor to the tenant tz.
+ * validated to real IANA ids on write (branding/profile APIs). The calendar
+ * renders in this zone — the server buckets calendar items into the same
+ * effective tz (GET /api/calendar/items), so the client never re-derives days.
+ * Reports still anchor to the tenant tz, not this per-viewer value.
  */
 export function useDisplayTimeZone(): string {
   const ctx = useSessionContext();
   return ctx?.user.timezone || ctx?.branding.defaultTimezone || "UTC";
+}
+
+/** Resolved display locale for the current viewer: user override, else tenant
+ *  default, else 'en-US'. Mirrors useDisplayTimeZone. */
+export function useDisplayLocale(): string {
+  const ctx = useSessionContext();
+  return ctx?.user.locale || ctx?.branding.defaultLocale || "en-US";
+}
+
+/** Tenant transaction/display currency (ISO 4217); 'USD' when unset. */
+export function useDisplayCurrency(): string {
+  const ctx = useSessionContext();
+  return ctx?.branding.currency || "USD";
 }

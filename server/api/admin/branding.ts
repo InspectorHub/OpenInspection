@@ -7,6 +7,7 @@ import {
 } from '../../lib/validations/admin.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { Errors } from '../../lib/errors';
+import { needsCurrencyChangeConfirm } from '../../lib/currency-guard';
 
 /**
  * GET /api/admin/branding
@@ -58,6 +59,21 @@ const updateBrandingRoute = createRoute(withMcpMetadata({
                 },
             },
             description: 'Success',
+        },
+        409: {
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        success: z.literal(false),
+                        error: z.object({
+                            code: z.literal('CURRENCY_CHANGE_NEEDS_CONFIRM'),
+                            message: z.string(),
+                            invoiceCount: z.number(),
+                        }),
+                    }),
+                },
+            },
+            description: 'Currency change requires explicit confirmation because invoices already exist (Phase B).',
         },
     },
     operationId: "createTenantBranding",
@@ -116,7 +132,9 @@ export const adminBrandingRoutes = createApiRouter()
             supportEmail: branding.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
             logoUrl: branding.logoUrl || null,
             billingUrl: branding.billingUrl || null,
-            defaultTimezone: branding.defaultTimezone || 'UTC'
+            defaultTimezone: branding.defaultTimezone || 'UTC',
+            defaultLocale: branding.defaultLocale || 'en-US',
+            currency: branding.currency || 'USD'
         };
 
         return c.json({ success: true, data: { branding: formattedBranding } }, 200);
@@ -124,7 +142,39 @@ export const adminBrandingRoutes = createApiRouter()
     .openapi(updateBrandingRoute, async (c) => {
         const body = c.req.valid('json');
         const brandingService = c.var.services.branding;
-        const result = await brandingService.updateBranding(c.get('tenantId'), body);
+        const tenantId = c.get('tenantId');
+
+        // Phase B — `confirmCurrencyChange` is a transient acknowledgement, never a
+        // persisted column; strip it before it reaches the branding service.
+        const { confirmCurrencyChange, ...brandingData } = body;
+
+        // Guard: block a tenant currency change once invoices exist unless the
+        // caller explicitly confirms (the per-invoice snapshot protects history,
+        // but the switch itself must be deliberate). Skips the invoice count for
+        // no-op / first-ever currency sets so a normal save pays no extra query.
+        if (brandingData.currency) {
+            const current = await brandingService.getBranding(tenantId, {
+                companyName: '', primaryColor: '', supportEmail: '',
+            });
+            const invoiceCount = current.currency && current.currency !== brandingData.currency
+                ? await c.var.services.invoice.countInvoices(tenantId)
+                : 0;
+            if (needsCurrencyChangeConfirm({
+                current: current.currency, next: brandingData.currency, invoiceCount,
+                confirmed: confirmCurrencyChange === true,
+            })) {
+                return c.json({
+                    success: false as const,
+                    error: {
+                        code: 'CURRENCY_CHANGE_NEEDS_CONFIRM' as const,
+                        message: `Changing your currency affects ${invoiceCount} existing invoice${invoiceCount === 1 ? '' : 's'}. Existing invoices keep the currency they were billed in; new invoices will use the new currency. Confirm to continue.`,
+                        invoiceCount,
+                    },
+                }, 409);
+            }
+        }
+
+        const result = await brandingService.updateBranding(tenantId, brandingData);
 
         const formattedResult = {
             ...result,
@@ -133,7 +183,9 @@ export const adminBrandingRoutes = createApiRouter()
             supportEmail: result.supportEmail || c.env.SENDER_EMAIL || 'support@example.com',
             logoUrl: result.logoUrl || null,
             billingUrl: result.billingUrl || null,
-            defaultTimezone: result.defaultTimezone || 'UTC'
+            defaultTimezone: result.defaultTimezone || 'UTC',
+            defaultLocale: result.defaultLocale || 'en-US',
+            currency: result.currency || 'USD'
         };
 
         return c.json({ success: true, data: { branding: formattedResult } }, 200);

@@ -7,6 +7,8 @@ import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { MoneyInput } from "~/components/MoneyInput";
+import { formatDollars } from "~/lib/money";
+import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 
 export function meta() {
   return [{ title: "Repair Items - OpenInspection" }];
@@ -97,6 +99,8 @@ export default function RepairItemsPage() {
   const [pendingDelete, setPendingDelete] = useState<RepairItem | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(EMPTY);
+  const locale = useDisplayLocale();
+  const currency = useDisplayCurrency();
   const ctName = (id: string | null) => contractorTypes.find((c) => c.id === id)?.name ?? null;
 
   function openCreate() { setForm(EMPTY); setModalOpen(true); }
@@ -143,8 +147,8 @@ export default function RepairItemsPage() {
                 {(it.defaultEstimateMin != null || it.defaultEstimateMax != null) && (
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-ok-bg text-ih-ok-fg tabular-nums">
                     {[
-                      it.defaultEstimateMin != null ? `$${(it.defaultEstimateMin / 100).toLocaleString()}` : null,
-                      it.defaultEstimateMax != null ? `$${(it.defaultEstimateMax / 100).toLocaleString()}` : null,
+                      it.defaultEstimateMin != null ? formatDollars(it.defaultEstimateMin, { locale, currency }) : null,
+                      it.defaultEstimateMax != null ? formatDollars(it.defaultEstimateMax, { locale, currency }) : null,
                     ].filter(Boolean).join(" – ")}
                   </span>
                 )}

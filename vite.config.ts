@@ -2,6 +2,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
+import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
 
@@ -21,6 +22,17 @@ export default defineConfig({
     },
   },
   plugins: [
+    // i18n Phase C — compile inlang messages to app/paraglide before RR resolves
+    // imports. strategy cookie→baseLocale ONLY: the default `globalVariable` is a
+    // module-global that is not request-safe under multi-tenant SSR concurrency
+    // (see the Phase C design §3a); locale is scoped per-request via AsyncLocalStorage
+    // (paraglideMiddleware in workers/app.ts).
+    paraglideVitePlugin({
+      project: "./project.inlang",
+      outdir: "./app/paraglide",
+      strategy: ["cookie", "baseLocale"],
+      emitTsDeclarations: true,
+    }),
     tailwindcss(),
     cloudflare({ viteEnvironment: { name: "ssr" }, configPath: wranglerConfig }),
     reactRouter(),

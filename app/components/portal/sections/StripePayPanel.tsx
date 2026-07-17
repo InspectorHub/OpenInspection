@@ -14,7 +14,9 @@ import { money } from "./payment-helpers";
 
 type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
 
-export function StripePayPanel({ id, balanceDue, inspectorName, brandColor }: { id: string; balanceDue: number; inspectorName: string; brandColor: string | null }) {
+export function StripePayPanel({ id, balanceDue, inspectorName, brandColor, currency }: { id: string; balanceDue: number; inspectorName: string; brandColor: string | null; currency?: string }) {
+  // Phase B — amounts render in the invoice's snapshot currency (USD fallback).
+  const cur = { currency };
   const [phase, setPhase] = useState<PayPhase>("idle");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<StripeJs | null> | null>(null);
@@ -53,7 +55,7 @@ export function StripePayPanel({ id, balanceDue, inspectorName, brandColor }: { 
     <div className="rounded-xl border border-ih-border bg-ih-bg-muted p-4">
       <div className="flex items-center justify-between mb-3">
         <span className="text-[13px] font-semibold text-ih-fg-1">Pay this invoice</span>
-        <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{money(balanceDue)}</span>
+        <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{money(balanceDue, cur)}</span>
       </div>
 
       {(phase === "idle" || phase === "loading") && (
@@ -64,7 +66,7 @@ export function StripePayPanel({ id, balanceDue, inspectorName, brandColor }: { 
             disabled={phase === "loading"}
             className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
           >
-            {phase === "loading" ? "Starting secure checkout…" : `Pay ${money(balanceDue)}`}
+            {phase === "loading" ? "Starting secure checkout…" : `Pay ${money(balanceDue, cur)}`}
           </button>
           <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-4">
             <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -89,7 +91,7 @@ export function StripePayPanel({ id, balanceDue, inspectorName, brandColor }: { 
             },
           }}
         >
-          <CheckoutForm balanceDue={balanceDue} returnUrl={returnUrl} />
+          <CheckoutForm balanceDue={balanceDue} returnUrl={returnUrl} currency={currency} />
         </Elements>
       )}
 
@@ -109,7 +111,7 @@ export function StripePayPanel({ id, balanceDue, inspectorName, brandColor }: { 
   );
 }
 
-function CheckoutForm({ balanceDue, returnUrl }: { balanceDue: number; returnUrl: string }) {
+function CheckoutForm({ balanceDue, returnUrl, currency }: { balanceDue: number; returnUrl: string; currency?: string }) {
   const stripe = useStripe();
   const elements = useElements();
   const [submitting, setSubmitting] = useState(false);
@@ -141,7 +143,7 @@ function CheckoutForm({ balanceDue, returnUrl }: { balanceDue: number; returnUrl
         disabled={!stripe || submitting}
         className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
       >
-        {submitting ? "Processing…" : `Pay ${money(balanceDue)}`}
+        {submitting ? "Processing…" : `Pay ${money(balanceDue, { currency })}`}
       </button>
       {error && <p className="text-[12px] text-ih-bad-fg font-medium">{error}</p>}
       <div className="flex items-center justify-center gap-1.5 text-[11px] text-ih-fg-4">

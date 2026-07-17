@@ -7,6 +7,13 @@ export interface CalendarEvent {
   title: string;
   start: string;
   end?: string;
+  /** Civil day (YYYY-MM-DD) in the viewer effective tz — the ONLY key views may
+   *  bucket by. Never re-derive the day from `start` via `toISOString()`. */
+  civilDate: string;
+  /** Wall-clock start (HH:MM) in the effective tz; omitted for all-day. */
+  startTime?: string;
+  /** Wall-clock end (HH:MM) in the effective tz; omitted for all-day. */
+  endTime?: string;
   url?: string;
   color?: string;
   backgroundColor?: string;
@@ -29,6 +36,9 @@ export interface CalendarItem {
   title: string;
   start: string;
   end: string;
+  civilDate: string;
+  startTime?: string;
+  endTime?: string;
   allDay: boolean;
   color?: string;
   inspectionId?: string;
@@ -69,6 +79,9 @@ export function calendarItemToEvent(item: CalendarItem): CalendarEvent {
     title: item.title,
     start: item.start,
     end: item.end,
+    civilDate: item.civilDate,
+    ...(item.startTime ? { startTime: item.startTime } : {}),
+    ...(item.endTime ? { endTime: item.endTime } : {}),
     ...(item.color ? { color: item.color } : {}),
     ...(status ? { status } : {}),
     source: item.kind,
@@ -92,8 +105,46 @@ export function isSameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export function formatTime(d: Date) {
-  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+/** Civil date string (YYYY-MM-DD) from calendar parts. `month` is 0-based (JS
+ *  Date convention). Built by string assembly, never through `toISOString()`,
+ *  so it carries no UTC drift — a grid cell's key always equals its label. */
+export function civilDateOf(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export interface BlockFormSeed {
+  date: string;
+  startTime: string;
+  endTime: string;
+  allDay: boolean;
+}
+
+/** Seed values for the Block Time create/edit form. Reads the block's
+ *  effective-tz civil fields (civilDate/startTime/endTime) — NEVER slices the
+ *  UTC `start` instant, which would show a tz-shifted time (e.g. 01:00 for a
+ *  09:00 block viewed at UTC+8). A new block parses the day-click seed string
+ *  (`YYYY-MM-DDTHH:MM`). */
+export function blockFormSeed(block: CalendarEvent | null, dateSeed: string | null): BlockFormSeed {
+  const allDay = block?.extendedProps?.allDay === true;
+  return {
+    date: block?.civilDate ?? dateSeed?.slice(0, 10) ?? "",
+    startTime: allDay ? "09:00" : block?.startTime ?? dateSeed?.slice(11, 16) ?? "09:00",
+    endTime: allDay ? "10:00" : block?.endTime ?? "10:00",
+    allDay,
+  };
+}
+
+/** Groups events by their server-provided `civilDate`. Views look cells up by
+ *  the same civil string (see `civilDateOf`) — no Date/UTC math on either side. */
+export function bucketEventsByCivilDate(events: CalendarEvent[]): Map<string, CalendarEvent[]> {
+  const map = new Map<string, CalendarEvent[]>();
+  for (const ev of events) {
+    if (!ev.civilDate) continue;
+    const list = map.get(ev.civilDate);
+    if (list) list.push(ev);
+    else map.set(ev.civilDate, [ev]);
+  }
+  return map;
 }
 
 export const STATUS_COLORS: Record<string, string> = {

@@ -5,6 +5,11 @@
 import { Hono } from "hono";
 import { createRequestHandler } from "react-router";
 import { buildOAuthHandler } from "../server/lib/mcp/oauth-provider";
+// i18n Phase C — request-scoped locale. paraglideMiddleware establishes an
+// AsyncLocalStorage scope so getLocale()/m.*() resolve per-request (never a
+// module-global) across the multi-tenant Worker. Generated (git-ignored); the
+// paraglide vite plugin + the prebuild `i18n:compile` step keep it present.
+import { paraglideMiddleware } from "../app/paraglide/server.js";
 
 declare module "react-router" {
   export interface AppLoadContext {
@@ -54,7 +59,13 @@ const ssr = (c: any) => {
         (await getApi()).app.fetch(req, c.env, c.executionCtx),
     },
   };
-  return requestHandler(c.req.raw, { cloudflare: { env, ctx: c.executionCtx } });
+  // Run the whole RR pipeline (loaders → actions → render) INSIDE the paraglide
+  // ALS scope, so getLocale()/m.*() resolve to this request's locale in server
+  // loaders/actions AND during SSR. cookie strategy ⇒ no URL rewrite/redirect,
+  // so the callback's request is the original.
+  return paraglideMiddleware(c.req.raw, ({ request }) =>
+    requestHandler(request, { cloudflare: { env, ctx: c.executionCtx } }),
+  );
 };
 
 // Delegate to the FULL API app (all its global `app.use('*')` middleware — CSRF,

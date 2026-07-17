@@ -154,6 +154,9 @@ const reportPdfDownloadRoute = createRoute(withMcpMetadata({
 const PublicInvoiceSchema = z.object({
     id: z.string(),
     amountCents: z.number(),
+    // Phase B — the invoice's snapshot currency (ISO 4217); the pay page renders
+    // this, not the tenant's live setting, so history stays self-describing.
+    currency: z.string().optional(),
     status: z.string(),
     createdAt: z.string().nullable().optional(),
     dueDate: z.string().nullable().optional(),
@@ -251,6 +254,7 @@ const ReportGateResponseSchema = z.object({
     scheduledDate: z.string().nullable(),
     amountCents: z.number().nullable(),
     currency: z.string().nullable(),
+    locale: z.string(),
 }).nullable();
 
 const reportGateRoute = createRoute(withMcpMetadata({
@@ -483,7 +487,9 @@ export const publicReportRoutes = createApiRouter()
             const svc = new StripeService(secretKey);
             const { clientSecret } = await svc.createPaymentIntent(
                 { id: inv.id, amountCents: inv.amountCents, inspectionId: inv.inspectionId, status: inv.status, paidAt: inv.paidAt },
-                { tenantId, descriptionPrefix: 'Inspection invoice' },
+                // Phase B — charge in the invoice's snapshot currency (Stripe lowercases,
+                // e.g. 'cad'), not a hardcoded USD, so the charge matches the billed amount.
+                { tenantId, currency: inv.currency, descriptionPrefix: 'Inspection invoice' },
             );
             return c.json({ success: true as const, data: { clientSecret, publishableKey, amountCents: inv.amountCents } }, 200);
         } catch (err) {

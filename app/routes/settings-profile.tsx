@@ -12,6 +12,7 @@ import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { profileSchema } from "~/lib/forms/settings.schema";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
+import { LOCALE_OPTIONS } from "~/lib/locales";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -27,6 +28,7 @@ interface Profile {
   signatureEnabled?: boolean;
   signaturePreviewHtml?: string;
   timezone?: string | null;
+  locale?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -99,6 +101,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   // Per-user timezone override. The <select> always submits a value; an empty
   // string clears the override (API maps '' -> NULL = inherit tenant).
   if (v.timezone !== undefined) body.timezone = v.timezone;
+  // Per-user locale override. Same contract as timezone: '' clears (inherit tenant).
+  if (v.locale !== undefined) body.locale = v.locale;
   // Email signature toggle: hidden "false" + optional checkbox "true" — last value wins.
   const sigVals = fd.getAll("signatureEnabled");
   body.signatureEnabled = sigVals[sigVals.length - 1] === "true";
@@ -228,6 +232,19 @@ export default function SettingsProfilePage() {
               options={[
                 { value: "", label: "Use company timezone" },
                 ...TIMEZONE_SELECT_OPTIONS,
+              ]}
+            />
+          </div>
+
+          <div className="max-w-md">
+            <Select
+              label="Your language / locale"
+              name="locale"
+              defaultValue={profile.locale ?? ""}
+              hint="Overrides how dates, times, and numbers are formatted for you only. Leave on the workspace default to inherit the company setting."
+              options={[
+                { value: "", label: "Use workspace default" },
+                ...LOCALE_OPTIONS,
               ]}
             />
           </div>

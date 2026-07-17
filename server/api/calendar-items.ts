@@ -1,6 +1,10 @@
 import { createRoute } from '@hono/zod-openapi';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/d1';
 import { requireRole } from '../lib/middleware/rbac';
 import { createApiRouter } from '../lib/openapi-router';
+import { tenantConfigs, users } from '../lib/db/schema';
+import { resolveTenantTimeZone } from '../lib/tz';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import {
     CalendarItemsErrorSchema,
@@ -8,6 +12,17 @@ import {
     ListCalendarItemsQuerySchema,
 } from '../lib/validations/calendar-items.schema';
 import { listCalendarItems } from '../services/calendar-items.service';
+
+/** Viewer's calendar display tz: their own override, else the tenant default. */
+async function resolveEffectiveTz(database: D1Database, tenantId: string, userId: string): Promise<string> {
+    const db = drizzle(database);
+    const [userRow, cfg] = await Promise.all([
+        db.select({ timezone: users.timezone }).from(users).where(eq(users.id, userId)).get(),
+        db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get(),
+    ]);
+    return resolveTenantTimeZone(userRow?.timezone ?? cfg?.defaultTimezone);
+}
 
 const allowedRoles = requireRole('owner', 'manager', 'inspector');
 
@@ -69,9 +84,11 @@ const calendarItemsRoutes = createApiRouter()
             userIds = [user.sub];
         }
 
+        const effectiveTz = await resolveEffectiveTz(c.env.DB, tenantId, user.sub);
         const items = await listCalendarItems(c.env.DB, tenantId, {
             start: query.start,
             end: query.end,
+            effectiveTz,
             ...(userIds ? { userIds } : {}),
         });
 

@@ -26,6 +26,7 @@ interface GateData {
   scheduledDate?: string | null;
   amountCents?: number | null;
   currency?: string | null;
+  locale?: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -50,10 +51,13 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function formatDate(scheduledDate: string | null | undefined): string | null {
+// Public page: no session context — the locale comes from the tenant default via
+// the loader (gate.locale). Varied option sets (weekday, whole-dollar drop) the
+// curated formatter can't express, so format with the injected locale directly.
+function formatDate(scheduledDate: string | null | undefined, locale: string): string | null {
   if (!scheduledDate) return null;
   try {
-    return new Date(scheduledDate).toLocaleDateString("en-US", {
+    return new Date(scheduledDate).toLocaleDateString(locale, {
       weekday: "long",
       year: "numeric",
       month: "long",
@@ -67,9 +71,10 @@ function formatDate(scheduledDate: string | null | undefined): string | null {
 function formatAmount(
   amountCents: number | null | undefined,
   currency: string | null | undefined,
+  locale: string,
 ): string | null {
   if (typeof amountCents !== "number" || amountCents <= 0) return null;
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: currency || "USD",
     minimumFractionDigits: amountCents % 100 === 0 ? 0 : 2,
@@ -99,8 +104,9 @@ export default function ReportGatePage() {
       ? "Your inspection report is ready, but the invoice has not been paid yet. Please complete payment to view the report -- your inspector's contact details are listed below."
       : "Your inspection report is ready, but the inspection agreement has not been signed yet. Please sign the agreement to view the report.";
 
-  const formattedDate = formatDate(gate.scheduledDate);
-  const formattedAmount = formatAmount(gate.amountCents, gate.currency);
+  const locale = gate.locale || "en-US";
+  const formattedDate = formatDate(gate.scheduledDate, locale);
+  const formattedAmount = formatAmount(gate.amountCents, gate.currency, locale);
   const ctaLabel =
     gate.reason === "payment" && formattedAmount
       ? `Pay ${formattedAmount} now`

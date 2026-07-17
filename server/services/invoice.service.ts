@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, sql, isNotNull, isNull } from 'drizzle-orm';
 import { invoices } from '../lib/db/schema/invoice';
-import { inspections } from '../lib/db/schema';
+import { inspections, tenantConfigs } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { AutomationService } from './automation.service';
@@ -21,6 +21,19 @@ export class InvoiceService {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private getDrizzle() { return drizzle(this.db as any); }
+
+    /**
+     * Phase B — number of invoices a tenant has (any status, void included). Used
+     * by the currency-change guard: switching the tenant currency once invoices
+     * exist is a data-integrity hazard, so the Workspace save requires an explicit
+     * confirm when this is > 0.
+     */
+    async countInvoices(tenantId: string): Promise<number> {
+        const db = this.getDrizzle();
+        const row = await db.select({ n: sql<number>`count(*)` })
+            .from(invoices).where(eq(invoices.tenantId, tenantId)).get();
+        return row?.n ?? 0;
+    }
 
     async listInvoices(tenantId: string) {
         const db = this.getDrizzle();
@@ -71,6 +84,10 @@ export class InvoiceService {
         notes?: string | null | undefined;
     }) {
         const db = this.getDrizzle();
+        // Phase B — snapshot the tenant's currency onto the invoice so history stays
+        // self-describing across a later tenant currency change. Default USD.
+        const cfg = await db.select({ currency: tenantConfigs.currency })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
         const row = {
             id: crypto.randomUUID(),
             tenantId,
@@ -84,6 +101,7 @@ export class InvoiceService {
             lineItems: data.lineItems,
             dueDate: data.dueDate ?? null,
             notes: data.notes ?? null,
+            currency: cfg?.currency ?? 'USD',
         };
         await db.insert(invoices).values(row);
         if (data.inspectionId) {

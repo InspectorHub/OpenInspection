@@ -10,6 +10,7 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { inspectorSignature } from '../lib/inspector-signature';
 import { r2Keys } from '../lib/r2-keys';
 import { isValidTimeZone } from '../lib/tz';
+import { isValidLocale } from '../lib/locale';
 
 /**
  * Booking #7 Sprint A — authenticated profile endpoint mounted at
@@ -38,6 +39,7 @@ const getProfileRoute = createRoute(withMcpMetadata({
                         signatureEnabled: z.boolean(),
                         signaturePreviewHtml: z.string(),
                         timezone: z.string().nullable(),
+                        locale: z.string().nullable(),
                     })),
                 },
             },
@@ -57,6 +59,7 @@ export const PatchProfileSchema = z.object({
     licenseNumber: z.string().max(50).optional().describe('Professional inspector license or certification number'),
     signatureEnabled: z.boolean().optional().describe('Whether the inspector business-card footer is added to outbound emails'),
     timezone: z.string().refine((v) => v === '' || isValidTimeZone(v), 'Invalid timezone').optional().describe('Per-user display timezone (IANA). Empty string clears the override (inherit tenant).'),
+    locale: z.string().refine((v) => v === '' || isValidLocale(v), 'Invalid locale').optional().describe('Per-user display locale (BCP-47). Empty string clears the override (inherit tenant).'),
 });
 
 const patchProfileRoute = createRoute(withMcpMetadata({
@@ -131,6 +134,7 @@ export const profileRoutes = createApiRouter()
             photoUrl: users.photoUrl,
             signatureEnabled: users.signatureEnabled,
             timezone: users.timezone,
+            locale: users.locale,
         }).from(users)
           .where(and(eq(users.id, userId), eq(users.tenantId, tenantId)))
           .get();
@@ -165,6 +169,8 @@ export const profileRoutes = createApiRouter()
         if (body.signatureEnabled !== undefined) updates.signatureEnabled = body.signatureEnabled;
         // Per-user timezone override: empty string clears it (NULL = inherit tenant).
         if (body.timezone !== undefined) updates.timezone = body.timezone === '' ? null : body.timezone;
+        // Per-user locale override: empty string clears it (NULL = inherit tenant).
+        if (body.locale !== undefined) updates.locale = body.locale === '' ? null : body.locale;
         // DB-12 / IA-26 — slug write removed; inspector booking slugs are frozen.
         // Agent slug writes go through POST /api/agent/profile (separate endpoint).
 

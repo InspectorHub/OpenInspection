@@ -1,6 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from '../shared.schema';
 import { isValidTimeZone } from '../../tz';
+import { isValidLocale } from '../../locale';
 
 /**
  * Validation schema for the branding configuration update.
@@ -45,6 +46,18 @@ export const UpdateBrandingSchema = z.object({
     // calendar events. Validated to a resolvable IANA id; UI constrains it to a
     // <select> of Intl.supportedValuesOf('timeZone').
     defaultTimezone: z.string().refine(isValidTimeZone, 'Invalid timezone').optional().openapi({ example: 'America/New_York' }).describe('Tenant default IANA timezone.'),
+    // Tenant default display locale (BCP-47). Drives date/time/number/currency
+    // formatting (and later UI language). Validated to a canonicalizable tag;
+    // the UI constrains it to a <select> of the supported LOCALE_OPTIONS.
+    defaultLocale: z.string().refine((v) => v === '' || isValidLocale(v), 'Invalid locale').optional().openapi({ example: 'es-419' }).describe('Tenant default display locale (BCP-47).'),
+    // Tenant transaction/display currency (ISO 4217). Constrained to the
+    // supported set; tenant-scoped only (no per-user override).
+    currency: z.enum(['USD']).optional().openapi({ example: 'USD' }).describe('Tenant currency (ISO 4217).'),
+    // Phase B — transient (NOT persisted) acknowledgement that the caller accepts
+    // changing the tenant currency while invoices already exist. Without it the
+    // save is blocked (409 CURRENCY_CHANGE_NEEDS_CONFIRM); existing invoices keep
+    // their snapshot currency, new ones use the new tenant currency.
+    confirmCurrencyChange: z.boolean().optional().openapi({ example: true }).describe('Acknowledge changing tenant currency with invoices present.'),
 }).openapi('UpdateBranding');
 
 /**
@@ -63,6 +76,8 @@ export const BrandingResponseSchema = createApiResponseSchema(z.object({
         supportEmail: z.string().describe('TODO describe supportEmail field for the OpenInspection MCP integration'),
         billingUrl: z.string().nullable().describe('TODO describe billingUrl field for the OpenInspection MCP integration'),
         defaultTimezone: z.string().describe('Tenant default IANA timezone (e.g. America/New_York); UTC when unset.'),
+        defaultLocale: z.string().describe('Tenant default display locale (BCP-47, e.g. es-419); en-US when unset.'),
+        currency: z.string().describe('Tenant currency (ISO 4217, e.g. USD); USD when unset.'),
     }).describe('TODO describe branding field for the OpenInspection MCP integration'),
 })).openapi('BrandingResponse');
 

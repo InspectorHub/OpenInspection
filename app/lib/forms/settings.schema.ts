@@ -96,6 +96,9 @@ export const profileSchema = z.object({
   // Per-user display-timezone override (IANA name). Empty string = inherit the
   // tenant default. Constrained to a <select> in the UI.
   timezone: z.string().optional(),
+  // Per-user display-locale override (BCP-47). Empty string = inherit the tenant
+  // default. Constrained to a <Select> in the UI.
+  locale: z.string().optional(),
 });
 
 export type ProfileInput = z.infer<typeof profileSchema>;
@@ -139,6 +142,11 @@ export const workspaceSchema = z.object({
   // Tenant display timezone (IANA name). Free-form string validated on the API;
   // the UI constrains it to a <select> of TIMEZONE_OPTIONS.
   defaultTimezone: z.string().optional(),
+  // Tenant default display locale (BCP-47). UI constrains to a <Select> of the
+  // supported LOCALE_OPTIONS; API validates via resolveLocale.
+  defaultLocale: z.string().optional(),
+  // Tenant currency (ISO 4217). UI constrains to a <Select> of CURRENCY_OPTIONS.
+  currency: z.string().optional(),
 });
 
 export type WorkspaceInput = z.infer<typeof workspaceSchema>;

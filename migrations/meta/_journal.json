@@ -50,6 +50,20 @@
       "when": 1784176137404,
       "tag": "0006_old_doomsday",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1784198482703,
+      "tag": "0007_large_exiles",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784207480662,
+      "tag": "0008_swift_stryfe",
+      "breakpoints": true
     }
   ]
 }

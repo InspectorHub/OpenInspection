@@ -215,6 +215,13 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     holidayInternalPolicy: text('holiday_internal_policy', {
         enum: ['advisory', 'block'],
     }).notNull().default('advisory'),
+    // Tenant default display locale (BCP-47, e.g. 'en-US', 'es-419'). Drives
+    // date/time/number formatting and (later) UI language. Per-user override in
+    // users.locale. Appended at table end for D1 rebuild safety.
+    defaultLocale: text('default_locale').notNull().default('en-US'),
+    // Tenant transaction/display currency (ISO 4217, e.g. 'USD'). Tenant-scoped
+    // only (tied to billing); no per-user override.
+    currency: text('currency').notNull().default('USD'),
 });
 
 /**

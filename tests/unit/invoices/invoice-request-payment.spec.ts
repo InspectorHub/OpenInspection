@@ -125,6 +125,26 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
         expect(payUrl).toContain(`/invoice/${INSP_ID}`);
     });
 
+    it('formats the email amount label in the recipient (tenant) locale/currency', async () => {
+        // Default tenant (no config row) -> en-US/USD: byte-identical to the old `$500.00`.
+        const res = await post({ inspectionId: INSP_ID });
+        expect(res.status).toBe(200);
+        expect(sendInvoiceRequest.mock.calls[0][2]).toBe('$500.00');
+    });
+
+    it('honors the tenant default_locale for the email amount label (es-419)', async () => {
+        await db.insert(schema.tenantConfigs).values({
+            tenantId: TENANT, defaultLocale: 'es-419', currency: 'USD',
+            createdAt: new Date(), updatedAt: new Date(),
+        });
+        const res = await post({ inspectionId: INSP_ID });
+        expect(res.status).toBe(200);
+        // es-419 keeps US-style digits + $ symbol for USD (localized, not the code).
+        const label = sendInvoiceRequest.mock.calls[0][2] as string;
+        expect(label).toContain('$');
+        expect(label).toContain('500.00');
+    });
+
     it('services present — amount is the Σ of service snapshots (override ?? snapshot), not inspections.price', async () => {
         await seedService(30000, 12000); // override wins
         const res = await post({ inspectionId: INSP_ID });

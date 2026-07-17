@@ -7,11 +7,12 @@
  * testable in isolation (see tests/web/unit/inspection-hub.spec.ts).
  *
  * `formatCents` is the cents → "$X.XX" formatter used by the Services block.
- * (No shared cents formatter lives in app/lib yet; this mirrors the
- * Intl.NumberFormat usage in routes/invoices.tsx.)
+ * It delegates to the shared locale-aware formatter; locale/currency default to
+ * en-US/USD (behavior-preserving) and callers thread the viewer values when known.
  */
 
 import { INSPECTION_STATUS, INSPECTION_STATUS_LABELS, isReportPublished } from '~/lib/status';
+import { formatCurrency } from '~/lib/format';
 
 /** Pill tone union — kept in sync with packages/shared-ui/src/Pill.tsx. */
 export type PillTone =
@@ -192,12 +193,11 @@ export function isReportShipped(hub: HubPayload): boolean {
 /*  Money formatting                                                   */
 /* ------------------------------------------------------------------ */
 
-const CENTS_FORMATTER = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-});
-
-/** Format integer cents as a US-currency string, e.g. 50000 → "$500.00". */
-export function formatCents(cents: number | null | undefined): string {
-    return CENTS_FORMATTER.format((cents ?? 0) / 100);
+/** Format integer cents as a currency string, e.g. 50000 → "$500.00".
+ *  locale/currency default to en-US/USD; callers pass the viewer values to localize. */
+export function formatCents(
+    cents: number | null | undefined,
+    opts?: { locale?: string; currency?: string },
+): string {
+    return formatCurrency(cents ?? 0, { locale: opts?.locale ?? 'en-US', currency: opts?.currency ?? 'USD' });
 }

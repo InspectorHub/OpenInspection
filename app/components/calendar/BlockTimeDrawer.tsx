@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { Drawer, Modal } from "@core/shared-ui";
-import type { CalendarEvent } from "./calendar-helpers";
+import { blockFormSeed, type CalendarEvent } from "./calendar-helpers";
 
 export interface CalendarMember {
   id: string;
@@ -53,13 +53,13 @@ export function BlockTimeDrawer({
 
   useEffect(() => {
     if (!open) return;
-    const seed = block?.start ?? dateSeed ?? new Date().toISOString();
-    const isAllDay = block?.extendedProps?.allDay === true;
+    // Populate from the block's effective-tz civil fields (never the UTC instant).
+    const seed = blockFormSeed(block ?? null, dateSeed ?? null);
     setTitle(block?.title ?? "");
-    setDate(seed.slice(0, 10));
-    setStartTime(isAllDay ? "09:00" : seed.slice(11, 16) || "09:00");
-    setEndTime(isAllDay ? "10:00" : block?.end?.slice(11, 16) || "10:00");
-    setAllDay(isAllDay);
+    setDate(seed.date);
+    setStartTime(seed.startTime);
+    setEndTime(seed.endTime);
+    setAllDay(seed.allDay);
     setNotes(eventValue(block, "notes") ?? "");
     setUserId(eventValue(block, "userId") ?? currentUserId);
     setConfirmDelete(false);

@@ -5,6 +5,8 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, StatCard, Button, EmptyState, Modal, Table, Pill, type PillTone } from "@core/shared-ui";
 import { MoneyInput } from "~/components/MoneyInput";
+import { formatCurrency } from "~/lib/format";
+import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 
 export function meta() {
   return [{ title: "Invoices - OpenInspection" }];
@@ -18,6 +20,9 @@ type InvoiceRow = {
   status: "draft" | "sent" | "paid" | "partial" | "void";
   paymentMethod: "card" | "check" | "cash" | "offline" | "other" | null;
   inspectionId: string | null;
+  // Phase B — the invoice's own snapshot currency; wins over the live tenant
+  // setting so a historical record never gets re-labelled after a switch.
+  currency: string;
 };
 
 type InspectionOption = {
@@ -98,10 +103,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   return { intent: null, ok: false, error: null };
-}
-
-function money(cents: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((cents || 0) / 100);
 }
 
 const STATUS_TONE: Record<InvoiceRow["status"], PillTone> = {
@@ -212,6 +213,8 @@ function NewInvoiceModal({
 export default function InvoicesPage() {
   const { invoices, inspections } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
+  const locale = useDisplayLocale();
+  const currency = useDisplayCurrency();
   const [pickerFor, setPickerFor] = useState<string | null>(null);
   const [newOpen, setNewOpen] = useState(false);
 
@@ -247,7 +250,7 @@ export default function InvoicesPage() {
           { label: "TOTAL", value: String(total) },
           { label: "UNPAID", value: String(unpaid) },
           { label: "PAID", value: String(paid) },
-          { label: "REVENUE", value: money(revenue) },
+          { label: "REVENUE", value: formatCurrency(revenue, { locale, currency }) },
         ].map((s) => (
           <StatCard key={s.label} label={s.label} value={s.value} />
         ))}
@@ -261,7 +264,7 @@ export default function InvoicesPage() {
           empty={<EmptyState title="No invoices yet" />}
           columns={[
             { label: "Client", cell: (invoice) => <span className="font-medium text-ih-fg-1">{invoice.clientName || "—"}</span> },
-            { label: "Amount", cell: (invoice) => <span className="font-mono text-ih-fg-1">{money(invoice.amountCents)}</span> },
+            { label: "Amount", cell: (invoice) => <span className="font-mono text-ih-fg-1">{formatCurrency(invoice.amountCents, { locale, currency: invoice.currency || currency })}</span> },
             { label: "Due Date", cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate || "—"}</span> },
             {
               label: "Status",

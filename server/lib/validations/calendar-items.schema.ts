@@ -47,6 +47,12 @@ const CalendarItemSchema = z.object({
     title: z.string().describe('Display title for the calendar item'),
     start: z.string().describe('Item start as civil date or ISO instant'),
     end: z.string().describe('Item end as civil date or ISO instant'),
+    civilDate: CivilDateSchema
+        .describe('Civil day the item belongs to in the viewer effective timezone; the client buckets calendar cells by this string'),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/).optional()
+        .describe('Wall-clock start HH:MM in the effective timezone; omitted for all-day items'),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/).optional()
+        .describe('Wall-clock end HH:MM in the effective timezone; omitted for all-day items'),
     allDay: z.boolean().describe('Whether the item spans a full civil date'),
     color: z.string().optional().describe('Optional accent color for the item'),
     inspectionId: z.string().optional().describe('Linked inspection id when applicable'),

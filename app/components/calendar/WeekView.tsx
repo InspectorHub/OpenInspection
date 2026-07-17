@@ -1,9 +1,15 @@
-import { eventColor, isEventDraggable, isSameDay, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+import { civilDateOf, eventColor, isEventDraggable, isSameDay, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+
+/** Hour (0-23) a timed event starts at, from its effective-tz wall clock. */
+function eventStartHour(ev: CalendarEvent): number {
+  return ev.startTime ? parseInt(ev.startTime.slice(0, 2), 10) : NaN;
+}
 
 export function WeekView({
   weekDays,
   today,
   hours,
+  locale,
   getEventsForDate,
   handleDayClick,
   handleDrop,
@@ -12,7 +18,8 @@ export function WeekView({
   weekDays: Date[];
   today: Date;
   hours: number[];
-  getEventsForDate: (d: Date) => CalendarEvent[];
+  locale: string;
+  getEventsForDate: (civilDate: string) => CalendarEvent[];
   handleDayClick: (dateStr: string) => void;
   handleDrop: (eventId: string, newDate: string) => void;
   handleEventClick: (ev: CalendarEvent) => void;
@@ -23,9 +30,9 @@ export function WeekView({
           <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border">
             <div className="py-2 px-1" />
             {weekDays.map((d) => (
-              <div key={d.toISOString()} className={`py-2 px-2 text-center border-l border-ih-border ${isSameDay(d, today) ? "bg-ih-primary-tint" : ""}`}>
+              <div key={civilDateOf(d.getFullYear(), d.getMonth(), d.getDate())} className={`py-2 px-2 text-center border-l border-ih-border ${isSameDay(d, today) ? "bg-ih-primary-tint" : ""}`}>
                 <span className="text-[10px] font-bold uppercase text-ih-fg-4 block">
-                  {d.toLocaleDateString("en-US", { weekday: "short" })}
+                  {d.toLocaleDateString(locale, { weekday: "short" })}
                 </span>
                 <span className={`text-[14px] font-bold ${isSameDay(d, today) ? "text-ih-primary" : "text-ih-fg-2"}`}>
                   {d.getDate()}
@@ -36,11 +43,11 @@ export function WeekView({
           <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border min-h-[42px]">
             <div className="text-[10px] font-bold text-ih-fg-4 text-right pr-2 pt-2">All day</div>
             {weekDays.map((d) => {
-              const dateStr = d.toISOString().slice(0, 10);
-              const allDayEvents = getEventsForDate(d).filter((ev) => ev.extendedProps?.allDay === true);
+              const dateStr = civilDateOf(d.getFullYear(), d.getMonth(), d.getDate());
+              const allDayEvents = getEventsForDate(dateStr).filter((ev) => ev.extendedProps?.allDay === true);
               return (
                 <div
-                  key={`all-day-${d.toISOString()}`}
+                  key={`all-day-${civilDateOf(d.getFullYear(), d.getMonth(), d.getDate())}`}
                   className="border-l border-ih-border p-0.5 cursor-pointer hover:bg-ih-primary-tint"
                   onClick={() => handleDayClick(`${dateStr}T09:00`)}
                 >
@@ -67,22 +74,21 @@ export function WeekView({
                   {h > 12 ? h - 12 : h}{h >= 12 ? "pm" : "am"}
                 </div>
                 {weekDays.map((d) => {
-                  const dayEvents = getEventsForDate(d).filter((ev) => {
+                  const dateStr = civilDateOf(d.getFullYear(), d.getMonth(), d.getDate());
+                  const dayEvents = getEventsForDate(dateStr).filter((ev) => {
                     if (ev.extendedProps?.allDay === true) return false;
-                    const evDate = new Date(ev.start);
-                    return evDate.getHours() === h;
+                    return eventStartHour(ev) === h;
                   });
-                  const dateStr = d.toISOString().slice(0, 10);
                   return (
                     <div
-                      key={d.toISOString() + h}
+                      key={dateStr + h}
                       className="border-l border-ih-border p-0.5 cursor-pointer hover:bg-ih-primary-tint"
                       onClick={() => handleDayClick(`${dateStr}T${String(h).padStart(2, "0")}:00`)}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => {
                         e.preventDefault();
                         const evId = e.dataTransfer.getData("text/plain");
-                        if (evId) handleDrop(evId, `${dateStr}T${String(h).padStart(2, "0")}:00:00.000Z`);
+                        if (evId) handleDrop(evId, dateStr);
                       }}
                     >
                       {dayEvents.map((ev) => (

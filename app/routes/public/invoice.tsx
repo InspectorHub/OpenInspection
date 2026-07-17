@@ -13,6 +13,7 @@ export function meta() {
 interface RawInvoice {
   id: string;
   amountCents: number;
+  currency?: string;
   status: string;
   createdAt?: string | null;
   dueDate?: string | null;
@@ -38,6 +39,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
           inspectorName: "",
           lineItems: (d.lineItems ?? []).map((li) => ({ description: li.description, amount: li.amountCents / 100 })),
           total: d.amountCents / 100,
+          currency: d.currency,
         }
       : null;
     return {

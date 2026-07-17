@@ -23,9 +23,20 @@ import {
 import { ErrorState } from "~/components/ErrorState";
 import { NavProgress } from "~/components/NavProgress";
 import { ToastPortal } from "~/components/Toast";
+// i18n Phase C — active UI locale for <html lang>. Resolved ONCE in the root
+// loader (server-side, inside the request's paraglide ALS scope) and threaded to
+// Layout via loader data. It must NOT be called during client render: the first
+// client-side getLocale() self-initializes via setLocale() (paraglide #455), and
+// running that side effect inside React's render/hydration breaks interactivity
+// (RR client router + fetcher actions stop working). Server-side getLocale()
+// returns from the ALS store with no side effect.
+import { getLocale } from "~/paraglide/runtime";
 
-export function loader({ request }: Route.LoaderArgs): UiPrefs {
-  return parseUiPrefs(request.headers.get("Cookie"));
+export function loader({ request }: Route.LoaderArgs): UiPrefs & { locale: string } {
+  // getLocale() here runs on the server inside the paraglide ALS scope
+  // (workers/app.ts wraps the whole RR render), so it resolves the request's
+  // locale and returns without the client-side setLocale() self-init side effect.
+  return { ...parseUiPrefs(request.headers.get("Cookie")), locale: getLocale() };
 }
 
 export function meta(_args: Route.MetaArgs) {
@@ -68,11 +79,12 @@ const CRITICAL_CSS = `html{background:#f8fafc;color:#0f172a;font-family:Inter,sy
 export function Layout({ children }: { children: React.ReactNode }) {
   // Root loader data is unavailable while the error boundary renders; fall back
   // to defaults so the document still renders.
-  const prefs = (useRouteLoaderData("root") as UiPrefs | undefined) ?? DEFAULT_UI_PREFS;
+  const data = useRouteLoaderData("root") as (UiPrefs & { locale: string }) | undefined;
+  const prefs = data ?? DEFAULT_UI_PREFS;
   const ssrScheme = resolveSchemeForSSR(prefs.colorScheme);
   return (
     <html
-      lang="en"
+      lang={data?.locale ?? "en"}
       className={`scroll-smooth${ssrScheme === "dark" || ssrScheme === "field" ? " dark" : ""}`}
       data-color-scheme={ssrScheme}
       data-sidebar-collapsed={prefs.sidebarCollapsed ? "1" : undefined}

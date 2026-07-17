@@ -2,6 +2,7 @@ import { eq, and, desc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, invoices } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
+import { resolveLocale } from '../../lib/locale';
 import { InvoiceService } from '../invoice.service';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
@@ -76,6 +77,7 @@ export class InspectionPublishService extends InspectionSubService {
         scheduledDate: string | null;
         amountCents: number | null;
         currency: string | null;
+        locale: string;
     } | null> {
         const db = this.getDrizzle();
         const insp = await db.select({
@@ -128,7 +130,7 @@ export class InspectionPublishService extends InspectionSubService {
         // Track I-a Task 7 — both gates outstanding → combined "Sign & pay".
         const bothOutstanding = reason === 'agreement' && paymentOutstanding;
 
-        const branding = await db.select({ companyName: tenantConfigs.companyName, primaryColor: tenantConfigs.primaryColor })
+        const branding = await db.select({ companyName: tenantConfigs.companyName, primaryColor: tenantConfigs.primaryColor, defaultLocale: tenantConfigs.defaultLocale })
             .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
 
         let inspector: { name: string | null; email: string | null; phone: string | null; licenseNumber: string | null } | undefined;
@@ -143,14 +145,19 @@ export class InspectionPublishService extends InspectionSubService {
         // Surface the invoice amount whenever payment is part of the gate (the
         // payment-only page AND the combined Sign & pay page both show it).
         let amountCents: number | null = null;
+        // Phase B — carry the invoice's snapshot currency onto the gate so the
+        // amount renders in the currency it was billed in, not the tenant's
+        // current setting. Null when there is no outstanding invoice.
+        let currency: string | null = null;
         if (paymentOutstanding) {
-            const invoice = await db.select({ amountCents: invoices.amountCents })
+            const invoice = await db.select({ amountCents: invoices.amountCents, currency: invoices.currency })
                 .from(invoices)
                 .where(and(eq(invoices.tenantId, tenantId), eq(invoices.inspectionId, inspectionId)))
                 .orderBy(desc(invoices.createdAt))
                 .limit(1)
                 .get();
             amountCents = invoice?.amountCents ?? null;
+            currency = invoice?.currency ?? null;
         }
 
         // Reconstruct the first outstanding signer's tier-2 link token
@@ -197,7 +204,12 @@ export class InspectionPublishService extends InspectionSubService {
             inspectorLicense: inspector?.licenseNumber ?? null,
             scheduledDate: insp.date ?? null,
             amountCents,
-            currency: amountCents != null ? 'USD' : null,
+            // Snapshot currency from the invoice (Phase B); fall back to USD only
+            // when an amount exists without a resolvable currency.
+            currency: amountCents != null ? (currency ?? 'USD') : null,
+            // Tenant default display locale for the public gate page (external
+            // client has no user override).
+            locale: resolveLocale(branding?.defaultLocale),
         };
     }
 
@@ -417,7 +429,7 @@ export class InspectionPublishService extends InspectionSubService {
                 if (resultsRow) {
                     await db.update(inspectionResults)
                         .set({ data: data as object, lastSyncedAt: new Date() })
-                        .where(eq(inspectionResults.id, resultsRow.id));
+                        .where(and(eq(inspectionResults.id, resultsRow.id), eq(inspectionResults.tenantId, tenantId)));
                 } else {
                     await db.insert(inspectionResults).values({
                         id:           crypto.randomUUID(),
