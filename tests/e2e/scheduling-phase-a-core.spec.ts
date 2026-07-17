@@ -120,26 +120,28 @@ test.describe.serial('Scheduling Phase A-core acceptance gates', () => {
         expect(inspectorToken).toBeTruthy();
     });
 
-    test('G1: Standard office + Texas without Advanced; copy company URL', async ({ page, context }) => {
+    test('G1: closed-on-holidays + Texas without Advanced; copy company URL', async ({ page, context }) => {
         await context.grantPermissions(['clipboard-read', 'clipboard-write']);
         await gotoAuth(page, '/settings/booking', adminToken);
 
         await expect(page.getByTestId('holiday-closed-panel')).toBeVisible({ timeout: 15000 });
-        await expect(page.getByTestId('holiday-preset-standard')).toBeVisible();
+        const regionSwitch = page.getByTestId('holiday-region-switch').getByRole('combobox');
+        await expect(regionSwitch).toBeVisible();
         await expectAdvancedClosed(page);
 
-        // Reset catalog via preset so the region picker opens (no Advanced).
-        await page.getByTestId('holiday-preset-off').click();
+        // Catalog off hides the policy cards: with no holidays there is nothing
+        // for a policy to apply to.
+        await regionSwitch.selectOption('');
+        await expect(page.getByTestId('holiday-policy-row')).toBeHidden();
         await expectAdvancedClosed(page);
 
-        await page.getByTestId('holiday-preset-standard').click();
-        const regionDialog = page.getByRole('dialog', { name: 'Choose holiday region' });
-        await expect(regionDialog).toBeVisible({ timeout: 10000 });
-        await regionDialog.getByRole('button', { name: 'Federal + TX' }).click();
-        await expect(regionDialog).toBeHidden({ timeout: 10000 });
-
-        // Standard office selected; Advanced never opened for this flow.
-        await expect(page.getByTestId('holiday-preset-standard')).toBeVisible();
+        // Turning the catalog on is one control, and it defaults to the safe policy.
+        await regionSwitch.selectOption('US-TX');
+        await expect(page.getByTestId('holiday-policy-row')).toBeVisible({ timeout: 10000 });
+        await expect(page.getByTestId('holiday-policy-closed')).toHaveAttribute(
+            'aria-checked',
+            'true',
+        );
         await expectAdvancedClosed(page);
         // Closed <details> keeps children in the DOM — assert not visible, not absent.
         await expect(page.getByTestId('holiday-public-policy-advanced')).toBeHidden();
