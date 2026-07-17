@@ -1,11 +1,5 @@
+import { m } from "~/paraglide/messages";
 import type { SystemsSummaryRow } from "./types";
-
-const SEVERITY_LABEL: Record<SystemsSummaryRow["worstSeverity"], string> = {
-  good: "Good",
-  minor: "Minor",
-  marginal: "Marginal",
-  significant: "Significant",
-};
 
 const SEVERITY_CLASS: Record<SystemsSummaryRow["worstSeverity"], string> = {
   good: "bg-ih-ok-bg text-ih-ok-fg",
@@ -22,17 +16,23 @@ const SEVERITY_CLASS: Record<SystemsSummaryRow["worstSeverity"], string> = {
  */
 export function SystemsSummaryTable({ rows }: { rows: SystemsSummaryRow[] }) {
   if (!rows.length) return null;
+  const SEVERITY_LABEL: Record<SystemsSummaryRow["worstSeverity"], string> = {
+    good: m.pca_severity_good(),
+    minor: m.pca_severity_minor(),
+    marginal: m.pca_severity_marginal(),
+    significant: m.pca_severity_significant(),
+  };
   return (
     <section className="mb-6 print:break-inside-avoid">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">Systems Summary</h2>
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">{m.pca_systems_summary_title()}</h2>
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-ih-border text-left text-ih-fg-3">
-            <th className="py-2 pr-4 font-medium">System</th>
-            <th className="py-2 pr-4 font-medium">Condition</th>
-            <th className="py-2 pr-4 font-medium text-right">Safety</th>
-            <th className="py-2 pr-4 font-medium text-right">Recommendation</th>
-            <th className="py-2 font-medium text-right">Maintenance</th>
+            <th className="py-2 pr-4 font-medium">{m.pca_systems_col_system()}</th>
+            <th className="py-2 pr-4 font-medium">{m.pca_systems_col_condition()}</th>
+            <th className="py-2 pr-4 font-medium text-right">{m.pca_systems_col_safety()}</th>
+            <th className="py-2 pr-4 font-medium text-right">{m.pca_systems_col_recommendation()}</th>
+            <th className="py-2 font-medium text-right">{m.pca_systems_col_maintenance()}</th>
           </tr>
         </thead>
         <tbody>

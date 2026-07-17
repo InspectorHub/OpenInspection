@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addContactSchema } from "~/lib/forms/contacts.schema";
+import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 
 /**
  * Unit tests for the contacts add/edit form schema (C-7 Conform + Zod migration).
@@ -15,7 +15,7 @@ describe("addContactSchema", () => {
   // --- name validation ---
 
   it("fails when name is empty", () => {
-    const result = addContactSchema.safeParse({ name: "" });
+    const result = makeAddContactSchema().safeParse({ name: "" });
     expect(result.success).toBe(false);
     if (!result.success) {
       const nameError = result.error.issues.find((i) => i.path.includes("name"));
@@ -24,7 +24,7 @@ describe("addContactSchema", () => {
   });
 
   it("fails when name is missing (undefined)", () => {
-    const result = addContactSchema.safeParse({});
+    const result = makeAddContactSchema().safeParse({});
     expect(result.success).toBe(false);
     if (!result.success) {
       const nameError = result.error.issues.find((i) => i.path.includes("name"));
@@ -35,7 +35,7 @@ describe("addContactSchema", () => {
   // --- email validation ---
 
   it("fails when email is an invalid address", () => {
-    const result = addContactSchema.safeParse({ name: "Jane", email: "not-an-email" });
+    const result = makeAddContactSchema().safeParse({ name: "Jane", email: "not-an-email" });
     expect(result.success).toBe(false);
     if (!result.success) {
       const emailError = result.error.issues.find((i) => i.path.includes("email"));
@@ -44,7 +44,7 @@ describe("addContactSchema", () => {
   });
 
   it("passes when email is empty string — coerced to undefined", () => {
-    const result = addContactSchema.safeParse({ name: "Jane", email: "" });
+    const result = makeAddContactSchema().safeParse({ name: "Jane", email: "" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.email).toBeUndefined();
@@ -52,7 +52,7 @@ describe("addContactSchema", () => {
   });
 
   it("passes when email is omitted entirely", () => {
-    const result = addContactSchema.safeParse({ name: "Jane" });
+    const result = makeAddContactSchema().safeParse({ name: "Jane" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.email).toBeUndefined();
@@ -60,7 +60,7 @@ describe("addContactSchema", () => {
   });
 
   it("passes with a valid email address", () => {
-    const result = addContactSchema.safeParse({ name: "Jane", email: "jane@realty.com" });
+    const result = makeAddContactSchema().safeParse({ name: "Jane", email: "jane@realty.com" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.email).toBe("jane@realty.com");
@@ -70,7 +70,7 @@ describe("addContactSchema", () => {
   // --- type defaults ---
 
   it("defaults type to 'client' when omitted", () => {
-    const result = addContactSchema.safeParse({ name: "Jane" });
+    const result = makeAddContactSchema().safeParse({ name: "Jane" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.type).toBe("client");
@@ -78,7 +78,7 @@ describe("addContactSchema", () => {
   });
 
   it("accepts type 'agent'", () => {
-    const result = addContactSchema.safeParse({ name: "Bob", type: "agent" });
+    const result = makeAddContactSchema().safeParse({ name: "Bob", type: "agent" });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.type).toBe("agent");
@@ -86,14 +86,14 @@ describe("addContactSchema", () => {
   });
 
   it("fails when type is not 'client' or 'agent'", () => {
-    const result = addContactSchema.safeParse({ name: "Bob", type: "owner" });
+    const result = makeAddContactSchema().safeParse({ name: "Bob", type: "owner" });
     expect(result.success).toBe(false);
   });
 
   // --- optional fields ---
 
   it("passes with phone and agency populated", () => {
-    const result = addContactSchema.safeParse({
+    const result = makeAddContactSchema().safeParse({
       name: "Jane",
       phone: "(555) 123-4567",
       agency: "Sunrise Realty",
@@ -106,7 +106,7 @@ describe("addContactSchema", () => {
   });
 
   it("passes with all fields populated", () => {
-    const result = addContactSchema.safeParse({
+    const result = makeAddContactSchema().safeParse({
       type: "agent",
       name: "Alice Agent",
       email: "alice@agency.com",

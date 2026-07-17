@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { TIME_WINDOWS, type CompanyProfile } from "./booking-constants";
+import { timeWindows, type CompanyProfile } from "./booking-constants";
 import { HolidayAdvisoryBanner } from "./HolidayAdvisoryBanner";
 import { m } from "~/paraglide/messages";
 
@@ -198,7 +198,7 @@ export function ScheduleStep({
         <div>
           <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_time_window_label()}</span>
           <div className="grid grid-cols-2 gap-2 mt-1">
-            {TIME_WINDOWS.map((w) => (
+            {timeWindows().map((w) => (
               <label key={w.id} className="cursor-pointer">
                 <input type="radio" name="timeSlot" value={w.id} checked={timeWindow === w.id} onChange={() => setTimeWindow(w.id)} className="sr-only" />
                 <div className={`px-3 py-2.5 rounded-md border transition-all ${
@@ -353,7 +353,7 @@ export function ConfirmStep({
             <div className="flex justify-between">
               <span className="text-ih-fg-3">{m.booking_confirm_row_time()}</span>
               <span className="font-medium text-ih-fg-1">
-                {timeWindow === "custom" ? customTime : TIME_WINDOWS.find((w) => w.id === timeWindow)?.label}
+                {timeWindow === "custom" ? customTime : timeWindows().find((w) => w.id === timeWindow)?.label}
               </span>
             </div>
             <div className="flex justify-between">

@@ -9,7 +9,7 @@ import { createApi } from "~/lib/api-client.server";
 import { SignaturePad } from "~/components/SignaturePad";
 import { AvatarCropper } from "~/components/media-studio/AvatarCropper";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
-import { profileSchema } from "~/lib/forms/settings.schema";
+import { makeProfileSchema } from "~/lib/forms/settings.schema";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { LOCALE_OPTIONS } from "~/lib/locales";
@@ -89,7 +89,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   // Default: save profile fields
-  const submission = parseWithZod(fd, { schema: profileSchema });
+  const submission = parseWithZod(fd, { schema: makeProfileSchema() });
   if (submission.status !== "success") {
     return submission.reply();
   }
@@ -133,7 +133,7 @@ export default function SettingsProfilePage() {
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: profileSchema });
+      return parseWithZod(formData, { schema: makeProfileSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",

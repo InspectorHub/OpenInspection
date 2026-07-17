@@ -10,6 +10,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import type { ReactNode } from "react";
+import { m } from "~/paraglide/messages";
 import { DefectCategoryChip } from "~/components/editor-shared/DefectCategoryChip";
 import { DEFECT_PHOTO_GRID_CLASS, PRINT_CARD_CLASS, type ReportItem, type ReportPhoto } from "./types";
 
@@ -42,7 +43,7 @@ export function ReportDefectCard({ item, mediaVisible, renderMediaTile, showPhot
               )}
               {d.isCustom && (
                 <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary">
-                  inspector-added
+                  {m.pca_defect_card_inspector_added()}
                 </span>
               )}
               {d.effectiveLocation && (

@@ -6,7 +6,7 @@ import type { Route } from "./+types/settings-advanced";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useFlash } from "~/hooks/useFlash";
-import { stripeConnectSchema } from "~/lib/forms/settings-config.schema";
+import { makeStripeConnectSchema } from "~/lib/forms/settings-config.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { StripeConnectPanel } from "~/components/settings/advanced/StripeConnectPanel";
@@ -83,7 +83,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
 
   if (intent === "connect-stripe") {
-    const submission = parseWithZod(fd, { schema: stripeConnectSchema });
+    const submission = parseWithZod(fd, { schema: makeStripeConnectSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -189,7 +189,7 @@ export default function SettingsAdvancedPage() {
   const [stripeForm, stripeFields] = useForm({
     lastResult: stripeResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: stripeConnectSchema });
+      return parseWithZod(formData, { schema: makeStripeConnectSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",

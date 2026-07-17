@@ -1,3 +1,5 @@
+import { m } from "~/paraglide/messages";
+
 export interface CrumbItem {
   label: string;
   href?: string;
@@ -18,7 +20,7 @@ export function SettingsCrumb({ items }: SettingsCrumbProps) {
   const title = items[items.length - 1]?.label ?? "";
   return (
     <div>
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs font-semibold text-ih-fg-3 flex-wrap">
+      <nav aria-label={m.breadcrumb_aria()} className="flex items-center gap-1.5 text-xs font-semibold text-ih-fg-3 flex-wrap">
         {items.map((item, idx) => {
           const isLast = idx === items.length - 1;
           return (

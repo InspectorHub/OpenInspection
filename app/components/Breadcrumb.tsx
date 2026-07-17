@@ -1,3 +1,5 @@
+import { m } from "~/paraglide/messages";
+
 export interface BreadcrumbItem {
   label: string;
   href?: string;
@@ -10,7 +12,7 @@ interface BreadcrumbProps {
 export function Breadcrumb({ items }: BreadcrumbProps) {
   if (!items || items.length === 0) return null;
   return (
-    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-[12px] font-medium">
+    <nav aria-label={m.breadcrumb_aria()} className="flex items-center gap-1.5 text-[12px] font-medium">
       {items.map((it, i) => {
         const isLast = i === items.length - 1;
         return (

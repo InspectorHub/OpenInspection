@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate, useFetcher } from "react-router";
 import { useSessionContext } from "~/hooks/useSessionContext";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -20,46 +21,54 @@ interface PaletteItem {
 /*  Static sources                                                     */
 /* ------------------------------------------------------------------ */
 
-const PAGES: PaletteItem[] = [
-  { id: "p-inspections", label: "Inspections", group: "Pages", icon: "page", to: "/inspections", hint: "G then I" },
-  { id: "p-reports", label: "Reports", group: "Pages", icon: "page", to: "/inspections?workflow=published", hint: "G then R" },
-  { id: "p-templates", label: "Templates", group: "Pages", icon: "page", to: "/library/templates", hint: "G then T" },
-  { id: "p-marketplace", label: "Marketplace", group: "Pages", icon: "page", to: "/library/marketplace" },
-  { id: "p-agreements", label: "Agreements", group: "Pages", icon: "page", to: "/library/agreements" },
-  { id: "p-comments", label: "Canned Comments", group: "Pages", icon: "page", to: "/library/comments" },
-  { id: "p-repair", label: "Repair Items", group: "Pages", icon: "page", to: "/library/repair-items" },
-  { id: "p-contacts", label: "Contacts", group: "Pages", icon: "page", to: "/contacts", hint: "G then C" },
-  { id: "p-calendar", label: "Calendar", group: "Pages", icon: "page", to: "/calendar" },
-  { id: "p-invoices", label: "Invoices", group: "Pages", icon: "page", to: "/invoices" },
-  { id: "p-ratings", label: "Rating Systems", group: "Pages", icon: "page", to: "/library/rating-systems" },
-  { id: "p-metrics", label: "Metrics", group: "Pages", icon: "page", to: "/metrics" },
-  { id: "p-team", label: "Team", group: "Pages", icon: "page", to: "/team" },
-  { id: "p-notifications", label: "Notifications", group: "Pages", icon: "page", to: "/notifications" },
-];
+// Built as thunks (not module-level consts) so the Paraglide `m.*()` labels
+// resolve inside the per-request locale scope instead of freezing at import.
+function getPages(): PaletteItem[] {
+  return [
+    { id: "p-inspections", label: m.command_palette_page_inspections(), group: m.command_palette_group_pages(), icon: "page", to: "/inspections", hint: m.command_palette_hint_g_then_i() },
+    { id: "p-reports", label: m.command_palette_page_reports(), group: m.command_palette_group_pages(), icon: "page", to: "/inspections?workflow=published", hint: m.command_palette_hint_g_then_r() },
+    { id: "p-templates", label: m.command_palette_page_templates(), group: m.command_palette_group_pages(), icon: "page", to: "/library/templates", hint: m.command_palette_hint_g_then_t() },
+    { id: "p-marketplace", label: m.command_palette_page_marketplace(), group: m.command_palette_group_pages(), icon: "page", to: "/library/marketplace" },
+    { id: "p-agreements", label: m.command_palette_page_agreements(), group: m.command_palette_group_pages(), icon: "page", to: "/library/agreements" },
+    { id: "p-comments", label: m.command_palette_page_comments(), group: m.command_palette_group_pages(), icon: "page", to: "/library/comments" },
+    { id: "p-repair", label: m.command_palette_page_repair(), group: m.command_palette_group_pages(), icon: "page", to: "/library/repair-items" },
+    { id: "p-contacts", label: m.command_palette_page_contacts(), group: m.command_palette_group_pages(), icon: "page", to: "/contacts", hint: m.command_palette_hint_g_then_c() },
+    { id: "p-calendar", label: m.command_palette_page_calendar(), group: m.command_palette_group_pages(), icon: "page", to: "/calendar" },
+    { id: "p-invoices", label: m.command_palette_page_invoices(), group: m.command_palette_group_pages(), icon: "page", to: "/invoices" },
+    { id: "p-ratings", label: m.command_palette_page_ratings(), group: m.command_palette_group_pages(), icon: "page", to: "/library/rating-systems" },
+    { id: "p-metrics", label: m.command_palette_page_metrics(), group: m.command_palette_group_pages(), icon: "page", to: "/metrics" },
+    { id: "p-team", label: m.command_palette_page_team(), group: m.command_palette_group_pages(), icon: "page", to: "/team" },
+    { id: "p-notifications", label: m.command_palette_page_notifications(), group: m.command_palette_group_pages(), icon: "page", to: "/notifications" },
+  ];
+}
 
-const SETTINGS: PaletteItem[] = [
-  { id: "s-main", label: "Settings", group: "Settings", icon: "gear", to: "/settings" },
-  { id: "s-profile", label: "Settings - Profile", group: "Settings", icon: "gear", to: "/settings/profile" },
-  { id: "s-company", label: "Settings - Company", group: "Settings", icon: "gear", to: "/settings/workspace" },
-  { id: "s-theme", label: "Settings - Report Theme", group: "Settings", icon: "gear", to: "/settings/workspace" },
-  { id: "s-services", label: "Settings - Services & Pricing", group: "Settings", icon: "gear", to: "/settings/services" },
-  { id: "s-email", label: "Settings - Email", group: "Settings", icon: "gear", to: "/settings/communication" },
-  { id: "s-automations", label: "Settings - Automations", group: "Settings", icon: "gear", to: "/settings/automations" },
-  { id: "s-integrations", label: "Settings - Integrations", group: "Settings", icon: "gear", to: "/settings/integrations" },
-  { id: "s-password", label: "Settings - Change Password", group: "Settings", icon: "gear", to: "/settings/security" },
-  { id: "s-2fa", label: "Settings - Two-factor (2FA)", group: "Settings", icon: "gear", to: "/settings/security" },
-  { id: "s-account", label: "Settings - Account & Security", group: "Settings", icon: "gear", to: "/settings/security" },
-  { id: "s-payments", label: "Settings - Payments", group: "Settings", icon: "gear", to: "/settings/advanced" },
-  { id: "s-ai", label: "Settings - AI", group: "Settings", icon: "gear", to: "/settings/advanced" },
-  { id: "s-data", label: "Settings - Data Import / Export", group: "Settings", icon: "gear", to: "/settings/data" },
-];
+function getSettings(): PaletteItem[] {
+  return [
+    { id: "s-main", label: m.command_palette_settings_main(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings" },
+    { id: "s-profile", label: m.command_palette_settings_profile(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/profile" },
+    { id: "s-company", label: m.command_palette_settings_company(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/workspace" },
+    { id: "s-theme", label: m.command_palette_settings_theme(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/workspace" },
+    { id: "s-services", label: m.command_palette_settings_services(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/services" },
+    { id: "s-email", label: m.command_palette_settings_email(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/communication" },
+    { id: "s-automations", label: m.command_palette_settings_automations(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/automations" },
+    { id: "s-integrations", label: m.command_palette_settings_integrations(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/integrations" },
+    { id: "s-password", label: m.command_palette_settings_password(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/security" },
+    { id: "s-2fa", label: m.command_palette_settings_2fa(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/security" },
+    { id: "s-account", label: m.command_palette_settings_account(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/security" },
+    { id: "s-payments", label: m.command_palette_settings_payments(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/advanced" },
+    { id: "s-ai", label: m.command_palette_settings_ai(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/advanced" },
+    { id: "s-data", label: m.command_palette_settings_data(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/data" },
+  ];
+}
 
-const QUICK_ACTIONS: PaletteItem[] = [
-  { id: "qa-new-inspection", label: "New Inspection", group: "Quick Actions", icon: "plus", hint: "create" },
-  { id: "qa-new-template", label: "New Template", group: "Quick Actions", icon: "plus", hint: "create", to: "/library/templates?new=1" },
-  { id: "qa-new-contact", label: "New Contact", group: "Quick Actions", icon: "plus", hint: "create", to: "/contacts?new=1" },
-  { id: "qa-import", label: "Import Spectora", group: "Quick Actions", icon: "plus", to: "/library/templates?import=1" },
-];
+function getQuickActions(): PaletteItem[] {
+  return [
+    { id: "qa-new-inspection", label: m.command_palette_action_new_inspection(), group: m.command_palette_group_quick_actions(), icon: "plus", hint: m.command_palette_action_hint_create() },
+    { id: "qa-new-template", label: m.command_palette_action_new_template(), group: m.command_palette_group_quick_actions(), icon: "plus", hint: m.command_palette_action_hint_create(), to: "/library/templates?new=1" },
+    { id: "qa-new-contact", label: m.command_palette_action_new_contact(), group: m.command_palette_group_quick_actions(), icon: "plus", hint: m.command_palette_action_hint_create(), to: "/contacts?new=1" },
+    { id: "qa-import", label: m.command_palette_action_import(), group: m.command_palette_group_quick_actions(), icon: "plus", to: "/library/templates?import=1" },
+  ];
+}
 
 /* ------------------------------------------------------------------ */
 /*  Fuzzy scoring                                                      */
@@ -145,8 +154,8 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
       const bookingUrl = `https://${host}/book/${tenant}/${slug}`;
       actions.push({
         id: "qa-copy-booking-link",
-        label: "Copy my booking link",
-        group: "Quick Actions",
+        label: m.command_palette_action_copy_booking_link(),
+        group: m.command_palette_group_quick_actions(),
         icon: "clip",
         hint: bookingUrl,
         onSelect: () => {
@@ -188,7 +197,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     const isPeople = query.startsWith("@");
     const q = query.replace(/^[>@]\s*/, "");
 
-    const dynamicQuickActions = [...QUICK_ACTIONS, ...bookingActions];
+    const dynamicQuickActions = [...getQuickActions(), ...bookingActions];
 
     let sources: PaletteItem[];
     if (isActions) {
@@ -197,17 +206,17 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
       sources = []; // contacts would need a search endpoint
     } else {
       const recents: PaletteItem[] = (recentsFetcher.data?.inspections ?? []).map((insp, i) => {
-        const addr = [insp.address1, insp.city, insp.state].filter(Boolean).join(", ") || `Inspection #${String(insp.id || "").slice(0, 6)}`;
+        const addr = [insp.address1, insp.city, insp.state].filter(Boolean).join(", ") || m.command_palette_recent_fallback({ id: String(insp.id || "").slice(0, 6) });
         return {
           id: `ri-${i}`,
           label: addr as string,
-          group: "Recent Inspections",
+          group: m.command_palette_group_recent(),
           icon: "clip",
           hint: (insp.status as string) || "",
           to: `/inspections/${insp.id}`,
         };
       });
-      sources = [...PAGES, ...recents, ...SETTINGS, ...dynamicQuickActions];
+      sources = [...getPages(), ...recents, ...getSettings(), ...dynamicQuickActions];
     }
 
     if (!q) return sources;
@@ -274,7 +283,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
             value={query}
             onChange={(e) => { setQuery(e.target.value); setActiveIdx(0); }}
             onKeyDown={handleKeyDown}
-            placeholder="Type a command or search..."
+            placeholder={m.command_palette_search_placeholder()}
             className="flex-1 bg-transparent text-[14px] text-ih-fg-1 outline-none placeholder:text-ih-fg-4"
           />
           <kbd className="hidden sm:inline px-1.5 py-0.5 rounded bg-ih-bg-muted text-[10px] font-bold text-ih-fg-4">ESC</kbd>
@@ -283,15 +292,15 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
         {/* Prefix hints */}
         {!query && (
           <div className="flex gap-3 px-4 py-1.5 border-b border-ih-border text-[10px] text-ih-fg-4">
-            <span><kbd className="font-bold">&gt;</kbd> actions</span>
-            <span><kbd className="font-bold">@</kbd> people</span>
+            <span><kbd className="font-bold">&gt;</kbd> {m.command_palette_prefix_actions()}</span>
+            <span><kbd className="font-bold">@</kbd> {m.command_palette_prefix_people()}</span>
           </div>
         )}
 
         {/* Results */}
         <div className="max-h-[300px] overflow-y-auto py-2">
           {flatFiltered.length === 0 ? (
-            <p className="px-4 py-6 text-center text-[13px] text-ih-fg-4">No results found</p>
+            <p className="px-4 py-6 text-center text-[13px] text-ih-fg-4">{m.command_palette_no_results()}</p>
           ) : (
             [...groups.entries()].map(([group, actions]) => (
               <div key={group}>
@@ -320,9 +329,9 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
 
         {/* Footer hint */}
         <div className="flex items-center gap-4 px-4 py-2 border-t border-ih-border text-[10px] text-ih-fg-4">
-          <span><kbd className="font-bold">&uarr;&darr;</kbd> navigate</span>
-          <span><kbd className="font-bold">Enter</kbd> select</span>
-          <span><kbd className="font-bold">Esc</kbd> close</span>
+          <span><kbd className="font-bold">&uarr;&darr;</kbd> {m.command_palette_footer_navigate()}</span>
+          <span><kbd className="font-bold">Enter</kbd> {m.command_palette_footer_select()}</span>
+          <span><kbd className="font-bold">Esc</kbd> {m.command_palette_footer_close()}</span>
         </div>
       </div>
     </div>

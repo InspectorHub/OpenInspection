@@ -8,7 +8,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
-import { workspaceSchema } from "~/lib/forms/settings.schema";
+import { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
@@ -76,7 +76,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { success: res.ok, intent, logoUrl: body?.data?.logoUrl ?? null };
   }
 
-  const submission = parseWithZod(fd, { schema: workspaceSchema });
+  const submission = parseWithZod(fd, { schema: makeWorkspaceSchema() });
   if (submission.status !== "success") {
     return submission.reply();
   }
@@ -150,7 +150,7 @@ export default function SettingsWorkspacePage() {
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: workspaceSchema });
+      return parseWithZod(formData, { schema: makeWorkspaceSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",

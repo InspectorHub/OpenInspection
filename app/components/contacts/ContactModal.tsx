@@ -1,7 +1,7 @@
 import { useFetcher } from "react-router";
 import { useForm, type SubmissionResult } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
-import { addContactSchema } from "~/lib/forms/contacts.schema";
+import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 import { Modal, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 import type { Contact } from "./contacts-helpers";
@@ -30,7 +30,7 @@ export function ContactModal({
   const [form, fields] = useForm({
     lastResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: addContactSchema });
+      return parseWithZod(formData, { schema: makeAddContactSchema() });
     },
     // eager-after-error: validate on blur first; once there's an error, switch
     // to real-time revalidation on every keystroke (project validation pattern).

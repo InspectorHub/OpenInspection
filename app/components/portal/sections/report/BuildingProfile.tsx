@@ -1,14 +1,7 @@
+import { m } from "~/paraglide/messages";
 import type { ProfileRow } from "./types";
 
 const GROUP_ORDER = ["identity", "physical", "occupancy", "compliance", "utilities", "maintenance"];
-const GROUP_LABEL: Record<string, string> = {
-  identity: "Identity",
-  physical: "Physical",
-  occupancy: "Occupancy",
-  compliance: "Compliance",
-  utilities: "Utilities",
-  maintenance: "Maintenance",
-};
 
 /**
  * Commercial PCA Phase F — Building Profile fact list. Renders property facts
@@ -20,6 +13,14 @@ const GROUP_LABEL: Record<string, string> = {
 export function BuildingProfile({ rows }: { rows: ProfileRow[] }) {
   if (!rows.length) return null;
 
+  const GROUP_LABEL: Record<string, string> = {
+    identity: m.pca_building_profile_group_identity(),
+    physical: m.pca_building_profile_group_physical(),
+    occupancy: m.pca_building_profile_group_occupancy(),
+    compliance: m.pca_building_profile_group_compliance(),
+    utilities: m.pca_building_profile_group_utilities(),
+    maintenance: m.pca_building_profile_group_maintenance(),
+  };
   const known = new Set(GROUP_ORDER);
   const extraGroups = Array.from(new Set(rows.map((r) => r.group))).filter((g) => !known.has(g));
   const groups = [...GROUP_ORDER, ...extraGroups]
@@ -28,7 +29,7 @@ export function BuildingProfile({ rows }: { rows: ProfileRow[] }) {
 
   return (
     <section className="mb-6 rounded-lg border border-ih-border bg-ih-bg-card p-4 print:break-inside-avoid">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">Building Profile</h2>
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">{m.pca_building_profile_title()}</h2>
       <div className="grid gap-x-8 gap-y-4 sm:grid-cols-2">
         {groups.map((g) => (
           <div key={g.group}>

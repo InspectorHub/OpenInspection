@@ -1,4 +1,5 @@
 import { Icon } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 /**
  * Commercial PCA — "Download CSV" / "Download Excel" controls for an
@@ -33,10 +34,10 @@ export function CostExportButtons({
   // Labels say WHAT is exported (the cost tables) + the format — so they read
   // distinctly next to "Export to Word" / "Download PDF", which export the whole
   // formatted report, not the spreadsheet cost data.
-  const CSV_LABEL = "Export Costs (CSV)";
-  const XLSX_LABEL = "Export Costs (Excel)";
-  const CSV_HINT = "Download the cost tables (Opinion of Cost + Reserve Schedule) as a CSV spreadsheet";
-  const XLSX_HINT = "Download the cost tables (Opinion of Cost + Reserve Schedule) as an Excel workbook";
+  const CSV_LABEL = m.cost_export_csv_label();
+  const XLSX_LABEL = m.cost_export_xlsx_label();
+  const CSV_HINT = m.cost_export_csv_hint();
+  const XLSX_HINT = m.cost_export_xlsx_hint();
 
   if (variant === "panel") {
     const link =
@@ -44,10 +45,10 @@ export function CostExportButtons({
     return (
       <div className="flex items-center gap-3" data-testid="cost-export-panel">
         <a href={href("csv")} download className={link} data-testid="cost-export-csv" title={CSV_HINT}>
-          <Icon name="download" size={13} /> Export CSV
+          <Icon name="download" size={13} /> {m.cost_export_csv_short()}
         </a>
         <a href={href("xlsx")} download className={link} data-testid="cost-export-xlsx" title={XLSX_HINT}>
-          <Icon name="download" size={13} /> Export Excel
+          <Icon name="download" size={13} /> {m.cost_export_xlsx_short()}
         </a>
       </div>
     );

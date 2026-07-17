@@ -1,5 +1,5 @@
 import { useLoaderData } from "react-router";
-import { usePdfExport, pdfActionLabel, PDF_BUSY_HINT } from "~/hooks/usePdfExport";
+import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
 import type { Route } from "./+types/v.$token";
 import { createApi } from "~/lib/api-client.server";
 import { m } from "~/paraglide/messages";
@@ -309,7 +309,7 @@ export default function VerifyTokenPage() {
           </button>
           {pdf.error || pdf.generating ? (
             <p role="status" className="mt-2 text-[12px] leading-snug text-ih-fg-3">
-              {pdf.error ?? PDF_BUSY_HINT}
+              {pdf.error ?? pdfBusyHint()}
             </p>
           ) : null}
         </>

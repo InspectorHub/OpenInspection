@@ -221,5 +221,19 @@
   "portal_payment_no_invoice_body": "There is no invoice for this inspection yet.",
   "portal_payment_download_pdf": "Download PDF",
   "portal_payment_questions": "Questions? Contact {name}.",
-  "portal_payment_privacy_policy": "Privacy Policy"
+  "portal_payment_privacy_policy": "Privacy Policy",
+  "repair_defect_credit_label": "Credit Request ($)",
+  "repair_defect_credit_aria": "Credit request for {label}",
+  "repair_defect_note_label": "Note",
+  "repair_defect_note_placeholder": "Optional — describe the repair or credit rationale",
+  "repair_intro_heading": "Custom Introduction",
+  "repair_intro_placeholder": "Add a personal message to appear at the top of the shared repair request…",
+  "repair_intro_saving": "Saving…",
+  "repair_share_heading": "Share",
+  "repair_share_view_pdf": "View as PDF",
+  "repair_share_email_heading": "Email to contractor",
+  "repair_share_email_placeholder": "contractor@example.com",
+  "repair_share_email_msg_placeholder": "Optional message…",
+  "repair_share_email_submit": "Send email",
+  "repair_share_email_sent": "Email sent."
 }

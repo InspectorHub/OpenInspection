@@ -23,7 +23,11 @@ import { m } from "~/paraglide/messages";
 // margin so a retry after the countdown reliably succeeds.
 const PDF_RETRY_COOLDOWN_SEC = 20;
 
-export const PDF_BUSY_HINT = "Generating your PDF — this can take up to a minute.";
+// A function (not a const) so the message resolves at call time in the active
+// locale, never frozen at module import.
+export function pdfBusyHint(): string {
+  return m.helper_pdf_busy_hint();
+}
 
 export interface PdfExportState {
   /** A render request is in flight. */

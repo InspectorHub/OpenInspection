@@ -40,5 +40,18 @@
   "helper_section_service_unavailable": "Service unavailable",
   "helper_section_inspection_not_found": "Inspection not found",
   "helper_section_invoice_not_found": "Invoice not found",
-  "helper_section_agreement_not_found": "Agreement not found"
+  "helper_section_agreement_not_found": "Agreement not found",
+  "helper_pdf_busy_hint": "Generating your PDF — this can take up to a minute.",
+  "helper_booking_step_property": "Property",
+  "helper_booking_step_services": "Services",
+  "helper_booking_step_schedule": "Schedule",
+  "helper_booking_step_confirm": "Confirm",
+  "helper_booking_window_morning_label": "Morning",
+  "helper_booking_window_morning_detail": "8:00 AM - 12:00 PM",
+  "helper_booking_window_afternoon_label": "Afternoon",
+  "helper_booking_window_afternoon_detail": "12:00 PM - 5:00 PM",
+  "helper_booking_window_allday_label": "All Day",
+  "helper_booking_window_allday_detail": "Flexible timing",
+  "helper_booking_window_custom_label": "Custom",
+  "helper_booking_window_custom_detail": "Pick a specific time"
 }

@@ -1,11 +1,5 @@
+import { m } from "~/paraglide/messages";
 import type { ReportSection, Severity, UnitMatrixRow } from "./types";
-
-const SEVERITY_LABEL: Record<Severity, string> = {
-  good: "Good",
-  minor: "Minor",
-  marginal: "Marginal",
-  significant: "Significant",
-};
 
 const SEVERITY_CLASS: Record<Severity, string> = {
   good: "bg-ih-ok-bg text-ih-ok-fg",
@@ -42,11 +36,18 @@ export function UnitSections({
   const exceptions = rows.filter((r) => r.isException);
   if (exceptions.length === 0) return null;
 
+  const SEVERITY_LABEL: Record<Severity, string> = {
+    good: m.pca_severity_good(),
+    minor: m.pca_severity_minor(),
+    marginal: m.pca_severity_marginal(),
+    significant: m.pca_severity_significant(),
+  };
+
   const sectionTitle = (id: string): string => sections.find((s) => s.id === id)?.title ?? id;
 
   return (
     <section className="mb-6">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">Exception Units — Detail</h2>
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">{m.pca_unit_sections_title()}</h2>
       <div className="space-y-3">
         {exceptions.map((unit) => {
           const findingSections = Object.entries(unit.cells).filter(
@@ -72,9 +73,9 @@ export function UnitSections({
                       )}
                       {(safety > 0 || recommendation > 0 || maintenance > 0) && (
                         <span className="flex gap-2 text-[11px] tabular-nums text-ih-fg-4">
-                          {safety > 0 && <span>Safety: {safety}</span>}
-                          {recommendation > 0 && <span>Recommendation: {recommendation}</span>}
-                          {maintenance > 0 && <span>Maintenance: {maintenance}</span>}
+                          {safety > 0 && <span>{m.pca_unit_sections_count_safety({ n: safety })}</span>}
+                          {recommendation > 0 && <span>{m.pca_unit_sections_count_recommendation({ n: recommendation })}</span>}
+                          {maintenance > 0 && <span>{m.pca_unit_sections_count_maintenance({ n: maintenance })}</span>}
                         </span>
                       )}
                     </li>

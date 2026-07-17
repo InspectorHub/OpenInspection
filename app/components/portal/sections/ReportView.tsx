@@ -19,7 +19,7 @@
  */
 import { useState } from "react";
 import { m } from "~/paraglide/messages";
-import { usePdfExport, pdfActionLabel, PDF_BUSY_HINT } from "~/hooks/usePdfExport";
+import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
 import { brandTokens } from "~/lib/brand";
 import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, isDefect } from "~/lib/report-helpers";
@@ -350,7 +350,7 @@ export function ReportView(props: ReportViewProps) {
               role="status"
               className="max-w-[15rem] rounded-lg bg-ih-bg-inverse px-3 py-2 text-[11px] font-medium leading-snug text-ih-fg-inverse shadow-ih-popover"
             >
-              {pdf.error ?? PDF_BUSY_HINT}
+              {pdf.error ?? pdfBusyHint()}
             </div>
           ) : null}
           <button

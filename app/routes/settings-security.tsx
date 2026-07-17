@@ -7,7 +7,7 @@ import type { Route } from "./+types/settings-security";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useFlash } from "~/hooks/useFlash";
-import { changePasswordSchema, deleteAccountSchema } from "~/lib/forms/settings.schema";
+import { makeChangePasswordSchema, makeDeleteAccountSchema } from "~/lib/forms/settings.schema";
 import { ChangePasswordPanel } from "~/components/settings/security/ChangePasswordPanel";
 import { TwoFactorPanel } from "~/components/settings/security/TwoFactorPanel";
 import { TurnstilePanel } from "~/components/settings/security/TurnstilePanel";
@@ -64,7 +64,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const intent = fd.get("intent");
 
   if (intent === "change-password") {
-    const submission = parseWithZod(fd, { schema: changePasswordSchema });
+    const submission = parseWithZod(fd, { schema: makeChangePasswordSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -118,7 +118,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   }
 
   if (intent === "delete-account") {
-    const submission = parseWithZod(fd, { schema: deleteAccountSchema });
+    const submission = parseWithZod(fd, { schema: makeDeleteAccountSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -178,7 +178,7 @@ export default function SettingsSecurityPage() {
   const [pwForm, pwFields] = useForm({
     lastResult: pwResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: changePasswordSchema });
+      return parseWithZod(formData, { schema: makeChangePasswordSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -192,7 +192,7 @@ export default function SettingsSecurityPage() {
   const [deleteForm, deleteFields] = useForm({
     lastResult: deleteResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: deleteAccountSchema });
+      return parseWithZod(formData, { schema: makeDeleteAccountSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",

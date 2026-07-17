@@ -4,7 +4,7 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/contacts";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { addContactSchema } from "~/lib/forms/contacts.schema";
+import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 import { PageHeader, TabStrip, Button, Select } from "@core/shared-ui";
 import { inferMappingFromCsv, type Contact, type Agent } from "~/components/contacts/contacts-helpers";
 import { ContactModal } from "~/components/contacts/ContactModal";
@@ -48,7 +48,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "create" || intent === "update") {
     const id = form.get("id") as string | null;
-    const submission = parseWithZod(form, { schema: addContactSchema });
+    const submission = parseWithZod(form, { schema: makeAddContactSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }

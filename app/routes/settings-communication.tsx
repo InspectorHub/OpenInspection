@@ -8,7 +8,7 @@ import type { Route } from "./+types/settings-communication";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useFlash } from "~/hooks/useFlash";
-import { communicationEmailSchema } from "~/lib/forms/settings-config.schema";
+import { makeCommunicationEmailSchema } from "~/lib/forms/settings-config.schema";
 import { ownEmailProviderConfigured } from "~/lib/email-provider-config";
 import { TemplateList } from "~/components/email-template/TemplateList";
 import { useSessionContext } from "~/hooks/useSessionContext";
@@ -198,7 +198,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
 
   if (intent === "save-email") {
-    const submission = parseWithZod(form, { schema: communicationEmailSchema });
+    const submission = parseWithZod(form, { schema: makeCommunicationEmailSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -507,7 +507,7 @@ export default function SettingsCommunication() {
   const [emailForm, emailFields] = useForm({
     lastResult: emailResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: communicationEmailSchema });
+      return parseWithZod(formData, { schema: makeCommunicationEmailSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",

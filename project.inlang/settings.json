@@ -34,7 +34,10 @@
       "./messages/{locale}/components.json",
       "./messages/{locale}/checkout.json",
       "./messages/{locale}/labels.json",
-      "./messages/{locale}/helpers.json"
+      "./messages/{locale}/helpers.json",
+      "./messages/{locale}/misc.json",
+      "./messages/{locale}/pca-report.json",
+      "./messages/{locale}/validation.json"
     ]
   }
 }

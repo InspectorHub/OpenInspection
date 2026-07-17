@@ -1,4 +1,4 @@
-import { STEPS, type CompanyProfile } from "./booking-constants";
+import { stepLabels, type CompanyProfile } from "./booking-constants";
 import { useTurnstileWidget } from "~/lib/turnstile";
 import { PropertyStep, ServicesStep, ScheduleStep, ConfirmStep } from "./BookingSteps";
 import type { useBookingFormState } from "./useBookingFormState";
@@ -60,7 +60,7 @@ export function BookingWizard({
 
       {/* Step indicator */}
       <div className="flex items-center gap-1 mb-8">
-        {STEPS.map((s, i) => (
+        {stepLabels().map((s, i) => (
           <div key={s} className="flex items-center gap-1 flex-1">
             <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${
               i <= step
@@ -70,7 +70,7 @@ export function BookingWizard({
             <span className={`text-[11px] font-medium hidden sm:inline ${
               i <= step ? "text-ih-primary" : "text-ih-fg-4"
             }`}>{s}</span>
-            {i < STEPS.length - 1 && (
+            {i < stepLabels().length - 1 && (
               <div className={`flex-1 h-px mx-1 ${i < step ? "bg-ih-primary" : "bg-ih-bg-muted"}`} />
             )}
           </div>

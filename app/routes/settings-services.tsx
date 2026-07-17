@@ -6,7 +6,7 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-services";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { createServiceSchema } from "~/lib/forms/settings.schema";
+import { makeCreateServiceSchema } from "~/lib/forms/settings.schema";
 import { MoneyInput } from "~/components/MoneyInput";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
@@ -108,7 +108,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
 
   if (intent === "create-service") {
-    const submission = parseWithZod(form, { schema: createServiceSchema });
+    const submission = parseWithZod(form, { schema: makeCreateServiceSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -179,7 +179,7 @@ export default function SettingsServices() {
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: createServiceSchema });
+      return parseWithZod(formData, { schema: makeCreateServiceSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
