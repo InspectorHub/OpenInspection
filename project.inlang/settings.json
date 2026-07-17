@@ -32,7 +32,9 @@
       "./messages/{locale}/public.json",
       "./messages/{locale}/media.json",
       "./messages/{locale}/components.json",
-      "./messages/{locale}/checkout.json"
+      "./messages/{locale}/checkout.json",
+      "./messages/{locale}/labels.json",
+      "./messages/{locale}/helpers.json"
     ]
   }
 }

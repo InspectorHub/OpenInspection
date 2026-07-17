@@ -32,10 +32,9 @@ describe('report-card-stack buttons (Task 9)', () => {
     const text = (src as unknown as { default: string }).default;
 
     // The top-bar toolbar sits inside the `flex items-center gap-2 print:hidden`
-    // container. Confirm "Print" label is present as a JSX text node.
-    // The label is on its own indented line between the button tags (whitespace-surrounded).
-    // We look for the word "Print" as a standalone label (not part of "window.print()").
-    expect(text).toMatch(/>\s*Print\s*<\/button>/m);
+    // container. Confirm the "Print" label is rendered via the i18n message
+    // (m.report_view_print() → "Print"), not the old ">PDF<" literal.
+    expect(text).toContain('m.report_view_print()');
   });
 
   it('top-bar toolbar button no longer reads ">PDF<"', async () => {
@@ -64,9 +63,11 @@ describe('report-card-stack buttons (Task 9)', () => {
     const view = ((await import('~/components/portal/sections/ReportView?raw')) as unknown as { default: string }).default;
     const hook = ((await import('~/hooks/usePdfExport?raw')) as unknown as { default: string }).default;
 
-    expect(view).toContain('pdfActionLabel(pdf, "Download PDF")');
-    expect(hook).toContain('Generating');
-    expect(hook).toContain('Retry in');
+    expect(view).toContain('pdfActionLabel(pdf, m.report_view_download_pdf())');
+    // The generating / cooldown labels moved into the i18n catalog; the hook
+    // resolves them via these message keys.
+    expect(hook).toContain('helper_pdf_generating');
+    expect(hook).toContain('helper_pdf_retry_in');
   });
 
   it('generating state lives in the shared usePdfExport hook', async () => {

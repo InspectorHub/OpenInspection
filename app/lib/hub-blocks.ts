@@ -13,6 +13,7 @@
 
 import { INSPECTION_STATUS, INSPECTION_STATUS_LABELS, isReportPublished } from '~/lib/status';
 import { formatCurrency } from '~/lib/format';
+import { m } from '~/paraglide/messages';
 
 /** Pill tone union — kept in sync with packages/shared-ui/src/Pill.tsx. */
 export type PillTone =
@@ -87,24 +88,24 @@ function deriveAgreement(hub: HubPayload): BlockState {
     const newest = hub.agreementRequests[0];
     if (!newest) {
         return hub.inspection.agreementRequired
-            ? { tone: 'warning', label: 'Not sent' }
-            : { tone: 'neutral', label: 'Not required' };
+            ? { tone: 'warning', label: m.label_hub_agreement_not_sent() }
+            : { tone: 'neutral', label: m.label_hub_agreement_not_required() };
     }
     switch (newest.status) {
         case 'pending':
         case 'sent':
-            return { tone: 'monitor', label: 'Awaiting signature' };
+            return { tone: 'monitor', label: m.label_hub_agreement_awaiting_signature() };
         case 'viewed':
-            return { tone: 'monitor', label: 'Viewed' };
+            return { tone: 'monitor', label: m.label_hub_agreement_viewed() };
         case 'signed':
-            return { tone: 'sat', label: 'Signed' };
+            return { tone: 'sat', label: m.label_hub_agreement_signed() };
         case 'declined':
-            return { tone: 'defect', label: 'Declined' };
+            return { tone: 'defect', label: m.label_hub_agreement_declined() };
         case 'expired':
-            return { tone: 'warning', label: 'Expired' };
+            return { tone: 'warning', label: m.label_hub_agreement_expired() };
         default:
             // Unknown status — treat as still-awaiting rather than crash.
-            return { tone: 'monitor', label: 'Awaiting signature' };
+            return { tone: 'monitor', label: m.label_hub_agreement_awaiting_signature() };
     }
 }
 
@@ -117,20 +118,20 @@ function deriveInvoice(hub: HubPayload): BlockState {
     const inv = hub.invoice;
     if (!inv) {
         return hub.inspection.paymentRequired
-            ? { tone: 'warning', label: 'Not invoiced' }
-            : { tone: 'neutral', label: 'No invoice' };
+            ? { tone: 'warning', label: m.label_hub_invoice_not_invoiced() }
+            : { tone: 'neutral', label: m.label_hub_invoice_none() };
     }
     switch (inv.status) {
         case 'draft':
-            return { tone: 'neutral', label: 'Draft' };
+            return { tone: 'neutral', label: m.label_hub_invoice_draft() };
         case 'sent':
-            return { tone: 'monitor', label: 'Awaiting payment' };
+            return { tone: 'monitor', label: m.label_hub_invoice_awaiting_payment() };
         case 'partial':
-            return { tone: 'warning', label: 'Partially paid' };
+            return { tone: 'warning', label: m.label_hub_invoice_partially_paid() };
         case 'paid':
-            return { tone: 'sat', label: 'Paid' };
+            return { tone: 'sat', label: m.label_hub_invoice_paid() };
         default:
-            return { tone: 'neutral', label: 'Draft' };
+            return { tone: 'neutral', label: m.label_hub_invoice_draft() };
     }
 }
 
@@ -150,10 +151,10 @@ export function deriveInspectionPill(status: string): BlockState {
 /** Report deliverable pill (report axis). */
 export function deriveReportPill(reportStatus: string): BlockState {
     switch (reportStatus) {
-        case 'in_progress': return { tone: 'neutral', label: 'In Progress' };
-        case 'submitted':   return { tone: 'warning', label: 'Submitted' };
-        case 'published':   return { tone: 'sat',     label: 'Published' };
-        default:            return { tone: 'neutral', label: 'In Progress' };
+        case 'in_progress': return { tone: 'neutral', label: m.label_hub_report_in_progress() };
+        case 'submitted':   return { tone: 'warning', label: m.label_hub_report_submitted() };
+        case 'published':   return { tone: 'sat',     label: m.label_hub_report_published() };
+        default:            return { tone: 'neutral', label: m.label_hub_report_in_progress() };
     }
 }
 

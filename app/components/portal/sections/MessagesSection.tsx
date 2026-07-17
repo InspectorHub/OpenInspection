@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -108,32 +109,32 @@ export function MessagesSection({
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-2 text-ih-fg-1">Messages</h1>
+      <h1 className="text-2xl font-bold mb-2 text-ih-fg-1">{m.portal_hub_nav_messages()}</h1>
       {inspection && (
         <p className="text-sm text-ih-fg-3 mb-6">
-          Inspection: {inspection.propertyAddress}
+          {m.portal_messages_inspection_label({ address: inspection.propertyAddress })}
         </p>
       )}
 
       {/* Message list */}
       <div className="space-y-3 max-h-[60vh] overflow-y-auto mb-4">
-        {ordered.map((m) => (
+        {ordered.map((msg) => (
           <div
-            key={m.id}
+            key={msg.id}
             className={`rounded-md p-3 ${
-              m.fromRole === "client"
+              msg.fromRole === "client"
                 ? "ml-12 bg-ih-primary-tint"
                 : "mr-12 bg-ih-watch-bg"
             }`}
           >
             <div className="text-xs text-ih-fg-3 mb-1">
-              {m.fromName || m.fromRole} &middot;{" "}
-              {new Date(m.createdAt).toLocaleString()}
+              {msg.fromName || msg.fromRole} &middot;{" "}
+              {new Date(msg.createdAt).toLocaleString()}
             </div>
-            <p className="text-sm whitespace-pre-wrap text-ih-fg-1">{m.body}</p>
-            {m.attachments && m.attachments.length > 0 && (
+            <p className="text-sm whitespace-pre-wrap text-ih-fg-1">{msg.body}</p>
+            {msg.attachments && msg.attachments.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {m.attachments.map((a) => (
+                {msg.attachments.map((a) => (
                   <a
                     key={a.id}
                     href={`${base}/attachments/${encodeURIComponent(a.id)}${tokenQuery}`}
@@ -150,8 +151,8 @@ export function MessagesSection({
         ))}
         {ordered.length === 0 && (
           <div className="text-center py-8">
-            <h3 className="font-semibold text-ih-fg-3">No messages yet</h3>
-            <p className="text-sm text-ih-fg-3 mt-1">Send the first one below.</p>
+            <h3 className="font-semibold text-ih-fg-3">{m.portal_messages_empty_title()}</h3>
+            <p className="text-sm text-ih-fg-3 mt-1">{m.portal_messages_empty_body()}</p>
           </div>
         )}
       </div>
@@ -162,7 +163,7 @@ export function MessagesSection({
           value={composeBody}
           onChange={(e) => setComposeBody(e.target.value)}
           rows={3}
-          placeholder="Type your message..."
+          placeholder={m.portal_messages_compose_placeholder()}
           className="w-full px-3 py-2 rounded-xl border border-ih-border text-sm resize-none bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary"
         />
         <div className="mt-2 flex items-center justify-end">
@@ -172,7 +173,7 @@ export function MessagesSection({
             disabled={!composeBody.trim() || sending}
             className="px-4 py-2 rounded-xl bg-ih-primary text-ih-primary-fg text-sm font-semibold disabled:opacity-50 transition-opacity"
           >
-            {sending ? "Sending..." : "Send"}
+            {sending ? m.portal_messages_send_pending() : m.portal_messages_send()}
           </button>
         </div>
       </div>

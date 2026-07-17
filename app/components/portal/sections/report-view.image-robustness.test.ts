@@ -45,7 +45,8 @@ describe('ReportView image robustness (Plan 1 / N1)', () => {
 
   it('cover renders a restrained "Cover photo unavailable" placeholder', async () => {
     const text = await source();
-    expect(text).toContain('Cover photo unavailable');
+    // The placeholder copy is now the i18n message (m.report_view_cover_unavailable() → "Cover photo unavailable").
+    expect(text).toContain('m.report_view_cover_unavailable()');
     // The placeholder is a co-located presentational component.
     expect(text).toContain('function CoverPhotoPlaceholder');
   });

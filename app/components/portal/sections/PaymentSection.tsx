@@ -25,6 +25,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { brandTokens, type TenantBrand } from "~/lib/brand";
+import { m } from "~/paraglide/messages";
 import { InvoiceDisplay } from "./InvoiceDisplay";
 import { type InvoiceData, paymentSectionState } from "./payment-helpers";
 
@@ -61,8 +62,8 @@ export function PaymentSection({
   if (error || !invoice) {
     return (
       <div className="rounded-xl border border-ih-border bg-ih-bg-card p-6 text-center">
-        <h1 className="font-serif text-xl font-semibold text-ih-fg-1">No invoice yet</h1>
-        <p className="text-sm text-ih-fg-3 mt-2">{error ?? "There is no invoice for this inspection yet."}</p>
+        <h1 className="font-serif text-xl font-semibold text-ih-fg-1">{m.portal_payment_no_invoice_title()}</h1>
+        <p className="text-sm text-ih-fg-3 mt-2">{error ?? m.portal_payment_no_invoice_body()}</p>
       </div>
     );
   }
@@ -84,15 +85,15 @@ export function PaymentSection({
               <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M4 6V2h8v4M4 12H3a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1M4 10h8v4H4z" />
               </svg>
-              Download PDF
+              {m.portal_payment_download_pdf()}
             </button>
             <p className="text-[12px] text-ih-fg-4">
-              Questions? Contact {invoice.inspectorName || "your inspector"}.
+              {m.portal_payment_questions({ name: invoice.inspectorName || m.portal_pay_inspector_fallback() })}
             </p>
           </div>
           {privacyUrl && (
             <p className="mt-8 text-center text-xs text-ih-fg-3 print:hidden">
-              <a href={privacyUrl} target="_blank" rel="noreferrer" className="hover:underline">Privacy Policy</a>
+              <a href={privacyUrl} target="_blank" rel="noreferrer" className="hover:underline">{m.portal_payment_privacy_policy()}</a>
             </p>
           )}
         </>

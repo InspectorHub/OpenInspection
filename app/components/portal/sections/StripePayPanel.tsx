@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { loadStripe, type Stripe as StripeJs } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { m } from "~/paraglide/messages";
 import { money } from "./payment-helpers";
 
 type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
@@ -54,7 +55,7 @@ export function StripePayPanel({ id, balanceDue, inspectorName, brandColor, curr
   return (
     <div className="rounded-xl border border-ih-border bg-ih-bg-muted p-4">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[13px] font-semibold text-ih-fg-1">Pay this invoice</span>
+        <span className="text-[13px] font-semibold text-ih-fg-1">{m.portal_pay_this_invoice()}</span>
         <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{money(balanceDue, cur)}</span>
       </div>
 
@@ -66,14 +67,14 @@ export function StripePayPanel({ id, balanceDue, inspectorName, brandColor, curr
             disabled={phase === "loading"}
             className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
           >
-            {phase === "loading" ? "Starting secure checkout…" : `Pay ${money(balanceDue, cur)}`}
+            {phase === "loading" ? m.portal_pay_starting_checkout() : m.portal_pay_amount({ amount: money(balanceDue, cur) })}
           </button>
           <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-4">
             <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
               <rect x="3" y="7" width="10" height="6" rx="1" />
               <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
             </svg>
-            Secured by Stripe · No signature required
+            {m.portal_pay_secured_no_signature()}
           </div>
         </>
       )}
@@ -97,14 +98,14 @@ export function StripePayPanel({ id, balanceDue, inspectorName, brandColor, curr
 
       {phase === "paid_already" && (
         <p className="mt-1 text-[12px] text-ih-fg-3 leading-relaxed">
-          This invoice has already been paid. Refresh the page to see your receipt.
+          {m.portal_pay_already_paid()}
         </p>
       )}
 
       {phase === "unavailable" && (
         <p className="mt-1 text-[12px] text-ih-fg-3 leading-relaxed">
-          Secure online card payment isn&rsquo;t available right now. Please contact{" "}
-          <span className="font-semibold text-ih-fg-2">{inspectorName || "your inspector"}</span> to arrange payment.
+          {m.portal_pay_unavailable_before()}{" "}
+          <span className="font-semibold text-ih-fg-2">{inspectorName || m.portal_pay_inspector_fallback()}</span>{" "}{m.portal_pay_unavailable_after()}
         </p>
       )}
     </div>
@@ -130,7 +131,7 @@ function CheckoutForm({ balanceDue, returnUrl, currency }: { balanceDue: number;
     });
     // On success Stripe redirects to return_url; we only reach here on error.
     if (payErr) {
-      setError(payErr.message ?? "Payment could not be completed. Please try again.");
+      setError(payErr.message ?? m.portal_pay_error_generic());
       setSubmitting(false);
     }
   }
@@ -143,7 +144,7 @@ function CheckoutForm({ balanceDue, returnUrl, currency }: { balanceDue: number;
         disabled={!stripe || submitting}
         className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 hover:-translate-y-px transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait disabled:translate-y-0"
       >
-        {submitting ? "Processing…" : `Pay ${money(balanceDue, { currency })}`}
+        {submitting ? m.portal_pay_processing() : m.portal_pay_amount({ amount: money(balanceDue, { currency }) })}
       </button>
       {error && <p className="text-[12px] text-ih-bad-fg font-medium">{error}</p>}
       <div className="flex items-center justify-center gap-1.5 text-[11px] text-ih-fg-4">
@@ -151,7 +152,7 @@ function CheckoutForm({ balanceDue, returnUrl, currency }: { balanceDue: number;
           <rect x="3" y="7" width="10" height="6" rx="1" />
           <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
         </svg>
-        Secured by Stripe
+        {m.portal_pay_secured()}
       </div>
     </form>
   );

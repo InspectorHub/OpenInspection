@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef } from "react";
 import type { CompanyProfile } from "./booking-constants";
+import { m } from "~/paraglide/messages";
 
 interface UseBookingFormStateArgs {
   profile: CompanyProfile | null;
@@ -57,10 +58,10 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
   }, [profile, preselected]);
 
   const chosenInspectorName = useMemo(() => {
-    if (!chosenInspectorId) return "First available";
+    if (!chosenInspectorId) return m.helper_booking_inspector_first_available();
     const found = inspectorOptions.find((i) => i.id === chosenInspectorId);
-    if (found) return found.name ?? "Inspector";
-    return "Inspector";
+    if (found) return found.name ?? m.helper_booking_inspector_default();
+    return m.helper_booking_inspector_default();
   }, [chosenInspectorId, inspectorOptions]);
 
   async function handleSubmit() {
@@ -86,14 +87,14 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
         }),
       });
       if (res.ok) {
-        setMessage({ text: "Booking request submitted! You will receive a confirmation email shortly.", ok: true });
+        setMessage({ text: m.helper_booking_submit_success(), ok: true });
         setStep(3);
       } else {
         const d = await res.json().catch(() => ({}));
-        setMessage({ text: (d as { error?: { message?: string } })?.error?.message || "Something went wrong. Please try again.", ok: false });
+        setMessage({ text: (d as { error?: { message?: string } })?.error?.message || m.helper_booking_submit_error(), ok: false });
       }
     } catch {
-      setMessage({ text: "Network error. Please check your connection.", ok: false });
+      setMessage({ text: m.helper_booking_network_error(), ok: false });
     } finally {
       setSubmitting(false);
     }

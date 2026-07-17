@@ -24,6 +24,7 @@
  */
 import { useState, useRef, useEffect } from "react";
 import { useFetcher } from "react-router";
+import { m } from "~/paraglide/messages";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
 import { SignaturePad, type SignaturePadHandle } from "~/components/media-studio/SignaturePad";
 import {
@@ -111,21 +112,21 @@ export function AgreementSection({
   useEffect(() => {
     if (signFetcher.state === "idle" && signFetcher.data) {
       if (signFetcher.data.ok) setSigned(true);
-      else setErrorMsg(signFetcher.data.error ?? "Signing failed. Please try again.");
+      else setErrorMsg(signFetcher.data.error ?? m.portal_agreement_error_sign_failed());
     }
   }, [signFetcher.state, signFetcher.data]);
 
   useEffect(() => {
     if (declineFetcher.state === "idle" && declineFetcher.data) {
       if (declineFetcher.data.ok) setDeclined(true);
-      else setErrorMsg(declineFetcher.data.error ?? "Failed to decline. Please try again.");
+      else setErrorMsg(declineFetcher.data.error ?? m.portal_agreement_error_decline_failed());
     }
   }, [declineFetcher.state, declineFetcher.data]);
 
   const submitSignature = () => {
     const pad = padRef.current;
     if (!pad || pad.isEmpty()) {
-      setErrorMsg("Please draw your signature before submitting.");
+      setErrorMsg(m.portal_agreement_error_draw_signature());
       return;
     }
     const signatureBase64 = pad.toDataURL();
@@ -152,12 +153,12 @@ export function AgreementSection({
     return (
       <div className="max-w-xl mx-auto p-8 text-center">
         <h2 className="text-xl font-bold text-ih-fg-1 mb-2">
-          {error && token ? "Agreement Not Found" : "No Agreement"}
+          {error && token ? m.portal_agreement_notfound_title() : m.portal_agreement_none_title()}
         </h2>
         <p className="text-[14px] text-ih-fg-3">
           {error && token
             ? error
-            : "No agreement requires your signature."}
+            : m.portal_agreement_none_body()}
         </p>
       </div>
     );
@@ -166,9 +167,9 @@ export function AgreementSection({
   if (declined) {
     return (
       <div className="max-w-xl mx-auto p-8 text-center">
-        <h2 className="text-xl font-bold text-ih-fg-1">Thank you</h2>
+        <h2 className="text-xl font-bold text-ih-fg-1">{m.portal_agreement_declined_title()}</h2>
         <p className="text-ih-fg-3 mt-2">
-          The inspector has been notified that you declined this agreement.
+          {m.portal_agreement_declined_body()}
         </p>
       </div>
     );
@@ -189,18 +190,18 @@ export function AgreementSection({
       <div className="bg-ih-bg-card rounded-lg shadow-ih-popover overflow-hidden">
         {/* Title bar */}
         <div className="px-6 py-6 sm:px-10 sm:py-8 border-b border-ih-border">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary mb-2">Document for Signature</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary mb-2">{m.portal_agreement_eyebrow()}</p>
           <h1 className="text-xl font-bold text-ih-fg-1 tracking-tight">{agreement.agreementName}</h1>
           <p className="text-[13px] text-ih-fg-3 mt-1">
-            For {agreement.signer.name}
+            {m.portal_agreement_for_signer({ name: agreement.signer.name })}
             {agreement.clientName && agreement.clientName !== agreement.signer.name && (
               <span> · {agreement.clientName}</span>
             )}
           </p>
           {multiSigner && (
             <p className="text-[12px] text-ih-fg-4 mt-1.5">
-              Signature {Math.min(myIndex, progress.total)} of {progress.total}
-              {agreement.completionPolicy === "one" && " · any one signature completes this"}
+              {m.portal_agreement_signature_x_of_y({ current: Math.min(myIndex, progress.total), total: progress.total })}
+              {agreement.completionPolicy === "one" && m.portal_agreement_any_one_completes()}
             </p>
           )}
         </div>
@@ -222,12 +223,12 @@ export function AgreementSection({
               </svg>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-ih-fg-1 mb-2">
-              {signed ? "Signed Successfully" : "Already Signed"}
+              {signed ? m.portal_agreement_signed_title() : m.portal_agreement_already_signed_title()}
             </h2>
             <p className="text-ih-fg-3 font-medium mb-6">
               {multiSigner && !envelopeComplete
-                ? `Thank you. We're waiting on the other signer${progress.total - progress.signed > 1 ? "s" : ""} (${progress.signed} of ${progress.total} signed).`
-                : "Thank you for signing this agreement."}
+                ? m.portal_agreement_waiting_others({ plural: progress.total - progress.signed > 1 ? "s" : "", signed: progress.signed, total: progress.total })
+                : m.portal_agreement_thanks_signed()}
             </p>
             <button
               type="button"
@@ -237,15 +238,15 @@ export function AgreementSection({
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              Download as PDF
+              {m.portal_agreement_download_pdf()}
             </button>
             <p className="text-[11px] text-ih-fg-4 italic mt-3">
-              In the print dialog, choose &quot;Save as PDF&quot; as destination.
+              {m.portal_agreement_print_hint()}
             </p>
           </div>
         ) : (
           <div className="px-6 py-6 sm:px-10 sm:py-8">
-            <p className="text-sm font-bold text-ih-fg-3 mb-4">Draw your signature below:</p>
+            <p className="text-sm font-bold text-ih-fg-3 mb-4">{m.portal_agreement_draw_prompt()}</p>
 
             <div className="mb-2">
               <SignaturePad ref={padRef} disabled={submitting} onMarkChange={setHasMark} />
@@ -266,7 +267,7 @@ export function AgreementSection({
                 disabled={submitting || !hasMark}
                 className="w-full h-11 px-4 bg-ih-primary text-ih-primary-fg rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {signFetcher.state !== "idle" ? "Signing..." : "Sign Agreement"}
+                {signFetcher.state !== "idle" ? m.portal_agreement_signing_pending() : m.portal_agreement_sign_submit()}
               </button>
             </div>
 
@@ -277,17 +278,17 @@ export function AgreementSection({
                 onClick={() => setShowDecline(!showDecline)}
                 className="text-xs text-ih-bad-fg hover:underline font-semibold"
               >
-                {showDecline ? "Cancel decline" : "Decline this agreement"}
+                {showDecline ? m.portal_agreement_cancel_decline() : m.portal_agreement_decline_toggle()}
               </button>
               {showDecline && (
                 <div className="mt-3 p-4 bg-ih-bad-bg rounded-lg border border-ih-bad/30">
-                  <label className="block text-[10px] font-bold text-ih-bad-fg uppercase tracking-widest mb-2">Reason (optional)</label>
+                  <label className="block text-[10px] font-bold text-ih-bad-fg uppercase tracking-widest mb-2">{m.portal_agreement_reason_label()}</label>
                   <textarea
                     value={declineReason}
                     onChange={(e) => setDeclineReason(e.target.value)}
                     rows={3}
                     className="w-full px-3 py-2 rounded-lg border border-ih-bad bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-bad/30 outline-none"
-                    placeholder="Let the inspector know why..."
+                    placeholder={m.portal_agreement_reason_placeholder()}
                   />
                   <button
                     type="button"
@@ -295,7 +296,7 @@ export function AgreementSection({
                     disabled={submitting}
                     className="mt-3 px-5 py-2 rounded-lg bg-ih-bad text-white text-[10px] font-bold uppercase tracking-widest hover:bg-ih-bad/85 transition disabled:opacity-50"
                   >
-                    {declineFetcher.state !== "idle" ? "Submitting..." : "Decline Agreement"}
+                    {declineFetcher.state !== "idle" ? m.portal_agreement_declining_pending() : m.portal_agreement_decline_submit()}
                   </button>
                 </div>
               )}
