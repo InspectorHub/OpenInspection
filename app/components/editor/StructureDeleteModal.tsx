@@ -49,7 +49,7 @@ export function StructureDeleteModal({ open, title, noun = 'section', impact, on
             variant="ghost"
             onClick={onCancel}
           >
-            {m.editor_structuredelete_cancel()}
+            {m.common_cancel()}
           </Button>
           <Button
             variant="danger"

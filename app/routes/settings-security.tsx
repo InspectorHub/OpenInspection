@@ -327,7 +327,7 @@ export default function SettingsSecurityPage() {
             <div className="flex gap-2">
               <button type="button" onClick={() => setShowDeleteConfirm(false)}
                 className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
-                {m.settings_security_delete_cancel()}
+                {m.common_cancel()}
               </button>
               <button type="submit"
                 className="h-9 px-4 rounded-md bg-ih-bad text-white font-bold text-[13px] hover:bg-ih-bad/85 active:scale-[.98] transition-all">

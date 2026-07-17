@@ -115,7 +115,7 @@ export function BlockTimeDrawer({
                 disabled={submitting}
                 className="mr-auto h-9 px-3 rounded-md border border-ih-bad text-[13px] font-bold text-ih-bad-fg hover:bg-ih-bad-tint disabled:opacity-50"
               >
-                {m.calendar_block_delete()}
+                {m.common_delete()}
               </button>
             )}
             <button
@@ -123,7 +123,7 @@ export function BlockTimeDrawer({
               onClick={onClose}
               className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted"
             >
-              {m.calendar_block_cancel()}
+              {m.common_cancel()}
             </button>
             <button
               type="submit"
@@ -240,7 +240,7 @@ export function BlockTimeDrawer({
               disabled={submitting}
               className="h-9 px-3 rounded-md bg-ih-bad text-[13px] font-bold text-white disabled:opacity-50"
             >
-              {m.calendar_block_delete()}
+              {m.common_delete()}
             </button>
           </>
         }

@@ -184,13 +184,13 @@ export default function SettingsEventTypes() {
                       onClick={() => openEdit(t)}
                       className="text-[12px] text-ih-primary hover:underline mr-3 font-bold"
                     >
-                      {m.settings_common_edit()}
+                      {m.common_edit()}
                     </button>
                     <button
                       onClick={() => confirmDelete(t)}
                       className="text-[12px] text-ih-bad-fg hover:underline font-bold"
                     >
-                      {m.settings_common_delete()}
+                      {m.common_delete()}
                     </button>
                   </>
                 ),
@@ -212,14 +212,14 @@ export default function SettingsEventTypes() {
               onClick={() => setModalOpen(false)}
               className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
             >
-              {m.settings_common_cancel()}
+              {m.common_cancel()}
             </button>
             <button
               onClick={save}
               disabled={saving}
               className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
             >
-              {saving ? m.settings_common_saving() : m.settings_common_save()}
+              {saving ? m.settings_common_saving() : m.common_save()}
             </button>
           </>
         }

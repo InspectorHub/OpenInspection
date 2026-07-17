@@ -37,7 +37,7 @@ export function ImportSpectoraModal({
             onClick={() => setImportOpen(false)}
             className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3"
           >
-            {m.templates_action_cancel()}
+            {m.common_cancel()}
           </button>
           <button
             type="button"

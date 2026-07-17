@@ -239,7 +239,7 @@ export function ItemList({
                           <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, 1); }}>{m.editor_shared_menu_move_down()}</MenuItem>
                         )}
                         {onDeleteItem && (
-                          <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDeleteItem(item.id); }}>{m.editor_shared_menu_delete()}</MenuItem>
+                          <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDeleteItem(item.id); }}>{m.common_delete()}</MenuItem>
                         )}
                       </div>
                     </>,

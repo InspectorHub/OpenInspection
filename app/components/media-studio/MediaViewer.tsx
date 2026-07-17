@@ -36,7 +36,7 @@ export function MediaViewerToolbar({
         {btn("poster", m.media_viewer_poster())}
         {btn("cover", m.media_viewer_cover())}
         {btn("caption", m.media_viewer_caption())}
-        {btn("delete", m.media_viewer_delete())}
+        {btn("delete", m.common_delete())}
       </>
     );
   }
@@ -48,7 +48,7 @@ export function MediaViewerToolbar({
     btn("caption", m.media_viewer_caption()),
   ];
   if (edited) items.push(btn("revert", m.media_viewer_revert()));
-  items.push(btn("delete", m.media_viewer_delete()));
+  items.push(btn("delete", m.common_delete()));
   return <>{items}</>;
 }
 

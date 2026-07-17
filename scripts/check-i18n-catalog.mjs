@@ -60,6 +60,29 @@ const source = load(SOURCE_LOCALE);
 const sourceKeys = Object.keys(source);
 const allow = new Set(FALLBACK_ALLOW);
 
+// Guard: the `common_` prefix is RESERVED for messages/<locale>/common.json.
+// Generic action words (Cancel/Save/Delete/…) live there once and are reused
+// everywhere as m.common_*(); a surface module minting its own generic key (the
+// parallel-extraction duplicate hazard) is a CI failure. Enforced on the source
+// locale's per-file layout.
+{
+  const dir = join(root, 'messages', SOURCE_LOCALE);
+  for (const file of readdirSync(dir).filter((f) => f.endsWith('.json'))) {
+    const { $schema, ...messages } = JSON.parse(readFileSync(join(dir, file), 'utf8'));
+    const isCommon = file === 'common.json';
+    for (const key of Object.keys(messages)) {
+      if (key.startsWith('common_') && !isCommon) {
+        console.error(`[i18n-catalog] ${file}: key '${key}' uses the reserved 'common_' prefix — generic keys must live in common.json.`);
+        failed = true;
+      }
+      if (!key.startsWith('common_') && isCommon) {
+        console.error(`[i18n-catalog] common.json: key '${key}' is not 'common_'-prefixed — common.json holds only shared generic keys.`);
+        failed = true;
+      }
+    }
+  }
+}
+
 // Guard 1: unknown allow-list entries (a key was translated or renamed but left
 // in FALLBACK_ALLOW) — keep the list honest.
 for (const k of allow) {

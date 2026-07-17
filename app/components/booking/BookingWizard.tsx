@@ -159,7 +159,7 @@ export function BookingWizard({
             disabled={step === 0}
             className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
           >
-            {m.booking_wizard_back()}
+            {m.common_back()}
           </button>
           {step < 3 ? (
             <button
@@ -167,7 +167,7 @@ export function BookingWizard({
               disabled={!canNext}
               className="h-9 px-5 rounded-md bg-ih-primary text-ih-primary-fg font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
-              {m.booking_wizard_continue()}
+              {m.common_continue()}
             </button>
           ) : (
             <div className="text-right">

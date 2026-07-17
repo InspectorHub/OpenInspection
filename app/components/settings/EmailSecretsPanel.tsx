@@ -242,7 +242,7 @@ export function EmailSecretsPanel({
         <div className="flex justify-end pt-3 border-t border-ih-border">
           <button type="submit" disabled={savingEmailSecrets}
             className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
-            {savingEmailSecrets ? m.settings_savebar_saving() : m.settings_emailsecrets_save({ provider: PROVIDER_LABELS[provider] })}
+            {savingEmailSecrets ? m.common_saving() : m.settings_emailsecrets_save({ provider: PROVIDER_LABELS[provider] })}
           </button>
         </div>
       </Form>

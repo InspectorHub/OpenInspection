@@ -24,7 +24,7 @@ export function FooterBar({ connected = false, status, roster = [] }: FooterBarP
     { keys: ["Z"], desc: m.editor_footer_shortcut_speed() },
     { keys: ["G", "D"], desc: m.editor_footer_shortcut_next_defect() },
     { keys: ["Tab"], desc: m.editor_footer_shortcut_next_field() },
-    { keys: ["Esc"], desc: m.editor_footer_shortcut_cancel() },
+    { keys: ["Esc"], desc: m.common_cancel() },
     { keys: ["⌘", "\\"], desc: m.editor_footer_shortcut_sidebar() },
     { keys: ["?"], desc: m.editor_footer_shortcut_help() },
   ];

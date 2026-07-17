@@ -420,7 +420,7 @@ export function VersionHistoryPanel({
                             disabled={restoring}
                             className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50"
                         >
-                            {m.editor_collab_cancel()}
+                            {m.common_cancel()}
                         </button>
                         <button
                             type="button"

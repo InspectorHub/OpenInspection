@@ -175,7 +175,7 @@ export function TemplateCombobox({
                     {/* List */}
                     <div className="max-h-52 overflow-y-auto">
                         {isLoading ? (
-                            <div className="py-6 text-center text-[12px] text-ih-fg-4">{m.template_combobox_loading()}</div>
+                            <div className="py-6 text-center text-[12px] text-ih-fg-4">{m.common_loading()}</div>
                         ) : results.length === 0 ? (
                             <div className="py-6 text-center text-[12px] text-ih-fg-4">
                                 {query ? m.template_combobox_no_match() : m.template_combobox_no_templates()}
@@ -219,7 +219,7 @@ export function TemplateCombobox({
                                 disabled={isLoadingMore}
                                 className="w-full h-7 rounded text-[12px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
                             >
-                                {isLoadingMore ? m.template_combobox_loading() : m.template_combobox_load_more()}
+                                {isLoadingMore ? m.common_loading() : m.template_combobox_load_more()}
                             </button>
                         </div>
                     )}

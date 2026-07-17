@@ -217,7 +217,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
             <div className="text-[11px] text-ih-fg-4">{m.editor_compliance_signed()} {formatDateTime(existing.signedAt, { locale, timeZone: displayTz })}</div>
           ) : null}
           <Button variant="danger-link" size="sm" disabled={removing} onClick={() => setConfirmOpen(true)}>
-            {removing ? m.editor_compliance_removing() : m.editor_compliance_remove()}
+            {removing ? m.editor_compliance_removing() : m.common_remove()}
           </Button>
         </div>
       ) : (
@@ -268,7 +268,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
         open={confirmOpen}
         title={m.editor_compliance_remove_signoff_title()}
         message={m.editor_compliance_remove_signoff_msg({ role: roleLabel(role) })}
-        confirmLabel={m.editor_compliance_remove()}
+        confirmLabel={m.common_remove()}
         busy={removing}
         onConfirm={confirmRemove}
         onCancel={() => setConfirmOpen(false)}
@@ -369,7 +369,7 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
         footer={
           <>
             <Button variant="ghost" onClick={() => setDeclineOpen(false)}>
-              {m.editor_compliance_cancel()}
+              {m.common_cancel()}
             </Button>
             <Button variant="danger" onClick={confirmDecline}>
               {m.editor_compliance_decline()}
@@ -505,7 +505,7 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
             disabled={seeding}
             onClick={() => seedFetcher.submit({ intent: "compliance-doc-review-seed" }, { method: "POST" })}
           >
-            {seeding ? m.editor_compliance_loading() : m.editor_compliance_load_checklist()}
+            {seeding ? m.common_loading() : m.editor_compliance_load_checklist()}
           </Button>
         </div>
       ) : (

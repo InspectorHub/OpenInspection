@@ -28,7 +28,7 @@ export function CalendarEventModal({ event, open, displayTz, locale, onClose }: 
             onClick={onClose}
             className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3"
           >
-            {m.calendar_event_close()}
+            {m.common_close()}
           </button>
           {event.id && (
             <button

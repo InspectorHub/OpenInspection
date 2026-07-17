@@ -28,7 +28,7 @@ export function TemplateRow({ t }: { t: { id: string; name?: string; updatedAt?:
                         <Pill tone="sat">{m.agreement_template_status_active()}</Pill>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button className="text-[13px] text-ih-primary hover:opacity-80 font-semibold">{m.agreement_template_edit()}</button>
+                        <button className="text-[13px] text-ih-primary hover:opacity-80 font-semibold">{m.common_edit()}</button>
                       </td>
                     </tr>
   );

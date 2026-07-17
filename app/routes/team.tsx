@@ -147,7 +147,7 @@ export default function TeamPage() {
                 align: "right",
                 cell: () => (
                   <button className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1">
-                    {m.settings_team_edit_button()}
+                    {m.common_edit()}
                   </button>
                 ),
               },

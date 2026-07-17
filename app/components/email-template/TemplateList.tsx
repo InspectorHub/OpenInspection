@@ -60,7 +60,7 @@ function TemplateRowItem({ row }: { row: TemplateRow }) {
           </button>
         </fetcher.Form>
       )}
-      <Link to={`/settings/communication/templates/${row.trigger}`} className="shrink-0 h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card hover:border-ih-primary hover:text-ih-primary transition-colors">{m.email_list_edit()}</Link>
+      <Link to={`/settings/communication/templates/${row.trigger}`} className="shrink-0 h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card hover:border-ih-primary hover:text-ih-primary transition-colors">{m.common_edit()}</Link>
     </div>
   );
 }

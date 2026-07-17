@@ -2377,7 +2377,7 @@ export default function InspectionEditPage() {
    const label = state.ratingLevels.find((l) => l.id === levelId)?.label ?? levelId;
    pushToast({
     message: m.editor_route_batch_rated({ count: selectedIds.length, s: selectedIds.length === 1 ? '' : 's', label }),
-    actionLabel: m.editor_route_undo(),
+    actionLabel: m.common_undo(),
     durationMs: 6000,
     onAction: () => {
      for (const { itemId, prior: p } of prior) {

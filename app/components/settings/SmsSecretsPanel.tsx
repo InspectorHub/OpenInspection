@@ -137,7 +137,7 @@ export function SmsSecretsPanel({
           <div className="flex justify-end pt-3 border-t border-ih-border">
             <button type="submit" disabled={savingSmsSecrets}
               className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
-              {savingSmsSecrets ? m.settings_savebar_saving() : m.settings_smssecrets_save({ provider: provider === "twilio" ? m.settings_sms_provider_twilio() : m.settings_sms_provider_telnyx() })}
+              {savingSmsSecrets ? m.common_saving() : m.settings_smssecrets_save({ provider: provider === "twilio" ? m.settings_sms_provider_twilio() : m.settings_sms_provider_telnyx() })}
             </button>
           </div>
         </Form>
@@ -154,7 +154,7 @@ export function SmsSecretsPanel({
               <button type="button" disabled={!inboundUrl}
                 onClick={() => { if (inboundUrl) void navigator.clipboard.writeText(inboundUrl); }}
                 className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0 disabled:opacity-60">
-                {m.settings_common_copy()}
+                {m.common_copy()}
               </button>
             </div>
             <p className="text-[11px] text-ih-fg-4">

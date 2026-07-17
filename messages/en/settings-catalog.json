@@ -1,8 +1,6 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
-  "settings_common_cancel": "Cancel",
   "settings_common_saving": "Saving...",
-  "settings_common_delete": "Delete",
   "settings_services_meta_title": "Services & Catalog - Settings - OpenInspection",
   "settings_services_crumb": "Services & catalog",
   "settings_services_error_create_failed": "Failed to create service.",
@@ -92,7 +90,6 @@
   "settings_contractor_types_rename": "Rename",
   "settings_contractor_types_delete_aria": "Delete {name}",
   "settings_contractor_types_name_placeholder": "e.g., Licensed Electrician",
-  "settings_contractor_types_add_button": "Add",
   "settings_contractor_types_empty": "No contractor types yet.",
   "settings_contractor_types_delete_title": "Delete contractor type",
   "settings_contractor_types_delete_confirm": "Delete \"{name}\"? This can't be undone.",

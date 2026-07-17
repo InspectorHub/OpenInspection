@@ -773,9 +773,9 @@ export default function InspectionsPage() {
           <span className="text-[13px] font-bold text-ih-primary">
             {m.inspections_list_batch_selected({ count: selectedIds.size })}
           </span>
-          <Button variant="danger" size="sm" onClick={batchDelete}>{m.inspections_list_batch_delete()}</Button>
+          <Button variant="danger" size="sm" onClick={batchDelete}>{m.common_delete()}</Button>
           <Button variant="ghost" size="sm" className="ml-auto" onClick={selectAll}>{m.inspections_list_batch_select_all()}</Button>
-          <Button variant="ghost" size="sm" onClick={clearSelection}>{m.inspections_list_batch_clear()}</Button>
+          <Button variant="ghost" size="sm" onClick={clearSelection}>{m.common_clear()}</Button>
         </div>
       )}
 

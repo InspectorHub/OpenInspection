@@ -69,7 +69,7 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
                     </h2>
                     <IconButton
                         onClick={onClose}
-                        aria-label={m.editor_close()}
+                        aria-label={m.common_close()}
                         size="sm"
                     >
                         &#x2715;
@@ -88,7 +88,7 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
                 </div>
                 <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
                     <Button variant="ghost" size="sm" onClick={onClose}>
-                        {warningOnly ? m.editor_cancel() : m.editor_close()}
+                        {warningOnly ? m.common_cancel() : m.common_close()}
                     </Button>
                     {warningOnly && onProceed && (
                         <Button

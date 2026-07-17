@@ -181,7 +181,7 @@ function RetentionWindow({ initialYears }: { initialYears: number }) {
           disabled={saving}
           className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
         >
-          {saving ? m.settings_compliance_saving() : m.settings_save()}
+          {saving ? m.settings_compliance_saving() : m.common_save()}
         </button>
         {saved && <span className="text-[13px] text-ih-ok-fg font-bold">{m.settings_flash_saved_short()}</span>}
         {failed && (

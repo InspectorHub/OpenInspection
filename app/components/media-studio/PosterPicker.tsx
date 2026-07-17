@@ -74,7 +74,7 @@ export function PosterPicker({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={m.media_poster_heading()}>
-      <button type="button" aria-label={m.media_common_close()} className="absolute inset-0 bg-ih-backdrop" onClick={onClose} />
+      <button type="button" aria-label={m.common_close()} className="absolute inset-0 bg-ih-backdrop" onClick={onClose} />
       <div
         data-testid="poster-picker"
         className="relative w-full max-w-2xl rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover"
@@ -86,7 +86,7 @@ export function PosterPicker({
             onClick={onClose}
             className="min-h-[44px] min-w-[44px] rounded-lg px-3 text-[13px] font-bold text-ih-fg-3 hover:text-ih-fg-1"
           >
-            {m.media_common_cancel()}
+            {m.common_cancel()}
           </button>
         </div>
 

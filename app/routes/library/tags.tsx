@@ -67,7 +67,7 @@ export default function TagsPage() {
                 align: "right",
                 cell: () => (
                   <button className="text-[13px] text-ih-primary hover:opacity-80 font-semibold">
-                    {m.library_action_edit()}
+                    {m.common_edit()}
                   </button>
                 ),
               },

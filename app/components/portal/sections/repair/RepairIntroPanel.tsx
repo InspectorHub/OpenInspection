@@ -34,7 +34,7 @@ export function RepairIntroPanel({
         className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-none focus:outline-none focus:border-ih-primary"
       />
       {saving && (
-        <p className="text-[11px] text-ih-fg-4">{m.repair_intro_saving()}</p>
+        <p className="text-[11px] text-ih-fg-4">{m.common_saving()}</p>
       )}
     </div>
   );

@@ -16,7 +16,7 @@ export function RecropWarningModal({ open, onCancel, onConfirm }: RecropWarningM
  size="sm"
  footer={
  <>
- <Button variant="ghost" onClick={onCancel}>{m.editor_cancel()}</Button>
+ <Button variant="ghost" onClick={onCancel}>{m.common_cancel()}</Button>
  <Button variant="danger" onClick={onConfirm}>{m.editor_recrop_confirm()}</Button>
  </>
  }

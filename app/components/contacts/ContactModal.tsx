@@ -49,8 +49,8 @@ export function ContactModal({
       size="lg"
       footer={
         <>
-          <Button variant="secondary" type="button" onClick={onClose}>{m.contacts_modal_cancel()}</Button>
-          <Button variant="primary" type="submit" form={form.id}>{m.contacts_modal_save()}</Button>
+          <Button variant="secondary" type="button" onClick={onClose}>{m.common_cancel()}</Button>
+          <Button variant="primary" type="submit" form={form.id}>{m.common_save()}</Button>
         </>
       }
     >

@@ -494,11 +494,11 @@ export function NewInspectionWizard({
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-ih-border">
           <button onClick={() => stepIdx > 0 ? setStepIdx(stepIdx - 1) : onClose()} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
-            {stepIdx > 0 ? m.new_inspection_back() : m.new_inspection_cancel()}
+            {stepIdx > 0 ? m.common_back() : m.common_cancel()}
           </button>
           {stepIdx < steps.length - 1 ? (
             <button disabled={!canNext} onClick={() => setStepIdx(stepIdx + 1)} className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed">
-              {m.new_inspection_next()}
+              {m.common_next()}
             </button>
           ) : (
             <button disabled={!canNext} onClick={handleSubmit} className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed">

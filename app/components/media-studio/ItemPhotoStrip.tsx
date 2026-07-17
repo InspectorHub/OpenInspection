@@ -173,7 +173,7 @@ export function ItemPhotoStrip({
           {selecting ? (
             <>
               <Button variant="ghost" size="sm" onClick={exitSelect}>
-                {m.media_common_cancel()}
+                {m.common_cancel()}
               </Button>
               <div className="flex items-center gap-3">
                 {onBulkMove && moveTargets && moveTargets.length > 0 && (

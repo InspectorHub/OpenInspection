@@ -25,7 +25,7 @@ export function SettingsSaveBar({ label }: { label: string }) {
         disabled={submitting}
         className="px-4 py-2 bg-ih-primary text-white rounded-md font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:pointer-events-none"
       >
-        {submitting ? m.settings_savebar_saving() : label}
+        {submitting ? m.common_saving() : label}
       </button>
     </div>
   );

@@ -23,7 +23,7 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  title={m.editor_publish_title()}
  footer={
  <>
- <Button variant="ghost" onClick={onClose}>{m.editor_cancel()}</Button>
+ <Button variant="ghost" onClick={onClose}>{m.common_cancel()}</Button>
  <Button
  variant="primary"
  disabled={isSubmitting}

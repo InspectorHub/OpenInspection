@@ -408,7 +408,7 @@ export function PhotoAnnotator({
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
           </svg>
-          {m.media_common_undo()}
+          {m.common_undo()}
         </button>
 
         <button
@@ -418,7 +418,7 @@ export function PhotoAnnotator({
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          {m.media_annotate_save()}
+          {m.common_save()}
         </button>
       </div>
 
@@ -583,13 +583,13 @@ export function PhotoAnnotator({
                         onClick={cancelLabel}
                         className="px-2 py-0.5 rounded text-[10px] font-bold text-white/50 hover:text-white/80"
                       >
-                        {m.media_common_cancel()}
+                        {m.common_cancel()}
                       </button>
                       <button
                         onClick={commitLabel}
                         className="px-2 py-0.5 rounded text-[10px] font-bold text-white bg-ih-primary hover:bg-ih-primary-600"
                       >
-                        {m.media_annotate_label_add()}
+                        {m.common_add()}
                       </button>
                     </div>
                   </div>

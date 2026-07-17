@@ -122,7 +122,7 @@ export function UnitsManager({ open, onClose, inspectionId, units, mode, fetcher
         footer={
           <>
             <Button variant="ghost" onClick={() => setShowLossy(false)}>
-              {m.editor_unitsmanager_cancel()}
+              {m.common_cancel()}
             </Button>
             <Button
               variant="danger"
@@ -245,7 +245,7 @@ function AddUnitForm({ busy, onSubmit }: { busy: boolean; onSubmit: (fields: Rec
         className="flex-1 h-8 px-2.5 rounded-ih-input border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
       />
       <Button variant="secondary" size="sm" disabled={busy || !trimmed} onClick={add}>
-        {m.editor_unitsmanager_add()}
+        {m.common_add()}
       </Button>
     </div>
   );

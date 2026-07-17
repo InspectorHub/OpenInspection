@@ -299,7 +299,7 @@ function TemplateList({
                 onClick={() => onEdit(t)}
                 className="text-[12px] text-ih-primary font-semibold hover:underline"
               >
-                {m.settings_edit()}
+                {m.common_edit()}
               </button>
               <fetcher.Form method="post">
                 <input type="hidden" name="intent" value="duplicate" />
@@ -316,7 +316,7 @@ function TemplateList({
                   onClick={() => onDelete(t)}
                   className="text-[12px] text-ih-bad-fg font-semibold hover:underline"
                 >
-                  {m.settings_delete()}
+                  {m.common_delete()}
                 </button>
               )}
             </div>
@@ -359,14 +359,14 @@ function DeleteModal({
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            {m.settings_cancel()}
+            {m.common_cancel()}
           </Button>
           {!isConflict && (
             <fetcher.Form method="post">
               <input type="hidden" name="intent" value="delete" />
               <input type="hidden" name="id" value={template.id} />
               <Button type="submit" variant="danger" disabled={fetcher.state !== "idle"}>
-                {m.settings_delete()}
+                {m.common_delete()}
               </Button>
             </fetcher.Form>
           )}
@@ -491,7 +491,7 @@ function TemplateEditorModal({
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            {m.settings_cancel()}
+            {m.common_cancel()}
           </Button>
           <fetcher.Form method="post">
             <input type="hidden" name="intent" value={template ? "update" : "create"} />
@@ -508,7 +508,7 @@ function TemplateEditorModal({
               variant="primary"
               disabled={isSaving || !name.trim() || !body.trim()}
             >
-              {template ? m.settings_save() : m.settings_msgtpl_create()}
+              {template ? m.common_save() : m.settings_msgtpl_create()}
             </Button>
           </fetcher.Form>
         </>
@@ -621,7 +621,7 @@ function TemplateEditorModal({
                   size="sm"
                   disabled={isPreviewing || !body.trim()}
                 >
-                  {isPreviewing ? m.settings_loading() : m.settings_msgtpl_refresh_preview()}
+                  {isPreviewing ? m.common_loading() : m.settings_msgtpl_refresh_preview()}
                 </Button>
               </previewFetcher.Form>
             </div>

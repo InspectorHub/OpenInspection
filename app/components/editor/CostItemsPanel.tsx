@@ -440,7 +440,7 @@ function CostItemRow({
           )}
         </div>
         <Button variant="danger-link" size="sm" disabled={busy} onClick={onRemove}>
-          {m.editor_cost_remove()}
+          {m.common_remove()}
         </Button>
       </div>
     </li>

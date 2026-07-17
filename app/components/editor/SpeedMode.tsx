@@ -172,7 +172,7 @@ export function SpeedMode({
         {/* Nav */}
         <div className="flex gap-4 mt-8">
           <Button variant="secondary" onClick={onPrev} disabled={currentIndex === 0} icon={<Icon name="chevL" size={16} />}>{m.editor_speedmode_prev()}</Button>
-          <Button variant="secondary" onClick={onNext} disabled={currentIndex >= totalCount - 1}>{m.editor_speedmode_next()} <Icon name="chevR" size={16} /></Button>
+          <Button variant="secondary" onClick={onNext} disabled={currentIndex >= totalCount - 1}>{m.common_next()} <Icon name="chevR" size={16} /></Button>
         </div>
       </div>
 

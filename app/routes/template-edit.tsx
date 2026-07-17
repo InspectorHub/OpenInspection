@@ -496,7 +496,7 @@ export default function TemplateEditPage() {
             {m.templates_edit_rating_system()}
           </Button>
           <Button variant="primary" size="sm" onClick={handleSave}>
-            {fetcher.state === "submitting" ? m.templates_edit_saving() : saveSuccess ? m.templates_edit_saved() : m.templates_edit_save()}
+            {fetcher.state === "submitting" ? m.templates_edit_saving() : saveSuccess ? m.templates_edit_saved() : m.common_save()}
           </Button>
         </div>
       </header>

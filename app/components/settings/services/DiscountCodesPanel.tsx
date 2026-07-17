@@ -37,7 +37,7 @@ export function DiscountCodesPanel({ discounts }: { discounts: Discount[] }) {
                   </span>
                 </div>
                 <button className="text-[12px] font-semibold text-ih-primary hover:underline">
-                  {m.settings_common_edit()}
+                  {m.common_edit()}
                 </button>
               </div>
             ))}

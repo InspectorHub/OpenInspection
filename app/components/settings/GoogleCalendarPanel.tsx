@@ -78,7 +78,7 @@ export function GoogleCalendarPanel({
               disabled={savingOAuthMode || oauthMode === googleOAuthMode}
               className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-50"
             >
-              {savingOAuthMode ? m.settings_savebar_saving() : m.settings_gcal_save_oauth_mode()}
+              {savingOAuthMode ? m.common_saving() : m.settings_gcal_save_oauth_mode()}
             </button>
           </Form>
         </div>
@@ -133,7 +133,7 @@ export function GoogleCalendarPanel({
                 disabled={savingCalendarSecrets}
                 className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
               >
-                {savingCalendarSecrets ? m.settings_savebar_saving() : m.settings_gcal_save_credentials()}
+                {savingCalendarSecrets ? m.common_saving() : m.settings_gcal_save_credentials()}
               </button>
             </div>
           </Form>

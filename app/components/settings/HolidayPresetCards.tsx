@@ -104,7 +104,7 @@ export function HolidayRegionPickerModal({
           onClick={onCancel}
           className="text-[12px] font-bold text-ih-fg-3 hover:underline"
         >
-          {m.settings_holiday_region_cancel()}
+          {m.common_cancel()}
         </button>
       </div>
     </div>

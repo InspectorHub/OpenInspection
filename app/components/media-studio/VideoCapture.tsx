@@ -213,7 +213,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={m.media_video_add_aria()}>
-      <button type="button" aria-label={m.media_common_close()} className="absolute inset-0 bg-ih-backdrop" onClick={busy ? undefined : onClose} />
+      <button type="button" aria-label={m.common_close()} className="absolute inset-0 bg-ih-backdrop" onClick={busy ? undefined : onClose} />
       <div data-testid="video-capture" className="relative w-full max-w-md rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover">
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-[15px] font-bold text-ih-fg-1">{m.media_video_add_heading()}</h2>
@@ -223,7 +223,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
             disabled={busy}
             className="min-h-[44px] min-w-[44px] rounded-lg px-3 text-[13px] font-bold text-ih-fg-3 hover:text-ih-fg-1 disabled:opacity-40"
           >
-            {m.media_common_cancel()}
+            {m.common_cancel()}
           </button>
         </div>
 

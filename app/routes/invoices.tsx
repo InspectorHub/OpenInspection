@@ -210,7 +210,7 @@ function NewInvoiceModal({
         <div className="flex justify-end gap-3 pt-2 border-t border-ih-border">
           <button type="button" onClick={onClose} disabled={busy}
             className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
-            {m.invoices_new_cancel()}
+            {m.common_cancel()}
           </button>
           <button type="submit" disabled={busy}
             className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
@@ -318,7 +318,7 @@ export default function InvoicesPage() {
                         disabled={busy}
                         className="px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-50"
                       >
-                        {m.invoices_cancel()}
+                        {m.common_cancel()}
                       </button>
                     </div>
                   );

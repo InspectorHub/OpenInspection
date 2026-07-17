@@ -179,7 +179,7 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                                         disabled={!!busy}
                                         className="text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed"
                                     >
-                                        {copiedId === s.id ? m.agreement_signers_copied() : m.agreement_signers_copy()}
+                                        {copiedId === s.id ? m.common_copied() : m.agreement_signers_copy()}
                                     </button>
                                 )}
                             </div>

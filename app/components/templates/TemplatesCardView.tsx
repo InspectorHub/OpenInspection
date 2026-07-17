@@ -87,13 +87,13 @@ export function TemplatesCardView({
               </div>
               <div className="flex items-center gap-3 pt-1 border-t border-ih-border mt-auto">
                 <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary hover:text-ih-primary transition-colors">
-                  {m.templates_action_edit()}
+                  {m.common_edit()}
                 </Link>
                 <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary transition-colors">
                   {m.templates_action_duplicate()}
                 </button>
                 <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-4 hover:text-ih-bad-fg transition-colors ml-auto">
-                  {m.templates_action_delete()}
+                  {m.common_delete()}
                 </button>
               </div>
             </div>

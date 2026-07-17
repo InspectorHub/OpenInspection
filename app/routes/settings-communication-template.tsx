@@ -115,7 +115,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
               <input type="hidden" name="intent" value="reset" />
               <span className="text-[12px] text-ih-fg-3">{m.settings_comms_template_reset_confirm()}</span>
               <button type="submit" className="h-8 px-3 rounded-md bg-ih-bad-bg text-ih-bad-fg border border-ih-bad text-[12px] font-bold">{m.settings_comms_template_reset_button()}</button>
-              <button type="button" onClick={() => setConfirmReset(false)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] text-ih-fg-2">{m.settings_cancel()}</button>
+              <button type="button" onClick={() => setConfirmReset(false)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] text-ih-fg-2">{m.common_cancel()}</button>
             </Form>
           ) : (
             <button type="button" onClick={() => setConfirmReset(true)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">{m.settings_comms_template_reset_default()}</button>
@@ -175,7 +175,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
 
           <div className="flex justify-end pt-2">
             <button type="submit" disabled={saving} className="h-9 px-5 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
-              {saving ? m.settings_saving() : m.settings_comms_template_save_changes()}
+              {saving ? m.common_saving() : m.settings_comms_template_save_changes()}
             </button>
           </div>
         </div>

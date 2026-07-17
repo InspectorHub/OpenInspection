@@ -86,9 +86,9 @@ export function DefectCategoryEditor({
       title={editing ? m.defect_category_editor_title_edit() : m.defect_category_editor_title_new()}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>{m.defect_category_editor_cancel()}</Button>
+          <Button variant="secondary" onClick={onClose}>{m.common_cancel()}</Button>
           <Button variant="primary" onClick={save} disabled={saving || (!!error && error !== fetcher.data?.error)}>
-            {saving ? m.defect_category_editor_saving() : editing ? m.defect_category_editor_save_changes() : m.defect_category_editor_create()}
+            {saving ? m.common_saving() : editing ? m.defect_category_editor_save_changes() : m.defect_category_editor_create()}
           </Button>
         </>
       }

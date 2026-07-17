@@ -90,9 +90,9 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
     <Modal open={open} onClose={onClose} title={editing ? m.comment_editor_title_edit() : m.comment_editor_title_new()} size="lg"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>{m.comment_editor_cancel()}</Button>
+          <Button variant="secondary" onClick={onClose}>{m.common_cancel()}</Button>
           <Button variant="primary" onClick={save} disabled={saving || !!error}>
-            {saving ? m.comment_editor_saving() : editing ? m.comment_editor_save_changes() : m.comment_editor_add()}
+            {saving ? m.common_saving() : editing ? m.comment_editor_save_changes() : m.comment_editor_add()}
           </Button>
         </>
       }>

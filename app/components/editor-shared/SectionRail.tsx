@@ -283,7 +283,7 @@ export function SectionRail({
      tone="danger"
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onDeleteSection(section.id); }}
      >
-     {m.editor_shared_menu_delete()}
+     {m.common_delete()}
      </MenuItem>
     </>
     )}

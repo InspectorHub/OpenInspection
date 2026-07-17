@@ -331,7 +331,7 @@ export default function DocumentsSection({
                           onClick={() => setPendingDeleteId(item.id)}
                           className="shrink-0 rounded-md px-2 py-1 text-[12px] font-bold text-ih-bad-fg transition-colors hover:bg-ih-bad-bg"
                         >
-                          {m.documents_delete()}
+                          {m.common_delete()}
                         </button>
                       )}
                     </li>
@@ -347,7 +347,7 @@ export default function DocumentsSection({
         open={pendingDeleteId != null}
         title={m.documents_delete_title()}
         message={m.documents_delete_message()}
-        confirmLabel={m.documents_delete()}
+        confirmLabel={m.common_delete()}
         onConfirm={() => {
           if (pendingDeleteId != null) onDelete(pendingDeleteId);
           setPendingDeleteId(null);

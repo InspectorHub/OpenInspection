@@ -144,7 +144,6 @@
   "oauth_authorize_aria_read": "Read {module}",
   "oauth_authorize_aria_write": "Write {module}",
   "oauth_authorize_scope_note": "Ticking Write also grants Read. Access is limited to your role and to what {clientName} requested.",
-  "oauth_authorize_cancel": "Cancel",
   "oauth_authorize_submit_pending": "Authorizing…",
   "oauth_authorize_submit": "Authorize"
 }

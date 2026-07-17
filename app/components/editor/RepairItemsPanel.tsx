@@ -89,7 +89,7 @@ export function RepairItemsPanel({
                   onClick={() => onDetach(a.recommendationId)}
                   aria-label={m.editor_repair_remove_aria({ name: a.summarySnapshot })}
                 >
-                  {m.editor_repair_remove()}
+                  {m.common_remove()}
                 </Button>
               </li>
             );

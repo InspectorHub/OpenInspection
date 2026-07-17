@@ -158,8 +158,8 @@ export default function RepairItemsPage() {
                 )}
               </div>
               <div className="mt-3 flex gap-3">
-                <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary hover:underline font-bold">{m.library_action_edit()}</button>
-                <button onClick={() => setPendingDelete(it)} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.library_action_delete()}</button>
+                <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary hover:underline font-bold">{m.common_edit()}</button>
+                <button onClick={() => setPendingDelete(it)} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.common_delete()}</button>
               </div>
             </Card>
           ))}
@@ -196,8 +196,8 @@ export default function RepairItemsPage() {
               </Field>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">{m.repair_items_cancel()}</button>
-              <button onClick={() => submit(form.id ? "update" : "create")} disabled={!form.name.trim() || !form.defaultRepairSummary.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50">{m.repair_items_save()}</button>
+              <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">{m.common_cancel()}</button>
+              <button onClick={() => submit(form.id ? "update" : "create")} disabled={!form.name.trim() || !form.defaultRepairSummary.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50">{m.common_save()}</button>
             </div>
           </div>
         </div>

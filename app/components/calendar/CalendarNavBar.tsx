@@ -39,7 +39,7 @@ export function CalendarNavBar({
         <button
           type="button"
           onClick={onNext}
-          aria-label={m.calendar_nav_next()}
+          aria-label={m.common_next()}
           className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
         >
           <Icon name="chevR" size={18} />

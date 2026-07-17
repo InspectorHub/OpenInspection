@@ -31,8 +31,6 @@
   "booking_placeholder_email": "jane@example.com",
   "booking_wizard_heading": "Schedule an inspection",
   "booking_wizard_subtitle": "Tell us about the property and pick a time that works.",
-  "booking_wizard_back": "Back",
-  "booking_wizard_continue": "Continue",
   "booking_wizard_submit": "Request Inspection",
   "booking_submitting": "Submitting...",
   "booking_powered_by": "Powered by OpenInspection",

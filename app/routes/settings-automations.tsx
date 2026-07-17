@@ -169,7 +169,7 @@ export default function SettingsAutomations() {
           <input id="reviewUrl" name="reviewUrl" type="url" defaultValue={reviewUrl} placeholder={m.settings_automations_review_placeholder()}
             className="flex-1 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1" />
           <button type="submit" disabled={nav.state !== "idle"}
-            className="h-9 px-4 rounded-md bg-ih-bg-muted text-ih-fg-1 font-semibold text-[13px] border border-ih-border">{m.settings_save()}</button>
+            className="h-9 px-4 rounded-md bg-ih-bg-muted text-ih-fg-1 font-semibold text-[13px] border border-ih-border">{m.common_save()}</button>
         </div>
       </Form>
 
@@ -188,7 +188,7 @@ export default function SettingsAutomations() {
                   </div>
                   <p className="text-[11px] text-ih-fg-3 mt-0.5">{TRIGGER_LABELS[rule.trigger] || rule.trigger} &rarr; {rule.recipient}</p>
                 </div>
-                <button onClick={() => setEditing(rule)} className="text-[12px] text-ih-primary font-semibold">{m.settings_edit()}</button>
+                <button onClick={() => setEditing(rule)} className="text-[12px] text-ih-primary font-semibold">{m.common_edit()}</button>
                 <Form method="post" className="shrink-0">
                   <input type="hidden" name="intent" value="toggle" />
                   <input type="hidden" name="id" value={rule.id} />
@@ -280,14 +280,14 @@ function AutomationEditor({
                 fetcher.submit({ intent: "delete", id: rule.id }, { method: "post" });
               }}
               className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-bad-fg disabled:opacity-50">
-              {confirmDelete ? m.settings_automations_confirm_delete() : m.settings_delete()}
+              {confirmDelete ? m.settings_automations_confirm_delete() : m.common_delete()}
             </button>
           )}
           <div className="flex-1" />
-          <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-fg-2">{m.settings_cancel()}</button>
+          <button type="button" onClick={onClose} className="h-9 px-4 rounded-md border border-ih-border text-[13px] text-ih-fg-2">{m.common_cancel()}</button>
           <button type="submit" form="automation-editor-form" disabled={submitting || saveBlocked}
             title={noChannel ? m.settings_automations_pick_channel_title() : undefined}
-            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] disabled:opacity-50">{m.settings_save()}</button>
+            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] disabled:opacity-50">{m.common_save()}</button>
         </>
       }
     >

@@ -40,11 +40,11 @@ export function ContactsTable({
             align: "right",
             cell: (c) => (
               <>
-                <button onClick={() => { setEditContact(c); setModalOpen(true); }} className="text-ih-primary text-[12px] font-bold hover:underline mr-3">{m.contacts_table_edit()}</button>
+                <button onClick={() => { setEditContact(c); setModalOpen(true); }} className="text-ih-primary text-[12px] font-bold hover:underline mr-3">{m.common_edit()}</button>
                 <deleteFetcher.Form method="post" className="inline">
                   <input type="hidden" name="intent" value="delete" />
                   <input type="hidden" name="id" value={c.id} />
-                  <button type="submit" className="text-ih-bad-fg text-[12px] font-bold hover:underline">{m.contacts_table_delete()}</button>
+                  <button type="submit" className="text-ih-bad-fg text-[12px] font-bold hover:underline">{m.common_delete()}</button>
                 </deleteFetcher.Form>
               </>
             ),

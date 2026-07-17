@@ -194,7 +194,7 @@ export function SignCard({
                             disabled={submitting}
                             className="flex-1 h-10 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-3 text-sm font-semibold hover:bg-ih-bg-muted transition-all disabled:opacity-50"
                         >
-                            {m.checkout_sign_clear()}
+                            {m.common_clear()}
                         </button>
                         <button
                             type="button"

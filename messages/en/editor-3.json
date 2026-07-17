@@ -4,7 +4,6 @@
   "editor_sectionpicker_placeholder": "Jump to section...",
   "editor_sectionpicker_item_count": "{count} items",
   "editor_sectionpicker_no_match": "No sections match",
-
   "editor_siderail_close_panel": "Close panel",
   "editor_siderail_tab_preview": "Preview",
   "editor_siderail_tab_library": "Library",
@@ -16,17 +15,14 @@
   "editor_siderail_filtered_to": "Filtered to: {label}",
   "editor_siderail_photos_empty": "Open an inspection to browse photos.",
   "editor_siderail_download_title": "Download {name}",
-
   "editor_signmodal_title": "Inspector Signature",
   "editor_signmodal_body": "Sign this inspection. The signature will be saved and can be included in the published report.",
   "editor_signmodal_save": "Save signature",
   "editor_signmodal_failed": "Failed to save signature. Please try again.",
-
   "editor_speedmode_aria_label": "Speed-rate inspection items",
   "editor_speedmode_exit": "Exit Speed Mode",
   "editor_speedmode_gesture_hint": "Swipe to navigate · Long-press to jump",
   "editor_speedmode_prev": "Prev",
-  "editor_speedmode_next": "Next",
   "editor_speedmode_footer_press": "Press",
   "editor_speedmode_footer_or": "or",
   "editor_speedmode_footer_exit": "to exit",
@@ -41,20 +37,14 @@
   "editor_speedmode_jumpto_title": "Jump to",
   "editor_speedmode_no_items": "No items",
   "editor_speedmode_sections_unavailable": "Sections list unavailable.",
-
-  "editor_speedmodeundotoast_undo": "Undo",
-
   "editor_tagchiprow_more": "+ more",
   "editor_tagchiprow_open_library_aria": "Open tag library",
-
   "editor_tagpicker_title": "Tags",
-
   "editor_unitprogress_summary_aria": "{completed} of {total} units complete",
   "editor_unitprogress_count": "{completed}/{total} units",
   "editor_unitprogress_status_complete": "complete",
   "editor_unitprogress_status_in_progress": "in progress",
   "editor_unitprogress_dot_title": "{label} — {status}",
-
   "editor_unitsmanager_title": "Units",
   "editor_unitsmanager_mode_heading": "Inspection mode",
   "editor_unitsmanager_mode_per_unit": "Per-unit",
@@ -65,9 +55,7 @@
   "editor_unitsmanager_switch_to_per_unit": "Switch to per-unit",
   "editor_unitsmanager_no_units": "No units yet. Add one below or bulk-create a set.",
   "editor_unitsmanager_new_unit_name": "New unit name",
-  "editor_unitsmanager_add": "Add",
   "editor_unitsmanager_bulk_create_heading": "Bulk create",
-  "editor_unitsmanager_cancel": "Cancel",
   "editor_unitsmanager_lossy_title": "Switch to tagged mode?",
   "editor_unitsmanager_switch_flatten": "Switch & flatten",
   "editor_unitsmanager_lossy_body_1": "This flattens every unit's findings back into the common scope and",
@@ -97,8 +85,6 @@
   "editor_unitsmanager_csv_hint": "One unit per line: label,floor",
   "editor_unitsmanager_row_one": "{count} row",
   "editor_unitsmanager_row_many": "{count} rows",
-
-  "editor_structuredelete_cancel": "Cancel",
   "editor_structuredelete_noun_section": "section",
   "editor_structuredelete_noun_item": "item",
   "editor_structuredelete_title": "Delete {noun} “{title}”?",
@@ -112,7 +98,6 @@
   "editor_structuredelete_notes_many": "notes",
   "editor_structuredelete_photos_one": "photo",
   "editor_structuredelete_photos_many": "photos",
-
   "editor_unsavedchanges_title": "Unsaved changes",
   "editor_unsavedchanges_stay": "Stay",
   "editor_unsavedchanges_leave": "Leave",

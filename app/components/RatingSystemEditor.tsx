@@ -177,9 +177,9 @@ export function RatingSystemEditor({
       size="xl"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>{m.rating_editor_cancel()}</Button>
+          <Button variant="secondary" onClick={onClose}>{m.common_cancel()}</Button>
           <Button variant="primary" onClick={save} disabled={saving || (!!error && error !== fetcher.data?.error)}>
-            {saving ? m.rating_editor_saving() : editing ? m.rating_editor_save_changes() : m.rating_editor_create()}
+            {saving ? m.common_saving() : editing ? m.rating_editor_save_changes() : m.rating_editor_create()}
           </Button>
         </>
       }

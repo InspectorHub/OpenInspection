@@ -60,7 +60,7 @@ export function BatchActionBar({
         {m.editor_batch_select_all()}
       </Button>
       <Button variant="link" size="sm" onClick={onClear}>
-        {m.editor_batch_clear()}
+        {m.common_clear()}
       </Button>
 
       <div className="w-px h-4 bg-ih-border flex-shrink-0" aria-hidden="true" />

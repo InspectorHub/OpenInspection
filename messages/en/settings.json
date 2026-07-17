@@ -1,7 +1,6 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "settings_crumb_settings": "Settings",
-
   "settings_hub_section_personal": "Personal",
   "settings_hub_section_team_company": "Team & company",
   "settings_hub_section_workflow_integrations": "Workflow & integrations",
@@ -45,9 +44,7 @@
   "settings_hub_compliance_desc": "GDPR retention window, erasure request records.",
   "settings_hub_usage_title": "Usage",
   "settings_hub_usage_desc": "SMS, email, and storage this account has used.",
-
   "settings_error_save_failed": "Save failed",
-
   "settings_profile_crumb": "Profile",
   "settings_profile_subtitle": "Inspector identity that appears on every report you generate.",
   "settings_profile_flash_saved": "Profile saved.",
@@ -85,7 +82,6 @@
   "settings_profile_error_no_signature": "No signature data provided",
   "settings_profile_error_no_photo": "No valid photo provided",
   "settings_profile_error_upload_failed": "Upload failed",
-
   "settings_security_crumb": "Account & Security",
   "settings_security_subtitle": "Password, two-factor authentication, account data, and security settings.",
   "settings_security_flash_saved": "Saved.",
@@ -103,7 +99,6 @@
   "settings_security_delete_button": "Delete my account",
   "settings_security_delete_confirm_label": "Retype your email to confirm",
   "settings_security_delete_confirm_placeholder": "your@email.com",
-  "settings_security_delete_cancel": "Cancel",
   "settings_security_delete_confirm_button": "Permanently delete",
   "settings_security_error_password_change_failed": "Password change failed",
   "settings_security_error_turnstile_save_failed": "Failed to save Turnstile key.",
@@ -112,7 +107,6 @@
   "settings_security_error_delete_failed": "Account deletion failed.",
   "settings_security_delete_success_message": "Account deleted.",
   "settings_security_error_unknown_action": "Unknown action",
-
   "settings_workspace_crumb": "Company",
   "settings_workspace_subtitle": "Branding, report theme, and referral sources.",
   "settings_workspace_flash_saved": "Company settings saved.",
@@ -152,7 +146,6 @@
   "settings_workspace_pdf_license_desc": "Includes the inspector license number on the report PDF.",
   "settings_workspace_save_button": "Save Company",
   "settings_workspace_error_no_logo": "No valid logo provided",
-
   "settings_data_meta_title": "Data - Settings - OpenInspection",
   "settings_data_crumb": "Data import / export",
   "settings_data_subtitle": "Download your data or import contacts from other platforms.",
@@ -169,7 +162,6 @@
   "settings_data_cleanup_subtitle": "Remove test data or request a full GDPR data export.",
   "settings_data_cleanup_delete_test": "Delete test data",
   "settings_data_cleanup_gdpr_export": "Request GDPR export",
-
   "settings_usage_meta_title": "Usage - Settings - OpenInspection",
   "settings_usage_crumb": "Usage",
   "settings_usage_subtitle_free": "What this account has used on the free plan. Storage is measured once a day.",
@@ -187,7 +179,6 @@
   "settings_usage_cap_reached": "Free plan limit reached",
   "settings_usage_cap_remaining": "{count} left on the free plan",
   "settings_usage_byo": "via your own account: {count}",
-
   "settings_team_meta_title": "Team - OpenInspection",
   "settings_team_crumb": "Team",
   "settings_team_heading": "Workspace Team",
@@ -206,7 +197,6 @@
   "settings_team_status_active": "Active",
   "settings_team_status_pending": "Pending",
   "settings_team_col_last_active": "Last Active",
-  "settings_team_edit_button": "Edit",
   "settings_team_roles_heading": "Roles",
   "settings_team_role_owner_name": "Owner",
   "settings_team_role_owner_desc": "Account holder. Full access, including billing.",

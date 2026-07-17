@@ -33,8 +33,8 @@ export function AvatarCropper({ sourceUrl, onCancel, onSave }: AvatarCropperProp
           <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="flex-1 accent-ih-primary" aria-label={m.media_common_zoom()} />
         </div>
         <div className="flex items-center justify-end gap-3">
-          <button type="button" onClick={onCancel} className="h-9 px-4 rounded-md border border-ih-border text-ih-fg-2 text-[13px] font-bold hover:bg-ih-bg-muted">{m.media_common_cancel()}</button>
-          <button type="button" onClick={handleSave} disabled={busy || !pixels} className="h-9 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 disabled:opacity-50">{busy ? m.media_common_saving() : m.media_avatar_save()}</button>
+          <button type="button" onClick={onCancel} className="h-9 px-4 rounded-md border border-ih-border text-ih-fg-2 text-[13px] font-bold hover:bg-ih-bg-muted">{m.common_cancel()}</button>
+          <button type="button" onClick={handleSave} disabled={busy || !pixels} className="h-9 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 disabled:opacity-50">{busy ? m.common_saving() : m.media_avatar_save()}</button>
         </div>
       </div>
     </div>

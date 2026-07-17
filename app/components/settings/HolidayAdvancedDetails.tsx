@@ -139,7 +139,7 @@ export function HolidayAdvancedDetails({
                   onClick={() => onRemoveCustom(h.id)}
                   className="text-[12px] font-bold text-ih-bad-fg hover:underline"
                 >
-                  {m.settings_holiday_custom_remove()}
+                  {m.common_remove()}
                 </button>
               </li>
             ))}
@@ -177,7 +177,7 @@ export function HolidayAdvancedDetails({
               disabled={saving || !newDate || !newName.trim()}
               className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-50"
             >
-              {m.settings_holiday_custom_add()}
+              {m.common_add()}
             </button>
           </div>
         </div>

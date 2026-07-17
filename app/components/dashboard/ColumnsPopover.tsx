@@ -33,7 +33,7 @@ export function ColumnsPopover({
       <div className="w-64 p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-[13px] font-bold text-ih-fg-1">{m.dashboard_columns_title()}</h2>
-          <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none" aria-label={m.dashboard_columns_close()}>
+          <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none" aria-label={m.common_close()}>
             &times;
           </button>
         </div>

@@ -77,7 +77,7 @@ export function CustomDefectForm({
           size="sm"
           onClick={onCancel}
         >
-          {m.editor_common_cancel()}
+          {m.common_cancel()}
         </Button>
         <Button
           variant="primary"

@@ -120,7 +120,7 @@ export function VersionCompare({
                         disabled={busy}
                         className="px-3 py-1.5 rounded-md text-xs font-bold border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
                     >
-                        {m.editor_collab_close()}
+                        {m.common_close()}
                     </button>
                 </header>
 
@@ -232,7 +232,7 @@ export function VersionCompare({
                         disabled={busy}
                         className="h-10 px-4 rounded-md text-[12px] font-bold border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
                     >
-                        {m.editor_collab_done()}
+                        {m.common_done()}
                     </button>
                     {onRestoreWhole && (
                         <button

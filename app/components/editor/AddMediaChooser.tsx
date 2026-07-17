@@ -14,7 +14,7 @@ export function AddMediaChooser({ onClose, onTakePhoto, onAddFromLibrary, onPick
  <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={m.editor_addmedia_title()}>
   <button
    type="button"
-   aria-label={m.editor_addmedia_close()}
+   aria-label={m.common_close()}
    className="absolute inset-0 bg-ih-backdrop"
    onClick={onClose}
   />

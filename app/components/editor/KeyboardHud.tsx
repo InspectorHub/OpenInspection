@@ -37,7 +37,7 @@ export function KeyboardHud({ onClose }: { onClose: () => void }) {
       { key: "Cmd+1", label: m.editor_hud_view_three_pane() },
       { key: "Cmd+2", label: m.editor_hud_view_focus() },
       { key: "Cmd+3", label: m.editor_header_preview() },
-      { key: "Cmd+S", label: m.editor_hud_view_save() },
+      { key: "Cmd+S", label: m.common_save() },
       { key: "Cmd+Shift+P", label: m.editor_header_publish() },
     ]},
   ];
@@ -64,7 +64,7 @@ export function KeyboardHud({ onClose }: { onClose: () => void }) {
             <h2 className="text-base font-bold text-ih-fg-1">{m.editor_shortcuts_heading()}</h2>
             <p className="text-xs text-ih-fg-3 mt-0.5">{m.editor_hud_press()}<kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">?</kbd>{m.editor_hud_toggle()}<kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">Esc</kbd>{m.editor_hud_close()}</p>
           </div>
-          <IconButton onClick={onClose} aria-label={m.editor_close()} size="sm">&times;</IconButton>
+          <IconButton onClick={onClose} aria-label={m.common_close()} size="sm">&times;</IconButton>
         </header>
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {COLUMNS.map((col) => (

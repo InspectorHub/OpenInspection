@@ -133,7 +133,7 @@ export function SendAgreementModal({
             size="lg"
             footer={
                 <>
-                    <Button variant="secondary" onClick={onClose} disabled={busy}>{m.agreement_send_cancel()}</Button>
+                    <Button variant="secondary" onClick={onClose} disabled={busy}>{m.common_cancel()}</Button>
                     <Button variant="primary" onClick={submit} disabled={busy}>
                         {busy ? m.agreement_send_pending() : m.agreement_send_submit()}
                     </Button>

@@ -132,7 +132,7 @@ export default function CommentsPage() {
                     onClick={() => { setEditing(c); setEditorOpen(true); }}
                     className="text-[11px] font-bold text-ih-primary hover:text-ih-primary-600"
                   >
-                    {m.library_action_edit()}
+                    {m.common_edit()}
                   </button>
                 </div>
               </Card>

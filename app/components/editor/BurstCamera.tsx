@@ -198,7 +198,7 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
 
         {captures.length > 0 ? (
           <Button type="button" variant="primary" onClick={commit} className="rounded-full px-5 py-2.5 shadow-ih-popover" data-testid="burst-done">
-            {uploading ? m.editor_burst_uploading() : m.editor_burst_done()}
+            {uploading ? m.editor_burst_uploading() : m.common_done()}
           </Button>
         ) : <div className="w-20" />}
       </div>

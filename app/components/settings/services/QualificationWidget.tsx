@@ -112,7 +112,7 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
             onClick={() => setOpen(true)}
             className="text-[12px] font-semibold text-ih-primary hover:underline"
           >
-            {m.settings_common_edit()}
+            {m.common_edit()}
           </button>
           {saved && <span className="text-[12px] text-ih-ok-fg font-bold">{m.settings_holiday_saved()}</span>}
         </div>
@@ -152,14 +152,14 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
               disabled={saving}
               className="h-7 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
             >
-              {saving ? m.settings_savebar_saving() : m.settings_common_save()}
+              {saving ? m.common_saving() : m.common_save()}
             </button>
             <button
               type="button"
               onClick={handleCancel}
               className="h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card transition-colors"
             >
-              {m.settings_holiday_region_cancel()}
+              {m.common_cancel()}
             </button>
           </div>
         </div>

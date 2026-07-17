@@ -34,7 +34,7 @@ export function SpeedModeUndoToast({ pending, onDismiss, durationMs = 3000 }: Sp
                 onClick={() => { pending.onUndo(); onDismiss(); }}
                 className="px-2 py-1 hover:bg-ih-bg-muted rounded"
             >
-                {m.editor_speedmodeundotoast_undo()}
+                {m.common_undo()}
             </Button>
         </div>
     );

@@ -32,7 +32,7 @@ export function SeatLimitPanel({
       </div>
       <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-ih-border">
         <button onClick={onClose} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
-          {m.modal_seatlimit_close()}
+          {m.common_close()}
         </button>
         {billingUrl && (
           <a

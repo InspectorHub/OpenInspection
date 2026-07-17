@@ -38,13 +38,13 @@ export function AddSectionPromptModal({
             variant="ghost"
             onClick={onCancel}
           >
-            {m.editor_common_cancel()}
+            {m.common_cancel()}
           </Button>
           <Button
             variant="primary"
             onClick={onConfirm}
           >
-            {m.editor_addsection_confirm()}
+            {m.common_add()}
           </Button>
         </>
       }

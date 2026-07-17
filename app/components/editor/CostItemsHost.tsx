@@ -58,7 +58,7 @@ export function CostItemsHost({
   return (
     <Drawer open={open} onClose={onClose} title={m.editor_cost_items_title()} wide>
       {data === null ? (
-        <p className="text-[12px] text-ih-fg-3" aria-busy="true">{m.editor_cost_loading()}</p>
+        <p className="text-[12px] text-ih-fg-3" aria-busy="true">{m.common_loading()}</p>
       ) : (
         <CostItemsPanel inspectionId={inspectionId} items={data.items} reserveEnabled={data.reserveEnabled} />
       )}

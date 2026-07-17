@@ -321,7 +321,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
             disabled={savingManagedProvider}
             className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
           >
-            {savingManagedProvider ? m.settings_savebar_saving() : m.settings_mcw_save_carrier()}
+            {savingManagedProvider ? m.common_saving() : m.settings_mcw_save_carrier()}
           </button>
         </div>
       </Form>

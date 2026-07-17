@@ -37,7 +37,7 @@ export function SaveTemplateModal({ mode, name, onChangeName, onConfirm, onCance
             variant="ghost"
             onClick={onCancel}
           >
-            {m.editor_cancel()}
+            {m.common_cancel()}
           </Button>
           <Button
             variant="primary"

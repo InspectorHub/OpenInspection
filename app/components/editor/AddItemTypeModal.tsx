@@ -57,7 +57,7 @@ export function AddItemTypeModal({ open, onConfirm, onCancel }: AddItemTypeModal
             variant="ghost"
             onClick={onCancel}
           >
-            {m.editor_common_cancel()}
+            {m.common_cancel()}
           </Button>
           <Button
             variant="primary"

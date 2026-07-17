@@ -3,14 +3,8 @@
   "settings_crumb_root": "Settings",
   "settings_comms_crumb": "Communication",
   "settings_integrations_crumb": "Integrations",
-  "settings_cancel": "Cancel",
-  "settings_save": "Save",
-  "settings_saving": "Saving…",
-  "settings_edit": "Edit",
-  "settings_delete": "Delete",
   "settings_send": "Send",
   "settings_sending": "Sending…",
-  "settings_loading": "Loading…",
   "settings_flash_saved": "Settings saved.",
   "settings_flash_saved_short": "Saved.",
   "settings_channel_email": "Email",
@@ -18,7 +12,6 @@
   "settings_connection_test_failed": "Connection test failed.",
   "settings_unknown_action": "Unknown action",
   "settings_error_generic": "An error occurred.",
-
   "settings_comms_meta_title": "Communication - Settings - OpenInspection",
   "settings_comms_intro": "Configure email delivery, templates, and calendar sync.",
   "settings_comms_email_save_error": "Failed to save email settings.",
@@ -51,7 +44,6 @@
   "settings_comms_manage_templates_link": "Manage templates",
   "settings_comms_templates_count": "{count} templates · click to customize",
   "settings_comms_no_templates": "No email templates available.",
-
   "settings_comms_template_meta_title": "{name} - Communication - OpenInspection",
   "settings_comms_template_meta_fallback": "Template",
   "settings_comms_template_reset_error": "Failed to reset.",
@@ -64,7 +56,6 @@
   "settings_comms_template_variables_hint": "Variables — click to insert",
   "settings_comms_template_signature_desc": "Your email signature — set it in Settings → Profile",
   "settings_comms_template_save_changes": "Save changes",
-
   "settings_msgtpl_meta_title": "Message Templates - Settings - OpenInspection",
   "settings_msgtpl_crumb": "Templates",
   "settings_msgtpl_create_error": "Failed to create template.",
@@ -116,7 +107,6 @@
   "settings_msgtpl_optin_desc_after": "under SMS delivery. Tenants using BYO Twilio manage disclosure copy there.",
   "settings_msgtpl_stopstart_heading": "STOP / START / HELP",
   "settings_msgtpl_stopstart_desc": "Inbound opt-out (STOP), opt-in (START), and help (HELP) keywords are handled automatically by your SMS provider. When a recipient texts STOP, future messages are suppressed at the provider level. You do not need to handle these replies manually — they are recorded in the compliance log in Communication settings.",
-
   "settings_integrations_meta_title": "Integrations - Settings - OpenInspection",
   "settings_integrations_intro": "Connect OpenInspection to your other business tools.",
   "settings_integrations_stripe_save_error": "Failed to save Stripe keys.",
@@ -126,7 +116,6 @@
   "settings_integrations_video_mode_save_error": "Failed to save video mode.",
   "settings_integrations_video_config_save_error": "Failed to save integration configuration.",
   "settings_integrations_video_saved": "Video settings saved.",
-
   "settings_qbo_meta_title": "QuickBooks Integration - OpenInspection",
   "settings_qbo_crumb": "QuickBooks Online",
   "settings_qbo_save_error": "Failed to save QBO keys.",
@@ -165,7 +154,6 @@
   "settings_qbo_disconnect": "Disconnect",
   "settings_qbo_sync_errors": "Sync Errors ({count})",
   "settings_qbo_sync_errors_desc": "Check the sync error log for details. Errors will retry automatically on the next sync.",
-
   "settings_apps_meta_title": "Connected applications - Settings - OpenInspection",
   "settings_apps_crumb": "Connected applications",
   "settings_apps_all_modules": "All modules",
@@ -186,7 +174,6 @@
   "settings_apps_tenant_none": "No team members have authorized any applications.",
   "settings_apps_revoke_title": "Revoke access",
   "settings_apps_revoke_confirm": "Revoke \"{name}\"? The application will lose access immediately.",
-
   "settings_billing_crumb": "Billing",
   "settings_billing_intro_hosted": "Manage your subscription, seats, and invoices.",
   "settings_billing_intro_selfhost": "Self-hosted deployment — no subscription required.",
@@ -220,7 +207,6 @@
   "settings_billing_add_seat_heading": "Add a seat",
   "settings_billing_add_seat_before": "Add an inspector in",
   "settings_billing_team_link": "Team settings",
-
   "settings_compliance_meta_title": "Compliance - Settings - OpenInspection",
   "settings_compliance_crumb": "Compliance",
   "settings_compliance_retention_range_error": "Enter a whole number between {min} and {max}.",
@@ -243,7 +229,6 @@
   "settings_compliance_status_completed": "Completed",
   "settings_compliance_status_partial": "Partial",
   "settings_compliance_status_refused": "Refused",
-
   "settings_automations_meta_title": "Automations - Settings - OpenInspection",
   "settings_automations_crumb": "Automations",
   "settings_automations_intro": "Emails sent automatically when inspection events occur.",
@@ -275,7 +260,6 @@
   "settings_automations_edit_new_template": "Edit / New template",
   "settings_automations_save_failed": "Could not save — please try again.",
   "settings_automations_request_failed": "Request failed",
-
   "settings_advanced_crumb": "Advanced",
   "settings_advanced_intro": "Stripe payments, AI features, and integrations.",
   "settings_advanced_stripe_connect_error": "Failed to connect Stripe account.",

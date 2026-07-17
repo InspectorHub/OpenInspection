@@ -88,7 +88,7 @@ export function CsvImportModal({ open, onClose }: { open: boolean; onClose: () =
   } else if (step === "preview") {
     footer = (
       <>
-        <Button variant="secondary" onClick={() => setStep("upload")}>{m.contacts_csv_back()}</Button>
+        <Button variant="secondary" onClick={() => setStep("upload")}>{m.common_back()}</Button>
         <button
           onClick={() => {
             fetcher.submit({ intent: "csv-import", csvText }, { method: "post" });
@@ -105,12 +105,12 @@ export function CsvImportModal({ open, onClose }: { open: boolean; onClose: () =
       footer = (
         <>
           <Button variant="secondary" onClick={() => setStep("upload")}>{m.contacts_csv_back_to_file()}</Button>
-          <button onClick={onClose} className="px-5 py-2 rounded-lg bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest">{m.contacts_csv_close()}</button>
+          <button onClick={onClose} className="px-5 py-2 rounded-lg bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest">{m.common_close()}</button>
         </>
       );
     } else {
       footer = (
-        <button onClick={onClose} className="px-5 py-2 rounded-lg bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest">{m.contacts_csv_done()}</button>
+        <button onClick={onClose} className="px-5 py-2 rounded-lg bg-ih-bg-inverse text-ih-fg-inverse text-xs font-bold uppercase tracking-widest">{m.common_done()}</button>
       );
     }
   }

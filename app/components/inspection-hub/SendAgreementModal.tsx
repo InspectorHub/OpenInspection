@@ -38,7 +38,7 @@ export function SendAgreementModal({
             onClick={onClose}
             className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
           >
-            {m.hub_agreement_cancel()}
+            {m.common_cancel()}
           </button>
           <button
             type="submit"

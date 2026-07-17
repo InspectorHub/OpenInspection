@@ -270,7 +270,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 14L4 9l5-5M4 9h11a5 5 0 015 5v0a5 5 0 01-5 5H9" />
           </svg>
-          {m.media_common_undo()}
+          {m.common_undo()}
         </button>
         <button
           type="button"
@@ -281,7 +281,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 14l5-5-5-5M20 9H9a5 5 0 00-5 5v0a5 5 0 005 5h6" />
           </svg>
-          {m.media_signature_redo()}
+          {m.common_redo()}
         </button>
         <button
           type="button"
@@ -292,7 +292,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 7h14M10 7V5a1 1 0 011-1h2a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" />
           </svg>
-          {m.media_signature_clear()}
+          {m.common_clear()}
         </button>
       </div>
     </div>

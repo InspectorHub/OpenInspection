@@ -363,7 +363,7 @@ export function ConsentForm({
               value="1"
               className="flex-1 py-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 font-bold text-sm hover:bg-ih-bg-app transition-colors"
             >
-              {m.oauth_authorize_cancel()}
+              {m.common_cancel()}
             </button>
             <button
               type="submit"

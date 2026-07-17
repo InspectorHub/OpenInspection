@@ -46,7 +46,7 @@ export function IntegrationKeysPanel({ secrets, fieldError, saving }: Integratio
         <div className="flex justify-end pt-2 border-t border-ih-border">
           <button type="submit" disabled={saving}
             className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
-            {saving ? m.settings_savebar_saving() : m.settings_common_save()}
+            {saving ? m.common_saving() : m.common_save()}
           </button>
         </div>
       </Form>

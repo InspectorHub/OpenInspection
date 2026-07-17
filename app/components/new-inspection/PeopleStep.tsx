@@ -118,7 +118,7 @@ export function PeopleStep({
                 type="button"
                 onClick={() => setNewAgentMode(false)}
                 className="text-[12px] text-ih-fg-4 hover:text-ih-fg-2"
-              >{m.newinsp_people_cancel()}</button>
+              >{m.common_cancel()}</button>
             </div>
             <div>
               <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_people_name_label()}</label>
