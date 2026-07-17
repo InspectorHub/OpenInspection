@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Button, Popover } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 /**
  * Commercial PCA Phase U (Batch C2b) — a flat unit row as it arrives from
@@ -26,8 +27,6 @@ export interface BreadcrumbDropdownProps {
   onSelect: (unitId: string | null) => void;
 }
 
-const COMMON_LABEL = "Common";
-
 /**
  * The SCOPE SWITCHER. Renders a breadcrumb-style pill naming the active scope
  * ("Common" or a unit) and, on click, a Popover listing Common + every unit.
@@ -40,6 +39,8 @@ const COMMON_LABEL = "Common";
 export function BreadcrumbDropdown({ units, activeUnitId, onSelect }: BreadcrumbDropdownProps) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef<HTMLButtonElement>(null);
+
+  const COMMON_LABEL = m.editor_scope_common();
 
   const scopes = units
     .filter((u) => (u.kind ?? "unit") === "unit")
@@ -63,8 +64,8 @@ export function BreadcrumbDropdown({ units, activeUnitId, onSelect }: Breadcrumb
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label={`Inspection scope: ${activeLabel}. Switch scope`}
-        title="Switch inspection scope"
+        aria-label={m.editor_scope_switch_aria({ label: activeLabel })}
+        title={m.editor_scope_switch_title()}
         className="border-none bg-ih-bg-muted hover:bg-ih-border max-w-[200px]"
       >
         <svg className="w-3.5 h-3.5 text-ih-fg-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -77,10 +78,10 @@ export function BreadcrumbDropdown({ units, activeUnitId, onSelect }: Breadcrumb
       </Button>
 
       <Popover open={open} onClose={() => setOpen(false)} anchorRef={anchorRef} align="left">
-        <ul role="listbox" aria-label="Inspection scope" className="py-1 min-w-[220px] max-h-[60vh] overflow-y-auto">
+        <ul role="listbox" aria-label={m.editor_scope_listbox_aria()} className="py-1 min-w-[220px] max-h-[60vh] overflow-y-auto">
           <ScopeOption
             label={COMMON_LABEL}
-            hint="Shared / common areas"
+            hint={m.editor_scope_common_hint()}
             selected={activeUnitId === null}
             onSelect={() => choose(null)}
           />
@@ -91,7 +92,7 @@ export function BreadcrumbDropdown({ units, activeUnitId, onSelect }: Breadcrumb
             <ScopeOption
               key={u.id}
               label={u.name}
-              hint={u.type === "common" ? "Common area" : undefined}
+              hint={u.type === "common" ? m.editor_scope_common_area_hint() : undefined}
               selected={u.id === activeUnitId}
               onSelect={() => choose(u.id)}
             />

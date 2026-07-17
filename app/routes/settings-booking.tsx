@@ -20,6 +20,7 @@ import {
   type HolidayInternalPolicy,
   type HolidayPublicPolicy,
 } from "~/components/settings/HolidayClosedPanel";
+import { m } from "~/paraglide/messages";
 
 interface TenantConfig {
   conciergeReviewRequired: boolean;
@@ -52,7 +53,7 @@ function parseInternalPolicy(raw: unknown): HolidayInternalPolicy {
 }
 
 export function meta() {
-  return [{ title: "Online Booking - Settings - OpenInspection" }];
+  return [{ title: m.settings_booking_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -237,9 +238,9 @@ export default function SettingsBookingPage() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Online Booking" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_booking_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">
-        Company booking policies and the embeddable widget.
+        {m.settings_booking_intro()}
       </p>
 
       <ManageTeamSchedulesBar

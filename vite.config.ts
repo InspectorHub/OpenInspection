@@ -35,6 +35,13 @@ export default defineConfig({
       project: "./project.inlang",
       outdir: "./app/paraglide",
       strategy: ["cookie", "baseLocale"],
+      // One module per locale instead of one per message. On an SSR Worker every
+      // message ships regardless of per-message tree-shaking, so message-modules
+      // buys nothing here but emits ~2 files per message (thousands total), which
+      // makes importing `~/paraglide/messages` O(catalog-size) slow to resolve in
+      // the vitest/happy-dom test env (timeouts). locale-modules keeps it ~1 file
+      // per locale — fast import, same shipped output.
+      outputStructure: "locale-modules",
       emitTsDeclarations: true,
     }),
     tailwindcss(),

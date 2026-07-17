@@ -10,9 +10,10 @@ import { formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import type { McpGrant } from "../../server/lib/validations/mcp.schema";
 import { MODULE_GROUPS } from "../../server/lib/mcp/tag-catalog";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Connected applications - Settings - OpenInspection" }];
+  return [{ title: m.settings_apps_meta_title() }];
 }
 
 // ─── Loader ──────────────────────────────────────────────────────────────────
@@ -123,7 +124,7 @@ function ScopesSummary({ scopes }: { scopes: string[] }) {
   if (hasReadAll) {
     return (
       <span className="text-[12px] text-ih-fg-3">
-        All modules{hasWriteAll ? <> — <Badge kind="W" /></> : <> — <Badge kind="R" /></>}
+        {m.settings_apps_all_modules()}{hasWriteAll ? <> — <Badge kind="W" /></> : <> — <Badge kind="R" /></>}
       </span>
     );
   }
@@ -133,7 +134,7 @@ function ScopesSummary({ scopes }: { scopes: string[] }) {
   );
 
   if (covered.length === 0) {
-    return <span className="text-[12px] text-ih-fg-4">No modules</span>;
+    return <span className="text-[12px] text-ih-fg-4">{m.settings_apps_no_modules()}</span>;
   }
 
   return (
@@ -193,7 +194,7 @@ function GrantRow({
         </p>
         {showUser && (
           <p className="text-[12px] text-ih-fg-3">
-            {grant.userEmail ?? grant.userId ?? "Unknown user"}{" "}
+            {grant.userEmail ?? grant.userId ?? m.settings_apps_unknown_user()}{" "}
             {grant.userRole ? <span className="text-ih-fg-4">({grant.userRole})</span> : null}
           </p>
         )}
@@ -201,10 +202,10 @@ function GrantRow({
           <ScopesSummary scopes={grant.scopes} />
         </div>
         <p className="text-[11px] text-ih-fg-4 mt-1">
-          Created {formatUnixDate(grant.createdAt, locale, tz)}{" "}
+          {m.settings_apps_created({ date: formatUnixDate(grant.createdAt, locale, tz) })}{" "}
           {grant.expiresAt != null
-            ? `· Expires ${formatUnixDate(grant.expiresAt, locale, tz)}`
-            : "· No expiry"}
+            ? m.settings_apps_expires({ date: formatUnixDate(grant.expiresAt, locale, tz) })
+            : m.settings_apps_no_expiry()}
         </p>
       </div>
       <button
@@ -212,7 +213,7 @@ function GrantRow({
         onClick={onRequestRevoke}
         className="text-[12px] text-ih-bad-fg hover:underline font-bold shrink-0"
       >
-        Revoke
+        {m.settings_apps_revoke()}
       </button>
     </div>
   );
@@ -247,8 +248,8 @@ export default function SettingsConnectedApps() {
   if (data.mcpEnabled === false) {
     return (
       <div className="text-center py-16 bg-ih-bg-card border border-ih-border rounded-lg">
-        <p className="font-bold text-[14px] text-ih-fg-2">MCP is not enabled on this deployment.</p>
-        <p className="text-[12px] text-ih-fg-4 mt-1">Contact your administrator to enable remote MCP access.</p>
+        <p className="font-bold text-[14px] text-ih-fg-2">{m.settings_apps_mcp_disabled_title()}</p>
+        <p className="text-[12px] text-ih-fg-4 mt-1">{m.settings_apps_mcp_disabled_desc()}</p>
       </div>
     );
   }
@@ -260,24 +261,23 @@ export default function SettingsConnectedApps() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Connected applications" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_root(), href: "/settings" }, { label: m.settings_apps_crumb() }]} />
       <div>
         <p className="text-[13px] text-ih-fg-3">
-          MCP clients (e.g. Claude) you&apos;ve authorized to access your data. Revoke
-          access at any time.
+          {m.settings_apps_intro()}
         </p>
       </div>
 
       {/* Your applications */}
       <section>
         <h3 className="text-[13px] font-semibold text-ih-fg-3 uppercase tracking-wide mb-2">
-          Your applications
+          {m.settings_apps_your_heading()}
         </h3>
         {self.length === 0 ? (
           <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
-            <p className="font-bold text-[14px] text-ih-fg-2">No authorized applications yet.</p>
+            <p className="font-bold text-[14px] text-ih-fg-2">{m.settings_apps_none_title()}</p>
             <p className="text-[12px] text-ih-fg-4 mt-1">
-              When you authorize an MCP client (e.g. Claude) it will appear here.
+              {m.settings_apps_none_desc()}
             </p>
           </div>
         ) : (
@@ -299,23 +299,22 @@ export default function SettingsConnectedApps() {
       {showAdmin && (
         <section>
           <h3 className="text-[13px] font-semibold text-ih-fg-3 uppercase tracking-wide mb-2">
-            Tenant-wide authorized applications
+            {m.settings_apps_tenant_heading()}
           </h3>
           <p className="text-[12px] text-ih-fg-4 mb-3">
-            All MCP client authorizations across your team. You can revoke any
-            member&apos;s access.
+            {m.settings_apps_tenant_desc()}
           </p>
           {all!.length === 0 ? (
             <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
               <p className="font-bold text-[14px] text-ih-fg-2">
-                No team members have authorized any applications.
+                {m.settings_apps_tenant_none()}
               </p>
             </div>
           ) : (
             <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
               {Object.entries(
                 all!.reduce<Record<string, McpGrant[]>>((acc, grant) => {
-                  const key = grant.userEmail ?? grant.userId ?? "Unknown user";
+                  const key = grant.userEmail ?? grant.userId ?? m.settings_apps_unknown_user();
                   if (!acc[key]) acc[key] = [];
                   acc[key].push(grant);
                   return acc;
@@ -349,13 +348,13 @@ export default function SettingsConnectedApps() {
       {/* Confirm revoke dialog */}
       <ConfirmDialog
         open={!!pendingRevoke}
-        title="Revoke access"
+        title={m.settings_apps_revoke_title()}
         message={
           pendingRevoke
-            ? `Revoke "${pendingRevoke.grant.clientName ?? pendingRevoke.grant.clientId}"? The application will lose access immediately.`
+            ? m.settings_apps_revoke_confirm({ name: pendingRevoke.grant.clientName ?? pendingRevoke.grant.clientId })
             : ""
         }
-        confirmLabel="Revoke"
+        confirmLabel={m.settings_apps_revoke()}
         busy={revokeFetcher.state !== "idle"}
         onConfirm={() => {
           if (pendingRevoke) {

@@ -1,4 +1,5 @@
 import { IconButton } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export interface FullscreenToggleProps {
   active: boolean;
@@ -14,8 +15,8 @@ export function FullscreenToggle({ active, onToggle }: FullscreenToggleProps) {
   return (
     <IconButton
       selected={active}
-      title={active ? 'Exit fullscreen (Esc)' : 'Fullscreen (F)'}
-      aria-label={active ? 'Exit fullscreen' : 'Enter fullscreen'}
+      title={active ? m.editor_fullscreen_exit_title() : m.editor_fullscreen_enter_title()}
+      aria-label={active ? m.editor_fullscreen_exit_aria() : m.editor_fullscreen_enter_aria()}
       onClick={onToggle}
     >
       {active ? (

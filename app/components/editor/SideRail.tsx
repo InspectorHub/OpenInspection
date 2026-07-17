@@ -7,6 +7,7 @@ import { PhotoGallery } from "~/components/media-studio/PhotoGallery";
 import { CommentLibraryList } from "./CommentLibraryList";
 import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import type { EditorMode } from "../editor-shared/editor-mode";
+import { m } from "~/paraglide/messages";
 
 interface SideRailProps {
   mode: EditorMode;
@@ -34,10 +35,10 @@ interface SideRailProps {
 
 type TabId = "preview" | "library" | "photos";
 
-const TABS: Array<{ id: TabId; label: string; icon: string }> = [
-  { id: "preview", label: "Preview", icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
-  { id: "library", label: "Library", icon: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" },
-  { id: "photos", label: "Photos", icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" },
+const TABS: Array<{ id: TabId; label: () => string; icon: string }> = [
+  { id: "preview", label: () => m.editor_siderail_tab_preview(), icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" },
+  { id: "library", label: () => m.editor_siderail_tab_library(), icon: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" },
+  { id: "photos", label: () => m.editor_siderail_tab_photos(), icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" },
 ];
 
 export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, categoryColor }: SideRailProps) {
@@ -91,7 +92,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
         <div className="w-64 border-l border-ih-border bg-ih-bg-card flex flex-col overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-ih-border">
             <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-4 capitalize">{effectiveTab}</span>
-            <IconButton onClick={closePanel} aria-label="Close panel" size="sm" className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2">
+            <IconButton onClick={closePanel} aria-label={m.editor_siderail_close_panel()} size="sm" className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2">
               <Icon name="x" size={14} />
             </IconButton>
           </div>
@@ -114,7 +115,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
 
                   {Boolean(activeResult.notes) && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">Notes</span>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">{m.editor_siderail_notes()}</span>
                       <p className="text-[12px] text-ih-fg-2 mt-1 whitespace-pre-wrap leading-relaxed">{activeResult.notes as string}</p>
                     </div>
                   )}
@@ -140,7 +141,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                     }
                     return included.length > 0 ? (
                       <div>
-                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">Comments</span>
+                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">{m.editor_siderail_comments()}</span>
                         <div className="mt-1 space-y-1">
                           {included.map((c, i) => {
                             const isDefect = c.tabName === "defects";
@@ -173,7 +174,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                   {/* Photos */}
                   {Array.isArray(activeResult.photos) && (activeResult.photos as string[]).length > 0 && (
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">Photos</span>
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-ih-fg-4">{m.editor_siderail_tab_photos()}</span>
                       <div className="mt-1 grid grid-cols-3 gap-1">
                         {(activeResult.photos as string[]).map((key, i) => {
                           const url = `/api/inspections/${inspectionId}/photo?key=${encodeURIComponent(key)}`;
@@ -183,7 +184,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                               key={i}
                               href={withDownload(url)}
                               download={name}
-                              title={`Download ${name}`}
+                              title={m.editor_siderail_download_title({ name })}
                               className="block"
                             >
                               <img
@@ -199,19 +200,19 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                   )}
                 </div>
               ) : (
-                <p className="text-[13px] text-ih-fg-3 text-center py-8">Select an item to see a live preview.</p>
+                <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.editor_siderail_preview_empty()}</p>
               )
             )}
             {effectiveTab === "library" && (
               <div>
                 <input
                   type="text"
-                  placeholder="Search comments…"
+                  placeholder={m.editor_siderail_search_placeholder()}
                   onChange={(e) => onLibrarySearch?.(e.target.value)}
                   className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-app text-[12px] mb-2"
                 />
                 {activeItem && (
-                  <p className="text-[10px] text-ih-fg-4 mb-1.5">Filtered to: {activeItem.label}</p>
+                  <p className="text-[10px] text-ih-fg-4 mb-1.5">{m.editor_siderail_filtered_to({ label: activeItem.label })}</p>
                 )}
                 <CommentLibraryList
                   serverComments={serverComments ?? []}
@@ -225,7 +226,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
               inspectionId ? (
                 <PhotoGallery inspectionId={inspectionId} onSetCover={(p) => onGallerySetCover?.(p)} onAnnotate={(p) => onGalleryAnnotate?.(p)} />
               ) : (
-                <p className="text-[13px] text-ih-fg-3 text-center py-8">Open an inspection to browse photos.</p>
+                <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.editor_siderail_photos_empty()}</p>
               )
             )}
           </div>
@@ -243,7 +244,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                 ? "bg-ih-bg-card text-ih-primary shadow-ih-card border-l-2 border-ih-primary -ml-px"
                 : "text-ih-fg-4 hover:text-ih-fg-2"
             }`}
-            title={tab.label}
+            title={tab.label()}
           >
             {tab.id === "photos" && (photoCount ?? 0) > 0 && (
               <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-ih-primary text-white text-[9px] font-bold leading-none">
@@ -253,7 +254,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <path d={tab.icon} />
             </svg>
-            <span className="text-[8px] font-bold uppercase tracking-[0.1em]" style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>{tab.label}</span>
+            <span className="text-[8px] font-bold uppercase tracking-[0.1em]" style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}>{tab.label()}</span>
           </button>
         ))}
       </div>

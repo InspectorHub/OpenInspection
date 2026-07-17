@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { m } from "~/paraglide/messages";
 
 type Integration = {
   id: string;
@@ -9,52 +10,6 @@ type Integration = {
   color: string;
 };
 
-const INTEGRATIONS: Integration[] = [
-  {
-    id: "qbo",
-    name: "QuickBooks Online",
-    description: "Sync invoices, contacts, and payment status in real time.",
-    status: "available" as const,
-    href: "/settings/integrations/qbo",
-    color: "#2CA01C",
-  },
-  {
-    id: "gcal",
-    name: "Google Calendar",
-    description: "Two-way sync for inspection scheduling and availability.",
-    status: "available" as const,
-    color: "#4285F4",
-  },
-  {
-    id: "google-places",
-    name: "Google Places",
-    description: "Address autocomplete and property data enrichment.",
-    status: "available" as const,
-    color: "#34A853",
-  },
-  {
-    id: "resend",
-    name: "Resend",
-    description: "Transactional email delivery for reports and notifications.",
-    status: "connected" as const,
-    color: "#000000",
-  },
-  {
-    id: "zapier",
-    name: "Zapier",
-    description: "Connect to 5,000+ apps with no-code workflows.",
-    status: "available" as const,
-    color: "#FF4A00",
-  },
-  {
-    id: "gemini",
-    name: "Gemini AI",
-    description: "AI-powered inspection assistance and defect detection.",
-    status: "available" as const,
-    color: "#8E75B2",
-  },
-];
-
 const STATUS_STYLES = {
   connected:
     "bg-ih-ok-bg text-ih-ok-fg",
@@ -63,6 +18,51 @@ const STATUS_STYLES = {
 };
 
 export function IntegrationCardsGrid() {
+  const INTEGRATIONS: Integration[] = [
+    {
+      id: "qbo",
+      name: m.settings_integrations_qbo_name(),
+      description: m.settings_integrations_qbo_desc(),
+      status: "available" as const,
+      href: "/settings/integrations/qbo",
+      color: "#2CA01C",
+    },
+    {
+      id: "gcal",
+      name: m.settings_integrations_gcal_name(),
+      description: m.settings_integrations_gcal_desc(),
+      status: "available" as const,
+      color: "#4285F4",
+    },
+    {
+      id: "google-places",
+      name: m.settings_integrations_places_name(),
+      description: m.settings_integrations_places_desc(),
+      status: "available" as const,
+      color: "#34A853",
+    },
+    {
+      id: "resend",
+      name: m.settings_integrations_resend_name(),
+      description: m.settings_integrations_resend_desc(),
+      status: "connected" as const,
+      color: "#000000",
+    },
+    {
+      id: "zapier",
+      name: m.settings_integrations_zapier_name(),
+      description: m.settings_integrations_zapier_desc(),
+      status: "available" as const,
+      color: "#FF4A00",
+    },
+    {
+      id: "gemini",
+      name: m.settings_integrations_gemini_name(),
+      description: m.settings_integrations_gemini_desc(),
+      status: "available" as const,
+      color: "#8E75B2",
+    },
+  ];
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {INTEGRATIONS.map((i) => (
@@ -85,7 +85,7 @@ export function IntegrationCardsGrid() {
             <span
               className={`flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-widest ${STATUS_STYLES[i.status]}`}
             >
-              {i.status === "connected" ? "Connected" : "Available"}
+              {i.status === "connected" ? m.settings_conn_status_connected() : m.settings_integrations_status_available()}
             </span>
           </div>
           <p className="text-[12px] text-ih-fg-3 leading-relaxed flex-1">
@@ -96,14 +96,14 @@ export function IntegrationCardsGrid() {
               to={i.href}
               className="self-start px-3 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors inline-flex items-center"
             >
-              {i.status === "connected" ? "Configure" : "Connect"}
+              {i.status === "connected" ? m.settings_integrations_configure() : m.settings_integrations_connect()}
             </Link>
           ) : (
             <button
               disabled
               className="self-start px-3 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 opacity-50 cursor-not-allowed inline-flex items-center"
             >
-              {i.status === "connected" ? "Configure" : "Connect"}
+              {i.status === "connected" ? m.settings_integrations_configure() : m.settings_integrations_connect()}
             </button>
           )}
         </div>

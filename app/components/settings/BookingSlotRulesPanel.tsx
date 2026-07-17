@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useFetcher } from "react-router";
 import { SegmentedControl, Select } from "@core/shared-ui";
 import type { action } from "~/routes/settings-booking";
+import { m } from "~/paraglide/messages";
 
 export type BookingSlotMode = "open" | "fixed";
 export type BookingSlotIntervalMin = 15 | 30 | 60;
@@ -11,23 +12,23 @@ export interface BookingSlotRules {
   bookingSlotIntervalMin: BookingSlotIntervalMin;
 }
 
-const MODE_OPTIONS = [
-  { value: "fixed", label: "Fixed time slots" },
-  { value: "open", label: "Open schedule" },
-];
-
-const INTERVAL_OPTIONS = [
-  { value: "15", label: "15 minutes" },
-  { value: "30", label: "30 minutes" },
-  { value: "60", label: "60 minutes" },
-];
-
 function parseInterval(raw: string): BookingSlotIntervalMin {
   const n = Number(raw);
   return n === 15 || n === 60 ? n : 30;
 }
 
 export function BookingSlotRulesPanel({ initial }: { initial: BookingSlotRules }) {
+  const MODE_OPTIONS = [
+    { value: "fixed", label: m.settings_slotrules_mode_fixed() },
+    { value: "open", label: m.settings_slotrules_mode_open() },
+  ];
+
+  const INTERVAL_OPTIONS = [
+    { value: "15", label: m.settings_slotrules_interval_15() },
+    { value: "30", label: m.settings_slotrules_interval_30() },
+    { value: "60", label: m.settings_slotrules_interval_60() },
+  ];
+
   const fetcher = useFetcher<typeof action>();
   const [mode, setMode] = useState<BookingSlotMode>(initial.bookingSlotMode);
   const [intervalMin, setIntervalMin] = useState<BookingSlotIntervalMin>(
@@ -63,18 +64,17 @@ export function BookingSlotRulesPanel({ initial }: { initial: BookingSlotRules }
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <div>
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-          Slot rules
+          {m.settings_slotrules_heading()}
         </h3>
         <p className="text-[12px] text-ih-fg-3 mt-1">
-          Choose how bookable start times are generated from inspector availability windows.
-          Defaults are Fixed time slots / 30 minutes.
+          {m.settings_slotrules_desc()}
         </p>
       </div>
 
       <div className="space-y-2">
-        <p className="text-[12px] font-bold text-ih-fg-2">Schedule mode</p>
+        <p className="text-[12px] font-bold text-ih-fg-2">{m.settings_slotrules_mode_label()}</p>
         <SegmentedControl
-          ariaLabel="Booking slot mode"
+          ariaLabel={m.settings_slotrules_mode_aria()}
           size="md"
           options={MODE_OPTIONS}
           value={mode}
@@ -85,14 +85,14 @@ export function BookingSlotRulesPanel({ initial }: { initial: BookingSlotRules }
         />
         <p className="text-[11px] text-ih-fg-3">
           {mode === "fixed"
-            ? "Starts align to each availability window’s start time, then step by the interval."
-            : "Starts snap to the clock (e.g. :00 / :30) at every interval inside each window."}
+            ? m.settings_slotrules_fixed_desc()
+            : m.settings_slotrules_open_desc()}
         </p>
       </div>
 
       <div className="space-y-2 max-w-xs">
         <Select
-          label="Slot interval"
+          label={m.settings_slotrules_interval_label()}
           options={INTERVAL_OPTIONS}
           value={String(intervalMin)}
           onChange={(e) => {
@@ -109,12 +109,12 @@ export function BookingSlotRulesPanel({ initial }: { initial: BookingSlotRules }
           disabled={saving}
           className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
         >
-          {saving ? "Saving..." : "Save slot rules"}
+          {saving ? m.settings_holiday_save_pending() : m.settings_slotrules_save()}
         </button>
-        {saved && <span className="text-[13px] text-ih-ok-fg font-bold">Saved.</span>}
+        {saved && <span className="text-[13px] text-ih-ok-fg font-bold">{m.settings_holiday_saved()}</span>}
         {failed && (
           <span className="text-[13px] text-ih-bad-fg font-bold">
-            {fetcher.data?.message ?? "Save failed. Please try again."}
+            {fetcher.data?.message ?? m.settings_holiday_save_failed()}
           </span>
         )}
       </div>

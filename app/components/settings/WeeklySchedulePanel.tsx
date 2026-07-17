@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
 import type { action } from "~/routes/settings-schedule";
+import { m } from "~/paraglide/messages";
 
 interface AvailabilitySlot {
   id: number;
@@ -8,8 +9,6 @@ interface AvailabilitySlot {
   startTime: string;
   endTime: string;
 }
-
-const DAY_LABELS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 interface DayState {
   enabled: boolean;
@@ -47,6 +46,15 @@ export function WeeklySchedulePanel({
   initialSlots: AvailabilitySlot[];
   inspectorId: string | null | undefined;
 }) {
+  const DAY_LABELS = [
+    m.settings_day_sunday(),
+    m.settings_day_monday(),
+    m.settings_day_tuesday(),
+    m.settings_day_wednesday(),
+    m.settings_day_thursday(),
+    m.settings_day_friday(),
+    m.settings_day_saturday(),
+  ];
   const fetcher = useFetcher<typeof action>();
   const [days, setDays] = useState<DayState[]>(() => buildDayMap(initialSlots));
   // dirty tracks whether local state differs from the last saved state
@@ -91,7 +99,7 @@ export function WeeklySchedulePanel({
 
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-      <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Weekly schedule</h3>
+      <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_weekly_heading()}</h3>
       <div className="space-y-2">
         {displayOrder.map((dow) => (
           <div key={dow} className="flex items-center gap-3">
@@ -112,7 +120,7 @@ export function WeeklySchedulePanel({
                   onChange={(e) => updateDay(dow, { startTime: e.target.value })}
                   className="px-2 py-1.5 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
-                <span className="text-[12px] text-ih-fg-3">to</span>
+                <span className="text-[12px] text-ih-fg-3">{m.settings_weekly_to()}</span>
                 <input
                   type="time"
                   value={days[dow].endTime}
@@ -121,7 +129,7 @@ export function WeeklySchedulePanel({
                 />
               </div>
             ) : (
-              <span className="text-[12px] text-ih-fg-4 italic">Unavailable</span>
+              <span className="text-[12px] text-ih-fg-4 italic">{m.settings_weekly_unavailable()}</span>
             )}
           </div>
         ))}
@@ -132,12 +140,12 @@ export function WeeklySchedulePanel({
           disabled={saving}
           className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
         >
-          {saving ? "Saving..." : "Save schedule"}
+          {saving ? m.settings_holiday_save_pending() : m.settings_weekly_save()}
         </button>
-        {saved && <span className="text-[13px] text-ih-ok-fg font-bold">Saved.</span>}
+        {saved && <span className="text-[13px] text-ih-ok-fg font-bold">{m.settings_holiday_saved()}</span>}
         {failed && (
           <span className="text-[13px] text-ih-bad-fg font-bold">
-            {fetcher.data?.message ?? "Save failed. Please try again."}
+            {fetcher.data?.message ?? m.settings_holiday_save_failed()}
           </span>
         )}
       </div>

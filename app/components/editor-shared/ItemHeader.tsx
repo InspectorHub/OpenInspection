@@ -1,3 +1,5 @@
+import { m } from "~/paraglide/messages";
+
 export interface ItemHeaderProps {
   /** Zero-padded item index (template card) — e.g. "01". Omit in the editor header. */
   number?: string;
@@ -24,12 +26,12 @@ export function ItemHeader({ number, label, required, isSafety, size = "sm", cla
       <span className={labelClass}>{label}</span>
       {required && (
         <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-bad-bg text-ih-bad-fg">
-          required
+          {m.editor_shared_badge_required()}
         </span>
       )}
       {isSafety && (
         <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-bad-bg text-ih-bad-fg">
-          safety
+          {m.editor_shared_badge_safety()}
         </span>
       )}
     </Tag>

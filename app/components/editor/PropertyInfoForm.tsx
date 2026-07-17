@@ -1,5 +1,6 @@
 import { useMemo, useCallback } from "react";
 import { isDedicatedFactKey } from "~/lib/property-facts-keys";
+import { m } from "~/paraglide/messages";
 
 interface MetadataField {
   id: string;
@@ -16,27 +17,31 @@ interface MetadataField {
 // are owned by CommercialReportControls, not this form. `unit`/`county` are real
 // text columns on `inspections` (autofilled at intake) and are now in
 // PropertyFactsSchema, so edits here persist through the property-facts write.
-const RESIDENTIAL_FIELDS: MetadataField[] = [
-  { id: "yearBuilt", label: "Year Built", type: "number", group: "Property facts" },
-  { id: "sqft", label: "Sq Ft", type: "number", group: "Property facts" },
-  { id: "foundationType", label: "Foundation", type: "select", group: "Property facts", options: ["basement", "slab", "crawlspace", "other"] },
-  { id: "lotSize", label: "Lot Size", type: "text", group: "Property facts" },
-  { id: "bedrooms", label: "Bedrooms", type: "number", group: "Property facts" },
-  { id: "bathrooms", label: "Bathrooms", type: "number", group: "Property facts" },
-  { id: "unit", label: "Unit / Suite", type: "text", group: "Property facts" },
-  { id: "county", label: "County", type: "text", group: "Property facts" },
-];
+function residentialFields(): MetadataField[] {
+  return [
+    { id: "yearBuilt", label: m.editor_property_field_year_built(), type: "number", group: m.editor_property_group_facts() },
+    { id: "sqft", label: m.editor_property_field_sqft(), type: "number", group: m.editor_property_group_facts() },
+    { id: "foundationType", label: m.editor_property_field_foundation(), type: "select", group: m.editor_property_group_facts(), options: ["basement", "slab", "crawlspace", "other"] },
+    { id: "lotSize", label: m.editor_property_field_lot_size(), type: "text", group: m.editor_property_group_facts() },
+    { id: "bedrooms", label: m.editor_property_field_bedrooms(), type: "number", group: m.editor_property_group_facts() },
+    { id: "bathrooms", label: m.editor_property_field_bathrooms(), type: "number", group: m.editor_property_group_facts() },
+    { id: "unit", label: m.editor_property_field_unit(), type: "text", group: m.editor_property_group_facts() },
+    { id: "county", label: m.editor_property_field_county(), type: "text", group: m.editor_property_group_facts() },
+  ];
+}
 
 // Commercial PCA inspections have no bedroom/bathroom counts; `sqft` reads as
 // gross building area rather than a home's living area. A commercial property has
 // a county but not a unit/suite, so `county` is present and `unit` is not.
-const COMMERCIAL_FIELDS: MetadataField[] = [
-  { id: "yearBuilt", label: "Year Built", type: "number", group: "Property facts" },
-  { id: "sqft", label: "Building Area (Sq Ft)", type: "number", group: "Property facts" },
-  { id: "foundationType", label: "Foundation", type: "select", group: "Property facts", options: ["basement", "slab", "crawlspace", "other"] },
-  { id: "lotSize", label: "Lot Size", type: "text", group: "Property facts" },
-  { id: "county", label: "County", type: "text", group: "Property facts" },
-];
+function commercialFields(): MetadataField[] {
+  return [
+    { id: "yearBuilt", label: m.editor_property_field_year_built(), type: "number", group: m.editor_property_group_facts() },
+    { id: "sqft", label: m.editor_property_field_building_area(), type: "number", group: m.editor_property_group_facts() },
+    { id: "foundationType", label: m.editor_property_field_foundation(), type: "select", group: m.editor_property_group_facts(), options: ["basement", "slab", "crawlspace", "other"] },
+    { id: "lotSize", label: m.editor_property_field_lot_size(), type: "text", group: m.editor_property_group_facts() },
+    { id: "county", label: m.editor_property_field_county(), type: "text", group: m.editor_property_group_facts() },
+  ];
+}
 
 interface PropertyInfoFormProps {
   inspection: Record<string, unknown>;
@@ -58,7 +63,7 @@ interface PropertyInfoFormProps {
 }
 
 export function PropertyInfoForm({ inspection, templateFields, propertyAddress, onSave, onCommit }: PropertyInfoFormProps) {
-  const defaultFields = inspection.propertyType === "commercial" ? COMMERCIAL_FIELDS : RESIDENTIAL_FIELDS;
+  const defaultFields = inspection.propertyType === "commercial" ? commercialFields() : residentialFields();
   const metaFields = templateFields?.length ? templateFields : defaultFields;
 
   const filled = useMemo(() => metaFields.filter((f) => inspection[f.id]).length, [metaFields, inspection]);
@@ -67,14 +72,14 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
     const seen = new Set<string>();
     const result: string[] = [];
     for (const f of metaFields) {
-      const g = f.group || "General";
+      const g = f.group || m.editor_property_group_general();
       if (!seen.has(g)) { seen.add(g); result.push(g); }
     }
     return result;
   }, [metaFields]);
 
   const fieldsByGroup = useCallback(
-    (group: string) => metaFields.filter((f) => (f.group || "General") === group),
+    (group: string) => metaFields.filter((f) => (f.group || m.editor_property_group_general()) === group),
     [metaFields],
   );
 
@@ -124,16 +129,16 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
       <header className="mb-6">
         <div className="flex items-center gap-2 mb-1">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4">
-            Property Info &middot; {filled} of {metaFields.length} fields complete
+            {m.editor_property_progress({ filled, total: metaFields.length })}
           </p>
           {filled === metaFields.length && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-ih-ok-bg text-ih-ok-fg ring-1 ring-inset ring-ih-ok/30">
-              Complete
+              {m.editor_property_complete()}
             </span>
           )}
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-ih-fg-1">
-          {(propertyAddress || inspection.propertyAddress as string) || "Property Info"}
+          {(propertyAddress || inspection.propertyAddress as string) || m.editor_property_fallback()}
         </h2>
       </header>
 
@@ -146,7 +151,7 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
                 <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.18em] text-ih-fg-3">
                   <span>{f.label}</span>
                   {Boolean(inspection[`_prefilled_${f.id}`]) && (
-                    <span className="text-[9px] font-semibold text-ih-primary normal-case tracking-normal">Prefilled</span>
+                    <span className="text-[9px] font-semibold text-ih-primary normal-case tracking-normal">{m.editor_property_prefilled()}</span>
                   )}
                 </span>
                 {(f.type === "text" || f.type === "number" || f.type === "date") && (

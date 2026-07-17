@@ -25,6 +25,7 @@ import { findRatingContradictions } from "../../lib/contradiction-lint";
 import { filterCannedEntries, deriveDefectTitle, type CustomDefect, type CustomDefectCategory } from "../../lib/custom-defects";
 import { ItemHeader } from "../editor-shared/ItemHeader";
 import { FormField, type ItemOptions, type TemplateItem } from "../form/FormField";
+import { m } from "~/paraglide/messages";
 
 export type { LibraryMatch };
 
@@ -51,11 +52,15 @@ interface ItemTabs {
  defects?: CannedDefect[];
 }
 
-const CANNED_TABS: Array<{ id: CannedTabId; label: string }> = [
- { id: "information", label: "Information" },
- { id: "limitations", label: "Limitations" },
- { id: "defects", label: "Defects" },
-];
+const CANNED_TAB_IDS: CannedTabId[] = ["information", "limitations", "defects"];
+
+function cannedTabLabel(id: CannedTabId): string {
+ return id === "information"
+  ? m.editor_item_tab_information()
+  : id === "limitations"
+  ? m.editor_item_tab_limitations()
+  : m.editor_item_tab_defects();
+}
 
 /* ------------------------------------------------------------------ */
 /* Props */
@@ -309,11 +314,11 @@ export function ItemEditor({
  );
  const defectPhotoChip = (target: { kind: "canned" | "custom"; id: string }, count: number) =>
  onAddDefectPhoto ? (
- <Button variant="ghost" size="sm" disabled={photoUploading} aria-label="Add photo to this defect" icon={addPhotoIcon}
+ <Button variant="ghost" size="sm" disabled={photoUploading} aria-label={m.editor_item_add_defect_photo_aria()} icon={addPhotoIcon}
  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onAddDefectPhoto(target); }}
  className="mt-1.5 h-auto px-2 py-1 border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
  >
- {count > 0 ? `${count} photo${count === 1 ? "" : "s"} · add` : "Add photo"}
+ {count > 0 ? (count === 1 ? m.editor_item_defect_photo_count_one({ count }) : m.editor_item_defect_photo_count_other({ count })) : m.editor_item_add_photo()}
  </Button>
  ) : null;
 
@@ -336,9 +341,9 @@ export function ItemEditor({
 
  // Build visible tabs for shared TabStrip (only tabs with entries)
  const visibleTabs = useMemo(() =>
- CANNED_TABS
-  .filter((tab) => ((tabs[tab.id] || []) as unknown[]).length > 0)
-  .map((tab) => ({ id: tab.id, label: tab.label, count: getIncludedSet(tab.id).size || undefined })),
+ CANNED_TAB_IDS
+  .filter((id) => ((tabs[id] || []) as unknown[]).length > 0)
+  .map((id) => ({ id, label: cannedTabLabel(id), count: getIncludedSet(id).size || undefined })),
  [tabs, result]);
 
  // Photo count is read in several places (badge, caption, empty-state copy).
@@ -348,12 +353,13 @@ export function ItemEditor({
  // Photo-strip status line (uploading / empty / counts).
  let photoStatus: string;
  if (photoUploading) {
- photoStatus = "Uploading…";
+ photoStatus = m.editor_uploading();
  } else if (photoCount === 0 && queuedCount === 0) {
- photoStatus = "No photos yet";
+ photoStatus = m.editor_item_photos_none();
  } else {
- const queuedSuffix = queuedCount > 0 ? ` · ${queuedCount} queued` : "";
- photoStatus = `${photoCount} photo${photoCount === 1 ? "" : "s"}${queuedSuffix}`;
+ const queuedSuffix = queuedCount > 0 ? m.editor_item_photo_queued_suffix({ count: queuedCount }) : "";
+ const base = photoCount === 1 ? m.editor_item_photo_count_one({ count: photoCount }) : m.editor_item_photo_count_other({ count: photoCount });
+ photoStatus = `${base}${queuedSuffix}`;
  }
 
  return (
@@ -421,18 +427,18 @@ export function ItemEditor({
  {contradictions.length > 0 && (
  <div className="rounded-lg border border-ih-watch/40 bg-ih-watch-bg px-3 py-2">
  <p className="text-[12px] font-bold text-ih-watch-fg">
- Rating contradicts {contradictions.length === 1 ? "a checked comment" : `${contradictions.length} checked comments`}
+ {contradictions.length === 1 ? m.editor_item_contradiction_one() : m.editor_item_contradiction_other({ count: contradictions.length })}
  </p>
  <ul className="mt-1 space-y-1">
  {contradictions.map((hit) => (
  <li key={hit.id} className="flex items-center justify-between gap-2 text-[12px] text-ih-watch-fg">
- <span className="truncate">“{hit.title}” still says all-clear</span>
+ <span className="truncate">{m.editor_item_contradiction_item({ title: hit.title })}</span>
  <Button
  variant="link" size="sm"
  onClick={() => onToggleCanned?.(hit.tab, hit.id, false)}
  className="shrink-0 h-auto px-0 py-0 text-[11px] text-ih-watch-fg underline decoration-ih-watch hover:text-ih-fg-1"
  >
- Uncheck it
+ {m.editor_item_uncheck()}
  </Button>
  </li>
  ))}
@@ -444,14 +450,14 @@ export function ItemEditor({
  <div>
  <div className="flex items-center justify-between mb-1">
  <label className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">
- Notes
+ {m.editor_item_notes_label()}
  </label>
  <span className={`text-[10px] font-mono tabular-nums ${
  ((result.notes as string) || "").length > 2000
  ? "text-ih-bad-fg"
  : "text-ih-fg-4"
  }`}>
- {((result.notes as string) || "").length} chars
+ {m.editor_item_notes_chars({ count: ((result.notes as string) || "").length })}
  </span>
  </div>
  <div className="relative">
@@ -484,7 +490,7 @@ export function ItemEditor({
     onOpenSnippets?.();
    }
   }}
-  placeholder="Add notes — type to see recommended comments, / for library"
+  placeholder={m.editor_item_notes_placeholder()}
   className="w-full h-28 px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] resize-none focus:shadow-ih-focus focus:border-ih-primary outline-none"
  />
  <Button
@@ -492,7 +498,7 @@ export function ItemEditor({
   onClick={() => { setTaQuery(""); setTaOpen(true); notesRef.current?.focus(); }}
   className="absolute right-2 top-2 h-auto px-0 py-0 text-[10px]"
  >
-  Recommended ▾
+  {m.editor_item_recommended()}
  </Button>
  <CommentTypeahead
   entries={taEntries}
@@ -530,9 +536,9 @@ export function ItemEditor({
  cannedDefectPhotoCount={cannedDefectPhotoCount}
  categoryColor={categoryColor}
  libraryMatches={libraryMatches}
- onSeedFromLibrary={(m) => {
-  setCustomTitle(deriveDefectTitle(m.text));
-  setCustomComment(m.text);
+ onSeedFromLibrary={(match) => {
+  setCustomTitle(deriveDefectTitle(match.text));
+  setCustomComment(match.text);
   setCustomCategory("recommendation");
   setCustomFormOpen(true);
  }}
@@ -567,7 +573,7 @@ export function ItemEditor({
  <div>
  <div className="flex items-center justify-between mb-1">
  <label className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">
- Photos
+ {m.editor_item_photos_label()}
  </label>
  {photoCount > 0 && (
  <span className="inline-flex items-center gap-1 text-[10px] font-bold text-ih-primary bg-ih-primary-tint px-1.5 py-0.5 rounded">
@@ -592,7 +598,7 @@ export function ItemEditor({
  onReorder={onReorderPhotos ? (order) => onReorderPhotos(item.id, order) : undefined}
  selectable={!!onBulkDetachPhotos || !!onBulkMovePhotos}
  onBulkDetach={onBulkDetachPhotos ? (indices) => onBulkDetachPhotos(item.id, indices) : undefined}
- moveTargets={moveTargets ? moveTargets.filter((m) => m.itemId !== item.id) : undefined}
+ moveTargets={moveTargets ? moveTargets.filter((mt) => mt.itemId !== item.id) : undefined}
  onBulkMove={onBulkMovePhotos ? (indices, to) => onBulkMovePhotos(item.id, indices, to) : undefined}
  photoUploading={photoUploading}
  videoPosterUrl={videoPosterUrl}
@@ -610,7 +616,7 @@ export function ItemEditor({
   />
   <span className="absolute bottom-0 left-0 right-0 flex justify-center pb-0.5">
   <span className="text-[9px] font-bold uppercase bg-ih-watch-bg text-ih-watch-fg rounded px-1">
-   QUEUED
+   {m.editor_item_photo_queued_badge()}
   </span>
   </span>
  </div>

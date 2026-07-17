@@ -1,4 +1,5 @@
 import type { TemplateSection } from "./types";
+import { m } from "~/paraglide/messages";
 
 export interface SectionAuthorHeaderProps {
   section: TemplateSection;
@@ -18,14 +19,14 @@ export function SectionAuthorHeader({ section, activeSection, renameSection, upd
           onChange={(e) => renameSection(activeSection, e.target.value)}
           className="text-[18px] font-bold bg-transparent border-b-2 border-transparent focus:border-ih-primary outline-none flex-1 text-ih-fg-1"
         />
-        <span className="text-[11px] text-ih-fg-4">{section.items.length} items</span>
+        <span className="text-[11px] text-ih-fg-4">{m.templates_row_items({ count: section.items.length })}</span>
       </div>
 
       {/* Section disclaimer */}
       <input
         value={section.disclaimerText || ""}
         onChange={(e) => updateSections((s) => { s[activeSection].disclaimerText = e.target.value; return s; })}
-        placeholder="Section disclaimer (optional)"
+        placeholder={m.templates_section_disclaimer_placeholder()}
         className="w-full text-[12px] text-ih-fg-4 bg-transparent border-b border-transparent focus:border-ih-border-strong outline-none"
       />
     </div>

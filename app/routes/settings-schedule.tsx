@@ -19,6 +19,7 @@ import {
   type CalendarCapability,
 } from "~/components/settings/CalendarConnectPanel";
 import { ScheduleLinksPanel } from "~/components/settings/ScheduleLinksPanel";
+import { m } from "~/paraglide/messages";
 
 interface AvailabilitySlot {
   id: number;
@@ -58,7 +59,7 @@ function parsePublicPolicy(raw: unknown): HolidayPublicPolicy {
 }
 
 export function meta() {
-  return [{ title: "My Schedule - Settings - OpenInspection" }];
+  return [{ title: m.settings_schedule_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -222,7 +223,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       ok: res.ok,
       intent,
       totalEvents: body?.data?.totalEvents ?? 0,
-      message: res.ok ? null : body?.error?.message ?? "Calendar sync failed.",
+      message: res.ok ? null : body?.error?.message ?? m.settings_schedule_error_sync_failed(),
     };
   }
 
@@ -232,7 +233,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return {
       ok: res.ok,
       intent,
-      message: res.ok ? null : body?.error?.message ?? "Failed to disconnect Google Calendar.",
+      message: res.ok ? null : body?.error?.message ?? m.settings_schedule_error_disconnect_failed(),
     };
   }
 
@@ -253,9 +254,9 @@ export default function SettingsSchedulePage() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "My Schedule" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_schedule_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">
-        Weekly hours, time off, and your personal booking link.
+        {m.settings_schedule_intro()}
       </p>
 
       {pickerMembers.length > 0 && (
@@ -304,7 +305,7 @@ function ManageOthersPicker({
   const navigate = useNavigate();
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 flex items-center gap-3">
-      <span className="text-[13px] font-bold text-ih-fg-1">Managing schedule for</span>
+      <span className="text-[13px] font-bold text-ih-fg-1">{m.settings_schedule_managing_for()}</span>
       <select
         value={managedInspectorId ?? ""}
         onChange={(e) => {
@@ -313,7 +314,7 @@ function ManageOthersPicker({
         }}
         className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
       >
-        <option value="">Myself</option>
+        <option value="">{m.settings_schedule_myself()}</option>
         {members.map((m) => (
           <option key={m.id} value={m.id}>
             {m.email}

@@ -23,6 +23,9 @@
       "./messages/{locale}/contacts.json",
       "./messages/{locale}/templates.json",
       "./messages/{locale}/editor.json",
+      "./messages/{locale}/editor-4.json",
+      "./messages/{locale}/editor-3.json",
+      "./messages/{locale}/editor-2.json",
       "./messages/{locale}/library.json",
       "./messages/{locale}/reports.json",
       "./messages/{locale}/metrics.json"

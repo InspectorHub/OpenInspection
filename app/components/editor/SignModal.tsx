@@ -1,5 +1,6 @@
 import { Modal } from "@core/shared-ui";
 import { SignaturePad } from "../SignaturePad";
+import { m } from "~/paraglide/messages";
 
 export interface SignModalProps {
  open: boolean;
@@ -10,17 +11,17 @@ export interface SignModalProps {
 
 export function SignModal({ open, onSubmit, onCancel, failed }: SignModalProps) {
  return (
- <Modal open={open} onClose={onCancel} title="Inspector Signature">
+ <Modal open={open} onClose={onCancel} title={m.editor_signmodal_title()}>
  <p className="text-[13px] text-ih-fg-3 mb-4">
- Sign this inspection. The signature will be saved and can be included in the published report.
+ {m.editor_signmodal_body()}
  </p>
  <SignaturePad
  onSubmit={onSubmit}
  onCancel={onCancel}
- label="Save signature"
+ label={m.editor_signmodal_save()}
  />
  {failed && (
- <p className="text-sm text-ih-bad-fg mt-2">Failed to save signature. Please try again.</p>
+ <p className="text-sm text-ih-bad-fg mt-2">{m.editor_signmodal_failed()}</p>
  )}
  </Modal>
  );

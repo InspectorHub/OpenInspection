@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { useCopyClipboard } from "~/hooks/useCopyClipboard";
-
-const STYLES = [
-  { id: "light", label: "Light" },
-  { id: "dark", label: "Dark" },
-  { id: "branded", label: "Branded" },
-] as const;
+import { m } from "~/paraglide/messages";
 
 export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined }) {
+  const STYLES = [
+    { id: "light", label: m.settings_embed_style_light() },
+    { id: "dark", label: m.settings_embed_style_dark() },
+    { id: "branded", label: m.settings_embed_style_branded() },
+  ] as const;
   const [style, setStyle] = useState<"light" | "dark" | "branded">("light");
   const { copied, copy } = useCopyClipboard();
 
@@ -16,11 +16,11 @@ export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined
   if (!tenant) {
     return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-3">
-        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Embed widget</h3>
+        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_embed_heading()}</h3>
         <div className="w-full min-h-[200px] rounded-md border-2 border-dashed border-ih-border flex items-center justify-center">
           <div className="text-center">
             <EmbedIcon />
-            <p className="text-[13px] text-ih-fg-3 mt-2">No company configured — embed widget unavailable.</p>
+            <p className="text-[13px] text-ih-fg-3 mt-2">{m.settings_embed_no_company()}</p>
           </div>
         </div>
       </section>
@@ -35,7 +35,7 @@ export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined
 
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-      <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Embed widget</h3>
+      <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_embed_heading()}</h3>
 
       <div className="flex gap-2">
         {STYLES.map((s) => (
@@ -55,12 +55,12 @@ export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[12px] font-bold text-ih-fg-2">Embed code</span>
+          <span className="text-[12px] font-bold text-ih-fg-2">{m.settings_embed_code_label()}</span>
           <button
             onClick={() => copy(snippet)}
             className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors"
           >
-            {copied ? "Copied!" : "Copy snippet"}
+            {copied ? m.settings_common_copied() : m.settings_embed_copy_snippet()}
           </button>
         </div>
         {/* ds-allow: fixed-dark terminal/code block — stays dark in both themes */}
@@ -70,12 +70,12 @@ export function EmbedWidgetPanel({ tenant }: { tenant: string | null | undefined
       </div>
 
       <div className="space-y-2">
-        <span className="text-[12px] font-bold text-ih-fg-2">Live preview</span>
+        <span className="text-[12px] font-bold text-ih-fg-2">{m.settings_embed_live_preview()}</span>
         <iframe
           src={embedUrl}
           className="w-full min-h-[700px] rounded-md border border-ih-border"
           loading="lazy"
-          title="Widget preview"
+          title={m.settings_embed_preview_title()}
         />
       </div>
     </section>

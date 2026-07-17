@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { useFetcher } from "react-router";
+import { m } from "~/paraglide/messages";
 
 /**
  * Shared "Test connection" control used by the Resend / Stripe / Gemini
@@ -14,8 +15,8 @@ import type { useFetcher } from "react-router";
 export function TestConnectionButton({
   fetcher,
   intent,
-  idleLabel = "Test connection",
-  busyLabel = "Testing…",
+  idleLabel = m.settings_testconn_idle(),
+  busyLabel = m.settings_testconn_busy(),
   children,
 }: {
   fetcher: ReturnType<typeof useFetcher>;

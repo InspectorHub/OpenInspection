@@ -1,4 +1,5 @@
 import { civilDateOf, eventColor, isEventDraggable, isSameDay, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+import { m } from "~/paraglide/messages";
 
 /** Hour (0-23) a timed event starts at, from its effective-tz wall clock. */
 function eventStartHour(ev: CalendarEvent): number {
@@ -41,7 +42,7 @@ export function WeekView({
             ))}
           </div>
           <div className="grid grid-cols-[60px_repeat(7,1fr)] border-b border-ih-border min-h-[42px]">
-            <div className="text-[10px] font-bold text-ih-fg-4 text-right pr-2 pt-2">All day</div>
+            <div className="text-[10px] font-bold text-ih-fg-4 text-right pr-2 pt-2">{m.calendar_all_day()}</div>
             {weekDays.map((d) => {
               const dateStr = civilDateOf(d.getFullYear(), d.getMonth(), d.getDate());
               const allDayEvents = getEventsForDate(dateStr).filter((ev) => ev.extendedProps?.allDay === true);

@@ -1,4 +1,5 @@
 import { civilDateOf, eventColor, isEventDraggable, type CalendarEvent } from "~/components/calendar/calendar-helpers";
+import { m } from "~/paraglide/messages";
 
 export function DayView({
   hours,
@@ -20,7 +21,7 @@ export function DayView({
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
           <div className="flex min-h-[48px] border-b border-ih-border">
-            <div className="w-16 shrink-0 pr-3 pt-2 text-right text-[10px] font-bold text-ih-fg-4">All day</div>
+            <div className="w-16 shrink-0 pr-3 pt-2 text-right text-[10px] font-bold text-ih-fg-4">{m.calendar_all_day()}</div>
             <div
               className="flex-1 cursor-pointer border-l border-ih-border p-1 hover:bg-ih-primary-tint"
               onClick={() => handleDayClick(`${dateStr}T09:00`)}

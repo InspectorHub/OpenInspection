@@ -5,6 +5,7 @@ import { usePdfExport, pdfActionLabel } from "~/hooks/usePdfExport";
 import type { ColorScheme } from "~/lib/ui-prefs";
 import { ProgressStripText } from "~/components/editor/ProgressStripText";
 import { TemplateMenu } from "~/components/editor/TemplateMenu";
+import { m } from "~/paraglide/messages";
 
 type EditorState = ReturnType<typeof useInspectionState>;
 
@@ -91,7 +92,7 @@ export function EditorHeader({
  </a>
  <div className="min-w-0">
   <div className="text-[14px] font-bold truncate">
-  {(state.inspection.propertyAddress as string) || "Inspection"}
+  {(state.inspection.propertyAddress as string) || m.editor_header_property_fallback()}
   </div>
   <div className="text-[11px] text-ih-fg-3 truncate">
   #{String(state.inspection.id).slice(0, 8).toUpperCase()}
@@ -132,7 +133,7 @@ export function EditorHeader({
   {state.saveStatus === "saving" ? (
    <>
    <span className="w-1.5 h-1.5 rounded-full bg-ih-watch animate-pulse" />
-   Saving...
+   {m.editor_header_save_saving()}
    </>
   ) : state.saveStatus === "saved" ? (
    <>
@@ -149,12 +150,12 @@ export function EditorHeader({
     d="M5 13l4 4L19 7"
     />
    </svg>
-   Saved
+   {m.editor_header_save_saved()}
    </>
   ) : (
    <>
    <span className="w-1.5 h-1.5 rounded-full bg-ih-bad" />
-   Error
+   {m.editor_header_save_error()}
    </>
   )}
   </span>
@@ -182,7 +183,7 @@ export function EditorHeader({
  {/* Search */}
  <input
   type="text"
-  placeholder="Search report..."
+  placeholder={m.editor_header_search_placeholder()}
   value={state.searchQuery}
   onChange={(e) => state.setSearchQuery(e.target.value)}
   className="w-44 h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[12px]"
@@ -195,9 +196,9 @@ export function EditorHeader({
  {/* #181 — Version history (only when collab editing is enabled) */}
  {collabEditing && (
   <IconButton
-  aria-label="Version history"
+  aria-label={m.editor_header_version_history()}
   onClick={() => onOpenVersionHistory?.()}
-  title="Version history"
+  title={m.editor_header_version_history()}
   >
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -210,10 +211,10 @@ export function EditorHeader({
  <div className="flex items-center gap-2">
  {/* Theme cycle: light → dark → field → auto */}
  <IconButton
-  aria-label={`Theme: ${scheme}${scheme === 'field' ? ' (high-contrast outdoor)' : ''}`}
+  aria-label={`${m.editor_header_theme_label({ scheme })}${scheme === 'field' ? m.editor_header_theme_field_suffix() : ''}`}
   onClick={() => setColorScheme(scheme === 'light' ? 'dark' : scheme === 'dark' ? 'field' : scheme === 'field' ? 'auto' : 'light')}
   className="hidden xl:flex"
-  title={`Theme: ${scheme}${scheme === 'field' ? ' (high-contrast outdoor)' : ''}`}
+  title={`${m.editor_header_theme_label({ scheme })}${scheme === 'field' ? m.editor_header_theme_field_suffix() : ''}`}
  >
   {scheme === 'dark' ? (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
@@ -228,9 +229,9 @@ export function EditorHeader({
 
  {/* Settings button */}
  <IconButton
-  aria-label="Inspection settings"
+  aria-label={m.editor_header_settings()}
   onClick={() => state.setSettingsOpen(true)}
-  title="Inspection settings"
+  title={m.editor_header_settings()}
  >
   <svg
   className="w-4 h-4"
@@ -271,7 +272,7 @@ export function EditorHeader({
   size="md"
   onClick={() => window.open(`/report-view/${tenantSlug}/${state.inspection.id}`, "_blank", "noopener")}
   className="hidden 2xl:inline-flex"
-  title="Preview the full report (all sections) in a new tab"
+  title={m.editor_header_preview_full_title()}
   icon={
    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -279,7 +280,7 @@ export function EditorHeader({
    </svg>
   }
   >
-  Preview
+  {m.editor_header_preview()}
   </Button>
  )}
 
@@ -292,14 +293,14 @@ export function EditorHeader({
   onClick={() => pdf.exportPdf(`/api/inspections/${state.inspection.id}/pdf?type=full`, { mode: "view", filename: `report-${state.inspection.id}.pdf` })}
   disabled={pdf.busy}
   className="hidden xl:inline-flex"
-  title={pdf.error ?? "Preview the real server-rendered PDF (the exact client deliverable) in a new tab"}
+  title={pdf.error ?? m.editor_header_preview_pdf_title()}
   icon={
    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
    </svg>
   }
  >
-  {pdfActionLabel(pdf, "Preview PDF")}
+  {pdfActionLabel(pdf, m.editor_header_preview_pdf())}
  </Button>
 
  {/* Sign now button */}
@@ -308,10 +309,10 @@ export function EditorHeader({
   size="md"
   onClick={() => setSignModalOpen(true)}
   className="hidden xl:inline-flex"
-  title="Sign this inspection now"
+  title={m.editor_header_sign_title()}
   icon={<Icon name="edit" className="w-3.5 h-3.5" />}
  >
-  Sign now
+  {m.editor_header_sign()}
  </Button>
 
  {/* Publish button */}
@@ -334,7 +335,7 @@ export function EditorHeader({
    </svg>
   }
  >
-  Publish
+  {m.editor_header_publish()}
  </Button>
  </div>
 

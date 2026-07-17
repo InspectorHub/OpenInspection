@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { m } from "~/paraglide/messages";
 
 interface DateOverride {
   id: string;
@@ -24,14 +25,14 @@ export function DateOverridesPanel({
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-        Synced & legacy
+        {m.settings_dateoverrides_heading()}
       </h3>
       <p className="text-[12px] text-ih-fg-3">
-        Use{" "}
+        {m.settings_dateoverrides_use_prefix()}{" "}
         <Link to="/calendar" className="text-ih-primary font-semibold hover:underline">
-          Calendar → Block time
+          {m.settings_dateoverrides_link()}
         </Link>{" "}
-        for new time off. This list shows synced Google busy days and older date blocks.
+        {m.settings_dateoverrides_use_suffix()}
       </p>
 
       <div className="space-y-2">
@@ -43,7 +44,7 @@ export function DateOverridesPanel({
             <div className="flex items-center gap-3">
               <span className="text-[13px] font-bold text-ih-fg-1">{o.date}</span>
               <span className="text-[11px] text-ih-bad-fg font-bold uppercase">
-                {o.isAvailable ? "Extra hours" : "Blocked"}
+                {o.isAvailable ? m.settings_dateoverrides_extra_hours() : m.settings_closed_policy_blocked()}
               </span>
               {o.startTime && o.endTime && (
                 <span className="text-[12px] text-ih-fg-3">

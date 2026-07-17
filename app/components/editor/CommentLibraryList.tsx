@@ -1,4 +1,5 @@
 import { formatRelativeTime } from "../../lib/format-relative-time";
+import { m } from "~/paraglide/messages";
 
 export interface CommentLibraryListProps {
   serverComments: Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>;
@@ -9,7 +10,7 @@ export interface CommentLibraryListProps {
 
 export function CommentLibraryList({ serverComments, selectedIndex, sort, onInsertText }: CommentLibraryListProps) {
   if (serverComments.length === 0) {
-    return <p className="text-[13px] text-ih-fg-3 text-center py-8">No comments match the current filter.</p>;
+    return <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.editor_comment_list_empty()}</p>;
   }
   return (
     <ul className="divide-y divide-ih-border">

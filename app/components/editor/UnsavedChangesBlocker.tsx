@@ -1,4 +1,5 @@
 import { Modal, Button } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export interface UnsavedChangesBlockerProps {
  open: boolean;
@@ -17,7 +18,7 @@ export function UnsavedChangesBlocker({ open, onStay, onLeave }: UnsavedChangesB
  <Modal
  open={open}
  onClose={onStay}
- title="Unsaved changes"
+ title={m.editor_unsavedchanges_title()}
  size="sm"
  footer={
  <>
@@ -25,19 +26,19 @@ export function UnsavedChangesBlocker({ open, onStay, onLeave }: UnsavedChangesB
  variant="ghost"
  onClick={onStay}
  >
- Stay
+ {m.editor_unsavedchanges_stay()}
  </Button>
  <Button
  variant="danger"
  onClick={onLeave}
  >
- Leave
+ {m.editor_unsavedchanges_leave()}
  </Button>
  </>
  }
  >
  <p className="text-[13px] text-ih-fg-3">
- You have unsaved changes. Are you sure you want to leave?
+ {m.editor_unsavedchanges_body()}
  </p>
  </Modal>
  );

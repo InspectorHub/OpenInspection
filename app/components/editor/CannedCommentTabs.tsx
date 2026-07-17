@@ -11,6 +11,7 @@ import {
   DEFECT_TIMEFRAME_LABELS,
 } from "../../lib/defect-fields";
 import type { CustomDefect, CustomDefectCategory } from "../../lib/custom-defects";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /* Canned comment types */
@@ -171,8 +172,8 @@ export function CannedCommentTabs({
         <input
           value={defectQuery}
           onChange={(e) => onDefectQueryChange(e.target.value)}
-          placeholder="Search defects…"
-          aria-label="Search defects"
+          placeholder={m.editor_canned_search_placeholder()}
+          aria-label={m.editor_canned_search_aria()}
           className="w-full h-9 px-3 mb-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus focus:border-ih-primary outline-none placeholder:text-ih-fg-4"
         />
       )}
@@ -182,8 +183,8 @@ export function CannedCommentTabs({
         {currentTabEntries.length === 0 ? (
           <p className="text-[13px] text-ih-fg-3 text-center py-8">
             {activeTab === "defects" && defectQuery.trim()
-              ? <>No defects match “{defectQuery.trim()}” — add it as a custom defect below.</>
-              : "No pre-built comments for this tab."}
+              ? m.editor_canned_no_match({ query: defectQuery.trim() })
+              : m.editor_canned_no_prebuilt()}
           </p>
         ) : (
           currentTabEntries.map((entry) => {
@@ -255,20 +256,20 @@ export function CannedCommentTabs({
         {activeTab === "defects" && libraryMatches.length > 0 && (
           <div className="pt-1">
             <div className="text-[10px] font-bold uppercase tracking-[0.08em] text-ih-fg-4 px-1 pb-1">
-              From your library
+              {m.editor_canned_from_library()}
             </div>
             <div className="space-y-1.5">
-              {libraryMatches.map((m, i) => (
+              {libraryMatches.map((match, i) => (
                 <button
-                  key={m.id ?? `lib-${i}`}
+                  key={match.id ?? `lib-${i}`}
                   type="button"
-                  onClick={() => onSeedFromLibrary(m)}
+                  onClick={() => onSeedFromLibrary(match)}
                   className="w-full text-left p-2.5 rounded-lg bg-ih-bg-app/50 hover:bg-ih-bg-muted border border-dashed border-ih-border transition-colors"
                 >
-                  <p className="text-[12px] leading-relaxed text-ih-fg-2 line-clamp-2">{m.text}</p>
+                  <p className="text-[12px] leading-relaxed text-ih-fg-2 line-clamp-2">{match.text}</p>
                   <span className="text-[10px] text-ih-fg-4">
-                    {m.severity !== "all" ? m.severity : "any severity"}
-                    {m.section ? ` · ${m.section}` : ""} · tap to use as custom defect
+                    {match.severity !== "all" ? match.severity : m.editor_canned_any_severity()}
+                    {match.section ? ` · ${match.section}` : ""} · {m.editor_canned_tap_to_use()}
                   </span>
                 </button>
               ))}
@@ -289,7 +290,7 @@ export function CannedCommentTabs({
                 categoryColor={categoryColor?.get(cd.category)}
                 extraBadge={
                   <span className="ml-1.5 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-ih-primary-tint text-ih-primary">
-                    custom
+                    {m.editor_canned_custom_badge()}
                   </span>
                 }
                 leading={
@@ -334,7 +335,7 @@ export function CannedCommentTabs({
                   onClick={onOpenCustomForm}
                   className="w-full h-auto py-2.5 justify-start border border-dashed border-ih-border-strong text-ih-fg-3 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
                 >
-                  + Add custom defect
+                  {m.editor_canned_add_custom()}
                 </Button>
               )
             )}

@@ -6,6 +6,7 @@ import { CoverCropper } from "~/components/media-studio/CoverCropper";
 import { fullResUrl } from "~/components/media-studio/cropImage";
 import { ORIGINAL_QUALITY_KEY } from "~/routes/inspection-edit";
 import { MoneyInput } from "~/components/MoneyInput";
+import { m } from "~/paraglide/messages";
 
 interface SettingsForm {
   date: string;
@@ -178,7 +179,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
       const key = d.coverKey;
       const url = d.coverUrl ?? null;
       if (url) {
-        setPhotos((prev) => (prev.some((p) => p.key === key) ? prev : [{ key, url, label: "Uploaded" }, ...prev]));
+        setPhotos((prev) => (prev.some((p) => p.key === key) ? prev : [{ key, url, label: m.editor_settings_cover_uploaded_label() }, ...prev]));
         setCropSource({ key, url });
       }
     }
@@ -237,15 +238,15 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
       <Drawer
         open={open}
         onClose={onClose}
-        title="Inspection settings"
+        title={m.editor_header_settings()}
         wide
         footer={loading ? undefined : (
           <>
-            {saveState === "saving" && <span className="text-[12px] text-ih-watch-fg font-bold self-center">Saving...</span>}
-            {saveState === "saved" && <span className="text-[12px] text-ih-ok-fg font-bold self-center">Saved</span>}
-            {saveState === "error" && <span className="text-[12px] text-ih-bad-fg font-bold self-center">Error -- try again</span>}
+            {saveState === "saving" && <span className="text-[12px] text-ih-watch-fg font-bold self-center">{m.editor_header_save_saving()}</span>}
+            {saveState === "saved" && <span className="text-[12px] text-ih-ok-fg font-bold self-center">{m.editor_header_save_saved()}</span>}
+            {saveState === "error" && <span className="text-[12px] text-ih-bad-fg font-bold self-center">{m.editor_settings_save_error()}</span>}
             <Button variant="primary" type="submit" form="inspection-settings-form" disabled={saveState === "saving"}>
-              Save changes
+              {m.editor_settings_save_changes()}
             </Button>
           </>
         )}
@@ -258,39 +259,39 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
         ) : (
           <form id="inspection-settings-form" onSubmit={handleSave} className="space-y-6">
               <fieldset className="space-y-4">
-                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Schedule</legend>
+                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">{m.editor_settings_legend_schedule()}</legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
-                    <span className={labelClass}>Date</span>
+                    <span className={labelClass}>{m.editor_settings_field_date()}</span>
                     <input type="date" value={form.date} onChange={(e) => updateForm("date", e.target.value)} className={inputClass} />
                   </label>
                   <label className="block">
-                    <span className={labelClass}>Inspector</span>
+                    <span className={labelClass}>{m.editor_settings_field_inspector()}</span>
                     <select value={form.inspectorId} onChange={(e) => updateForm("inspectorId", e.target.value)} className={inputClass}>
-                      <option value="">--- Unassigned ---</option>
+                      <option value="">{m.editor_settings_inspector_unassigned()}</option>
                       {inspectors.map((u) => <option key={u.id} value={u.id}>{u.name || u.email}</option>)}
                     </select>
                   </label>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
-                    <span className={labelClass}>Closing Date</span>
+                    <span className={labelClass}>{m.editor_settings_field_closing_date()}</span>
                     <input type="date" value={form.closingDate} onChange={(e) => updateForm("closingDate", e.target.value)} className={inputClass} data-testid="inspection-closing-date" />
                   </label>
                 </div>
               </fieldset>
 
               <fieldset className="space-y-4">
-                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Order & referral</legend>
+                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">{m.editor_settings_legend_order_referral()}</legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
-                    <span className={labelClass}>Reference #</span>
+                    <span className={labelClass}>{m.editor_settings_field_reference()}</span>
                     <input type="text" maxLength={64} placeholder="---" value={form.referenceNumber} onChange={(e) => updateForm("referenceNumber", e.target.value)} className={inputClass} data-testid="inspection-reference-number" />
                   </label>
                   <label className="block">
-                    <span className={labelClass}>Referral Source</span>
+                    <span className={labelClass}>{m.editor_settings_field_referral_source()}</span>
                     <select value={form.referralSource} onChange={(e) => updateForm("referralSource", e.target.value)} className={inputClass} data-testid="inspection-referral-source">
-                      <option value="">--- Select source ---</option>
+                      <option value="">{m.editor_settings_referral_select()}</option>
                       {referralSources.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </label>
@@ -298,9 +299,9 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
               </fieldset>
 
               <fieldset className="space-y-4">
-                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Template</legend>
+                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">{m.editor_settings_legend_template()}</legend>
                 <div className="block">
-                  <span className={labelClass}>Inspection template</span>
+                  <span className={labelClass}>{m.editor_settings_field_template()}</span>
                   <TemplateCombobox
                     value={form.templateId}
                     onChange={(id) => updateForm("templateId", id)}
@@ -310,44 +311,44 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
               </fieldset>
 
               <fieldset className="space-y-4">
-                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Pricing & gates</legend>
+                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">{m.editor_settings_legend_pricing()}</legend>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <label className="block">
-                    <span className={labelClass}>Price</span>
-                    <MoneyInput cents={form.price} onChange={(c) => updateForm("price", c ?? 0)} className={inputClass} ariaLabel="Price" />
+                    <span className={labelClass}>{m.editor_settings_field_price()}</span>
+                    <MoneyInput cents={form.price} onChange={(c) => updateForm("price", c ?? 0)} className={inputClass} ariaLabel={m.editor_settings_field_price()} />
                   </label>
                   <div className="flex flex-col gap-2 pt-5">
                     <label className="inline-flex items-center gap-2 text-[13px] text-ih-fg-3">
                       <input type="checkbox" checked={form.paymentRequired} onChange={(e) => updateForm("paymentRequired", e.target.checked)} className="h-4 w-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30" />
-                      Payment required to view report
+                      {m.editor_settings_payment_required()}
                     </label>
                     <label className="inline-flex items-center gap-2 text-[13px] text-ih-fg-3">
                       <input type="checkbox" checked={form.agreementRequired} onChange={(e) => updateForm("agreementRequired", e.target.checked)} className="h-4 w-4 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30" />
-                      Agreement signature required
+                      {m.editor_settings_agreement_required()}
                     </label>
                   </div>
                 </div>
                 <label className="block">
-                  <span className={labelClass}>Required defect fields at publish</span>
+                  <span className={labelClass}>{m.editor_settings_required_defect_fields()}</span>
                   <select
                     value={form.requireDefectFieldsOverride}
                     onChange={(e) => updateForm("requireDefectFieldsOverride", e.target.value as SettingsForm["requireDefectFieldsOverride"])}
                     className={inputClass}
                     data-testid="inspection-require-defect-fields"
                   >
-                    <option value="">Inherit (tenant default)</option>
-                    <option value="none">None — warn only</option>
-                    <option value="location">Location required</option>
-                    <option value="trade">Recommended trade required</option>
-                    <option value="both">Location + trade required</option>
+                    <option value="">{m.editor_settings_required_inherit()}</option>
+                    <option value="none">{m.editor_settings_required_none()}</option>
+                    <option value="location">{m.editor_settings_required_location()}</option>
+                    <option value="trade">{m.editor_settings_required_trade()}</option>
+                    <option value="both">{m.editor_settings_required_both()}</option>
                   </select>
-                  <p className="mt-1 text-[11px] text-ih-fg-4">Overrides the workspace default for this inspection only.</p>
+                  <p className="mt-1 text-[11px] text-ih-fg-4">{m.editor_settings_required_defect_help()}</p>
                 </label>
               </fieldset>
 
               {/* DB-16 — report cover photo: pick an existing inspection photo OR upload one directly */}
               <fieldset className="space-y-2">
-                <legend className={labelClass}>Report cover photo</legend>
+                <legend className={labelClass}>{m.editor_settings_legend_cover()}</legend>
                 <input
                   ref={coverFileRef}
                   type="file"
@@ -360,7 +361,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                   }}
                 />
                 {photos.length === 0 ? (
-                  <p className="text-[12px] text-ih-fg-4">No photos yet — upload one below, or add photos to an inspection item and pick one here.</p>
+                  <p className="text-[12px] text-ih-fg-4">{m.editor_settings_cover_empty()}</p>
                 ) : (
                   <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                     {photos.map((p) => {
@@ -370,12 +371,12 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                           key={p.key}
                           type="button"
                           onClick={() => selectCover(p.key)}
-                          title={selected ? "Current cover — click to clear" : `Set as cover${p.label ? ` (${p.label})` : ""}`}
+                          title={selected ? m.editor_settings_cover_current() : (p.label ? m.editor_settings_cover_set_labeled({ label: p.label }) : m.editor_settings_cover_set())}
                           className={`relative aspect-square rounded-md overflow-hidden border-2 transition-colors ${selected ? "border-ih-primary" : "border-ih-border hover:border-ih-primary/60"}`}
                         >
-                          <img src={p.url} alt={p.label || "Photo"} className="w-full h-full object-cover" loading="lazy" />
+                          <img src={p.url} alt={p.label || m.editor_settings_cover_photo_alt()} className="w-full h-full object-cover" loading="lazy" />
                           {selected && (
-                            <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[9px] font-bold text-center py-0.5">COVER</span>
+                            <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[9px] font-bold text-center py-0.5">{m.editor_settings_cover_badge()}</span>
                           )}
                         </button>
                       );
@@ -384,16 +385,16 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                 )}
                 <div className="flex items-center gap-3 pt-1">
                   <Button variant="secondary" size="sm" onClick={() => coverFileRef.current?.click()} disabled={coverFetcher.state !== "idle"} className="hover:border-ih-primary hover:text-ih-primary">
-                    {coverFetcher.state !== "idle" && coverFetcher.formData?.get("intent") === "upload-cover" ? "Uploading…" : "Upload cover photo"}
+                    {coverFetcher.state !== "idle" && coverFetcher.formData?.get("intent") === "upload-cover" ? m.editor_uploading() : m.editor_settings_cover_upload()}
                   </Button>
-                  <span className="text-[11px] text-ih-fg-4">Shown on the report cover page. Click the selected photo to clear it.</span>
+                  <span className="text-[11px] text-ih-fg-4">{m.editor_settings_cover_hint()}</span>
                 </div>
               </fieldset>
 
               {/* N2+N4 — device-local upload quality preference. Persisted to
                   localStorage (not the inspection row); applies to this browser. */}
               <fieldset className="space-y-2">
-                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">Photo uploads</legend>
+                <legend className="text-[15px] font-semibold tracking-tight text-ih-fg-1">{m.editor_settings_legend_photo_uploads()}</legend>
                 <label className="inline-flex items-start gap-2 text-[13px] text-ih-fg-3">
                   <input
                     type="checkbox"
@@ -403,9 +404,9 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                     data-testid="original-quality-uploads"
                   />
                   <span>
-                    Original quality uploads
+                    {m.editor_settings_original_quality()}
                     <span className="block text-[11px] text-ih-fg-4">
-                      Skip on-device resizing and metadata stripping. Larger files; uploads keep camera location data.
+                      {m.editor_settings_original_quality_help()}
                     </span>
                   </span>
                 </label>
