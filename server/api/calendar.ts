@@ -25,6 +25,7 @@ import {
     deleteCalendarConnection,
     getCalendarConnection,
     loadOpenGoogleConnection,
+    markCalendarSynced,
     upsertCalendarConnection,
     type PendingCalendarOAuth,
 } from '../lib/calendar/connection';
@@ -185,6 +186,8 @@ export const calendarRoutes = createApiRouter()
             });
             created++;
         }
+
+        await markCalendarSynced(c.env.DB, tenantId, inspectorId, 'google');
 
         return c.json({
             success: true,

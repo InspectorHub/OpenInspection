@@ -47,5 +47,8 @@
   "schedule_heatmap_open": "Open",
   "schedule_heatmap_full": "Fully booked",
   "schedule_heatmap_closed": "Closed",
-  "schedule_heatmap_unconfigured": "No hours set"
+  "schedule_heatmap_unconfigured": "No hours set",
+  "calendar_sync_connected": "Calendar synced",
+  "calendar_sync_stale": "Calendar sync is out of date",
+  "calendar_sync_not_connected": "Calendar not connected"
 }

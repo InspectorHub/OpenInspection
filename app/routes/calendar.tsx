@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { useLoaderData, useFetcher, useNavigate, useNavigation } from "react-router";
 import type { Route } from "./+types/calendar";
 import { requireToken } from "~/lib/session.server";
@@ -18,10 +18,8 @@ import {
   type CalendarScope,
   type ViewMode,
 } from "~/components/calendar/calendar-helpers";
-import {
-  AvailabilityHeatmapWeek,
-  type HeatmapDay,
-} from "~/components/settings/AvailabilityHeatmapWeek";
+import { AvailabilityHeatmapWeek } from "~/components/settings/AvailabilityHeatmapWeek";
+import { useWeekSummary } from "~/hooks/useWeekSummary";
 import { BlockTimeDrawer, type CalendarMember } from "~/components/calendar/BlockTimeDrawer";
 import { CalendarScopeToolbar } from "~/components/calendar/CalendarScopeToolbar";
 import { CalendarNavBar } from "~/components/calendar/CalendarNavBar";
@@ -69,7 +67,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     let members: CalendarMember[] = [];
     if (canManageTeam && membersRes?.ok) {
       const membersBody = (await membersRes.json()) as {
-        data?: Array<{ id: string; email: string; name?: string | null; role: string }>;
+        data?: Array<{
+          id: string;
+          email: string;
+          name?: string | null;
+          role: string;
+          calendarConnected?: boolean;
+          calendarLastSyncAt?: number | null;
+        }>;
       };
       members = (membersBody.data ?? [])
         .filter((member) => ["owner", "manager", "inspector"].includes(member.role))
@@ -78,6 +83,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
           email: member.email,
           name: member.name?.trim() || member.email,
           role: member.role,
+          calendarConnected: member.calendarConnected ?? false,
+          calendarLastSyncAt: member.calendarLastSyncAt ?? null,
         }));
     }
 
@@ -244,18 +251,12 @@ export default function CalendarPage() {
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const hours = Array.from({ length: 14 }, (_, i) => i + 7);
 
-  // The visible week lives in client state, so the strip loads through a BFF
-  // resource route rather than this page's loader.
-  const weekSummaryFetcher = useFetcher<{ days: HeatmapDay[] }>();
-  const weekStartCivil = civilDateOf(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate());
-  useEffect(() => {
-    if (viewMode !== "week") return;
-    const params = new URLSearchParams({ start: weekStartCivil });
-    // Team scope summarizes the whole tenant; My scope narrows to the viewer.
-    if (scope === "my" && currentUserId) params.set("userId", currentUserId);
-    weekSummaryFetcher.load(`/resources/week-summary?${params.toString()}`);
-  // weekSummaryFetcher is stable across renders — intentionally omitted per RR convention.
-  }, [viewMode, weekStartCivil, scope, currentUserId]);
+  // Team scope summarizes the whole tenant; My scope narrows to the viewer.
+  const weekSummary = useWeekSummary({
+    weekStart: civilDateOf(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate()),
+    enabled: viewMode === "week",
+    ...(scope === "my" && currentUserId ? { userId: currentUserId } : {}),
+  });
 
   const handleEventClick = (ev: CalendarEvent) => {
     if (ev.extendedProps?.kind === "calendar_block") {
@@ -316,6 +317,7 @@ export default function CalendarPage() {
         selectedUserIds={selectedUserIds}
         onScopeChange={setScope}
         onToggleMember={toggleMember}
+        locale={locale}
       />
 
       <CalendarNavBar
@@ -345,7 +347,7 @@ export default function CalendarPage() {
       )}
 
       {!isLoading && viewMode === "week" && (
-        <AvailabilityHeatmapWeek days={weekSummaryFetcher.data?.days ?? []} locale={locale} />
+        <AvailabilityHeatmapWeek days={weekSummary} locale={locale} />
       )}
 
       {!isLoading && viewMode === "week" && (

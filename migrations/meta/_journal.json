@@ -64,6 +64,13 @@
       "when": 1784207480662,
       "tag": "0008_swift_stryfe",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1784286920455,
+      "tag": "0009_aspiring_mathemanic",
+      "breakpoints": true
     }
   ]
 }

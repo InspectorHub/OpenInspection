@@ -121,6 +121,28 @@ export async function upsertCalendarConnection(input: {
     return row;
 }
 
+/**
+ * Records a completed busy pull. Distinct from updatedAt, which tracks writes
+ * to the connection itself: re-authenticating is not a sync. Only call this
+ * once the provider fetch has actually succeeded — the freshness badge vouches
+ * for data we hold.
+ */
+export async function markCalendarSynced(
+    db: D1Database,
+    tenantId: string,
+    userId: string,
+    provider: CalendarProviderId = 'google',
+): Promise<void> {
+    const drizzleDb = drizzle(db);
+    await drizzleDb.update(calendarConnections)
+        .set({ lastSyncAt: new Date() })
+        .where(and(
+            eq(calendarConnections.tenantId, tenantId),
+            eq(calendarConnections.userId, userId),
+            eq(calendarConnections.provider, provider),
+        ));
+}
+
 export async function deleteCalendarConnection(
     db: D1Database,
     tenantId: string,

@@ -12,6 +12,7 @@ import { eq, desc as descDz } from 'drizzle-orm';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { safeISODate } from '../../lib/date';
+import type { MemberWithCalendarSync } from '../../services/admin.service';
 import { getBaseUrl } from '../../lib/url';
 import {
     InviteMemberSchema,
@@ -292,8 +293,8 @@ export const adminDataRoutes = createApiRouter()
         const adminService = c.var.services.admin;
         const members = await adminService.getMembers(tenantId);
 
-        // Map Date to string for schema compatibility
-        const formattedMembers = members.members.map((m: { id: string; email: string; role: string; createdAt: Date }) => ({
+        // Map Date to string for schema compatibility.
+        const formattedMembers = members.members.map((m: MemberWithCalendarSync) => ({
             ...m,
             createdAt: safeISODate(m.createdAt)
         }));

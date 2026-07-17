@@ -45,6 +45,8 @@ export const MemberListResponseSchema = createApiResponseSchema(z.array(z.object
     email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
     role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
     createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
+    calendarConnected: z.boolean().describe('Whether this member has a connected Google calendar'),
+    calendarLastSyncAt: z.number().nullable().describe('Epoch ms of the last successful Google busy pull; null when never synced'),
 }))).openapi('MemberListResponse');
 
 export const AuditLogResponseSchema = createApiResponseSchema(z.object({

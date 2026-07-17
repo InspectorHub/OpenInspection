@@ -52,7 +52,7 @@ const weekSummaryRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/week-summary',
     operationId: 'getScheduleWeekSummary',
-    tags: ['scheduling'],
+    tags: ['calendar'],
     summary: 'Summarize seven days of availability',
     description: 'Returns one availability status per civil day for the week beginning at start, batching the shared per-week setup into a single call. Owners and managers may summarize any inspector via userId; inspectors are always summarized against themselves.',
     middleware: [allowedRoles],

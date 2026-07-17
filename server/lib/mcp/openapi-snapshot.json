@@ -7668,7 +7668,7 @@
     "scopes": [
       "read"
     ],
-    "tag": "scheduling",
+    "tag": "calendar",
     "tier": "primary",
     "inputSchema": {
       "parameters": [
