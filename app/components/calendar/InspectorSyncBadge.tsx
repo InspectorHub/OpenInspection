@@ -52,15 +52,36 @@ export function InspectorSyncBadge({
 }) {
   const state = syncBadgeState(connected, lastSyncAt, now);
   const status = stateLabel(state);
-  // Only claim a sync time when one actually happened.
-  const relative = connected && lastSyncAt !== null
-    ? formatRelativeTime(lastSyncAt, { locale, now })
+  // Only claim a sync time when one actually happened. The tooltip carries the
+  // verbose form ("1 hour ago"); the chip shows the narrow form ("1 hr. ago")
+  // so a row of inspectors stays scannable.
+  const synced = connected && lastSyncAt !== null;
+  const relativeLong = synced ? formatRelativeTime(lastSyncAt, { locale, now }) : "";
+  const relativeShort = synced
+    ? formatRelativeTime(lastSyncAt, { locale, now, style: "narrow" })
     : "";
-  const title = relative ? `${status} · ${relative}` : status;
+  const title = relativeLong ? `${status} · ${relativeLong}` : status;
+
+  // Quiet when healthy, loud when there is a problem. Connected shows just the
+  // freshness — the green dot already says "synced", so the word is redundant.
+  // Stale/missing spell out the problem as visible text rather than hiding it in
+  // a hover tooltip. A connected-but-never-synced calendar is stale, but reads
+  // as "Never synced": there is no earlier sync for it to be out of date from.
+  const visibleLabel =
+    state === "connected"
+      ? relativeShort
+      : state === "stale" && connected && lastSyncAt === null
+        ? m.calendar_sync_never()
+        : state === "stale"
+          ? m.calendar_sync_stale_short()
+          : m.calendar_sync_not_connected_short();
 
   return (
-    <span data-sync-state={state} title={title}>
+    <span data-sync-state={state} title={title} className="inline-flex items-center">
       <Pill tone={TONE[state]} dot>
+        <span data-sync-label aria-hidden="true" className="text-[11px] font-medium">
+          {visibleLabel}
+        </span>
         <span className="sr-only">{title}</span>
       </Pill>
     </span>

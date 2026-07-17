@@ -50,5 +50,8 @@
   "schedule_heatmap_unconfigured": "No hours set",
   "calendar_sync_connected": "Calendar synced",
   "calendar_sync_stale": "Calendar sync is out of date",
-  "calendar_sync_not_connected": "Calendar not connected"
+  "calendar_sync_not_connected": "Calendar not connected",
+  "calendar_sync_stale_short": "Out of sync",
+  "calendar_sync_not_connected_short": "Not connected",
+  "calendar_sync_never": "Never synced"
 }

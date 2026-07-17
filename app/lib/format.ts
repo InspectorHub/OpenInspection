@@ -47,12 +47,15 @@ const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
  */
 export function formatRelativeTime(
   value: DateInput,
-  opts: { locale: string; now?: number },
+  opts: { locale: string; now?: number; style?: Intl.RelativeTimeFormatStyle },
 ): string {
   const d = toDate(value);
   if (!d) return "";
   const diffMs = d.getTime() - (opts.now ?? Date.now());
-  const fmt = new Intl.RelativeTimeFormat(opts.locale, { numeric: "auto" });
+  const fmt = new Intl.RelativeTimeFormat(opts.locale, {
+    numeric: "auto",
+    style: opts.style ?? "long",
+  });
   for (const [unit, unitMs] of RELATIVE_UNITS) {
     if (Math.abs(diffMs) >= unitMs) return fmt.format(Math.round(diffMs / unitMs), unit);
   }
