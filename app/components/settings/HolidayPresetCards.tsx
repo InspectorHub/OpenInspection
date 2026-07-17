@@ -1,4 +1,4 @@
-import { SUPPORTED_STATE_CODES } from "./holiday-region-options";
+import { SUPPORTED_STATE_CODES, regionOptionLabel } from "./holiday-region-options";
 import { m } from "~/paraglide/messages";
 
 export type HolidayPresetId = "standard" | "on-call" | "off";
@@ -95,7 +95,7 @@ export function HolidayRegionPickerModal({
               onClick={() => onPick(code)}
               className="w-full text-left px-3 py-2 rounded-md text-[13px] font-bold text-ih-fg-1 hover:bg-ih-bg-muted"
             >
-              {m.settings_holiday_region_federal_plus({ code })}
+              {regionOptionLabel(code)}
             </button>
           ))}
         </div>
