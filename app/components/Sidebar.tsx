@@ -7,6 +7,7 @@ import { SidebarGroup } from "~/components/sidebar/SidebarGroup";
 import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";
 import { MobileHeader } from "~/components/sidebar/MobileHeader";
 import { Avatar } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export { MobileHeader };
 
@@ -56,7 +57,7 @@ export function Sidebar() {
         {!collapsed && (
           <>
             <span className="text-[14px] font-bold text-ih-fg-1 tracking-tight leading-tight truncate">{companyName}</span>
-            <NavLink to="/notifications" className="ml-auto relative flex items-center justify-center w-7 h-7 rounded-ih-button text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-primary transition-all" aria-label="Notifications">
+            <NavLink to="/notifications" className="ml-auto relative flex items-center justify-center w-7 h-7 rounded-ih-button text-ih-fg-4 hover:bg-ih-bg-muted hover:text-ih-primary transition-all" aria-label={m.nav_action_notifications()}>
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
             </NavLink>
           </>
@@ -70,10 +71,10 @@ export function Sidebar() {
           <button
             type="button"
             className="w-full flex items-center gap-2 px-[10px] py-[7px] rounded-ih-button bg-ih-bg-muted hover:bg-ih-bg-muted/80 text-ih-fg-4 transition-all border border-ih-border text-[12px]"
-            aria-label="Open command palette"
+            aria-label={m.nav_action_command_palette()}
           >
             <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M16.5 10.5a6 6 0 11-12 0 6 6 0 0112 0z" /></svg>
-            <span className="font-medium">Search…</span>
+            <span className="font-medium">{m.nav_action_search()}</span>
             <kbd className="ih-kbd ml-auto">
               {typeof navigator !== "undefined" && navigator.platform?.startsWith("Mac") ? "⌘K" : "Ctrl /"}
             </kbd>
@@ -83,7 +84,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-1 overflow-y-auto">
-        <SidebarGroup label="Workspace" items={WORKSPACE_ITEMS} collapsed={collapsed} />
+        <SidebarGroup label={m.nav_section_workspace()} items={WORKSPACE_ITEMS} collapsed={collapsed} />
         {/* ds-allow: compact sidebar nav rhythm (10/7/14px), no semantic spacing token */}
         <div className="mb-[14px]">
           <NavLink
@@ -93,10 +94,10 @@ export function Sidebar() {
                 isActive ? "bg-ih-primary-tint text-ih-primary font-bold" : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary"
               } ${collapsed ? "justify-center" : ""}`
             }
-            title={collapsed ? "Library" : undefined}
+            title={collapsed ? m.nav_item_library() : undefined}
           >
             <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-            {!collapsed && <span>Library</span>}
+            {!collapsed && <span>{m.nav_item_library()}</span>}
           </NavLink>
         </div>
       </nav>
@@ -107,9 +108,9 @@ export function Sidebar() {
         {/* Collapse handle — slim chevron on the sidebar right edge */}
         <button
           onClick={toggleCollapsed}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-label={collapsed ? m.nav_action_expand_sidebar() : m.nav_action_collapse_sidebar()}
           className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-10 flex items-center justify-center rounded-r-[6px] bg-ih-bg-card border border-l-0 border-ih-border text-ih-fg-4 opacity-0 hover:opacity-100 focus:opacity-100 group-hover:opacity-100 transition-opacity z-10 hover:text-ih-primary focus:outline-none focus:text-ih-primary"
-          title={collapsed ? "Expand" : "Collapse"}
+          title={collapsed ? m.nav_action_expand() : m.nav_action_collapse()}
         >
           {collapsed ? (
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
@@ -127,10 +128,10 @@ export function Sidebar() {
               isActive ? "bg-ih-primary-tint text-ih-primary font-bold" : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary"
             } ${collapsed ? "justify-center" : ""}`
           }
-          title={collapsed ? "Settings" : undefined}
+          title={collapsed ? m.nav_item_settings() : undefined}
         >
           <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-          {!collapsed && <span>Settings</span>}
+          {!collapsed && <span>{m.nav_item_settings()}</span>}
         </NavLink>
 
         {/* Row 2: Avatar identity row — opens User Menu popover */}

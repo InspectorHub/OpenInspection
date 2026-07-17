@@ -3,12 +3,13 @@ import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/signup";
 import { createApi } from "~/lib/api-client.server";
-import { agentSignupSchema } from "~/lib/forms/auth.schema";
+import { makeAgentSignupSchema } from "~/lib/forms/auth.schema";
 import { readLegalLinks } from "~/lib/legal-links.server";
 import { LegalCheckbox } from "~/components/LegalCheckbox";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Become a partner agent - OpenInspection" }];
+  return [{ title: m.auth_agent_signup_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -28,7 +29,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const fd = await request.formData();
   // Turnstile token is not a validated form field — it passes through.
   const turnstileTokenRaw = fd.get("cf-turnstile-response");
-  const submission = parseWithZod(fd, { schema: agentSignupSchema });
+  const submission = parseWithZod(fd, { schema: makeAgentSignupSchema() });
   if (submission.status !== "success") {
     return submission.reply();
   }
@@ -48,9 +49,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!res.ok || !(json as Record<string, unknown>).success) {
     const err = json.error as Record<string, string> | undefined;
     if (err?.code === "conflict") {
-      return submission.reply({ formErrors: ["That email is already registered. Log in instead."] });
+      return submission.reply({ formErrors: [m.auth_agent_signup_error_conflict()] });
     }
-    return submission.reply({ formErrors: [err?.message || "Could not create account"] });
+    return submission.reply({ formErrors: [err?.message || m.auth_agent_signup_error_failed()] });
   }
 
   const data = json.data as Record<string, string> | undefined;
@@ -63,23 +64,27 @@ export async function action({ request, context }: Route.ActionArgs) {
 /*  Value proposition items                                            */
 /* ------------------------------------------------------------------ */
 
-const VALUE_PROPS = [
-  {
-    num: "1",
-    bold: "See every referred inspection.",
-    text: "One dashboard, every inspector you work with.",
-  },
-  {
-    num: "2",
-    bold: "Subscribe to availability.",
-    text: "Calendar feeds keep the dates your inspectors are open in your own calendar app.",
-  },
-  {
-    num: "3",
-    bold: "Free forever.",
-    text: "No fees, no card on file. Your inspectors pay for the platform.",
-  },
-];
+// Built by a factory (called per render) so the copy resolves against the
+// active locale rather than freezing at module import time.
+function makeValueProps() {
+  return [
+    {
+      num: "1",
+      bold: m.auth_agent_signup_prop1_bold(),
+      text: m.auth_agent_signup_prop1_text(),
+    },
+    {
+      num: "2",
+      bold: m.auth_agent_signup_prop2_bold(),
+      text: m.auth_agent_signup_prop2_text(),
+    },
+    {
+      num: "3",
+      bold: m.auth_agent_signup_prop3_bold(),
+      text: m.auth_agent_signup_prop3_text(),
+    },
+  ];
+}
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -106,7 +111,7 @@ export default function AgentSignupPage() {
   const [form, fields] = useForm({
     lastResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: agentSignupSchema });
+      return parseWithZod(formData, { schema: makeAgentSignupSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -126,15 +131,14 @@ export default function AgentSignupPage() {
             </span>
           </div>
           <h1 className="font-serif font-bold text-[2.75rem] leading-[1.05] tracking-tight mb-5">
-            Become a partner agent
+            {m.auth_agent_signup_heading()}
           </h1>
           {/* ds-allow: light tint text on the fixed-dark marketing panel */}
           <p className="text-base leading-relaxed text-stone-300 mb-8">
-            The free way for real-estate agents to track every inspection
-            their inspectors completed for clients they referred.
+            {m.auth_agent_signup_panel_text()}
           </p>
           <ul className="space-y-0">
-            {VALUE_PROPS.map((v) => (
+            {makeValueProps().map((v) => (
               <li
                 key={v.num}
                 className="flex gap-3.5 py-4 border-t border-white/[0.08] last:border-b"
@@ -157,11 +161,10 @@ export default function AgentSignupPage() {
       <section className="flex flex-col justify-center px-8 py-12 lg:px-12 bg-ih-bg-card">
         <div className="max-w-[420px] w-full mx-auto">
           <h2 className="text-2xl font-bold tracking-tight mb-2 text-ih-fg-1">
-            Create your free account
+            {m.auth_agent_signup_form_heading()}
           </h2>
           <p className="text-[15px] text-ih-fg-3 leading-relaxed mb-8">
-            Takes about a minute. Already invited? Use the link in your email
-            instead -- it pre-fills the right tenant.
+            {m.auth_agent_signup_form_subtitle()}
           </p>
 
           <Form method="post" autoComplete="off" id={form.id} onSubmit={form.onSubmit} noValidate>
@@ -171,13 +174,13 @@ export default function AgentSignupPage() {
                   htmlFor={fields.name.id}
                   className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
                 >
-                  Full name
+                  {m.auth_join_name_label()}
                 </label>
                 <input
                   type="text"
                   id={fields.name.id}
                   name={fields.name.name}
-                  placeholder="Jane Smith"
+                  placeholder={m.auth_agent_name_placeholder()}
                   aria-invalid={fields.name.errors ? true : undefined}
                   className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
@@ -190,13 +193,13 @@ export default function AgentSignupPage() {
                   htmlFor={fields.email.id}
                   className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
                 >
-                  Work email
+                  {m.auth_agent_signup_email_label()}
                 </label>
                 <input
                   type="email"
                   id={fields.email.id}
                   name={fields.email.name}
-                  placeholder="jane@realty.com"
+                  placeholder={m.auth_agent_signup_email_placeholder()}
                   aria-invalid={fields.email.errors ? true : undefined}
                   className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
@@ -209,13 +212,13 @@ export default function AgentSignupPage() {
                   htmlFor={fields.password.id}
                   className="block text-[13px] font-semibold text-ih-fg-3 mb-2"
                 >
-                  Password
+                  {m.auth_login_password_label()}
                 </label>
                 <input
                   type="password"
                   id={fields.password.id}
                   name={fields.password.name}
-                  placeholder="At least 12 characters"
+                  placeholder={m.auth_agent_password_placeholder()}
                   aria-invalid={fields.password.errors ? true : undefined}
                   className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
                 />
@@ -232,7 +235,7 @@ export default function AgentSignupPage() {
               disabled={submitting}
               className="w-full mt-7 px-6 py-3.5 text-[15px] font-semibold text-white bg-ih-primary rounded-xl hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
             >
-              {submitting ? "Creating account..." : "Create account"}
+              {submitting ? m.auth_agent_signup_submit_pending() : m.auth_agent_signup_submit()}
             </button>
 
             {form.errors && (
@@ -243,12 +246,12 @@ export default function AgentSignupPage() {
           </Form>
 
           <p className="mt-6 text-[14px] text-ih-fg-3 text-center">
-            Already have an account?{" "}
+            {m.auth_agent_signup_have_account()}{" "}
             <Link
               to="/login"
               className="text-ih-primary font-medium hover:underline"
             >
-              Log in
+              {m.auth_agent_signup_login_link()}
             </Link>
           </p>
         </div>

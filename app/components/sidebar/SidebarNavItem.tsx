@@ -13,10 +13,10 @@ export function SidebarNavItem({ item, collapsed }: { item: NavItem; collapsed: 
             : "text-ih-fg-2 hover:bg-ih-bg-muted hover:text-ih-primary"
         } ${collapsed ? "justify-center" : ""}`
       }
-      title={collapsed ? item.label : undefined}
+      title={collapsed ? item.label() : undefined}
     >
       {item.icon}
-      {!collapsed && <span>{item.label}</span>}
+      {!collapsed && <span>{item.label()}</span>}
     </NavLink>
   );
 }

@@ -22,11 +22,15 @@ export default defineConfig({
     },
   },
   plugins: [
-    // i18n Phase C — compile inlang messages to app/paraglide before RR resolves
-    // imports. strategy cookie→baseLocale ONLY: the default `globalVariable` is a
-    // module-global that is not request-safe under multi-tenant SSR concurrency
-    // (see the Phase C design §3a); locale is scoped per-request via AsyncLocalStorage
-    // (paraglideMiddleware in workers/app.ts).
+    // i18n — compile inlang messages to app/paraglide before RR resolves imports.
+    // Strategy cookie→baseLocale ONLY: the framework ships DORMANT (nothing sets
+    // the PARAGLIDE_LOCALE cookie yet), so every request resolves to baseLocale
+    // ('en') — extraction adds English messages with zero visible change. The
+    // locale SOURCE (Accept-Language / stored preference) and the language switcher
+    // are a later phase, added once translations exist. The default `globalVariable`
+    // strategy is excluded — it is a module-global, not request-safe under
+    // multi-tenant SSR concurrency (design §3a); locale is scoped per-request via
+    // AsyncLocalStorage (paraglideMiddleware in workers/app.ts).
     paraglideVitePlugin({
       project: "./project.inlang",
       outdir: "./app/paraglide",

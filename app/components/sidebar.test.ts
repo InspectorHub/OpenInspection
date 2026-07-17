@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 
 describe('Sidebar', () => {
   it('exports Sidebar and MobileHeader', async () => {
-    // Basic smoke test that the module loads
+    // Basic smoke test that the module loads. Generous timeout: this actually
+    // executes the Sidebar module, whose transitive imports are heavy (session
+    // context, Stripe, and the full Paraglide message set, which grows with the
+    // i18n catalog); under concurrent full-suite load it can exceed the 5s default.
     const mod = await import('~/components/Sidebar');
     expect(mod.Sidebar).toBeDefined();
     expect(mod.MobileHeader).toBeDefined();
-  });
+  }, 20000);
 
   it('WORKSPACE_ITEMS includes Team, not Reports; Library is a single hub entry', async () => {
     // Import the raw module source to verify the nav arrays.
@@ -22,9 +25,10 @@ describe('Sidebar', () => {
     // /reports now 301-redirects to the dashboard Published tab. The sidebar must
     // no longer surface a Reports entry.
     expect(text).not.toContain('"/reports"');
-    expect(text).not.toContain('"Reports"');
+    // Labels are now Paraglide messages (m.nav_item_*), so assert on the route +
+    // the externalized message key rather than the raw English literal.
     expect(text).toContain('"/team"');
-    expect(text).toContain('"Team"');
+    expect(text).toContain('nav_item_team');
     // The flat LIBRARY_ITEMS group has been collapsed into a single Library hub
     // entry. The sidebar must point at /library, not the individual module pages.
     expect(text).not.toContain('const LIBRARY_ITEMS');
@@ -70,9 +74,9 @@ describe('Sidebar', () => {
   it('IA-25: collapse button is an edge handle with correct aria-labels', async () => {
     const src = await import('~/components/Sidebar?raw');
     const text = (src as unknown as { default: string }).default;
-    // Edge handle must have both accessible label strings (may be a JSX ternary expression)
-    expect(text).toContain('"Collapse sidebar"');
-    expect(text).toContain('"Expand sidebar"');
+    // Edge handle must have both accessible labels — now Paraglide message keys.
+    expect(text).toContain('nav_action_collapse_sidebar');
+    expect(text).toContain('nav_action_expand_sidebar');
     // The aria-label attribute must be set on the collapse handle button
     expect(text).toContain('aria-label=');
   });

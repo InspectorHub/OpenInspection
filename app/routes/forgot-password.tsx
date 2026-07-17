@@ -3,11 +3,12 @@ import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/forgot-password";
 import { createApi } from "~/lib/api-client.server";
-import { forgotPasswordSchema } from "~/lib/forms/auth.schema";
+import { makeForgotPasswordSchema } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Reset your password - OpenInspection" }];
+  return [{ title: m.auth_forgot_meta_title() }];
 }
 
 export async function loader({ context }: Route.LoaderArgs) {
@@ -23,7 +24,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
-  const submission = parseWithZod(formData, { schema: forgotPasswordSchema });
+  const submission = parseWithZod(formData, { schema: makeForgotPasswordSchema() });
   if (submission.status !== "success") {
     return submission.reply();
   }
@@ -54,7 +55,7 @@ export default function ForgotPasswordPage() {
   const [form, fields] = useForm({
     lastResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: forgotPasswordSchema });
+      return parseWithZod(formData, { schema: makeForgotPasswordSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -63,23 +64,23 @@ export default function ForgotPasswordPage() {
   if (sent) {
     return (
       <AuthShell
-        heading="Check your inbox"
+        heading={m.auth_forgot_sent_heading()}
         subtitle={
           <>
-            If an account exists for{" "}
-            <strong className="text-ih-fg-1">{sent.email}</strong>, we've sent a
-            password reset link.
+            {m.auth_forgot_sent_subtitle_prefix()}{" "}
+            <strong className="text-ih-fg-1">{sent.email}</strong>
+            {m.auth_forgot_sent_subtitle_suffix()}
           </>
         }
       >
         <p className="text-sm text-ih-fg-3">
-          The link expires in 1 hour. Check your spam folder if it doesn't arrive.
+          {m.auth_forgot_sent_expiry_note()}
         </p>
         <a
           href="/forgot-password"
           className="mt-6 inline-block text-sm font-bold text-ih-primary hover:underline"
         >
-          Use a different email
+          {m.auth_forgot_sent_different_email()}
         </a>
       </AuthShell>
     );
@@ -87,18 +88,18 @@ export default function ForgotPasswordPage() {
 
   return (
     <AuthShell
-      heading="Reset your password"
-      subtitle="Enter your email and we'll send you a reset link."
+      heading={m.auth_forgot_heading()}
+      subtitle={m.auth_forgot_subtitle()}
       footer={
         <a href="/login" className="font-bold text-ih-primary hover:underline">
-          Back to log in
+          {m.auth_forgot_back_to_login()}
         </a>
       }
     >
       <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
         <div>
           <label htmlFor={fields.email.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-            Email address
+            {m.auth_login_email_label()}
           </label>
           <input
             id={fields.email.id}
@@ -118,7 +119,7 @@ export default function ForgotPasswordPage() {
           disabled={isSubmitting}
           className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "Sending…" : "Send reset link"}
+          {isSubmitting ? m.auth_forgot_submit_pending() : m.auth_forgot_submit()}
         </button>
       </Form>
     </AuthShell>

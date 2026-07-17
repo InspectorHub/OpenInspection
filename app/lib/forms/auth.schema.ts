@@ -31,14 +31,19 @@ export type LoginInput = z.infer<ReturnType<typeof makeLoginSchema>>;
 /**
  * Shared strong-password rule, mirroring the API's `passwordSchema`
  * (server/lib/validations/shared.schema.ts): min 8 chars with at least one
- * uppercase letter, one digit, and one special character.
+ * uppercase letter, one digit, and one special character. Built by a FACTORY
+ * (not a module const) so its user-facing messages resolve per validation
+ * against the active locale (paraglide ALS/cookie) instead of freezing at
+ * import time.
  */
-const strongPassword = z
-  .string()
-  .min(8, "Password must be at least 8 characters")
-  .regex(/[A-Z]/, "Must contain at least one uppercase letter")
-  .regex(/[0-9]/, "Must contain at least one number")
-  .regex(/[^A-Za-z0-9]/, "Must contain at least one special character");
+function makeStrongPassword() {
+  return z
+    .string()
+    .min(8, m.auth_validation_password_min8())
+    .regex(/[A-Z]/, m.auth_validation_password_uppercase())
+    .regex(/[0-9]/, m.auth_validation_password_number())
+    .regex(/[^A-Za-z0-9]/, m.auth_validation_password_special());
+}
 
 /**
  * Setup (first-run) — mirrors the API's `SetupSchema`. The form field names
@@ -46,34 +51,45 @@ const strongPassword = z
  * are preserved; the action maps them to the API body. `setupCode` is required
  * by the form (min 6), matching the operator-provisioned SETUP_CODE.
  */
-export const setupSchema = z.object({
-  workspaceName: z.string().min(2, "Workspace name is required"),
-  adminName: z
-    .string()
-    .min(2, "Your name is required")
-    .max(120, "Name is too long"),
-  email: z.string().min(1, "Email is required").email("Invalid email address"),
-  password: strongPassword,
-  setupCode: z.string().min(6, "Setup code must be at least 6 characters"),
-});
+export function makeSetupSchema() {
+  return z.object({
+    workspaceName: z.string().min(2, m.auth_validation_workspace_name_required()),
+    adminName: z
+      .string()
+      .min(2, m.auth_validation_your_name_required())
+      .max(120, m.auth_validation_name_too_long()),
+    email: z
+      .string()
+      .min(1, m.auth_validation_email_required())
+      .email(m.auth_validation_email_invalid()),
+    password: makeStrongPassword(),
+    setupCode: z.string().min(6, m.auth_validation_setup_code_min()),
+  });
+}
 
-export type SetupInput = z.infer<typeof setupSchema>;
+export type SetupInput = z.infer<ReturnType<typeof makeSetupSchema>>;
 
 /**
  * Human-readable strong-password requirement, shown next to password inputs on
- * the reset and join pages. Kept as ONE constant so both surfaces stay in sync
- * with `strongPassword` above.
+ * the reset and join pages. A factory (not a const) so the copy tracks the
+ * active locale; stays in sync with `makeStrongPassword()` above.
  */
-export const PASSWORD_HINT =
-  'At least 8 characters, with an uppercase letter, a number, and a special character.';
+export function makePasswordHint() {
+  return m.auth_password_hint();
+}
 
 /**
  * Forgot-password request (`/forgot-password`). Only the email is user-entered;
  * the backend answers 200 unconditionally (anti-enumeration).
  */
-export const forgotPasswordSchema = z.object({
-  email: z.string().min(1, 'Email is required').email('Invalid email address'),
-});
+export function makeForgotPasswordSchema() {
+  return z.object({
+    email: z
+      .string()
+      .min(1, m.auth_validation_email_required())
+      .email(m.auth_validation_email_invalid()),
+  });
+}
 
 /**
  * Reset-password submit (`/reset-password`). The token rides as a hidden field
@@ -81,46 +97,66 @@ export const forgotPasswordSchema = z.object({
  * validates the new password. Field name is `newPassword`, matching the API's
  * `ResetPasswordSchema` (server/lib/validations/auth.schema.ts).
  */
-export const resetPasswordSchema = z.object({
-  newPassword: strongPassword,
-});
+export function makeResetPasswordSchema() {
+  return z.object({
+    newPassword: makeStrongPassword(),
+  });
+}
 
 /**
  * Team-invite accept (`/join`). Token comes from the URL, NOT the form — the
  * schema only validates the user-entered name + password. Mirrors the API's
  * `JoinTeamSchema` password strength.
  */
-export const joinSchema = z.object({
-  name: z.string().min(1, "Name is required").max(120, "Name is too long"),
-  password: strongPassword,
-});
+export function makeJoinSchema() {
+  return z.object({
+    name: z
+      .string()
+      .min(1, m.auth_validation_name_required())
+      .max(120, m.auth_validation_name_too_long()),
+    password: makeStrongPassword(),
+  });
+}
 
-export type JoinInput = z.infer<typeof joinSchema>;
+export type JoinInput = z.infer<ReturnType<typeof makeJoinSchema>>;
 
 /**
  * Partner-agent invite accept (`/agent-invite/accept`). Token + email come from
  * the invite (email is read-only), so only name + password are validated.
  * Mirrors the API's agent accept schema: name min 2, password min 12.
  */
-export const agentInviteAcceptSchema = z.object({
-  name: z.string().min(2, "Please enter your full name").max(120, "Name is too long"),
-  password: z.string().min(12, "Password must be at least 12 characters"),
-});
+export function makeAgentInviteAcceptSchema() {
+  return z.object({
+    name: z
+      .string()
+      .min(2, m.auth_validation_full_name_required())
+      .max(120, m.auth_validation_name_too_long()),
+    password: z.string().min(12, m.auth_validation_password_min12()),
+  });
+}
 
-export type AgentInviteAcceptInput = z.infer<typeof agentInviteAcceptSchema>;
+export type AgentInviteAcceptInput = z.infer<ReturnType<typeof makeAgentInviteAcceptSchema>>;
 
 /**
  * Partner-agent self-signup (`/agent-signup`). Mirrors the API's
  * `SignupBodySchema`: name min 2/max 120, email, password min 12/max 120.
  * The Turnstile token is not a validated form field — it passes through.
  */
-export const agentSignupSchema = z.object({
-  name: z.string().min(2, "Please enter your full name").max(120, "Name is too long"),
-  email: z.string().min(1, "Email is required").email("Invalid email address"),
-  password: z
-    .string()
-    .min(12, "Password must be at least 12 characters")
-    .max(120, "Password is too long"),
-});
+export function makeAgentSignupSchema() {
+  return z.object({
+    name: z
+      .string()
+      .min(2, m.auth_validation_full_name_required())
+      .max(120, m.auth_validation_name_too_long()),
+    email: z
+      .string()
+      .min(1, m.auth_validation_email_required())
+      .email(m.auth_validation_email_invalid()),
+    password: z
+      .string()
+      .min(12, m.auth_validation_password_min12())
+      .max(120, m.auth_validation_password_too_long()),
+  });
+}
 
-export type AgentSignupInput = z.infer<typeof agentSignupSchema>;
+export type AgentSignupInput = z.infer<ReturnType<typeof makeAgentSignupSchema>>;

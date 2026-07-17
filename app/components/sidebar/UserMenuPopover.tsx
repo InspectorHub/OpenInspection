@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { NavLink } from "react-router";
 import { IC } from "~/components/sidebar/nav-items";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
+import { m } from "~/paraglide/messages";
 
 // ─── User Menu popover (desktop sidebar) ─────────────────────────────────────
 interface UserMenuPopoverProps {
@@ -51,7 +52,7 @@ export function UserMenuPopover({
     <div
       ref={ref}
       role="menu"
-      aria-label="User menu"
+      aria-label={m.nav_user_menu_aria()}
       className="absolute bottom-full left-0 mb-2 w-[220px] bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover z-50 py-1.5 overflow-hidden"
     >
       {/* Workspace card */}
@@ -73,14 +74,14 @@ export function UserMenuPopover({
           onClick={onClose}
         >
           <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
-          <span>Switch workspace…</span>
+          <span>{m.nav_user_switch_workspace()}</span>
         </a>
       )}
 
       {/* Divider + Theme */}
       <div className="border-t border-ih-border my-1" />
       <div className="px-3 py-1.5">
-        <div className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-wide mb-1.5">Theme</div>
+        <div className="text-[10px] font-bold text-ih-fg-4 uppercase tracking-wide mb-1.5">{m.nav_theme_label()}</div>
         <ThemeSegmentControl />
       </div>
 
@@ -98,7 +99,7 @@ export function UserMenuPopover({
         onClick={onClose}
       >
         <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-        <span>My profile</span>
+        <span>{m.nav_user_profile()}</span>
       </NavLink>
 
       {privacyUrl && (
@@ -112,7 +113,7 @@ export function UserMenuPopover({
           onClick={onClose}
         >
           <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-          <span>Privacy Policy</span>
+          <span>{m.nav_user_privacy()}</span>
         </a>
       )}
 
@@ -125,7 +126,7 @@ export function UserMenuPopover({
         onClick={onClose}
       >
         <svg className={IC} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-        <span>Log out</span>
+        <span>{m.nav_user_logout()}</span>
       </a>
     </div>
   );

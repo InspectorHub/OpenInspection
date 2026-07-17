@@ -21,9 +21,10 @@ import { PublishReportModal } from "~/components/inspection-hub/PublishReportMod
 import { CreateReinspectionModal } from "~/components/inspection-hub/CreateReinspectionModal";
 import { toActionResult } from "~/lib/inspection-hub-actions";
 import type { ReinspectCandidate } from "~/lib/inspection-hub-helpers";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Inspection - OpenInspection" }];
+  return [{ title: m.inspections_hub_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -175,20 +176,20 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       },
     });
     // Surface the API rejection (B-4: never unconditional ok:true).
-    return toActionResult(res, "send-agreement", "Could not send the agreement. Please try again.");
+    return toActionResult(res, "send-agreement", m.inspections_hub_error_send_agreement());
   }
 
   if (intent === "request-payment") {
     const res = await api.invoices["request-payment"].$post({
       json: { inspectionId: id },
     });
-    return toActionResult(res, "request-payment", "Could not request payment. Please try again.");
+    return toActionResult(res, "request-payment", m.inspections_hub_error_request_payment());
   }
 
   if (intent === "attest-sms") {
     // Track L (E) — inspector attestation that the client agreed to receive texts.
     const res = await api.smsAdmin.sms.attest.$post({ json: { inspectionId: id } });
-    return toActionResult(res, "attest-sms", "Could not record consent. Please try again.");
+    return toActionResult(res, "attest-sms", m.inspections_hub_error_attest_sms());
   }
 
   if (intent === "publish") {
@@ -206,7 +207,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         requirePayment: formData.get("requirePayment") === "on",
       },
     });
-    return toActionResult(res, "publish", "Could not publish the report. Please try again.");
+    return toActionResult(res, "publish", m.inspections_hub_error_publish());
   }
 
   if (intent === "submit") {
@@ -214,7 +215,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       submit: { $post: (args: { param: { id: string } }) => Promise<Response> };
     };
     const res = await submitApi.submit.$post({ param: { id } });
-    return toActionResult(res, "submit", "Could not submit the report. Please try again.");
+    return toActionResult(res, "submit", m.inspections_hub_error_submit());
   }
 
   if (intent === "return") {
@@ -222,7 +223,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       return: { $post: (args: { param: { id: string } }) => Promise<Response> };
     };
     const res = await returnApi.return.$post({ param: { id } });
-    return toActionResult(res, "return", "Could not return the report. Please try again.");
+    return toActionResult(res, "return", m.inspections_hub_error_return());
   }
 
   if (intent === "unpublish") {
@@ -230,7 +231,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       unpublish: { $post: (args: { param: { id: string } }) => Promise<Response> };
     };
     const res = await unpublishApi.unpublish.$post({ param: { id } });
-    return toActionResult(res, "unpublish", "Could not unpublish the report. Please try again.");
+    return toActionResult(res, "unpublish", m.inspections_hub_error_unpublish());
   }
 
   if (intent === "create-reinspection") {
@@ -245,7 +246,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       return {
         ok: false,
         intent: "create-reinspection" as const,
-        error: "Select at least one item to carry forward.",
+        error: m.inspections_hub_error_reinspect_no_items(),
         newId: undefined,
       };
     }
@@ -258,7 +259,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       return {
         ok: false,
         intent: "create-reinspection" as const,
-        error: err?.error?.message ?? "Could not create the re-inspection. Please try again.",
+        error: err?.error?.message ?? m.inspections_hub_error_reinspect(),
         newId: undefined,
       };
     }
@@ -271,7 +272,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     };
   }
 
-  return { ok: false, intent: undefined, error: "Unknown action." };
+  return { ok: false, intent: undefined, error: m.inspections_hub_error_unknown_action() };
 }
 
 /* ------------------------------------------------------------------ */
@@ -335,12 +336,12 @@ export default function InspectionHubPage() {
         body: file,
       });
       if (!res.ok) {
-        setDocError("Upload failed. Please try again.");
+        setDocError(m.inspections_hub_doc_upload_failed());
         return;
       }
       revalidator.revalidate();
     } catch {
-      setDocError("Upload failed. Please try again.");
+      setDocError(m.inspections_hub_doc_upload_failed());
     } finally {
       setDocUploading(false);
     }
@@ -353,12 +354,12 @@ export default function InspectionHubPage() {
         method: "DELETE",
       });
       if (!res.ok) {
-        setDocError("Could not delete the document. Please try again.");
+        setDocError(m.inspections_hub_doc_delete_failed());
         return;
       }
       revalidator.revalidate();
     } catch {
-      setDocError("Could not delete the document. Please try again.");
+      setDocError(m.inspections_hub_doc_delete_failed());
     }
   };
 
@@ -440,14 +441,14 @@ export default function InspectionHubPage() {
       {/* Breadcrumb — Inspections > this inspection */}
       <Breadcrumb
         items={[
-          { label: "Inspections", href: "/inspections" },
-          { label: inspection.propertyAddress || "Untitled inspection" },
+          { label: m.inspections_hub_breadcrumb_inspections(), href: "/inspections" },
+          { label: inspection.propertyAddress || m.inspections_hub_untitled() },
         ]}
       />
 
       {/* PageHeader — status pill in meta, address title, date + inspector meta */}
       <PageHeader
-        title={inspection.propertyAddress || "Untitled inspection"}
+        title={inspection.propertyAddress || m.inspections_hub_untitled()}
         meta={
           <span className="flex items-center gap-2 flex-wrap">
             <Pill tone={statusTone(inspection.status)}>
@@ -467,14 +468,14 @@ export default function InspectionHubPage() {
               to={`/inspections/${inspection.id}/edit`}
               className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600"
             >
-              Open editor
+              {m.inspections_hub_action_open_editor()}
             </Link>
             {reportShipped && (
               <Link
                 to={`/report-view/${tenantSlug}/${inspection.id}`}
                 className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted"
               >
-                View report
+                {m.inspections_hub_action_view_report()}
               </Link>
             )}
           </>
@@ -485,12 +486,12 @@ export default function InspectionHubPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 1. People ------------------------------------------------- */}
         <Card className="p-5">
-          <BlockHeading title="People" />
+          <BlockHeading title={m.inspections_hub_block_people()} />
           <div className="space-y-3">
             {/* Client */}
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                Client
+                {m.inspections_hub_people_client()}
               </p>
               {people.client ? (
                 <div className="text-[13px] text-ih-fg-1">
@@ -530,7 +531,7 @@ export default function InspectionHubPage() {
                 // Bare-text fallback when only the denormalized name is present.
                 <p className="text-[13px] text-ih-fg-1">{inspection.clientName}</p>
               ) : (
-                <p className="text-[13px] text-ih-fg-4">No client</p>
+                <p className="text-[13px] text-ih-fg-4">{m.inspections_hub_people_no_client()}</p>
               )}
             </div>
 
@@ -538,7 +539,7 @@ export default function InspectionHubPage() {
             {allAgents.length > 0 && (
               <div>
                 <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                  Agents
+                  {m.inspections_hub_people_agents()}
                 </p>
                 <div className="space-y-2">
                   {allAgents.map((agent) => (
@@ -571,14 +572,14 @@ export default function InspectionHubPage() {
             {/* Inspector */}
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                Inspector
+                {m.inspections_hub_people_inspector()}
               </p>
               {people.inspector ? (
                 <p className="text-[13px] text-ih-fg-1 font-medium">
                   {people.inspector.name || people.inspector.email}
                 </p>
               ) : (
-                <p className="text-[13px] text-ih-fg-4">Unassigned</p>
+                <p className="text-[13px] text-ih-fg-4">{m.inspections_hub_people_unassigned()}</p>
               )}
             </div>
           </div>
@@ -586,7 +587,7 @@ export default function InspectionHubPage() {
 
         {/* 2. Schedule ---------------------------------------------- */}
         <Card className="p-5">
-          <BlockHeading title="Schedule" />
+          <BlockHeading title={m.inspections_hub_block_schedule()} />
           <p className="text-[15px] font-medium text-ih-fg-1">
             {formatInspectionDateTime(inspection.date)}
           </p>
@@ -594,15 +595,15 @@ export default function InspectionHubPage() {
             to={`/inspections/${inspection.id}/edit`}
             className="text-[12px] font-bold text-ih-primary hover:underline mt-3 inline-block"
           >
-            Reschedule in editor
+            {m.inspections_hub_schedule_reschedule()}
           </Link>
         </Card>
 
         {/* 3. Services ---------------------------------------------- */}
         <Card className="p-5">
-          <BlockHeading title="Services" />
+          <BlockHeading title={m.inspections_hub_block_services()} />
           {services.length === 0 ? (
-            <EmptyState title="No services" description="No services have been added to this inspection." />
+            <EmptyState title={m.inspections_hub_services_empty_title()} description={m.inspections_hub_services_empty_desc()} />
           ) : (
             <div className="divide-y divide-ih-border">
               {services.map((svc) => (
@@ -614,7 +615,7 @@ export default function InspectionHubPage() {
                 </div>
               ))}
               <div className="flex items-center justify-between py-2 text-[13px] font-bold">
-                <span className="text-ih-fg-1">Total</span>
+                <span className="text-ih-fg-1">{m.inspections_hub_services_total()}</span>
                 <span className="text-ih-fg-1 tabular-nums">{formatCents(servicesTotalCents)}</span>
               </div>
             </div>
@@ -623,7 +624,7 @@ export default function InspectionHubPage() {
 
         {/* 4. Agreement --------------------------------------------- */}
         <Card className="p-5">
-          <BlockHeading title="Agreement" pill={blocks.agreement} />
+          <BlockHeading title={m.inspections_hub_block_agreement()} pill={blocks.agreement} />
           {hub.agreementRequests.length > 0 ? (
             <div className="divide-y divide-ih-border mb-3">
               {hub.agreementRequests.map((req) => (
@@ -639,26 +640,26 @@ export default function InspectionHubPage() {
               ))}
             </div>
           ) : (
-            <p className="text-[12px] text-ih-fg-3 mb-3">No agreement requests yet.</p>
+            <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_agreement_empty()}</p>
           )}
           <Button
             variant="secondary"
             size="sm"
             onClick={() => agreementModal.setOpen(true)}
           >
-            Send agreement
+            {m.inspections_hub_agreement_send()}
           </Button>
         </Card>
 
         {/* 5. Invoice ----------------------------------------------- */}
         <Card className="p-5">
-          <BlockHeading title="Invoice" pill={blocks.invoice} />
+          <BlockHeading title={m.inspections_hub_block_invoice()} pill={blocks.invoice} />
           <p className="text-[15px] font-medium text-ih-fg-1 mb-3">
             {formatCents(invoiceAmountCents)}
           </p>
           {invoicePaid ? (
             // Paid is terminal — read-only (the pill already shows "Paid").
-            <p className="text-[12px] text-ih-fg-3">Payment received.</p>
+            <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_invoice_paid()}</p>
           ) : invoiceSent ? (
             <div className="flex items-center gap-2 flex-wrap">
               <Button
@@ -666,7 +667,7 @@ export default function InspectionHubPage() {
                 size="sm"
                 onClick={() => paymentModal.setOpen(true)}
               >
-                Resend request
+                {m.inspections_hub_invoice_resend()}
               </Button>
               <CopyLinkButton url={`/invoice/${inspection.id}`} />
             </div>
@@ -676,21 +677,21 @@ export default function InspectionHubPage() {
               size="sm"
               onClick={() => paymentModal.setOpen(true)}
             >
-              Request payment
+              {m.inspections_hub_invoice_request()}
             </Button>
           )}
         </Card>
 
         {/* 6. Report ------------------------------------------------ */}
         <Card className="p-5">
-          <BlockHeading title="Report" pill={blocks.report} />
+          <BlockHeading title={m.inspections_hub_block_report()} pill={blocks.report} />
           {reportPublished ? (
             // Already shipped — read-only for publishing. The header "View report"
             // link covers viewing. #119: a published baseline can spawn a
             // re-inspection that carries forward its still-open flagged items.
             <>
               <p className="text-[12px] text-ih-fg-3 mb-3">
-                Report delivered to the client.
+                {m.inspections_hub_report_delivered()}
               </p>
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
@@ -698,7 +699,7 @@ export default function InspectionHubPage() {
                   size="sm"
                   onClick={() => reinspectModal.setOpen(true)}
                 >
-                  Create re-inspection
+                  {m.inspections_hub_report_create_reinspection()}
                 </Button>
                 {reportActionList.includes('unpublish') && (
                   <unpublishReport.Form method="post">
@@ -708,7 +709,7 @@ export default function InspectionHubPage() {
                       disabled={unpublishingReport}
                       className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60"
                     >
-                      {unpublishingReport ? "Unpublishing…" : "Unpublish"}
+                      {unpublishingReport ? m.inspections_hub_report_unpublishing() : m.inspections_hub_report_unpublish()}
                     </button>
                   </unpublishReport.Form>
                 )}
@@ -718,17 +719,17 @@ export default function InspectionHubPage() {
             <>
               {inspection.reportStatus === 'submitted' && (
                 <p className="text-[12px] text-ih-fg-3 mb-3">
-                  Report submitted for review.
+                  {m.inspections_hub_report_submitted()}
                 </p>
               )}
               {inspection.reportStatus === 'in_progress' && hub.publishReadiness.ready && (
                 <p className="text-[12px] text-ih-fg-3 mb-3">
-                  All required fields are complete.
+                  {m.inspections_hub_report_ready()}
                 </p>
               )}
               {inspection.reportStatus === 'in_progress' && !hub.publishReadiness.ready && hub.publishReadiness.blockingCount > 0 && (
                 <p className="text-[12px] text-ih-fg-3 mb-3">
-                  {hub.publishReadiness.blockingCount} blocker(s) to resolve before publishing.
+                  {m.inspections_hub_report_blockers({ count: hub.publishReadiness.blockingCount })}
                 </p>
               )}
               <div className="flex items-center gap-2 flex-wrap">
@@ -738,7 +739,7 @@ export default function InspectionHubPage() {
                     size="sm"
                     onClick={() => publishModal.setOpen(true)}
                   >
-                    Publish report
+                    {m.inspections_hub_report_publish()}
                   </Button>
                 )}
                 {reportActionList.includes('submit') && (
@@ -749,7 +750,7 @@ export default function InspectionHubPage() {
                       disabled={submittingReport}
                       className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
                     >
-                      {submittingReport ? "Submitting…" : "Submit for review"}
+                      {submittingReport ? m.inspections_hub_report_submitting() : m.inspections_hub_report_submit()}
                     </button>
                   </submitReport.Form>
                 )}
@@ -761,7 +762,7 @@ export default function InspectionHubPage() {
                       disabled={returningReport}
                       className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60"
                     >
-                      {returningReport ? "Returning…" : "Return to inspector"}
+                      {returningReport ? m.inspections_hub_report_returning() : m.inspections_hub_report_return()}
                     </button>
                   </returnReport.Form>
                 )}
@@ -770,14 +771,14 @@ export default function InspectionHubPage() {
                     to={`/inspections/${inspection.id}/edit`}
                     className="text-[12px] font-bold text-ih-primary hover:underline"
                   >
-                    Resolve in editor
+                    {m.inspections_hub_report_resolve()}
                   </Link>
                 )}
               </div>
             </>
           ) : (
             // Pre-completion (in progress) — nothing to publish yet.
-            <p className="text-[12px] text-ih-fg-3">Report is still in progress.</p>
+            <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_report_in_progress()}</p>
           )}
         </Card>
       </div>
@@ -894,14 +895,14 @@ function ClientSmsConsent({
       : undefined;
 
   const label =
-    consent === "granted" ? "granted" : consent === "revoked" ? "revoked" : "not recorded";
+    consent === "granted" ? m.inspections_hub_sms_granted() : consent === "revoked" ? m.inspections_hub_sms_revoked() : m.inspections_hub_sms_not_recorded();
   const tone =
     consent === "granted" ? "text-ih-ok-fg" : consent === "revoked" ? "text-ih-bad-fg" : "text-ih-fg-4";
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
       <span className="text-ih-fg-3">
-        Client SMS: <span className={`font-bold ${tone}`}>{label}</span>
+        {m.inspections_hub_sms_label()} <span className={`font-bold ${tone}`}>{label}</span>
       </span>
       {/* Offer the attestation only when not already granted. Framed as an
           inspector confirmation that the client agreed (not a consent-less
@@ -914,7 +915,7 @@ function ClientSmsConsent({
             disabled={attesting}
             className="text-[11px] font-bold text-ih-primary hover:underline disabled:opacity-60"
           >
-            {attesting ? "Recording…" : "Client agreed to receive texts — I confirm"}
+            {attesting ? m.inspections_hub_sms_recording() : m.inspections_hub_sms_confirm()}
           </button>
         </fetcher.Form>
       )}
@@ -940,7 +941,7 @@ function CopyLinkButton({ url }: { url: string }) {
       onClick={onCopy}
       className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted"
     >
-      {copied ? "Copied!" : "Copy link"}
+      {copied ? m.inspections_hub_copied() : m.inspections_hub_copy_link()}
     </button>
   );
 }
@@ -970,10 +971,10 @@ export function ErrorBoundary() {
   const status = isRouteErrorResponse(error) ? error.status : null;
   const message =
     status === 404
-      ? "This inspection could not be found. It may have been deleted."
+      ? m.inspections_hub_eb_not_found()
       : status === 403
-        ? "You do not have permission to view this inspection."
-        : "Something went wrong while opening the inspection.";
+        ? m.inspections_hub_eb_forbidden()
+        : m.inspections_hub_eb_generic();
 
   return (
     <div className="max-w-[1080px] mx-auto pt-16 px-9 flex flex-col items-center gap-3 text-center">
@@ -982,7 +983,7 @@ export function ErrorBoundary() {
         to="/inspections"
         className="h-9 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600"
       >
-        Back to Dashboard
+        {m.inspections_hub_eb_back()}
       </Link>
     </div>
   );
