@@ -61,6 +61,7 @@ import placesRoutes from './api/places';
 import availabilityRoutes from './api/availability';
 import calendarRoutes from './api/calendar';
 import calendarEventsRoutes from './api/calendar-events';
+import scheduleWeekSummaryRoutes from './api/schedule-week-summary';
 import teamRoutes from './api/team';
 import contactRoutes from './api/contacts';
 import contactsImportRoutes from './api/contacts/import';
@@ -526,6 +527,7 @@ const routes = app
   // Mount /api/calendar/events BEFORE /api/calendar so the more-specific path takes precedence.
   .route('/api/calendar/events', calendarEventsRoutes)
   .route('/api/calendar', calendarRoutes)
+  .route('/api/schedule', scheduleWeekSummaryRoutes)
   .route('/api/team', teamRoutes)
   .route('/api/contacts', contactRoutes)
   // Import sub-router — extracted to fix hono/client type-collapse (C-10)
