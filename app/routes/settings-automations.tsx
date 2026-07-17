@@ -28,21 +28,23 @@ interface Svc { id: string; name: string; }
 interface LogRow { id: string; recipient: string; channel: string; sendAt: string; status: string; error: string | null; }
 interface TemplateSummary { id: string; name: string; channel: string; }
 
+// Trigger ids are unchanged (used as <option> values + rule.trigger keys). Labels are
+// exposed as getters so each resolves at access time under the active paraglide locale.
 export const TRIGGER_LABELS: Record<string, string> = {
-  "inspection.created": "Inspection created",
-  "inspection.confirmed": "Inspection confirmed",
-  "inspection.cancelled": "Inspection cancelled",
-  "inspection.reminder": "Before the inspection (reminder)",
-  "report.published": "Report published",
-  "invoice.created": "Invoice created",
-  "payment.received": "Payment received",
-  "agreement.signed": "Agreement signed",
-  "agreement.signer_signed": "A signer signed",
-  "agreement.viewed": "Agreement viewed",
-  "agreement.declined": "Agreement declined",
-  "agreement.expired": "Agreement expired",
-  "event.created": "Event created",
-  "event.completed": "Event completed",
+  get "inspection.created"() { return m.label_trigger_inspection_created(); },
+  get "inspection.confirmed"() { return m.label_trigger_inspection_confirmed(); },
+  get "inspection.cancelled"() { return m.label_trigger_inspection_cancelled(); },
+  get "inspection.reminder"() { return m.label_trigger_inspection_reminder(); },
+  get "report.published"() { return m.label_trigger_report_published(); },
+  get "invoice.created"() { return m.label_trigger_invoice_created(); },
+  get "payment.received"() { return m.label_trigger_payment_received(); },
+  get "agreement.signed"() { return m.label_trigger_agreement_signed(); },
+  get "agreement.signer_signed"() { return m.label_trigger_agreement_signer_signed(); },
+  get "agreement.viewed"() { return m.label_trigger_agreement_viewed(); },
+  get "agreement.declined"() { return m.label_trigger_agreement_declined(); },
+  get "agreement.expired"() { return m.label_trigger_agreement_expired(); },
+  get "event.created"() { return m.label_trigger_event_created(); },
+  get "event.completed"() { return m.label_trigger_event_completed(); },
 };
 const RECIPIENTS = ["client", "buying_agent", "selling_agent", "inspector", "all"] as const;
 

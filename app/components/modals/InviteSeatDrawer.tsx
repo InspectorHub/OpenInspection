@@ -18,12 +18,15 @@ const ROLE_DESC: Record<Role, () => string> = {
  agent: () => m.modal_invite_role_desc_agent(),
 };
 
-/** Advanced-permissions toggle labels, in TOGGLEABLE order. */
+/**
+ * Advanced-permissions toggle labels, in TOGGLEABLE order. Exposed as getters so each
+ * label resolves at access time inside the paraglide request scope, not frozen at import.
+ */
 export const CAP_LABELS: Record<Capability, string> = {
- publish: "Publish reports",
- scheduleOthers: "Schedule for others",
- financial: "Financial data",
- manageContacts: "Manage contacts",
+ get publish() { return m.label_cap_publish(); },
+ get scheduleOthers() { return m.label_cap_schedule_others(); },
+ get financial() { return m.label_cap_financial(); },
+ get manageContacts() { return m.label_cap_manage_contacts(); },
 };
 
 /**

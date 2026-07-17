@@ -72,14 +72,16 @@ export const DOCUMENT_CATEGORIES = [
 ] as const;
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 
+// Labels are exposed as getters so each resolves at access time under the active
+// paraglide locale; the category ids/keys are unchanged (used as React keys + values).
 export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
-  prior_reports: "Prior Reports",
-  plans_drawings: "Plans & Drawings",
-  environmental: "Environmental",
-  leases_financials: "Leases & Financials",
-  permits_certificates: "Permits & Certificates",
-  photos: "Photos",
-  other: "Other",
+  get prior_reports() { return m.label_doccategory_prior_reports(); },
+  get plans_drawings() { return m.label_doccategory_plans_drawings(); },
+  get environmental() { return m.label_doccategory_environmental(); },
+  get leases_financials() { return m.label_doccategory_leases_financials(); },
+  get permits_certificates() { return m.label_doccategory_permits_certificates(); },
+  get photos() { return m.label_doccategory_photos(); },
+  get other() { return m.label_doccategory_other(); },
 };
 
 export type DocumentVisibility = "client_visible" | "internal";
