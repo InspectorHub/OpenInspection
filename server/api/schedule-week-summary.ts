@@ -163,4 +163,6 @@ const scheduleWeekSummaryRoutes = createApiRouter()
         return c.json({ success: true as const, data: { days } }, 200);
     });
 
+export type ScheduleApi = typeof scheduleWeekSummaryRoutes;
+
 export default scheduleWeekSummaryRoutes;

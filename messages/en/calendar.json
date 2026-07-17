@@ -42,5 +42,10 @@
   "calendar_weekday_wed": "Wed",
   "calendar_weekday_thu": "Thu",
   "calendar_weekday_fri": "Fri",
-  "calendar_weekday_sat": "Sat"
+  "calendar_weekday_sat": "Sat",
+  "schedule_heatmap_heading": "Availability this week",
+  "schedule_heatmap_open": "Open",
+  "schedule_heatmap_full": "Fully booked",
+  "schedule_heatmap_closed": "Closed",
+  "schedule_heatmap_unconfigured": "No hours set"
 }
