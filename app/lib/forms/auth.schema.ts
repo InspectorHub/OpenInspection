@@ -1,4 +1,9 @@
 import { z } from "zod";
+// i18n Phase C (auth pilot) — locale-aware validation messages. `m.*()` resolves
+// to the active locale via paraglide's ALS (server) / cookie (client), so schemas
+// carrying user-facing messages are built by a FACTORY called per validation
+// (never a module-level const, which would freeze the message at import time).
+import { m } from "~/paraglide/messages";
 
 /**
  * Form schemas, mirroring the API's validation rules
@@ -11,12 +16,17 @@ import { z } from "zod";
  * into a `packages/shared-schemas` consumed by both api and frontend. For now
  * these are co-located mirrors.
  */
-export const loginSchema = z.object({
-  email: z.string().min(1, "Email is required").email("Invalid email address"),
-  password: z.string().min(1, "Password is required"),
-});
+export function makeLoginSchema() {
+  return z.object({
+    email: z
+      .string()
+      .min(1, m.auth_validation_email_required())
+      .email(m.auth_validation_email_invalid()),
+    password: z.string().min(1, m.auth_validation_password_required()),
+  });
+}
 
-export type LoginInput = z.infer<typeof loginSchema>;
+export type LoginInput = z.infer<ReturnType<typeof makeLoginSchema>>;
 
 /**
  * Shared strong-password rule, mirroring the API's `passwordSchema`

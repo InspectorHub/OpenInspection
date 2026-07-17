@@ -53,6 +53,7 @@
     "tailwindcss",
     "miniflare",
     "lint-staged",
-    "cloudflare"
+    "cloudflare",
+    "@inlang/plugin-message-format"
   ]
 }

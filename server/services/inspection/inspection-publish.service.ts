@@ -429,7 +429,7 @@ export class InspectionPublishService extends InspectionSubService {
                 if (resultsRow) {
                     await db.update(inspectionResults)
                         .set({ data: data as object, lastSyncedAt: new Date() })
-                        .where(eq(inspectionResults.id, resultsRow.id));
+                        .where(and(eq(inspectionResults.id, resultsRow.id), eq(inspectionResults.tenantId, tenantId)));
                 } else {
                     await db.insert(inspectionResults).values({
                         id:           crypto.randomUUID(),

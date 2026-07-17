@@ -23,6 +23,10 @@ import {
 import { ErrorState } from "~/components/ErrorState";
 import { NavProgress } from "~/components/NavProgress";
 import { ToastPortal } from "~/components/Toast";
+// i18n Phase C — active UI locale for <html lang>. Resolves via the request's
+// paraglide ALS scope on the server and the client-readable locale cookie on the
+// client, so SSR and hydration agree; falls back to baseLocale ('en') outside a scope.
+import { getLocale } from "~/paraglide/runtime";
 
 export function loader({ request }: Route.LoaderArgs): UiPrefs {
   return parseUiPrefs(request.headers.get("Cookie"));
@@ -72,7 +76,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const ssrScheme = resolveSchemeForSSR(prefs.colorScheme);
   return (
     <html
-      lang="en"
+      lang={getLocale()}
       className={`scroll-smooth${ssrScheme === "dark" || ssrScheme === "field" ? " dark" : ""}`}
       data-color-scheme={ssrScheme}
       data-sidebar-collapsed={prefs.sidebarCollapsed ? "1" : undefined}

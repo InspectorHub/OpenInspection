@@ -4,12 +4,13 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/login";
 import { getToken, createSessionWithToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { loginSchema } from "~/lib/forms/auth.schema";
+import { makeLoginSchema } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
 import { safeReturnTo } from "../../server/lib/mcp/safe-return-to";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Log In - OpenInspection" }];
+  return [{ title: m.auth_login_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -37,7 +38,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   // Same schema as the client (Conform onValidate) — defends the API and powers
   // the no-JS path (the native form POST lands here without client validation).
-  const submission = parseWithZod(formData, { schema: loginSchema });
+  const submission = parseWithZod(formData, { schema: makeLoginSchema() });
   if (submission.status !== "success") {
     return submission.reply();
   }
@@ -56,7 +57,8 @@ export async function action({ request, context }: Route.ActionArgs) {
       let parsedErr: Record<string, unknown> = {};
       try { parsedErr = JSON.parse(text); } catch { /* response wasn't JSON — fall through to default error */ }
       const message =
-        (parsedErr?.error as Record<string, string>)?.message ?? `Login failed (${res.status})`;
+        (parsedErr?.error as Record<string, string>)?.message ??
+        m.auth_login_error_failed_with_status({ status: res.status });
       return submission.reply({ formErrors: [message] });
     }
 
@@ -72,12 +74,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     }
 
     if (body?.data?.requires2fa) {
-      return submission.reply({ formErrors: ["2FA is not yet supported in the new frontend."] });
+      return submission.reply({ formErrors: [m.auth_login_error_2fa_unsupported()] });
     }
 
-    return submission.reply({ formErrors: ["Authentication succeeded but no token received"] });
+    return submission.reply({ formErrors: [m.auth_login_error_no_token()] });
   } catch {
-    return submission.reply({ formErrors: ["Network error — is the API server running?"] });
+    return submission.reply({ formErrors: [m.auth_login_error_network()] });
   }
 }
 
@@ -94,7 +96,7 @@ export default function LoginPage() {
   const [form, fields] = useForm({
     lastResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: loginSchema });
+      return parseWithZod(formData, { schema: makeLoginSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -102,8 +104,8 @@ export default function LoginPage() {
 
   return (
     <AuthShell
-      heading="Log in to your workspace"
-      subtitle="Enter your credentials to access inspections, reports, and team tools."
+      heading={m.auth_login_heading()}
+      subtitle={m.auth_login_subtitle()}
     >
         <Form
           method="post"
@@ -117,7 +119,7 @@ export default function LoginPage() {
           ) : null}
           <div>
             <label htmlFor={fields.email.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-              Email address
+              {m.auth_login_email_label()}
             </label>
             <input
               id={fields.email.id}
@@ -137,10 +139,10 @@ export default function LoginPage() {
           <div>
             <div className="flex items-center justify-between mb-1">
               <label htmlFor={fields.password.id} className="block text-xs font-bold text-ih-fg-3">
-                Password
+                {m.auth_login_password_label()}
               </label>
               <a href="/forgot-password" className="text-xs font-bold text-ih-primary hover:underline">
-                Forgot password?
+                {m.auth_login_forgot_link()}
               </a>
             </div>
             <input
@@ -166,7 +168,7 @@ export default function LoginPage() {
             disabled={isSubmitting}
             className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {isSubmitting ? "Logging in…" : "Log In"}
+            {isSubmitting ? m.auth_login_submit_pending() : m.auth_login_submit()}
           </button>
         </Form>
     </AuthShell>
