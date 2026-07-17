@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { Drawer, IconButton, SegmentedControl } from "@core/shared-ui";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { CommentLibraryList } from "./CommentLibraryList";
 import { m } from "~/paraglide/messages";
 
@@ -26,13 +27,14 @@ export interface CommentLibraryDrawerProps {
   commentLibrarySelectedIdx: number;
   setShowCommentLibrary: (open: boolean) => void;
  };
- serverComments: Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>;
+ serverComments: Array<{ id: string; text: string; useCount?: number; lastUsedAt?: string | null }>;
  onInsert: (sectionId: string, itemId: string, text: string) => void;
  onClose: () => void;
 }
 
 export function CommentLibraryDrawer({ open, comments, state, serverComments, onInsert, onClose }: CommentLibraryDrawerProps) {
  const searchRef = useRef<HTMLInputElement>(null);
+ const locale = useDisplayLocale();
  return (
  <Drawer open={open} onClose={onClose} title={m.editor_comment_library_title()} wide initialFocusRef={searchRef}>
  {/* -m-4 cancels the Drawer body padding so the sub-headers keep their
@@ -138,6 +140,7 @@ export function CommentLibraryDrawer({ open, comments, state, serverComments, on
  serverComments={serverComments}
  selectedIndex={state.commentLibrarySelectedIdx}
  sort={comments.sort}
+ locale={locale}
  onInsertText={(text, id) => {
  if (!state.currentSection || !state.activeItemId) return;
  onInsert(state.currentSection.id, state.activeItemId, text);

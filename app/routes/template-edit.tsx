@@ -412,7 +412,7 @@ export default function TemplateEditPage() {
   const [libraryTab, setLibraryTab] = useState<CannedTab | null>(null);
   const [commentLibrarySearch, setCommentLibrarySearch] = useState("");
   const [commentLibrarySelectedIdx, setCommentLibrarySelectedIdx] = useState(0);
-  const [serverComments, setServerComments] = useState<Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>>([]);
+  const [serverComments, setServerComments] = useState<Array<{ id: string; text: string; useCount?: number; lastUsedAt?: string | null }>>([]);
 
   // Reuse the inspection editor's hook verbatim. `inspectionId` is only a load
   // key for the tenant library route; the template id is a stable, unique key.
@@ -436,7 +436,7 @@ export default function TemplateEditPage() {
     const t = setTimeout(() => {
       comments.fetchFiltered(ctx).then((rows) => {
         if (cancelled) return;
-        setServerComments(rows as Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>);
+        setServerComments(rows as Array<{ id: string; text: string; useCount?: number; lastUsedAt?: string | null }>);
       });
     }, q ? 250 : 0);
     return () => { cancelled = true; clearTimeout(t); };
