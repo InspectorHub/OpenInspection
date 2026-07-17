@@ -1,4 +1,5 @@
 import { EmptyState, Pill } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export interface InspectionRow {
   inspectionId: string;
@@ -32,8 +33,8 @@ export default function InspectionList({
   if (rows.length === 0) {
     return (
       <EmptyState
-        title="No inspections yet"
-        description="Inspections shared with you will appear here."
+        title={m.portal_list_empty_title()}
+        description={m.portal_list_empty_description()}
       />
     );
   }
@@ -49,7 +50,7 @@ export default function InspectionList({
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-sm font-semibold text-ih-fg-1 truncate">
-                {r.address || "Inspection"}
+                {r.address || m.portal_address_fallback()}
               </div>
               {r.date && <div className="mt-0.5 text-xs text-ih-fg-3">{r.date}</div>}
             </div>
@@ -57,7 +58,7 @@ export default function InspectionList({
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <Pill tone="neutral">{capitalize(r.inspectionStatus)}</Pill>
             <Pill tone={r.reportPublished ? "sat" : "np"}>
-              {r.reportPublished ? "Report published" : "Report pending"}
+              {r.reportPublished ? m.portal_list_report_published() : m.portal_list_report_pending()}
             </Pill>
             <Pill tone={paymentTone(r.paymentStatus)}>{capitalize(r.paymentStatus)}</Pill>
           </div>

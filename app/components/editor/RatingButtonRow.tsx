@@ -1,5 +1,6 @@
 import type { EditorRatingLevel } from "../../lib/rating-levels";
 import { RatingSegment, type RatingOption, type RatingTone } from "../editor-shared/RatingSegment";
+import { m } from "~/paraglide/messages";
 
 /* Severity → RatingSegment tone. `good`/`marginal`/`significant` map to the
  * ok/warn/bad tone tokens (readable in direct sunlight per field eval
@@ -50,7 +51,7 @@ export function RatingButtonRow({ levels, activeLevel, onRating }: RatingButtonR
         ratings={ratings}
         value={activeLevel?.id ?? null}
         onChange={onRating}
-        ariaLabel="Rating"
+        ariaLabel={m.editor_rating_aria()}
         className="flex-nowrap gap-3"
       />
     </div>

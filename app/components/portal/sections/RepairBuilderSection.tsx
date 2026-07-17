@@ -21,6 +21,7 @@
  */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { m } from "~/paraglide/messages";
 import { RepairDefectRow } from "./repair/RepairDefectRow";
 import { RepairIntroPanel } from "./repair/RepairIntroPanel";
 import { RepairSharePanel } from "./repair/RepairSharePanel";
@@ -134,28 +135,31 @@ interface ItemDraft {
 // ---------------------------------------------------------------------------
 
 // Gated states (everything except `ok`) render the same centered mini-card,
-// differing only in title + body copy. One lookup keeps them in lockstep.
-const GATED_STATES: Record<
+// differing only in title + body copy. Built inside a function (not a module
+// const) so the localized message thunks resolve per-request, not at import.
+function gatedStates(): Record<
   Exclude<LoaderResult["kind"], "ok">,
   { title: string; message: string }
-> = {
-  no_access: {
-    title: "Access Required",
-    message: "You need a valid token or login to view this page.",
-  },
-  not_published: {
-    title: "Report Not Published",
-    message: "The report must be published before you can build a repair request.",
-  },
-  forbidden: {
-    title: "Feature Not Available",
-    message: "The repair request builder is not enabled for this inspection company.",
-  },
-  error: {
-    title: "Something went wrong",
-    message: "Unable to load the repair builder. Please try again.",
-  },
-};
+> {
+  return {
+    no_access: {
+      title: m.portal_repair_gate_no_access_title(),
+      message: m.portal_repair_gate_no_access_body(),
+    },
+    not_published: {
+      title: m.portal_repair_gate_not_published_title(),
+      message: m.portal_repair_gate_not_published_body(),
+    },
+    forbidden: {
+      title: m.portal_repair_gate_forbidden_title(),
+      message: m.portal_repair_gate_forbidden_body(),
+    },
+    error: {
+      title: m.portal_repair_gate_error_title(),
+      message: m.portal_repair_gate_error_body(),
+    },
+  };
+}
 
 export function RepairBuilderSection({
   result,
@@ -166,7 +170,7 @@ export function RepairBuilderSection({
 }) {
   // Error / gated states
   if (result.kind !== "ok") {
-    const { title, message } = GATED_STATES[result.kind];
+    const { title, message } = gatedStates()[result.kind];
     return (
       <div className="max-w-xl mx-auto p-8 text-center">
         <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">{title}</h1>
@@ -223,7 +227,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
   // responses must not depend on a stale render closure.
   const itemIdsRef = useRef<Record<string, string>>(initialItemIds);
   const [customIntro, setCustomIntro] = useState<string>(existingList?.customIntro ?? "");
-  const [copyLabel, setCopyLabel] = useState("Copy share link");
+  const [copyLabel, setCopyLabel] = useState(m.portal_repair_copy_share());
   const [emailTo, setEmailTo] = useState("");
   const [emailMsg, setEmailMsg] = useState("");
   const [emailSent, setEmailSent] = useState(false);
@@ -436,10 +440,10 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
     if (!shareUrl) return;
     try {
       await navigator.clipboard.writeText(shareUrl);
-      setCopyLabel("Copied!");
-      setTimeout(() => setCopyLabel("Copy share link"), 2000);
+      setCopyLabel(m.portal_repair_copied());
+      setTimeout(() => setCopyLabel(m.portal_repair_copy_share()), 2000);
     } catch {
-      setCopyLabel("Copy failed");
+      setCopyLabel(m.portal_repair_copy_failed());
     }
   };
 
@@ -459,17 +463,17 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
       {/* Header */}
       <div>
         <p className="text-[11px] font-bold tracking-widest uppercase text-ih-fg-4 mb-1">
-          Repair Request Builder
+          {m.portal_repair_eyebrow()}
         </p>
-        <h1 className="text-2xl font-bold text-ih-fg-1">Select items to include</h1>
+        <h1 className="text-2xl font-bold text-ih-fg-1">{m.portal_repair_heading()}</h1>
         <p className="text-[14px] text-ih-fg-3 mt-1">
-          Check the defects you want to request repair or credit for. Add amounts and notes for each.
+          {m.portal_repair_subtitle()}
         </p>
       </div>
 
       {/* Sort controls */}
       <div className="flex items-center gap-2">
-        <span className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">Sort by:</span>
+        <span className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">{m.portal_repair_sort_by()}</span>
         <button
           type="button"
           onClick={() => setSortKey("section")}
@@ -479,7 +483,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
               : "border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"
           }`}
         >
-          Section
+          {m.portal_repair_sort_section()}
         </button>
         <button
           type="button"
@@ -490,7 +494,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
               : "border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"
           }`}
         >
-          Severity
+          {m.portal_repair_sort_severity()}
         </button>
         {sorted.length > 0 && (
           <button
@@ -504,7 +508,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
               });
             }}
           >
-            {sorted.every((d) => selected.has(d.findingKey)) ? "Deselect all" : "Select all"}
+            {sorted.every((d) => selected.has(d.findingKey)) ? m.portal_repair_deselect_all() : m.portal_repair_select_all()}
           </button>
         )}
       </div>
@@ -512,7 +516,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
       {/* Defect list */}
       {defects.length === 0 ? (
         <div className="bg-ih-bg-card border border-dashed border-ih-border-strong rounded-xl p-8 text-center">
-          <p className="text-[14px] text-ih-fg-3">No repair-rated defects found in this report.</p>
+          <p className="text-[14px] text-ih-fg-3">{m.portal_repair_empty()}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -550,10 +554,10 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
       {selected.size > 0 && (
         <div className="bg-ih-bg-card border border-ih-border rounded-xl px-5 py-4 flex items-center justify-between">
           <span className="text-[13px] font-semibold text-ih-fg-3">
-            {selected.size} item{selected.size !== 1 ? "s" : ""} selected
+            {m.portal_repair_items_selected({ count: selected.size, plural: selected.size !== 1 ? "s" : "" })}
           </span>
           <span className="text-[18px] font-bold text-ih-fg-1">
-            {total > 0 ? formatCents(total) : "—"} requested
+            {total > 0 ? formatCents(total) : "—"} {m.portal_repair_requested()}
           </span>
         </div>
       )}

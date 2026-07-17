@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Drawer } from "@core/shared-ui";
 import { CostItemsPanel } from "./CostItemsPanel";
 import type { CostItemView } from "~/components/portal/sections/report/types";
+import { m } from "~/paraglide/messages";
 
 interface CostItemsData {
   items: CostItemView[];
@@ -55,9 +56,9 @@ export function CostItemsHost({
   }, [open, inspectionId]);
 
   return (
-    <Drawer open={open} onClose={onClose} title="Cost Items" wide>
+    <Drawer open={open} onClose={onClose} title={m.editor_cost_items_title()} wide>
       {data === null ? (
-        <p className="text-[12px] text-ih-fg-3" aria-busy="true">Loading…</p>
+        <p className="text-[12px] text-ih-fg-3" aria-busy="true">{m.common_loading()}</p>
       ) : (
         <CostItemsPanel inspectionId={inspectionId} items={data.items} reserveEnabled={data.reserveEnabled} />
       )}

@@ -1,4 +1,5 @@
 import type { StepState } from "~/lib/checkout-steps";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Shell                                                              */
@@ -25,7 +26,7 @@ export function CheckoutShell({
                     <span className="text-lg font-bold tracking-tight text-ih-fg-1">{companyName}</span>
                 </div>
                 <div className="bg-ih-bg-card rounded-lg shadow-ih-popover overflow-hidden">{children}</div>
-                <p className="text-center text-[11px] text-ih-fg-4 mt-6">Powered by OpenInspection</p>
+                <p className="text-center text-[11px] text-ih-fg-4 mt-6">{m.checkout_powered_by()}</p>
             </div>
         </div>
     );
@@ -55,8 +56,8 @@ export function StepPill({ index, label, state }: { index: number; label: string
             </span>
             <span className={`text-[13px] font-semibold ${done ? "text-ih-fg-2" : active ? "text-ih-fg-1" : "text-ih-fg-4"}`}>
                 {label}
-                {state === "na" && <span className="text-ih-fg-4 font-normal"> · not required</span>}
-                {state === "waiting" && <span className="text-ih-fg-4 font-normal"> · waiting</span>}
+                {state === "na" && <span className="text-ih-fg-4 font-normal">{m.checkout_step_suffix_not_required()}</span>}
+                {state === "waiting" && <span className="text-ih-fg-4 font-normal">{m.checkout_step_suffix_waiting()}</span>}
             </span>
         </div>
     );
@@ -80,9 +81,9 @@ export function CompleteCard({ tenant, inspectionId }: { tenant: string; inspect
                     </svg>
                 </div>
                 <div>
-                    <h2 className="text-[15px] font-bold text-ih-ok-fg">All done — thank you!</h2>
+                    <h2 className="text-[15px] font-bold text-ih-ok-fg">{m.checkout_complete_heading()}</h2>
                     <p className="text-[13px] text-ih-fg-2 mt-0.5">
-                        Your agreement is signed and payment is settled.
+                        {m.checkout_complete_body()}
                     </p>
                 </div>
             </div>
@@ -91,7 +92,7 @@ export function CompleteCard({ tenant, inspectionId }: { tenant: string; inspect
                     href={reportHref}
                     className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 rounded-md bg-ih-primary text-ih-primary-fg text-sm font-bold hover:bg-ih-primary-600 transition-all"
                 >
-                    View your report
+                    {m.checkout_complete_view_report()}
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
                     </svg>

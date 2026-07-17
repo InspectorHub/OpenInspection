@@ -25,9 +25,10 @@ import {
   type RepairRequestItem,
   type LoaderResult,
 } from "~/components/portal/sections/RepairBuilderSection";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Build Repair Request - OpenInspection" }];
+  return [{ title: m.repair_builder_meta_title() }];
 }
 
 // Re-export pure helpers + types so existing tests/importers keep working after
@@ -113,7 +114,7 @@ export async function action({
         param: { tenant, id },
         query: { token },
       });
-      if (!res.ok) return { ok: false as const, error: "Failed to create list." };
+      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_create_list() };
       const body = (await res.json()) as { data?: RepairRequest };
       return { ok: true as const, data: body.data };
     }
@@ -141,7 +142,7 @@ export async function action({
           note,
         },
       });
-      if (!res.ok) return { ok: false as const, error: "Failed to add item." };
+      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_add_item() };
       const body = (await res.json()) as { data?: RepairRequestItem };
       return { ok: true as const, data: body.data };
     }
@@ -159,7 +160,7 @@ export async function action({
         query: { token },
         json: patch,
       });
-      if (!res.ok) return { ok: false as const, error: "Failed to update item." };
+      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_update_item() };
       return { ok: true as const };
     }
 
@@ -169,7 +170,7 @@ export async function action({
         param: { tenant, id, rrId, itemId },
         query: { token },
       });
-      if (!res.ok) return { ok: false as const, error: "Failed to remove item." };
+      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_remove_item() };
       return { ok: true as const };
     }
 
@@ -180,7 +181,7 @@ export async function action({
         query: { token },
         json: { customIntro },
       });
-      if (!res.ok) return { ok: false as const, error: "Failed to save intro." };
+      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_save_intro() };
       return { ok: true as const };
     }
 
@@ -188,18 +189,18 @@ export async function action({
       const shareToken = String(form.get("shareToken") ?? "");
       const to = String(form.get("to") ?? "");
       const message = (form.get("message") as string | null) ?? undefined;
-      if (!shareToken || !to) return { ok: false as const, error: "Missing shareToken or to." };
+      if (!shareToken || !to) return { ok: false as const, error: m.repair_builder_error_missing_recipient() };
       const res = await api.repairBuilder["repair-request"].share[":shareToken"].email.$post({
         param: { shareToken },
         json: { to, message },
       });
-      if (!res.ok) return { ok: false as const, error: "Failed to send email." };
+      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_send_email() };
       return { ok: true as const };
     }
 
-    return { ok: false as const, error: `Unknown intent: ${intent}` };
+    return { ok: false as const, error: m.repair_builder_error_unknown_intent({ intent }) };
   } catch {
-    return { ok: false as const, error: "Server error." };
+    return { ok: false as const, error: m.repair_builder_error_server() };
   }
 }
 
@@ -219,29 +220,29 @@ export default function RepairBuilderPage() {
   // mini-cards, which is correct inside the Hub's own chrome.)
   if (result.kind === "no_access") {
     return (
-      <PublicNotice title="Access required">
-        You need a valid token or login to view this page.
+      <PublicNotice title={m.repair_builder_noaccess_title()}>
+        {m.repair_builder_noaccess_body()}
       </PublicNotice>
     );
   }
   if (result.kind === "not_published") {
     return (
-      <PublicNotice title="Report not published">
-        The report must be published before you can build a repair request.
+      <PublicNotice title={m.repair_request_notpublished_title()}>
+        {m.repair_builder_notpublished_body()}
       </PublicNotice>
     );
   }
   if (result.kind === "forbidden") {
     return (
-      <PublicNotice title="Feature not available">
-        The repair request builder is not enabled for this inspection company.
+      <PublicNotice title={m.repair_builder_forbidden_title()}>
+        {m.repair_builder_forbidden_body()}
       </PublicNotice>
     );
   }
   if (result.kind === "error") {
     return (
-      <PublicNotice title="Something went wrong" tone="error">
-        Unable to load the repair builder. Please try again.
+      <PublicNotice title={m.repair_builder_error_title()} tone="error">
+        {m.repair_builder_error_body()}
       </PublicNotice>
     );
   }

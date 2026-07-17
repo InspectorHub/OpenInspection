@@ -5,9 +5,10 @@ import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
 import { createApi } from '~/lib/api-client.server';
 import { useInspectionPrefs } from '~/hooks/useInspectionPrefs';
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-    return [{ title: 'Inspection Workflow Settings - OpenInspection' }];
+    return [{ title: m.settings_inspection_meta_title() }];
 }
 
 interface TagRow { id: string; name: string; color: string }
@@ -30,15 +31,15 @@ export default function SettingsInspectionPage() {
     const { prefs, loaded, patch } = useInspectionPrefs();
     const { tags } = useLoaderData<typeof loader>();
 
-    if (!loaded) return <div className="p-6 text-[13px] text-ih-fg-3">Loading...</div>;
+    if (!loaded) return <div className="p-6 text-[13px] text-ih-fg-3">{m.settings_inspection_loading()}</div>;
 
     return (
         <div className="space-y-8">
-            <SettingsCrumb items={[{ label: 'Settings', href: '/settings' }, { label: 'Inspection Workflow' }]} />
-            <p className="text-[13px] text-ih-fg-3">Defaults that apply to every inspector on this workspace.</p>
+            <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: '/settings' }, { label: m.settings_inspection_crumb() }]} />
+            <p className="text-[13px] text-ih-fg-3">{m.settings_inspection_intro()}</p>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">Clone last (R key) default</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_clone_heading()}</h2>
                 {(['rating', 'rating_notes', 'all'] as const).map(scope => (
                     <label key={scope} className="flex items-center gap-2 py-1.5 cursor-pointer">
                         <input
@@ -48,16 +49,16 @@ export default function SettingsInspectionPage() {
                             className="w-4 h-4"
                         />
                         <span className="text-[13px]">{({
-                            rating:       'Rating only',
-                            rating_notes: 'Rating + Notes',
-                            all:          'Everything (rating + notes + photos + tags)',
+                            rating:       m.settings_inspection_clone_rating(),
+                            rating_notes: m.settings_inspection_clone_rating_notes(),
+                            all:          m.settings_inspection_clone_all(),
                         } as Record<typeof scope, string>)[scope]}</span>
                     </label>
                 ))}
             </section>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">Auto-advance after rating</h2>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_autoadvance_heading()}</h2>
                 {(['keyboard', 'always', 'off'] as const).map(mode => (
                     <label key={mode} className="flex items-center gap-2 py-1 cursor-pointer">
                         <input
@@ -67,13 +68,13 @@ export default function SettingsInspectionPage() {
                             className="w-4 h-4"
                         />
                         <span className="text-[13px]">{({
-                            keyboard: 'Keyboard rating only (1-5 speed-scans; clicks stay on the item)',
-                            always:   'Always (clicks and keyboard both advance)',
-                            off:      'Never (always stay on the item)',
+                            keyboard: m.settings_inspection_autoadvance_keyboard(),
+                            always:   m.settings_inspection_autoadvance_always(),
+                            off:      m.settings_inspection_autoadvance_off(),
                         } as Record<typeof mode, string>)[mode]}</span>
                     </label>
                 ))}
-                <p className="text-[12px] text-ih-fg-3 mt-1">Defect/Monitor-style ratings always stay put and focus Notes so you can describe the finding.</p>
+                <p className="text-[12px] text-ih-fg-3 mt-1">{m.settings_inspection_autoadvance_note()}</p>
                 <div className="flex items-center gap-3 mt-3">
                     <input
                         type="range"
@@ -84,14 +85,14 @@ export default function SettingsInspectionPage() {
                         onChange={e => patch({ autoAdvanceDelayMs: Number(e.target.value) })}
                         className="flex-1"
                     />
-                    <span className="text-[13px] font-mono tabular-nums w-20 text-right">{prefs.autoAdvanceDelayMs} ms</span>
+                    <span className="text-[13px] font-mono tabular-nums w-20 text-right">{m.settings_inspection_autoadvance_delay_value({ ms: prefs.autoAdvanceDelayMs })}</span>
                 </div>
-                <p className="text-[12px] text-ih-fg-3 mt-1">Delay before the editor advances to the next item.</p>
+                <p className="text-[12px] text-ih-fg-3 mt-1">{m.settings_inspection_autoadvance_delay_help()}</p>
             </section>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">Required defect fields at publish</h2>
-                <p className="text-[12px] text-ih-fg-3 mb-2">Fields every defect must have before a report can be published. Inspections can override this per-job in inspection settings.</p>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_required_heading()}</h2>
+                <p className="text-[12px] text-ih-fg-3 mb-2">{m.settings_inspection_required_help()}</p>
                 {(['none', 'location', 'trade', 'both'] as const).map(req => (
                     <label key={req} className="flex items-center gap-2 py-1 cursor-pointer">
                         <input
@@ -101,18 +102,18 @@ export default function SettingsInspectionPage() {
                             className="w-4 h-4"
                         />
                         <span className="text-[13px]">{({
-                            none:     'None — missing fields warn, never block',
-                            location: 'Location required',
-                            trade:    'Recommended trade required',
-                            both:     'Location + trade required',
+                            none:     m.settings_inspection_required_none(),
+                            location: m.settings_inspection_required_location(),
+                            trade:    m.settings_inspection_required_trade(),
+                            both:     m.settings_inspection_required_both(),
                         } as Record<typeof req, string>)[req]}</span>
                     </label>
                 ))}
             </section>
 
             <section>
-                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">Pinned tags ({prefs.pinnedTagIds.length}/5)</h2>
-                <p className="text-[12px] text-ih-fg-3 mb-3">Up to 5 tags shown as 1-click chips below the Notes field.</p>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_pinned_heading({ count: prefs.pinnedTagIds.length })}</h2>
+                <p className="text-[12px] text-ih-fg-3 mb-3">{m.settings_inspection_pinned_help()}</p>
                 <ul className="space-y-1">
                     {tags.map(tag => {
                         const pinned = prefs.pinnedTagIds.includes(tag.id);
@@ -136,7 +137,7 @@ export default function SettingsInspectionPage() {
                         );
                     })}
                 </ul>
-                <a href="/library/tags" className="text-[12px] text-ih-primary hover:underline mt-3 inline-flex items-center gap-1">Manage tag library <Icon name="arrowR" size={12} /></a>
+                <a href="/library/tags" className="text-[12px] text-ih-primary hover:underline mt-3 inline-flex items-center gap-1">{m.settings_inspection_manage_tags()} <Icon name="arrowR" size={12} /></a>
             </section>
         </div>
     );

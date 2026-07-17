@@ -1,4 +1,5 @@
 import { Modal, Button } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export interface PublishModalProps {
  open: boolean;
@@ -19,30 +20,30 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  <Modal
  open={open}
  onClose={onClose}
- title="Publish Report"
+ title={m.editor_publish_title()}
  footer={
  <>
- <Button variant="ghost" onClick={onClose}>Cancel</Button>
+ <Button variant="ghost" onClick={onClose}>{m.common_cancel()}</Button>
  <Button
  variant="primary"
  disabled={isSubmitting}
  onClick={onPublish}
- >{isSubmitting ? "Publishing…" : "Publish Now"}</Button>
+ >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_now()}</Button>
  </>
  }
  >
  <p className="text-[13px] text-ih-fg-3">
- Publishing will finalize this inspection and make the report available to clients.
+ {m.editor_publish_body()}
  {progress.pct < 100 && (
  <span className="block mt-2 text-ih-watch font-medium">
- Warning: Only {progress.rated} of {progress.total} items have been rated ({progress.pct}% complete).
+ {m.editor_publish_warning({ rated: progress.rated, total: progress.total, pct: progress.pct })}
  </span>
  )}
  </p>
  <div className="mt-4 p-3 rounded-lg bg-ih-bg-muted text-[12px] space-y-1">
- <div className="flex justify-between"><span className="text-ih-fg-3">Items rated</span><span className="font-bold">{progress.rated}/{progress.total}</span></div>
- <div className="flex justify-between"><span className="text-ih-fg-3">Completion</span><span className="font-bold">{progress.pct}%</span></div>
- <div className="flex justify-between"><span className="text-ih-fg-3">Status</span><span className="font-bold uppercase">{status}</span></div>
+ <div className="flex justify-between"><span className="text-ih-fg-3">{m.editor_publish_stat_items_rated()}</span><span className="font-bold">{progress.rated}/{progress.total}</span></div>
+ <div className="flex justify-between"><span className="text-ih-fg-3">{m.editor_publish_stat_completion()}</span><span className="font-bold">{progress.pct}%</span></div>
+ <div className="flex justify-between"><span className="text-ih-fg-3">{m.editor_publish_stat_status()}</span><span className="font-bold uppercase">{status}</span></div>
  </div>
  {publishError && (
  <div role="alert" className="mt-4 p-3 rounded-lg bg-ih-bad/10 border border-ih-bad/30 text-[12px] text-ih-bad font-medium">
@@ -56,7 +57,7 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
   onChange={(e) => onAutoSignToggle(e.target.checked)}
   className="h-3.5 w-3.5 rounded border-ih-border-strong text-ih-primary"
  />
- Auto-sign this report on publish
+ {m.editor_publish_autosign()}
  </label>
  </Modal>
  );

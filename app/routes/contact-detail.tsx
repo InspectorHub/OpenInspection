@@ -7,9 +7,10 @@ import { formatCents } from "~/lib/hub-blocks";
 import { humanizeStatus, capitalize } from "~/lib/status";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, EmptyState } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Contact - OpenInspection" }];
+  return [{ title: m.contacts_detail_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -80,7 +81,7 @@ export default function ContactDetailPage() {
       {/* Breadcrumb — Contacts > this contact */}
       <Breadcrumb
         items={[
-          { label: "Contacts", href: "/contacts" },
+          { label: m.contacts_label_contacts(), href: "/contacts" },
           { label: contact.name },
         ]}
       />
@@ -91,7 +92,7 @@ export default function ContactDetailPage() {
         meta={
           <span className="flex items-center gap-2 flex-wrap">
             <Pill tone="info">{capitalize(contact.type)}</Pill>
-            {archived && <Pill tone="neutral">Archived</Pill>}
+            {archived && <Pill tone="neutral">{m.contacts_detail_archived()}</Pill>}
             <span className="text-ih-fg-3">
               {contact.type === "agent"
                 ? contact.agency || contact.email || ""
@@ -104,7 +105,7 @@ export default function ContactDetailPage() {
             to="/contacts"
             className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted"
           >
-            Back to Contacts
+            {m.contacts_detail_back()}
           </Link>
         }
       />
@@ -112,11 +113,11 @@ export default function ContactDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* 1. Contact info ------------------------------------------ */}
         <Card className="p-5">
-          <BlockHeading title="Contact info" />
+          <BlockHeading title={m.contacts_detail_info_heading()} />
           <div className="space-y-3 text-[13px]">
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                Email
+                {m.contacts_field_email()}
               </p>
               {contact.email ? (
                 <a href={`mailto:${contact.email}`} className="text-ih-primary hover:underline">
@@ -129,7 +130,7 @@ export default function ContactDetailPage() {
 
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                Phone
+                {m.contacts_field_phone()}
               </p>
               {contact.phone ? (
                 <a href={`tel:${contact.phone}`} className="text-ih-primary hover:underline">
@@ -142,19 +143,19 @@ export default function ContactDetailPage() {
 
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                Agency
+                {m.contacts_field_agency()}
               </p>
               <p className="text-ih-fg-1">{contact.agency || <span className="text-ih-fg-4">—</span>}</p>
             </div>
 
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                Notes
+                {m.contacts_field_notes()}
               </p>
               {contact.notes ? (
                 <p className="text-ih-fg-1 whitespace-pre-wrap">{contact.notes}</p>
               ) : (
-                <p className="text-ih-fg-4">No notes</p>
+                <p className="text-ih-fg-4">{m.contacts_detail_no_notes()}</p>
               )}
             </div>
           </div>
@@ -162,11 +163,11 @@ export default function ContactDetailPage() {
 
         {/* 2. Stats ------------------------------------------------- */}
         <Card className="p-5">
-          <BlockHeading title="Stats" />
+          <BlockHeading title={m.contacts_detail_stats_heading()} />
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                Inspections
+                {m.contacts_field_inspections()}
               </p>
               <p className="text-[24px] font-bold text-ih-fg-1 tabular-nums">
                 {stats.inspectionCount}
@@ -174,7 +175,7 @@ export default function ContactDetailPage() {
             </div>
             <div>
               <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                Total revenue
+                {m.contacts_detail_revenue_label()}
               </p>
               <p className="text-[24px] font-bold text-ih-fg-1 tabular-nums">
                 {formatCents(stats.totalRevenueCents)}
@@ -186,11 +187,11 @@ export default function ContactDetailPage() {
 
       {/* 3. Inspection history -------------------------------------- */}
       <Card className="p-5">
-        <BlockHeading title="Inspection history" />
+        <BlockHeading title={m.contacts_detail_history_heading()} />
         {inspections.length === 0 ? (
           <EmptyState
-            title="No inspections"
-            description="This contact has no linked inspections yet."
+            title={m.contacts_detail_history_empty_title()}
+            description={m.contacts_detail_history_empty_desc()}
           />
         ) : (
           <div className="divide-y divide-ih-border">
@@ -202,7 +203,7 @@ export default function ContactDetailPage() {
               >
                 <div className="min-w-0">
                   <p className="text-[13px] font-medium text-ih-fg-1 truncate">
-                    {insp.propertyAddress || "Untitled inspection"}
+                    {insp.propertyAddress || m.contacts_detail_untitled_inspection()}
                   </p>
                   <p className="text-[12px] text-ih-fg-3">
                     {formatInspectionDateTime(insp.date)} &middot; {humanizeStatus(insp.status)}
@@ -247,10 +248,10 @@ export function ErrorBoundary() {
   const status = isRouteErrorResponse(error) ? error.status : null;
   const message =
     status === 404
-      ? "This contact could not be found. It may have been deleted."
+      ? m.contacts_error_not_found()
       : status === 403
-        ? "You do not have permission to view this contact."
-        : "Something went wrong while opening the contact.";
+        ? m.contacts_error_forbidden()
+        : m.contacts_error_generic();
 
   return (
     <div className="max-w-[1080px] mx-auto pt-16 px-9 flex flex-col items-center gap-3 text-center">
@@ -259,7 +260,7 @@ export function ErrorBoundary() {
         to="/contacts"
         className="h-9 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600"
       >
-        Back to Contacts
+        {m.contacts_detail_back()}
       </Link>
     </div>
   );

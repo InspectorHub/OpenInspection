@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { m } from "~/paraglide/messages";
 
 /**
  * Live email preview. Submits the in-progress subject/blocks to the editor
@@ -41,8 +42,8 @@ export function EmailPreview({ subject, blocks }: { trigger: string; subject: st
   return (
     <div className="lg:sticky lg:top-4">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Preview</p>
-        <span className={`text-[10px] uppercase tracking-widest ${loading ? "text-ih-watch-fg" : "text-ih-fg-4"}`}>{loading ? "Updating…" : "Sample data"}</span>
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.email_preview_label()}</p>
+        <span className={`text-[10px] uppercase tracking-widest ${loading ? "text-ih-watch-fg" : "text-ih-fg-4"}`}>{loading ? m.email_preview_updating() : m.email_preview_sample()}</span>
       </div>
       {/* ds-allow: email surface — the simulated client window and iframe body
           stay white in both themes because real email clients render light with
@@ -54,10 +55,10 @@ export function EmailPreview({ subject, blocks }: { trigger: string; subject: st
           <span className="h-2.5 w-2.5 rounded-full bg-ih-border" />
         </div>
         <div className="px-4 py-2.5 border-b border-ih-border bg-white">
-          <p className="text-[11px] text-ih-fg-4">To: client@example.com</p>
+          <p className="text-[11px] text-ih-fg-4">{m.email_preview_to()}</p>
           <p className="text-[13px] font-semibold text-ih-fg-1 truncate">{renderedSubject || "—"}</p>
         </div>
-        <iframe title="Email preview" srcDoc={html} sandbox="" className="w-full h-[520px] bg-white" />
+        <iframe title={m.email_preview_iframe_title()} srcDoc={html} sandbox="" className="w-full h-[520px] bg-white" />
       </div>
     </div>
   );

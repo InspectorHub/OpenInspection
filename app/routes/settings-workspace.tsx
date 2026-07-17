@@ -8,12 +8,13 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
-import { workspaceSchema } from "~/lib/forms/settings.schema";
+import { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { LOCALE_OPTIONS, CURRENCY_OPTIONS } from "~/lib/locales";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -67,7 +68,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "logo-upload") {
     const logo = fd.get("logo");
     if (!(logo instanceof File) || logo.size === 0) {
-      return { success: false, error: "No valid logo provided", intent };
+      return { success: false, error: m.settings_workspace_error_no_logo(), intent };
     }
     const api = createApi(context, { token });
     const res = await api.adminBranding.branding.logo.$post({ form: { logo } });
@@ -75,7 +76,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { success: res.ok, intent, logoUrl: body?.data?.logoUrl ?? null };
   }
 
-  const submission = parseWithZod(fd, { schema: workspaceSchema });
+  const submission = parseWithZod(fd, { schema: makeWorkspaceSchema() });
   if (submission.status !== "success") {
     return submission.reply();
   }
@@ -121,7 +122,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     return submission.reply({
-      formErrors: [(err as Record<string, string>)?.message || "Save failed"],
+      formErrors: [(err as Record<string, string>)?.message || m.settings_error_save_failed()],
     });
   }
   return { success: true, error: null };
@@ -149,7 +150,7 @@ export default function SettingsWorkspacePage() {
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: workspaceSchema });
+      return parseWithZod(formData, { schema: makeWorkspaceSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -159,13 +160,13 @@ export default function SettingsWorkspacePage() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Company" }]} />
-      <p className="text-[13px] text-ih-fg-3">Branding, report theme, and referral sources.</p>
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_workspace_crumb() }]} />
+      <p className="text-[13px] text-ih-fg-3">{m.settings_workspace_subtitle()}</p>
 
       {/* Flash */}
       {actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          Company settings saved.
+          {m.settings_workspace_flash_saved()}
         </div>
       )}
 
@@ -178,10 +179,10 @@ export default function SettingsWorkspacePage() {
       >
         {/* Branding */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-6">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Branding</h3>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_branding_heading()}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <label htmlFor={fields.companyName.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Company name</label>
+              <label htmlFor={fields.companyName.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_company_name_label()}</label>
               <input type="text" id={fields.companyName.id} name={fields.companyName.name} defaultValue={branding.companyName ?? "OpenInspection"}
                 aria-invalid={fields.companyName.errors ? true : undefined}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] text-ih-fg-1" />
@@ -190,7 +191,7 @@ export default function SettingsWorkspacePage() {
               )}
             </div>
             <div className="space-y-2">
-              <label htmlFor={fields.primaryColor.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Primary Color</label>
+              <label htmlFor={fields.primaryColor.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_primary_color_label()}</label>
               <div className="flex gap-3">
                 <input type="color" id={fields.primaryColor.id} name={fields.primaryColor.name} value={color}
                   onChange={(e) => setColor(e.target.value)}
@@ -206,7 +207,7 @@ export default function SettingsWorkspacePage() {
 
           {/* Logo upload */}
           <div className="space-y-3">
-            <label className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Company Logo</label>
+            <label className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_logo_label()}</label>
             <LogoUploader
               currentUrl={logoUrl}
               uploading={logoFetcher.state !== "idle"}
@@ -222,13 +223,13 @@ export default function SettingsWorkspacePage() {
 
         {/* Timezone */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Timezone</h3>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_timezone_heading()}</h3>
           <p className="text-[12px] text-ih-fg-3">
-            Reports, reminders, and calendar events use this timezone. Individual users can override how times appear for them in their profile.
+            {m.settings_workspace_timezone_subtitle()}
           </p>
           <div className="max-w-md">
             <Select
-              label="Company timezone"
+              label={m.settings_workspace_timezone_select_label()}
               name="defaultTimezone"
               defaultValue={branding.defaultTimezone ?? "UTC"}
               options={TIMEZONE_SELECT_OPTIONS}
@@ -238,19 +239,19 @@ export default function SettingsWorkspacePage() {
 
         {/* Locale & Currency */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Locale &amp; Currency</h3>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_locale_currency_heading()}</h3>
           <p className="text-[12px] text-ih-fg-3">
-            Controls how dates, times, numbers, and money are formatted across reports and the dashboard. Individual users can override the language/locale in their profile; currency is company-wide.
+            {m.settings_workspace_locale_currency_subtitle()}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl">
             <Select
-              label="Company locale"
+              label={m.settings_workspace_locale_select_label()}
               name="defaultLocale"
               defaultValue={branding.defaultLocale ?? "en-US"}
               options={LOCALE_OPTIONS}
             />
             <Select
-              label="Currency"
+              label={m.settings_workspace_currency_select_label()}
               name="currency"
               defaultValue={branding.currency ?? "USD"}
               options={CURRENCY_OPTIONS}
@@ -260,8 +261,8 @@ export default function SettingsWorkspacePage() {
 
         {/* Report theme */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Report Theme</h3>
-          <p className="text-[12px] text-ih-fg-3">Default visual style for client-facing reports.</p>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_theme_heading()}</h3>
+          <p className="text-[12px] text-ih-fg-3">{m.settings_workspace_report_theme_subtitle()}</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {THEMES.map((t) => (
               <label key={t} className="cursor-pointer">
@@ -278,9 +279,9 @@ export default function SettingsWorkspacePage() {
 
         {/* Referral sources */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Referral Sources</h3>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_referral_heading()}</h3>
           <div className="space-y-3">
-            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-ih-fg-2">Built-in sources</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-ih-fg-2">{m.settings_workspace_referral_builtin_label()}</div>
             <div className="flex flex-wrap gap-2">
               {["Realtor", "Past Client", "Google Search", "Facebook", "Yelp", "Walk-in", "Other"].map((s) => (
                 <span key={s} className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-ih-bg-muted text-ih-fg-2">{s}</span>
@@ -288,18 +289,18 @@ export default function SettingsWorkspacePage() {
             </div>
           </div>
           <div className="space-y-2">
-            <label htmlFor={fields.customReferralSources.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Custom labels</label>
+            <label htmlFor={fields.customReferralSources.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_referral_custom_label()}</label>
             <textarea id={fields.customReferralSources.id} name={fields.customReferralSources.name} rows={6}
               defaultValue={(branding.customReferralSources ?? []).join("\n")}
-              placeholder={"Magazine ad\nTrade show\nReferral partner"}
+              placeholder={m.settings_workspace_referral_custom_placeholder()}
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
-            <p className="text-[11px] text-ih-fg-3">One label per line. Maximum 32 entries; duplicates are ignored.</p>
+            <p className="text-[11px] text-ih-fg-3">{m.settings_workspace_referral_custom_hint()}</p>
           </div>
         </section>
 
         {/* Report features */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Report Features</h3>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_features_heading()}</h3>
 
           <label className="flex items-start gap-3 cursor-pointer select-none">
             <input
@@ -310,9 +311,9 @@ export default function SettingsWorkspacePage() {
               className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
             />
             <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">Show repair list tab</span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_repair_list_title()}</span>
               <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                Displays a summarised Repair List tab on the published client report.
+                {m.settings_workspace_repair_list_desc()}
               </span>
             </span>
           </label>
@@ -326,9 +327,9 @@ export default function SettingsWorkspacePage() {
               className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
             />
             <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">Allow clients to build repair requests</span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_repair_export_title()}</span>
               <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                Lets clients, agents, and inspectors build a shareable repair-request addendum from a published report.
+                {m.settings_workspace_repair_export_desc()}
               </span>
             </span>
           </label>
@@ -336,17 +337,17 @@ export default function SettingsWorkspacePage() {
 
         {/* Report PDF */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Report PDF</h3>
-          <p className="text-[12px] text-ih-fg-3">Print-layout options for downloadable report PDFs.</p>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_pdf_heading()}</h3>
+          <p className="text-[12px] text-ih-fg-3">{m.settings_workspace_report_pdf_subtitle()}</p>
 
           <div className="space-y-2">
-            <label htmlFor={fields.companyAddress.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Company address</label>
+            <label htmlFor={fields.companyAddress.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_company_address_label()}</label>
             <input type="text" id={fields.companyAddress.id} name={fields.companyAddress.name}
               defaultValue={branding.companyAddress ?? ""}
-              placeholder="123 Main St, Springfield, IL 62704"
+              placeholder={m.settings_workspace_company_address_placeholder()}
               aria-invalid={fields.companyAddress.errors ? true : undefined}
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
-            <p className="text-[11px] text-ih-fg-3">Shown in the report PDF footer block.</p>
+            <p className="text-[11px] text-ih-fg-3">{m.settings_workspace_company_address_hint()}</p>
             {fields.companyAddress.errors && (
               <p className="mt-1 text-xs text-ih-bad-fg">{fields.companyAddress.errors[0]}</p>
             )}
@@ -361,9 +362,9 @@ export default function SettingsWorkspacePage() {
               className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
             />
             <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">Show footer</span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_pdf_footer_title()}</span>
               <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                Renders the company footer block at the bottom of each report PDF page.
+                {m.settings_workspace_pdf_footer_desc()}
               </span>
             </span>
           </label>
@@ -377,9 +378,9 @@ export default function SettingsWorkspacePage() {
               className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
             />
             <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">Show page numbers</span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_pdf_page_numbers_title()}</span>
               <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                Adds page numbers to the report PDF.
+                {m.settings_workspace_pdf_page_numbers_desc()}
               </span>
             </span>
           </label>
@@ -393,9 +394,9 @@ export default function SettingsWorkspacePage() {
               className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary"
             />
             <span>
-              <span className="block text-[13px] font-bold text-ih-fg-1">Show inspector license</span>
+              <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_workspace_pdf_license_title()}</span>
               <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                Includes the inspector license number on the report PDF.
+                {m.settings_workspace_pdf_license_desc()}
               </span>
             </span>
           </label>
@@ -408,7 +409,7 @@ export default function SettingsWorkspacePage() {
         )}
 
         {/* Save — sticky bar pinned to the bottom of the settings scroll area */}
-        <SettingsSaveBar label="Save Company" />
+        <SettingsSaveBar label={m.settings_workspace_save_button()} />
       </Form>
     </div>
   );

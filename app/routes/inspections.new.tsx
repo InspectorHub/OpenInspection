@@ -5,9 +5,10 @@ import { createApi } from "~/lib/api-client.server";
 import { NewInspectionWizard, type WizardTeamMember } from "~/components/NewInspectionWizard";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import type { TemplateOption, ServiceOption } from "~/lib/dashboard-schema";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "New Inspection - OpenInspection" }];
+  return [{ title: m.inspections_new_meta_title() }];
 }
 
 type QuotaTriple = { inspections: number; sms: number; email: number };

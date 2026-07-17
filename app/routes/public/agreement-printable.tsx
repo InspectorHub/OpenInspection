@@ -1,9 +1,10 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-printable";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Signed Agreement - OpenInspection" }];
+  return [{ title: m.agreement_printable_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -61,7 +62,7 @@ export default function AgreementPrintablePage() {
   if (error || !agreement) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-ih-fg-3">Agreement not found.</p>
+        <p className="text-ih-fg-3">{m.agreement_printable_not_found()}</p>
       </div>
     );
   }
@@ -74,7 +75,7 @@ export default function AgreementPrintablePage() {
         {agreement.agreementName}
       </h1>
       <div className="text-[10px] text-ih-fg-3 font-mono mb-6">
-        Envelope ID: {agreement.envelopeId}
+        {m.agreement_printable_envelope_id({ envelopeId: agreement.envelopeId })}
       </div>
 
       {/* Agreement body */}
@@ -86,14 +87,14 @@ export default function AgreementPrintablePage() {
       {/* Signature block */}
       <div className="mt-12 pt-6 border-t border-slate-200">
         <div className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-3 mb-3">
-          Signed by
+          {m.agreement_printable_signed_by()}
         </div>
         <div className="flex items-end gap-8">
           <div className="flex-1">
             {sigSrc ? (
               <img
                 src={sigSrc}
-                alt="Signature"
+                alt={m.agreement_printable_signature_alt()}
                 className="h-20 max-w-[240px] border-b border-slate-400 block mb-1.5"
               />
             ) : (
@@ -108,7 +109,7 @@ export default function AgreementPrintablePage() {
           </div>
           <div>
             <div className="text-[10px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
-              Date signed (UTC)
+              {m.agreement_printable_date_signed()}
             </div>
             <div className="text-[13px] font-semibold text-slate-900">
               {agreement.signedAtUtcIso ?? "--"}

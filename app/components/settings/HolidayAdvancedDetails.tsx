@@ -1,25 +1,7 @@
 import { Banner, SegmentedControl, Select } from "@core/shared-ui";
 import type { CustomHoliday, HolidayInternalPolicy, HolidayPublicPolicy } from "./HolidayClosedPanel";
 import { SUPPORTED_STATE_CODES } from "./holiday-region-options";
-
-const PUBLIC_OPTIONS = [
-  { value: "block", label: "Block bookings" },
-  { value: "advisory", label: "Allow with notice" },
-  { value: "open", label: "Allow bookings" },
-];
-
-const INTERNAL_OPTIONS = [
-  { value: "advisory", label: "Warn only" },
-  { value: "block", label: "Block" },
-];
-
-const REGION_OPTIONS = [
-  { value: "US", label: "Federal only (US)" },
-  ...SUPPORTED_STATE_CODES.map((code) => ({
-    value: `US-${code}`,
-    label: `Federal + ${code}`,
-  })),
-];
+import { m } from "~/paraglide/messages";
 
 export function HolidayAdvancedDetails({
   region,
@@ -64,17 +46,36 @@ export function HolidayAdvancedDetails({
   failed: boolean;
   failMessage?: string;
 }) {
+  const PUBLIC_OPTIONS = [
+    { value: "block", label: m.settings_holiday_public_block() },
+    { value: "advisory", label: m.settings_holiday_public_advisory() },
+    { value: "open", label: m.settings_holiday_public_open() },
+  ];
+
+  const INTERNAL_OPTIONS = [
+    { value: "advisory", label: m.settings_holiday_internal_warn() },
+    { value: "block", label: m.settings_holiday_internal_block() },
+  ];
+
+  const REGION_OPTIONS = [
+    { value: "US", label: m.settings_holiday_region_federal_only() },
+    ...SUPPORTED_STATE_CODES.map((code) => ({
+      value: `US-${code}`,
+      label: m.settings_holiday_region_federal_plus({ code }),
+    })),
+  ];
+
   return (
     <details data-testid="holiday-advanced" className="rounded-md border border-ih-border">
       <summary className="cursor-pointer px-3 py-2 text-[12px] font-bold text-ih-fg-2 select-none">
-        Advanced
+        {m.settings_holiday_advanced_summary()}
       </summary>
       <div className="border-t border-ih-border px-3 py-4 space-y-4">
         <div className="space-y-2 max-w-sm">
           <Select
-            label="Holiday region"
+            label={m.settings_holiday_region_label()}
             options={[
-              { value: "", label: "Off (no holiday catalog)" },
+              { value: "", label: m.settings_holiday_region_off() },
               ...REGION_OPTIONS,
             ]}
             value={region ?? ""}
@@ -88,9 +89,9 @@ export function HolidayAdvancedDetails({
         </div>
 
         <div className="space-y-2" data-testid="holiday-public-policy-advanced">
-          <p className="text-[12px] font-bold text-ih-fg-2">Public booking</p>
+          <p className="text-[12px] font-bold text-ih-fg-2">{m.settings_holiday_public_heading()}</p>
           <SegmentedControl
-            ariaLabel="Public holiday policy"
+            ariaLabel={m.settings_holiday_public_aria()}
             size="md"
             options={PUBLIC_OPTIONS}
             value={publicPolicy}
@@ -101,16 +102,15 @@ export function HolidayAdvancedDetails({
           />
           {region && publicPolicy === "open" && (
             <Banner tone="warn">
-              Customers can still book on listed holidays (e.g. Thanksgiving). Use Block
-              or Allow with notice if that is not intended.
+              {m.settings_holiday_open_warning()}
             </Banner>
           )}
         </div>
 
         <div className="space-y-2">
-          <p className="text-[12px] font-bold text-ih-fg-2">Internal scheduling</p>
+          <p className="text-[12px] font-bold text-ih-fg-2">{m.settings_holiday_internal_heading()}</p>
           <SegmentedControl
-            ariaLabel="Internal holiday policy"
+            ariaLabel={m.settings_holiday_internal_aria()}
             size="md"
             options={INTERNAL_OPTIONS}
             value={internalPolicy}
@@ -122,7 +122,7 @@ export function HolidayAdvancedDetails({
         </div>
 
         <div className="space-y-2">
-          <p className="text-[12px] font-bold text-ih-fg-2">Custom closed days</p>
+          <p className="text-[12px] font-bold text-ih-fg-2">{m.settings_holiday_custom_heading()}</p>
           <ul className="space-y-1">
             {customHolidays.map((h) => (
               <li
@@ -139,18 +139,18 @@ export function HolidayAdvancedDetails({
                   onClick={() => onRemoveCustom(h.id)}
                   className="text-[12px] font-bold text-ih-bad-fg hover:underline"
                 >
-                  Remove
+                  {m.common_remove()}
                 </button>
               </li>
             ))}
             {customHolidays.length === 0 && (
-              <li className="text-[12px] text-ih-fg-3">No custom days yet.</li>
+              <li className="text-[12px] text-ih-fg-3">{m.settings_holiday_custom_none()}</li>
             )}
           </ul>
           <div className="flex flex-wrap items-end gap-2 pt-1">
             <label className="block">
               <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-                Date
+                {m.settings_holiday_custom_date()}
               </span>
               <input
                 type="date"
@@ -161,14 +161,14 @@ export function HolidayAdvancedDetails({
             </label>
             <label className="block flex-1 min-w-[8rem]">
               <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-                Name
+                {m.settings_holiday_custom_name()}
               </span>
               <input
                 type="text"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
                 className="mt-1 block w-full h-8 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px]"
-                placeholder="Company picnic"
+                placeholder={m.settings_holiday_custom_name_placeholder()}
               />
             </label>
             <button
@@ -177,7 +177,7 @@ export function HolidayAdvancedDetails({
               disabled={saving || !newDate || !newName.trim()}
               className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-50"
             >
-              Add
+              {m.common_add()}
             </button>
           </div>
         </div>
@@ -189,12 +189,12 @@ export function HolidayAdvancedDetails({
             disabled={saving}
             className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
           >
-            {saving ? "Saving..." : "Save holiday settings"}
+            {saving ? m.settings_holiday_save_pending() : m.settings_holiday_save()}
           </button>
-          {saved && <span className="text-[13px] text-ih-ok-fg font-bold">Saved.</span>}
+          {saved && <span className="text-[13px] text-ih-ok-fg font-bold">{m.settings_holiday_saved()}</span>}
           {failed && (
             <span className="text-[13px] text-ih-bad-fg font-bold">
-              {failMessage ?? "Save failed. Please try again."}
+              {failMessage ?? m.settings_holiday_save_failed()}
             </span>
           )}
         </div>

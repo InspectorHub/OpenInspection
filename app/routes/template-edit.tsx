@@ -21,9 +21,10 @@ import type { PropertyType } from "~/components/template/types";
 import { CommentLibraryDrawer } from "~/components/editor/CommentLibraryDrawer";
 import { useCannedComments } from "~/hooks/useCannedComments";
 import { buildCannedFromText, TAB_SEVERITY, type CannedTab } from "~/lib/editor/canned-from-library";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Edit Template - OpenInspection" }];
+  return [{ title: m.templates_edit_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -53,7 +54,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const body = await res.json();
   const raw = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
   const tpl = raw?.template ? (raw.template as Record<string, unknown>) : raw;
-  const name = (tpl?.name as string) || "Untitled Template";
+  const name = (tpl?.name as string) || m.templates_edit_untitled();
   const version = (tpl?.version as number) || 1;
   let schema = (tpl?.schema || { schemaVersion: 2, sections: [] }) as TemplateSchema;
   if (typeof schema === "string") {
@@ -100,7 +101,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const formData = await request.formData();
   const name = formData.get("name") as string;
   const schemaStr = formData.get("schema") as string;
-  if (!schemaStr) return { error: "No schema" };
+  if (!schemaStr) return { error: m.templates_edit_error_no_schema() };
   const api = createApi(context, { token });
   const res = await api.inspections.templates[":id"].$put({
     param: { id: params.id },
@@ -114,7 +115,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     return { ok: true, version: newVersion };
   }
   const err = await res.json().catch(() => ({}));
-  return { error: (err as Record<string, unknown>)?.message || "Failed to save" };
+  return { error: (err as Record<string, unknown>)?.message || m.templates_edit_error_save_failed() };
 }
 
 /* ------------------------------------------------------------------ */
@@ -183,7 +184,7 @@ export default function TemplateEditPage() {
 
   function addSection() {
     const newId = `sec_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    updateSections((s) => [...s, { id: newId, title: "New Section", items: [] }]);
+    updateSections((s) => [...s, { id: newId, title: m.templates_edit_new_section(), items: [] }]);
     setActiveSection(sections.length);
   }
 
@@ -228,7 +229,7 @@ export default function TemplateEditPage() {
     updateSections((s) => {
       s[activeSection].items.push({
         id: itemId,
-        label: "New Item",
+        label: m.templates_edit_new_item(),
         type: "rich",
         ratingOptions: ["Inspected", "Not Inspected", "Not Present", "Repair", "Safety Hazard"],
         tabs: { information: [], limitations: [], defects: [] },
@@ -275,7 +276,7 @@ export default function TemplateEditPage() {
       if (idx < 0) return s;
       const clone = structuredClone(items[idx]);
       clone.id = newId;
-      clone.label = `${clone.label} (copy)`;
+      clone.label = m.templates_edit_item_copy_suffix({ label: clone.label });
       items.splice(idx + 1, 0, clone);
       return s;
     });
@@ -304,7 +305,7 @@ export default function TemplateEditPage() {
       if (!item.tabs) item.tabs = { information: [], limitations: [], defects: [] };
       const prefix = tab === "defects" ? "rd_" : tab === "limitations" ? "rl_" : "ri_";
       const newId = `${prefix}${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const entry: CannedComment = { id: newId, title: "New entry", comment: "", default: false };
+      const entry: CannedComment = { id: newId, title: m.templates_edit_new_entry(), comment: "", default: false };
       if (tab === "defects") {
         entry.category = "recommendation";
         entry.location = "";
@@ -466,7 +467,7 @@ export default function TemplateEditPage() {
   // prop identity) does not re-seed and discard in-progress edits on unrelated
   // re-renders while the modal is open.
   const editorSystem = useMemo(
-    () => ({ id, name: ratingSystem.name || "Rating System", slug: "template", levels: ratingSystem.levels.map(toEditorLevel) }),
+    () => ({ id, name: ratingSystem.name || m.templates_edit_rating_system(), slug: "template", levels: ratingSystem.levels.map(toEditorLevel) }),
     [id, ratingSystem],
   );
 
@@ -475,7 +476,7 @@ export default function TemplateEditPage() {
       {/* Toolbar */}
       <header className="flex items-center justify-between h-12 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
         <div className="flex items-center gap-3">
-          <Link to="/library/templates" className="inline-flex items-center gap-1 text-ih-fg-4 hover:text-ih-fg-2 text-[13px]"><Icon name="chevL" size={14} /> Templates</Link>
+          <Link to="/library/templates" className="inline-flex items-center gap-1 text-ih-fg-4 hover:text-ih-fg-2 text-[13px]"><Icon name="chevL" size={14} /> {m.templates_breadcrumb_current()}</Link>
           <input
             value={templateName}
             onChange={(e) => setTemplateName(e.target.value)}
@@ -489,13 +490,13 @@ export default function TemplateEditPage() {
             onClick={() => setPreviewMode(!previewMode)}
             className={`h-7 px-3 rounded-md text-[12px] font-bold transition-colors ${previewMode ? "bg-ih-watch-bg text-ih-watch-fg" : "bg-ih-bg-muted text-ih-fg-3"}`}
           >
-            {previewMode ? "Exit Preview" : "Preview"}
+            {previewMode ? m.templates_edit_exit_preview() : m.templates_edit_preview()}
           </button>
           <Button variant="secondary" size="sm" onClick={() => setRatingModalOpen(true)}>
-            Rating System
+            {m.templates_edit_rating_system()}
           </Button>
           <Button variant="primary" size="sm" onClick={handleSave}>
-            {fetcher.state === "submitting" ? "Saving..." : saveSuccess ? "Saved!" : "Save"}
+            {fetcher.state === "submitting" ? m.templates_edit_saving() : saveSuccess ? m.templates_edit_saved() : m.common_save()}
           </Button>
         </div>
       </header>
@@ -554,7 +555,7 @@ export default function TemplateEditPage() {
               />
             )
           ) : (
-            <div className="flex-1 flex items-center justify-center text-[13px] text-ih-fg-4">Add a section to get started</div>
+            <div className="flex-1 flex items-center justify-center text-[13px] text-ih-fg-4">{m.templates_edit_empty_add_section()}</div>
           )}
         </div>
 
@@ -564,9 +565,9 @@ export default function TemplateEditPage() {
             {/* Rail tabs */}
             <TabStrip
               tabs={[
-                { id: "properties", label: "Properties" },
-                { id: "comments", label: "Comments" },
-                { id: "preview", label: "Preview" },
+                { id: "properties", label: m.templates_edit_tab_properties() },
+                { id: "comments", label: m.templates_edit_tab_comments() },
+                { id: "preview", label: m.templates_edit_preview() },
               ]}
               activeId={rightRail}
               onChange={(id) => setRightRail(id as "properties" | "comments" | "preview")}
@@ -680,16 +681,16 @@ export function ErrorBoundary() {
   const status = isRouteErrorResponse(error) ? error.status : null;
   const message =
     status === 404
-      ? "This template could not be found. It may have been deleted."
+      ? m.templates_edit_error_not_found()
       : status === 403
-        ? "You do not have permission to edit this template."
-        : "Something went wrong while opening the template editor.";
+        ? m.templates_edit_error_forbidden()
+        : m.templates_edit_error_generic();
 
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-ih-bg-app gap-3 px-6 text-center">
       <p className="text-[15px] font-bold text-ih-fg-1">{message}</p>
       <Link to="/library/templates" className="h-8 px-4 inline-flex items-center rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600">
-        Back to Templates
+        {m.templates_edit_error_back()}
       </Link>
     </div>
   );

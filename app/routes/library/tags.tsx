@@ -4,9 +4,10 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState, Table } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Tags - OpenInspection" }];
+  return [{ title: m.library_tags_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -26,20 +27,20 @@ export default function TagsPage() {
 
   return (
     <div className="space-y-ih-list">
-      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Tags" }]} />
+      <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_tags_heading() }]} />
       <PageHeader
-        title="Tags"
-        meta={`${tags.length} tags`}
+        title={m.library_tags_heading()}
+        meta={m.library_tags_meta({ count: tags.length })}
         actions={
-          <Button variant="primary">+ Add tag</Button>
+          <Button variant="primary">{m.library_tags_add()}</Button>
         }
       />
 
       {tags.length === 0 ? (
         <Card>
           <EmptyState
-            title="No tags yet"
-            description='Click "+ Add tag" above to organize your library with tags.'
+            title={m.library_tags_empty_title()}
+            description={m.library_tags_empty_desc()}
           />
         </Card>
       ) : (
@@ -49,7 +50,7 @@ export default function TagsPage() {
             getRowKey={(tag) => tag.id}
             columns={[
               {
-                label: "Name",
+                label: m.library_tags_col_name(),
                 cell: (tag) => (
                   <span className="inline-flex items-center gap-2 font-semibold text-ih-fg-1">
                     {tag.color && (
@@ -59,14 +60,14 @@ export default function TagsPage() {
                   </span>
                 ),
               },
-              { label: "Color", cell: (tag) => <span className="text-ih-fg-3">{tag.color || "--"}</span> },
-              { label: "Used", cell: (tag) => <span className="text-ih-fg-3">{tag.count ?? 0}</span> },
+              { label: m.library_tags_col_color(), cell: (tag) => <span className="text-ih-fg-3">{tag.color || "--"}</span> },
+              { label: m.library_tags_col_used(), cell: (tag) => <span className="text-ih-fg-3">{tag.count ?? 0}</span> },
               {
-                label: "Actions",
+                label: m.library_tags_col_actions(),
                 align: "right",
                 cell: () => (
                   <button className="text-[13px] text-ih-primary hover:opacity-80 font-semibold">
-                    Edit
+                    {m.common_edit()}
                   </button>
                 ),
               },

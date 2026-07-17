@@ -1,4 +1,5 @@
 import { Icon, IconButton } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export interface MobileAppBarProps {
     sectionTitle: string;
@@ -18,7 +19,7 @@ export function MobileAppBar({ sectionTitle, itemLabel, onBack, onMore }: Mobile
             <IconButton
                 onClick={onBack}
                 className="w-10 h-10"
-                aria-label="Back"
+                aria-label={m.common_back()}
             ><Icon name="back" size={18} /></IconButton>
             <div className="flex-1 min-w-0">
                 <div className="text-[10px] uppercase tracking-[0.1em] text-ih-fg-4 truncate">{sectionTitle}</div>
@@ -27,7 +28,7 @@ export function MobileAppBar({ sectionTitle, itemLabel, onBack, onMore }: Mobile
             <IconButton
                 onClick={onMore}
                 className="w-10 h-10"
-                aria-label="More actions"
+                aria-label={m.editor_mobile_more()}
             >⋮</IconButton>
         </header>
     );

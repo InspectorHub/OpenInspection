@@ -4,6 +4,7 @@ import { formatDollars } from "~/lib/money";
 import { MoneyInput } from "~/components/MoneyInput";
 import { CostExportButtons } from "~/components/CostExportButtons";
 import type { CostItemView } from "~/components/portal/sections/report/types";
+import { m } from "~/paraglide/messages";
 
 /**
  * Commercial PCA Phase C Task 13b — the inspection-level Cost Items editor
@@ -21,23 +22,6 @@ import type { CostItemView } from "~/components/portal/sections/report/types";
  * repair" materiality threshold gets an inline note (never blocks saving —
  * advisory only).
  */
-
-const ACTION_OPTIONS: Array<{ value: CostItemView["action"]; label: string }> = [
-  { value: "repair", label: "Repair" },
-  { value: "replace", label: "Replace" },
-  { value: "further_study", label: "Further study" },
-];
-
-const COST_METHOD_OPTIONS: Array<{ value: CostItemView["costMethod"]; label: string }> = [
-  { value: "lump_sum", label: "Lump sum" },
-  { value: "unit", label: "Unit cost" },
-];
-
-const BUCKET_OPTIONS: Array<{ value: CostItemView["bucket"]; label: string }> = [
-  { value: "immediate", label: "Immediate (0–1 yr)" },
-  { value: "short_term", label: "Short-term (1–5 yr)" },
-  { value: "long_term", label: "Long-term (reserve)" },
-];
 
 const THRESHOLD_CENTS = 300_000; // ASTM E2018 $3,000 immediate-repair materiality line.
 
@@ -184,13 +168,13 @@ export function CostItemsPanel({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[13px] font-bold uppercase tracking-widest text-ih-fg-4">Cost Items</h2>
+        <h2 className="text-[13px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_cost_items_title()}</h2>
         <div className="flex items-center gap-3">
           {/* Export the current Opinion of Cost — only worth offering once at
               least one line exists (empty exports are just a header row). */}
           {rows.length > 0 && <CostExportButtons inspectionId={inspectionId} variant="panel" />}
           <Button variant="link" size="sm" onClick={addRow}>
-            + Add cost item
+            {m.editor_cost_add_item()}
           </Button>
         </div>
       </div>
@@ -199,27 +183,27 @@ export function CostItemsPanel({
         {rows.length > 0 && (
           <div className="grid grid-cols-3 gap-3 text-[12px] mb-2 pb-2 border-b border-ih-border">
             <div>
-              <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">Immediate</div>
+              <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">{m.editor_cost_total_immediate()}</div>
               <div className="tabular-nums text-ih-fg-1 font-bold">{formatDollars(bucketTotals.immediate)}</div>
             </div>
             <div>
-              <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">Short-term</div>
+              <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">{m.editor_cost_total_short_term()}</div>
               <div className="tabular-nums text-ih-fg-1 font-bold">{formatDollars(bucketTotals.short_term)}</div>
             </div>
             <div>
-              <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">Long-term</div>
+              <div className="text-ih-fg-4 uppercase tracking-wide text-[10px] font-bold">{m.editor_cost_total_long_term()}</div>
               <div className="tabular-nums text-ih-fg-1 font-bold">{formatDollars(bucketTotals.long_term)}</div>
             </div>
           </div>
         )}
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Running total</span>
+          <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.editor_cost_running_total()}</span>
           <span className="tabular-nums text-ih-fg-1 font-bold text-[14px]">{formatDollars(grandTotalCents)}</span>
         </div>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[12px] text-ih-fg-3">Nothing recorded yet — add a line to start the Opinion of Cost.</p>
+        <p className="text-[12px] text-ih-fg-3">{m.editor_cost_empty()}</p>
       ) : (
         <ul className="space-y-3">
           {rows.map((row) => (
@@ -252,33 +236,51 @@ function CostItemRow({
   const total = rowTotalCents(item);
   const underThreshold = total > 0 && total < THRESHOLD_CENTS;
 
+  // Option labels are built in render so the message functions resolve
+  // per-render (never frozen at import). The `value`s are the persisted enum
+  // members and stay as-is.
+  const ACTION_OPTIONS: Array<{ value: CostItemView["action"]; label: string }> = [
+    { value: "repair", label: m.editor_cost_action_repair() },
+    { value: "replace", label: m.editor_cost_action_replace() },
+    { value: "further_study", label: m.editor_cost_action_further_study() },
+  ];
+  const COST_METHOD_OPTIONS: Array<{ value: CostItemView["costMethod"]; label: string }> = [
+    { value: "lump_sum", label: m.editor_cost_method_lump_sum() },
+    { value: "unit", label: m.editor_cost_method_unit() },
+  ];
+  const BUCKET_OPTIONS: Array<{ value: CostItemView["bucket"]; label: string }> = [
+    { value: "immediate", label: m.editor_cost_bucket_immediate() },
+    { value: "short_term", label: m.editor_cost_bucket_short_term() },
+    { value: "long_term", label: m.editor_cost_bucket_long_term() },
+  ];
+
   return (
     <li className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3 space-y-2">
       <div className="grid grid-cols-12 gap-2 text-[11px]">
         <div className="col-span-6 md:col-span-3">
-          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">System</label>
+          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_system()}</label>
           <input
             value={item.system}
             onChange={(e) => onChange({ system: e.target.value })}
             onBlur={onCommit}
             disabled={busy}
-            placeholder="e.g. roof"
+            placeholder={m.editor_cost_placeholder_system()}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           />
         </div>
         <div className="col-span-6 md:col-span-3">
-          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Component</label>
+          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_component()}</label>
           <input
             value={item.component}
             onChange={(e) => onChange({ component: e.target.value })}
             onBlur={onCommit}
             disabled={busy}
-            placeholder="e.g. membrane"
+            placeholder={m.editor_cost_placeholder_component()}
             className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
           />
         </div>
         <div className="col-span-6 md:col-span-3">
-          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Location</label>
+          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_location()}</label>
           <input
             value={item.location ?? ""}
             onChange={(e) => onChange({ location: e.target.value })}
@@ -288,7 +290,7 @@ function CostItemRow({
           />
         </div>
         <div className="col-span-6 md:col-span-3">
-          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Action</label>
+          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_action()}</label>
           <select
             value={item.action}
             onChange={(e) => { onChange({ action: e.target.value as CostItemView["action"] }); onCommit(); }}
@@ -300,7 +302,7 @@ function CostItemRow({
         </div>
 
         <div className="col-span-6 md:col-span-3">
-          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Cost method</label>
+          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_cost_method()}</label>
           <select
             value={item.costMethod}
             onChange={(e) => { onChange({ costMethod: e.target.value as CostItemView["costMethod"] }); onCommit(); }}
@@ -314,7 +316,7 @@ function CostItemRow({
         {item.costMethod === "unit" ? (
           <>
             <div className="col-span-4 md:col-span-2">
-              <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Qty</label>
+              <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_qty()}</label>
               <input
                 type="number" min={0}
                 value={item.quantity ?? ""}
@@ -325,44 +327,44 @@ function CostItemRow({
               />
             </div>
             <div className="col-span-4 md:col-span-2">
-              <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">UOM</label>
+              <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_uom()}</label>
               <input
                 value={item.uom ?? ""}
                 onChange={(e) => onChange({ uom: e.target.value || null })}
                 onBlur={onCommit}
                 disabled={busy}
-                placeholder="sf, ea…"
+                placeholder={m.editor_cost_placeholder_uom()}
                 className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
               />
             </div>
             <div className="col-span-4 md:col-span-2">
-              <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Unit cost</label>
+              <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_unit_cost()}</label>
               <MoneyInput
                 cents={item.unitCostCents}
                 onChange={(c) => onChange({ unitCostCents: c })}
                 onBlur={onCommit}
                 disabled={busy}
-                ariaLabel="Unit cost"
+                ariaLabel={m.editor_cost_unit_cost()}
                 className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
               />
             </div>
           </>
         ) : (
           <div className="col-span-6 md:col-span-3">
-            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Lump sum</label>
+            <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_lump_sum()}</label>
             <MoneyInput
               cents={item.lumpSumCents}
               onChange={(c) => onChange({ lumpSumCents: c })}
               onBlur={onCommit}
               disabled={busy}
-              ariaLabel="Lump sum"
+              ariaLabel={m.editor_cost_lump_sum()}
               className="w-full px-2 h-9 rounded border border-ih-border bg-ih-bg-app text-ih-fg-1"
             />
           </div>
         )}
 
         <div className="col-span-6 md:col-span-3">
-          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Bucket</label>
+          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_bucket()}</label>
           <select
             value={item.bucket}
             onChange={(e) => { onChange({ bucket: e.target.value as CostItemView["bucket"] }); onCommit(); }}
@@ -376,11 +378,11 @@ function CostItemRow({
         {reserveEnabled && (
           <div className="col-span-12 rounded-md border border-ih-border bg-ih-bg-muted/40 p-2.5">
             <div className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.15em] text-ih-fg-4">
-              Reserve schedule (Table 2) — expected / effective / remaining useful life (years)
+              {m.editor_cost_reserve_schedule()}
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">EUL</label>
+                <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_eul()}</label>
                 <input
                   type="number" min={0}
                   value={item.eul ?? ""}
@@ -391,7 +393,7 @@ function CostItemRow({
                 />
               </div>
               <div>
-                <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Eff. age</label>
+                <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_eff_age()}</label>
                 <input
                   type="number" min={0}
                   value={item.effAge ?? ""}
@@ -402,7 +404,7 @@ function CostItemRow({
                 />
               </div>
               <div>
-                <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">RUL</label>
+                <label className="block whitespace-nowrap font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_rul()}</label>
                 <input
                   type="number" min={0}
                   value={item.rul ?? ""}
@@ -417,7 +419,7 @@ function CostItemRow({
         )}
 
         <div className="col-span-12">
-          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Suggested remedy</label>
+          <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_cost_field_suggested_remedy()}</label>
           <input
             value={item.suggestedRemedy}
             onChange={(e) => onChange({ suggestedRemedy: e.target.value })}
@@ -433,12 +435,12 @@ function CostItemRow({
           {formatDollars(total)}
           {underThreshold && (
             <span className="ml-2 px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-info-fg text-[11px] font-normal normal-case tracking-normal">
-              below the $3,000 threshold
+              {m.editor_cost_below_threshold()}
             </span>
           )}
         </div>
         <Button variant="danger-link" size="sm" disabled={busy} onClick={onRemove}>
-          Remove
+          {m.common_remove()}
         </Button>
       </div>
     </li>

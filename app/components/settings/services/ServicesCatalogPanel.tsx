@@ -1,6 +1,7 @@
 import { Form } from "react-router";
 import { Table } from "@core/shared-ui";
 import { QualificationWidget } from "./QualificationWidget";
+import { m } from "~/paraglide/messages";
 
 interface Service {
   id: string;
@@ -31,12 +32,12 @@ export function ServicesCatalogPanel({ services, restrictionMap, members }: Serv
         getRowKey={(svc) => svc.id}
         empty={
           <p className="py-10 text-center text-[13px] text-ih-fg-3">
-            No services yet. Click "Add service" to create your first.
+            {m.settings_services_empty()}
           </p>
         }
         columns={[
           {
-            label: "Name",
+            label: m.settings_services_col_name(),
             cell: (svc) => (
               <>
                 <p className="text-[13px] font-medium text-ih-fg-1">{svc.name}</p>
@@ -51,25 +52,25 @@ export function ServicesCatalogPanel({ services, restrictionMap, members }: Serv
               </>
             ),
           },
-          { label: "Duration", cell: () => <span className="text-ih-fg-3">&mdash;</span> },
+          { label: m.settings_services_col_duration(), cell: () => <span className="text-ih-fg-3">&mdash;</span> },
           {
-            label: "Price",
+            label: m.settings_services_col_price(),
             cell: (svc) => <span className="font-bold text-ih-ok-fg">${((svc.price || 0) / 100).toFixed(2)}</span>,
           },
           {
-            label: "Status",
+            label: m.settings_services_col_status(),
             cell: (svc) => (
               <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
                 svc.active
                   ? "bg-ih-ok-bg text-ih-ok-fg"
                   : "bg-ih-bg-muted text-ih-fg-3"
               }`}>
-                {svc.active ? "Active" : "Inactive"}
+                {svc.active ? m.settings_discount_active() : m.settings_services_inactive()}
               </span>
             ),
           },
           {
-            label: "Actions",
+            label: m.settings_services_col_actions(),
             align: "right",
             cell: (svc) => (
               <Form method="post" className="inline">
@@ -77,7 +78,7 @@ export function ServicesCatalogPanel({ services, restrictionMap, members }: Serv
                 <input type="hidden" name="id" value={svc.id} />
                 <input type="hidden" name="active" value={String(svc.active)} />
                 <button type="submit" className="text-[12px] font-semibold text-ih-primary hover:underline">
-                  {svc.active ? "Deactivate" : "Activate"}
+                  {svc.active ? m.settings_services_deactivate() : m.settings_services_activate()}
                 </button>
               </Form>
             ),

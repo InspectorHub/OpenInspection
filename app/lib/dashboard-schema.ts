@@ -1,3 +1,5 @@
+import { m } from "~/paraglide/messages";
+
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -62,19 +64,21 @@ export interface ColumnDef {
   alwaysOn?: boolean;
 }
 
+// Labels are exposed as getters so the string resolves at render time (under
+// the active paraglide locale), not frozen at module-import time.
 export const COLUMN_REGISTRY: ColumnDef[] = [
-  { id: "propertyAddress", label: "Property Address", defaultOn: true, alwaysOn: true },
-  { id: "clientName", label: "Client Name", defaultOn: true },
-  { id: "date", label: "Inspection Date", defaultOn: true },
-  { id: "inspector", label: "Inspector", defaultOn: false },
-  { id: "statusIcons", label: "Status Icons", defaultOn: true },
-  { id: "defectChips", label: "Defect Counts", defaultOn: true },
-  { id: "agent", label: "Agent", defaultOn: true },
-  { id: "price", label: "Price", defaultOn: true },
-  { id: "closingDate", label: "Closing Date", defaultOn: true },
-  { id: "referenceNumber", label: "Reference #", defaultOn: false },
-  { id: "referralSource", label: "Referral Source", defaultOn: false },
-  { id: "propertyFacts", label: "Property Facts", defaultOn: false },
+  { id: "propertyAddress", get label() { return m.label_col_property_address(); }, defaultOn: true, alwaysOn: true },
+  { id: "clientName", get label() { return m.label_col_client_name(); }, defaultOn: true },
+  { id: "date", get label() { return m.label_col_inspection_date(); }, defaultOn: true },
+  { id: "inspector", get label() { return m.label_col_inspector(); }, defaultOn: false },
+  { id: "statusIcons", get label() { return m.label_col_status_icons(); }, defaultOn: true },
+  { id: "defectChips", get label() { return m.label_col_defect_counts(); }, defaultOn: true },
+  { id: "agent", get label() { return m.label_col_agent(); }, defaultOn: true },
+  { id: "price", get label() { return m.label_col_price(); }, defaultOn: true },
+  { id: "closingDate", get label() { return m.label_col_closing_date(); }, defaultOn: true },
+  { id: "referenceNumber", get label() { return m.label_col_reference_number(); }, defaultOn: false },
+  { id: "referralSource", get label() { return m.label_col_referral_source(); }, defaultOn: false },
+  { id: "propertyFacts", get label() { return m.label_col_property_facts(); }, defaultOn: false },
 ];
 
 export const DEFAULT_COLUMNS = COLUMN_REGISTRY.filter((c) => c.defaultOn).map((c) => c.id);
@@ -85,15 +89,15 @@ export const ALWAYS_ON = new Set(COLUMN_REGISTRY.filter((c) => c.alwaysOn).map((
 /* ------------------------------------------------------------------ */
 
 export const INSPECTION_FILTERS = [
-  { id: "all", label: "All" },
-  { id: "past", label: "Past" },
-  { id: "yesterday", label: "Yesterday" },
-  { id: "today", label: "Today" },
-  { id: "tomorrow", label: "Tomorrow" },
-  { id: "this_week", label: "This Week" },
-  { id: "future", label: "Future" },
-  { id: "unconfirmed", label: "Unconfirmed" },
-  { id: "in_progress", label: "In Progress" },
+  { id: "all", get label() { return m.label_filter_all(); } },
+  { id: "past", get label() { return m.label_filter_past(); } },
+  { id: "yesterday", get label() { return m.label_filter_yesterday(); } },
+  { id: "today", get label() { return m.label_filter_today(); } },
+  { id: "tomorrow", get label() { return m.label_filter_tomorrow(); } },
+  { id: "this_week", get label() { return m.label_filter_this_week(); } },
+  { id: "future", get label() { return m.label_filter_future(); } },
+  { id: "unconfirmed", get label() { return m.label_filter_unconfirmed(); } },
+  { id: "in_progress", get label() { return m.label_filter_in_progress(); } },
 ] as const;
 
 export type FilterId = (typeof INSPECTION_FILTERS)[number]["id"];
@@ -103,13 +107,13 @@ export type FilterId = (typeof INSPECTION_FILTERS)[number]["id"];
 /* ------------------------------------------------------------------ */
 
 export const TABS = [
-  { key: "all", label: "All" },
-  { key: "active", label: "Active" },
-  { key: "requested", label: "Requested" },
-  { key: "to_review", label: "To Review" },
-  { key: "awaiting_payment", label: "Awaiting payment" },
-  { key: "published", label: "Published" },
-  { key: "cancelled", label: "Cancelled" },
+  { key: "all", get label() { return m.label_tab_all(); } },
+  { key: "active", get label() { return m.label_tab_active(); } },
+  { key: "requested", get label() { return m.label_tab_requested(); } },
+  { key: "to_review", get label() { return m.label_tab_to_review(); } },
+  { key: "awaiting_payment", get label() { return m.label_tab_awaiting_payment(); } },
+  { key: "published", get label() { return m.label_tab_published(); } },
+  { key: "cancelled", get label() { return m.label_tab_cancelled(); } },
 ] as const;
 
 export type TabKey = (typeof TABS)[number]["key"];
@@ -130,12 +134,12 @@ export const REPORT_STATE_TONE: Record<string, "monitor" | "sat" | "warning"> = 
 /* ------------------------------------------------------------------ */
 
 export const BUCKET_META: Record<string, { label: string; hint: string }> = {
-  needsAttention: { label: "Needs Attention", hint: "Inspections requiring action" },
-  today: { label: "Today", hint: "Scheduled for today" },
-  thisWeek: { label: "This Week", hint: "Upcoming this week" },
-  later: { label: "Later", hint: "Future inspections" },
-  recentReports: { label: "Recent Reports", hint: "Recently completed" },
-  cancelled: { label: "Cancelled", hint: "Cancelled inspections" },
+  needsAttention: { get label() { return m.label_bucket_needs_attention(); }, get hint() { return m.label_bucket_needs_attention_hint(); } },
+  today: { get label() { return m.label_bucket_today(); }, get hint() { return m.label_bucket_today_hint(); } },
+  thisWeek: { get label() { return m.label_bucket_this_week(); }, get hint() { return m.label_bucket_this_week_hint(); } },
+  later: { get label() { return m.label_bucket_later(); }, get hint() { return m.label_bucket_later_hint(); } },
+  recentReports: { get label() { return m.label_bucket_recent_reports(); }, get hint() { return m.label_bucket_recent_reports_hint(); } },
+  cancelled: { get label() { return m.label_bucket_cancelled(); }, get hint() { return m.label_bucket_cancelled_hint(); } },
 };
 
 export const PAGE_SIZE = 25;

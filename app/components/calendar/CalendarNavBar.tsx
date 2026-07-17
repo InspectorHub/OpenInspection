@@ -1,5 +1,12 @@
 import { Icon } from "@core/shared-ui";
 import type { ViewMode } from "~/components/calendar/calendar-helpers";
+import { m } from "~/paraglide/messages";
+
+const VIEW_LABELS: Record<ViewMode, () => string> = {
+  month: () => m.calendar_view_month(),
+  week: () => m.calendar_view_week(),
+  day: () => m.calendar_view_day(),
+};
 
 interface CalendarNavBarProps {
   title: string;
@@ -24,7 +31,7 @@ export function CalendarNavBar({
         <button
           type="button"
           onClick={onPrev}
-          aria-label="Previous"
+          aria-label={m.calendar_nav_previous()}
           className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
         >
           <Icon name="chevL" size={18} />
@@ -32,7 +39,7 @@ export function CalendarNavBar({
         <button
           type="button"
           onClick={onNext}
-          aria-label="Next"
+          aria-label={m.common_next()}
           className="h-9 w-9 rounded-md border border-ih-border flex items-center justify-center text-ih-fg-3 hover:bg-ih-bg-muted"
         >
           <Icon name="chevR" size={18} />
@@ -42,7 +49,7 @@ export function CalendarNavBar({
           onClick={onToday}
           className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted"
         >
-          Today
+          {m.calendar_nav_today()}
         </button>
       </div>
       <h2 className="text-xl font-bold text-ih-fg-1">{title}</h2>
@@ -58,7 +65,7 @@ export function CalendarNavBar({
                 : "border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"
             }`}
           >
-            {mode}
+            {VIEW_LABELS[mode]()}
           </button>
         ))}
       </div>

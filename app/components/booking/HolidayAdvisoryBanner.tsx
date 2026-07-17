@@ -1,4 +1,5 @@
 import { Banner } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export function HolidayAdvisoryBanner({
   name,
@@ -8,8 +9,8 @@ export function HolidayAdvisoryBanner({
   conciergeReviewRequired?: boolean;
 }) {
   const copy = conciergeReviewRequired
-    ? `Office may be closed — ${name}. Request received — office will confirm.`
-    : `Office may be closed — ${name}. We'll confirm availability.`;
+    ? m.booking_holiday_advisory_concierge({ name })
+    : m.booking_holiday_advisory_default({ name });
 
   return (
     <Banner tone="warn" className="mb-3">

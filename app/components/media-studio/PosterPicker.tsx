@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useFetcher } from "react-router";
 import { framesForDuration } from "../../../server/lib/media/poster-timestamp";
+import { m } from "~/paraglide/messages";
 
 /**
  * Plan 7 — poster-frame picker (filmstrip → Stream `thumbnailTimestampPct`).
@@ -72,26 +73,26 @@ export function PosterPicker({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Choose poster frame">
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-ih-backdrop" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={m.media_poster_heading()}>
+      <button type="button" aria-label={m.common_close()} className="absolute inset-0 bg-ih-backdrop" onClick={onClose} />
       <div
         data-testid="poster-picker"
         className="relative w-full max-w-2xl rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover"
       >
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[15px] font-bold text-ih-fg-1">Choose poster frame</h2>
+          <h2 className="text-[15px] font-bold text-ih-fg-1">{m.media_poster_heading()}</h2>
           <button
             type="button"
             onClick={onClose}
             className="min-h-[44px] min-w-[44px] rounded-lg px-3 text-[13px] font-bold text-ih-fg-3 hover:text-ih-fg-1"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
         </div>
 
         {unavailable ? (
           <p data-testid="poster-unavailable" className="py-8 text-center text-[13px] text-ih-fg-3">
-            Video unavailable — poster frames can't be loaded right now.
+            {m.media_poster_unavailable()}
           </p>
         ) : (
           <div className="-mx-1 flex gap-2 overflow-x-auto pb-2" style={{ touchAction: "pan-x" }}>
@@ -108,7 +109,7 @@ export function PosterPicker({
               >
                 <img
                   src={streamThumbUrl(streamCustomerSubdomain!, streamUid, Math.round(f.sec))}
-                  alt={`Frame at ${Math.round(f.sec)}s`}
+                  alt={m.media_poster_frame_alt({ sec: Math.round(f.sec) })}
                   className="h-full w-full object-cover"
                   loading="lazy"
                   draggable={false}
@@ -125,7 +126,7 @@ export function PosterPicker({
             disabled={!onPickFromPhotos}
             className="min-h-[44px] rounded-xl px-3 text-[13px] font-bold text-ih-primary hover:text-ih-primary-600 disabled:opacity-40"
           >
-            Pick from photos…
+            {m.media_poster_pick_from_photos()}
           </button>
           <button
             type="button"
@@ -133,7 +134,7 @@ export function PosterPicker({
             disabled={unavailable || saving}
             className="min-h-[44px] rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-white hover:bg-ih-primary-600 disabled:opacity-50"
           >
-            Set poster
+            {m.media_poster_set()}
           </button>
         </div>
       </div>

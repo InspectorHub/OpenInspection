@@ -14,6 +14,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { photoDisplayName, withDownload } from "~/lib/photo-name";
+import { m } from "~/paraglide/messages";
 import { qrToSvg } from "../../../../../server/lib/qr";
 import { PRINT_FIGURE_CLASS, printThumbWidth, type ReportPhoto } from "./types";
 
@@ -27,14 +28,14 @@ export interface ReportMediaTileProps {
 }
 
 export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, onPhotoFailed }: ReportMediaTileProps) {
-  const m = photo.media;
+  const media = photo.media;
   const name = photoDisplayName(photo.key);
 
-  if (m && m.kind === "video-player") {
+  if (media && media.kind === "video-player") {
     return (
-      <div key={`v-${m.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+      <div key={`v-${media.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
         <iframe
-          src={m.playerSrc}
+          src={media.playerSrc}
           title={alt}
           loading="lazy"
           allow="accelerated-2d-canvas; fullscreen; encrypted-media; picture-in-picture"
@@ -45,12 +46,12 @@ export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, on
     );
   }
 
-  if (m && m.kind === "video-poster") {
+  if (media && media.kind === "video-poster") {
     // PDF cannot embed a player → poster frame + QR + deep link.
-    const qr = qrToSvg(m.playerLinkUrl);
+    const qr = qrToSvg(media.playerLinkUrl);
     return (
-      <div key={`vp-${m.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
-        <img src={m.posterUrl} alt={alt} title={name} className="h-full w-full object-cover" loading="eager" />
+      <div key={`vp-${media.streamUid}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+        <img src={media.posterUrl} alt={alt} title={name} className="h-full w-full object-cover" loading="eager" />
         <span
           className="absolute bottom-1 right-1 h-12 w-12 rounded bg-ih-bg-card p-0.5"
           // biome-ignore lint/security/noDangerouslySetInnerHtml: server-generated SVG from qrToSvg — no user input
@@ -58,25 +59,25 @@ export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, on
           aria-hidden="true"
         />
         <a
-          href={m.playerLinkUrl}
+          href={media.playerLinkUrl}
           /* ds-allow: customer report render surface, not app chrome — fixed-dark caption chip over media */
           className="absolute inset-x-0 bottom-0 bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white"
         >
-          ▶ Watch the walk-through
+          {m.pca_media_watch_walkthrough()}
         </a>
       </div>
     );
   }
 
-  if (m && m.kind === "r2-video-player") {
+  if (media && media.kind === "r2-video-player") {
     // Web report → native <video> with the R2 poster + clip URL. The clip route
     // is tenant-guarded by the pool-row lookup; preload="none" so the poster
     // shows first and the clip only downloads on play (no CLS, no eager bytes).
     return (
-      <div key={`r2v-${m.mediaId}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+      <div key={`r2v-${media.mediaId}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
         <video
-          src={m.playerSrc}
-          poster={m.posterUrl}
+          src={media.playerSrc}
+          poster={media.posterUrl}
           controls
           preload="none"
           title={alt}
@@ -86,13 +87,13 @@ export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, on
     );
   }
 
-  if (m && m.kind === "r2-video-poster") {
+  if (media && media.kind === "r2-video-poster") {
     // PDF cannot embed a player → poster frame only. R2 clips have no public
     // deep-link watch page (unlike Stream), so the poster JPEG is the static
     // fallback with no QR/link.
     return (
-      <div key={`r2vp-${m.mediaId}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
-        <img src={m.posterUrl} alt={alt} title={name} className="h-full w-full object-cover" loading="eager" />
+      <div key={`r2vp-${media.mediaId}-${idx}`} className={`relative aspect-video overflow-hidden rounded ${PRINT_FIGURE_CLASS}`}>
+        <img src={media.posterUrl} alt={alt} title={name} className="h-full w-full object-cover" loading="eager" />
       </div>
     );
   }
@@ -112,7 +113,7 @@ export function ReportMediaTile({ photo, alt, idx, printMode, onOpenLightbox, on
       <a
         href={withDownload(photo.url)}
         download={name}
-        title={`Download ${name}`}
+        title={m.pca_media_download_title({ name })}
         onClick={(e) => e.stopPropagation()}
         /* ds-allow: customer report render surface, not app chrome — fixed-dark download chip over media */
         className="absolute top-1 right-1 rounded bg-[rgba(15,23,42,0.55)] px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100"

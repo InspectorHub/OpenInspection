@@ -1,5 +1,6 @@
 import { Link, Form } from "react-router";
 import type { useForm } from "@conform-to/react";
+import { m } from "~/paraglide/messages";
 
 interface CommConfig {
   senderEmail: string | null;
@@ -25,12 +26,6 @@ type EmailForm = ReturnType<typeof useForm<EmailFormShape>>[0];
 type EmailFields = ReturnType<typeof useForm<EmailFormShape>>[1];
 
 type EmailByoProvider = "resend" | "sendgrid" | "postmark" | "mailgun";
-const EMAIL_PROVIDER_LABELS: Record<EmailByoProvider, string> = {
-  resend: "Resend",
-  sendgrid: "SendGrid",
-  postmark: "Postmark",
-  mailgun: "Mailgun",
-};
 
 /**
  * Settings → Communication: "Email delivery" panel. Presentational — the route
@@ -71,10 +66,16 @@ export function EmailDeliveryPanel({
   emailFields: EmailFields;
   secretFormError: (intent: string) => string | null;
 }) {
+  const EMAIL_PROVIDER_LABELS: Record<EmailByoProvider, string> = {
+    resend: m.settings_email_provider_resend(),
+    sendgrid: m.settings_email_provider_sendgrid(),
+    postmark: m.settings_email_provider_postmark(),
+    mailgun: m.settings_email_provider_mailgun(),
+  };
   const providerLabel = EMAIL_PROVIDER_LABELS[emailByoProvider];
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email delivery</h3>
+        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_emaildelivery_heading()}</h3>
         <Form
           method="post"
           id={emailForm.id}
@@ -94,17 +95,17 @@ export function EmailDeliveryPanel({
           {/* Guardrail banners */}
           {config.emailMode === "own" && (!config.senderEmail || !ownProviderConfigured) ? (
             <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-              Own provider selected but no sender address / {providerLabel} credentials — emails will fail to send.
+              {m.settings_emaildelivery_own_missing({ provider: providerLabel })}
             </div>
           ) : null}
           {config.emailMode === "platform" && !config.resendConfigured ? (
             <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">
-              No platform email is configured (SENDER_EMAIL / Resend) — emails cannot be sent.
+              {m.settings_emaildelivery_platform_missing()}
             </div>
           ) : null}
           {config.pointOfContact === "inspector" ? (
             <div className="px-4 py-2.5 rounded-md bg-ih-bg-muted border border-ih-border text-[12px] text-ih-fg-3">
-              Emails use each inspector&rsquo;s name &amp; email; inspectors without a name fall back to the company.
+              {m.settings_emaildelivery_inspector_note()}
             </div>
           ) : null}
 
@@ -113,22 +114,22 @@ export function EmailDeliveryPanel({
           {isSaas ? (
             <>
               <div className="inline-flex rounded-md border border-ih-border overflow-hidden">
-                {(["platform", "own"] as const).map((m) => (
-                  <label key={m} className={`px-3 h-8 flex items-center text-[12px] font-bold cursor-pointer ${mode === m ? "bg-ih-primary text-white" : "bg-ih-bg-card text-ih-fg-2"}`}>
+                {(["platform", "own"] as const).map((optMode) => (
+                  <label key={optMode} className={`px-3 h-8 flex items-center text-[12px] font-bold cursor-pointer ${mode === optMode ? "bg-ih-primary text-white" : "bg-ih-bg-card text-ih-fg-2"}`}>
                     <input
-                      type="radio" name={emailFields.emailMode.name} value={m}
-                      defaultChecked={config.emailMode === m}
-                      onChange={() => setMode(m)}
+                      type="radio" name={emailFields.emailMode.name} value={optMode}
+                      defaultChecked={config.emailMode === optMode}
+                      onChange={() => setMode(optMode)}
                       className="sr-only"
                     />
-                    {m === "platform" ? "Platform email" : "My own provider"}
+                    {optMode === "platform" ? m.settings_emaildelivery_mode_platform() : m.settings_emaildelivery_mode_own()}
                   </label>
                 ))}
               </div>
               <p className="text-[11px] text-ih-fg-4">
                 {mode === "platform"
-                  ? "Send from the platform mailbox. You can set the display name and reply-to; the address is fixed."
-                  : "Send from your own email provider. Choose the provider and add its credentials under Email API keys below, plus a verified sender address."}
+                  ? m.settings_emaildelivery_mode_platform_desc()
+                  : m.settings_emaildelivery_mode_own_desc()}
               </p>
             </>
           ) : (
@@ -137,9 +138,7 @@ export function EmailDeliveryPanel({
                   default `platform` back into self-host config. */}
               <input type="hidden" name={emailFields.emailMode.name} value="own" />
               <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
-                Self-hosted deployments send from your own email provider. Choose a provider
-                (Resend, SendGrid, Postmark, or Mailgun) and add its credentials plus a
-                verified sender address under Email API keys below to enable email.
+                {m.settings_emaildelivery_selfhost_note()}
               </p>
             </>
           )}
@@ -147,30 +146,30 @@ export function EmailDeliveryPanel({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {mode === "own" && (
               <div>
-                <label htmlFor={emailFields.senderEmail.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Sender email</label>
+                <label htmlFor={emailFields.senderEmail.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_emaildelivery_sender_email_label()}</label>
                 <input
                   type="email" name={emailFields.senderEmail.name} id={emailFields.senderEmail.id}
-                  defaultValue={config.senderEmail || ""} placeholder="reports@yourdomain.com"
+                  defaultValue={config.senderEmail || ""} placeholder={m.settings_emaildelivery_sender_email_placeholder()}
                   aria-invalid={emailFields.senderEmail.errors ? true : undefined}
                   className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
                 {emailFields.senderEmail.errors ? (
                   <p className="mt-1 text-xs text-ih-bad-fg">{emailFields.senderEmail.errors[0]}</p>
                 ) : (
-                  <p className="text-[11px] text-ih-fg-4 mt-1">Must be a domain verified in your {providerLabel} account.</p>
+                  <p className="text-[11px] text-ih-fg-4 mt-1">{m.settings_emaildelivery_sender_verified({ provider: providerLabel })}</p>
                 )}
               </div>
             )}
             <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">From name</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_emaildelivery_from_name_label()}</p>
               <p className="text-[13px] text-ih-fg-2">
                 <strong>
                   {config.companyName || config.senderDisplayName || (
-                    <Link to="/settings/workspace" className="text-ih-primary hover:underline">Set your company name in Settings &rsaquo; Workspace</Link>
+                    <Link to="/settings/workspace" className="text-ih-primary hover:underline">{m.settings_emaildelivery_set_company_link()}</Link>
                   )}
                 </strong>
                 {config.companyName && (
-                  <span className="text-[11px] text-ih-fg-4 ml-2">(from Workspace settings)</span>
+                  <span className="text-[11px] text-ih-fg-4 ml-2">{m.settings_emaildelivery_from_workspace()}</span>
                 )}
               </p>
               <label className="flex items-center gap-2 text-[12px] text-ih-fg-2 cursor-pointer">
@@ -180,12 +179,12 @@ export function EmailDeliveryPanel({
                   onChange={(e) => setOverrideName(e.currentTarget.checked)}
                   className="h-4 w-4 border-ih-border"
                 />
-                Use a different name for email From
+                {m.settings_emaildelivery_override_name()}
               </label>
               {overrideName ? (
                 <input
                   type="text" name={emailFields.senderDisplayName.name} id={emailFields.senderDisplayName.id}
-                  defaultValue={config.senderDisplayName || ""} placeholder="Acme Inspections"
+                  defaultValue={config.senderDisplayName || ""} placeholder={m.settings_emaildelivery_display_name_placeholder()}
                   className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               ) : (
@@ -194,7 +193,7 @@ export function EmailDeliveryPanel({
             </div>
             <div>
               <label htmlFor={emailFields.replyTo.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">
-                Reply-to <span className="normal-case font-normal text-ih-bad-fg">* required when Point of Contact is Company</span>
+                {m.settings_emaildelivery_replyto_label()} <span className="normal-case font-normal text-ih-bad-fg">{m.settings_emaildelivery_replyto_required()}</span>
               </label>
               {config.emailMode === "own" && config.senderEmail ? (
                 <label className="flex items-center gap-2 text-[12px] text-ih-fg-3 mb-1">
@@ -205,25 +204,25 @@ export function EmailDeliveryPanel({
                       if (replyEl && e.currentTarget.checked) replyEl.value = config.senderEmail ?? "";
                     }}
                   />
-                  Same as sender email
+                  {m.settings_emaildelivery_same_as_sender()}
                 </label>
               ) : null}
               <input
                 type="email" name={emailFields.replyTo.name} id={emailFields.replyTo.id}
-                defaultValue={config.replyTo || ""} placeholder="hello@yourdomain.com"
+                defaultValue={config.replyTo || ""} placeholder={m.settings_emaildelivery_replyto_placeholder()}
                 aria-invalid={emailFields.replyTo.errors ? true : undefined}
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
               {emailFields.replyTo.errors ? (
                 <p className="mt-1 text-xs text-ih-bad-fg">{emailFields.replyTo.errors[0]}</p>
               ) : (
-                <p className="text-[11px] text-ih-fg-4 mt-1">Replies go to this address.</p>
+                <p className="text-[11px] text-ih-fg-4 mt-1">{m.settings_emaildelivery_replies_note()}</p>
               )}
             </div>
           </div>
 
           <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Point of contact</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_emaildelivery_poc_label()}</p>
             {(["company", "inspector"] as const).map((p) => (
               <label key={p} className="flex items-center gap-2 text-[13px] text-ih-fg-2 cursor-pointer">
                 <input
@@ -232,20 +231,20 @@ export function EmailDeliveryPanel({
                   onChange={() => setPoc(p)}
                   className="h-4 w-4 border-ih-border"
                 />
-                {p === "company" ? "Company (reply-to address required)" : "Sending inspector (replies go to that inspector)"}
+                {p === "company" ? m.settings_emaildelivery_poc_company() : m.settings_emaildelivery_poc_inspector()}
               </label>
             ))}
             <p className="text-[11px] text-ih-fg-4 pt-1">
-              Emails send as:{" "}
+              {m.settings_emaildelivery_send_as()}{" "}
               <strong>
                 {poc === "company"
-                  ? (overrideName && config.senderDisplayName ? config.senderDisplayName : (config.companyName || config.senderDisplayName || "your company"))
-                  : "the sending inspector"}
+                  ? (overrideName && config.senderDisplayName ? config.senderDisplayName : (config.companyName || config.senderDisplayName || m.settings_emaildelivery_your_company()))
+                  : m.settings_emaildelivery_the_inspector()}
               </strong>
               {poc === "inspector"
-                ? ", replies go to that inspector"
+                ? m.settings_emaildelivery_replies_to_inspector()
                 : config.replyTo
-                  ? `, replies go to ${config.replyTo}`
+                  ? m.settings_emaildelivery_replies_to_address({ replyTo: config.replyTo })
                   : ""}
             </p>
           </div>
@@ -260,15 +259,15 @@ export function EmailDeliveryPanel({
               // Status reflects the live mode selection: own → the chosen
               // provider's creds; platform → the platform Resend key.
               const activeConfigured = mode === "own" ? ownProviderConfigured : config.resendConfigured;
-              const activeLabel = mode === "own" ? `${providerLabel} credentials` : "Platform email";
+              const activeLabel = mode === "own" ? m.settings_emaildelivery_provider_credentials({ provider: providerLabel }) : m.settings_emaildelivery_mode_platform();
               return (
                 <span className={`text-[11px] font-bold ${activeConfigured ? "text-ih-ok-fg" : "text-ih-watch-fg"}`}>
-                  {activeConfigured ? `${activeLabel} configured` : `${activeLabel} not set`}
+                  {activeConfigured ? m.settings_emaildelivery_label_configured({ label: activeLabel }) : m.settings_emaildelivery_label_not_set({ label: activeLabel })}
                 </span>
               );
             })()}
             <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
-              Save
+              {m.common_save()}
             </button>
           </div>
         </Form>

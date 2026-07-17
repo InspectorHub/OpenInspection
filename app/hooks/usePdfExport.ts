@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { m } from "~/paraglide/messages";
 
 /**
  * Shared graceful-degradation logic for every "download/preview PDF" surface
@@ -22,9 +23,11 @@ import { useCallback, useEffect, useState } from "react";
 // margin so a retry after the countdown reliably succeeds.
 const PDF_RETRY_COOLDOWN_SEC = 20;
 
-export const PDF_BUSY_HINT = "Generating your PDF — this can take up to a minute.";
-const PDF_RATE_LIMIT_MSG = "The PDF service is busy right now. Please wait for the countdown, then try again.";
-const PDF_NETWORK_MSG = "Couldn't reach the PDF service. Please wait, then try again.";
+// A function (not a const) so the message resolves at call time in the active
+// locale, never frozen at module import.
+export function pdfBusyHint(): string {
+  return m.helper_pdf_busy_hint();
+}
 
 export interface PdfExportState {
   /** A render request is in flight. */
@@ -44,8 +47,8 @@ export interface PdfExportState {
  * "Generating…" while rendering, otherwise the surface's own default label.
  */
 export function pdfActionLabel(state: Pick<PdfExportState, "generating" | "cooldown">, defaultLabel: string): string {
-  if (state.cooldown > 0) return `Retry in ${state.cooldown}s`;
-  if (state.generating) return "Generating…";
+  if (state.cooldown > 0) return m.helper_pdf_retry_in({ seconds: state.cooldown });
+  if (state.generating) return m.helper_pdf_generating();
   return defaultLabel;
 }
 
@@ -77,7 +80,7 @@ export function usePdfExport(): PdfExportState {
         if (!res.ok) {
           viewTab?.close();
           setCooldown(PDF_RETRY_COOLDOWN_SEC);
-          setError(PDF_RATE_LIMIT_MSG);
+          setError(m.helper_pdf_rate_limit());
           return;
         }
         const blob = await res.blob();
@@ -99,7 +102,7 @@ export function usePdfExport(): PdfExportState {
         console.error(err);
         viewTab?.close();
         setCooldown(PDF_RETRY_COOLDOWN_SEC);
-        setError(PDF_NETWORK_MSG);
+        setError(m.helper_pdf_network());
       } finally {
         setGenerating(false);
       }

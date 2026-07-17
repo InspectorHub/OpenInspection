@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import { Modal, Button } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 /**
  * D8 — "Add section" title prompt modal.
@@ -28,7 +29,7 @@ export function AddSectionPromptModal({
     <Modal
       open={open}
       onClose={onCancel}
-      title="Add section"
+      title={m.editor_addsection_title()}
       size="sm"
       initialFocusRef={inputRef}
       footer={
@@ -37,13 +38,13 @@ export function AddSectionPromptModal({
             variant="ghost"
             onClick={onCancel}
           >
-            Cancel
+            {m.common_cancel()}
           </Button>
           <Button
             variant="primary"
             onClick={onConfirm}
           >
-            Add
+            {m.common_add()}
           </Button>
         </>
       }
@@ -52,7 +53,7 @@ export function AddSectionPromptModal({
         ref={inputRef}
         type="text"
         className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:ring-2 focus:ring-ih-primary"
-        placeholder="Section title (e.g. Roof)"
+        placeholder={m.editor_addsection_placeholder()}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(e) => {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useFetcher } from "react-router";
 import { Icon } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface TemplateSummary {
     id: string;
@@ -27,7 +28,7 @@ export function TemplateCombobox({
     onChange,
     initialTemplates = [],
     className = "",
-    placeholder = "--- Select template ---",
+    placeholder = m.template_combobox_placeholder(),
 }: TemplateComboboxProps) {
     const [open, setOpen] = useState(false);
     const [query, setQuery] = useState("");
@@ -165,7 +166,7 @@ export function TemplateCombobox({
                                 value={query}
                                 onChange={e => setQuery(e.target.value)}
                                 onKeyDown={handleKeyDown}
-                                placeholder="Search templates..."
+                                placeholder={m.template_combobox_search_placeholder()}
                                 className="w-full h-8 pl-8 pr-3 text-[13px] bg-ih-bg-muted rounded border border-ih-border outline-none focus:border-ih-primary text-ih-fg-1 placeholder:text-ih-fg-4"
                             />
                         </div>
@@ -174,10 +175,10 @@ export function TemplateCombobox({
                     {/* List */}
                     <div className="max-h-52 overflow-y-auto">
                         {isLoading ? (
-                            <div className="py-6 text-center text-[12px] text-ih-fg-4">Loading…</div>
+                            <div className="py-6 text-center text-[12px] text-ih-fg-4">{m.common_loading()}</div>
                         ) : results.length === 0 ? (
                             <div className="py-6 text-center text-[12px] text-ih-fg-4">
-                                {query ? "No templates match your search" : "No templates found"}
+                                {query ? m.template_combobox_no_match() : m.template_combobox_no_templates()}
                             </div>
                         ) : (
                             <>
@@ -188,7 +189,7 @@ export function TemplateCombobox({
                                         onClick={() => { onChange(""); setOpen(false); setQuery(""); }}
                                         className="w-full px-3 py-2 text-left text-[12px] text-ih-fg-4 hover:bg-ih-bg-muted italic"
                                     >
-                                        --- Clear selection ---
+                                        {m.template_combobox_clear()}
                                     </button>
                                 )}
                                 {results.map((t, i) => (
@@ -218,7 +219,7 @@ export function TemplateCombobox({
                                 disabled={isLoadingMore}
                                 className="w-full h-7 rounded text-[12px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
                             >
-                                {isLoadingMore ? "Loading…" : "Load more"}
+                                {isLoadingMore ? m.common_loading() : m.template_combobox_load_more()}
                             </button>
                         </div>
                     )}

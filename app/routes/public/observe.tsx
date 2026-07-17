@@ -2,9 +2,10 @@ import { useLoaderData } from "react-router";
 import type { Route } from "./+types/observe";
 import { createApi } from "~/lib/api-client.server";
 import { ProgressView } from "~/components/portal/sections/ProgressView";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Observe Inspection - OpenInspection" }];
+  return [{ title: m.portal_observe_meta_title() }];
 }
 
 interface ObserveData {
@@ -27,10 +28,10 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
     return {
       inspection: (Object.keys(d).length > 0 ? d : null) as ObserveData | null,
-      error: res.ok ? null : "Inspection not found",
+      error: res.ok ? null : m.portal_observe_error_not_found(),
     };
   } catch {
-    return { inspection: null, error: "Service unavailable" };
+    return { inspection: null, error: m.portal_observe_error_unavailable() };
   }
 }
 
@@ -46,7 +47,7 @@ export default function ObservePage() {
         inspectorName={inspection?.inspectorName ?? ""}
         status={inspection?.status ?? ""}
         sections={inspection?.sections ?? []}
-        error={error || (!inspection ? "Inspection not found" : null)}
+        error={error || (!inspection ? m.portal_observe_error_not_found() : null)}
       />
     </div>
   );

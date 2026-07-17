@@ -6,9 +6,10 @@ import { useSessionContext } from "~/hooks/useSessionContext";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { formatNumber } from "~/lib/format";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Usage - Settings - OpenInspection" }];
+  return [{ title: m.settings_usage_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -83,13 +84,13 @@ export default function SettingsUsagePage() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Usage" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_usage_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">
         {caps
-          ? "What this account has used on the free plan. Storage is measured once a day."
+          ? m.settings_usage_subtitle_free()
           : isSaas
-            ? "What this account has consumed. Inspections/SMS/email are cumulative totals; storage is measured once a day."
-            : "What this account has consumed. SMS/email are cumulative totals; storage is measured once a day."}
+            ? m.settings_usage_subtitle_saas()
+            : m.settings_usage_subtitle_standalone()}
       </p>
 
       {/* Metric cards — inspections (SaaS only) + SMS, email, storage.
@@ -101,36 +102,36 @@ export default function SettingsUsagePage() {
           paid SaaS tenants still see the lifetime-analytics count. */}
       <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${isSaas ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         {isSaas && (caps ? (
-          <CappedMetricCard label="Inspections" used={u.inspections ?? 0} cap={caps.inspections} locale={locale} />
+          <CappedMetricCard label={m.settings_usage_metric_inspections()} used={u.inspections ?? 0} cap={caps.inspections} locale={locale} />
         ) : (
           <MetricCard
-            label="Inspections"
+            label={m.settings_usage_metric_inspections()}
             value={formatNumber(u.inspections ?? 0, { locale })}
-            sub="Inspections created — cumulative"
+            sub={m.settings_usage_metric_inspections_sub()}
           />
         ))}
         {caps ? (
-          <CappedMetricCard label="SMS sent" used={u.sms ?? 0} cap={caps.sms} byo={u.smsByo ?? 0} locale={locale} />
+          <CappedMetricCard label={m.settings_usage_metric_sms()} used={u.sms ?? 0} cap={caps.sms} byo={u.smsByo ?? 0} locale={locale} />
         ) : (
           <MetricCard
-            label="SMS sent"
+            label={m.settings_usage_metric_sms()}
             value={formatNumber(u.sms ?? 0, { locale })}
-            sub="Text messages sent — cumulative"
+            sub={m.settings_usage_metric_sms_sub()}
           />
         )}
         {caps ? (
-          <CappedMetricCard label="Emails sent" used={u.email ?? 0} cap={caps.email} byo={u.emailByo ?? 0} locale={locale} />
+          <CappedMetricCard label={m.settings_usage_metric_email()} used={u.email ?? 0} cap={caps.email} byo={u.emailByo ?? 0} locale={locale} />
         ) : (
           <MetricCard
-            label="Emails sent"
+            label={m.settings_usage_metric_email()}
             value={formatNumber(u.email ?? 0, { locale })}
-            sub="Emails delivered — cumulative"
+            sub={m.settings_usage_metric_email_sub()}
           />
         )}
         <MetricCard
-          label="Storage used"
+          label={m.settings_usage_metric_storage()}
           value={fmtBytes(u.r2Bytes ?? 0)}
-          sub="Photos & documents — measured daily"
+          sub={m.settings_usage_metric_storage_sub()}
         />
       </div>
 
@@ -140,7 +141,7 @@ export default function SettingsUsagePage() {
           to="/settings/billing"
           className="inline-flex items-center text-ih-primary text-[13px] font-medium hover:underline"
         >
-          ← Back to billing &amp; plan
+          {m.settings_usage_back_to_billing()}
         </Link>
       )}
     </div>
@@ -199,10 +200,10 @@ function CappedMetricCard({
         />
       </div>
       <div className={`text-[12px] mt-1 ${atCap ? "text-ih-bad-fg font-semibold" : "text-ih-fg-3"}`}>
-        {atCap ? "Free plan limit reached" : `${cap - used} left on the free plan`}
+        {atCap ? m.settings_usage_cap_reached() : m.settings_usage_cap_remaining({ count: cap - used })}
       </div>
       {byo !== undefined && (
-        <div className="text-[11px] text-ih-fg-4 mt-1">via your own account: {formatNumber(byo, { locale })}</div>
+        <div className="text-[11px] text-ih-fg-4 mt-1">{m.settings_usage_byo({ count: formatNumber(byo, { locale }) })}</div>
       )}
     </div>
   );

@@ -1,4 +1,9 @@
 import { z } from "zod";
+// i18n — locale-aware validation messages. `m.*()` resolves to the active locale
+// via paraglide's ALS (server) / cookie (client), so schemas carrying user-facing
+// messages are built by a FACTORY called per validation (never a module-level
+// const, which would freeze the message at import time).
+import { m } from "~/paraglide/messages";
 
 /**
  * Settings form schemas, mirroring the API's validation rules (see
@@ -16,12 +21,14 @@ import { z } from "zod";
 /*  Shared strong-password rule (mirrors api shared.schema passwordSchema) */
 /* ------------------------------------------------------------------ */
 
-const strongPassword = z
-  .string()
-  .min(8, "Password must be at least 8 characters")
-  .regex(/[A-Z]/, "Must contain at least one uppercase letter")
-  .regex(/[0-9]/, "Must contain at least one number")
-  .regex(/[^A-Za-z0-9]/, "Must contain at least one special character");
+function makeStrongPassword() {
+  return z
+    .string()
+    .min(8, m.validation_password_min8())
+    .regex(/[A-Z]/, m.validation_password_uppercase())
+    .regex(/[0-9]/, m.validation_password_number())
+    .regex(/[^A-Za-z0-9]/, m.validation_password_special());
+}
 
 /* ------------------------------------------------------------------ */
 /*  Account (settings-account.tsx)                                     */
@@ -32,14 +39,16 @@ const strongPassword = z
  * (confirmEmail must be a valid email). The action additionally checks the
  * email is non-empty; a valid email already implies that.
  */
-export const deleteAccountSchema = z.object({
-  confirmEmail: z
-    .string()
-    .min(1, "Retype your account email to confirm deletion")
-    .email("Enter a valid email address"),
-});
+export function makeDeleteAccountSchema() {
+  return z.object({
+    confirmEmail: z
+      .string()
+      .min(1, m.validation_delete_account_email_required())
+      .email(m.validation_delete_account_email_invalid()),
+  });
+}
 
-export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
+export type DeleteAccountInput = z.infer<ReturnType<typeof makeDeleteAccountSchema>>;
 
 /* ------------------------------------------------------------------ */
 /*  Security (settings-security.tsx)                                   */
@@ -51,18 +60,20 @@ export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;
  * is form-only; a cross-field `refine` enforces the match (the action also
  * guards it server-side).
  */
-export const changePasswordSchema = z
-  .object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: strongPassword,
-    confirmPassword: z.string().min(1, "Please confirm your new password"),
-  })
-  .refine((d) => d.newPassword === d.confirmPassword, {
-    message: "New passwords do not match",
-    path: ["confirmPassword"],
-  });
+export function makeChangePasswordSchema() {
+  return z
+    .object({
+      currentPassword: z.string().min(1, m.validation_change_password_current_required()),
+      newPassword: makeStrongPassword(),
+      confirmPassword: z.string().min(1, m.validation_change_password_confirm_required()),
+    })
+    .refine((d) => d.newPassword === d.confirmPassword, {
+      message: m.validation_change_password_mismatch(),
+      path: ["confirmPassword"],
+    });
+}
 
-export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+export type ChangePasswordInput = z.infer<ReturnType<typeof makeChangePasswordSchema>>;
 
 /**
  * Turnstile secret key — the only validated field on the bot-protection form.
@@ -88,20 +99,22 @@ export type TurnstileInput = z.infer<typeof turnstileSchema>;
  * frozen; the field was removed from the PATCH endpoint on the API side.
  * Agent slugs use POST /api/agent/profile (separate endpoint, unaffected).
  */
-export const profileSchema = z.object({
-  name: z.string().max(100, "Name is too long").optional(),
-  phone: z.string().max(30, "Phone is too long").optional(),
-  licenseNumber: z.string().max(50, "License number is too long").optional(),
-  signatureEnabled: z.boolean().optional(),
-  // Per-user display-timezone override (IANA name). Empty string = inherit the
-  // tenant default. Constrained to a <select> in the UI.
-  timezone: z.string().optional(),
-  // Per-user display-locale override (BCP-47). Empty string = inherit the tenant
-  // default. Constrained to a <Select> in the UI.
-  locale: z.string().optional(),
-});
+export function makeProfileSchema() {
+  return z.object({
+    name: z.string().max(100, m.validation_profile_name_too_long()).optional(),
+    phone: z.string().max(30, m.validation_profile_phone_too_long()).optional(),
+    licenseNumber: z.string().max(50, m.validation_profile_license_too_long()).optional(),
+    signatureEnabled: z.boolean().optional(),
+    // Per-user display-timezone override (IANA name). Empty string = inherit the
+    // tenant default. Constrained to a <select> in the UI.
+    timezone: z.string().optional(),
+    // Per-user display-locale override (BCP-47). Empty string = inherit the tenant
+    // default. Constrained to a <Select> in the UI.
+    locale: z.string().optional(),
+  });
+}
 
-export type ProfileInput = z.infer<typeof profileSchema>;
+export type ProfileInput = z.infer<ReturnType<typeof makeProfileSchema>>;
 
 /* ------------------------------------------------------------------ */
 /*  Workspace (settings-workspace.tsx)                                 */
@@ -115,41 +128,43 @@ export type ProfileInput = z.infer<typeof profileSchema>;
  */
 const THEMES = ["modern", "classic", "minimal"] as const;
 
-export const workspaceSchema = z.object({
-  companyName: z
-    .string()
-    .min(1, "Workspace name is required")
-    .max(50, "Workspace name is too long"),
-  primaryColor: z
-    .string()
-    .regex(/^#[0-9A-Fa-f]{6}$/, "Invalid hex color")
-    .optional(),
-  reportTheme: z.enum(THEMES).optional(),
-  customReferralSources: z.string().optional(),
-  // Report-feature flags. Rendered as conform-native checkboxes (single input,
-  // value "on", NO hidden "false" sibling) so a checked box submits ONE value that
-  // conform coerces to a boolean — read from submission.value in the action. (An
-  // earlier hidden+checkbox pair submitted two values and broke z.boolean parsing.)
-  enableRepairList: z.boolean().optional(),
-  enableCustomerRepairExport: z.boolean().optional(),
-  // Report PDF print-layout settings (mirror UpdateBrandingSchema). companyAddress
-  // is a free-text field (empty string clears it); the three toggles are
-  // conform-native checkboxes like the report-feature flags above.
-  companyAddress: z.string().max(300, "Company address is too long").optional(),
-  pdfShowFooter: z.boolean().optional(),
-  pdfShowPageNumbers: z.boolean().optional(),
-  pdfShowLicense: z.boolean().optional(),
-  // Tenant display timezone (IANA name). Free-form string validated on the API;
-  // the UI constrains it to a <select> of TIMEZONE_OPTIONS.
-  defaultTimezone: z.string().optional(),
-  // Tenant default display locale (BCP-47). UI constrains to a <Select> of the
-  // supported LOCALE_OPTIONS; API validates via resolveLocale.
-  defaultLocale: z.string().optional(),
-  // Tenant currency (ISO 4217). UI constrains to a <Select> of CURRENCY_OPTIONS.
-  currency: z.string().optional(),
-});
+export function makeWorkspaceSchema() {
+  return z.object({
+    companyName: z
+      .string()
+      .min(1, m.validation_workspace_name_required())
+      .max(50, m.validation_workspace_name_too_long()),
+    primaryColor: z
+      .string()
+      .regex(/^#[0-9A-Fa-f]{6}$/, m.validation_workspace_color_invalid())
+      .optional(),
+    reportTheme: z.enum(THEMES).optional(),
+    customReferralSources: z.string().optional(),
+    // Report-feature flags. Rendered as conform-native checkboxes (single input,
+    // value "on", NO hidden "false" sibling) so a checked box submits ONE value that
+    // conform coerces to a boolean — read from submission.value in the action. (An
+    // earlier hidden+checkbox pair submitted two values and broke z.boolean parsing.)
+    enableRepairList: z.boolean().optional(),
+    enableCustomerRepairExport: z.boolean().optional(),
+    // Report PDF print-layout settings (mirror UpdateBrandingSchema). companyAddress
+    // is a free-text field (empty string clears it); the three toggles are
+    // conform-native checkboxes like the report-feature flags above.
+    companyAddress: z.string().max(300, m.validation_workspace_company_address_too_long()).optional(),
+    pdfShowFooter: z.boolean().optional(),
+    pdfShowPageNumbers: z.boolean().optional(),
+    pdfShowLicense: z.boolean().optional(),
+    // Tenant display timezone (IANA name). Free-form string validated on the API;
+    // the UI constrains it to a <select> of TIMEZONE_OPTIONS.
+    defaultTimezone: z.string().optional(),
+    // Tenant default display locale (BCP-47). UI constrains to a <Select> of the
+    // supported LOCALE_OPTIONS; API validates via resolveLocale.
+    defaultLocale: z.string().optional(),
+    // Tenant currency (ISO 4217). UI constrains to a <Select> of CURRENCY_OPTIONS.
+    currency: z.string().optional(),
+  });
+}
 
-export type WorkspaceInput = z.infer<typeof workspaceSchema>;
+export type WorkspaceInput = z.infer<ReturnType<typeof makeWorkspaceSchema>>;
 
 /* ------------------------------------------------------------------ */
 /*  Services (settings-services.tsx)                                   */
@@ -161,19 +176,21 @@ export type WorkspaceInput = z.infer<typeof workspaceSchema>;
  * and converted to integer cents in the action, so we validate the raw dollar
  * input as a non-negative number string.
  */
-export const createServiceSchema = z.object({
-  name: z
-    .string()
-    .min(1, "Service name is required")
-    .max(200, "Service name is too long"),
-  description: z.string().max(1000, "Description is too long").optional(),
-  price: z
-    .string()
-    .optional()
-    .refine(
-      (v) => v == null || v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0),
-      "Enter a price of 0 or more",
-    ),
-});
+export function makeCreateServiceSchema() {
+  return z.object({
+    name: z
+      .string()
+      .min(1, m.validation_service_name_required())
+      .max(200, m.validation_service_name_too_long()),
+    description: z.string().max(1000, m.validation_service_description_too_long()).optional(),
+    price: z
+      .string()
+      .optional()
+      .refine(
+        (v) => v == null || v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0),
+        m.validation_service_price_invalid(),
+      ),
+  });
+}
 
-export type CreateServiceInput = z.infer<typeof createServiceSchema>;
+export type CreateServiceInput = z.infer<ReturnType<typeof makeCreateServiceSchema>>;

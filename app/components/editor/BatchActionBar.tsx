@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@core/shared-ui";
 import { RatingSegment, type RatingOption } from "../editor-shared/RatingSegment";
+import { m } from "~/paraglide/messages";
 
 interface BatchActionBarProps {
   count: number;
@@ -49,17 +50,17 @@ export function BatchActionBar({
         data-testid="batch-count"
         className="text-[11px] font-bold text-ih-fg-2 whitespace-nowrap"
       >
-        {count} selected
+        {m.editor_batch_selected_count({ count })}
       </span>
 
       <div className="w-px h-4 bg-ih-border flex-shrink-0" aria-hidden="true" />
 
       {/* Select all / Clear */}
       <Button variant="link" size="sm" onClick={onSelectAll}>
-        Select all
+        {m.editor_batch_select_all()}
       </Button>
       <Button variant="link" size="sm" onClick={onClear}>
-        Clear
+        {m.common_clear()}
       </Button>
 
       <div className="w-px h-4 bg-ih-border flex-shrink-0" aria-hidden="true" />
@@ -72,12 +73,12 @@ export function BatchActionBar({
         value={null}
         onChange={onSetRating}
         size="sm"
-        ariaLabel="Set rating for selected items"
+        ariaLabel={m.editor_batch_set_rating_aria()}
       />
 
       {/* Exit batch mode */}
       <Button variant="ghost" size="sm" onClick={onExit} className="ml-auto">
-        Exit
+        {m.editor_batch_exit()}
       </Button>
     </div>
   );

@@ -3,24 +3,30 @@ import { useFetcher } from "react-router";
 import { Drawer } from "@core/shared-ui";
 import { getCapabilities, TOGGLEABLE, type Capability, type CapabilitySet, type PermissionOverrides } from "../../../server/lib/auth/capabilities";
 import { SeatLimitPanel } from "./SeatLimitPanel";
+import { m } from "~/paraglide/messages";
 
 const FORM_ID = "invite-seat-form";
 
 type Role = "owner" | "manager" | "inspector" | "agent";
 
-const ROLE_DESC: Record<Role, string> = {
- owner: "Full access, including billing and ownership transfer.",
- manager: "Full access to inspections, templates, and team management.",
- inspector: "Create and edit inspections they're assigned to.",
- agent: "Read-only buyer-agent view.",
+// Thunks (not eager strings) so each description resolves at render inside the
+// paraglide request scope, not once at module import.
+const ROLE_DESC: Record<Role, () => string> = {
+ owner: () => m.modal_invite_role_desc_owner(),
+ manager: () => m.modal_invite_role_desc_manager(),
+ inspector: () => m.modal_invite_role_desc_inspector(),
+ agent: () => m.modal_invite_role_desc_agent(),
 };
 
-/** Advanced-permissions toggle labels, in TOGGLEABLE order. */
+/**
+ * Advanced-permissions toggle labels, in TOGGLEABLE order. Exposed as getters so each
+ * label resolves at access time inside the paraglide request scope, not frozen at import.
+ */
 export const CAP_LABELS: Record<Capability, string> = {
- publish: "Publish reports",
- scheduleOthers: "Schedule for others",
- financial: "Financial data",
- manageContacts: "Manage contacts",
+ get publish() { return m.label_cap_publish(); },
+ get scheduleOthers() { return m.label_cap_schedule_others(); },
+ get financial() { return m.label_cap_financial(); },
+ get manageContacts() { return m.label_cap_manage_contacts(); },
 };
 
 /**
@@ -88,7 +94,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
   const d = inviteFetcher.data;
   if (!d) return;
   if (!d.ok) {
-   setError(d.error ?? "Failed");
+   setError(d.error ?? m.modal_invite_error_failed());
    return;
   }
   if (d.intent === "invite") {
@@ -115,13 +121,13 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  <Drawer
  open={open}
  onClose={onClose}
- title="Invite"
+ title={m.modal_invite_title()}
  initialFocusRef={emailRef}
  footer={
  seatLimit ? undefined : (
  <>
- <button type="button" onClick={onClose} className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted">Cancel</button>
- <button type="submit" form={FORM_ID} disabled={submitting} className="px-4 h-10 rounded-xl bg-ih-primary text-white text-sm font-semibold hover:bg-ih-primary-600 disabled:opacity-50">Send invite</button>
+ <button type="button" onClick={onClose} className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted">{m.common_cancel()}</button>
+ <button type="submit" form={FORM_ID} disabled={submitting} className="px-4 h-10 rounded-xl bg-ih-primary text-white text-sm font-semibold hover:bg-ih-primary-600 disabled:opacity-50">{m.modal_invite_send()}</button>
  </>
  )
  }
@@ -132,24 +138,24 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  <form id={FORM_ID} onSubmit={submitPermanent} className="space-y-4">
  <div className="space-y-3">
  <label className="block">
- <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Email</span>
+ <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.modal_invite_email_label()}</span>
  <input ref={emailRef} className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
  </label>
  <label className="flex items-center gap-2 text-sm text-ih-fg-3">
  <input type="checkbox" checked={notify} onChange={(e) => setNotify(e.target.checked)} />
- Send email notification
+ {m.modal_invite_notify_label()}
  </label>
  </div>
 
  <label className="block">
- <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">Role</span>
+ <span className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 mb-1">{m.modal_invite_role_label()}</span>
  <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={role} onChange={(e) => setRole(e.target.value as Role)}>
- <option value="manager">Manager</option>
- <option value="inspector">Inspector</option>
- <option value="agent">Agent</option>
+ <option value="manager">{m.modal_invite_role_manager()}</option>
+ <option value="inspector">{m.modal_invite_role_inspector()}</option>
+ <option value="agent">{m.modal_invite_role_agent()}</option>
  </select>
  </label>
- <p className="text-xs text-ih-fg-3">{ROLE_DESC[role]}</p>
+ <p className="text-xs text-ih-fg-3">{ROLE_DESC[role]()}</p>
 
  <div className="border-t border-ih-border pt-3">
  <button
@@ -159,7 +165,7 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-ih-fg-3 hover:text-ih-fg-1"
  >
  <span className={`transition-transform ${advancedOpen ? "rotate-90" : ""}`} aria-hidden="true">▸</span>
- Advanced permissions
+ {m.modal_invite_advanced()}
  </button>
  {advancedOpen && (
  <div className="mt-3 space-y-2">

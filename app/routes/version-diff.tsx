@@ -3,9 +3,10 @@ import type { Route } from "./+types/version-diff";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
- return [{ title: "Version Diff - OpenInspection" }];
+ return [{ title: m.misc_version_diff_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -40,7 +41,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  query: { from },
  });
  if (!res.ok) {
- return { inspectionId: id, version: n, diffs: [] as DiffEntry[], error: "Version not found" };
+ return { inspectionId: id, version: n, diffs: [] as DiffEntry[], error: m.misc_version_diff_err_not_found() };
  }
  const body = await res.json();
  return {
@@ -50,7 +51,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  error: null,
  };
  } catch {
- return { inspectionId: id, version: n, diffs: [] as DiffEntry[], error: "Service unavailable" };
+ return { inspectionId: id, version: n, diffs: [] as DiffEntry[], error: m.misc_version_diff_err_unavailable() };
  }
 }
 
@@ -66,14 +67,14 @@ export default function VersionDiffPage() {
  return (
  <div className="max-w-3xl mx-auto p-8 text-center">
  <h1 className="text-2xl font-bold text-ih-fg-1">
- Version Diff
+ {m.misc_version_diff_error_heading()}
  </h1>
  <p className="text-ih-fg-3 mt-2">{error}</p>
  <a
  href={`/inspections/${inspectionId}/edit`}
  className="inline-flex items-center mt-4 h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
  >
- Back to Inspection
+ {m.misc_version_diff_back_inspection()}
  </a>
  </div>
  );
@@ -83,14 +84,16 @@ export default function VersionDiffPage() {
  <div className="max-w-4xl mx-auto py-8 px-6">
  <div className="mb-6">
  <PageHeader
- title={`Version ${version} Changes`}
- meta={`Inspection #${String(inspectionId).slice(0, 8).toUpperCase()} — ${diffs.length} change${diffs.length !== 1 ? "s" : ""}`}
+ title={m.misc_version_diff_title({ version })}
+ meta={diffs.length === 1
+ ? m.misc_version_diff_meta_one({ id: String(inspectionId).slice(0, 8).toUpperCase(), count: diffs.length })
+ : m.misc_version_diff_meta_other({ id: String(inspectionId).slice(0, 8).toUpperCase(), count: diffs.length })}
  actions={
  <a
  href={`/inspections/${inspectionId}/edit`}
  className="h-9 px-4 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors inline-flex items-center"
  >
- Back to Editor
+ {m.misc_version_diff_back_editor()}
  </a>
  }
  />
@@ -99,17 +102,17 @@ export default function VersionDiffPage() {
  {/* Diff table */}
  {diffs.length === 0 ? (
  <div className="p-6 rounded-lg border border-dashed border-ih-border-strong text-center text-[13px] text-ih-fg-4">
- No changes in this version.
+ {m.misc_version_diff_no_changes()}
  </div>
  ) : (
  <div className="bg-ih-bg-card border border-ih-border rounded-xl overflow-hidden">
  <div className="grid grid-cols-[1fr_1fr_1fr] gap-0 text-[11px] font-bold uppercase tracking-widest text-ih-fg-4 bg-ih-bg-app/30 border-b border-ih-border">
- <div className="px-4 py-3">Field</div>
+ <div className="px-4 py-3">{m.misc_version_diff_col_field()}</div>
  <div className="px-4 py-3 border-l border-ih-border">
- Before
+ {m.misc_version_diff_col_before()}
  </div>
  <div className="px-4 py-3 border-l border-ih-border">
- After
+ {m.misc_version_diff_col_after()}
  </div>
  </div>
 
@@ -128,12 +131,12 @@ export default function VersionDiffPage() {
  </div>
  <div className="px-4 py-3 border-l border-ih-border bg-ih-bad-bg/50">
  <span className="text-[13px] text-ih-bad-fg">
- {d.before ?? <span className="italic text-ih-fg-4">empty</span>}
+ {d.before ?? <span className="italic text-ih-fg-4">{m.misc_version_diff_empty_value()}</span>}
  </span>
  </div>
  <div className="px-4 py-3 border-l border-ih-border bg-ih-ok-bg/50">
  <span className="text-[13px] text-ih-ok-fg">
- {d.after ?? <span className="italic text-ih-fg-4">empty</span>}
+ {d.after ?? <span className="italic text-ih-fg-4">{m.misc_version_diff_empty_value()}</span>}
  </span>
  </div>
  </div>

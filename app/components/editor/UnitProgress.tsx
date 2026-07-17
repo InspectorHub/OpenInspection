@@ -9,6 +9,7 @@
  */
 
 import { IconButton } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface UnitProgressUnit {
   id: string;
@@ -35,10 +36,10 @@ export function UnitProgress({ units, completedUnitIds, onSelectUnit, activeUnit
   return (
     <div
       className="flex items-center gap-2 text-[12px] font-mono tabular-nums"
-      aria-label={`${completed} of ${units.length} units complete`}
+      aria-label={m.editor_unitprogress_summary_aria({ completed, total: units.length })}
     >
       <span className="text-ih-fg-2">
-        {completed}/{units.length} units
+        {m.editor_unitprogress_count({ completed, total: units.length })}
       </span>
       <div className="flex items-center gap-1">
         {units.map((u) => {
@@ -47,7 +48,10 @@ export function UnitProgress({ units, completedUnitIds, onSelectUnit, activeUnit
           const dotClass = `inline-block w-2 h-2 rounded-full ${isDone ? "bg-ih-ok" : "bg-ih-border"} ${
             isActive ? "ring-2 ring-inset ring-ih-primary" : ""
           }`;
-          const title = `${u.label} — ${isDone ? "complete" : "in progress"}`;
+          const title = m.editor_unitprogress_dot_title({
+            label: u.label,
+            status: isDone ? m.editor_unitprogress_status_complete() : m.editor_unitprogress_status_in_progress(),
+          });
 
           return onSelectUnit ? (
             <IconButton

@@ -1,5 +1,6 @@
 import { Icon, Button, IconButton } from '@core/shared-ui';
 import type { PublishReadiness, PublishBlockingDefect } from '../../lib/types';
+import { m } from '~/paraglide/messages';
 
 export interface PublishGateModalProps {
     open: boolean;
@@ -30,9 +31,9 @@ function DefectList({ entries, onJump, tone }: {
                         </div>
                         <div className="text-[13px] font-bold">{b.cannedTitle}</div>
                         <div className="mt-1 text-[12px] text-ih-fg-3">
-                            Missing: {b.missing.length === 0 ? <em>(none)</em> : b.missing.join(', ')}
+                            {m.editor_gate_missing()}{b.missing.length === 0 ? <em>{m.editor_gate_none()}</em> : b.missing.join(', ')}
                             {b.unresolvedTokens.length > 0 && (
-                                <> &middot; Unresolved tokens: {b.unresolvedTokens.map(t => `{{${t}}}`).join(', ')}</>
+                                <>{m.editor_gate_unresolved()}{b.unresolvedTokens.map(t => `{{${t}}}`).join(', ')}</>
                             )}
                         </div>
                     </div>
@@ -41,7 +42,7 @@ function DefectList({ entries, onJump, tone }: {
                         size="sm"
                         onClick={() => onJump(b)}
                     >
-                        Jump <Icon name="arrowR" size={13} />
+                        {m.editor_gate_jump()} <Icon name="arrowR" size={13} />
                     </Button>
                 </li>
             ))}
@@ -63,12 +64,12 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
                 <div className="px-5 py-3 border-b border-ih-border flex items-center justify-between">
                     <h2 className="text-[14px] font-bold">
                         {warningOnly
-                            ? <>Publish with warnings? &mdash; {warnings.length} defect{warnings.length === 1 ? '' : 's'} incomplete</>
-                            : <>Cannot publish &mdash; {blocking.length} defect{blocking.length === 1 ? '' : 's'} need attention</>}
+                            ? (warnings.length === 1 ? m.editor_gate_warn_title_one({ count: warnings.length }) : m.editor_gate_warn_title_other({ count: warnings.length }))
+                            : (blocking.length === 1 ? m.editor_gate_block_title_one({ count: blocking.length }) : m.editor_gate_block_title_other({ count: blocking.length }))}
                     </h2>
                     <IconButton
                         onClick={onClose}
-                        aria-label="Close"
+                        aria-label={m.common_close()}
                         size="sm"
                     >
                         &#x2715;
@@ -79,7 +80,7 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
                     {warnings.length > 0 && (
                         <>
                             <div className="px-5 py-2 bg-ih-watch-bg text-ih-watch-fg text-[11px] font-bold uppercase tracking-[0.1em] border-y border-ih-border">
-                                Warnings — won&apos;t block publishing
+                                {m.editor_gate_warnings_banner()}
                             </div>
                             <DefectList entries={warnings} onJump={onJump} tone="warning" />
                         </>
@@ -87,7 +88,7 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
                 </div>
                 <div className="px-5 py-3 border-t border-ih-border flex items-center justify-end gap-2">
                     <Button variant="ghost" size="sm" onClick={onClose}>
-                        {warningOnly ? 'Cancel' : 'Close'}
+                        {warningOnly ? m.common_cancel() : m.common_close()}
                     </Button>
                     {warningOnly && onProceed && (
                         <Button
@@ -96,7 +97,7 @@ export function PublishGateModal({ open, readiness, onClose, onJump, onProceed }
                             onClick={onProceed}
                             data-testid="publish-anyway"
                         >
-                            Publish anyway
+                            {m.editor_gate_publish_anyway()}
                         </Button>
                     )}
                 </div>

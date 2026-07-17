@@ -10,6 +10,7 @@
  * Fail closed: for Stream, when the subdomain is absent we render a
  * "Video unavailable" panel rather than a fabricated/broken subdomain.
  */
+import { m } from "~/paraglide/messages";
 
 export interface VideoPlayerProps {
   provider: "stream" | "r2";
@@ -50,7 +51,7 @@ export function VideoPlayer({
           data-testid="video-unavailable"
           className="flex aspect-video w-full items-center justify-center rounded-xl bg-ih-bg-muted text-[13px] text-ih-fg-3"
         >
-          Video unavailable
+          {m.media_video_unavailable()}
         </div>
       );
     }
@@ -92,7 +93,7 @@ export function VideoPlayer({
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
         </svg>
-        <span>Processing…{typeof pctComplete === "number" ? ` ${Math.round(pctComplete)}%` : ""}</span>
+        <span>{m.media_video_processing()}{typeof pctComplete === "number" ? ` ${Math.round(pctComplete)}%` : ""}</span>
       </div>
     );
   }
@@ -101,7 +102,7 @@ export function VideoPlayer({
     <div data-testid="video-player" className="relative aspect-video w-full overflow-hidden rounded-xl bg-ih-bg-muted">
       <iframe
         src={streamIframeSrc(streamCustomerSubdomain, streamUid)}
-        title="Video walk-through"
+        title={m.media_video_walkthrough_title()}
         loading="lazy"
         allow="accelerated-2d-canvas; fullscreen; encrypted-media; picture-in-picture"
         allowFullScreen

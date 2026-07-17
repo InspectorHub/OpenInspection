@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useFetcher } from "react-router";
 import type { action } from "~/routes/settings-services";
+import { m } from "~/paraglide/messages";
 
 interface Service {
   id: string;
@@ -57,8 +58,10 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
 
   const displayLabel =
     initialUserIds.length === 0
-      ? "All inspectors"
-      : `${initialUserIds.length} inspector${initialUserIds.length !== 1 ? "s" : ""}`;
+      ? m.settings_qual_all_inspectors()
+      : initialUserIds.length !== 1
+        ? m.settings_qual_inspectors_many({ count: initialUserIds.length })
+        : m.settings_qual_inspectors_one({ count: initialUserIds.length });
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -92,7 +95,7 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
   if (members.length === 0) {
     return (
       <div className="text-[12px] text-ih-fg-3">
-        <span className="font-medium">Qualified:</span> {displayLabel}
+        <span className="font-medium">{m.settings_qual_qualified_label()}</span> {displayLabel}
       </div>
     );
   }
@@ -102,44 +105,44 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
       {!open ? (
         <div className="flex items-center gap-3">
           <span className="text-[12px] text-ih-fg-3">
-            <span className="font-medium">Qualified:</span> {displayLabel}
+            <span className="font-medium">{m.settings_qual_qualified_label()}</span> {displayLabel}
           </span>
           <button
             type="button"
             onClick={() => setOpen(true)}
             className="text-[12px] font-semibold text-ih-primary hover:underline"
           >
-            Edit
+            {m.common_edit()}
           </button>
-          {saved && <span className="text-[12px] text-ih-ok-fg font-bold">Saved.</span>}
+          {saved && <span className="text-[12px] text-ih-ok-fg font-bold">{m.settings_holiday_saved()}</span>}
         </div>
       ) : (
         <div className="border border-ih-border rounded-md p-3 space-y-2 bg-ih-bg-muted">
           <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 mb-2">
-            Qualified inspectors
+            {m.settings_qual_heading()}
           </p>
           <p className="text-[12px] text-ih-fg-3 mb-2">
-            Leave all unchecked to allow all staff.
+            {m.settings_qual_leave_unchecked()}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-40 overflow-y-auto">
-            {members.map((m) => (
-              <label key={m.id} className="flex items-center gap-2 cursor-pointer select-none py-1">
+            {members.map((member) => (
+              <label key={member.id} className="flex items-center gap-2 cursor-pointer select-none py-1">
                 <input
                   type="checkbox"
-                  checked={selected.has(m.id)}
-                  onChange={() => toggle(m.id)}
+                  checked={selected.has(member.id)}
+                  onChange={() => toggle(member.id)}
                   className="h-4 w-4 rounded border-ih-border text-ih-primary"
                 />
                 <span className="text-[12px] text-ih-fg-1 truncate">
-                  {m.email}
-                  <span className="ml-1 text-ih-fg-3 text-[11px]">({m.role})</span>
+                  {member.email}
+                  <span className="ml-1 text-ih-fg-3 text-[11px]">({member.role})</span>
                 </span>
               </label>
             ))}
           </div>
           {failed && (
             <p className="text-[12px] text-ih-bad-fg">
-              {(lastResult as { message?: string }).message ?? "Save failed. Please try again."}
+              {(lastResult as { message?: string }).message ?? m.settings_holiday_save_failed()}
             </p>
           )}
           <div className="flex items-center gap-2 pt-1">
@@ -149,14 +152,14 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
               disabled={saving}
               className="h-7 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
             >
-              {saving ? "Saving…" : "Save"}
+              {saving ? m.common_saving() : m.common_save()}
             </button>
             <button
               type="button"
               onClick={handleCancel}
               className="h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card transition-colors"
             >
-              Cancel
+              {m.common_cancel()}
             </button>
           </div>
         </div>

@@ -1,7 +1,8 @@
 import { Link } from "react-router";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Feature Disabled - OpenInspection" }];
+  return [{ title: m.misc_feature_disabled_meta_title() }];
 }
 
 export default function FeatureDisabledPage() {
@@ -24,17 +25,16 @@ export default function FeatureDisabledPage() {
           </svg>
         </div>
         <p className="text-lg font-semibold text-ih-fg-2">
-          Feature Not Available
+          {m.misc_feature_disabled_heading()}
         </p>
         <p className="text-[13px] text-ih-fg-3 mt-2 max-w-sm mx-auto">
-          This feature is not enabled for your workspace. Contact your
-          administrator or upgrade your plan.
+          {m.misc_feature_disabled_desc()}
         </p>
         <Link
           to="/inspections"
           className="inline-flex items-center gap-1.5 mt-6 h-9 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors"
         >
-          Back to Dashboard
+          {m.misc_feature_disabled_back()}
         </Link>
       </div>
     </div>

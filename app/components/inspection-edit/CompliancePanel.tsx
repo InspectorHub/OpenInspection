@@ -4,6 +4,7 @@ import { Button, Modal, SegmentedControl } from "@core/shared-ui";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { formatDateTime } from "~/lib/format";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
+import { m } from "~/paraglide/messages";
 
 /**
  * Commercial PCA Phase M Task 10 — the "Compliance (Full PCA)" editor panel.
@@ -74,23 +75,36 @@ export interface CompliancePanelData {
   relianceText: RelianceTextView;
 }
 
-const ROLE_LABELS: Record<SignoffRole, string> = {
-  field_observer: "Field Observer (§7.5)",
-  pcr_reviewer: "PCR Reviewer (§7.6)",
-};
+// Thunks (not module consts) so labels resolve at render time rather than being
+// frozen to the message value present at import.
+function roleLabel(role: SignoffRole): string {
+  return role === "field_observer"
+    ? m.editor_compliance_role_field_observer()
+    : m.editor_compliance_role_pcr_reviewer();
+}
 
-const PSQ_QUESTIONS: { key: string; label: string }[] = [
-  { key: "knownDeficiencies", label: "Known physical deficiencies or damage" },
-  { key: "pendingViolations", label: "Pending code, fire, or zoning violations" },
-  { key: "environmentalConcerns", label: "Known environmental concerns" },
-  { key: "plannedImprovements", label: "Planned or budgeted capital improvements" },
-];
+// Keys are stable data; labels resolve per render via psqQuestions().
+const PSQ_QUESTION_KEYS = [
+  "knownDeficiencies",
+  "pendingViolations",
+  "environmentalConcerns",
+  "plannedImprovements",
+] as const;
+
+function psqQuestions(): { key: string; label: string }[] {
+  return [
+    { key: "knownDeficiencies", label: m.editor_compliance_psq_q_known_deficiencies() },
+    { key: "pendingViolations", label: m.editor_compliance_psq_q_pending_violations() },
+    { key: "environmentalConcerns", label: m.editor_compliance_psq_q_environmental() },
+    { key: "plannedImprovements", label: m.editor_compliance_psq_q_improvements() },
+  ];
+}
 
 function normalizeResponses(raw: Record<string, unknown> | null | undefined): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const q of PSQ_QUESTIONS) {
-    const v = raw?.[q.key];
-    out[q.key] = typeof v === "string" ? v : "";
+  for (const key of PSQ_QUESTION_KEYS) {
+    const v = raw?.[key];
+    out[key] = typeof v === "string" ? v : "";
   }
   return out;
 }
@@ -108,15 +122,15 @@ function ConformancePreview({ data }: { data: CompliancePanelData }) {
   return (
     <div className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3 space-y-2" data-testid="conformance-preview">
       <div className="flex items-center justify-between">
-        <span className="text-[12px] font-bold text-ih-fg-2">ASTM {data.conformance.standard} conformance</span>
+        <span className="text-[12px] font-bold text-ih-fg-2">{m.editor_compliance_conformance_heading({ standard: data.conformance.standard })}</span>
         <span className={`ih-pill ${conforms ? "ih-pill--sat" : "ih-pill--defect"}`}>
-          {conforms ? "Conforms" : "Does not conform"}
+          {conforms ? m.editor_compliance_conforms() : m.editor_compliance_does_not_conform()}
         </span>
       </div>
       <ul className="text-[11px] text-ih-fg-4 space-y-0.5">
-        <li>{reviewerSigned ? "✓" : "—"} PCR Reviewer sign-off recorded</li>
-        <li>{psqOk ? "✓" : "—"} PSQ received, or declined and disclosed</li>
-        <li>{docReviewStarted ? "✓" : "—"} Document Review checklist started</li>
+        <li>{reviewerSigned ? "✓" : "—"} {m.editor_compliance_check_pcr()}</li>
+        <li>{psqOk ? "✓" : "—"} {m.editor_compliance_check_psq()}</li>
+        <li>{docReviewStarted ? "✓" : "—"} {m.editor_compliance_check_doc_review()}</li>
       </ul>
     </div>
   );
@@ -190,40 +204,40 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
   return (
     <div className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3 space-y-2" data-testid={`signoff-${role}`}>
       <div className="flex items-center justify-between">
-        <span className="text-[12px] font-bold text-ih-fg-2">{ROLE_LABELS[role]}</span>
+        <span className="text-[12px] font-bold text-ih-fg-2">{roleLabel(role)}</span>
         <span className={`text-[11px] font-bold ${existing ? "text-ih-ok-fg" : "text-ih-fg-4"}`}>
-          {existing ? "Signed" : "Not signed"}
+          {existing ? m.editor_compliance_signed() : m.editor_compliance_not_signed()}
         </span>
       </div>
 
       {existing ? (
         <div className="text-[12px] text-ih-fg-2 space-y-1">
-          <div>{existing.name}{existing.license ? ` — License ${existing.license}` : ""}</div>
+          <div>{existing.name}{existing.license ? m.editor_compliance_license_suffix({ license: existing.license }) : ""}</div>
           {existing.signedAt ? (
-            <div className="text-[11px] text-ih-fg-4">Signed {formatDateTime(existing.signedAt, { locale, timeZone: displayTz })}</div>
+            <div className="text-[11px] text-ih-fg-4">{m.editor_compliance_signed()} {formatDateTime(existing.signedAt, { locale, timeZone: displayTz })}</div>
           ) : null}
           <Button variant="danger-link" size="sm" disabled={removing} onClick={() => setConfirmOpen(true)}>
-            {removing ? "Removing…" : "Remove"}
+            {removing ? m.editor_compliance_removing() : m.common_remove()}
           </Button>
         </div>
       ) : (
         <div className="space-y-2">
           <input
-            placeholder="Person ID"
+            placeholder={m.editor_compliance_person_id()}
             value={personId}
             onChange={(e) => setPersonId(e.target.value)}
             disabled={saving}
             className="ih-input w-full"
           />
           <input
-            placeholder="Name"
+            placeholder={m.editor_compliance_name()}
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={saving}
             className="ih-input w-full"
           />
           <input
-            placeholder="License (optional)"
+            placeholder={m.editor_compliance_license_optional()}
             value={license}
             onChange={(e) => setLicense(e.target.value)}
             disabled={saving}
@@ -236,7 +250,7 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
               onChange={(e) => setDualRole(e.target.checked)}
               disabled={saving}
             />
-            Dual role (same person signs both)
+            {m.editor_compliance_dual_role()}
           </label>
           <Button
             variant="primary"
@@ -245,16 +259,16 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
             disabled={saving || !personId.trim() || !name.trim()}
             className="w-full"
           >
-            {saving ? "Signing…" : "Sign off"}
+            {saving ? m.editor_compliance_signing() : m.editor_compliance_sign_off()}
           </Button>
         </div>
       )}
 
       <ConfirmDialog
         open={confirmOpen}
-        title="Remove sign-off"
-        message={`Remove the ${ROLE_LABELS[role]} sign-off? This cannot be undone.`}
-        confirmLabel="Remove"
+        title={m.editor_compliance_remove_signoff_title()}
+        message={m.editor_compliance_remove_signoff_msg({ role: roleLabel(role) })}
+        confirmLabel={m.common_remove()}
         busy={removing}
         onConfirm={confirmRemove}
         onCancel={() => setConfirmOpen(false)}
@@ -267,11 +281,13 @@ function SignoffRoleCard({ role, existing }: { role: SignoffRole; existing: Repo
 /* PSQ (b)                                                            */
 /* ------------------------------------------------------------------ */
 
-const PSQ_STATUSES: { value: "sent" | "received" | "declined"; label: string }[] = [
-  { value: "sent", label: "Sent" },
-  { value: "received", label: "Received" },
-  { value: "declined", label: "Declined" },
-];
+function psqStatuses(): { value: "sent" | "received" | "declined"; label: string }[] {
+  return [
+    { value: "sent", label: m.editor_compliance_status_sent() },
+    { value: "received", label: m.editor_compliance_received() },
+    { value: "declined", label: m.editor_compliance_status_declined() },
+  ];
+}
 
 function PsqPanel({ psq }: { psq: PsqView | null }) {
   // Separate fetcher per mutation TYPE (responses vs status) — a status click
@@ -314,23 +330,23 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
   return (
     <div className="rounded-ih-card border border-ih-border bg-ih-bg-card p-3 space-y-3" data-testid="psq-panel">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">Status</span>
+        <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-4">{m.editor_compliance_status()}</span>
         <fieldset disabled={settingStatus} className="contents">
           <SegmentedControl
-            ariaLabel="PSQ status"
+            ariaLabel={m.editor_compliance_psq_status()}
             value={status ?? ""}
             onChange={(v) => {
               const next = v as "sent" | "received" | "declined";
               if (next === "declined") setDeclineOpen(true);
               else applyStatus(next);
             }}
-            options={PSQ_STATUSES.map((s) => ({ value: s.value, label: s.label }))}
+            options={psqStatuses().map((s) => ({ value: s.value, label: s.label }))}
           />
         </fieldset>
       </div>
 
       <div className="space-y-2">
-        {PSQ_QUESTIONS.map((q) => (
+        {psqQuestions().map((q) => (
           <label key={q.key} className="block">
             <span className="mb-1 block text-[11px] font-medium text-ih-fg-3">{q.label}</span>
             <textarea
@@ -348,29 +364,29 @@ function PsqPanel({ psq }: { psq: PsqView | null }) {
       <Modal
         open={declineOpen}
         onClose={() => setDeclineOpen(false)}
-        title="Decline PSQ"
+        title={m.editor_compliance_decline_psq_title()}
         size="sm"
         footer={
           <>
             <Button variant="ghost" onClick={() => setDeclineOpen(false)}>
-              Cancel
+              {m.common_cancel()}
             </Button>
             <Button variant="danger" onClick={confirmDecline}>
-              Decline
+              {m.editor_compliance_decline()}
             </Button>
           </>
         }
       >
         <label className="block">
           <span className="mb-1 block text-[12px] text-ih-fg-2">
-            Declining the PSQ discloses the omission in the report&apos;s Deviations section (ASTM §11.4.3). Reason:
+            {m.editor_compliance_decline_body()}
           </span>
           <textarea
             rows={3}
             value={declineReason}
             onChange={(e) => setDeclineReason(e.target.value)}
             className="w-full rounded border border-ih-border bg-ih-bg-app p-2 text-[12px] text-ih-fg-1"
-            placeholder="Point-of-contact unavailable, refused, …"
+            placeholder={m.editor_compliance_decline_placeholder()}
           />
         </label>
       </Modal>
@@ -416,7 +432,7 @@ function DocReviewRow({ item }: { item: DocumentReviewItemView }) {
             disabled={busy}
             onChange={(e) => submitPatch({ ...local, requested: e.target.checked })}
           />
-          Requested
+          {m.editor_compliance_doc_requested()}
         </label>
         <label className="flex items-center gap-1">
           <input
@@ -425,7 +441,7 @@ function DocReviewRow({ item }: { item: DocumentReviewItemView }) {
             disabled={busy}
             onChange={(e) => submitPatch({ ...local, received: e.target.checked })}
           />
-          Received
+          {m.editor_compliance_received()}
         </label>
         <label className="flex items-center gap-1">
           <input
@@ -434,7 +450,7 @@ function DocReviewRow({ item }: { item: DocumentReviewItemView }) {
             disabled={busy}
             onChange={(e) => submitPatch({ ...local, reviewed: e.target.checked })}
           />
-          Reviewed
+          {m.editor_compliance_doc_reviewed()}
         </label>
         <label className="flex items-center gap-1">
           <input
@@ -443,12 +459,12 @@ function DocReviewRow({ item }: { item: DocumentReviewItemView }) {
             disabled={busy}
             onChange={(e) => submitPatch({ ...local, na: e.target.checked })}
           />
-          N/A
+          {m.editor_compliance_doc_na()}
         </label>
       </div>
       <textarea
         rows={2}
-        placeholder="Notes"
+        placeholder={m.editor_compliance_notes()}
         value={local.notes ?? ""}
         disabled={busy}
         onChange={(e) => setLocal((l) => ({ ...l, notes: e.target.value }))}
@@ -482,14 +498,14 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
     <div className="space-y-2" data-testid="doc-review-section">
       {items.length === 0 ? (
         <div className="flex items-center justify-between">
-          <p className="text-[12px] text-ih-fg-3">No documents tracked yet.</p>
+          <p className="text-[12px] text-ih-fg-3">{m.editor_compliance_no_docs()}</p>
           <Button
             variant="link"
             size="sm"
             disabled={seeding}
             onClick={() => seedFetcher.submit({ intent: "compliance-doc-review-seed" }, { method: "POST" })}
           >
-            {seeding ? "Loading…" : "Load standard checklist"}
+            {seeding ? m.common_loading() : m.editor_compliance_load_checklist()}
           </Button>
         </div>
       ) : (
@@ -507,11 +523,13 @@ function DocReviewSection({ items }: { items: DocumentReviewItemView[] }) {
 /* Reliance & Limitations (M10)                                       */
 /* ------------------------------------------------------------------ */
 
-const RELIANCE_FIELDS: { key: keyof RelianceTextView; label: string }[] = [
-  { key: "userReliance", label: "Reliance — entitled parties (§4.2.1)" },
-  { key: "pointInTime", label: "Point-in-time limitation (§4.2.3)" },
-  { key: "siteSpecific", label: "Site-specific scope (§4.2.4)" },
-];
+function relianceFields(): { key: keyof RelianceTextView; label: string }[] {
+  return [
+    { key: "userReliance", label: m.editor_compliance_reliance_userReliance() },
+    { key: "pointInTime", label: m.editor_compliance_reliance_pointInTime() },
+    { key: "siteSpecific", label: m.editor_compliance_reliance_siteSpecific() },
+  ];
+}
 
 // One fetcher PER reliance clause — the three clauses save independently, so a
 // save of one must never abort another's in-flight PATCH. This is the file-wide
@@ -553,14 +571,14 @@ function RelianceFieldRow({ fieldKey, label, initial }: { fieldKey: keyof Relian
 function RelianceSection({ relianceText }: { relianceText: RelianceTextView }) {
   return (
     <section className="space-y-1.5" data-testid="reliance-section">
-      <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Reliance &amp; Limitations</h3>
+      <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_compliance_reliance_heading()}</h3>
       <div className="space-y-2">
-        {RELIANCE_FIELDS.map((f) => (
+        {relianceFields().map((f) => (
           <RelianceFieldRow key={f.key} fieldKey={f.key} label={f.label} initial={relianceText[f.key]} />
         ))}
       </div>
       <p className="text-[11px] text-ih-fg-4 italic">
-        Seeded ASTM §4.2.1–4.2.4 boilerplate. Edit any field to override how it renders in the report; changes save on blur.
+        {m.editor_compliance_reliance_note()}
       </p>
     </section>
   );
@@ -576,12 +594,12 @@ export function CompliancePanel({ inspectionId, data }: { inspectionId: string; 
 
   return (
     <div className="space-y-5" data-testid="compliance-panel" data-inspection-id={inspectionId}>
-      <h2 className="text-sm font-semibold text-ih-fg-2">Compliance (Full PCA)</h2>
+      <h2 className="text-sm font-semibold text-ih-fg-2">{m.editor_compliance_panel_heading()}</h2>
 
       <ConformancePreview data={data} />
 
       <section className="space-y-2">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Dual Sign-off</h3>
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_compliance_dual_signoff()}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <SignoffRoleCard role="field_observer" existing={fieldObserver} />
           <SignoffRoleCard role="pcr_reviewer" existing={pcrReviewer} />
@@ -589,12 +607,12 @@ export function CompliancePanel({ inspectionId, data }: { inspectionId: string; 
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Pre-Survey Questionnaire (§8.5)</h3>
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_compliance_psq_heading()}</h3>
         <PsqPanel psq={data.psq} />
       </section>
 
       <section className="space-y-2">
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Document Review (§8.6)</h3>
+        <h3 className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_compliance_doc_review_heading()}</h3>
         <DocReviewSection items={data.documentReview} />
       </section>
 

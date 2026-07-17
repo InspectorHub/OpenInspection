@@ -6,6 +6,7 @@
  */
 import { money, STATUS_TONE, Field, Row, type InvoiceData } from "./payment-helpers";
 import { StripePayPanel } from "./StripePayPanel";
+import { m } from "~/paraglide/messages";
 import { Pill } from "@core/shared-ui";
 import type { TenantBrand } from "~/lib/brand";
 
@@ -40,7 +41,7 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
       {isPaid && (
         <div className="pointer-events-none absolute top-16 right-6 -rotate-12 select-none">
           <span className="inline-block px-4 py-1.5 rounded-md border-[3px] border-ih-ok-fg text-ih-ok-fg font-extrabold tracking-[0.25em] text-2xl uppercase opacity-90">
-            Paid
+            {m.portal_invoice_paid_stamp()}
           </span>
         </div>
       )}
@@ -49,7 +50,7 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
       <div className="px-7 pt-7 pb-5 border-b border-ih-border">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">Invoice</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-ih-fg-4">{m.portal_invoice_eyebrow()}</p>
             <h1 className="font-serif text-[26px] leading-tight font-semibold tracking-tight text-ih-fg-1 mt-0.5">
               {invoice.number}
             </h1>
@@ -60,20 +61,20 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
         </div>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-5 text-[13px]">
-          <Field label="From">{invoice.inspectorName || "Your inspector"}</Field>
-          <Field label="Bill to">{invoice.clientName || "—"}</Field>
-          <Field label="Issued">{invoice.date || "—"}</Field>
-          <Field label="Due">{invoice.dueDate || "On receipt"}</Field>
+          <Field label={m.portal_invoice_field_from()}>{invoice.inspectorName || m.portal_invoice_inspector_fallback()}</Field>
+          <Field label={m.portal_invoice_field_bill_to()}>{invoice.clientName || "—"}</Field>
+          <Field label={m.portal_invoice_field_issued()}>{invoice.date || "—"}</Field>
+          <Field label={m.portal_invoice_field_due()}>{invoice.dueDate || m.portal_invoice_due_on_receipt()}</Field>
         </div>
       </div>
 
       {/* Line items */}
       <div className="px-7 py-5">
         <div className="flex items-baseline justify-between pb-2 mb-1 border-b border-ih-border text-[10px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">
-          <span>Description</span>
-          <span>Amount</span>
+          <span>{m.portal_invoice_col_description()}</span>
+          <span>{m.portal_invoice_col_amount()}</span>
         </div>
-        {items.length === 0 && <p className="py-3 text-[13px] text-ih-fg-4">No line items.</p>}
+        {items.length === 0 && <p className="py-3 text-[13px] text-ih-fg-4">{m.portal_invoice_no_line_items()}</p>}
         {items.map((item, i) => (
           <div key={i} className="flex items-baseline justify-between py-2.5 border-b border-ih-border/60 last:border-b-0">
             <span className={`text-[13px] ${item.amount < 0 ? "text-ih-ok-fg" : "text-ih-fg-1"}`}>{item.description}</span>
@@ -85,12 +86,12 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
 
         {/* Totals */}
         <div className="mt-4 pt-4 border-t border-ih-border space-y-1.5 text-[13px]">
-          <Row label="Subtotal" value={money(subtotal, cur)} muted />
-          {discountTotal < 0 && <Row label="Discount" value={`−${money(Math.abs(discountTotal), cur)}`} muted tone="ok" />}
-          <Row label="Total" value={money(total, cur)} strong />
-          {isPaid && <Row label="Amount paid" value={`−${money(amountPaid, cur)}`} muted tone="ok" />}
+          <Row label={m.portal_invoice_subtotal()} value={money(subtotal, cur)} muted />
+          {discountTotal < 0 && <Row label={m.portal_invoice_discount()} value={`−${money(Math.abs(discountTotal), cur)}`} muted tone="ok" />}
+          <Row label={m.portal_invoice_total()} value={money(total, cur)} strong />
+          {isPaid && <Row label={m.portal_invoice_amount_paid()} value={`−${money(amountPaid, cur)}`} muted tone="ok" />}
           <div className="flex items-baseline justify-between pt-2 mt-1 border-t border-ih-border">
-            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">{isPaid ? "Balance" : "Balance due"}</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">{isPaid ? m.portal_invoice_balance() : m.portal_invoice_balance_due()}</span>
             <span className={`font-serif text-[24px] font-semibold tracking-tight ${balanceDue > 0 ? "text-ih-fg-1" : "text-ih-ok-fg"}`}>
               {money(balanceDue, cur)}
             </span>
@@ -109,8 +110,8 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
       {payable && justPaid && (
         <div className="px-7 pb-7 print:hidden">
           <div className="rounded-xl border border-ih-ok bg-ih-ok-bg p-4 text-center">
-            <p className="text-[13px] font-semibold text-ih-ok-fg">Payment received — thank you.</p>
-            <p className="text-[12px] text-ih-fg-3 mt-1">We&rsquo;re finalizing your receipt; your paid invoice will appear here shortly.</p>
+            <p className="text-[13px] font-semibold text-ih-ok-fg">{m.portal_invoice_payment_received()}</p>
+            <p className="text-[12px] text-ih-fg-3 mt-1">{m.portal_invoice_finalizing()}</p>
           </div>
         </div>
       )}
@@ -119,8 +120,8 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
       {isPaid && (
         <div className="px-7 pb-7 print:hidden">
           <div className="rounded-xl border border-ih-ok bg-ih-ok-bg p-4 text-center">
-            <p className="text-[13px] font-semibold text-ih-ok-fg">Payment received — thank you.</p>
-            <p className="text-[12px] text-ih-fg-3 mt-1">Keep this receipt for your records.</p>
+            <p className="text-[13px] font-semibold text-ih-ok-fg">{m.portal_invoice_payment_received()}</p>
+            <p className="text-[12px] text-ih-fg-3 mt-1">{m.portal_invoice_keep_receipt()}</p>
           </div>
         </div>
       )}

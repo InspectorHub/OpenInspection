@@ -35,12 +35,13 @@ import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspecti
 import { FiltersDrawer } from "~/components/dashboard/FiltersDrawer";
 import { ColumnsPopover } from "~/components/dashboard/ColumnsPopover";
 import { InspectionsToolbar } from "~/components/dashboard/InspectionsToolbar";
+import { m } from "~/paraglide/messages";
 
 // Re-exported for unit tests (tests/web import these from ~/routes/inspections).
 export { tabMatches, matchesWorkflow };
 
 export function meta() {
-  return [{ title: "Inspections - OpenInspection" }];
+  return [{ title: m.inspections_list_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -61,7 +62,7 @@ function emptyDashboard() {
       cancelled: [] as Inspection[],
     },
     conciergePending: 0,
-    greeting: "Good morning",
+    greeting: m.inspections_list_greeting_morning(),
     tags: [] as Tag[],
     templates: [] as TemplateOption[],
     services: [] as ServiceOption[],
@@ -162,7 +163,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         cancelled: d?.cancelled ?? [],
       } satisfies Record<string, Inspection[]>,
       conciergePending: d?.conciergePending ?? 0,
-      greeting: "Good morning",
+      greeting: m.inspections_list_greeting_morning(),
       tags,
       templates,
       services: svcOptions,
@@ -181,11 +182,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 function getGreeting() {
-  if (typeof window === "undefined") return "Good morning";
+  if (typeof window === "undefined") return m.inspections_list_greeting_morning();
   const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
+  if (h < 12) return m.inspections_list_greeting_morning();
+  if (h < 17) return m.inspections_list_greeting_afternoon();
+  return m.inspections_list_greeting_evening();
 }
 
 /* ------------------------------------------------------------------ */
@@ -636,18 +637,23 @@ export default function InspectionsPage() {
         title={greeting}
         meta={
           <>
-            {counts.upcoming} upcoming{" "}
-            {counts.upcoming === 1 ? "inspection" : "inspections"}
+            {counts.upcoming === 1
+              ? m.inspections_list_meta_upcoming_one({ count: counts.upcoming })
+              : m.inspections_list_meta_upcoming_other({ count: counts.upcoming })}
             {counts.needsAttention > 0 && (
               <span>
-                {" "}&middot; {counts.needsAttention}{" "}
-                {counts.needsAttention === 1 ? "report needs" : "reports need"} attention
+                {" "}&middot;{" "}
+                {counts.needsAttention === 1
+                  ? m.inspections_list_meta_needs_one({ count: counts.needsAttention })
+                  : m.inspections_list_meta_needs_other({ count: counts.needsAttention })}
               </span>
             )}
             {conciergePending > 0 && (
               <span>
-                {" "}&middot; {conciergePending} pending{" "}
-                {conciergePending === 1 ? "booking" : "bookings"}
+                {" "}&middot;{" "}
+                {conciergePending === 1
+                  ? m.inspections_list_meta_pending_one({ count: conciergePending })
+                  : m.inspections_list_meta_pending_other({ count: conciergePending })}
               </span>
             )}
           </>
@@ -658,10 +664,10 @@ export default function InspectionsPage() {
                 columns) live in the table toolbar strip below — DS two-layer
                 actions convention. */}
             <Button variant="secondary" size="sm" onClick={exportCsv}>
-              Export
+              {m.inspections_list_action_export()}
             </Button>
             <Button variant="primary" size="sm" icon={<Icon name="plus" size={14} />} onClick={() => navigate("/inspections/new")}>
-              New Inspection
+              {m.inspections_list_action_new()}
             </Button>
           </>
         }
@@ -670,10 +676,10 @@ export default function InspectionsPage() {
       {/* Stat cards — quick-jump to buckets */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Upcoming", value: counts.upcoming, icon: "calendar" as const, color: "text-ih-primary bg-ih-primary-tint" },
-          { label: "In Progress", value: counts.inProgress, icon: "edit" as const, color: "text-ih-watch-fg bg-ih-watch-bg" },
-          { label: "Needs Attention", value: counts.needsAttention, icon: "zap" as const, color: "text-ih-bad-fg bg-ih-bad-bg" },
-          { label: "Recent Reports", value: counts.recent, icon: "check" as const, color: "text-ih-ok-fg bg-ih-ok-bg" },
+          { label: m.inspections_list_stat_upcoming(), value: counts.upcoming, icon: "calendar" as const, color: "text-ih-primary bg-ih-primary-tint" },
+          { label: m.inspections_list_stat_in_progress(), value: counts.inProgress, icon: "edit" as const, color: "text-ih-watch-fg bg-ih-watch-bg" },
+          { label: m.inspections_list_stat_needs_attention(), value: counts.needsAttention, icon: "zap" as const, color: "text-ih-bad-fg bg-ih-bad-bg" },
+          { label: m.inspections_list_stat_recent_reports(), value: counts.recent, icon: "check" as const, color: "text-ih-ok-fg bg-ih-ok-bg" },
         ].map((stat) => (
           <Card key={stat.label} className="p-ih-card cursor-pointer hover:shadow-ih-popover transition-all">
             <div className={`w-10 h-10 rounded-md flex items-center justify-center mb-3 ${stat.color}`}>
@@ -741,7 +747,7 @@ export default function InspectionsPage() {
             onChange={(e) => setActiveTagFilter(e.target.value)}
             className="h-7 px-2 rounded-md text-[11px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none ml-2"
           >
-            <option value="">All tags</option>
+            <option value="">{m.inspections_list_filter_all_tags()}</option>
             {tags.map((t) => (
               <option key={t.id} value={t.id}>{t.name}</option>
             ))}
@@ -765,11 +771,11 @@ export default function InspectionsPage() {
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 px-4 py-2.5 bg-ih-primary-tint rounded-lg border border-ih-border">
           <span className="text-[13px] font-bold text-ih-primary">
-            {selectedIds.size} selected
+            {m.inspections_list_batch_selected({ count: selectedIds.size })}
           </span>
-          <Button variant="danger" size="sm" onClick={batchDelete}>Delete</Button>
-          <Button variant="ghost" size="sm" className="ml-auto" onClick={selectAll}>Select all</Button>
-          <Button variant="ghost" size="sm" onClick={clearSelection}>Clear</Button>
+          <Button variant="danger" size="sm" onClick={batchDelete}>{m.common_delete()}</Button>
+          <Button variant="ghost" size="sm" className="ml-auto" onClick={selectAll}>{m.inspections_list_batch_select_all()}</Button>
+          <Button variant="ghost" size="sm" onClick={clearSelection}>{m.common_clear()}</Button>
         </div>
       )}
 
@@ -778,8 +784,8 @@ export default function InspectionsPage() {
         <Card>
           <EmptyState
             icon={<Icon name="check" size={32} />}
-            title="No inspections yet"
-            description="Click + New Inspection above to get started."
+            title={m.inspections_list_empty_title()}
+            description={m.inspections_list_empty_desc()}
           />
         </Card>
       ) : filteredBuckets ? (
@@ -830,14 +836,18 @@ export default function InspectionsPage() {
             <Card className="overflow-hidden">
               <div className="px-4 py-2 border-b border-ih-border">
                 <span className="text-[11px] font-bold text-ih-fg-4">
-                  {isSearching ? "Searching…" : `${displayCount} result${displayCount !== 1 ? "s" : ""}`}
+                  {isSearching
+                    ? m.inspections_list_searching()
+                    : displayCount === 1
+                      ? m.inspections_list_results_one({ count: displayCount })
+                      : m.inspections_list_results_other({ count: displayCount })}
                 </span>
               </div>
               <div className="divide-y divide-ih-border">
                 {!isSearching && displayList.map(renderRow)}
               </div>
               {isSearching && (
-                <div className="py-8 text-center text-[12px] text-ih-fg-4">Searching…</div>
+                <div className="py-8 text-center text-[12px] text-ih-fg-4">{m.inspections_list_searching()}</div>
               )}
               {/* Server search load-more */}
               {isServerSearch && serverHasMore && !isSearching && (
@@ -846,7 +856,7 @@ export default function InspectionsPage() {
                     onClick={handleSearchLoadMore}
                     className="h-8 px-4 rounded-md text-[12px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
                   >
-                    Load more
+                    {m.inspections_list_load_more()}
                   </button>
                 </div>
               )}

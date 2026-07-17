@@ -5,6 +5,7 @@ import { applyItemPatch } from "../../../server/lib/collab/results-doc";
 import type { ResultsProjection } from "../../../server/lib/collab/results-doc.types";
 import { diffProjections, type FindingDiff, type ScalarField } from "~/lib/collab/snapshot-diff";
 import { VersionCompare } from "~/components/collab/VersionCompare";
+import { m } from "~/paraglide/messages";
 
 /**
  * #181 — Version history panel (collab Phase 4 / PR-D, Task 12a).
@@ -69,10 +70,10 @@ const SCALAR_FIELD_SET = new Set<ScalarField>([
 
 /** Human label for a snapshot's capture reason (surfaces the pre-merge boundary). */
 function reasonLabel(reason: SnapshotReason | undefined, byUserId: string | null): string {
-    if (reason === "connect") return "Auto-saved before a reconnect";
-    if (reason === "periodic") return "Auto-saved";
+    if (reason === "connect") return m.editor_collab_autosaved_before_reconnect();
+    if (reason === "periodic") return m.editor_collab_autosaved();
     // 'manual' (or legacy/no reason): show the actor when known.
-    return byUserId === null ? "Auto-saved" : byUserId;
+    return byUserId === null ? m.editor_collab_autosaved() : byUserId;
 }
 
 /**
@@ -81,15 +82,15 @@ function reasonLabel(reason: SnapshotReason | undefined, byUserId: string | null
  */
 export function formatRelativeTime(atMs: number, now: number = Date.now()): string {
     const diffMs = now - atMs;
-    if (!Number.isFinite(diffMs) || diffMs < 0) return "just now";
+    if (!Number.isFinite(diffMs) || diffMs < 0) return m.editor_collab_just_now();
     const sec = Math.floor(diffMs / 1000);
-    if (sec < 45) return "just now";
+    if (sec < 45) return m.editor_collab_just_now();
     const min = Math.floor(sec / 60);
-    if (min < 60) return `${min} minute${min === 1 ? "" : "s"} ago`;
+    if (min < 60) return m.editor_collab_minutes_ago({ min, s: min === 1 ? "" : "s" });
     const hr = Math.floor(min / 60);
-    if (hr < 24) return `${hr} hour${hr === 1 ? "" : "s"} ago`;
+    if (hr < 24) return m.editor_collab_hours_ago({ hr, s: hr === 1 ? "" : "s" });
     const day = Math.floor(hr / 24);
-    if (day < 7) return `${day} day${day === 1 ? "" : "s"} ago`;
+    if (day < 7) return m.editor_collab_days_ago({ day, s: day === 1 ? "" : "s" });
     return new Date(atMs).toLocaleDateString();
 }
 
@@ -311,7 +312,7 @@ export function VersionHistoryPanel({
             await loadSnapshots();
             onRestored?.(restoredSeq);
         } catch (e) {
-            setRestoreError(e instanceof Error ? e.message : "Restore failed");
+            setRestoreError(e instanceof Error ? e.message : m.editor_collab_restore_failed());
         } finally {
             setRestoring(false);
         }
@@ -324,41 +325,40 @@ export function VersionHistoryPanel({
             disabled={saving}
             className="h-9 px-3 rounded-md bg-ih-primary text-white text-[12px] font-bold hover:bg-ih-primary/85 disabled:opacity-50 inline-flex items-center gap-1.5"
         >
-            {saving ? "Saving..." : "Save version now"}
+            {saving ? m.editor_collab_saving() : m.editor_collab_save_version_now()}
         </button>
     );
 
     return (
         <>
-            <Modal open={open} onClose={onClose} title="Version history" size="lg">
+            <Modal open={open} onClose={onClose} title={m.editor_collab_version_history()} size="lg">
                 <div className="space-y-3">
                     <div className="flex items-center justify-between">
                         <p className="text-[12px] text-ih-fg-3">
-                            Saved versions of this report. Restore replaces the current
-                            content with the selected version.
+                            {m.editor_collab_history_desc()}
                         </p>
                         {saveAction}
                     </div>
 
                     {loadState === "loading" && (
-                        <p className="py-6 text-center text-[13px] text-ih-fg-3">Loading versions...</p>
+                        <p className="py-6 text-center text-[13px] text-ih-fg-3">{m.editor_collab_loading_versions()}</p>
                     )}
 
                     {loadState === "error" && (
                         <div className="py-6 text-center space-y-2">
-                            <p className="text-[13px] text-ih-bad">Could not load version history.</p>
+                            <p className="text-[13px] text-ih-bad">{m.editor_collab_load_failed()}</p>
                             <button
                                 type="button"
                                 onClick={() => void loadSnapshots()}
                                 className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-2 hover:bg-ih-bg-muted"
                             >
-                                Try again
+                                {m.editor_collab_try_again()}
                             </button>
                         </div>
                     )}
 
                     {loadState === "ready" && snapshots.length === 0 && (
-                        <p className="py-6 text-center text-[13px] text-ih-fg-3">No saved versions yet</p>
+                        <p className="py-6 text-center text-[13px] text-ih-fg-3">{m.editor_collab_no_versions()}</p>
                     )}
 
                     {loadState === "ready" && snapshots.length > 0 && (
@@ -383,7 +383,7 @@ export function VersionHistoryPanel({
                                                 onClick={() => void handleCompare(snap.seq)}
                                                 className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-2 hover:bg-ih-bg-muted"
                                             >
-                                                Compare
+                                                {m.editor_collab_compare()}
                                             </button>
                                         )}
                                         <button
@@ -394,7 +394,7 @@ export function VersionHistoryPanel({
                                             }}
                                             className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-semibold text-ih-fg-2 hover:bg-ih-bg-muted"
                                         >
-                                            Restore
+                                            {m.editor_collab_restore()}
                                         </button>
                                     </div>
                                 </li>
@@ -410,7 +410,7 @@ export function VersionHistoryPanel({
                 onClose={() => {
                     if (!restoring) setConfirmSeq(null);
                 }}
-                title="Restore this version?"
+                title={m.editor_collab_restore_confirm_title()}
                 size="sm"
                 footer={
                     <>
@@ -420,7 +420,7 @@ export function VersionHistoryPanel({
                             disabled={restoring}
                             className="px-4 h-10 rounded-xl border border-ih-border text-sm font-semibold text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50"
                         >
-                            Cancel
+                            {m.common_cancel()}
                         </button>
                         <button
                             type="button"
@@ -428,15 +428,13 @@ export function VersionHistoryPanel({
                             disabled={restoring}
                             className="px-4 h-10 rounded-xl bg-ih-primary text-white text-sm font-semibold hover:bg-ih-primary/85 disabled:opacity-50"
                         >
-                            {restoring ? "Restoring..." : "Restore version"}
+                            {restoring ? m.editor_collab_restoring() : m.editor_collab_restore_version()}
                         </button>
                     </>
                 }
             >
                 <p className="text-[13px] text-ih-fg-2">
-                    Restoring replaces the current report content with the selected
-                    version. The current state is saved as a new version first, so this
-                    is reversible.
+                    {m.editor_collab_restore_confirm_body()}
                 </p>
                 {restoreError && (
                     <p className="mt-3 text-[12px] text-ih-bad">{restoreError}</p>
@@ -454,10 +452,10 @@ export function VersionHistoryPanel({
                 }}
                 fromLabel={
                     compareSeq === null
-                        ? "Selected version"
-                        : `Version #${compareSeq}`
+                        ? m.editor_collab_selected_version()
+                        : m.editor_collab_version_n({ seq: compareSeq })
                 }
-                toLabel="Current"
+                toLabel={m.editor_collab_current()}
                 diffs={compareDiffs}
                 busy={compareBusy}
                 // Single-value recovery requires the live doc; hide it otherwise.

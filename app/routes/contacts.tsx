@@ -4,16 +4,17 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/contacts";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { addContactSchema } from "~/lib/forms/contacts.schema";
+import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 import { PageHeader, TabStrip, Button, Select } from "@core/shared-ui";
 import { inferMappingFromCsv, type Contact, type Agent } from "~/components/contacts/contacts-helpers";
 import { ContactModal } from "~/components/contacts/ContactModal";
 import { CsvImportModal } from "~/components/contacts/CsvImportModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
 import { AgentsTable } from "~/components/contacts/AgentsTable";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Contacts - OpenInspection" }];
+  return [{ title: m.contacts_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -47,7 +48,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "create" || intent === "update") {
     const id = form.get("id") as string | null;
-    const submission = parseWithZod(form, { schema: addContactSchema });
+    const submission = parseWithZod(form, { schema: makeAddContactSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -103,13 +104,12 @@ export async function action({ request, context }: Route.ActionArgs) {
   return { ok: false };
 }
 
-const TABS = [
-  { id: "contacts", label: "Contacts" },
-  { id: "agents", label: "Agents" },
-];
-
 export default function ContactsPage() {
   const { contacts, agents, filterType } = useLoaderData<typeof loader>();
+  const TABS = [
+    { id: "contacts", label: m.contacts_label_contacts() },
+    { id: "agents", label: m.contacts_label_agents() },
+  ];
   const contactList = contacts as Contact[];
   const agentList = agents as Agent[];
   const [activeTab, setActiveTab] = useState("contacts");
@@ -126,28 +126,28 @@ export default function ContactsPage() {
   return (
     <div className="space-y-ih-list">
       <PageHeader
-        title={`${filtered.length} ${filtered.length === 1 ? "Contact" : "Contacts"}`}
-        meta={`${filtered.length} contacts`}
+        title={`${filtered.length} ${filtered.length === 1 ? m.contacts_list_count_one() : m.contacts_label_contacts()}`}
+        meta={m.contacts_list_meta_count({ count: filtered.length })}
         actions={
           <>
             <div className="w-[130px]">
               <Select
                 bare
-                aria-label="Filter by contact type"
+                aria-label={m.contacts_filter_type_aria()}
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
                 options={[
-                  { value: "", label: "All Types" },
-                  { value: "agent", label: "Agents" },
-                  { value: "client", label: "Clients" },
+                  { value: "", label: m.contacts_filter_all_types() },
+                  { value: "agent", label: m.contacts_label_agents() },
+                  { value: "client", label: m.contacts_label_clients() },
                 ]}
               />
             </div>
             <Button variant="secondary" size="sm" onClick={() => setCsvModalOpen(true)}>
-              Import CSV
+              {m.contacts_action_import_csv()}
             </Button>
             <Button variant="primary" onClick={() => { setEditContact(null); setModalOpen(true); }} icon={<PlusIcon />}>
-              Add Contact
+              {m.contacts_action_add()}
             </Button>
           </>
         }

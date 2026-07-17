@@ -2,6 +2,7 @@ import { useFetcher } from "react-router";
 import { Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
 import type { ReinspectCandidate } from "~/lib/inspection-hub-helpers";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Create-re-inspection modal (#119)                                 */
@@ -29,7 +30,7 @@ export function CreateReinspectionModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Create re-inspection"
+      title={m.hub_reinspect_title()}
       footer={
         <>
           <button
@@ -37,7 +38,7 @@ export function CreateReinspectionModal({
             onClick={onClose}
             className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
           <button
             type="submit"
@@ -45,7 +46,7 @@ export function CreateReinspectionModal({
             disabled={submitting || !hasCandidates}
             className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
           >
-            {submitting ? "Creating…" : "Create re-inspection"}
+            {submitting ? m.hub_reinspect_pending() : m.hub_reinspect_submit()}
           </button>
         </>
       }
@@ -55,8 +56,7 @@ export function CreateReinspectionModal({
         {hasCandidates ? (
           <>
             <p className="text-[12px] text-ih-fg-3">
-              Choose which items to carry forward. Still-open flagged items are
-              pre-selected.
+              {m.hub_reinspect_help()}
             </p>
             <div className="divide-y divide-ih-border">
               {candidates.map((c) => (
@@ -85,7 +85,7 @@ export function CreateReinspectionModal({
           </>
         ) : (
           <p className="text-[13px] text-ih-fg-4">
-            This report has no items available to carry forward.
+            {m.hub_reinspect_empty()}
           </p>
         )}
 

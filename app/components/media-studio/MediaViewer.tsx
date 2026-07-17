@@ -3,6 +3,7 @@ import { VideoPlayer } from "./VideoPlayer";
 import { fullResUrl } from "./cropImage";
 import { resolveMediaType } from "../../../server/lib/media/media-type";
 import type { GalleryPhoto } from "~/lib/inspection-media";
+import { m } from "~/paraglide/messages";
 
 export type MediaAction = "crop" | "annotate" | "rotate" | "cover" | "caption" | "revert" | "delete" | "poster";
 
@@ -32,22 +33,22 @@ export function MediaViewerToolbar({
   if (kind === "video") {
     return (
       <>
-        {btn("poster", "Poster frame")}
-        {btn("cover", "Set cover")}
-        {btn("caption", "Caption")}
-        {btn("delete", "Delete")}
+        {btn("poster", m.media_viewer_poster())}
+        {btn("cover", m.media_viewer_cover())}
+        {btn("caption", m.media_viewer_caption())}
+        {btn("delete", m.common_delete())}
       </>
     );
   }
   const items: React.ReactNode[] = [
-    btn("crop", "Crop"),
-    btn("annotate", "Annotate"),
-    btn("rotate", "Rotate"),
-    btn("cover", "Set cover"),
-    btn("caption", "Caption"),
+    btn("crop", m.media_viewer_crop()),
+    btn("annotate", m.media_viewer_annotate()),
+    btn("rotate", m.media_viewer_rotate()),
+    btn("cover", m.media_viewer_cover()),
+    btn("caption", m.media_viewer_caption()),
   ];
-  if (edited) items.push(btn("revert", "Revert"));
-  items.push(btn("delete", "Delete"));
+  if (edited) items.push(btn("revert", m.media_viewer_revert()));
+  items.push(btn("delete", m.common_delete()));
   return <>{items}</>;
 }
 

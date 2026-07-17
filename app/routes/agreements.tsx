@@ -10,9 +10,10 @@ import { type SignerRow } from "~/components/agreements/SignerList";
 import { SendAgreementModal, type SendAgreementPayload } from "~/components/agreements/SendAgreementModal";
 import { type RequestRow as RequestRowData, type InspectionOption } from "~/components/agreements/agreements-helpers";
 import { TemplateRow, RequestRow } from "~/components/agreements/AgreementRows";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Agreements - OpenInspection" }];
+  return [{ title: m.library_agreements_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -51,9 +52,9 @@ export async function action({ request, context }: Route.ActionArgs) {
   // Track I-a Task 9 — per-signer detail / actions for the Signing tab.
   if (intent === "load-signers") {
     const requestId = String(formData.get("requestId") ?? "");
-    if (!requestId) return { ok: false, intent, error: "Missing requestId" };
+    if (!requestId) return { ok: false, intent, error: m.library_agreements_err_missing_request_id() };
     const res = await api.admin.agreements.requests[":requestId"].signers.$get({ param: { requestId } });
-    if (!res.ok) return { ok: false, intent, requestId, error: `API ${res.status}` };
+    if (!res.ok) return { ok: false, intent, requestId, error: m.library_agreements_err_api_status({ status: res.status }) };
     const body = (await res.json()) as { data: SignerRow[] };
     return { ok: true, intent, requestId, signers: body.data };
   }
@@ -64,9 +65,9 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.admin.agreements.requests[":requestId"].signers[":signerId"].remind.$post({
       param: { requestId, signerId },
     });
-    if (res.status === 429) return { ok: false, intent, signerId, error: "Reminded within the last hour. Try again later." };
-    if (res.status === 409) return { ok: false, intent, signerId, error: "This signer is no longer awaiting signature." };
-    if (!res.ok) return { ok: false, intent, signerId, error: `Could not send reminder (${res.status}).` };
+    if (res.status === 429) return { ok: false, intent, signerId, error: m.library_agreements_err_remind_throttled() };
+    if (res.status === 409) return { ok: false, intent, signerId, error: m.library_agreements_err_signer_not_awaiting() };
+    if (!res.ok) return { ok: false, intent, signerId, error: m.library_agreements_err_remind_failed({ status: res.status }) };
     return { ok: true, intent, signerId };
   }
 
@@ -82,11 +83,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     try {
       signers = JSON.parse(String(formData.get("signers") ?? "[]"));
     } catch {
-      return { ok: false, intent, error: "Malformed signers payload." };
+      return { ok: false, intent, error: m.library_agreements_err_malformed_signers() };
     }
-    if (!agreementId) return { ok: false, intent, error: "Pick an agreement template." };
-    if (!inspectionId) return { ok: false, intent, error: "Pick an inspection." };
-    if (signers.length === 0) return { ok: false, intent, error: "Add at least one signer." };
+    if (!agreementId) return { ok: false, intent, error: m.library_agreements_err_pick_template() };
+    if (!inspectionId) return { ok: false, intent, error: m.library_agreements_err_pick_inspection() };
+    if (signers.length === 0) return { ok: false, intent, error: m.library_agreements_err_no_signers() };
     const res = await api.admin.agreements.send.$post({
       json: {
         agreementId,
@@ -101,7 +102,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
     if (!res.ok) {
       const text = await res.text();
-      return { ok: false, intent, error: `Could not send (${res.status}): ${text.slice(0, 200)}` };
+      return { ok: false, intent, error: m.library_agreements_err_send_failed({ status: res.status, detail: text.slice(0, 200) }) };
     }
     const body = (await res.json()) as { data?: { requestId?: string } };
     return { ok: true, intent, requestId: body.data?.requestId };
@@ -113,7 +114,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.admin.agreements.requests[":requestId"].signers[":signerId"].link.$get({
       param: { requestId, signerId },
     });
-    if (!res.ok) return { ok: false, intent, signerId, error: `Could not get link (${res.status}).` };
+    if (!res.ok) return { ok: false, intent, signerId, error: m.library_agreements_err_link_failed({ status: res.status }) };
     const body = (await res.json()) as { data: { url: string } };
     return { ok: true, intent, signerId, url: body.data.url };
   }
@@ -122,7 +123,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const envelopeId = String(formData.get("envelopeId") ?? "");
   const signatureBase64 = String(formData.get("signatureBase64") ?? "");
   if (!envelopeId || !signatureBase64) {
-    return { ok: false, intent: "inspector-sign", error: "Missing envelopeId or signatureBase64" };
+    return { ok: false, intent: "inspector-sign", error: m.library_agreements_err_missing_envelope() };
   }
   const res = await api.admin["agreement-requests"][":id"]["inspector-sign"].$post({
     param: { id: envelopeId },
@@ -130,15 +131,19 @@ export async function action({ request, context }: Route.ActionArgs) {
   });
   if (!res.ok) {
     const text = await res.text();
-    return { ok: false, intent: "inspector-sign", error: `API returned ${res.status}: ${text.slice(0, 200)}` };
+    return { ok: false, intent: "inspector-sign", error: m.library_agreements_err_api_returned({ status: res.status, detail: text.slice(0, 200) }) };
   }
   return { ok: true, intent: "inspector-sign" };
 }
 
-const TABS = [
-  { id: "templates", label: "Templates" },
-  { id: "signing", label: "Signing" },
-];
+// A function (not a module const) so `m.*()` resolves inside the per-request
+// paraglide locale scope, not once at import time.
+function getTabs() {
+  return [
+    { id: "templates", label: m.library_agreements_tab_templates() },
+    { id: "signing", label: m.library_agreements_tab_signing() },
+  ];
+}
 
 export default function AgreementsPage() {
   const { templates, requests, inspections } = useLoaderData<typeof loader>();
@@ -206,38 +211,38 @@ export default function AgreementsPage() {
 
   return (
     <div className="space-y-ih-list">
-      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Agreements" }]} />
+      <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_agreements_heading() }]} />
       <PageHeader
-        title="Agreements"
-        meta={`${templates.length} templates · ${requests.length} requests`}
-        actions={<Button variant="primary">+ New agreement</Button>}
+        title={m.library_agreements_heading()}
+        meta={m.library_agreements_meta({ templates: templates.length, requests: requests.length })}
+        actions={<Button variant="primary">{m.library_agreements_new()}</Button>}
       />
 
-      <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
+      <TabStrip tabs={getTabs()} activeId={activeTab} onChange={setActiveTab} />
 
       {!showingTemplates && (
         <div className="flex flex-wrap items-end gap-3 rounded-lg border border-ih-border bg-ih-bg-card p-4">
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Agreement</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">{m.library_agreements_field_agreement()}</span>
             <select
               value={sendAgreementId}
               onChange={(e) => setSendAgreementId(e.target.value)}
               className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none min-w-[180px]"
             >
-              <option value="">Select template…</option>
+              <option value="">{m.library_agreements_select_template()}</option>
               {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.name || "Untitled"}</option>
+                <option key={t.id} value={t.id}>{t.name || m.library_agreements_untitled()}</option>
               ))}
             </select>
           </label>
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">Inspection</span>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">{m.library_agreements_field_inspection()}</span>
             <select
               value={sendInspectionId}
               onChange={(e) => setSendInspectionId(e.target.value)}
               className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none min-w-[220px]"
             >
-              <option value="">Select inspection…</option>
+              <option value="">{m.library_agreements_select_inspection()}</option>
               {inspections.map((i) => (
                 <option key={i.id} value={i.id}>
                   {[i.propertyAddress, i.clientName].filter(Boolean).join(" · ") || i.id.slice(0, 8)}
@@ -250,9 +255,9 @@ export default function AgreementsPage() {
             disabled={!sendAgreementId || !sendInspectionId}
             onClick={() => { setSendOk(false); setSendOpen(true); }}
           >
-            Send for signing
+            {m.library_agreements_send_for_signing()}
           </Button>
-          {sendOk && <span className="text-[13px] text-ih-good-fg self-center">Sent — signers emailed their links.</span>}
+          {sendOk && <span className="text-[13px] text-ih-good-fg self-center">{m.library_agreements_sent()}</span>}
           {sendError && <span className="text-[13px] text-ih-bad-fg self-center">{sendError}</span>}
         </div>
       )}
@@ -260,11 +265,11 @@ export default function AgreementsPage() {
       {rows.length === 0 ? (
         <Card>
           <EmptyState
-            title={showingTemplates ? "No agreement templates yet" : "No signed agreements yet"}
+            title={showingTemplates ? m.library_agreements_empty_templates_title() : m.library_agreements_empty_signing_title()}
             description={
               showingTemplates
-                ? 'Click "+ New agreement" above to create your first agreement template.'
-                : "Signed agreements will appear here after clients complete the signing process."
+                ? m.library_agreements_empty_templates_desc()
+                : m.library_agreements_empty_signing_desc()
             }
           />
         </Card>
@@ -278,12 +283,12 @@ export default function AgreementsPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="border-b border-ih-border">
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3">Title</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3">{m.library_agreements_col_title()}</th>
                 <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3">
-                  {showingTemplates ? "Last updated" : "Client"}
+                  {showingTemplates ? m.library_agreements_col_last_updated() : m.library_agreements_col_client()}
                 </th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3">Status</th>
-                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3 text-right">Actions</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3">{m.library_agreements_col_status()}</th>
+                <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-ih-fg-3 text-right">{m.library_agreements_col_actions()}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-ih-border">
@@ -316,12 +321,12 @@ export default function AgreementsPage() {
       <Modal
         open={!!signingId}
         onClose={() => setSigningId(null)}
-        title="Inspector signature"
+        title={m.library_agreements_sign_title()}
       >
         <p className="text-sm text-ih-fg-3 mb-4">
-          Draw your signature below. This will pre-sign the agreement; the client signs separately after you send it.
+          {m.library_agreements_sign_desc()}
         </p>
-        <SignaturePad onSubmit={submitSignature} onCancel={() => setSigningId(null)} label="Save signature" />
+        <SignaturePad onSubmit={submitSignature} onCancel={() => setSigningId(null)} label={m.library_agreements_save_signature()} />
         {fetcher.data?.ok === false && fetcher.data.intent === "inspector-sign" && (
           <p className="text-sm text-ih-bad-fg mt-3">{fetcher.data.error}</p>
         )}

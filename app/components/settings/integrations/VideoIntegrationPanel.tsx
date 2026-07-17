@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Form } from "react-router";
+import { m } from "~/paraglide/messages";
 
 interface VideoIntegrationPanelProps {
   videoMode: "r2" | "stream";
@@ -75,21 +76,19 @@ export function VideoIntegrationPanel({
           </svg>
         </div>
         <div>
-          <h3 className="text-[13px] font-bold text-ih-fg-1">Video</h3>
+          <h3 className="text-[13px] font-bold text-ih-fg-1">{m.settings_video_heading()}</h3>
           <p className="text-[11px] text-ih-fg-3">
-            Choose the video storage backend for this instance.
+            {m.settings_video_subtitle()}
           </p>
         </div>
       </div>
 
       {/* Info callout */}
       <div className="rounded-md bg-ih-bg-muted border border-ih-border px-4 py-3 text-[12px] text-ih-fg-3 leading-relaxed">
-        <span className="font-semibold text-ih-fg-2">Default: R2 (free).</span> Videos are stored
-        in your Cloudflare R2 bucket — no extra cost beyond R2 storage rates.{" "}
-        <span className="font-semibold text-ih-fg-2">Cloudflare Stream</span> enables adaptive
-        bitrate playback and requires a paid Stream subscription plus the{" "}
-        <span className="font-mono">STREAM</span> binding in your{" "}
-        <span className="font-mono">wrangler</span> config.
+        <span className="font-semibold text-ih-fg-2">{m.settings_video_default_label()}</span> {m.settings_video_r2_desc()}{" "}
+        <span className="font-semibold text-ih-fg-2">{m.settings_video_stream_label()}</span> {m.settings_video_stream_desc()}{" "}
+        <span className="font-mono">STREAM</span> {m.settings_video_stream_binding()}{" "}
+        <span className="font-mono">wrangler</span> {m.settings_video_config_word()}
       </div>
 
       {/* Server-level error (not field-specific) */}
@@ -116,8 +115,8 @@ export function VideoIntegrationPanel({
             <div className="absolute top-1 left-1 w-4 h-4 rounded-full bg-ih-bg-card shadow transition-transform peer-checked:translate-x-4" />
           </div>
           <span className="text-[13px] font-medium text-ih-fg-1">
-            Use Cloudflare Stream for video{" "}
-            <span className="text-[11px] font-normal text-ih-fg-3">(paid)</span>
+            {m.settings_video_toggle_label()}{" "}
+            <span className="text-[11px] font-normal text-ih-fg-3">{m.settings_video_paid()}</span>
           </span>
         </label>
         {/* Hidden videoMode value derived from toggle */}
@@ -128,7 +127,7 @@ export function VideoIntegrationPanel({
           /* ds-allow: indent aligns the field under the toggle label (52px), bespoke offset with no spacing token */
           <div className="space-y-1.5 pl-[52px]">
             <label htmlFor="streamCustomerSubdomain" className="block text-[12px] font-bold text-ih-fg-2">
-              Stream customer subdomain
+              {m.settings_video_subdomain_label()}
             </label>
             <input
               id="streamCustomerSubdomain"
@@ -136,7 +135,7 @@ export function VideoIntegrationPanel({
               type="text"
               value={subdomain}
               onChange={(e) => handleSubdomainChange(e.target.value)}
-              placeholder="customer.cloudflarestream.com"
+              placeholder={m.settings_video_subdomain_placeholder()}
               className={[
                 "w-full max-w-sm h-9 px-3 rounded-md border text-[13px] font-mono bg-ih-bg-input text-ih-fg-1 placeholder:text-ih-fg-4 outline-none transition-colors",
                 subdomainError
@@ -151,8 +150,8 @@ export function VideoIntegrationPanel({
               </p>
             ) : (
               <p id="subdomain-hint" className="text-[11px] text-ih-fg-3">
-                Found in your Cloudflare Stream dashboard under{" "}
-                <span className="font-semibold text-ih-fg-2">Account → Customer subdomain</span>.
+                {m.settings_video_subdomain_hint_prefix()}{" "}
+                <span className="font-semibold text-ih-fg-2">{m.settings_video_subdomain_hint_path()}</span>.
               </p>
             )}
           </div>
@@ -164,7 +163,7 @@ export function VideoIntegrationPanel({
             disabled={saving}
             className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {saving ? "Saving…" : "Save video settings"}
+            {saving ? m.common_saving() : m.settings_video_save()}
           </button>
         </div>
       </Form>

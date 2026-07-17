@@ -1,10 +1,11 @@
 import { useLoaderData } from "react-router";
-import { usePdfExport, pdfActionLabel, PDF_BUSY_HINT } from "~/hooks/usePdfExport";
+import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
 import type { Route } from "./+types/v.$token";
 import { createApi } from "~/lib/api-client.server";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Verify Report - OpenInspection" }];
+  return [{ title: m.report_verify_meta_title() }];
 }
 
 // ---------------------------------------------------------------------------
@@ -106,7 +107,7 @@ export async function loader({
 
     // 404 from report verifier — fall through to agreement verifier below.
     if (res.status !== 404) {
-      return { kind: "error", message: "Verification service unavailable" };
+      return { kind: "error", message: m.report_verify_error_unavailable() };
     }
   } catch {
     return { kind: "error", message: "Verification service unavailable" };
@@ -168,12 +169,12 @@ export default function VerifyTokenPage() {
     return (
       <div className="max-w-xl mx-auto p-6 text-center">
         <p className="text-ih-fg-2 text-[15px]">
-          This link is an agreement verification token.{" "}
+          {m.report_verify_agreement_text()}{" "}
           <a
             href={`/verify/${result.envelopeId}`}
             className="text-ih-accent underline underline-offset-2"
           >
-            View agreement verification
+            {m.report_verify_agreement_link()}
           </a>
         </p>
       </div>
@@ -183,9 +184,9 @@ export default function VerifyTokenPage() {
   if (result.kind === "not_found") {
     return (
       <div className="max-w-xl mx-auto p-6 text-center">
-        <h1 className="text-2xl font-bold text-ih-fg-1">Not Found</h1>
+        <h1 className="text-2xl font-bold text-ih-fg-1">{m.report_verify_notfound_heading()}</h1>
         <p className="text-ih-fg-3 mt-2 text-[14px]">
-          No report or agreement matches this verification token.
+          {m.report_verify_notfound_body()}
         </p>
       </div>
     );
@@ -194,7 +195,7 @@ export default function VerifyTokenPage() {
   if (result.kind === "error") {
     return (
       <div className="max-w-xl mx-auto p-6 text-center">
-        <h1 className="text-2xl font-bold text-ih-bad-fg">Error</h1>
+        <h1 className="text-2xl font-bold text-ih-bad-fg">{m.report_verify_error_heading()}</h1>
         <p className="text-ih-fg-3 mt-2 text-[14px]">{result.message}</p>
       </div>
     );
@@ -208,18 +209,17 @@ export default function VerifyTokenPage() {
       <div className="max-w-xl mx-auto p-6">
         <div className="rounded-lg bg-ih-warn-bg text-ih-warn-fg p-4 text-center mb-6">
           <p className="text-lg font-bold">
-            ⚠️ Legacy Version
+            {m.report_verify_legacy_heading()}
           </p>
           <p className="text-[13px] mt-1">
-            Integrity not cryptographically verifiable — this report was
-            published before signing was introduced.
+            {m.report_verify_legacy_body()}
           </p>
         </div>
         {model.versionNumber !== undefined && (
           <p className="text-[13px] text-ih-fg-3 text-center">
-            Report version v{model.versionNumber}
+            {m.report_verify_version({ version: model.versionNumber })}
             {model.publishedAt
-              ? ` · Published ${formatDate(model.publishedAt)}`
+              ? m.report_verify_published_suffix({ date: formatDate(model.publishedAt) })
               : ""}
           </p>
         )}
@@ -231,8 +231,8 @@ export default function VerifyTokenPage() {
     return (
       <div className="max-w-xl mx-auto p-6">
         <div className="rounded-lg bg-ih-bad-bg text-ih-bad-fg p-4 text-center mb-6">
-          <p className="text-lg font-bold">Not published</p>
-          <p className="text-[13px] mt-1">This report is not published.</p>
+          <p className="text-lg font-bold">{m.report_verify_notpublished_heading()}</p>
+          <p className="text-[13px] mt-1">{m.report_verify_notpublished_body()}</p>
         </div>
       </div>
     );
@@ -242,15 +242,14 @@ export default function VerifyTokenPage() {
     return (
       <div className="max-w-xl mx-auto p-6">
         <div className="rounded-lg bg-ih-bad-bg text-ih-bad-fg p-4 text-center mb-6">
-          <p className="text-lg font-bold">❌ Verification Failed</p>
+          <p className="text-lg font-bold">{m.report_verify_failed_heading()}</p>
           <p className="text-[13px] mt-1">
-            This report's cryptographic signature could not be verified. The
-            content may have been altered.
+            {m.report_verify_failed_body()}
           </p>
         </div>
         {model.versionNumber !== undefined && (
           <p className="text-[13px] text-ih-fg-3 text-center">
-            Report version v{model.versionNumber}
+            {m.report_verify_version({ version: model.versionNumber })}
           </p>
         )}
       </div>
@@ -262,12 +261,12 @@ export default function VerifyTokenPage() {
     <div className="max-w-xl mx-auto p-6">
       {/* Result banner */}
       <div className="rounded-lg bg-ih-ok-bg text-ih-ok-fg p-4 text-center mb-6">
-        <p className="text-lg font-bold">✅ Verified</p>
+        <p className="text-lg font-bold">{m.report_verify_verified_heading()}</p>
         {model.versionNumber !== undefined && (
           <p className="text-[13px] mt-1">
-            Report version v{model.versionNumber}
+            {m.report_verify_version({ version: model.versionNumber })}
             {model.publishedAt
-              ? ` · Published ${formatDate(model.publishedAt)}`
+              ? m.report_verify_published_suffix({ date: formatDate(model.publishedAt) })
               : ""}
           </p>
         )}
@@ -277,7 +276,7 @@ export default function VerifyTokenPage() {
       <div className="rounded-lg border border-ih-border text-[13px] divide-y divide-ih-border mb-6">
         {model.address && (
           <div className="flex justify-between gap-3 p-3">
-            <span className="text-ih-fg-3">Property</span>
+            <span className="text-ih-fg-3">{m.report_verify_detail_property()}</span>
             <span className="text-ih-fg-1 font-medium text-right">
               {model.address}
             </span>
@@ -285,14 +284,14 @@ export default function VerifyTokenPage() {
         )}
         {model.contentHash && (
           <div className="flex justify-between gap-3 p-3">
-            <span className="text-ih-fg-3">Content hash</span>
+            <span className="text-ih-fg-3">{m.report_verify_detail_content_hash()}</span>
             <code className="text-[11px] text-ih-fg-2 break-all text-right">
               {shortHash(model.contentHash)}
             </code>
           </div>
         )}
         <div className="flex justify-between gap-3 p-3">
-          <span className="text-ih-fg-3">Algorithm</span>
+          <span className="text-ih-fg-3">{m.report_verify_detail_algorithm()}</span>
           <span className="text-ih-fg-2">Ed25519</span>
         </div>
       </div>
@@ -306,11 +305,11 @@ export default function VerifyTokenPage() {
             disabled={pdf.busy}
             className="flex items-center justify-center gap-2 w-full rounded-lg border border-ih-border px-4 py-2.5 text-[13px] font-medium text-ih-fg-1 hover:bg-ih-bg-muted transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            {pdfActionLabel(pdf, `Download signed v${model.versionNumber} PDF`)}
+            {pdfActionLabel(pdf, m.report_verify_download_pdf({ version: model.versionNumber }))}
           </button>
           {pdf.error || pdf.generating ? (
             <p role="status" className="mt-2 text-[12px] leading-snug text-ih-fg-3">
-              {pdf.error ?? PDF_BUSY_HINT}
+              {pdf.error ?? pdfBusyHint()}
             </p>
           ) : null}
         </>

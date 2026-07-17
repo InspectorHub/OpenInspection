@@ -7,6 +7,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Table, Modal } from "@core/shared-ui";
 import { MoneyInput } from "~/components/MoneyInput";
+import { m } from "~/paraglide/messages";
 
 interface EventType {
   id: string;
@@ -20,7 +21,7 @@ interface EventType {
 }
 
 export function meta() {
-  return [{ title: "Event Types - OpenInspection" }];
+  return [{ title: m.settings_event_types_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -122,28 +123,27 @@ export default function SettingsEventTypes() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Event types" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_event_types_crumb() }]} />
 
       <div className="flex items-start justify-between gap-4">
         <p className="text-[13px] text-ih-fg-3">
-          Define ancillary inspection events that can be attached to an
-          inspection.
+          {m.settings_event_types_intro()}
         </p>
         <button
           onClick={openCreate}
           className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
         >
-          + Add type
+          {m.settings_event_types_add_button()}
         </button>
       </div>
 
       {types.length === 0 ? (
         <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
           <p className="font-bold text-[14px] text-ih-fg-2">
-            No event types yet.
+            {m.settings_event_types_empty_title()}
           </p>
           <p className="text-[12px] text-ih-fg-3 mt-2">
-            Click &ldquo;+ Add type&rdquo; to define your first event type.
+            {m.settings_event_types_empty_desc()}
           </p>
         </div>
       ) : (
@@ -153,7 +153,7 @@ export default function SettingsEventTypes() {
             getRowKey={(t) => t.id}
             columns={[
               {
-                label: "Name",
+                label: m.settings_event_types_col_name(),
                 cell: (t) => (
                   <div className="flex items-center gap-2">
                     <span
@@ -165,18 +165,18 @@ export default function SettingsEventTypes() {
                     </span>
                     {!t.active && (
                       <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-3">
-                        Inactive
+                        {m.settings_event_types_inactive()}
                       </span>
                     )}
                   </div>
                 ),
               },
-              { label: "Slug", cell: (t) => <span className="font-mono text-[12px] text-ih-fg-3">{t.slug}</span> },
-              { label: "Duration", cell: (t) => <span className="text-ih-fg-2">{t.defaultDurationMin ?? 0} min</span> },
-              { label: "Price", cell: (t) => <span className="text-ih-fg-2">${((t.defaultPriceCents ?? 0) / 100).toFixed(2)}</span> },
-              { label: "Color", cell: (t) => <span className="font-mono text-[11px] text-ih-fg-3">{t.color}</span> },
+              { label: m.settings_event_types_col_slug(), cell: (t) => <span className="font-mono text-[12px] text-ih-fg-3">{t.slug}</span> },
+              { label: m.settings_event_types_col_duration(), cell: (t) => <span className="text-ih-fg-2">{m.settings_event_types_duration_value({ min: t.defaultDurationMin ?? 0 })}</span> },
+              { label: m.settings_event_types_col_price(), cell: (t) => <span className="text-ih-fg-2">${((t.defaultPriceCents ?? 0) / 100).toFixed(2)}</span> },
+              { label: m.settings_event_types_col_color(), cell: (t) => <span className="font-mono text-[11px] text-ih-fg-3">{t.color}</span> },
               {
-                label: "Actions",
+                label: m.settings_event_types_col_actions(),
                 align: "right",
                 cell: (t) => (
                   <>
@@ -184,13 +184,13 @@ export default function SettingsEventTypes() {
                       onClick={() => openEdit(t)}
                       className="text-[12px] text-ih-primary hover:underline mr-3 font-bold"
                     >
-                      Edit
+                      {m.common_edit()}
                     </button>
                     <button
                       onClick={() => confirmDelete(t)}
                       className="text-[12px] text-ih-bad-fg hover:underline font-bold"
                     >
-                      Delete
+                      {m.common_delete()}
                     </button>
                   </>
                 ),
@@ -204,7 +204,7 @@ export default function SettingsEventTypes() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingId ? "Edit event type" : "New event type"}
+        title={editingId ? m.settings_event_types_modal_edit_title() : m.settings_event_types_modal_new_title()}
         initialFocusRef={nameRef}
         footer={
           <>
@@ -212,14 +212,14 @@ export default function SettingsEventTypes() {
               onClick={() => setModalOpen(false)}
               className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
             >
-              Cancel
+              {m.common_cancel()}
             </button>
             <button
               onClick={save}
               disabled={saving}
               className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? m.settings_common_saving() : m.common_save()}
             </button>
           </>
         }
@@ -227,7 +227,7 @@ export default function SettingsEventTypes() {
         <div className="space-y-3">
               <div>
                 <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                  Name
+                  {m.settings_event_types_name_label()}
                 </label>
                 <input
                   ref={nameRef}
@@ -236,13 +236,13 @@ export default function SettingsEventTypes() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, name: e.target.value }))
                   }
-                  placeholder="e.g., Radon Test - Pickup"
+                  placeholder={m.settings_event_types_name_placeholder()}
                   className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                  Slug
+                  {m.settings_event_types_slug_label()}
                 </label>
                 <input
                   type="text"
@@ -250,14 +250,14 @@ export default function SettingsEventTypes() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, slug: e.target.value }))
                   }
-                  placeholder="radon_pickup"
+                  placeholder={m.settings_event_types_slug_placeholder()}
                   className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 font-mono focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                    Duration (min)
+                    {m.settings_event_types_duration_label()}
                   </label>
                   <input
                     type="number"
@@ -274,7 +274,7 @@ export default function SettingsEventTypes() {
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                    Price
+                    {m.settings_event_types_price_label()}
                   </label>
                   <MoneyInput
                     cents={Math.round(form.priceDollars * 100)}
@@ -284,7 +284,7 @@ export default function SettingsEventTypes() {
                         priceDollars: c == null ? 0 : c / 100,
                       }))
                     }
-                    ariaLabel="Price"
+                    ariaLabel={m.settings_event_types_price_label()}
                     className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                   />
                 </div>
@@ -292,7 +292,7 @@ export default function SettingsEventTypes() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                    Color
+                    {m.settings_event_types_color_label()}
                   </label>
                   <div className="flex items-center gap-2">
                     <input
@@ -315,7 +315,7 @@ export default function SettingsEventTypes() {
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                    Sort order
+                    {m.settings_event_types_sort_label()}
                   </label>
                   <input
                     type="number"

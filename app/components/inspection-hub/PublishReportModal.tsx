@@ -1,6 +1,7 @@
 import { useFetcher } from "react-router";
 import { Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Publish-report modal                                              */
@@ -29,7 +30,7 @@ export function PublishReportModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Publish report"
+      title={m.hub_publish_title()}
       footer={
         <>
           <button
@@ -37,7 +38,7 @@ export function PublishReportModal({
             onClick={onClose}
             className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
           <button
             type="submit"
@@ -45,7 +46,7 @@ export function PublishReportModal({
             disabled={submitting}
             className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
           >
-            {submitting ? "Publishing…" : "Publish report"}
+            {submitting ? m.hub_publish_pending() : m.hub_publish_submit()}
           </button>
         </>
       }
@@ -54,16 +55,16 @@ export function PublishReportModal({
         <input type="hidden" name="intent" value="publish" />
         {/* No theme picker — rides the editor's effective default (server
             'modern'); the action sends theme:"modern" explicitly. */}
-        <ToggleRow name="notifyClient" label="Notify client by email" defaultChecked />
-        <ToggleRow name="notifyAgent" label="Notify agent" defaultChecked={false} />
+        <ToggleRow name="notifyClient" label={m.hub_publish_notify_client()} defaultChecked />
+        <ToggleRow name="notifyAgent" label={m.hub_publish_notify_agent()} defaultChecked={false} />
         <ToggleRow
           name="requireSignature"
-          label="Require signature before viewing"
+          label={m.hub_publish_require_signature()}
           defaultChecked={agreementRequired}
         />
         <ToggleRow
           name="requirePayment"
-          label="Require payment before viewing"
+          label={m.hub_publish_require_payment()}
           defaultChecked={paymentRequired}
         />
 

@@ -11,6 +11,7 @@ import {
 } from "./annotations";
 import { AnnotationToolbar, type ToolId } from "./AnnotationToolbar";
 import { MeasureCalibration } from "./MeasureCalibration";
+import { m } from "~/paraglide/messages";
 
 const STROKE = 4; // logical px (natural-resolution); divided by scale when rendered
 const CIRCLE_R = 40; // default circle radius in natural px
@@ -100,7 +101,7 @@ export function PhotoAnnotator({
     setMeasures(
       doc.annotations
         .filter((a): a is Extract<Annotation, { kind: "measure" }> => a.kind === "measure")
-        .map((m) => ({ a: { x: m.x, y: m.y }, b: { x: m.x2, y: m.y2 } })),
+        .map((seg) => ({ a: { x: seg.x, y: seg.y }, b: { x: seg.x2, y: seg.y2 } })),
     );
     setCaption(sectionName || "");
     setZoom(1);
@@ -320,8 +321,8 @@ export function PhotoAnnotator({
     if (!blob) return;
     // P6 — derive `measure` annotations from the committed measure lines and
     // serialize them together with the calibration so measurements persist.
-    const measureAnns: Annotation[] = measures.map((m) => ({
-      kind: "measure", x: m.a.x, y: m.a.y, x2: m.b.x, y2: m.b.y, unit: calibUnit,
+    const measureAnns: Annotation[] = measures.map((seg) => ({
+      kind: "measure", x: seg.a.x, y: seg.a.y, x2: seg.b.x, y2: seg.b.y, unit: calibUnit,
     }));
     const calibration = pxPerUnit != null ? { pxPerUnit, calibUnit } : null;
     onSave({ blob, nodesJson: serializeMeasureDoc([...annotations, ...measureAnns], calibration), caption });
@@ -357,7 +358,7 @@ export function PhotoAnnotator({
         <button
           onClick={onClose}
           className="w-9 h-9 rounded-md flex items-center justify-center text-white/70 hover:bg-white/10 transition-colors"
-          aria-label="Close photo studio"
+          aria-label={m.media_annotate_close_aria()}
         >
           <Icon name="x" className="w-5 h-5" />
         </button>
@@ -365,17 +366,17 @@ export function PhotoAnnotator({
         <div className="flex-1 min-w-0 text-center">
           <span className="text-[14px] font-bold text-white/90">
             {photoIndex != null && totalPhotos != null && totalPhotos > 0
-              ? `Photo ${photoIndex} of ${totalPhotos}`
-              : "Photo Studio"}
+              ? m.media_annotate_photo_of({ index: photoIndex, total: totalPhotos })
+              : m.media_annotate_title()}
           </span>
           {arrowStart && (
-            <span className="block text-[11px] text-amber-400 font-medium">Click to set arrow endpoint</span>
+            <span className="block text-[11px] text-amber-400 font-medium">{m.media_annotate_arrow_hint()}</span>
           )}
           {measureStart && (
-            <span className="block text-[11px] text-amber-400 font-medium">Click to set measurement endpoint</span>
+            <span className="block text-[11px] text-amber-400 font-medium">{m.media_annotate_measure_hint()}</span>
           )}
           {tool === "free" && !isDrawingFreehand && (
-            <span className="block text-[11px] text-white/50">Click and drag to draw</span>
+            <span className="block text-[11px] text-white/50">{m.media_annotate_draw_hint()}</span>
           )}
         </div>
 
@@ -389,12 +390,12 @@ export function PhotoAnnotator({
                 ? "text-amber-300 bg-amber-400/15 border-amber-400/40"
                 : "text-white/60 bg-white/5 border-white/10 hover:bg-white/10"
             }`}
-            title={isCover ? "This is the report cover" : "Set as report cover"}
+            title={isCover ? m.media_annotate_cover_current() : m.media_annotate_cover_set_title()}
           >
             <svg className="w-3.5 h-3.5" fill={isCover ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.48 3.5a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
             </svg>
-            {isCover ? "Cover" : "Set as cover"}
+            {isCover ? m.media_annotate_cover_badge() : m.media_annotate_cover_set()}
           </button>
         )}
 
@@ -402,12 +403,12 @@ export function PhotoAnnotator({
           onClick={undoLast}
           disabled={annotations.length === 0}
           className="h-8 px-3 rounded-md text-[12px] font-bold text-white/60 bg-white/5 border border-white/10 hover:bg-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1.5"
-          title="Undo last annotation"
+          title={m.media_annotate_undo_title()}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
           </svg>
-          Undo
+          {m.common_undo()}
         </button>
 
         <button
@@ -417,7 +418,7 @@ export function PhotoAnnotator({
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
-          Save
+          {m.common_save()}
         </button>
       </div>
 
@@ -521,10 +522,10 @@ export function PhotoAnnotator({
                   )}
 
                   {/* Committed measurements: line + distance text */}
-                  {measures.map((m, i) => (
+                  {measures.map((seg, i) => (
                     <Fragment key={`m-${i}`}>
                       <Arrow
-                        points={[m.a.x, m.a.y, m.b.x, m.b.y]}
+                        points={[seg.a.x, seg.a.y, seg.b.x, seg.b.y]}
                         stroke="#fbbf24"
                         fill="#fbbf24"
                         strokeWidth={sw}
@@ -532,10 +533,10 @@ export function PhotoAnnotator({
                         pointerLength={10 / scale}
                         pointerWidth={10 / scale}
                       />
-                      <Label x={(m.a.x + m.b.x) / 2} y={(m.a.y + m.b.y) / 2}>
+                      <Label x={(seg.a.x + seg.b.x) / 2} y={(seg.a.y + seg.b.y) / 2}>
                         <Tag fill="#000000" opacity={0.85} cornerRadius={3 / scale} />
                         <Text
-                          text={fmtDistance(m.a, m.b)}
+                          text={fmtDistance(seg.a, seg.b)}
                           fill="#fbbf24"
                           fontStyle="bold"
                           fontSize={14 / scale}
@@ -574,7 +575,7 @@ export function PhotoAnnotator({
                         }
                         e.stopPropagation();
                       }}
-                      placeholder="Enter label..."
+                      placeholder={m.media_annotate_label_placeholder()}
                       className="w-40 h-7 px-2 rounded bg-slate-700 text-white text-[12px] border border-white/10 outline-none focus:border-ih-primary placeholder-white/30"
                     />
                     <div className="flex justify-end gap-1 mt-1.5">
@@ -582,13 +583,13 @@ export function PhotoAnnotator({
                         onClick={cancelLabel}
                         className="px-2 py-0.5 rounded text-[10px] font-bold text-white/50 hover:text-white/80"
                       >
-                        Cancel
+                        {m.common_cancel()}
                       </button>
                       <button
                         onClick={commitLabel}
                         className="px-2 py-0.5 rounded text-[10px] font-bold text-white bg-ih-primary hover:bg-ih-primary-600"
                       >
-                        Add
+                        {m.common_add()}
                       </button>
                     </div>
                   </div>
@@ -607,8 +608,8 @@ export function PhotoAnnotator({
                 <svg className="w-12 h-12 mx-auto mb-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 001.5-1.5V5.25a1.5 1.5 0 00-1.5-1.5H3.75a1.5 1.5 0 00-1.5 1.5v14.25a1.5 1.5 0 001.5 1.5z" />
                 </svg>
-                <p className="text-[13px]">No photo selected</p>
-                <p className="text-[11px] mt-1">Take or upload a photo to annotate</p>
+                <p className="text-[13px]">{m.media_annotate_empty_title()}</p>
+                <p className="text-[11px] mt-1">{m.media_annotate_empty_subtitle()}</p>
               </div>
             </div>
           )}
@@ -619,21 +620,21 @@ export function PhotoAnnotator({
           <button
             onClick={zoomIn}
             className="w-9 h-9 rounded-md bg-white/10 text-white/70 hover:bg-white/20 flex items-center justify-center text-[16px] font-bold transition-colors"
-            title="Zoom in"
+            title={m.media_annotate_zoom_in()}
           >
             +
           </button>
           <button
             onClick={zoomReset}
             className="w-9 h-9 rounded-md bg-white/10 text-white/60 hover:bg-white/20 flex items-center justify-center text-[10px] font-bold transition-colors"
-            title="Reset zoom"
+            title={m.media_annotate_zoom_reset()}
           >
             {Math.round(zoom * 100)}%
           </button>
           <button
             onClick={zoomOut}
             className="w-9 h-9 rounded-md bg-white/10 text-white/70 hover:bg-white/20 flex items-center justify-center text-[16px] font-bold transition-colors"
-            title="Zoom out"
+            title={m.media_annotate_zoom_out()}
           >
             -
           </button>
@@ -644,7 +645,9 @@ export function PhotoAnnotator({
           <div className="absolute left-4 top-4">
             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white/10 text-[11px] font-bold text-white/70 border border-white/10">
               <Icon name="edit" className="w-3 h-3" />
-              {annotations.length} annotation{annotations.length !== 1 ? "s" : ""}
+              {annotations.length !== 1
+                ? m.media_annotate_count_other({ count: annotations.length })
+                : m.media_annotate_count_one({ count: annotations.length })}
             </span>
           </div>
         )}

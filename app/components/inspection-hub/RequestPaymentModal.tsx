@@ -1,6 +1,7 @@
 import { useFetcher } from "react-router";
 import { Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Request-payment modal                                             */
@@ -27,8 +28,8 @@ export function RequestPaymentModal({
   error: string | undefined;
   onClose: () => void;
 }) {
-  const title = resend ? "Resend payment request" : "Request payment";
-  const submitLabel = resend ? "Resend request" : "Send request";
+  const title = resend ? m.hub_payment_title_resend() : m.hub_payment_title();
+  const submitLabel = resend ? m.hub_payment_submit_resend() : m.hub_payment_submit();
   return (
     <Modal
       open={open}
@@ -41,7 +42,7 @@ export function RequestPaymentModal({
             onClick={onClose}
             className="px-3 py-1.5 rounded-md border border-ih-border text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
           <button
             type="submit"
@@ -49,7 +50,7 @@ export function RequestPaymentModal({
             disabled={submitting || !recipientEmail}
             className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
           >
-            {submitting ? "Sending…" : submitLabel}
+            {submitting ? m.hub_payment_pending() : submitLabel}
           </button>
         </>
       }
@@ -57,16 +58,16 @@ export function RequestPaymentModal({
       <fetcher.Form id={FORM_ID} method="post" className="space-y-4">
         <input type="hidden" name="intent" value="request-payment" />
         <div>
-          <p className="text-[12px] font-bold text-ih-fg-2 mb-1">Recipient</p>
+          <p className="text-[12px] font-bold text-ih-fg-2 mb-1">{m.hub_payment_recipient_label()}</p>
           <p className="text-[13px] text-ih-fg-1">
             {recipientEmail || (
-              <span className="text-ih-fg-4">No client email on this inspection</span>
+              <span className="text-ih-fg-4">{m.hub_payment_no_email()}</span>
             )}
           </p>
         </div>
 
         <div>
-          <p className="text-[12px] font-bold text-ih-fg-2 mb-1">Amount</p>
+          <p className="text-[12px] font-bold text-ih-fg-2 mb-1">{m.hub_payment_amount_label()}</p>
           <p className="text-[18px] font-bold text-ih-fg-1 tabular-nums">{amountLabel}</p>
         </div>
 

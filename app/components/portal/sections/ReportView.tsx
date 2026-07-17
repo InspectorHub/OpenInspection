@@ -18,7 +18,8 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { useState } from "react";
-import { usePdfExport, pdfActionLabel, PDF_BUSY_HINT } from "~/hooks/usePdfExport";
+import { m } from "~/paraglide/messages";
+import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
 import { brandTokens } from "~/lib/brand";
 import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, isDefect } from "~/lib/report-helpers";
@@ -177,7 +178,7 @@ function CoverPhotoPlaceholder() {
       <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
       </svg>
-      <span className="text-xs font-medium tracking-wide">Cover photo unavailable</span>
+      <span className="text-xs font-medium tracking-wide">{m.report_view_cover_unavailable()}</span>
     </div>
   );
 }
@@ -270,7 +271,7 @@ export function ReportView(props: ReportViewProps) {
     else ratingTally.set(it.rating, { label: it.ratingLabel ?? it.rating, color: it.ratingColor, bucket: it.severityBucket, count: 1, seen: seenOrder++ });
   }
   const summaryCards: Array<{ label: string; value: number; color: string | null }> = [
-    { label: "Total", value: data.stats.total, color: null },
+    { label: m.report_view_stat_total(), value: data.stats.total, color: null },
     ...[...ratingTally.values()]
       .sort((a, b) => (BUCKET_RANK[a.bucket] ?? 9) - (BUCKET_RANK[b.bucket] ?? 9) || a.seen - b.seen)
       .map((l) => ({ label: l.label, value: l.count, color: l.color })),
@@ -287,19 +288,19 @@ export function ReportView(props: ReportViewProps) {
     if (data.notPublished) {
       return (
         <ErrorState
-          title="This report is not published"
-          message="This report is not published. Please contact your inspector if you believe this is a mistake."
+          title={m.report_view_not_published_title()}
+          message={m.report_view_not_published_message()}
         />
       );
     }
     const notFound = data.error === "Report not found";
     return (
       <ErrorState
-        title={notFound ? "Report not found" : "Report unavailable"}
+        title={notFound ? m.report_gate_notfound_title() : m.report_view_unavailable_title()}
         message={
           notFound
-            ? "This report link is invalid or has expired. Please contact your inspector for an up-to-date link."
-            : "We couldn't load this report right now. Please try again in a moment."
+            ? m.report_gate_notfound_message()
+            : m.report_view_load_error()
         }
       />
     );
@@ -349,7 +350,7 @@ export function ReportView(props: ReportViewProps) {
               role="status"
               className="max-w-[15rem] rounded-lg bg-ih-bg-inverse px-3 py-2 text-[11px] font-medium leading-snug text-ih-fg-inverse shadow-ih-popover"
             >
-              {pdf.error ?? PDF_BUSY_HINT}
+              {pdf.error ?? pdfBusyHint()}
             </div>
           ) : null}
           <button
@@ -361,7 +362,7 @@ export function ReportView(props: ReportViewProps) {
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
             </svg>
-            {pdfActionLabel(pdf, "Download PDF")}
+            {pdfActionLabel(pdf, m.report_view_download_pdf())}
           </button>
         </div>
       </div>
@@ -371,7 +372,7 @@ export function ReportView(props: ReportViewProps) {
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-3">
             {data.brand.logoUrl ? (
-              <img src={data.brand.logoUrl} alt={data.brand.companyName ?? "Logo"} className="h-10 w-auto" />
+              <img src={data.brand.logoUrl} alt={data.brand.companyName ?? m.report_view_logo_alt()} className="h-10 w-auto" />
             ) : (
               <div className="w-10 h-10 rounded-full bg-ih-ok/10 flex items-center justify-center">
                 <svg className="w-5 h-5 text-ih-ok" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -380,7 +381,7 @@ export function ReportView(props: ReportViewProps) {
               </div>
             )}
             <span className="text-xs font-semibold tracking-widest uppercase text-ih-fg-4">
-              {data.brand.companyName ? `${data.brand.companyName} · Certified Inspection Report` : "Certified Inspection Report"}
+              {data.brand.companyName ? m.report_view_cert_with_company({ company: data.brand.companyName }) : m.report_view_cert()}
             </span>
           </div>
           <div className="flex items-center gap-2 print:hidden">
@@ -389,7 +390,7 @@ export function ReportView(props: ReportViewProps) {
                 href={`/inspections/${data.inspectionId}/repair-list`}
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
               >
-                View Repair List
+                {m.report_view_repair_list_link()}
               </a>
             )}
             {data.enableCustomerRepairExport && (
@@ -397,7 +398,7 @@ export function ReportView(props: ReportViewProps) {
                 href={`/repair-builder/${tenant}/${id}${urlToken ? `?token=${encodeURIComponent(urlToken)}` : ""}`}
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
               >
-                Build repair request
+                {m.report_view_build_repair()}
               </a>
             )}
             <button
@@ -405,14 +406,14 @@ export function ReportView(props: ReportViewProps) {
               onClick={() => window.print()}
               className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
             >
-              Print
+              {m.report_view_print()}
             </button>
             <button
               type="button"
               onClick={() => setRepairPanel(!repairPanel)}
               className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg flex items-center gap-2"
             >
-              Repair Request
+              {m.portal_hub_nav_repair()}
             </button>
           </div>
         </div>
@@ -426,7 +427,7 @@ export function ReportView(props: ReportViewProps) {
           </h1>
         )}
         <p className="text-sm text-ih-fg-3">
-          {data.date} &middot; Inspector: {data.inspectorName || "N/A"}
+          {data.date} &middot; {m.report_view_inspector({ name: data.inspectorName || m.report_view_na() })}
         </p>
       </div>
 
@@ -490,7 +491,7 @@ export function ReportView(props: ReportViewProps) {
                   : "border border-ih-border text-ih-fg-3"
               }`}
             >
-              {f === "all" ? "All" : f === "defects" ? "Defects Only" : "Summary"}
+              {f === "all" ? m.report_view_filter_all() : f === "defects" ? m.report_view_filter_defects() : m.report_view_filter_summary()}
             </button>
           ))}
         </div>
@@ -541,7 +542,7 @@ export function ReportView(props: ReportViewProps) {
                 </h2>
                 <div className="flex-1 h-px border-t border-ih-border" />
                 <span className="text-xs font-mono text-ih-fg-4">
-                  {section.items.length} items
+                  {m.report_view_section_items({ count: section.items.length })}
                 </span>
               </div>
 
@@ -616,12 +617,12 @@ export function ReportView(props: ReportViewProps) {
                         {item.recommendation && (
                           <div className="mt-2 flex items-center gap-2 flex-wrap">
                             <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-ih-info-bg text-ih-info-fg uppercase">
-                              Recommend: {item.recommendation}
+                              {m.report_view_recommend({ value: item.recommendation })}
                             </span>
                             {data.showEstimates &&
                               (item.estimateMin != null || item.estimateMax != null) && (
                                 <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-ih-ok-bg text-ih-ok-fg tabular-nums">
-                                  Estimated cost: $
+                                  {m.report_view_estimated_cost_label()} $
                                   {item.estimateMin?.toLocaleString() ?? "?"} - $
                                   {item.estimateMax?.toLocaleString() ?? "?"}
                                 </span>
@@ -664,7 +665,7 @@ export function ReportView(props: ReportViewProps) {
                               onChange={() => toggleRepairItem(item.id)}
                               className="rounded border-ih-border-strong"
                             />
-                            Add to repair request
+                            {m.report_view_add_to_repair()}
                           </label>
                         )}
                       </div>
@@ -678,7 +679,7 @@ export function ReportView(props: ReportViewProps) {
                 <div className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-ih-fg-1">
-                      {section.items.length} items inspected
+                      {m.report_view_items_inspected({ count: section.items.length })}
                     </span>
                     <span
                       className="text-sm font-semibold"
@@ -687,8 +688,8 @@ export function ReportView(props: ReportViewProps) {
                       }}
                     >
                       {section.defectCount > 0
-                        ? `${section.defectCount} defect${section.defectCount > 1 ? "s" : ""}`
-                        : "All clear"}
+                        ? m.report_view_defect_count({ count: section.defectCount, plural: section.defectCount > 1 ? "s" : "" })
+                        : m.report_view_all_clear()}
                     </span>
                   </div>
                 </div>
@@ -698,7 +699,7 @@ export function ReportView(props: ReportViewProps) {
               {section.disclaimerText && filter !== "summary" && (
                 <div className="mt-4 px-4 py-3 rounded-md border border-ih-border bg-ih-watch-bg/40 text-[12px] leading-relaxed text-ih-fg-3">
                   <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-watch-fg mb-1">
-                    Disclaimer
+                    {m.report_view_disclaimer()}
                   </div>
                   <p className="whitespace-pre-line">{section.disclaimerText}</p>
                 </div>

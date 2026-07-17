@@ -1,41 +1,41 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { forgotPasswordSchema, resetPasswordSchema, PASSWORD_HINT, makeLoginSchema } from './auth.schema';
+import { makeForgotPasswordSchema, makeResetPasswordSchema, makePasswordHint, makeLoginSchema } from './auth.schema';
 import { overwriteGetLocale } from '~/paraglide/runtime';
 import { m } from '~/paraglide/messages';
 
-describe('forgotPasswordSchema', () => {
+describe('makeForgotPasswordSchema', () => {
   it('accepts a valid email', () => {
-    expect(forgotPasswordSchema.parse({ email: 'a@b.com' }).email).toBe('a@b.com');
+    expect(makeForgotPasswordSchema().parse({ email: 'a@b.com' }).email).toBe('a@b.com');
   });
   it('rejects an empty email', () => {
-    expect(forgotPasswordSchema.safeParse({ email: '' }).success).toBe(false);
+    expect(makeForgotPasswordSchema().safeParse({ email: '' }).success).toBe(false);
   });
   it('rejects a malformed email', () => {
-    expect(forgotPasswordSchema.safeParse({ email: 'nope' }).success).toBe(false);
+    expect(makeForgotPasswordSchema().safeParse({ email: 'nope' }).success).toBe(false);
   });
 });
 
-describe('resetPasswordSchema', () => {
+describe('makeResetPasswordSchema', () => {
   it('accepts a strong password', () => {
-    expect(resetPasswordSchema.parse({ newPassword: 'ValidPass1!' }).newPassword).toBe('ValidPass1!');
+    expect(makeResetPasswordSchema().parse({ newPassword: 'ValidPass1!' }).newPassword).toBe('ValidPass1!');
   });
   it('rejects fewer than 8 chars', () => {
-    expect(resetPasswordSchema.safeParse({ newPassword: 'Va1!' }).success).toBe(false);
+    expect(makeResetPasswordSchema().safeParse({ newPassword: 'Va1!' }).success).toBe(false);
   });
   it('rejects a password with no uppercase', () => {
-    expect(resetPasswordSchema.safeParse({ newPassword: 'validpass1!' }).success).toBe(false);
+    expect(makeResetPasswordSchema().safeParse({ newPassword: 'validpass1!' }).success).toBe(false);
   });
   it('rejects a password with no number', () => {
-    expect(resetPasswordSchema.safeParse({ newPassword: 'ValidPass!' }).success).toBe(false);
+    expect(makeResetPasswordSchema().safeParse({ newPassword: 'ValidPass!' }).success).toBe(false);
   });
   it('rejects a password with no special char', () => {
-    expect(resetPasswordSchema.safeParse({ newPassword: 'ValidPass1' }).success).toBe(false);
+    expect(makeResetPasswordSchema().safeParse({ newPassword: 'ValidPass1' }).success).toBe(false);
   });
 });
 
-describe('PASSWORD_HINT', () => {
+describe('makePasswordHint', () => {
   it('states the strong-password requirements', () => {
-    expect(PASSWORD_HINT).toBe(
+    expect(makePasswordHint()).toBe(
       'At least 8 characters, with an uppercase letter, a number, and a special character.',
     );
   });

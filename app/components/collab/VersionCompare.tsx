@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import type { FindingDiff } from "~/lib/collab/snapshot-diff";
+import { m } from "~/paraglide/messages";
 
 /**
  * #181 PR-H (Task H2) — version compare + field recovery modal.
@@ -39,7 +40,7 @@ export interface VersionCompareProps {
 /** Render an arbitrary scalar value as a short, readable string for the diff cell. */
 function displayValue(value: unknown): string {
     if (value === undefined || value === null) return "—";
-    if (typeof value === "string") return value === "" ? "(empty)" : value;
+    if (typeof value === "string") return value === "" ? m.editor_collab_empty_value() : value;
     if (typeof value === "number" || typeof value === "boolean") return String(value);
     try {
         return JSON.stringify(value);
@@ -104,13 +105,13 @@ export function VersionCompare({
                     </span>
                     <div className="flex-1 min-w-0">
                         <h2 id="version-compare-title" className="text-base font-bold text-ih-fg-1">
-                            Compare versions
+                            {m.editor_collab_compare_versions()}
                         </h2>
                         <p className="text-xs text-ih-fg-3 mt-0.5">
                             <span className="font-semibold text-ih-fg-2">{fromLabel}</span>
                             {" → "}
                             <span className="font-semibold text-ih-fg-2">{toLabel}</span>
-                            {" · recover an individual value, or restore the whole version below."}
+                            {m.editor_collab_compare_desc()}
                         </p>
                     </div>
                     <button
@@ -119,7 +120,7 @@ export function VersionCompare({
                         disabled={busy}
                         className="px-3 py-1.5 rounded-md text-xs font-bold border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
                     >
-                        Close
+                        {m.common_close()}
                     </button>
                 </header>
 
@@ -128,15 +129,15 @@ export function VersionCompare({
                     {diffs.length === 0 && (
                         <div className="py-10 text-center">
                             <p className="text-[13px] text-ih-fg-3">
-                                No differences between these versions.
+                                {m.editor_collab_no_differences()}
                             </p>
                         </div>
                     )}
 
                     {diffs.map((diff) => {
                         // Column labels reflect the framing: from = older snapshot, to = current.
-                        const fromHead = diff.itemAdded ? "(not present)" : fromLabel;
-                        const toHead = diff.itemRemoved ? "(removed)" : toLabel;
+                        const fromHead = diff.itemAdded ? m.editor_collab_not_present() : fromLabel;
+                        const toHead = diff.itemRemoved ? m.editor_collab_removed() : toLabel;
                         return (
                             <section
                                 key={diff.findingKey}
@@ -147,10 +148,10 @@ export function VersionCompare({
                                         {labelFor(diff.findingKey)}
                                     </h3>
                                     {diff.itemAdded && (
-                                        <span className="ih-pill ih-pill--monitor">Added since this version</span>
+                                        <span className="ih-pill ih-pill--monitor">{m.editor_collab_added_since()}</span>
                                     )}
                                     {diff.itemRemoved && (
-                                        <span className="ih-pill ih-pill--monitor">Removed since this version</span>
+                                        <span className="ih-pill ih-pill--monitor">{m.editor_collab_removed_since()}</span>
                                     )}
                                 </header>
 
@@ -192,9 +193,9 @@ export function VersionCompare({
                                                     }
                                                     disabled={busy || !onRecoverField}
                                                     className="h-8 px-3 rounded-md text-[12px] font-bold bg-ih-primary text-white hover:bg-ih-primary-600 disabled:opacity-50 transition-colors whitespace-nowrap"
-                                                    title="Write the older value back into the current report"
+                                                    title={m.editor_collab_recover_title()}
                                                 >
-                                                    Recover this value
+                                                    {m.editor_collab_recover_value()}
                                                 </button>
                                             </div>
                                         </div>
@@ -204,15 +205,13 @@ export function VersionCompare({
                                     {diff.nestedChanged && (
                                         <div className="px-4 py-3 flex items-start gap-2 bg-ih-bg-muted/40">
                                             <span className="ih-pill ih-pill--monitor flex-shrink-0">
-                                                Photos / comments changed
+                                                {m.editor_collab_photos_comments_changed()}
                                             </span>
                                             <p className="text-[12px] text-ih-fg-3 leading-snug">
                                                 {diff.nestedSummary
-                                                    ? `${diff.nestedSummary}. `
+                                                    ? m.editor_collab_nested_summary_prefix({ summary: diff.nestedSummary })
                                                     : ""}
-                                                Use “Restore entire version” below to roll back these
-                                                nested changes — individual recovery is not available for
-                                                photos, defects, or custom comments.
+                                                {m.editor_collab_nested_note()}
                                             </p>
                                         </div>
                                     )}
@@ -225,9 +224,7 @@ export function VersionCompare({
                 {/* Footer — whole-version restore */}
                 <footer className="border-t border-ih-border px-6 py-4 flex items-center gap-3 flex-wrap">
                     <p className="text-[11px] text-ih-fg-3 flex-1 leading-snug min-w-[220px]">
-                        Recovering a single value writes it into the live report. Restoring the entire
-                        version replaces all current content with this version (your current state is
-                        saved as a new version first, so it is reversible).
+                        {m.editor_collab_footer_desc()}
                     </p>
                     <button
                         type="button"
@@ -235,7 +232,7 @@ export function VersionCompare({
                         disabled={busy}
                         className="h-10 px-4 rounded-md text-[12px] font-bold border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-50 transition-colors"
                     >
-                        Done
+                        {m.common_done()}
                     </button>
                     {onRestoreWhole && (
                         <button
@@ -244,7 +241,7 @@ export function VersionCompare({
                             disabled={busy}
                             className="h-10 px-4 rounded-md text-[12px] font-bold border border-ih-bad text-ih-bad-fg hover:bg-ih-bad-bg disabled:opacity-50 transition-colors"
                         >
-                            {busy ? "Working…" : "Restore entire version"}
+                            {busy ? m.editor_collab_working() : m.editor_collab_restore_entire_version()}
                         </button>
                     )}
                 </footer>

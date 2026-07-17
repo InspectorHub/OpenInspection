@@ -6,6 +6,7 @@ import {
   addItem, duplicateItem, deleteItem, moveItem, renameItem,
 } from "~/lib/editor/structure-ops";
 import type { Snapshot, ItemType } from "~/lib/editor/structure-ops";
+import { m } from "~/paraglide/messages";
 
 /** Impact data shown in the StructureDeleteModal — for a section OR a single item. */
 export interface DeletePending {
@@ -275,7 +276,7 @@ export function useStructureEdit({
   }, []);
 
   const submitAddSection = useCallback(() => {
-    const title = addSectionTitle.trim() || "New Section";
+    const title = addSectionTitle.trim() || m.helper_structure_new_section_default();
     setAddSectionPromptOpen(false);
     setAddSectionTitle("");
     applyStructure(addSection(snapshotRef.current, title));
@@ -347,7 +348,7 @@ export function useStructureEdit({
       const pending = addItemPending;
       setAddItemPending(null);
       if (!pending) return;
-      const clean = label.trim() || "New Item";
+      const clean = label.trim() || m.helper_structure_new_item_default();
       applyStructure(addItem(snapshotRef.current, pending.sectionId, clean, type));
     },
     [addItemPending, applyStructure],
@@ -376,7 +377,7 @@ export function useStructureEdit({
       snapshot: JSON.stringify(snapshotRef.current),
     };
     if (pending.mode === "new") {
-      fields.name = saveTemplateName.trim() || "Custom Template";
+      fields.name = saveTemplateName.trim() || m.helper_structure_custom_template_default();
     } else {
       fields.templateId = templateId ?? "";
     }

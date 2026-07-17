@@ -7,6 +7,7 @@ import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Table, Pill, type PillTone } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 const DEFAULT_RETENTION_YEARS = 6;
 const MIN_RETENTION_YEARS = 1;
@@ -31,7 +32,7 @@ interface ErasureLogRow {
 }
 
 export function meta() {
-  return [{ title: "Compliance - Settings - OpenInspection" }];
+  return [{ title: m.settings_compliance_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -83,7 +84,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         ok: false,
         intent,
-        message: `Enter a whole number between ${MIN_RETENTION_YEARS} and ${MAX_RETENTION_YEARS}.`,
+        message: m.settings_compliance_retention_range_error({ min: MIN_RETENTION_YEARS, max: MAX_RETENTION_YEARS }),
       };
     }
     const res = await api.admin["tenant-config"].$patch({
@@ -108,9 +109,9 @@ export default function SettingsCompliancePage() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Compliance" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_root(), href: "/settings" }, { label: m.settings_compliance_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">
-        GDPR retention policy and the record of erasure requests you have honored.
+        {m.settings_compliance_intro()}
       </p>
 
       <RetentionWindow initialYears={data.retentionYears} />
@@ -152,17 +153,16 @@ function RetentionWindow({ initialYears }: { initialYears: number }) {
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <div>
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-          Agreement retention window
+          {m.settings_compliance_retention_heading()}
         </h3>
         <p className="text-[12px] text-ih-fg-3 mt-1">
-          How long signed agreements and signatures are kept before they are permanently
-          destroyed.
+          {m.settings_compliance_retention_desc()}
         </p>
       </div>
 
       <div className="flex items-end gap-3 flex-wrap">
         <label className="block">
-          <span className="block text-[12px] font-bold text-ih-fg-2 mb-1">Years</span>
+          <span className="block text-[12px] font-bold text-ih-fg-2 mb-1">{m.settings_compliance_years_label()}</span>
           <input
             type="number"
             min={MIN_RETENTION_YEARS}
@@ -181,20 +181,18 @@ function RetentionWindow({ initialYears }: { initialYears: number }) {
           disabled={saving}
           className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
         >
-          {saving ? "Saving..." : "Save"}
+          {saving ? m.settings_compliance_saving() : m.common_save()}
         </button>
-        {saved && <span className="text-[13px] text-ih-ok-fg font-bold">Saved.</span>}
+        {saved && <span className="text-[13px] text-ih-ok-fg font-bold">{m.settings_flash_saved_short()}</span>}
         {failed && (
           <span className="text-[13px] text-ih-bad-fg font-bold">
-            {fetcher.data?.message ?? "Save failed. Please try again."}
+            {fetcher.data?.message ?? m.settings_compliance_save_failed()}
           </span>
         )}
       </div>
 
       <p className="text-[12px] text-ih-fg-3 leading-relaxed">
-        Retained as a legal obligation under GDPR Art. 17(3)(e) (defence of legal claims). The
-        default of 6 years matches the UK simple-contract limitation period. Note: deleted rows
-        remain restorable from D1 Time-Travel backups for up to 30 days.
+        {m.settings_compliance_retention_note()}
       </p>
     </section>
   );
@@ -209,27 +207,27 @@ function ErasureLogView({ rows }: { rows: ErasureLogRow[] }) {
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <div>
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-          Recent erasure requests
+          {m.settings_compliance_erasure_heading()}
         </h3>
         <p className="text-[12px] text-ih-fg-3 mt-1">
-          The accountability record of data-subject erasure requests you have honored. Read-only.
+          {m.settings_compliance_erasure_desc()}
         </p>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[12px] text-ih-fg-4 italic">No erasure requests have been recorded yet.</p>
+        <p className="text-[12px] text-ih-fg-4 italic">{m.settings_compliance_erasure_empty()}</p>
       ) : (
         <div className="overflow-x-auto">
           <Table<ErasureLogRow>
             rows={rows}
             getRowKey={(r) => r.id}
             columns={[
-              { label: "Subject", cell: (r) => <span className="font-medium text-ih-fg-1">{r.subjectEmail}</span> },
-              { label: "Date", cell: (r) => <span className="text-ih-fg-2 whitespace-nowrap">{formatDate(r.createdAt)}</span> },
-              { label: "Status", cell: (r) => <StatusBadge status={r.status} /> },
-              { label: "Deleted", align: "right", cell: (r) => <span className="text-ih-fg-2 tabular-nums">{r.deletedCount}</span> },
-              { label: "Anonymized", align: "right", cell: (r) => <span className="text-ih-fg-2 tabular-nums">{r.anonymizedCount}</span> },
-              { label: "Retained", align: "right", cell: (r) => <span className="text-ih-fg-2 tabular-nums">{r.retainedCount}</span> },
+              { label: m.settings_compliance_col_subject(), cell: (r) => <span className="font-medium text-ih-fg-1">{r.subjectEmail}</span> },
+              { label: m.settings_compliance_col_date(), cell: (r) => <span className="text-ih-fg-2 whitespace-nowrap">{formatDate(r.createdAt)}</span> },
+              { label: m.settings_compliance_col_status(), cell: (r) => <StatusBadge status={r.status} /> },
+              { label: m.settings_compliance_col_deleted(), align: "right", cell: (r) => <span className="text-ih-fg-2 tabular-nums">{r.deletedCount}</span> },
+              { label: m.settings_compliance_col_anonymized(), align: "right", cell: (r) => <span className="text-ih-fg-2 tabular-nums">{r.anonymizedCount}</span> },
+              { label: m.settings_compliance_col_retained(), align: "right", cell: (r) => <span className="text-ih-fg-2 tabular-nums">{r.retainedCount}</span> },
             ]}
           />
         </div>
@@ -245,9 +243,9 @@ function StatusBadge({ status }: { status: string }) {
     refused: "defect",
   };
   const label: Record<string, string> = {
-    completed: "Completed",
-    partially_completed: "Partial",
-    refused: "Refused",
+    completed: m.settings_compliance_status_completed(),
+    partially_completed: m.settings_compliance_status_partial(),
+    refused: m.settings_compliance_status_refused(),
   };
   return (
     <Pill tone={tone[status] ?? "neutral"} className="uppercase tracking-wide">

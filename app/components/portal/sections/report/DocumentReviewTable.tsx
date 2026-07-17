@@ -1,3 +1,4 @@
+import { m } from "~/paraglide/messages";
 import type { DocReviewView } from "./types";
 
 /**
@@ -14,23 +15,23 @@ export function DocumentReviewTable({ items }: { items: DocReviewView[] }) {
     <table data-pca-document-review className="mb-5 w-full border-collapse text-sm print:break-inside-avoid">
       <thead>
         <tr className="border-b border-ih-border text-left text-ih-fg-3">
-          <th className="py-2 pr-4 font-medium">Document</th>
-          <th className="py-2 pr-4 font-medium">Status</th>
-          <th className="py-2 font-medium">Notes</th>
+          <th className="py-2 pr-4 font-medium">{m.pca_docreview_col_document()}</th>
+          <th className="py-2 pr-4 font-medium">{m.pca_docreview_col_status()}</th>
+          <th className="py-2 font-medium">{m.pca_docreview_col_notes()}</th>
         </tr>
       </thead>
       <tbody>
         {items.map((item) => {
           const notProvided = item.requested && !item.received && !item.na;
           const status = item.na
-            ? "Not applicable"
+            ? m.pca_docreview_status_na()
             : item.received
               ? item.reviewed
-                ? "Received & reviewed"
-                : "Received"
+                ? m.pca_docreview_status_received_reviewed()
+                : m.pca_docreview_status_received()
               : item.requested
-                ? "Requested"
-                : "Not requested";
+                ? m.pca_docreview_status_requested()
+                : m.pca_docreview_status_not_requested();
           return (
             <tr key={item.documentKey} className="border-b border-ih-border last:border-0 text-ih-fg-1">
               <td className="py-2 pr-4">{item.label}</td>
@@ -38,7 +39,7 @@ export function DocumentReviewTable({ items }: { items: DocReviewView[] }) {
                 {status}
                 {notProvided ? (
                   <span className="ml-2 rounded bg-ih-bad-bg px-2 py-0.5 text-xs font-medium text-ih-bad-fg">
-                    not provided (limitation)
+                    {m.pca_docreview_limitation_badge()}
                   </span>
                 ) : null}
               </td>

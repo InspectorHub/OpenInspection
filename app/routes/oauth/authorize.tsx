@@ -15,9 +15,10 @@ import {
   selectedScopesFromForm,
   type ModuleGroup,
 } from "../../../server/lib/mcp/tag-catalog";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Authorize access - OpenInspection" }];
+  return [{ title: m.oauth_authorize_meta_title() }];
 }
 
 /**
@@ -143,7 +144,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // field so the action can complete authorization without re-parsing.
   const authReq = await env.OAUTH_PROVIDER.parseAuthRequest(request);
   const client = await env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
-  const clientName = client?.clientName?.trim() || "An application";
+  const clientName = client?.clientName?.trim() || m.oauth_authorize_client_fallback();
 
   return {
     clientName,
@@ -177,7 +178,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   // The clientName/redirectUri both derive from the (untrusted) hidden field, so
   // resolve the REGISTERED client once and validate against it.
   const client = await env.OAUTH_PROVIDER.lookupClient(authReq.clientId);
-  const clientName = client?.clientName?.trim() || "An application";
+  const clientName = client?.clientName?.trim() || m.oauth_authorize_client_fallback();
 
   // Cancel => bounce back to the client's redirect_uri with an OAuth error
   // (RFC 6749 §4.1.2.1) — but ONLY if that redirect_uri is registered to the
@@ -279,12 +280,10 @@ export function ConsentForm({
         </div>
 
         <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">
-          Authorize access
+          {m.oauth_authorize_heading()}
         </h1>
         <p className="text-sm text-ih-fg-3 mb-6">
-          <span className="font-semibold text-ih-fg-1">{clientName}</span> wants to
-          access your OpenInspection data. Choose what it can read and change, then
-          authorize.
+          <span className="font-semibold text-ih-fg-1">{clientName}</span> {m.oauth_authorize_intro()}
         </p>
 
         <form method="post" className="space-y-5">
@@ -292,7 +291,7 @@ export function ConsentForm({
 
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wide text-ih-fg-3">
-              Modules
+              {m.oauth_authorize_modules()}
             </span>
             <div className="flex items-center gap-3 text-xs">
               <button
@@ -300,23 +299,23 @@ export function ConsentForm({
                 onClick={selectAllRead}
                 className="font-semibold text-ih-primary hover:underline"
               >
-                Select all read
+                {m.oauth_authorize_select_all_read()}
               </button>
               <button
                 type="button"
                 onClick={clearAll}
                 className="font-semibold text-ih-fg-3 hover:underline"
               >
-                None
+                {m.oauth_authorize_none()}
               </button>
             </div>
           </div>
 
           <div className="rounded-xl border border-ih-border bg-ih-bg-card divide-y divide-ih-border">
             <div className="grid grid-cols-[1fr_auto_auto] gap-x-6 px-4 py-2 text-xs font-bold uppercase tracking-wide text-ih-fg-3">
-              <span>Module</span>
-              <span className="text-center w-12">Read</span>
-              {canWrite && <span className="text-center w-12">Write</span>}
+              <span>{m.oauth_authorize_col_module()}</span>
+              <span className="text-center w-12">{m.oauth_authorize_col_read()}</span>
+              {canWrite && <span className="text-center w-12">{m.oauth_authorize_col_write()}</span>}
             </div>
             {modules.map((g) => (
               <div
@@ -333,7 +332,7 @@ export function ConsentForm({
                     checked={!!checked[`read:${g.key}`]}
                     onChange={(e) => setRead(g.key, e.target.checked)}
                     className="h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary"
-                    aria-label={`Read ${g.label}`}
+                    aria-label={m.oauth_authorize_aria_read({ module: g.label })}
                   />
                 </label>
                 {canWrite && (
@@ -345,7 +344,7 @@ export function ConsentForm({
                       checked={!!checked[`write:${g.key}`]}
                       onChange={(e) => setWrite(g.key, e.target.checked)}
                       className="h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary"
-                      aria-label={`Write ${g.label}`}
+                      aria-label={m.oauth_authorize_aria_write({ module: g.label })}
                     />
                   </label>
                 )}
@@ -354,8 +353,7 @@ export function ConsentForm({
           </div>
 
           <p className="text-xs text-ih-fg-3">
-            Ticking Write also grants Read. Access is limited to your role and to
-            what {clientName} requested.
+            {m.oauth_authorize_scope_note({ clientName })}
           </p>
 
           <div className="flex items-center gap-3 pt-1">
@@ -365,7 +363,7 @@ export function ConsentForm({
               value="1"
               className="flex-1 py-2.5 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 font-bold text-sm hover:bg-ih-bg-app transition-colors"
             >
-              Cancel
+              {m.common_cancel()}
             </button>
             <button
               type="submit"
@@ -373,7 +371,7 @@ export function ConsentForm({
               disabled={submitting}
               className="flex-1 py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              {submitting ? "Authorizing…" : "Authorize"}
+              {submitting ? m.oauth_authorize_submit_pending() : m.oauth_authorize_submit()}
             </button>
           </div>
         </form>

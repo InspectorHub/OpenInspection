@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { Form } from "react-router";
 import { Pill } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,10 +73,10 @@ function pillToneForStep(s: StepState) {
 }
 
 function stepLabel(s: StepState): string {
-  if (s === "done") return "Approved";
-  if (s === "rejected") return "Rejected";
-  if (s === "pending") return "Pending";
-  return "Not started";
+  if (s === "done") return m.settings_smsdelivery_compliance_approved();
+  if (s === "rejected") return m.settings_smsdelivery_compliance_rejected();
+  if (s === "pending") return m.settings_smsdelivery_compliance_pending();
+  return m.settings_smsdelivery_compliance_not_started();
 }
 
 // Shared field class (mirrors SmsDeliveryPanel raw inputs).
@@ -133,41 +134,41 @@ function StatusTimeline({
   return (
     <div className="space-y-3">
       <h4 className="text-[12px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-        Provisioning status
+        {m.settings_mcw_provisioning_status()}
       </h4>
 
       <ol className="space-y-2">
         <li className="flex items-center gap-3">
           <StepDot state={profileStep} num={1} />
-          <span className="flex-1 text-[13px] text-ih-fg-2">Business profile (TCR)</span>
+          <span className="flex-1 text-[13px] text-ih-fg-2">{m.settings_mcw_step_business_profile()}</span>
           <Pill tone={pillToneForStep(profileStep)} dot>{stepLabel(profileStep)}</Pill>
         </li>
 
         <li className="flex items-center gap-3">
           <StepDot state={brandStep} num={2} />
-          <span className="flex-1 text-[13px] text-ih-fg-2">Brand registration (10DLC)</span>
+          <span className="flex-1 text-[13px] text-ih-fg-2">{m.settings_mcw_step_brand()}</span>
           <Pill tone={pillToneForStep(brandStep)} dot>{stepLabel(brandStep)}</Pill>
         </li>
 
         {campaignStatus !== null ? (
           <li className="flex items-center gap-3">
             <StepDot state={campaignStep} num={3} />
-            <span className="flex-1 text-[13px] text-ih-fg-2">Campaign registration (10DLC)</span>
+            <span className="flex-1 text-[13px] text-ih-fg-2">{m.settings_mcw_step_campaign()}</span>
             <Pill tone={pillToneForStep(campaignStep)} dot>{stepLabel(campaignStep)}</Pill>
           </li>
         ) : tfvStatus !== null ? (
           <li className="flex items-center gap-3">
             <StepDot state={tfvStep} num={3} />
-            <span className="flex-1 text-[13px] text-ih-fg-2">Toll-free verification (TFV)</span>
+            <span className="flex-1 text-[13px] text-ih-fg-2">{m.settings_mcw_step_tfv()}</span>
             <Pill tone={pillToneForStep(tfvStep)} dot>{stepLabel(tfvStep)}</Pill>
           </li>
         ) : null}
 
         <li className="flex items-center gap-3">
           <StepDot state={approvedStep} num={4} />
-          <span className="flex-1 text-[13px] text-ih-fg-2">Number active</span>
+          <span className="flex-1 text-[13px] text-ih-fg-2">{m.settings_mcw_step_number_active()}</span>
           <Pill tone={approvedStep === "done" ? "sat" : "neutral"} dot>
-            {approvedStep === "done" ? "Active" : "Waiting"}
+            {approvedStep === "done" ? m.settings_discount_active() : m.settings_mcw_waiting()}
           </Pill>
         </li>
       </ol>
@@ -175,19 +176,19 @@ function StatusTimeline({
       {/* Provisioned number */}
       {provisionedNumber && (
         <p className="text-[12px] text-ih-ok-fg font-medium">
-          Provisioned number: <span className="font-bold">{provisionedNumber}</span>
+          {m.settings_mcw_provisioned_number()} <span className="font-bold">{provisionedNumber}</span>
         </p>
       )}
 
       {/* Rejection notice */}
       {isRejected && (
         <div className="rounded-md bg-ih-bad-bg border border-ih-bad/30 p-3 space-y-2">
-          <p className="text-[13px] font-bold text-ih-bad-fg">Registration rejected</p>
+          <p className="text-[13px] font-bold text-ih-bad-fg">{m.settings_mcw_registration_rejected()}</p>
           {rejectionReason && (
             <p className="text-[12px] text-ih-bad-fg">{rejectionReason}</p>
           )}
           <p className="text-[11px] text-ih-fg-3">
-            Correct the issue above, update your business info below, and click &ldquo;Fix &amp; resubmit&rdquo;.
+            {m.settings_mcw_rejection_note()}
           </p>
         </div>
       )}
@@ -196,7 +197,7 @@ function StatusTimeline({
       {complianceStatus === "approved" && (
         <div className="rounded-md bg-ih-ok-bg border border-ih-ok/30 p-3">
           <p className="text-[13px] font-bold text-ih-ok-fg">
-            Managed SMS is active and ready to send.
+            {m.settings_mcw_active_banner()}
           </p>
         </div>
       )}
@@ -207,7 +208,7 @@ function StatusTimeline({
         complianceStatus === "campaign_pending" ||
         complianceStatus === "tfv_pending") && (
         <p className="text-[12px] text-ih-watch-fg">
-          Registration is in progress. Twilio typically completes this within 1–5 business days.
+          {m.settings_mcw_in_progress()}
         </p>
       )}
 
@@ -222,7 +223,7 @@ function StatusTimeline({
             disabled={saving}
             className="h-8 px-4 rounded-md bg-ih-bad text-ih-fg-inverse font-bold text-[13px] hover:opacity-90 transition-opacity disabled:opacity-60"
           >
-            {saving ? "Resubmitting…" : "Fix & resubmit"}
+            {saving ? m.settings_mcw_resubmitting() : m.settings_mcw_fix_resubmit()}
           </button>
         </div>
       )}
@@ -283,7 +284,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
         <input type="hidden" name="intent" value="save-managed-provider" />
         <input type="hidden" name="managedProvider" value={carrier} />
         <div className="space-y-1.5">
-          <p className={labelCls} id="managed-carrier-label">Managed carrier</p>
+          <p className={labelCls} id="managed-carrier-label">{m.settings_mcw_managed_carrier()}</p>
           <div className="flex gap-2" role="group" aria-labelledby="managed-carrier-label">
             <button
               type="button"
@@ -295,7 +296,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
                   : "border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-primary/40"
               }`}
             >
-              Twilio
+              {m.settings_sms_provider_twilio()}
             </button>
             <button
               type="button"
@@ -307,11 +308,11 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
                   : "border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-primary/40"
               }`}
             >
-              Telnyx
+              {m.settings_sms_provider_telnyx()}
             </button>
           </div>
           <p className="text-[11px] text-ih-fg-4">
-            Which carrier provisions and manages this tenant&rsquo;s dedicated number.
+            {m.settings_mcw_carrier_note()}
           </p>
         </div>
         <div className="flex justify-end">
@@ -320,7 +321,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
             disabled={savingManagedProvider}
             className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
           >
-            {savingManagedProvider ? "Saving…" : "Save carrier"}
+            {savingManagedProvider ? m.common_saving() : m.settings_mcw_save_carrier()}
           </button>
         </div>
       </Form>
@@ -341,16 +342,15 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
           <input type="hidden" name="intent" value="sms-compliance-provision" />
 
           <h4 className="text-[12px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-            {isRejected ? "Update business information" : "Business information"}
+            {isRejected ? m.settings_mcw_update_business_info() : m.settings_mcw_business_info()}
           </h4>
           <p className="text-[12px] text-ih-fg-3">
-            Required for 10DLC brand/campaign registration or toll-free verification.
-            Submitted directly to The Campaign Registry (TCR) or Twilio.
+            {m.settings_mcw_business_info_desc()}
           </p>
 
           {/* Channel selector */}
           <div className="space-y-2">
-            <p className={labelCls}>Registration channel</p>
+            <p className={labelCls}>{m.settings_mcw_registration_channel()}</p>
             <div className="flex flex-col gap-2">
               <label
                 className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
@@ -368,9 +368,9 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
                   className="mt-0.5 accent-ih-primary"
                 />
                 <span className="flex-1 min-w-0">
-                  <span className="block text-[13px] font-bold text-ih-fg-1">Local 10DLC number</span>
+                  <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_mcw_channel_10dlc_label()}</span>
                   <span className="block text-[11px] text-ih-fg-3 mt-0.5">
-                    Dedicated local number via brand + campaign (TCR). Best for high-volume A2P.
+                    {m.settings_mcw_channel_10dlc_desc()}
                   </span>
                 </span>
               </label>
@@ -390,9 +390,9 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
                   className="mt-0.5 accent-ih-primary"
                 />
                 <span className="flex-1 min-w-0">
-                  <span className="block text-[13px] font-bold text-ih-fg-1">Toll-free number (TFV)</span>
+                  <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_mcw_channel_tollfree_label()}</span>
                   <span className="block text-[11px] text-ih-fg-3 mt-0.5">
-                    800-series number with toll-free verification. Simpler approval, lower throughput.
+                    {m.settings_mcw_channel_tollfree_desc()}
                   </span>
                 </span>
               </label>
@@ -402,14 +402,14 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
           {/* Fields: legal name + rep */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="mcw-legalName" className={labelCls}>Legal business name *</label>
+              <label htmlFor="mcw-legalName" className={labelCls}>{m.settings_mcw_legal_name_label()}</label>
               <input
                 id="mcw-legalName"
                 name="legalName"
                 type="text"
                 value={fields.legalName}
                 onChange={onChange("legalName")}
-                placeholder="Acme Inspection LLC"
+                placeholder={m.settings_mcw_legal_name_placeholder()}
                 autoComplete="organization"
                 className={`${inputCls}${fieldError("legalName") ? " border-ih-bad" : ""}`}
               />
@@ -418,14 +418,14 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
               )}
             </div>
             <div>
-              <label htmlFor="mcw-repName" className={labelCls}>Authorized representative *</label>
+              <label htmlFor="mcw-repName" className={labelCls}>{m.settings_mcw_rep_name_label()}</label>
               <input
                 id="mcw-repName"
                 name="repName"
                 type="text"
                 value={fields.repName}
                 onChange={onChange("repName")}
-                placeholder="Jane Smith"
+                placeholder={m.settings_mcw_rep_name_placeholder()}
                 autoComplete="name"
                 className={`${inputCls}${fieldError("repName") ? " border-ih-bad" : ""}`}
               />
@@ -438,7 +438,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
           {/* Address */}
           <div>
             <label htmlFor="mcw-address" className={labelCls}>
-              Business address (street, city, state, ZIP) *
+              {m.settings_mcw_address_label()}
             </label>
             <input
               id="mcw-address"
@@ -446,7 +446,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
               type="text"
               value={fields.address}
               onChange={onChange("address")}
-              placeholder="123 Main St, Springfield, IL 62701"
+              placeholder={m.settings_mcw_address_placeholder()}
               autoComplete="street-address"
               className={`${inputCls}${fieldError("address") ? " border-ih-bad" : ""}`}
             />
@@ -458,14 +458,14 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
           {/* Email + area code */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label htmlFor="mcw-email" className={labelCls}>Contact email</label>
+              <label htmlFor="mcw-email" className={labelCls}>{m.settings_mcw_email_label()}</label>
               <input
                 id="mcw-email"
                 name="email"
                 type="email"
                 value={fields.email}
                 onChange={onChange("email")}
-                placeholder="compliance@acme.com"
+                placeholder={m.settings_mcw_email_placeholder()}
                 autoComplete="email"
                 className={`${inputCls}${fieldError("email") ? " border-ih-bad" : ""}`}
               />
@@ -474,7 +474,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
               )}
             </div>
             <div>
-              <label htmlFor="mcw-areaCode" className={labelCls}>Preferred area code (optional)</label>
+              <label htmlFor="mcw-areaCode" className={labelCls}>{m.settings_mcw_areacode_label()}</label>
               <input
                 id="mcw-areaCode"
                 name="areaCode"
@@ -485,7 +485,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
                 className={inputCls}
               />
               <p className="text-[11px] text-ih-fg-4 mt-1">
-                3-digit area code for number search. Leave blank for any.
+                {m.settings_mcw_areacode_hint()}
               </p>
             </div>
           </div>
@@ -503,7 +503,7 @@ export function ManagedComplianceWizard({ compliance, managedProvider, savingMan
               disabled={saving}
               className="h-8 px-4 rounded-md bg-ih-primary text-ih-fg-inverse font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
             >
-              {saving ? "Submitting…" : "Start provisioning"}
+              {saving ? m.settings_mcw_submitting() : m.settings_mcw_start_provisioning()}
             </button>
           </div>
         </Form>

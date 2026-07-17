@@ -75,9 +75,10 @@ import { CostItemsHost } from "~/components/editor/CostItemsHost";
 import type { ResultMap } from "~/hooks/useInspection";
 import type { PublishReadiness, PublishBlockingDefect } from "~/lib/types";
 import { Button, IconButton, SegmentedControl } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
- return [{ title: "Edit Inspection - OpenInspection" }];
+ return [{ title: m.editor_route_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -851,7 +852,7 @@ export default function InspectionEditPage() {
  if (failed) {
  state.setSaveStatus("error");
  pushToast({
- message: "Save failed — your last change did NOT reach the server.",
+ message: m.editor_route_save_failed(),
 				variant: "error",
  durationMs: 8000,
  });
@@ -916,7 +917,7 @@ export default function InspectionEditPage() {
  setTimeout(
  () => state.advanceToNextUnrated((newSectionTitle: string) => {
  pushToast({
- message: `Entered next section: ${newSectionTitle}`,
+ message: m.editor_route_entered_next_section({ section: newSectionTitle }),
  durationMs: 2500,
  });
  }),
@@ -1111,7 +1112,7 @@ export default function InspectionEditPage() {
 
  if (overflow) {
   pushToast({
-  message: "Added the first 20 photos; add the rest in another batch.",
+  message: m.editor_route_photos_batch_capped(),
   variant: "warning",
   durationMs: 6000,
   });
@@ -1192,13 +1193,13 @@ export default function InspectionEditPage() {
  const failCount = total - successCount;
  if (failCount > 0) {
  pushToast({
- message: `${successCount} of ${total} photos uploaded — ${failCount} failed.`,
+ message: m.editor_route_photos_partial_upload({ success: successCount, total, failed: failCount }),
  variant: "error",
  durationMs: 8000,
  });
  } else {
  pushToast({
- message: `${successCount} photo${successCount === 1 ? "" : "s"} added${d.targetType === "defect" ? " to defect" : ""}`,
+ message: m.editor_route_photos_added({ count: successCount, s: successCount === 1 ? "" : "s", toDefect: d.targetType === "defect" ? " to defect" : "" }),
  variant: "success",
  durationMs: 2000,
  });
@@ -1207,7 +1208,7 @@ export default function InspectionEditPage() {
  // Fallback for a response shape without results[] (e.g. an older/other
  // action path) — preserves the pre-Task-16 generic failure toast.
  pushToast({
- message: "Photo upload failed — your photo did NOT reach the server.",
+ message: m.editor_route_photo_upload_failed(),
  variant: "error",
  durationMs: 8000,
  });
@@ -1572,7 +1573,7 @@ export default function InspectionEditPage() {
  undefined,
  (state.activeItem?.label || state.activeItem?.name || undefined) as string | undefined,
  ).then((ok) => {
- if (!ok) pushToast({ message: "Saved the defect, but the library copy failed — try again from Notes › Save as snippet.", variant: "warning", durationMs: 6000 });
+ if (!ok) pushToast({ message: m.editor_route_defect_library_copy_failed(), variant: "warning", durationMs: 6000 });
  });
  }}
  queuedPreviews={[]}
@@ -1598,10 +1599,10 @@ export default function InspectionEditPage() {
  <div className="flex items-center justify-center h-full text-ih-fg-4">
  <div className="text-center">
  <p className="text-[13px]">
- Select an item from the list to start editing
+ {m.editor_route_select_item_hint()}
  </p>
  <p className="text-[11px] mt-2 text-ih-fg-4">
- Press <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">J</kbd> / <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">K</kbd> to navigate
+ {m.editor_route_navigate_hint_press()} <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">J</kbd> / <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border">K</kbd> {m.editor_route_navigate_hint_navigate()}
  </p>
  </div>
  </div>
@@ -1637,13 +1638,13 @@ export default function InspectionEditPage() {
   * InspectionSettingsSheet where the user can pick a template. */
  const emptyTemplateEl = state.sections.length === 0 ? (
  <div className="flex flex-col items-center justify-center h-full gap-4 text-center px-6">
-  <p className="text-[15px] font-semibold text-ih-fg-1">This inspection has no template content</p>
-  <p className="text-[13px] text-ih-fg-3 max-w-sm">Apply a template to get sections, items and canned comments — or import your Spectora template.</p>
+  <p className="text-[15px] font-semibold text-ih-fg-1">{m.editor_route_empty_template_title()}</p>
+  <p className="text-[13px] text-ih-fg-3 max-w-sm">{m.editor_route_empty_template_desc()}</p>
   <Button
   variant="primary"
   onClick={() => state.setSettingsOpen(true)}
   >
-  Choose a template
+  {m.editor_route_choose_template()}
   </Button>
  </div>
  ) : null;
@@ -1729,7 +1730,7 @@ export default function InspectionEditPage() {
  {addMediaOverlaysEl}
  <MobileAppBar
  sectionTitle={state.currentSection?.title ?? ''}
- itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? 'Select an item'}
+ itemLabel={((state.activeItem?.label || state.activeItem?.name) as string | undefined) ?? m.editor_route_select_an_item()}
  onBack={() => {
   // B-22: back from item editor → item list; back from list → inspections
   if (state.activeItemId) { state.setActiveItemId(null); return; }
@@ -1741,28 +1742,28 @@ export default function InspectionEditPage() {
  {emptyTemplateEl ?? (state.activeItemId ? (
   itemEditorEl
  ) : (
-  <p className="text-center text-ih-fg-3 mt-12">Tap [☰ Sections] below to begin</p>
+  <p className="text-center text-ih-fg-3 mt-12">{m.editor_route_mobile_begin()}</p>
  ))}
  </main>
  <MobileDrawerTriggers onOpen={(id) => setMobileDrawer(id)} />
  <MobileBottomDrawer
  open={mobileDrawer === 'sections'}
  onClose={() => setMobileDrawer(null)}
- title="Sections"
+ title={m.editor_route_drawer_sections()}
  >
  {sectionRailEl}
  </MobileBottomDrawer>
  <MobileBottomDrawer
  open={mobileDrawer === 'items'}
  onClose={() => setMobileDrawer(null)}
- title="Items"
+ title={m.editor_route_drawer_items()}
  >
  {itemListEl}
  </MobileBottomDrawer>
  <MobileBottomDrawer
  open={mobileDrawer === 'preview'}
  onClose={() => setMobileDrawer(null)}
- title="Preview"
+ title={m.editor_route_drawer_preview()}
  >
  {sideRailEl}
  </MobileBottomDrawer>
@@ -1901,8 +1902,8 @@ export default function InspectionEditPage() {
  <PhotoCropper
   sourceUrl={fullResUrl(photoCropTarget.sourceUrl)}
   allowFree
-  title="Crop photo"
-  saveLabel="Save crop"
+  title={m.editor_route_crop_photo()}
+  saveLabel={m.editor_route_save_crop()}
   onCancel={() => setPhotoCropTarget(null)}
   onSave={(blob, crop) => {
    const target = photoCropTarget;
@@ -2133,28 +2134,28 @@ export default function InspectionEditPage() {
      size="sm"
      onClick={() => setUnitsManagerOpen(true)}
      className="hidden lg:inline-flex"
-     title="Manage units"
+     title={m.editor_route_manage_units()}
      icon={
       <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
       </svg>
      }
     >
-     Units
+     {m.editor_route_units()}
     </Button>
     <Button
      variant="secondary"
      size="sm"
      onClick={() => setCostItemsOpen(true)}
      className="hidden lg:inline-flex"
-     title="Cost items"
+     title={m.editor_route_cost_items_title()}
      icon={
       <svg className="w-3.5 h-3.5 text-ih-fg-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.66 0-3 .9-3 2s1.34 2 3 2 3 .9 3 2-1.34 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V6m0 12v-2m0-10a4 4 0 100 8 4 4 0 000-8z" />
       </svg>
      }
     >
-     Cost Items
+     {m.editor_route_cost_items()}
     </Button>
    </div>
   ) : undefined
@@ -2199,14 +2200,14 @@ export default function InspectionEditPage() {
  {/* Item filter tabs */}
  <div className="flex items-center gap-1 px-3 py-1.5 border-b border-ih-border">
  <SegmentedControl
- ariaLabel="Item filter"
+ ariaLabel={m.editor_route_item_filter()}
  value={state.itemFilter}
  onChange={(v) => state.setItemFilter(v as ItemFilter)}
  options={(["all", "unrated", "issues", "flagged"] as const).map((f) => ({
  value: f,
  label: (
  <>
- {f === "all" ? "All" : f === "unrated" ? "Unrated" : f === "issues" ? "Issues" : "Flagged"}
+ {f === "all" ? m.editor_route_filter_all() : f === "unrated" ? m.editor_route_filter_unrated() : f === "issues" ? m.editor_route_filter_issues() : m.editor_route_filter_flagged()}
  {f !== "all" && (
  <span className="ml-1 text-[10px]">
  {f === "unrated" ? state.filterCounts.unrated : f === "issues" ? state.filterCounts.issues : state.filterCounts.flagged}
@@ -2230,8 +2231,8 @@ export default function InspectionEditPage() {
  selected={state.batchMode}
  size="sm"
  className="ml-auto"
- title={state.batchMode ? "Exit batch mode" : "Batch mode (B)"}
- aria-label={state.batchMode ? "Exit batch mode" : "Batch select items"}
+ title={state.batchMode ? m.editor_route_exit_batch_mode() : m.editor_route_batch_mode()}
+ aria-label={state.batchMode ? m.editor_route_exit_batch_mode() : m.editor_route_batch_select_items()}
  >
  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -2324,10 +2325,10 @@ export default function InspectionEditPage() {
   state.sideRailCollapsed ? (
   <div className="w-8 flex-shrink-0 border-l border-ih-border flex flex-col items-center pt-3">
    <IconButton
-   aria-label="Expand photo rail"
+   aria-label={m.editor_route_expand_photo_rail()}
    onClick={() => state.setSideRailCollapsed(false)}
    size="sm"
-   title="Expand photo rail"
+   title={m.editor_route_expand_photo_rail()}
    >
    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -2337,11 +2338,11 @@ export default function InspectionEditPage() {
   ) : (
   <div className="relative flex-shrink-0">
    <IconButton
-   aria-label="Collapse photo rail"
+   aria-label={m.editor_route_collapse_photo_rail()}
    onClick={() => state.setSideRailCollapsed(true)}
    size="sm"
    className="absolute top-3 left-1 z-10 w-6 h-6"
-   title="Collapse photo rail"
+   title={m.editor_route_collapse_photo_rail()}
    >
    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -2375,8 +2376,8 @@ export default function InspectionEditPage() {
    findings.batchSetRating(sectionId, state.currentSectionItems, state.batchSelected, levelId);
    const label = state.ratingLevels.find((l) => l.id === levelId)?.label ?? levelId;
    pushToast({
-    message: `Rated ${selectedIds.length} item${selectedIds.length === 1 ? '' : 's'} as ${label}`,
-    actionLabel: 'Undo',
+    message: m.editor_route_batch_rated({ count: selectedIds.length, s: selectedIds.length === 1 ? '' : 's', label }),
+    actionLabel: m.common_undo(),
     durationMs: 6000,
     onAction: () => {
      for (const { itemId, prior: p } of prior) {

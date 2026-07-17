@@ -1,46 +1,46 @@
 import { useEffect } from "react";
 import { IconButton } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface ShortcutColumn {
   title: string;
   rows: { key: string; label: string }[];
 }
 
-const COLUMNS: ShortcutColumn[] = [
-  { title: "Navigate", rows: [
-    { key: "Up/Down", label: "Next / previous item" },
-    { key: "Enter",   label: "Next item" },
-    { key: "Shift+Enter", label: "Previous item" },
-    { key: "GS",   label: "Jump to section" },
-    { key: "Cmd+K", label: "Command palette" },
-    { key: "Ctrl+/", label: "Command palette (Win)" },
-  ]},
-  { title: "Rating", rows: [
-    { key: "1", label: "Satisfactory" },
-    { key: "2", label: "Monitor" },
-    { key: "3", label: "Defect" },
-    { key: "4", label: "Not Inspected" },
-    { key: "5", label: "Not Present" },
-    { key: "0", label: "Clear rating" },
-    { key: "N", label: "Mark Not Applicable" },
-  ]},
-  { title: "Content", rows: [
-    { key: "/", label: "Open Comment Library" },
-    { key: ";", label: "Insert snippet" },
-    { key: "P", label: "Add photo" },
-    { key: "T", label: "Add tag" },
-    { key: "Cmd+D", label: "Save current as snippet" },
-  ]},
-  { title: "View", rows: [
-    { key: "Cmd+1", label: "Three-pane layout" },
-    { key: "Cmd+2", label: "Focus mode" },
-    { key: "Cmd+3", label: "Preview" },
-    { key: "Cmd+S", label: "Save" },
-    { key: "Cmd+Shift+P", label: "Publish" },
-  ]},
-];
-
 export function KeyboardHud({ onClose }: { onClose: () => void }) {
+  const COLUMNS: ShortcutColumn[] = [
+    { title: m.editor_hud_col_navigate(), rows: [
+      { key: "Up/Down", label: m.editor_hud_nav_prev_next() },
+      { key: "Enter",   label: m.editor_hud_nav_next() },
+      { key: "Shift+Enter", label: m.editor_hud_nav_prev() },
+      { key: "GS",   label: m.editor_hud_nav_section() },
+      { key: "Cmd+K", label: m.editor_hud_nav_palette() },
+      { key: "Ctrl+/", label: m.editor_hud_nav_palette_win() },
+    ]},
+    { title: m.editor_hud_col_rating(), rows: [
+      { key: "1", label: m.editor_hud_rate_satisfactory() },
+      { key: "2", label: m.editor_hud_rate_monitor() },
+      { key: "3", label: m.editor_hud_rate_defect() },
+      { key: "4", label: m.editor_hud_rate_not_inspected() },
+      { key: "5", label: m.editor_hud_rate_not_present() },
+      { key: "0", label: m.editor_hud_rate_clear() },
+      { key: "N", label: m.editor_hud_rate_na() },
+    ]},
+    { title: m.editor_hud_col_content(), rows: [
+      { key: "/", label: m.editor_hud_content_library() },
+      { key: ";", label: m.editor_hud_content_snippet() },
+      { key: "P", label: m.editor_item_add_photo() },
+      { key: "T", label: m.editor_hud_content_tag() },
+      { key: "Cmd+D", label: m.editor_hud_content_save_snippet() },
+    ]},
+    { title: m.editor_hud_col_view(), rows: [
+      { key: "Cmd+1", label: m.editor_hud_view_three_pane() },
+      { key: "Cmd+2", label: m.editor_hud_view_focus() },
+      { key: "Cmd+3", label: m.editor_header_preview() },
+      { key: "Cmd+S", label: m.common_save() },
+      { key: "Cmd+Shift+P", label: m.editor_header_publish() },
+    ]},
+  ];
   // The editor mounts this only while the cheatsheet is toggled on — that state
   // lives in the parent, and the `?` hotkey (useKeyboard) flips it — so the
   // overlay renders as soon as it mounts and closes via `onClose` (Esc, backdrop
@@ -56,15 +56,15 @@ export function KeyboardHud({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="hidden md:flex fixed inset-0 z-[9999] items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+    <div className="hidden md:flex fixed inset-0 z-[9999] items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={m.editor_shortcuts_heading()}>
       <div className="absolute inset-0 bg-ih-backdrop" onClick={onClose} />
       <div className="relative bg-ih-bg-card rounded-lg shadow-ih-popover border border-ih-border max-w-4xl w-full max-h-[85vh] overflow-y-auto">
         <header className="px-6 py-4 border-b border-ih-border flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-ih-fg-1">Keyboard shortcuts</h2>
-            <p className="text-xs text-ih-fg-3 mt-0.5">Press <kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">?</kbd> to toggle, <kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">Esc</kbd> to close</p>
+            <h2 className="text-base font-bold text-ih-fg-1">{m.editor_shortcuts_heading()}</h2>
+            <p className="text-xs text-ih-fg-3 mt-0.5">{m.editor_hud_press()}<kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">?</kbd>{m.editor_hud_toggle()}<kbd className="px-1.5 py-0.5 bg-ih-bg-muted border border-ih-border rounded text-[10px] font-mono">Esc</kbd>{m.editor_hud_close()}</p>
           </div>
-          <IconButton onClick={onClose} aria-label="Close" size="sm">&times;</IconButton>
+          <IconButton onClick={onClose} aria-label={m.common_close()} size="sm">&times;</IconButton>
         </header>
         <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {COLUMNS.map((col) => (
@@ -82,7 +82,7 @@ export function KeyboardHud({ onClose }: { onClose: () => void }) {
           ))}
         </div>
         <footer className="px-6 py-3 border-t border-ih-border text-[10px] text-ih-fg-4 italic">
-          Shortcuts marked with Cmd require platform meta key on Mac. Some shortcuts may be inactive until that feature ships.
+          {m.editor_hud_footer()}
         </footer>
       </div>
     </div>

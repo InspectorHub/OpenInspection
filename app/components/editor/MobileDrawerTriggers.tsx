@@ -1,3 +1,5 @@
+import { m } from "~/paraglide/messages";
+
 export type MobileDrawerId = 'sections' | 'items' | 'preview';
 
 export interface MobileDrawerTriggersProps {
@@ -13,9 +15,9 @@ export function MobileDrawerTriggers({ onOpen }: MobileDrawerTriggersProps) {
     return (
         <nav className="fixed left-0 right-0 bottom-0 z-30 h-14 bg-ih-bg-card border-t border-ih-border flex">
             {([
-                { id: 'sections', label: 'Sections', icon: '☰' },
-                { id: 'items',    label: 'Items',    icon: '≣' },
-                { id: 'preview',  label: 'Preview',  icon: '👁' },
+                { id: 'sections', label: m.editor_mobile_drawer_sections(), icon: '☰' },
+                { id: 'items',    label: m.editor_mobile_drawer_items(),    icon: '≣' },
+                { id: 'preview',  label: m.editor_header_preview(),  icon: '👁' },
             ] as const).map(t => (
                 <button
                     key={t.id}

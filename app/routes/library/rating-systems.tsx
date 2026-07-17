@@ -8,9 +8,10 @@ import { Breadcrumb } from "~/components/Breadcrumb";
 import { RatingSystemEditor, type EditorSystem } from "~/components/RatingSystemEditor";
 import type { Severity } from "~/lib/severity";
 import { SEVERITY_LABEL } from "~/lib/severity";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Rating Systems - OpenInspection" }];
+  return [{ title: m.library_rating_meta_title() }];
 }
 
 type Level = { id: string; abbreviation: string; label: string; color: string; severity: Severity; isDefect?: boolean; pausesAdvance?: boolean; hotkey?: string; order?: number };
@@ -43,7 +44,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "save") {
     const id = form.get("id") ? String(form.get("id")) : null;
     let levels: unknown;
-    try { levels = JSON.parse(String(form.get("levels") || "[]")); } catch { return { ok: false, error: "Invalid levels" }; }
+    try { levels = JSON.parse(String(form.get("levels") || "[]")); } catch { return { ok: false, error: m.library_rating_err_invalid_levels() }; }
     const json = {
       name: String(form.get("name") || ""),
       slug: String(form.get("slug") || ""),
@@ -56,7 +57,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       : await api.ratingSystems.index.$post({ json });
     if (!res.ok) {
       const errBody = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-      return { ok: false, error: errBody?.error?.message || "Failed to save rating system" };
+      return { ok: false, error: errBody?.error?.message || m.library_rating_err_save_failed() };
     }
     return { ok: true, intent: "save" as const };
   }
@@ -103,18 +104,18 @@ export default function RatingSystemsPage() {
 
   return (
     <div className="space-y-ih-list">
-      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Rating Systems" }]} />
+      <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_rating_heading() }]} />
       <PageHeader
-        title="Rating Systems"
-        meta={`${systems.length} ${systems.length === 1 ? "system" : "systems"}`}
-        actions={<Button variant="primary" onClick={openNew}>+ New rating system</Button>}
+        title={m.library_rating_heading()}
+        meta={systems.length === 1 ? m.library_rating_meta_one({ count: systems.length }) : m.library_rating_meta_other({ count: systems.length })}
+        actions={<Button variant="primary" onClick={openNew}>{m.library_rating_new()}</Button>}
       />
 
       {systems.length === 0 ? (
         <Card>
           <EmptyState
-            title="No rating systems yet"
-            description='Click "+ New rating system" above to define how items are rated during inspections.'
+            title={m.library_rating_empty_title()}
+            description={m.library_rating_empty_desc()}
           />
         </Card>
       ) : (
@@ -129,7 +130,7 @@ export default function RatingSystemsPage() {
                     <div className="flex items-center gap-2">
                       <p className="text-[13px] font-semibold text-ih-fg-1 truncate">{sys.name}</p>
                       {sys.isDefault && (
-                        <span className="shrink-0 inline-flex items-center h-4 px-1.5 rounded text-[9px] font-bold uppercase tracking-wide bg-ih-primary-tint text-ih-primary">Default</span>
+                        <span className="shrink-0 inline-flex items-center h-4 px-1.5 rounded text-[9px] font-bold uppercase tracking-wide bg-ih-primary-tint text-ih-primary">{m.library_rating_default_badge()}</span>
                       )}
                     </div>
                     {sys.description && (
@@ -138,17 +139,17 @@ export default function RatingSystemsPage() {
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => openEdit(sys)} className="text-[13px] text-ih-primary hover:opacity-80 font-semibold px-1">
-                      Edit
+                      {m.common_edit()}
                     </button>
                     {!sys.isSeed && (
                       confirming ? (
                         <deleteFetcher.Form method="post" onSubmit={() => setConfirmId(null)}>
                           <input type="hidden" name="intent" value="delete" />
                           <input type="hidden" name="id" value={sys.id} />
-                          <button type="submit" className="text-[12px] font-bold text-ih-bad-fg hover:opacity-80 px-1">Confirm?</button>
+                          <button type="submit" className="text-[12px] font-bold text-ih-bad-fg hover:opacity-80 px-1">{m.library_action_confirm()}</button>
                         </deleteFetcher.Form>
                       ) : (
-                        <button onClick={() => setConfirmId(sys.id)} className="text-[13px] text-ih-fg-4 hover:text-ih-bad-fg font-semibold px-1" title="Delete">Delete</button>
+                        <button onClick={() => setConfirmId(sys.id)} className="text-[13px] text-ih-fg-4 hover:text-ih-bad-fg font-semibold px-1" title={m.common_delete()}>{m.common_delete()}</button>
                       )
                     )}
                   </div>

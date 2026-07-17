@@ -6,16 +6,17 @@ import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-services";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { createServiceSchema } from "~/lib/forms/settings.schema";
+import { makeCreateServiceSchema } from "~/lib/forms/settings.schema";
 import { MoneyInput } from "~/components/MoneyInput";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { SCHEDULING_ROLES_SET } from "~/lib/settings/constants";
 import { ServicesCatalogPanel } from "~/components/settings/services/ServicesCatalogPanel";
 import { DiscountCodesPanel } from "~/components/settings/services/DiscountCodesPanel";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Services & Catalog - Settings - OpenInspection" }];
+  return [{ title: m.settings_services_meta_title() }];
 }
 
 interface Service {
@@ -107,7 +108,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
 
   if (intent === "create-service") {
-    const submission = parseWithZod(form, { schema: createServiceSchema });
+    const submission = parseWithZod(form, { schema: makeCreateServiceSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -126,7 +127,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return submission.reply({
-        formErrors: [(err as Record<string, string>)?.message || "Failed to create service."],
+        formErrors: [(err as Record<string, string>)?.message || m.settings_services_error_create_failed()],
       });
     }
     return { ok: true };
@@ -143,7 +144,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     try {
       userIds = JSON.parse(String(form.get("userIds") ?? "[]"));
     } catch {
-      return { ok: false, intent: "qualification-save", message: "Invalid user IDs format." };
+      return { ok: false, intent: "qualification-save", message: m.settings_services_error_invalid_user_ids() };
     }
     const res = await api.services[":id"].inspectors.$put({
       param: { id },
@@ -154,7 +155,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         ok: false,
         intent: "qualification-save",
-        message: (err as Record<string, unknown>)?.message as string | undefined ?? "Failed to save restrictions.",
+        message: (err as Record<string, unknown>)?.message as string | undefined ?? m.settings_services_error_save_restrictions_failed(),
         serviceId: id,
       };
     }
@@ -178,7 +179,7 @@ export default function SettingsServices() {
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: createServiceSchema });
+      return parseWithZod(formData, { schema: makeCreateServiceSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -189,17 +190,17 @@ export default function SettingsServices() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Services & catalog" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_services_crumb() }]} />
 
       <div className="flex items-center justify-between gap-4">
         <p className="text-[13px] text-ih-fg-3">
-          Define the services you offer and their prices, plus discount codes.
+          {m.settings_services_intro()}
         </p>
         <button
           onClick={() => setShowForm(!showForm)}
           className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
         >
-          + Add service
+          {m.settings_services_add_button()}
         </button>
       </div>
 
@@ -215,10 +216,10 @@ export default function SettingsServices() {
           <input type="hidden" name="intent" value="create-service" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div>
-              <label htmlFor={fields.name.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Name</label>
+              <label htmlFor={fields.name.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_name_label()}</label>
               <input
                 type="text" id={fields.name.id} name={fields.name.name}
-                placeholder="e.g., Standard Inspection"
+                placeholder={m.settings_services_name_placeholder()}
                 aria-invalid={fields.name.errors ? true : undefined}
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
@@ -227,10 +228,10 @@ export default function SettingsServices() {
               )}
             </div>
             <div>
-              <label htmlFor={fields.description.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Description</label>
+              <label htmlFor={fields.description.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_description_label()}</label>
               <input
                 type="text" id={fields.description.id} name={fields.description.name}
-                placeholder="Optional details"
+                placeholder={m.settings_services_description_placeholder()}
                 aria-invalid={fields.description.errors ? true : undefined}
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
@@ -239,12 +240,12 @@ export default function SettingsServices() {
               )}
             </div>
             <div>
-              <label htmlFor={fields.price.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Price</label>
+              <label htmlFor={fields.price.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_price_label()}</label>
               <MoneyInput
                 id={fields.price.id}
                 cents={priceCents}
                 onChange={setPriceCents}
-                ariaLabel="Price"
+                ariaLabel={m.settings_services_price_label()}
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
               />
               <input type="hidden" name={fields.price.name} value={priceCents == null ? "" : String(priceCents / 100)} />
@@ -260,10 +261,10 @@ export default function SettingsServices() {
           )}
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => { setShowForm(false); setPriceCents(null); }} className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
-              Cancel
+              {m.common_cancel()}
             </button>
             <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
-              Save
+              {m.common_save()}
             </button>
           </div>
         </Form>

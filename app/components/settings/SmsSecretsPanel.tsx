@@ -4,6 +4,7 @@ import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-communication";
+import { m } from "~/paraglide/messages";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
@@ -60,7 +61,7 @@ export function SmsSecretsPanel({
 
           {/* Provider choice */}
           <div className="space-y-1.5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">SMS provider</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_smssecrets_provider_label()}</p>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -71,7 +72,7 @@ export function SmsSecretsPanel({
                     : "border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-primary/40"
                 }`}
               >
-                Twilio
+                {m.settings_sms_provider_twilio()}
               </button>
               <button
                 type="button"
@@ -82,7 +83,7 @@ export function SmsSecretsPanel({
                     : "border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-primary/40"
                 }`}
               >
-                Telnyx
+                {m.settings_sms_provider_telnyx()}
               </button>
             </div>
           </div>
@@ -91,21 +92,20 @@ export function SmsSecretsPanel({
           {provider === "twilio" && (
             <>
               <p className="text-[13px] text-ih-fg-3">
-                Add your Twilio Account SID, Auth Token, and a sending number. New numbers must be
-                registered for{" "}
-                <a href="https://www.twilio.com/docs/messaging/compliance/a2p-10dlc" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">A2P 10DLC</a>{" "}
-                before they can text US numbers.
+                {m.settings_smssecrets_twilio_intro()}{" "}
+                <a href="https://www.twilio.com/docs/messaging/compliance/a2p-10dlc" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">{m.settings_smssecrets_a2p_link()}</a>{" "}
+                {m.settings_smssecrets_twilio_intro_suffix()}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <SecretField name="TWILIO_ACCOUNT_SID" label="Twilio Account SID"
+                <SecretField name="TWILIO_ACCOUNT_SID" label={m.settings_smssecrets_twilio_sid_label()}
                   value={secrets.TWILIO_ACCOUNT_SID} error={secretFieldError("TWILIO_ACCOUNT_SID")}
-                  hint="Starts with AC, 34 chars. Twilio Console → Account Info" />
-                <SecretField name="TWILIO_AUTH_TOKEN" label="Twilio Auth Token"
+                  hint={m.settings_smssecrets_twilio_sid_hint()} />
+                <SecretField name="TWILIO_AUTH_TOKEN" label={m.settings_smssecrets_twilio_token_label()}
                   value={secrets.TWILIO_AUTH_TOKEN} error={secretFieldError("TWILIO_AUTH_TOKEN")}
-                  hint="Paired with the Account SID. Also verifies inbound STOP/START webhooks." />
-                <SecretField name="TWILIO_FROM_NUMBER" label="Twilio From Number"
+                  hint={m.settings_smssecrets_twilio_token_hint()} />
+                <SecretField name="TWILIO_FROM_NUMBER" label={m.settings_smssecrets_twilio_from_label()}
                   value={secrets.TWILIO_FROM_NUMBER} error={secretFieldError("TWILIO_FROM_NUMBER")}
-                  hint="Your sending number in E.164, e.g. +15551234567" />
+                  hint={m.settings_smssecrets_twilio_from_hint()} />
               </div>
             </>
           )}
@@ -114,20 +114,19 @@ export function SmsSecretsPanel({
           {provider === "telnyx" && (
             <>
               <p className="text-[13px] text-ih-fg-3">
-                Add your Telnyx API key, sending number, and public key. Configure your number in the{" "}
-                <a href="https://portal.telnyx.com/" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">Telnyx Mission Control Portal</a>.
-                Outbound SMS plus inbound STOP/HELP parity are both fully operational once the public key is set.
+                {m.settings_smssecrets_telnyx_intro()}{" "}
+                <a href="https://portal.telnyx.com/" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">{m.settings_smssecrets_telnyx_portal_link()}</a>{m.settings_smssecrets_telnyx_intro_suffix()}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <SecretField name="TELNYX_API_KEY" label="Telnyx API Key"
+                <SecretField name="TELNYX_API_KEY" label={m.settings_smssecrets_telnyx_key_label()}
                   value={secrets.TELNYX_API_KEY} error={secretFieldError("TELNYX_API_KEY")}
-                  hint="Telnyx Mission Control → API Keys. Keep this secret." />
-                <SecretField name="TELNYX_FROM_NUMBER" label="Telnyx From Number"
+                  hint={m.settings_smssecrets_telnyx_key_hint()} />
+                <SecretField name="TELNYX_FROM_NUMBER" label={m.settings_smssecrets_telnyx_from_label()}
                   value={secrets.TELNYX_FROM_NUMBER} error={secretFieldError("TELNYX_FROM_NUMBER")}
-                  hint="Your Telnyx sending number in E.164, e.g. +15551234567" />
-                <SecretField name="TELNYX_PUBLIC_KEY" label="Telnyx Public Key"
+                  hint={m.settings_smssecrets_telnyx_from_hint()} />
+                <SecretField name="TELNYX_PUBLIC_KEY" label={m.settings_smssecrets_telnyx_pubkey_label()}
                   value={secrets.TELNYX_PUBLIC_KEY} error={secretFieldError("TELNYX_PUBLIC_KEY")}
-                  hint="Telnyx Mission Control → your Messaging Profile → Public Key. Used to verify inbound STOP/HELP webhooks." />
+                  hint={m.settings_smssecrets_telnyx_pubkey_hint()} />
               </div>
             </>
           )}
@@ -138,7 +137,7 @@ export function SmsSecretsPanel({
           <div className="flex justify-end pt-3 border-t border-ih-border">
             <button type="submit" disabled={savingSmsSecrets}
               className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
-              {savingSmsSecrets ? "Saving…" : `Save ${provider === "twilio" ? "Twilio" : "Telnyx"} credentials`}
+              {savingSmsSecrets ? m.common_saving() : m.settings_smssecrets_save({ provider: provider === "twilio" ? m.settings_sms_provider_twilio() : m.settings_sms_provider_telnyx() })}
             </button>
           </div>
         </Form>
@@ -146,22 +145,22 @@ export function SmsSecretsPanel({
         {/* Inbound webhook URL (own number / standalone only) */}
         {showInboundUrl && (
           <div className="pt-4 border-t border-ih-border space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Inbound webhook URL</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_smssecrets_inbound_label()}</p>
             <div className="flex items-center gap-2">
               <input
-                type="text" readOnly value={inboundUrl || "Save your company first to see this URL"}
+                type="text" readOnly value={inboundUrl || m.settings_smssecrets_inbound_placeholder()}
                 className="flex-1 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-muted text-[11px] font-mono text-ih-fg-3 outline-none"
               />
               <button type="button" disabled={!inboundUrl}
                 onClick={() => { if (inboundUrl) void navigator.clipboard.writeText(inboundUrl); }}
                 className="h-8 px-3 rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors shrink-0 disabled:opacity-60">
-                Copy
+                {m.common_copy()}
               </button>
             </div>
             <p className="text-[11px] text-ih-fg-4">
               {provider === "telnyx"
-                ? "Paste this into your Telnyx number’s inbound webhook so STOP/HELP replies sync. Set your Public Key above so we can verify these webhooks."
-                : "Paste this into your Twilio number’s Messaging webhook so STOP/START replies sync."}
+                ? m.settings_smssecrets_inbound_note_telnyx()
+                : m.settings_smssecrets_inbound_note_twilio()}
             </p>
           </div>
         )}
@@ -170,7 +169,7 @@ export function SmsSecretsPanel({
         <smsTestFetcher.Form method="post" className="flex flex-wrap items-end gap-3 pt-4 border-t border-ih-border">
           <input type="hidden" name="intent" value="test-sms" />
           <div className="flex-1 min-w-[200px]">
-            <label htmlFor="sms-test-to" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Send test SMS</label>
+            <label htmlFor="sms-test-to" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_smssecrets_test_label()}</label>
             <input
               type="tel" name="to" id="sms-test-to" placeholder="+15551234567"
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
@@ -178,11 +177,11 @@ export function SmsSecretsPanel({
           </div>
           <button type="submit" disabled={smsTestFetcher.state !== "idle"}
             className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
-            {smsTestFetcher.state !== "idle" ? "Sending…" : "Send test"}
+            {smsTestFetcher.state !== "idle" ? m.settings_smssecrets_sending() : m.settings_smssecrets_send_test()}
           </button>
           {smsTestFetcher.data && "intent" in smsTestFetcher.data && smsTestFetcher.data.intent === "test-sms" && "ok" in smsTestFetcher.data && (
             smsTestFetcher.data.ok
-              ? <span className="text-[12px] text-ih-ok-fg">Test message sent.</span>
+              ? <span className="text-[12px] text-ih-ok-fg">{m.settings_smssecrets_test_sent()}</span>
               : <span className="text-[12px] text-ih-bad-fg">{smsTestFetcher.data.error}</span>
           )}
         </smsTestFetcher.Form>

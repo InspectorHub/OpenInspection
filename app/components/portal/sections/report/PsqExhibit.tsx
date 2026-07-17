@@ -1,3 +1,4 @@
+import { m } from "~/paraglide/messages";
 import type { PsqView } from "./types";
 
 /**
@@ -12,9 +13,9 @@ export function PsqExhibit({ psq }: { psq: PsqView | null }) {
   if (psq == null) return null;
   return (
     <section data-pca-psq className="mb-5 print:break-inside-avoid">
-      <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">Appendix E — Property Suitability Questionnaire</h3>
+      <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">{m.pca_psq_title()}</h3>
       {psq.status === "declined" ? (
-        <p className="text-sm text-ih-fg-3">PSQ declined — see Deviations.</p>
+        <p className="text-sm text-ih-fg-3">{m.pca_psq_declined()}</p>
       ) : psq.responses && Object.keys(psq.responses).length > 0 ? (
         <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm text-ih-fg-1">
           {Object.entries(psq.responses).map(([question, answer]) => (
@@ -25,7 +26,7 @@ export function PsqExhibit({ psq }: { psq: PsqView | null }) {
           ))}
         </dl>
       ) : (
-        <p className="text-sm text-ih-fg-3">PSQ sent — response pending.</p>
+        <p className="text-sm text-ih-fg-3">{m.pca_psq_pending()}</p>
       )}
     </section>
   );

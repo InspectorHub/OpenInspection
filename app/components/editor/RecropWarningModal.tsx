@@ -1,4 +1,5 @@
 import { Modal, Button } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export interface RecropWarningModalProps {
  open: boolean;
@@ -11,17 +12,17 @@ export function RecropWarningModal({ open, onCancel, onConfirm }: RecropWarningM
  <Modal
  open={open}
  onClose={onCancel}
- title="Re-crop this photo?"
+ title={m.editor_recrop_title()}
  size="sm"
  footer={
  <>
- <Button variant="ghost" onClick={onCancel}>Cancel</Button>
- <Button variant="danger" onClick={onConfirm}>Crop &amp; clear</Button>
+ <Button variant="ghost" onClick={onCancel}>{m.common_cancel()}</Button>
+ <Button variant="danger" onClick={onConfirm}>{m.editor_recrop_confirm()}</Button>
  </>
  }
  >
  <p className="text-[13px] text-ih-fg-3">
- Re-cropping will remove the existing annotation on this photo (its marks are tied to the previous crop).
+ {m.editor_recrop_body()}
  </p>
  </Modal>
  );

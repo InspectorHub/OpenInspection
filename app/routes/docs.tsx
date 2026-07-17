@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { m } from "~/paraglide/messages";
 
 // API docs (Swagger UI) — was a hono-rendered HTML page at GET /ui; migrated to a
 // React Router route so hono renders no browser pages. The OpenAPI document is
@@ -6,7 +7,7 @@ import { useEffect } from "react";
 // swagger-ui bundle + css are vendored into public/vendor by scripts/vendor-copy.js.
 
 export function meta() {
-  return [{ title: "API Docs - OpenInspection" }];
+  return [{ title: m.docs_meta_title() }];
 }
 
 export function links() {

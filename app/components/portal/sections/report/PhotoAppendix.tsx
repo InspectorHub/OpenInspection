@@ -1,3 +1,4 @@
+import { m } from "~/paraglide/messages";
 import type { AppendixPhoto } from "./types";
 import { printThumbWidth, PRINT_FIGURE_CLASS } from "./types";
 
@@ -18,7 +19,7 @@ export function PhotoAppendix({ photos, isPrint }: { photos: AppendixPhoto[]; is
   return (
     <section className="mt-10 print:break-before-page" aria-labelledby="appendix-b-heading">
       <h2 id="appendix-b-heading" className="mb-4 text-lg font-semibold text-ih-fg-1">
-        Appendix B — Photographs
+        {m.pca_photo_appendix_title()}
       </h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 print:grid-cols-3">
         {photos.map((p) => (
@@ -30,7 +31,7 @@ export function PhotoAppendix({ photos, isPrint }: { photos: AppendixPhoto[]; is
               loading="lazy"
             />
             <figcaption className="mt-1">
-              <span className="font-semibold text-ih-fg-1">Photo {p.photoNo}.</span>{" "}
+              <span className="font-semibold text-ih-fg-1">{m.pca_photo_appendix_photo_no({ n: p.photoNo })}</span>{" "}
               <span className="text-ih-fg-3">{p.caption ?? `${p.sectionTitle} — ${p.itemLabel}`}</span>
             </figcaption>
           </figure>

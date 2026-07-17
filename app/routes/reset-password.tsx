@@ -4,11 +4,12 @@ import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/reset-password";
 import { createApi } from "~/lib/api-client.server";
-import { resetPasswordSchema, PASSWORD_HINT } from "~/lib/forms/auth.schema";
+import { makeResetPasswordSchema, makePasswordHint } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Set a new password - OpenInspection" }];
+  return [{ title: m.auth_reset_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -26,7 +27,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const formData = await request.formData();
   // Token rides as a hidden field (sourced from the loader), NOT a schema field.
   const token = String(formData.get("token") || "");
-  const submission = parseWithZod(formData, { schema: resetPasswordSchema });
+  const submission = parseWithZod(formData, { schema: makeResetPasswordSchema() });
   if (submission.status !== "success") {
     return submission.reply();
   }
@@ -39,12 +40,12 @@ export async function action({ request, context }: Route.ActionArgs) {
       const body = await res.json().catch(() => ({}));
       const message =
         (body as Record<string, Record<string, string>>)?.error?.message ??
-        "This reset link is invalid or has expired. Request a new one.";
+        m.auth_reset_error_invalid_link();
       return submission.reply({ formErrors: [message] });
     }
     return { done: true };
   } catch {
-    return submission.reply({ formErrors: ["Network error — is the API server running?"] });
+    return submission.reply({ formErrors: [m.auth_login_error_network()] });
   }
 }
 
@@ -67,7 +68,7 @@ export default function ResetPasswordPage() {
   const [form, fields] = useForm({
     lastResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: resetPasswordSchema });
+      return parseWithZod(formData, { schema: makeResetPasswordSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -76,14 +77,14 @@ export default function ResetPasswordPage() {
   if (!token) {
     return (
       <AuthShell
-        heading="Reset link invalid"
-        subtitle="This reset link is invalid or has expired. Request a new one."
+        heading={m.auth_reset_invalid_heading()}
+        subtitle={m.auth_reset_error_invalid_link()}
       >
         <a
           href="/forgot-password"
           className="inline-block text-sm font-bold text-ih-primary hover:underline"
         >
-          Request a new link
+          {m.auth_reset_request_new_link()}
         </a>
       </AuthShell>
     );
@@ -92,26 +93,26 @@ export default function ResetPasswordPage() {
   if (done) {
     return (
       <AuthShell
-        heading="Password updated"
-        subtitle="You can now log in with your new password."
+        heading={m.auth_reset_done_heading()}
+        subtitle={m.auth_reset_done_subtitle()}
       >
         <a
           href="/login"
           className="inline-block text-sm font-bold text-ih-primary hover:underline"
         >
-          Go to log in
+          {m.auth_reset_go_to_login()}
         </a>
       </AuthShell>
     );
   }
 
   return (
-    <AuthShell heading="Set a new password">
+    <AuthShell heading={m.auth_reset_heading()}>
       <Form method="post" id={form.id} onSubmit={form.onSubmit} noValidate className="space-y-4">
         <input type="hidden" name="token" value={token} />
         <div>
           <label htmlFor={fields.newPassword.id} className="block text-xs font-bold text-ih-fg-3 mb-1">
-            New password
+            {m.auth_reset_password_label()}
           </label>
           <input
             id={fields.newPassword.id}
@@ -121,7 +122,7 @@ export default function ResetPasswordPage() {
             aria-invalid={fields.newPassword.errors ? true : undefined}
             className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-sm focus:shadow-ih-focus focus:border-ih-primary outline-none"
           />
-          <p className="mt-1 text-xs text-ih-fg-3">{PASSWORD_HINT}</p>
+          <p className="mt-1 text-xs text-ih-fg-3">{makePasswordHint()}</p>
           {fields.newPassword.errors && (
             <p className="mt-1 text-xs text-ih-bad-fg">{fields.newPassword.errors[0]}</p>
           )}
@@ -138,7 +139,7 @@ export default function ResetPasswordPage() {
           disabled={isSubmitting}
           className="w-full py-2.5 rounded-lg bg-ih-primary text-white font-bold text-sm hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isSubmitting ? "Updating…" : "Update password"}
+          {isSubmitting ? m.auth_reset_submit_pending() : m.auth_reset_submit()}
         </button>
       </Form>
     </AuthShell>

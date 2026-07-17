@@ -8,9 +8,10 @@ import { type CompanyProfile } from "~/components/booking/booking-constants";
 import { useBookingFormState } from "~/components/booking/useBookingFormState";
 import { BookingWizard } from "~/components/booking/BookingWizard";
 import { BookingShell, BookingErrorState, BookingNotOpenState } from "~/components/booking/BookingShell";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Book an Inspection - OpenInspection" }];
+  return [{ title: m.booking_page_meta_title() }];
 }
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
@@ -41,7 +42,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       }).catch(() => null);
       if (legacy?.ok) {
         const lb = (await legacy.json()) as { data?: { inspectorId?: string; name?: string } };
-        if (lb.data?.inspectorId) preselected = { id: lb.data.inspectorId, name: lb.data.name ?? "Inspector" };
+        if (lb.data?.inspectorId) preselected = { id: lb.data.inspectorId, name: lb.data.name ?? m.booking_inspector_default_name() };
       }
     }
 
@@ -49,7 +50,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     return {
       profile: (Object.keys(d).length > 0 ? d : null) as CompanyProfile | null,
       preselected,
-      error: res.ok ? null : "Company not found",
+      error: res.ok ? null : m.booking_error_company_not_found(),
       tenant: params.tenant,
       agentRefSlug,
       brand,
@@ -57,7 +58,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       termsUrl: legal?.termsUrl ?? null,
     };
   } catch {
-    return { profile: null, preselected: null, error: "Service unavailable", tenant: "", agentRefSlug: null, brand: EMPTY_BRAND as TenantBrand, privacyUrl: null, termsUrl: null };
+    return { profile: null, preselected: null, error: m.booking_error_service_unavailable(), tenant: "", agentRefSlug: null, brand: EMPTY_BRAND as TenantBrand, privacyUrl: null, termsUrl: null };
   }
 }
 

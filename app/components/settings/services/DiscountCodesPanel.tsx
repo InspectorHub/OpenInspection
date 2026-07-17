@@ -1,3 +1,5 @@
+import { m } from "~/paraglide/messages";
+
 interface Discount {
   id: string;
   code: string;
@@ -9,13 +11,13 @@ interface Discount {
 export function DiscountCodesPanel({ discounts }: { discounts: Discount[] }) {
   return (
     <div className="pt-2">
-      <h3 className="text-[15px] font-bold text-ih-fg-1 mb-2">Discount codes</h3>
-      <p className="text-[13px] text-ih-fg-3 mb-3">Promo codes clients can apply at booking.</p>
+      <h3 className="text-[15px] font-bold text-ih-fg-1 mb-2">{m.settings_discount_heading()}</h3>
+      <p className="text-[13px] text-ih-fg-3 mb-3">{m.settings_discount_desc()}</p>
 
       <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
         {discounts.length === 0 ? (
           <div className="py-8 text-center text-[13px] text-ih-fg-3">
-            No discount codes yet.
+            {m.settings_discount_none()}
           </div>
         ) : (
           <div className="divide-y divide-ih-border">
@@ -24,18 +26,18 @@ export function DiscountCodesPanel({ discounts }: { discounts: Discount[] }) {
                 <div className="flex items-center gap-4">
                   <code className="font-mono text-[13px] font-bold text-ih-fg-1">{d.code}</code>
                   <span className="text-[12px] text-ih-fg-3">
-                    {d.type === "percent" ? `${d.value}% off` : `$${(d.value / 100).toFixed(2)} off`}
+                    {d.type === "percent" ? m.settings_discount_percent_off({ value: d.value }) : m.settings_discount_fixed_off({ amount: (d.value / 100).toFixed(2) })}
                   </span>
                   <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${
  d.active
  ? "bg-ih-ok-bg text-ih-ok-fg"
  : "bg-ih-bg-muted text-ih-fg-3"
  }`}>
-                    {d.active ? "Active" : "Disabled"}
+                    {d.active ? m.settings_discount_active() : m.settings_discount_disabled()}
                   </span>
                 </div>
                 <button className="text-[12px] font-semibold text-ih-primary hover:underline">
-                  Edit
+                  {m.common_edit()}
                 </button>
               </div>
             ))}

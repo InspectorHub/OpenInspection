@@ -1,14 +1,15 @@
 import type { ReactNode } from "react";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
 import type { CompanyProfile } from "./booking-constants";
+import { m } from "~/paraglide/messages";
 
 export function BookingErrorState({ error }: { error: string | null }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-ih-bg-app">
       <div className="text-center p-8">
-        <h1 className="text-2xl font-bold text-ih-fg-1">Not Available</h1>
+        <h1 className="text-2xl font-bold text-ih-fg-1">{m.booking_error_state_heading()}</h1>
         <p className="text-ih-fg-3 mt-2">
-          {error ?? "This booking page is not available."}
+          {error ?? m.booking_error_state_default()}
         </p>
       </div>
     </div>
@@ -21,9 +22,9 @@ export function BookingNotOpenState({ profile, brand }: { profile: CompanyProfil
   return (
     <div className="min-h-screen flex items-center justify-center bg-ih-bg-app" style={brandTokens(brand.primaryColor)}>
       <div className="max-w-md text-center p-8 bg-ih-bg-card border border-ih-border rounded-xl">
-        <h1 className="text-xl font-bold text-ih-fg-1">Online booking isn&rsquo;t open yet</h1>
+        <h1 className="text-xl font-bold text-ih-fg-1">{m.booking_not_open_heading()}</h1>
         <p className="text-[14px] text-ih-fg-3 mt-3 leading-relaxed">
-          {profile.company} hasn&rsquo;t opened online scheduling yet. Please contact them directly to book your inspection.
+          {m.booking_not_open_body({ company: profile.company })}
         </p>
       </div>
     </div>
@@ -47,7 +48,7 @@ export function BookingShell({
         {/* Company header */}
         <nav className="mb-8 flex items-center gap-3">
           {brand.logoUrl ? (
-            <img src={brand.logoUrl} alt={brand.companyName ?? profile.company ?? "Logo"} className="h-10 w-auto" />
+            <img src={brand.logoUrl} alt={brand.companyName ?? profile.company ?? m.booking_logo_alt()} className="h-10 w-auto" />
           ) : (
             <div className="w-10 h-10 rounded-full bg-ih-primary-tint flex items-center justify-center text-ih-primary text-lg font-bold">
               {profile.company.charAt(0)}
@@ -61,11 +62,11 @@ export function BookingShell({
         {children}
 
         <p className="text-center text-[11px] text-ih-fg-4 mt-6">
-          Powered by OpenInspection
+          {m.booking_powered_by()}
         </p>
         {privacyUrl && (
           <p className="mt-8 text-center text-xs text-ih-fg-3">
-            <a href={privacyUrl} target="_blank" rel="noreferrer" className="hover:underline">Privacy Policy</a>
+            <a href={privacyUrl} target="_blank" rel="noreferrer" className="hover:underline">{m.booking_link_privacy_policy()}</a>
           </p>
         )}
       </div>

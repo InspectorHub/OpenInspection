@@ -3,6 +3,7 @@ import {
     DEFECT_TRADE_OPTIONS, DEFECT_DEADLINE_OPTIONS, DEFECT_TIMEFRAME_OPTIONS,
     type DefectTrade, type DefectDeadline, type DefectTimeframe,
 } from '../../lib/defect-fields';
+import { m } from '~/paraglide/messages';
 
 export interface DefectFieldsValue {
     location?: string | null;
@@ -38,14 +39,14 @@ export function DefectFieldsRow({
             {/* Location text */}
             <div className="col-span-12 md:col-span-5">
                 <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">
-                    Location {locationRequired && <span className="text-ih-bad-fg">*</span>}
+                    {m.editor_defect_location_label()} {locationRequired && <span className="text-ih-bad-fg">*</span>}
                 </label>
                 <input
                     type="text"
                     list={DATALIST_ID}
                     value={value.location ?? ''}
                     onChange={e => onChange(cannedId, { location: e.target.value || null })}
-                    placeholder="e.g. master bathroom, NE corner of basement"
+                    placeholder={m.editor_defect_location_placeholder()}
                     className={`w-full px-2 h-11 rounded border bg-ih-bg-app text-ih-fg-1 ${
                         locationRequired && !value.location ? 'border-ih-bad' : 'border-ih-border'
                     }`}
@@ -58,7 +59,7 @@ export function DefectFieldsRow({
             {/* Trade select */}
             <div className="col-span-12 md:col-span-3">
                 <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">
-                    Trade {tradeRequired && <span className="text-ih-bad-fg">*</span>}
+                    {m.editor_defect_trade_label()} {tradeRequired && <span className="text-ih-bad-fg">*</span>}
                 </label>
                 <select
                     value={value.trade ?? ''}
@@ -67,7 +68,7 @@ export function DefectFieldsRow({
                         tradeRequired && !value.trade ? 'border-ih-bad' : 'border-ih-border'
                     }`}
                 >
-                    <option value="">— select —</option>
+                    <option value="">{m.editor_defect_trade_select_placeholder()}</option>
                     {DEFECT_TRADE_OPTIONS.map(o => (
                         <option key={o.value} value={o.value}>{o.label}</option>
                     ))}
@@ -76,7 +77,7 @@ export function DefectFieldsRow({
 
             {/* Deadline select */}
             <div className="col-span-6 md:col-span-2">
-                <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Deadline</label>
+                <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_defect_deadline_label()}</label>
                 <select
                     value={value.deadline ?? ''}
                     onChange={e => onChange(cannedId, { deadline: (e.target.value || null) as DefectDeadline | null })}
@@ -91,7 +92,7 @@ export function DefectFieldsRow({
 
             {/* Timeframe select */}
             <div className="col-span-6 md:col-span-2">
-                <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">Timeframe</label>
+                <label className="block font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-0.5">{m.editor_defect_timeframe_label()}</label>
                 <select
                     value={value.timeframe ?? ''}
                     onChange={e => onChange(cannedId, { timeframe: (e.target.value || null) as DefectTimeframe | null })}

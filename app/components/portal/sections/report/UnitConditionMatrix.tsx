@@ -1,15 +1,9 @@
+import { m } from "~/paraglide/messages";
 import type { ReportSection, Severity, UnitMatrixRow } from "./types";
 
-/* Severity → label + token class. Reuses the exact mapping from the sibling
+/* Severity → token class. Reuses the exact mapping from the sibling
    SystemsSummaryTable (Phase S) so the per-unit matrix reads as one system with
    the systems-summary table. ih-* tokens only; dark-mode-safe. */
-const SEVERITY_LABEL: Record<Severity, string> = {
-  good: "Good",
-  minor: "Minor",
-  marginal: "Marginal",
-  significant: "Significant",
-};
-
 const SEVERITY_CLASS: Record<Severity, string> = {
   good: "bg-ih-ok-bg text-ih-ok-fg",
   minor: "bg-ih-bg-muted text-ih-fg-2",
@@ -42,20 +36,26 @@ export function UnitConditionMatrix({
   defectCounts: Record<string, number>;
 }) {
   if (rows.length === 0) return null;
+  const SEVERITY_LABEL: Record<Severity, string> = {
+    good: m.pca_severity_good(),
+    minor: m.pca_severity_minor(),
+    marginal: m.pca_severity_marginal(),
+    significant: m.pca_severity_significant(),
+  };
   return (
     <section className="mb-6 print:break-inside-avoid">
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">Unit Condition Matrix</h2>
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-ih-fg-3">{m.pca_unit_matrix_title()}</h2>
       {/* Wide grid: scroll inside its own container so a many-section matrix
           never forces the page body to scroll horizontally. */}
       <div className="overflow-x-auto rounded-lg border border-ih-border">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-ih-border text-left text-ih-fg-3">
-              <th className="whitespace-nowrap px-3 py-2 font-medium">Unit</th>
+              <th className="whitespace-nowrap px-3 py-2 font-medium">{m.pca_unit_matrix_col_unit()}</th>
               {sections.map((s) => (
                 <th key={s.id} className="whitespace-nowrap px-3 py-2 font-medium">{s.title}</th>
               ))}
-              <th className="whitespace-nowrap px-3 py-2 text-right font-medium">Defects</th>
+              <th className="whitespace-nowrap px-3 py-2 text-right font-medium">{m.pca_unit_matrix_col_defects()}</th>
             </tr>
           </thead>
           <tbody>
@@ -69,7 +69,7 @@ export function UnitConditionMatrix({
                     <span className="font-medium">{row.label}</span>
                     {row.isException && (
                       <span className="rounded bg-ih-bad-bg px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ih-bad-fg">
-                        Exception
+                        {m.pca_unit_matrix_exception()}
                       </span>
                     )}
                   </div>
@@ -78,7 +78,7 @@ export function UnitConditionMatrix({
                   const cell = row.cells[s.id];
                   if (!cell || cell.worst === null) {
                     return (
-                      <td key={s.id} className="px-3 py-2 align-top text-ih-fg-4" aria-label="No findings">
+                      <td key={s.id} className="px-3 py-2 align-top text-ih-fg-4" aria-label={m.pca_unit_matrix_no_findings()}>
                         —
                       </td>
                     );
@@ -91,9 +91,9 @@ export function UnitConditionMatrix({
                       </span>
                       {(safety > 0 || recommendation > 0 || maintenance > 0) && (
                         <div className="mt-1 flex gap-1.5 text-[10px] tabular-nums text-ih-fg-4">
-                          {safety > 0 && <span>S:{safety}</span>}
-                          {recommendation > 0 && <span>R:{recommendation}</span>}
-                          {maintenance > 0 && <span>M:{maintenance}</span>}
+                          {safety > 0 && <span>{m.pca_unit_matrix_count_safety({ n: safety })}</span>}
+                          {recommendation > 0 && <span>{m.pca_unit_matrix_count_recommendation({ n: recommendation })}</span>}
+                          {maintenance > 0 && <span>{m.pca_unit_matrix_count_maintenance({ n: maintenance })}</span>}
                         </div>
                       )}
                     </td>

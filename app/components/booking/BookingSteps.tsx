@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { TIME_WINDOWS, type CompanyProfile } from "./booking-constants";
+import { timeWindows, type CompanyProfile } from "./booking-constants";
 import { HolidayAdvisoryBanner } from "./HolidayAdvisoryBanner";
+import { m } from "~/paraglide/messages";
 
 export function PropertyStep({
   address,
@@ -12,16 +13,16 @@ export function PropertyStep({
   return (
     <section className="space-y-5">
       <div className="space-y-1">
-        <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Property</h2>
-        <p className="text-[13px] text-ih-fg-3">Where is the inspection?</p>
+        <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">{m.booking_step_property_heading()}</h2>
+        <p className="text-[13px] text-ih-fg-3">{m.booking_step_property_subtitle()}</p>
       </div>
       <label className="block">
-        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Property address</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_address_label()}</span>
         <input
           type="text"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="123 Main St, City, State ZIP"
+          placeholder={m.booking_step_property_address_placeholder()}
           autoFocus
           className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
         />
@@ -44,8 +45,8 @@ export function ServicesStep({
   return (
     <section className="space-y-5">
       <div className="space-y-1">
-        <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Services</h2>
-        <p className="text-[13px] text-ih-fg-3">Choose one or more inspections for this visit.</p>
+        <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">{m.booking_step_services_heading()}</h2>
+        <p className="text-[13px] text-ih-fg-3">{m.booking_step_services_subtitle()}</p>
       </div>
       <div className="space-y-2">
         {profile.services.map((svc) => {
@@ -66,7 +67,7 @@ export function ServicesStep({
                 <div className="min-w-0">
                   <div className="text-[13px] font-bold text-ih-fg-1 truncate">{svc.name}</div>
                   <div className="text-[11px] text-ih-fg-3 mt-0.5">
-                    ~{svc.duration} min
+                    {m.booking_step_services_duration({ duration: svc.duration })}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -85,7 +86,7 @@ export function ServicesStep({
       {selectedServices.size > 0 && (
         <div className="px-4 py-2 rounded-md bg-ih-bg-muted flex items-center justify-between">
           <span className="text-[12px] font-bold text-ih-fg-3">
-            {selectedServices.size} {selectedServices.size === 1 ? "inspection" : "inspections"}
+            {selectedServices.size} {selectedServices.size === 1 ? m.booking_unit_inspection_one() : m.booking_unit_inspection_other()}
           </span>
           <span className="text-[15px] font-bold text-ih-fg-1 tabular-nums">
             ${totalPrice.toFixed(2)}
@@ -144,7 +145,7 @@ export function ScheduleStep({
   conciergeReviewRequired?: boolean;
 }) {
   // Twilio/CTIA require the opt-in to be branded with the end business name.
-  const company = companyName?.trim() || "your inspection company";
+  const company = companyName?.trim() || m.booking_schedule_company_fallback();
   const [holidayAdvisory, setHolidayAdvisory] = useState<{ date: string; name: string } | null>(null);
 
   useEffect(() => {
@@ -176,11 +177,11 @@ export function ScheduleStep({
     <section className="space-y-8">
       <div className="space-y-5">
         <div className="space-y-1">
-          <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Schedule</h2>
-          <p className="text-[13px] text-ih-fg-3">Pick a date and time window that works.</p>
+          <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">{m.booking_step_schedule_heading()}</h2>
+          <p className="text-[13px] text-ih-fg-3">{m.booking_step_schedule_subtitle()}</p>
         </div>
         <label className="block">
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Inspection date</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_inspection_date_label()}</span>
           <input
             type="date"
             value={inspectionDate}
@@ -195,9 +196,9 @@ export function ScheduleStep({
           />
         )}
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Time window</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_time_window_label()}</span>
           <div className="grid grid-cols-2 gap-2 mt-1">
-            {TIME_WINDOWS.map((w) => (
+            {timeWindows().map((w) => (
               <label key={w.id} className="cursor-pointer">
                 <input type="radio" name="timeSlot" value={w.id} checked={timeWindow === w.id} onChange={() => setTimeWindow(w.id)} className="sr-only" />
                 <div className={`px-3 py-2.5 rounded-md border transition-all ${
@@ -219,21 +220,21 @@ export function ScheduleStep({
                 onChange={(e) => setCustomTime(e.target.value)}
                 className="h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[13px] font-medium tabular-nums"
               />
-              <span className="text-[11px] text-ih-fg-4">on selected date</span>
+              <span className="text-[11px] text-ih-fg-4">{m.booking_schedule_custom_time_suffix()}</span>
             </div>
           )}
         </div>
         {showInspectorDropdown && (
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Inspector</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_inspector_label()}</span>
             <select
               value={chosenInspectorId ?? ""}
               onChange={(e) => setChosenInspectorId(e.target.value || null)}
               className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
             >
-              <option value="">No preference — first available</option>
+              <option value="">{m.booking_schedule_inspector_no_preference()}</option>
               {inspectorOptions.map((i) => (
-                <option key={i.id} value={i.id}>{i.name ?? "Inspector"}</option>
+                <option key={i.id} value={i.id}>{i.name ?? m.booking_inspector_default_name()}</option>
               ))}
             </select>
           </label>
@@ -242,27 +243,27 @@ export function ScheduleStep({
 
       <div className="space-y-5">
         <div className="space-y-1">
-          <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Your info</h2>
-          <p className="text-[13px] text-ih-fg-3">How do we reach you with the report?</p>
+          <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">{m.booking_step_yourinfo_heading()}</h2>
+          <p className="text-[13px] text-ih-fg-3">{m.booking_step_yourinfo_subtitle()}</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Full name</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_fullname_label()}</span>
             <input
               type="text"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
-              placeholder="Jane Doe"
+              placeholder={m.booking_placeholder_name()}
               className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
             />
           </label>
           <label className="block">
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Email</span>
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.booking_field_email_label()}</span>
             <input
               type="email"
               value={clientEmail}
               onChange={(e) => setClientEmail(e.target.value)}
-              placeholder="jane@example.com"
+              placeholder={m.booking_placeholder_email()}
               className="mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none text-[14px] font-medium transition-colors"
             />
           </label>
@@ -276,19 +277,16 @@ export function ScheduleStep({
             className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary"
           />
           <span className="text-[13px] text-ih-fg-3 leading-relaxed">
-            Text me appointment &amp; report updates from {company}. By checking this box you
-            agree to receive automated text messages from {company} about your inspection.
-            Message frequency varies by your inspection activity. Message &amp; data rates may
-            apply; reply STOP to opt out, HELP for help. Consent is not a condition of booking.
+            {m.booking_schedule_sms_optin({ company })}
             {(privacyUrl || termsUrl) && (
               <>
                 {" "}
                 {privacyUrl && (
-                  <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>
+                  <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">{m.booking_link_privacy_policy()}</a>
                 )}
                 {privacyUrl && termsUrl && <span> · </span>}
                 {termsUrl && (
-                  <a href={termsUrl} target="_blank" rel="noreferrer" className="underline">Terms</a>
+                  <a href={termsUrl} target="_blank" rel="noreferrer" className="underline">{m.booking_link_terms()}</a>
                 )}
                 .
               </>
@@ -334,50 +332,50 @@ export function ConfirmStep({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-ih-fg-1 mb-2">Request Submitted</h2>
+          <h2 className="text-xl font-bold text-ih-fg-1 mb-2">{m.booking_confirm_submitted_heading()}</h2>
           <p className="text-[14px] text-ih-fg-3">{message.text}</p>
         </div>
       ) : (
         <>
           <div className="space-y-1">
-            <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">Confirm details</h2>
-            <p className="text-[13px] text-ih-fg-3">Review your booking before submitting.</p>
+            <h2 className="text-[18px] font-semibold tracking-tight text-ih-fg-1">{m.booking_confirm_details_heading()}</h2>
+            <p className="text-[13px] text-ih-fg-3">{m.booking_confirm_subtitle()}</p>
           </div>
           <div className="bg-ih-bg-muted rounded-md p-4 space-y-3 text-[13px]">
             <div className="flex justify-between">
-              <span className="text-ih-fg-3">Address</span>
+              <span className="text-ih-fg-3">{m.booking_confirm_row_address()}</span>
               <span className="font-medium text-ih-fg-1">{address}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-ih-fg-3">Date</span>
+              <span className="text-ih-fg-3">{m.booking_confirm_row_date()}</span>
               <span className="font-medium text-ih-fg-1">{inspectionDate}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-ih-fg-3">Time</span>
+              <span className="text-ih-fg-3">{m.booking_confirm_row_time()}</span>
               <span className="font-medium text-ih-fg-1">
-                {timeWindow === "custom" ? customTime : TIME_WINDOWS.find((w) => w.id === timeWindow)?.label}
+                {timeWindow === "custom" ? customTime : timeWindows().find((w) => w.id === timeWindow)?.label}
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-ih-fg-3">Services</span>
-              <span className="font-medium text-ih-fg-1">{selectedServices.size} selected</span>
+              <span className="text-ih-fg-3">{m.booking_confirm_row_services()}</span>
+              <span className="font-medium text-ih-fg-1">{m.booking_confirm_services_selected({ count: selectedServices.size })}</span>
             </div>
             {showInspectorDropdown && (
               <div className="flex justify-between">
-                <span className="text-ih-fg-3">Inspector</span>
+                <span className="text-ih-fg-3">{m.booking_field_inspector_label()}</span>
                 <span className="font-medium text-ih-fg-1">{chosenInspectorName}</span>
               </div>
             )}
             <div className="flex justify-between border-t border-ih-border pt-3">
-              <span className="font-bold text-ih-fg-2">Total</span>
+              <span className="font-bold text-ih-fg-2">{m.booking_confirm_row_total()}</span>
               <span className="font-bold text-ih-fg-1">${totalPrice.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-ih-fg-3">Name</span>
+              <span className="text-ih-fg-3">{m.booking_confirm_row_name()}</span>
               <span className="font-medium text-ih-fg-1">{clientName}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-ih-fg-3">Email</span>
+              <span className="text-ih-fg-3">{m.booking_field_email_label()}</span>
               <span className="font-medium text-ih-fg-1">{clientEmail}</span>
             </div>
           </div>

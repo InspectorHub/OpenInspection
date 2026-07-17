@@ -1,6 +1,7 @@
 import { Pill } from "@core/shared-ui";
 import { RequestDetail } from "~/components/agreements/RequestDetail";
 import { pillToneFor, pillLabelFor, type RequestRow as RequestRowData } from "~/components/agreements/agreements-helpers";
+import { m } from "~/paraglide/messages";
 
 /** Per-envelope progress chip, e.g. "1/2 signed". Hidden for 0-signer rows. */
 export function ProgressBadge({ row }: { row: RequestRowData }) {
@@ -9,7 +10,7 @@ export function ProgressBadge({ row }: { row: RequestRowData }) {
   const signed = row.signersSigned ?? 0;
   return (
     <Pill tone={signed >= total ? "sat" : "gen"}>
-      {signed}/{total} signed
+      {m.agreement_progress_signed({ signed, total })}
     </Pill>
   );
 }
@@ -18,16 +19,16 @@ export function TemplateRow({ t }: { t: { id: string; name?: string; updatedAt?:
   return (
     <tr key={t.id} className="hover:bg-ih-bg-muted/50 transition-colors">
                       <td className="px-4 py-3 text-[13px] font-semibold text-ih-fg-1">
-                        {t.name || "Untitled"}
+                        {t.name || m.agreement_row_untitled()}
                       </td>
                       <td className="px-4 py-3 text-[13px] text-ih-fg-3">
                         {t.updatedAt || t.createdAt || "--"}
                       </td>
                       <td className="px-4 py-3">
-                        <Pill tone="sat">Active</Pill>
+                        <Pill tone="sat">{m.agreement_template_status_active()}</Pill>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button className="text-[13px] text-ih-primary hover:opacity-80 font-semibold">Edit</button>
+                        <button className="text-[13px] text-ih-primary hover:opacity-80 font-semibold">{m.common_edit()}</button>
                       </td>
                     </tr>
   );
@@ -52,7 +53,7 @@ export function RequestRow({
                         onClick={() => setExpandedId((cur) => (cur === r.id ? null : r.id))}
                       >
                         <td className="px-4 py-3 text-[13px] font-semibold text-ih-fg-1">
-                          {r.agreementName || "Untitled"}
+                          {r.agreementName || m.agreement_row_untitled()}
                         </td>
                         <td className="px-4 py-3 text-[13px] text-ih-fg-3">
                           {r.clientName || r.clientEmail || "--"}
@@ -72,7 +73,7 @@ export function RequestRow({
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                Signed PDF
+                                {m.agreement_request_signed_pdf()}
                               </a>
                               <a
                                 className="text-[13px] text-ih-primary hover:opacity-80 font-semibold"
@@ -80,7 +81,7 @@ export function RequestRow({
                                 target="_blank"
                                 rel="noopener noreferrer"
                               >
-                                Certificate
+                                {m.agreement_request_certificate()}
                               </a>
                               <a
                                 className="text-[13px] text-ih-primary hover:opacity-80 font-semibold"
@@ -88,7 +89,7 @@ export function RequestRow({
                                 download={`evidence-${r.id.slice(0, 8)}.zip`}
                                 rel="noopener noreferrer"
                               >
-                                Evidence pack
+                                {m.agreement_request_evidence_pack()}
                               </a>
                             </div>
                           ) : r.status === "pending" ? (
@@ -96,11 +97,11 @@ export function RequestRow({
                               className="text-[13px] text-ih-primary hover:opacity-80 font-semibold"
                               onClick={(e) => { e.stopPropagation(); setSigningId(r.id); }}
                             >
-                              Sign now
+                              {m.agreement_request_sign_now()}
                             </button>
                           ) : (
                             <span className="text-[13px] text-ih-fg-3">
-                              {expandedId === r.id ? "Hide" : "View signers"}
+                              {expandedId === r.id ? m.agreement_request_hide() : m.agreement_request_view_signers()}
                             </span>
                           )}
                         </td>

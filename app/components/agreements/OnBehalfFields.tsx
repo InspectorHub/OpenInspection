@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { m } from "~/paraglide/messages";
 
 /**
  * Track I-a §5.2 — shared "signing on behalf of someone else" capture, used by
@@ -48,7 +49,7 @@ export function OnBehalfFields({
                     className="mt-0.5 h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary/30"
                 />
                 <span className="text-[13px] font-medium text-ih-fg-2 leading-snug">
-                    I am signing on behalf of someone else
+                    {m.agreement_onbehalf_checkbox()}
                 </span>
             </label>
 
@@ -56,7 +57,7 @@ export function OnBehalfFields({
                 <div className="mt-3 pl-6 space-y-3">
                     <div>
                         <label htmlFor={nameId} className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">
-                            Name of the person you represent
+                            {m.agreement_onbehalf_name_label()}
                         </label>
                         <input
                             id={nameId}
@@ -65,13 +66,13 @@ export function OnBehalfFields({
                             disabled={disabled}
                             maxLength={200}
                             onChange={(e) => onChange({ ...value, onBehalfOf: e.target.value })}
-                            placeholder="e.g. Jane Buyer"
+                            placeholder={m.agreement_onbehalf_name_placeholder()}
                             className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
                         />
                     </div>
                     <div>
                         <label htmlFor={disclaimerId} className="block text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-1">
-                            Authorization (optional)
+                            {m.agreement_onbehalf_disclaimer_label()}
                         </label>
                         <textarea
                             id={disclaimerId}
@@ -80,7 +81,7 @@ export function OnBehalfFields({
                             rows={3}
                             maxLength={2000}
                             onChange={(e) => onChange({ ...value, onBehalfDisclaimer: e.target.value })}
-                            placeholder="Describe your authority to sign for this person."
+                            placeholder={m.agreement_onbehalf_disclaimer_placeholder()}
                             className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
                         />
                     </div>

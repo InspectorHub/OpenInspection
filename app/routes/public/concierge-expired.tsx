@@ -1,8 +1,9 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/concierge-expired";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Confirmation link unavailable - OpenInspection" }];
+  return [{ title: m.concierge_expired_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -24,17 +25,17 @@ export default function ConciergeExpiredPage() {
 
   const headline =
     reason === "expired"
-      ? "This confirmation link has expired"
+      ? m.concierge_confirm_expired_title()
       : reason === "unknown"
-        ? "We couldn't find that confirmation link"
-        : "No confirmation link provided";
+        ? m.concierge_expired_unknown_title()
+        : m.concierge_expired_notoken_title();
 
   const body =
     reason === "expired"
-      ? "Confirmation links are valid for 7 days. Reach out to your agent or inspector and they can send you a fresh one in a minute."
+      ? m.concierge_expired_expired_body()
       : reason === "unknown"
-        ? "The link may have been mistyped, or the booking was cancelled. Get in touch with your agent -- they can reissue a new confirmation."
-        : "It looks like the link is incomplete. Use the original email and try again, or contact your agent.";
+        ? m.concierge_expired_unknown_body()
+        : m.concierge_expired_notoken_body();
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-ih-bg-card">

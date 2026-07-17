@@ -1,4 +1,5 @@
 import { Icon } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface MeasureCalibrationProps {
   calibKnown: string;
@@ -31,7 +32,7 @@ export function MeasureCalibration({
         <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <span>Reference length:</span>
+        <span>{m.media_measure_reference_label()}</span>
         <input
           type="number"
           min="0"
@@ -45,7 +46,7 @@ export function MeasureCalibration({
             }
             e.stopPropagation();
           }}
-          placeholder="e.g. 12"
+          placeholder={m.media_measure_placeholder()}
           className="w-20 h-7 px-2 rounded bg-slate-700 text-white text-[12px] border border-white/10 outline-none focus:border-ih-primary placeholder-white/30"
         />
         <select
@@ -63,12 +64,12 @@ export function MeasureCalibration({
           onClick={onCommit}
           className="h-7 px-3 rounded bg-ih-primary text-white text-[11px] font-bold hover:bg-ih-primary-600"
         >
-          Set
+          {m.media_measure_set()}
         </button>
         <button
           onClick={onCancel}
           className="text-white/40 hover:text-white/70 ml-1"
-          aria-label="Cancel calibration"
+          aria-label={m.media_measure_cancel_aria()}
         >
           <Icon name="x" className="w-4 h-4" />
         </button>

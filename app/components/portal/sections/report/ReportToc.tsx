@@ -1,3 +1,4 @@
+import { m } from "~/paraglide/messages";
 import type { ReportOutlineEntry } from "./types";
 
 /**
@@ -29,10 +30,10 @@ export function ReportToc({
     <section
       id="report-toc"
       className="mb-8 print:break-after-page"
-      aria-label="Table of contents"
+      aria-label={m.pca_toc_aria()}
     >
       <h2 className="mb-4 text-sm font-semibold uppercase tracking-widest text-ih-fg-4">
-        Table of Contents
+        {m.pca_toc_title()}
       </h2>
       <ol className="space-y-1">
         {entries.map((entry) => (

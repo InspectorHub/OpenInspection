@@ -4,6 +4,7 @@ import { SmsSecretsPanel } from "~/components/settings/SmsSecretsPanel";
 import type { action } from "~/routes/settings-communication";
 import type { ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
 import type { ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
+import { m } from "~/paraglide/messages";
 
 type SmsTestFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
@@ -24,15 +25,15 @@ export type SmsModeValue = "own" | "managed_shared" | "managed_dedicated";
  * brand/campaign registration are all intermediate states).
  */
 function complianceLabel(status: ComplianceStatus | null): string {
-  if (status === "approved") return "Approved";
-  if (status === "rejected") return "Rejected";
+  if (status === "approved") return m.settings_smsdelivery_compliance_approved();
+  if (status === "rejected") return m.settings_smsdelivery_compliance_rejected();
   if (
     status === "profile_pending" ||
     status === "brand_pending" ||
     status === "campaign_pending" ||
     status === "tfv_pending"
-  ) return "Pending";
-  return "Not started";
+  ) return m.settings_smsdelivery_compliance_pending();
+  return m.settings_smsdelivery_compliance_not_started();
 }
 
 /**
@@ -94,14 +95,12 @@ export function SmsDeliveryPanel({
 }) {
   // Toll-free verification is Twilio-specific; Telnyx has a different inbound/
   // compliance flow, so the compliance block below is gated to Twilio.
-  const smsProviderLabel = byoProvider === "telnyx" ? "Telnyx" : "Twilio";
+  const smsProviderLabel = byoProvider === "telnyx" ? m.settings_sms_provider_telnyx() : m.settings_sms_provider_twilio();
   return (
       <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">SMS delivery</h3>
+        <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_smsdelivery_heading()}</h3>
         <p className="text-[13px] text-ih-fg-3">
-          Send appointment and report text messages by SMS. Clients are texted only
-          after they opt in — STOP replies are honored automatically. With your own
-          provider you pay the carrier&rsquo;s per-message rates directly.
+          {m.settings_smsdelivery_desc()}
         </p>
 
         {/* Mode + company phone */}
@@ -125,8 +124,8 @@ export function SmsDeliveryPanel({
                     className="mt-0.5 accent-ih-primary"
                   />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-ih-fg-1">My own Twilio / Telnyx (BYO)</span>
-                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">Bring your own account. You pay provider rates directly and control your numbers.</span>
+                    <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_smsdelivery_byo_label()}</span>
+                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">{m.settings_smsdelivery_byo_desc()}</span>
                   </span>
                 </label>
                 {/* Managed shared */}
@@ -138,8 +137,8 @@ export function SmsDeliveryPanel({
                     className="mt-0.5 accent-ih-primary"
                   />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-ih-fg-1">Managed — shared number <span className="font-normal text-ih-ok-fg">(included)</span></span>
-                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">Send from a platform-managed shared number. No setup needed.</span>
+                    <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_smsdelivery_shared_label()} <span className="font-normal text-ih-ok-fg">{m.settings_smsdelivery_included()}</span></span>
+                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">{m.settings_smsdelivery_shared_desc()}</span>
                   </span>
                 </label>
                 {/* Managed dedicated — selectable; provisioning wizard renders below */}
@@ -151,8 +150,8 @@ export function SmsDeliveryPanel({
                     className="mt-0.5 accent-ih-primary"
                   />
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-ih-fg-1">Managed — dedicated local number</span>
-                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">Your own local number, managed by the platform. Complete TCR/TFV registration below.</span>
+                    <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_smsdelivery_dedicated_label()}</span>
+                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">{m.settings_smsdelivery_dedicated_desc()}</span>
                   </span>
                 </label>
               </div>
@@ -160,16 +159,15 @@ export function SmsDeliveryPanel({
           )}
           {!isSaas && (
             <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
-              Self-hosted deployments text from your own SMS provider (Twilio or Telnyx).
-              Choose a provider and add its credentials below to enable SMS.
+              {m.settings_smsdelivery_selfhost_note()}
             </p>
           )}
           <p className="text-[11px] font-bold text-ih-ok-fg">
             {smsConfig.effectiveSource === "own"
-              ? `Using your ${smsProviderLabel}`
+              ? m.settings_smsdelivery_using_your({ provider: smsProviderLabel })
               : smsConfig.effectiveSource === "platform"
-                ? "Using platform SMS"
-                : "SMS not configured — set your provider credentials below"}
+                ? m.settings_smsdelivery_using_platform()
+                : m.settings_smsdelivery_not_configured()}
           </p>
 
           {/* BYO compliance status — toll-free verification is Twilio-specific,
@@ -177,7 +175,7 @@ export function SmsDeliveryPanel({
           {smsConfig.effectiveSource === "own" && byoProvider !== "telnyx" && (
             <div className="space-y-1">
               <p className="text-[11px] text-ih-fg-3">
-                Toll-free verification:{" "}
+                {m.settings_smsdelivery_tfv_label()}{" "}
                 <span
                   className={`font-bold ${
                     compliance.complianceStatus === "approved"
@@ -197,19 +195,19 @@ export function SmsDeliveryPanel({
           )}
 
           <div>
-            <label htmlFor="companyPhone" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Company phone</label>
+            <label htmlFor="companyPhone" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_smsdelivery_company_phone_label()}</label>
             <input
               type="tel" name="companyPhone" id="companyPhone" defaultValue={companyPhone}
               placeholder="+1 555 123 4567"
               className="w-full md:w-1/2 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
             />
-            <p className="text-[11px] text-ih-fg-4 mt-1">Shown in your texts as the call-back number (<code>{"{{company_phone}}"}</code>).</p>
+            <p className="text-[11px] text-ih-fg-4 mt-1">{m.settings_smsdelivery_phone_note_prefix()}<code>{"{{company_phone}}"}</code>{m.settings_smsdelivery_phone_note_suffix()}</p>
           </div>
 
           <div className="flex justify-end pt-3 border-t border-ih-border">
             <button type="submit" disabled={savingSmsConfig}
               className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
-              {savingSmsConfig ? "Saving…" : "Save SMS settings"}
+              {savingSmsConfig ? m.common_saving() : m.settings_smsdelivery_save()}
             </button>
           </div>
         </Form>

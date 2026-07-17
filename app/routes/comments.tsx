@@ -9,9 +9,10 @@ import { usePagination } from "~/hooks/usePagination";
 import { CommentEditor } from "~/components/CommentEditor";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL, isSeverity } from "~/lib/severity";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Canned Comments - OpenInspection" }];
+  return [{ title: m.comments_meta_title() }];
 }
 
 export interface LibraryComment {
@@ -60,10 +61,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 // Module D — severity tabs (single canonical vocabulary shared with rating
 // levels, module F). The "all" tab clears the filter; the rest map straight
 // onto the `severity` query param the loader forwards to the API.
-const TABS = [
-  { id: "all", label: "All" },
-  ...SEVERITIES.map((s) => ({ id: s, label: SEVERITY_LABEL[s] })),
-];
+// A function (not a module const) so `m.*()` resolves inside the per-request
+// paraglide locale scope, not once at import time.
+function getTabs() {
+  return [
+    { id: "all", label: m.comments_tab_all() },
+    ...SEVERITIES.map((s) => ({ id: s, label: SEVERITY_LABEL[s] })),
+  ];
+}
 
 const SEVERITY_TONE: Record<Severity, "sat" | "monitor" | "defect" | "gen"> = {
   good: "sat",
@@ -91,22 +96,22 @@ export default function CommentsPage() {
 
   return (
     <div className="space-y-ih-list">
-      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Canned Comments" }]} />
+      <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.comments_heading() }]} />
       <PageHeader
-        title="Canned Comments"
-        meta={`${meta.total} in library`}
+        title={m.comments_heading()}
+        meta={m.comments_meta({ count: meta.total })}
         actions={
-          <Button variant="primary" onClick={() => { setEditing(null); setEditorOpen(true); }}>+ Add comment</Button>
+          <Button variant="primary" onClick={() => { setEditing(null); setEditorOpen(true); }}>{m.comments_add()}</Button>
         }
       />
 
-      <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
+      <TabStrip tabs={getTabs()} activeId={activeTab} onChange={setActiveTab} />
 
       {comments.length === 0 ? (
         <Card>
           <EmptyState
-            title="No comments yet"
-            description='Click "+ Add comment" above to create your first comment snippet.'
+            title={m.comments_empty_title()}
+            description={m.comments_empty_desc()}
           />
         </Card>
       ) : (
@@ -127,7 +132,7 @@ export default function CommentsPage() {
                     onClick={() => { setEditing(c); setEditorOpen(true); }}
                     className="text-[11px] font-bold text-ih-primary hover:text-ih-primary-600"
                   >
-                    Edit
+                    {m.common_edit()}
                   </button>
                 </div>
               </Card>

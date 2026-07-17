@@ -9,9 +9,10 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { MoneyInput } from "~/components/MoneyInput";
 import { formatDollars } from "~/lib/money";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Repair Items - OpenInspection" }];
+  return [{ title: m.repair_items_meta_title() }];
 }
 
 interface RepairItem {
@@ -120,16 +121,16 @@ export default function RepairItemsPage() {
 
   return (
     <div className="space-y-ih-list">
-      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Repair Items" }]} />
+      <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.repair_items_heading() }]} />
       <PageHeader
-        title="Repair Items"
-        meta={`${items.length} in library`}
-        actions={<Button variant="primary" onClick={openCreate}>+ Add item</Button>}
+        title={m.repair_items_heading()}
+        meta={m.repair_items_meta({ count: items.length })}
+        actions={<Button variant="primary" onClick={openCreate}>{m.repair_items_add()}</Button>}
       />
 
       {items.length === 0 ? (
         <Card>
-          <EmptyState title="No repair items yet" description='Click "+ Add item" above to create your first repair recommendation.' />
+          <EmptyState title={m.repair_items_empty_title()} description={m.repair_items_empty_desc()} />
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -157,8 +158,8 @@ export default function RepairItemsPage() {
                 )}
               </div>
               <div className="mt-3 flex gap-3">
-                <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary hover:underline font-bold">Edit</button>
-                <button onClick={() => setPendingDelete(it)} className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
+                <button onClick={() => openEdit(it)} className="text-[12px] text-ih-primary hover:underline font-bold">{m.common_edit()}</button>
+                <button onClick={() => setPendingDelete(it)} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.common_delete()}</button>
               </div>
             </Card>
           ))}
@@ -169,34 +170,34 @@ export default function RepairItemsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-ih-backdrop" onClick={() => setModalOpen(false)} />
           <div className="relative bg-ih-bg-card border border-ih-border rounded-lg shadow-ih-popover w-full max-w-md mx-4 p-6 space-y-4">
-            <h3 className="text-[16px] font-bold text-ih-fg-1">{form.id ? "Edit repair item" : "New repair item"}</h3>
+            <h3 className="text-[16px] font-bold text-ih-fg-1">{form.id ? m.repair_items_modal_edit_title() : m.repair_items_modal_new_title()}</h3>
             <div className="space-y-3">
-              <Field label="Name"><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g., Replace double-tapped breaker" className={INPUT} /></Field>
+              <Field label={m.repair_items_field_name()}><input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder={m.repair_items_placeholder_name()} className={INPUT} /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Category"><input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} placeholder="Electrical" className={INPUT} /></Field>
-                <Field label="Severity">
+                <Field label={m.repair_items_field_category()}><input value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))} placeholder={m.repair_items_placeholder_category()} className={INPUT} /></Field>
+                <Field label={m.repair_items_field_severity()}>
                   <select value={form.severity} onChange={(e) => setForm((f) => ({ ...f, severity: e.target.value as RepairItem["severity"] }))} className={INPUT}>
-                    <option value="good">Satisfactory</option>
-                    <option value="marginal">Monitor</option>
-                    <option value="significant">Defect</option>
+                    <option value="good">{m.repair_items_severity_good()}</option>
+                    <option value="marginal">{m.repair_items_severity_marginal()}</option>
+                    <option value="significant">{m.repair_items_severity_significant()}</option>
                   </select>
                 </Field>
               </div>
-              <Field label="Repair summary"><textarea value={form.defaultRepairSummary} onChange={(e) => setForm((f) => ({ ...f, defaultRepairSummary: e.target.value }))} rows={3} className={INPUT} /></Field>
+              <Field label={m.repair_items_field_summary()}><textarea value={form.defaultRepairSummary} onChange={(e) => setForm((f) => ({ ...f, defaultRepairSummary: e.target.value }))} rows={3} className={INPUT} /></Field>
               <div className="grid grid-cols-2 gap-3">
-                <Field label="Est. min"><MoneyInput ariaLabel="Est. min" cents={form.estimateMinDollars === "" ? null : Math.round(Number(form.estimateMinDollars) * 100)} onChange={(c) => setForm((f) => ({ ...f, estimateMinDollars: c == null ? "" : String(c / 100) }))} className={INPUT} /></Field>
-                <Field label="Est. max"><MoneyInput ariaLabel="Est. max" cents={form.estimateMaxDollars === "" ? null : Math.round(Number(form.estimateMaxDollars) * 100)} onChange={(c) => setForm((f) => ({ ...f, estimateMaxDollars: c == null ? "" : String(c / 100) }))} className={INPUT} /></Field>
+                <Field label={m.repair_items_field_est_min()}><MoneyInput ariaLabel={m.repair_items_field_est_min()} cents={form.estimateMinDollars === "" ? null : Math.round(Number(form.estimateMinDollars) * 100)} onChange={(c) => setForm((f) => ({ ...f, estimateMinDollars: c == null ? "" : String(c / 100) }))} className={INPUT} /></Field>
+                <Field label={m.repair_items_field_est_max()}><MoneyInput ariaLabel={m.repair_items_field_est_max()} cents={form.estimateMaxDollars === "" ? null : Math.round(Number(form.estimateMaxDollars) * 100)} onChange={(c) => setForm((f) => ({ ...f, estimateMaxDollars: c == null ? "" : String(c / 100) }))} className={INPUT} /></Field>
               </div>
-              <Field label="Recommended contractor">
+              <Field label={m.repair_items_field_contractor()}>
                 <select value={form.recommendedContractorTypeId} onChange={(e) => setForm((f) => ({ ...f, recommendedContractorTypeId: e.target.value }))} className={INPUT}>
-                  <option value="">— none —</option>
+                  <option value="">{m.repair_items_contractor_none()}</option>
                   {contractorTypes.map((ct) => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
                 </select>
               </Field>
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">Cancel</button>
-              <button onClick={() => submit(form.id ? "update" : "create")} disabled={!form.name.trim() || !form.defaultRepairSummary.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50">Save</button>
+              <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">{m.common_cancel()}</button>
+              <button onClick={() => submit(form.id ? "update" : "create")} disabled={!form.name.trim() || !form.defaultRepairSummary.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50">{m.common_save()}</button>
             </div>
           </div>
         </div>
@@ -204,8 +205,8 @@ export default function RepairItemsPage() {
 
       <ConfirmDialog
         open={!!pendingDelete}
-        title="Delete repair item"
-        message={pendingDelete ? `Delete "${pendingDelete.name}"? This can't be undone.` : ""}
+        title={m.repair_items_delete_title()}
+        message={pendingDelete ? m.repair_items_delete_message({ name: pendingDelete.name }) : ""}
         busy={deleteFetcher.state !== "idle"}
         onConfirm={() => {
           if (pendingDelete) deleteFetcher.submit({ intent: "delete", id: pendingDelete.id }, { method: "POST" });

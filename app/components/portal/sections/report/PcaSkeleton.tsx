@@ -1,3 +1,4 @@
+import { m } from "~/paraglide/messages";
 import type {
   PcaReportData,
   AstmConformance,
@@ -103,7 +104,7 @@ export function PcaSkeleton({
           light_commercial drops them (matches the tier-gated TOC + docx). */}
       {!isLight && (
         <>
-          <Block id="transmittal-letter" title="Transmittal Letter">{narrative.transmittalLetter}</Block>
+          <Block id="transmittal-letter" title={m.pca_skeleton_transmittal_letter()}>{narrative.transmittalLetter}</Block>
           {/* Transmittal signature slot — Phase M dual-role signoffs. */}
           <SignoffBlock signoffs={signoffs} timeZone={reportTimeZone} />
 
@@ -118,46 +119,45 @@ export function PcaSkeleton({
       )}
 
       {/* 1. SUMMARY */}
-      <h2 id="summary" className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3 scroll-mt-4">1. Summary</h2>
-      <Block id="summary.general-description" title="1.1 General Description">{narrative.summaryGeneralDescription}</Block>
-      <Block id="summary.physical-condition" title="1.2 General Physical Condition">{narrative.summaryPhysicalCondition}</Block>
+      <h2 id="summary" className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3 scroll-mt-4">{m.pca_skeleton_summary()}</h2>
+      <Block id="summary.general-description" title={m.pca_skeleton_summary_general_description()}>{narrative.summaryGeneralDescription}</Block>
+      <Block id="summary.physical-condition" title={m.pca_skeleton_summary_physical_condition()}>{narrative.summaryPhysicalCondition}</Block>
       {/* 1.3 Opinion of Cost — prose + EMPTY cost region (Phase C fills numbers). */}
       <section id="summary.opinion-of-cost" className="mb-5 print:break-inside-avoid scroll-mt-4">
-        <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">1.3 Opinion of Cost</h3>
+        <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">{m.pca_skeleton_summary_opinion_of_cost()}</h3>
         <div data-pca-cost-region className="text-sm text-ih-fg-3" aria-hidden="true" />
       </section>
       {/* 1.4 Deviations from the Guide — structured, with the ASTM conformance
           statement (Phase M) rendered adjacent. */}
       <section id="summary.deviations" className="mb-5 print:break-inside-avoid scroll-mt-4">
-        <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">1.4 Deviations from the Guide</h3>
+        <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">{m.pca_skeleton_summary_deviations()}</h3>
         <ConformanceStatement conformance={conformance} />
         {deviations.length === 0 ? (
-          <p className="text-sm text-ih-fg-3">No deviations from the Guide.</p>
+          <p className="text-sm text-ih-fg-3">{m.pca_skeleton_no_deviations()}</p>
         ) : (
           <ul className="space-y-2 text-sm text-ih-fg-1">
             {deviations.map((d) => (
               <li key={d.id} className="border-l-2 border-ih-border pl-3">
                 <span className="font-medium">{d.area}:</span> {d.deviation}
-                <span className="block text-ih-fg-3">Baseline: {d.baselineRequirement} — Reason: {d.reason}</span>
+                <span className="block text-ih-fg-3">{m.pca_skeleton_deviation_baseline_reason({ baseline: d.baselineRequirement, reason: d.reason })}</span>
               </li>
             ))}
           </ul>
         )}
       </section>
-      <Block id="summary.recommendations" title="1.5 Recommendations">{narrative.summaryRecommendations}</Block>
+      <Block id="summary.recommendations" title={m.pca_skeleton_summary_recommendations()}>{narrative.summaryRecommendations}</Block>
 
       {/* 2. INTRODUCTION */}
-      <h2 id="introduction" className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3 scroll-mt-4">2. Introduction</h2>
-      <Block id="introduction.purpose" title="2.1 Purpose">{narrative.purpose}</Block>
-      <Block id="introduction.scope-of-work" title="2.2 Scope of Work">{narrative.scopeOfWork}</Block>
-      <Block id="introduction.limitations-exceptions" title="2.3 Limitations & Exceptions">{narrative.limitationsExceptions}</Block>
-      <Block id="introduction.reconnaissance" title="2.4 General Property Reconnaissance">{narrative.reconnaissance}</Block>
+      <h2 id="introduction" className="mb-3 mt-6 text-sm font-semibold uppercase tracking-wide text-ih-fg-3 scroll-mt-4">{m.pca_skeleton_introduction()}</h2>
+      <Block id="introduction.purpose" title={m.pca_skeleton_introduction_purpose()}>{narrative.purpose}</Block>
+      <Block id="introduction.scope-of-work" title={m.pca_skeleton_introduction_scope_of_work()}>{narrative.scopeOfWork}</Block>
+      <Block id="introduction.limitations-exceptions" title={m.pca_skeleton_introduction_limitations()}>{narrative.limitationsExceptions}</Block>
+      <Block id="introduction.reconnaissance" title={m.pca_skeleton_introduction_reconnaissance()}>{narrative.reconnaissance}</Block>
       {/* 2.5 User Reliance + §11.4.4 arm's-length disclosure slot (Phase M copy). */}
       <section id="introduction.user-reliance" className="mb-5 print:break-inside-avoid scroll-mt-4">
-        <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">2.5 User Reliance</h3>
+        <h3 className="mb-1 text-sm font-semibold text-ih-fg-2">{m.pca_skeleton_introduction_user_reliance()}</h3>
         <p data-pca-reliance className="text-sm text-ih-fg-3">
-          {relianceText?.userReliance ||
-            "The consultant’s relationship to the client is disclosed in accordance with ASTM E2018 §7.3."}
+          {relianceText?.userReliance || m.pca_skeleton_reliance_default()}
         </p>
         {relianceText?.pointInTime ? (
           <p className="text-sm text-ih-fg-3">{relianceText.pointInTime}</p>
@@ -169,10 +169,10 @@ export function PcaSkeleton({
 
       {/* 3. GENERAL PROPERTY DESCRIPTION — chapter divider (Phase O); detailed
           content lives in the Building Profile block above the fold. */}
-      <ChapterDivider id="property-description" title="General Property Description" />
+      <ChapterDivider id="property-description" title={m.pca_skeleton_chapter_property_description()} />
 
       {/* Document Review & Interviews. */}
-      <Block id="document-review" title="Document Review & Interviews">
+      <Block id="document-review" title={m.pca_skeleton_document_review()}>
         <DocumentReviewTable items={documentReview} />
         <PsqExhibit psq={psq} />
       </Block>
@@ -183,13 +183,13 @@ export function PcaSkeleton({
           these canonical ASTM chapter ids 1:1. These headings exist so every
           registry entry has a real anchor and the report shows the full
           chapter structure; a later phase can bind real content to them. */}
-      <ChapterDivider id="site" title="Site" />
-      <ChapterDivider id="structural-envelope" title="Structural Frame & Building Envelope" />
-      <ChapterDivider id="mep" title="Mechanical, Electrical & Plumbing" />
-      <ChapterDivider id="interior" title="Interior Elements" />
-      <ChapterDivider id="life-safety" title="Life Safety / Fire Protection" />
+      <ChapterDivider id="site" title={m.pca_skeleton_chapter_site()} />
+      <ChapterDivider id="structural-envelope" title={m.pca_skeleton_chapter_structural_envelope()} />
+      <ChapterDivider id="mep" title={m.pca_skeleton_chapter_mep()} />
+      <ChapterDivider id="interior" title={m.pca_skeleton_chapter_interior()} />
+      <ChapterDivider id="life-safety" title={m.pca_skeleton_chapter_life_safety()} />
 
-      <Block id="additional-considerations" title="Additional Considerations">{narrative.additionalConsiderations}</Block>
+      <Block id="additional-considerations" title={m.pca_skeleton_additional_considerations()}>{narrative.additionalConsiderations}</Block>
     </div>
   );
 }

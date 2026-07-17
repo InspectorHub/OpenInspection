@@ -7,9 +7,10 @@ import { PageHeader, Card, StatCard, Button, EmptyState, Modal, Table, Pill, typ
 import { MoneyInput } from "~/components/MoneyInput";
 import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Invoices - OpenInspection" }];
+  return [{ title: m.invoices_meta_title() }];
 }
 
 type InvoiceRow = {
@@ -54,12 +55,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 }
 
-const PAY_METHODS = [
-  { value: "check", label: "Check" },
-  { value: "cash", label: "Cash" },
-  { value: "offline", label: "Bank / Other offline" },
-  { value: "other", label: "Other" },
-] as const;
+// Built as a thunk (not a module-level const) so the Paraglide `m.*()` labels
+// resolve inside the per-request locale scope instead of freezing at import.
+function getPayMethods() {
+  return [
+    { value: "check", label: m.invoices_pay_method_check() },
+    { value: "cash", label: m.invoices_pay_method_cash() },
+    { value: "offline", label: m.invoices_pay_method_offline() },
+    { value: "other", label: m.invoices_pay_method_other() },
+  ] as const;
+}
 
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
@@ -82,7 +87,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const dueDate = String(fd.get("dueDate") || "").trim() || null;
     const notes = String(fd.get("notes") || "").trim() || null;
     if (!clientName || !Number.isFinite(amountDollars) || amountDollars <= 0) {
-      return { intent, ok: false, error: "Client name and a positive amount are required." };
+      return { intent, ok: false, error: m.invoices_action_error_amount() };
     }
     const api = createApi(context, { token });
     const res = await api.invoices.index.$post({
@@ -97,7 +102,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
     if (!res.ok) {
       const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return { intent, ok: false, error: err?.error?.message ?? "Failed to create the invoice." };
+      return { intent, ok: false, error: err?.error?.message ?? m.invoices_action_error_create() };
     }
     return { intent, ok: true, error: null };
   }
@@ -113,9 +118,16 @@ const STATUS_TONE: Record<InvoiceRow["status"], PillTone> = {
   void: "neutral",
 };
 
-const METHOD_LABEL: Record<string, string> = {
-  card: "Card", check: "Check", cash: "Cash", offline: "Offline", other: "Other",
-};
+function methodLabel(method: string): string {
+  const labels: Record<string, string> = {
+    card: m.invoices_method_label_card(),
+    check: m.invoices_method_label_check(),
+    cash: m.invoices_method_label_cash(),
+    offline: m.invoices_method_label_offline(),
+    other: m.invoices_method_label_other(),
+  };
+  return labels[method];
+}
 
 function NewInvoiceModal({
   open,
@@ -147,11 +159,11 @@ function NewInvoiceModal({
   const labelCls = "block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1";
 
   return (
-    <Modal open={open} onClose={onClose} title="New invoice" size="md">
+    <Modal open={open} onClose={onClose} title={m.invoices_new_title()} size="md">
       <fetcher.Form method="post" className="space-y-4">
         <input type="hidden" name="intent" value="create-invoice" />
         <div>
-          <label htmlFor="ninv-inspection" className={labelCls}>Inspection (links the payment page)</label>
+          <label htmlFor="ninv-inspection" className={labelCls}>{m.invoices_new_inspection_label()}</label>
           <select
             id="ninv-inspection"
             name="inspectionId"
@@ -162,7 +174,7 @@ function NewInvoiceModal({
               if (insp?.clientName && !clientName) setClientName(insp.clientName);
             }}
           >
-            <option value="">— No inspection (standalone invoice) —</option>
+            <option value="">{m.invoices_new_no_inspection()}</option>
             {inspections.map((i) => (
               <option key={i.id} value={i.id}>
                 {(i.propertyAddress || i.id.slice(0, 8)) + (i.date ? ` · ${i.date.slice(0, 10)}` : "")}
@@ -171,7 +183,7 @@ function NewInvoiceModal({
           </select>
         </div>
         <div>
-          <label htmlFor="ninv-client" className={labelCls}>Client name</label>
+          <label htmlFor="ninv-client" className={labelCls}>{m.invoices_new_client_label()}</label>
           <input
             id="ninv-client" name="clientName" required className={inputCls}
             value={clientName} onChange={(e) => setClientName(e.target.value)}
@@ -179,17 +191,17 @@ function NewInvoiceModal({
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label htmlFor="ninv-amount" className={labelCls}>Amount (USD)</label>
-            <MoneyInput cents={amountCents} onChange={setAmountCents} ariaLabel="Amount (USD)" className={inputCls} />
+            <label htmlFor="ninv-amount" className={labelCls}>{m.invoices_new_amount_label()}</label>
+            <MoneyInput cents={amountCents} onChange={setAmountCents} ariaLabel={m.invoices_new_amount_label()} className={inputCls} />
             <input type="hidden" name="amount" value={amountCents == null ? "" : String(amountCents / 100)} />
           </div>
           <div>
-            <label htmlFor="ninv-due" className={labelCls}>Due date</label>
+            <label htmlFor="ninv-due" className={labelCls}>{m.invoices_new_due_label()}</label>
             <input id="ninv-due" name="dueDate" type="date" className={inputCls} />
           </div>
         </div>
         <div>
-          <label htmlFor="ninv-notes" className={labelCls}>Notes</label>
+          <label htmlFor="ninv-notes" className={labelCls}>{m.invoices_new_notes_label()}</label>
           <input id="ninv-notes" name="notes" className={inputCls} />
         </div>
         {fetcher.data?.intent === "create-invoice" && fetcher.data.error && (
@@ -198,11 +210,11 @@ function NewInvoiceModal({
         <div className="flex justify-end gap-3 pt-2 border-t border-ih-border">
           <button type="button" onClick={onClose} disabled={busy}
             className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
-            Cancel
+            {m.common_cancel()}
           </button>
           <button type="submit" disabled={busy}
             className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
-            {busy ? "Creating…" : "Create invoice"}
+            {busy ? m.invoices_new_creating() : m.invoices_new_create()}
           </button>
         </div>
       </fetcher.Form>
@@ -237,9 +249,9 @@ export default function InvoicesPage() {
   return (
     <div className="space-y-ih-list">
       <PageHeader
-        title={`${total} ${total === 1 ? "Invoice" : "Invoices"}`}
-        meta={`${total} ${total === 1 ? "invoice" : "invoices"}`}
-        actions={<Button variant="primary" onClick={() => setNewOpen(true)}>+ New Invoice</Button>}
+        title={`${total} ${total === 1 ? m.invoices_count_singular() : m.invoices_count_plural()}`}
+        meta={`${total} ${total === 1 ? m.invoices_meta_singular() : m.invoices_meta_plural()}`}
+        actions={<Button variant="primary" onClick={() => setNewOpen(true)}>{m.invoices_new_button()}</Button>}
       />
 
       <NewInvoiceModal open={newOpen} onClose={() => setNewOpen(false)} inspections={inspections} />
@@ -247,10 +259,10 @@ export default function InvoicesPage() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "TOTAL", value: String(total) },
-          { label: "UNPAID", value: String(unpaid) },
-          { label: "PAID", value: String(paid) },
-          { label: "REVENUE", value: formatCurrency(revenue, { locale, currency }) },
+          { label: m.invoices_stat_total(), value: String(total) },
+          { label: m.invoices_stat_unpaid(), value: String(unpaid) },
+          { label: m.invoices_stat_paid(), value: String(paid) },
+          { label: m.invoices_stat_revenue(), value: formatCurrency(revenue, { locale, currency }) },
         ].map((s) => (
           <StatCard key={s.label} label={s.label} value={s.value} />
         ))}
@@ -261,27 +273,27 @@ export default function InvoicesPage() {
         <Table<InvoiceRow>
           rows={invoices}
           getRowKey={(invoice) => invoice.id}
-          empty={<EmptyState title="No invoices yet" />}
+          empty={<EmptyState title={m.invoices_empty_title()} />}
           columns={[
-            { label: "Client", cell: (invoice) => <span className="font-medium text-ih-fg-1">{invoice.clientName || "—"}</span> },
-            { label: "Amount", cell: (invoice) => <span className="font-mono text-ih-fg-1">{formatCurrency(invoice.amountCents, { locale, currency: invoice.currency || currency })}</span> },
-            { label: "Due Date", cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate || "—"}</span> },
+            { label: m.invoices_col_client(), cell: (invoice) => <span className="font-medium text-ih-fg-1">{invoice.clientName || "—"}</span> },
+            { label: m.invoices_col_amount(), cell: (invoice) => <span className="font-mono text-ih-fg-1">{formatCurrency(invoice.amountCents, { locale, currency: invoice.currency || currency })}</span> },
+            { label: m.invoices_col_due(), cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate || "—"}</span> },
             {
-              label: "Status",
+              label: m.invoices_col_status(),
               cell: (invoice) => {
                 const isPaid = invoice.status === "paid";
                 return (
                   <Pill tone={STATUS_TONE[invoice.status] ?? "neutral"} className="uppercase tracking-wide">
                     {invoice.status}
                     {isPaid && invoice.paymentMethod && (
-                      <span className="font-medium normal-case tracking-normal opacity-80">· {METHOD_LABEL[invoice.paymentMethod]}</span>
+                      <span className="font-medium normal-case tracking-normal opacity-80">· {methodLabel(invoice.paymentMethod)}</span>
                     )}
                   </Pill>
                 );
               },
             },
             {
-              label: "Action",
+              label: m.invoices_col_action(),
               align: "right",
               cell: (invoice) => {
                 const isPaid = invoice.status === "paid";
@@ -290,15 +302,15 @@ export default function InvoicesPage() {
                 if (pickerFor === invoice.id) {
                   return (
                     <div className="inline-flex flex-wrap items-center justify-end gap-1.5">
-                      <span className="text-[11px] text-ih-fg-3 mr-1">Paid by:</span>
-                      {PAY_METHODS.map((m) => (
+                      <span className="text-[11px] text-ih-fg-3 mr-1">{m.invoices_paid_by()}</span>
+                      {getPayMethods().map((method) => (
                         <button
-                          key={m.value}
-                          onClick={() => markPaid(invoice.id, m.value)}
+                          key={method.value}
+                          onClick={() => markPaid(invoice.id, method.value)}
                           disabled={busy}
                           className="px-2 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 hover:border-ih-ok-fg hover:text-ih-ok-fg transition-colors disabled:opacity-50"
                         >
-                          {m.label}
+                          {method.label}
                         </button>
                       ))}
                       <button
@@ -306,7 +318,7 @@ export default function InvoicesPage() {
                         disabled={busy}
                         className="px-2 h-7 rounded-md text-[12px] font-semibold text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-50"
                       >
-                        Cancel
+                        {m.common_cancel()}
                       </button>
                     </div>
                   );
@@ -316,7 +328,7 @@ export default function InvoicesPage() {
                     onClick={() => setPickerFor(invoice.id)}
                     className="px-3 h-7 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
                   >
-                    Mark paid
+                    {m.invoices_mark_paid()}
                   </button>
                 );
               },
@@ -326,7 +338,7 @@ export default function InvoicesPage() {
       </Card>
 
       <p className="text-[12px] text-ih-fg-4">
-        &ldquo;Mark paid&rdquo; records an offline payment (check, cash, bank transfer) and unlocks the report. Online card payments are marked automatically when the customer pays.
+        {m.invoices_footer_note()}
       </p>
     </div>
   );

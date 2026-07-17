@@ -6,12 +6,13 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { VariableChips } from "~/components/email-template/VariableChips";
 import { EmailPreview } from "~/components/email-template/EmailPreview";
+import { m } from "~/paraglide/messages";
 
 interface BlockField { key: string; label: string; multiline: boolean; value: string; }
 interface Detail { trigger: string; name: string; required: boolean; enabled: boolean; subject: string; blocks: BlockField[]; variables: { name: string; desc: string }[]; }
 
 export function meta({ data }: Route.MetaArgs) {
-  return [{ title: `${data?.detail?.name ?? "Template"} - Communication - OpenInspection` }];
+  return [{ title: m.settings_comms_template_meta_title({ name: data?.detail?.name ?? m.settings_comms_template_meta_fallback() }) }];
 }
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
@@ -47,7 +48,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
   if (intent === "reset") {
     const res = await api.emailTemplates["email-templates"][":trigger"].reset.$post({ param: { trigger } });
-    if (!res.ok) return { ok: false as const, error: "Failed to reset." };
+    if (!res.ok) return { ok: false as const, error: m.settings_comms_template_reset_error() };
     return redirect(`/settings/communication/templates/${trigger}`);
   }
 
@@ -63,7 +64,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   });
   if (!res.ok) {
     const msg = await res.json().then((b) => (b as { error?: { message?: string } }).error?.message).catch(() => undefined);
-    return { ok: false as const, error: msg ?? "Failed to save." };
+    return { ok: false as const, error: msg ?? m.settings_comms_template_save_error() };
   }
   return { ok: true as const };
 }
@@ -103,8 +104,8 @@ function TemplateEditor({ detail }: { detail: Detail }) {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <SettingsCrumb
           items={[
-            { label: "Settings", href: "/settings" },
-            { label: "Communication", href: "/settings/communication" },
+            { label: m.settings_crumb_root(), href: "/settings" },
+            { label: m.settings_comms_crumb(), href: "/settings/communication" },
             { label: detail.name },
           ]}
         />
@@ -112,18 +113,18 @@ function TemplateEditor({ detail }: { detail: Detail }) {
           {confirmReset ? (
             <Form method="post" className="flex items-center gap-2">
               <input type="hidden" name="intent" value="reset" />
-              <span className="text-[12px] text-ih-fg-3">Reset to default?</span>
-              <button type="submit" className="h-8 px-3 rounded-md bg-ih-bad-bg text-ih-bad-fg border border-ih-bad text-[12px] font-bold">Reset</button>
-              <button type="button" onClick={() => setConfirmReset(false)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] text-ih-fg-2">Cancel</button>
+              <span className="text-[12px] text-ih-fg-3">{m.settings_comms_template_reset_confirm()}</span>
+              <button type="submit" className="h-8 px-3 rounded-md bg-ih-bad-bg text-ih-bad-fg border border-ih-bad text-[12px] font-bold">{m.settings_comms_template_reset_button()}</button>
+              <button type="button" onClick={() => setConfirmReset(false)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] text-ih-fg-2">{m.common_cancel()}</button>
             </Form>
           ) : (
-            <button type="button" onClick={() => setConfirmReset(true)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">Reset to default</button>
+            <button type="button" onClick={() => setConfirmReset(true)} className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">{m.settings_comms_template_reset_default()}</button>
           )}
         </div>
       </div>
 
       {actionData && "ok" in actionData && actionData.ok && (
-        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok text-[13px] text-ih-ok-fg font-medium">Saved.</div>
+        <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok text-[13px] text-ih-ok-fg font-medium">{m.settings_flash_saved_short()}</div>
       )}
       {actionData && "ok" in actionData && !actionData.ok && (
         <div className="px-4 py-2.5 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg font-medium">{actionData.error}</div>
@@ -135,7 +136,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
         <div className="space-y-5 bg-ih-bg-card border border-ih-border rounded-lg p-5">
           {!detail.required ? (
             <label className="flex items-center justify-between gap-3">
-              <span className="text-[13px] text-ih-fg-2">Send this email</span>
+              <span className="text-[13px] text-ih-fg-2">{m.settings_comms_template_send_toggle()}</span>
               <input type="checkbox" name="enabled" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 rounded border-ih-border" />
             </label>
           ) : (
@@ -143,7 +144,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
           )}
 
           <div>
-            <label htmlFor="field-subject" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">Subject</label>
+            <label htmlFor="field-subject" className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_comms_template_subject_label()}</label>
             <input id="field-subject" name="subject" value={subject} onFocus={(e) => (activeRef.current = e.currentTarget)} onChange={(e) => setSubject(e.target.value)}
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none" />
           </div>
@@ -162,11 +163,11 @@ function TemplateEditor({ detail }: { detail: Detail }) {
           ))}
 
           <div className="pt-3 border-t border-ih-border space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Variables — click to insert</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_comms_template_variables_hint()}</p>
             <VariableChips
                 variables={[
                   ...detail.variables,
-                  { name: "signature", desc: "Your email signature — set it in Settings → Profile" },
+                  { name: "signature", desc: m.settings_comms_template_signature_desc() },
                 ]}
                 onInsert={insert}
               />
@@ -174,7 +175,7 @@ function TemplateEditor({ detail }: { detail: Detail }) {
 
           <div className="flex justify-end pt-2">
             <button type="submit" disabled={saving} className="h-9 px-5 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60">
-              {saving ? "Saving…" : "Save changes"}
+              {saving ? m.common_saving() : m.settings_comms_template_save_changes()}
             </button>
           </div>
         </div>

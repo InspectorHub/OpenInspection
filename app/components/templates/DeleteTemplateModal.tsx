@@ -1,4 +1,5 @@
 import { Modal } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface DeleteTemplateModalProps {
   open: boolean;
@@ -11,7 +12,7 @@ export function DeleteTemplateModal({ open, setDeleteConfirm, handleDelete }: De
     <Modal
       open={open}
       onClose={() => setDeleteConfirm(null)}
-      title="Delete Template"
+      title={m.templates_delete_title()}
       size="sm"
       footer={
         <>
@@ -20,20 +21,20 @@ export function DeleteTemplateModal({ open, setDeleteConfirm, handleDelete }: De
             onClick={() => setDeleteConfirm(null)}
             className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
           <button
             type="button"
             onClick={handleDelete}
             className="h-8 px-4 rounded-md bg-ih-bad-fg text-white font-bold text-[13px] hover:bg-ih-bad-fg"
           >
-            Delete
+            {m.common_delete()}
           </button>
         </>
       }
     >
       <p className="text-[13px] text-ih-fg-3">
-        Are you sure you want to delete this template? This cannot be undone.
+        {m.templates_delete_body()}
       </p>
     </Modal>
   );

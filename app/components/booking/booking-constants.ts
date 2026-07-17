@@ -1,12 +1,26 @@
-export const STEPS = ["Property", "Services", "Schedule", "Confirm"] as const;
+import { m } from "~/paraglide/messages";
 
-export const TIME_WINDOWS = [
-  { id: "morning", label: "Morning", detail: "8:00 AM - 12:00 PM" },
-  { id: "afternoon", label: "Afternoon", detail: "12:00 PM - 5:00 PM" },
-  // id must match the API timeSlot enum ('all-day', not 'allday')
-  { id: "all-day", label: "All Day", detail: "Flexible timing" },
-  { id: "custom", label: "Custom", detail: "Pick a specific time" },
-] as const;
+// Functions (not module consts) so the labels resolve in the active locale at
+// call time, never frozen at import. The `id`s are the API timeSlot enum and
+// stay literal.
+export function stepLabels(): string[] {
+  return [
+    m.helper_booking_step_property(),
+    m.helper_booking_step_services(),
+    m.helper_booking_step_schedule(),
+    m.helper_booking_step_confirm(),
+  ];
+}
+
+export function timeWindows(): { id: string; label: string; detail: string }[] {
+  return [
+    { id: "morning", label: m.helper_booking_window_morning_label(), detail: m.helper_booking_window_morning_detail() },
+    { id: "afternoon", label: m.helper_booking_window_afternoon_label(), detail: m.helper_booking_window_afternoon_detail() },
+    // id must match the API timeSlot enum ('all-day', not 'allday')
+    { id: "all-day", label: m.helper_booking_window_allday_label(), detail: m.helper_booking_window_allday_detail() },
+    { id: "custom", label: m.helper_booking_window_custom_label(), detail: m.helper_booking_window_custom_detail() },
+  ];
+}
 
 export interface CompanyProfile {
   company: string;

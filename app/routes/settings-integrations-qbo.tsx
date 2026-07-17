@@ -6,6 +6,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { getApiUrl } from "~/lib/api.server";
 import { SecretField } from "~/components/SecretField";
+import { m } from "~/paraglide/messages";
 
 interface QboStatus {
   connected: boolean;
@@ -17,7 +18,7 @@ interface QboStatus {
 }
 
 export function meta() {
-  return [{ title: "QuickBooks Integration - OpenInspection" }];
+  return [{ title: m.settings_qbo_meta_title() }];
 }
 
 type BffEnv = { API_WORKER?: { fetch: typeof fetch } };
@@ -93,7 +94,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         return {
           success: false,
           intent,
-          error: errBody?.error?.message ?? "Failed to save QBO keys.",
+          error: errBody?.error?.message ?? m.settings_qbo_save_error(),
           syncEnabled: undefined,
         };
       }
@@ -104,7 +105,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "qbo-sync" || intent === "qbo-pause" || intent === "qbo-disconnect") {
     const path = intent === "qbo-sync" ? "/sync" : intent === "qbo-pause" ? "/pause" : "/disconnect";
     const res = await qboApiFetch(context, cookie, path, "POST");
-    if (!res?.ok) return { success: false, intent, error: `${intent} failed`, syncEnabled: undefined };
+    if (!res?.ok) return { success: false, intent, error: m.settings_qbo_action_failed({ intent }), syncEnabled: undefined };
 
     if (intent === "qbo-pause") {
       const body = await res.json() as { data?: { syncEnabled?: boolean } };
@@ -113,15 +114,15 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { success: true, intent, error: null, syncEnabled: undefined };
   }
 
-  return { success: false, intent, error: "Unknown action", syncEnabled: undefined };
+  return { success: false, intent, error: m.settings_unknown_action(), syncEnabled: undefined };
 }
 
 function timeSince(ts: number | null | undefined): string {
-  if (!ts) return "Never";
+  if (!ts) return m.settings_qbo_time_never();
   const diff = Math.floor(Date.now() / 1000) - ts;
-  if (diff < 60) return "Just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)} minutes ago`;
-  return `${Math.floor(diff / 3600)} hours ago`;
+  if (diff < 60) return m.settings_qbo_time_just_now();
+  if (diff < 3600) return m.settings_qbo_time_minutes_ago({ minutes: Math.floor(diff / 60) });
+  return m.settings_qbo_time_hours_ago({ hours: Math.floor(diff / 3600) });
 }
 
 export default function SettingsIntegrationsQbo() {
@@ -177,16 +178,16 @@ export default function SettingsIntegrationsQbo() {
     <div className="space-y-ih-list">
       <SettingsCrumb
         items={[
-          { label: "Settings", href: "/settings" },
-          { label: "Integrations", href: "/settings/integrations" },
-          { label: "QuickBooks Online" },
+          { label: m.settings_crumb_root(), href: "/settings" },
+          { label: m.settings_integrations_crumb(), href: "/settings/integrations" },
+          { label: m.settings_qbo_crumb() },
         ]}
       />
 
       {/* Flash */}
       {flashVisible && actionData?.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          QBO credentials saved.
+          {m.settings_qbo_flash_saved()}
         </div>
       )}
       {actionData?.error && (
@@ -197,39 +198,38 @@ export default function SettingsIntegrationsQbo() {
 
       {/* QBO API credentials */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">API credentials</h3>
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_qbo_api_credentials_heading()}</h3>
         <p className="text-[13px] text-ih-fg-3">
-          OAuth credentials from your QuickBooks Developer app. Required before connecting.
-          Get them at{" "}
+          {m.settings_qbo_credentials_desc_before()}{" "}
           <a href="https://developer.intuit.com/app/developer/appdetail" target="_blank" rel="noopener noreferrer"
             className="text-ih-primary hover:underline">
-            developer.intuit.com
+            {m.settings_qbo_credentials_link()}
           </a>.
         </p>
         <Form method="post" className="space-y-4 max-w-xl">
           <input type="hidden" name="intent" value="save-qbo-secrets" />
           <SecretField
             name="QBO_CLIENT_ID"
-            label="QBO Client ID"
+            label={m.settings_qbo_client_id_label()}
             value={secrets.QBO_CLIENT_ID}
-            hint="QuickBooks Online integration for invoice sync. Create at developer.intuit.com → My Apps"
+            hint={m.settings_qbo_client_id_hint()}
           />
           <SecretField
             name="QBO_CLIENT_SECRET"
-            label="QBO Client Secret"
+            label={m.settings_qbo_client_secret_label()}
             value={secrets.QBO_CLIENT_SECRET}
-            hint="Paired with Client ID. Found in the same Intuit app settings"
+            hint={m.settings_qbo_client_secret_hint()}
           />
           <SecretField
             name="QBO_WEBHOOK_SECRET"
-            label="QBO Webhook Verifier Token"
+            label={m.settings_qbo_webhook_label()}
             value={secrets.QBO_WEBHOOK_SECRET}
-            hint="Verifies QuickBooks data change notifications. Found at developer.intuit.com → Webhooks"
+            hint={m.settings_qbo_webhook_hint()}
           />
           <div className="flex justify-end pt-2 border-t border-ih-border">
             <button type="submit" disabled={savingSecrets}
               className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
-              {savingSecrets ? "Saving…" : "Save credentials"}
+              {savingSecrets ? m.common_saving() : m.settings_qbo_save_credentials()}
             </button>
           </div>
         </Form>
@@ -252,9 +252,9 @@ export default function SettingsIntegrationsQbo() {
             />
           </svg>
           <span>
-            Your QuickBooks connection expires soon.{" "}
+            {m.settings_qbo_expiry_warning()}{" "}
             <a href="/settings/integrations/qbo/connect" className="underline font-semibold">
-              Reconnect to avoid interruption.
+              {m.settings_qbo_reconnect_link()}
             </a>
           </span>
         </div>
@@ -267,31 +267,27 @@ export default function SettingsIntegrationsQbo() {
             <span className="text-[#2CA01C] text-2xl font-extrabold">QB</span>
           </div>
           <h3 className="text-[16px] font-bold text-ih-fg-1 mb-2">
-            Connect QuickBooks Online
+            {m.settings_qbo_connect_heading()}
           </h3>
           <ul className="text-[13px] text-ih-fg-3 text-left max-w-xs mx-auto mb-6 space-y-2">
             <li className="flex items-start gap-2">
-              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> Real-time
-              invoice sync
+              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> {m.settings_qbo_feature_sync()}
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> Automatic
-              payment status updates
+              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> {m.settings_qbo_feature_payments()}
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> Duplicate
-              customer detection
+              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> {m.settings_qbo_feature_dedup()}
             </li>
             <li className="flex items-start gap-2">
-              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> Invoice
-              void and refund sync
+              <span className="text-ih-ok-fg mt-0.5">&#x2713;</span> {m.settings_qbo_feature_void()}
             </li>
           </ul>
           <a
             href="/settings/integrations/qbo/connect"
             className="inline-flex items-center gap-2 px-6 py-3 bg-[#2CA01C] text-white rounded-lg font-bold text-[13px] hover:bg-[#237a16] transition-colors"
           >
-            Connect QuickBooks
+            {m.settings_qbo_connect_button()}
           </a>
         </div>
       )}
@@ -304,10 +300,10 @@ export default function SettingsIntegrationsQbo() {
             <div className="flex items-start justify-between mb-4">
               <div>
                 <p className="font-bold text-[14px] text-ih-fg-1">
-                  {status.companyName ?? "Connected"}
+                  {status.companyName ?? m.settings_qbo_connected_fallback()}
                 </p>
                 <p className="text-[12px] text-ih-fg-3 mt-0.5">
-                  Last synced: {timeSince(status.lastSyncAt)}
+                  {m.settings_qbo_last_synced({ time: timeSince(status.lastSyncAt) })}
                 </p>
               </div>
               <span
@@ -324,7 +320,7 @@ export default function SettingsIntegrationsQbo() {
  : "bg-ih-fg-4"
  }`}
                 />
-                {status.syncEnabled ? "Active" : "Paused"}
+                {status.syncEnabled ? m.settings_qbo_status_active() : m.settings_qbo_status_paused()}
               </span>
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -333,19 +329,19 @@ export default function SettingsIntegrationsQbo() {
                 disabled={syncing}
                 className="px-4 py-2 text-[12px] font-bold bg-ih-primary-tint text-ih-primary rounded-md hover:bg-ih-primary-tint transition-colors disabled:opacity-50"
               >
-                {syncing ? "Syncing..." : "Sync Now"}
+                {syncing ? m.settings_qbo_syncing() : m.settings_qbo_sync_now()}
               </button>
               <button
                 onClick={togglePause}
                 className="px-4 py-2 text-[12px] font-bold bg-ih-bg-muted text-ih-fg-2 rounded-md hover:bg-ih-bg-muted transition-colors"
               >
-                {status.syncEnabled ? "Pause Sync" : "Resume Sync"}
+                {status.syncEnabled ? m.settings_qbo_pause_sync() : m.settings_qbo_resume_sync()}
               </button>
               <button
                 onClick={disconnect}
                 className="px-4 py-2 text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bad-bg rounded-md transition-colors"
               >
-                Disconnect
+                {m.settings_qbo_disconnect()}
               </button>
             </div>
           </div>
@@ -367,11 +363,10 @@ export default function SettingsIntegrationsQbo() {
                     d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                Sync Errors ({status.openErrors})
+                {m.settings_qbo_sync_errors({ count: status.openErrors ?? 0 })}
               </h3>
               <p className="text-[12px] text-ih-fg-3">
-                Check the sync error log for details. Errors will retry
-                automatically on the next sync.
+                {m.settings_qbo_sync_errors_desc()}
               </p>
             </div>
           )}

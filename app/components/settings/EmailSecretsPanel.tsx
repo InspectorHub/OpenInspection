@@ -5,17 +5,11 @@ import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import type { action } from "~/routes/settings-communication";
+import { m } from "~/paraglide/messages";
 
 type ActionFetcher = ReturnType<typeof useFetcher<typeof action>>;
 
 type EmailByoProvider = "resend" | "sendgrid" | "postmark" | "mailgun";
-
-const PROVIDER_LABELS: Record<EmailByoProvider, string> = {
-  resend: "Resend",
-  sendgrid: "SendGrid",
-  postmark: "Postmark",
-  mailgun: "Mailgun",
-};
 
 /**
  * Settings → Communication: "Email API keys" panel. Presentational — the route
@@ -37,29 +31,6 @@ const PROVIDER_LABELS: Record<EmailByoProvider, string> = {
  * URL itself is rendered separately from `webhookUrl` so it can carry the live
  * origin + tenant slug.
  */
-const WEBHOOK_FIELDS: Record<EmailByoProvider, { name: string; label: string; hint: string }> = {
-  resend: {
-    name: "RESEND_WEBHOOK_SECRET",
-    label: "Resend Webhook Signing Secret",
-    hint: "Resend → Webhooks → Signing Secret (starts with whsec_). Point the webhook at the URL below.",
-  },
-  sendgrid: {
-    name: "SENDGRID_WEBHOOK_PUBLIC_KEY",
-    label: "SendGrid Event Webhook Verification Key",
-    hint: "SendGrid → Settings → Mail Settings → Event Webhook → Signed Event Webhook (base64 public key). Point the webhook at the URL below.",
-  },
-  postmark: {
-    name: "POSTMARK_WEBHOOK_TOKEN",
-    label: "Postmark Webhook Token",
-    hint: "A shared token you choose. Append it as ?token=… on the webhook URL below (Postmark → Servers → Webhooks).",
-  },
-  mailgun: {
-    name: "MAILGUN_SIGNING_KEY",
-    label: "Mailgun Webhook Signing Key",
-    hint: "Mailgun → Settings → Webhooks → HTTP webhook signing key. Point the webhook at the URL below.",
-  },
-};
-
 export function EmailSecretsPanel({
   secrets,
   secretFieldError,
@@ -98,6 +69,34 @@ export function EmailSecretsPanel({
   /** Persisted "Test connection" history (shared loader list, filtered to email). */
   testResults?: ConnectionTestResult[];
 }) {
+  const PROVIDER_LABELS: Record<EmailByoProvider, string> = {
+    resend: m.settings_email_provider_resend(),
+    sendgrid: m.settings_email_provider_sendgrid(),
+    postmark: m.settings_email_provider_postmark(),
+    mailgun: m.settings_email_provider_mailgun(),
+  };
+  const WEBHOOK_FIELDS: Record<EmailByoProvider, { name: string; label: string; hint: string }> = {
+    resend: {
+      name: "RESEND_WEBHOOK_SECRET",
+      label: m.settings_emailsecrets_webhook_resend_label(),
+      hint: m.settings_emailsecrets_webhook_resend_hint(),
+    },
+    sendgrid: {
+      name: "SENDGRID_WEBHOOK_PUBLIC_KEY",
+      label: m.settings_emailsecrets_webhook_sendgrid_label(),
+      hint: m.settings_emailsecrets_webhook_sendgrid_hint(),
+    },
+    postmark: {
+      name: "POSTMARK_WEBHOOK_TOKEN",
+      label: m.settings_emailsecrets_webhook_postmark_label(),
+      hint: m.settings_emailsecrets_webhook_postmark_hint(),
+    },
+    mailgun: {
+      name: "MAILGUN_SIGNING_KEY",
+      label: m.settings_emailsecrets_webhook_mailgun_label(),
+      hint: m.settings_emailsecrets_webhook_mailgun_hint(),
+    },
+  };
   const [provider, setProvider] = useState<EmailByoProvider>(initialProvider);
   const webhookField = WEBHOOK_FIELDS[provider];
   const webhookUrl =
@@ -107,10 +106,9 @@ export function EmailSecretsPanel({
 
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-      <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email API keys</h3>
+      <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_emailsecrets_heading()}</h3>
       <p className="text-[13px] text-ih-fg-3">
-        Without email configured, password resets and booking confirmations will not be sent.
-        Choose your email provider and enter its API credentials.
+        {m.settings_emailsecrets_desc()}
       </p>
 
       <Form method="post" className="space-y-4">
@@ -120,7 +118,7 @@ export function EmailSecretsPanel({
 
         {/* Provider choice */}
         <div className="space-y-1.5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Email provider</p>
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_emailsecrets_provider_label()}</p>
           <div className="flex gap-2">
             {(["resend", "sendgrid", "postmark", "mailgun"] as const).map((p) => (
               <button
@@ -143,16 +141,16 @@ export function EmailSecretsPanel({
         {provider === "resend" && (
           <>
             <p className="text-[13px] text-ih-fg-3">
-              Get a key at{" "}
+              {m.settings_emailsecrets_get_key_at()}{" "}
               <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">resend.com</a>.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SecretField
                 name="RESEND_API_KEY"
-                label="Resend API key"
+                label={m.settings_emailsecrets_resend_key_label()}
                 value={secrets.RESEND_API_KEY}
                 error={secretFieldError("RESEND_API_KEY")}
-                hint="Email delivery for reports, confirmations, and password resets. Get your key at resend.com → API Keys"
+                hint={m.settings_emailsecrets_resend_key_hint()}
               />
             </div>
           </>
@@ -164,10 +162,10 @@ export function EmailSecretsPanel({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SecretField
                 name="SENDGRID_API_KEY"
-                label="SendGrid API key"
+                label={m.settings_emailsecrets_sendgrid_key_label()}
                 value={secrets.SENDGRID_API_KEY}
                 error={secretFieldError("SENDGRID_API_KEY")}
-                hint="Starts with SG. — SendGrid → Settings → API Keys"
+                hint={m.settings_emailsecrets_sendgrid_key_hint()}
               />
             </div>
           </>
@@ -179,10 +177,10 @@ export function EmailSecretsPanel({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SecretField
                 name="POSTMARK_SERVER_TOKEN"
-                label="Postmark Server Token"
+                label={m.settings_emailsecrets_postmark_token_label()}
                 value={secrets.POSTMARK_SERVER_TOKEN}
                 error={secretFieldError("POSTMARK_SERVER_TOKEN")}
-                hint="Postmark → Servers → API Tokens"
+                hint={m.settings_emailsecrets_postmark_token_hint()}
               />
             </div>
           </>
@@ -194,17 +192,17 @@ export function EmailSecretsPanel({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <SecretField
                 name="MAILGUN_API_KEY"
-                label="Mailgun API key"
+                label={m.settings_emailsecrets_mailgun_key_label()}
                 value={secrets.MAILGUN_API_KEY}
                 error={secretFieldError("MAILGUN_API_KEY")}
-                hint="Mailgun → Settings → API Keys"
+                hint={m.settings_emailsecrets_mailgun_key_hint()}
               />
               <SecretField
                 name="MAILGUN_DOMAIN"
-                label="Mailgun sending domain"
+                label={m.settings_emailsecrets_mailgun_domain_label()}
                 value={secrets.MAILGUN_DOMAIN}
                 error={secretFieldError("MAILGUN_DOMAIN")}
-                hint="Your sending domain, e.g. mg.yourdomain.com"
+                hint={m.settings_emailsecrets_mailgun_domain_hint()}
               />
             </div>
           </>
@@ -214,15 +212,14 @@ export function EmailSecretsPanel({
             callbacks for the selected provider, feeding the suppression list. */}
         <div className="space-y-3 pt-3 border-t border-ih-border">
           <div className="space-y-1">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Deliverability webhook</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_emailsecrets_deliverability_label()}</p>
             <p className="text-[12px] text-ih-fg-3">
-              Configure {PROVIDER_LABELS[provider]} to send bounce &amp; spam-complaint events here so suppressed
-              addresses are never emailed again.
+              {m.settings_emailsecrets_deliverability_desc({ provider: PROVIDER_LABELS[provider] })}
             </p>
           </div>
           {webhookUrl ? (
             <div className="space-y-1">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">Webhook URL</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_emailsecrets_webhook_url_label()}</p>
               <code className="block w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-muted text-[12px] font-mono text-ih-fg-2 break-all">
                 {webhookUrl}
               </code>
@@ -245,7 +242,7 @@ export function EmailSecretsPanel({
         <div className="flex justify-end pt-3 border-t border-ih-border">
           <button type="submit" disabled={savingEmailSecrets}
             className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
-            {savingEmailSecrets ? "Saving…" : `Save ${PROVIDER_LABELS[provider]} key(s)`}
+            {savingEmailSecrets ? m.common_saving() : m.settings_emailsecrets_save({ provider: PROVIDER_LABELS[provider] })}
           </button>
         </div>
       </Form>
@@ -255,7 +252,7 @@ export function EmailSecretsPanel({
         <TestConnectionButton fetcher={resendTestFetcher} intent="test-resend">
           {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && resendTest.test && "domains" in resendTest.test && (
             <span className="text-[12px] text-ih-fg-2">
-              Connected — {resendTest.test.domains} verified domain(s)
+              {m.settings_emailsecrets_resend_connected({ count: resendTest.test.domains })}
             </span>
           )}
           {resendTest && "intent" in resendTest && resendTest.intent === "test-resend" && "ok" in resendTest && !resendTest.ok && (
@@ -271,8 +268,8 @@ export function EmailSecretsPanel({
         <TestConnectionButton
           fetcher={emailValidateFetcher}
           intent="validate-email-provider"
-          idleLabel="Validate credentials"
-          busyLabel="Validating…"
+          idleLabel={m.settings_emailsecrets_validate_idle()}
+          busyLabel={m.settings_emailsecrets_validate_busy()}
         >
           {/* This input is inside fetcher.Form (TestConnectionButton wraps children in the form) */}
           <input type="hidden" name="provider" value={provider} />
@@ -281,7 +278,7 @@ export function EmailSecretsPanel({
             emailValidateFetcher.data.intent === "validate-email-provider" &&
             "ok" in emailValidateFetcher.data &&
             emailValidateFetcher.data.ok && (
-              <span className="text-[12px] text-ih-ok-fg">Credentials verified.</span>
+              <span className="text-[12px] text-ih-ok-fg">{m.settings_emailsecrets_creds_verified()}</span>
             )}
           {emailValidateFetcher.data &&
             "intent" in emailValidateFetcher.data &&

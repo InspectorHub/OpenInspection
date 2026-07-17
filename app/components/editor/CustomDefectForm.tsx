@@ -1,5 +1,6 @@
 import { Button } from "@core/shared-ui";
 import type { CustomDefectCategory } from "../../lib/custom-defects";
+import { m } from "~/paraglide/messages";
 
 export interface CustomDefectFormProps {
   title: string;
@@ -35,28 +36,28 @@ export function CustomDefectForm({
       <input
         value={title}
         onChange={(e) => onTitleChange(e.target.value)}
-        placeholder="Defect title — e.g. Water stain at sheathing"
-        aria-label="Custom defect title"
+        placeholder={m.editor_customdefect_title_placeholder()}
+        aria-label={m.editor_customdefect_title_aria()}
         autoFocus
         className="w-full h-9 px-3 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus focus:border-ih-primary outline-none"
       />
       <textarea
         value={comment}
         onChange={(e) => onCommentChange(e.target.value)}
-        placeholder="Narrative for the report (optional)"
-        aria-label="Custom defect narrative"
+        placeholder={m.editor_customdefect_narrative_placeholder()}
+        aria-label={m.editor_customdefect_narrative_aria()}
         className="w-full h-16 px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] resize-none focus:shadow-ih-focus focus:border-ih-primary outline-none"
       />
       <div className="flex items-center gap-2">
         <select
           value={category}
           onChange={(e) => onCategoryChange(e.target.value as CustomDefectCategory)}
-          aria-label="Custom defect category"
+          aria-label={m.editor_customdefect_category_aria()}
           className="h-8 px-2 rounded-lg border border-ih-border bg-ih-bg-card text-[12px] outline-none"
         >
-          <option value="safety">Safety</option>
-          <option value="recommendation">Recommendation</option>
-          <option value="maintenance">Maintenance</option>
+          <option value="safety">{m.editor_customdefect_category_safety()}</option>
+          <option value="recommendation">{m.editor_customdefect_category_recommendation()}</option>
+          <option value="maintenance">{m.editor_customdefect_category_maintenance()}</option>
         </select>
         {/* Track H (B-20 回流) — default OFF so one-off findings don't pollute the library */}
         {showSaveToLibrary && (
@@ -67,7 +68,7 @@ export function CustomDefectForm({
               onChange={(e) => onSaveToLibraryChange(e.target.checked)}
               className="w-3.5 h-3.5 rounded border-ih-border-strong text-ih-primary focus:ring-ih-primary/30"
             />
-            Save to my library
+            {m.editor_customdefect_save_to_library()}
           </label>
         )}
         <span className="flex-1" />
@@ -76,7 +77,7 @@ export function CustomDefectForm({
           size="sm"
           onClick={onCancel}
         >
-          Cancel
+          {m.common_cancel()}
         </Button>
         <Button
           variant="primary"
@@ -84,7 +85,7 @@ export function CustomDefectForm({
           onClick={onSubmit}
           disabled={!title.trim()}
         >
-          Add defect
+          {m.editor_customdefect_add()}
         </Button>
       </div>
     </div>

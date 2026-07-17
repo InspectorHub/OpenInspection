@@ -5,6 +5,7 @@ import type { EditorMode } from "./editor-mode";
 import { useSortableReorder } from "./useSortableReorder";
 import { InlineRename } from "./InlineRename";
 import { findingKey } from "~/hooks/findings/shared";
+import { m } from "~/paraglide/messages";
 
 // Handle + ⋯ occupy reserved flex slots so they never cover the item number,
 // label, or rating dot. Desktop reveals on hover; touch always shows them.
@@ -137,8 +138,8 @@ export function ItemList({
               {onReorderItem && !batchMode && (
                 <span
                   data-drag-handle
-                  aria-label={`Drag ${item.label}`}
-                  title="Drag to reorder"
+                  aria-label={m.editor_shared_drag_label({ label: item.label })}
+                  title={m.editor_shared_drag_to_reorder()}
                   className={`shrink-0 w-5 flex items-center justify-center cursor-grab select-none text-ih-fg-4 touch-none ${REVEAL}`}
                 >☰</span>
               )}
@@ -148,7 +149,7 @@ export function ItemList({
                   <span className="text-[10px] text-ih-fg-4 font-mono w-5 shrink-0">{String(idx + 1).padStart(2, "0")}</span>
                   <InlineRename
                     value={item.label}
-                    ariaLabel="Item name"
+                    ariaLabel={m.editor_shared_item_name_aria()}
                     onCommit={(next) => { onRenameItem(item.id, next); setEditingId(null); }}
                     onCancel={() => setEditingId(null)}
                     className="min-w-0 flex-1 bg-transparent border-b border-ih-primary outline-none text-[13px] text-ih-fg-1"
@@ -211,7 +212,7 @@ export function ItemList({
                     onClick={(e) => { e.stopPropagation(); openItemMenu(item.id, e.currentTarget); }}
                     size="sm"
                     className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2"
-                    aria-label={`Edit ${item.label}`}
+                    aria-label={m.editor_shared_edit_label({ label: item.label })}
                     aria-haspopup="true"
                     aria-expanded={menuItemId === item.id}
                   >
@@ -226,19 +227,19 @@ export function ItemList({
                         className="fixed -translate-x-full z-[61] w-36 py-1 bg-ih-bg-card border border-ih-border rounded-md shadow-ih-popover text-[12px]"
                       >
                         {onRenameItem && (
-                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); setEditingId(item.id); }}>Rename</MenuItem>
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); setEditingId(item.id); }}>{m.editor_shared_menu_rename()}</MenuItem>
                         )}
                         {onDuplicateItem && (
-                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDuplicateItem(item.id); }}>Duplicate</MenuItem>
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDuplicateItem(item.id); }}>{m.editor_shared_menu_duplicate()}</MenuItem>
                         )}
                         {onMoveItem && fullIdx > 0 && (
-                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, -1); }}>Move up</MenuItem>
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, -1); }}>{m.editor_shared_menu_move_up()}</MenuItem>
                         )}
                         {onMoveItem && fullIdx < items.length - 1 && (
-                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, 1); }}>Move down</MenuItem>
+                          <MenuItem onClick={(e) => { e.stopPropagation(); closeItemMenu(); onMoveItem(item.id, 1); }}>{m.editor_shared_menu_move_down()}</MenuItem>
                         )}
                         {onDeleteItem && (
-                          <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDeleteItem(item.id); }}>Delete</MenuItem>
+                          <MenuItem tone="danger" onClick={(e) => { e.stopPropagation(); closeItemMenu(); onDeleteItem(item.id); }}>{m.common_delete()}</MenuItem>
                         )}
                       </div>
                     </>,
@@ -258,7 +259,7 @@ export function ItemList({
             onClick={onAddItem}
             className="w-full h-auto py-2 border border-dashed border-ih-border-strong font-bold text-ih-fg-3 hover:bg-transparent hover:text-ih-primary hover:border-ih-primary"
           >
-            + Add item
+            {m.editor_shared_add_item()}
           </Button>
         </div>
       )}

@@ -8,9 +8,10 @@ import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Team - OpenInspection" }];
+  return [{ title: m.settings_team_meta_title() }];
 }
 
 interface Member {
@@ -47,16 +48,18 @@ const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "m
   office: "gen",
 };
 
-const TABS = [
-  { id: "active", label: "Active" },
-  { id: "pending", label: "Pending Invites" },
-];
-
 export default function TeamPage() {
   const { members } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
+
+  // Built in the render (request ALS scope) so the labels resolve per-request
+  // rather than freezing the locale at module import.
+  const TABS = [
+    { id: "active", label: m.settings_team_tab_active() },
+    { id: "pending", label: m.settings_team_tab_pending() },
+  ];
 
   const filtered = members.filter((m) => {
     if (activeTab === "active") return m.status !== "pending";
@@ -85,17 +88,17 @@ export default function TeamPage() {
 
       <Breadcrumb
         items={[
-          { label: "Settings", href: "/settings" },
-          { label: "Team" },
+          { label: m.settings_crumb_settings(), href: "/settings" },
+          { label: m.settings_team_crumb() },
         ]}
       />
 
       <PageHeader
-        title="Workspace Team"
-        meta={`${members.length} ${members.length === 1 ? "member" : "members"}`}
+        title={m.settings_team_heading()}
+        meta={`${members.length} ${members.length === 1 ? m.settings_team_member_singular() : m.settings_team_member_plural()}`}
         actions={
           <Button variant="primary" icon={<PlusIcon />} onClick={() => setInviteOpen(true)}>
-            Invite Member
+            {m.settings_team_invite_button()}
           </Button>
         }
       />
@@ -107,8 +110,8 @@ export default function TeamPage() {
       {filtered.length === 0 ? (
         <Card>
           <EmptyState
-            title={activeTab === "pending" ? "No pending invites" : "No members found"}
-            description="Invite team members above to get started."
+            title={activeTab === "pending" ? m.settings_team_empty_pending_title() : m.settings_team_empty_active_title()}
+            description={m.settings_team_empty_desc()}
           />
         </Card>
       ) : (
@@ -118,33 +121,33 @@ export default function TeamPage() {
             getRowKey={(m) => m.id}
             columns={[
               {
-                label: "Name",
-                cell: (m) => (
+                label: m.settings_team_col_name(),
+                cell: (member) => (
                   <>
-                    <p className="text-[13px] font-medium text-ih-fg-1">{m.name || "Unnamed"}</p>
-                    <p className="text-[11px] text-ih-fg-3">{m.email}</p>
+                    <p className="text-[13px] font-medium text-ih-fg-1">{member.name || m.settings_team_member_unnamed()}</p>
+                    <p className="text-[11px] text-ih-fg-3">{member.email}</p>
                   </>
                 ),
               },
-              { label: "Role", cell: (m) => <Pill tone={ROLE_TONES[m.role] || "gen"}>{m.role}</Pill> },
+              { label: m.settings_team_col_role(), cell: (member) => <Pill tone={ROLE_TONES[member.role] || "gen"}>{member.role}</Pill> },
               {
-                label: "Status",
-                cell: (m) => (
+                label: m.settings_team_col_status(),
+                cell: (member) => (
                   <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${
-                    m.status === "active" ? "text-ih-ok-fg" : "text-ih-watch-fg"
+                    member.status === "active" ? "text-ih-ok-fg" : "text-ih-watch-fg"
                   }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${m.status === "active" ? "bg-ih-ok" : "bg-ih-watch"}`} />
-                    {m.status === "active" ? "Active" : "Pending"}
+                    <span className={`w-1.5 h-1.5 rounded-full ${member.status === "active" ? "bg-ih-ok" : "bg-ih-watch"}`} />
+                    {member.status === "active" ? m.settings_team_status_active() : m.settings_team_status_pending()}
                   </span>
                 ),
               },
-              { label: "Last Active", cell: (m) => <span className="text-ih-fg-3">{m.lastActiveAt || "—"}</span> },
+              { label: m.settings_team_col_last_active(), cell: (member) => <span className="text-ih-fg-3">{member.lastActiveAt || "—"}</span> },
               {
                 label: "",
                 align: "right",
                 cell: () => (
                   <button className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1">
-                    Edit
+                    {m.common_edit()}
                   </button>
                 ),
               },
@@ -155,13 +158,13 @@ export default function TeamPage() {
 
       {/* Roles reference */}
       <Card className="p-6">
-        <h2 className="text-sm font-bold text-ih-fg-1 mb-3">Roles</h2>
+        <h2 className="text-sm font-bold text-ih-fg-1 mb-3">{m.settings_team_roles_heading()}</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {[
-            { role: "Owner", desc: "Account holder. Full access, including billing." },
-            { role: "Manager", desc: "Back office: team, settings, scheduling, and all inspections." },
-            { role: "Inspector", desc: "Conducts inspections; edits and publishes reports." },
-            { role: "Agent", desc: "External agent. Read-only access to their own orders." },
+            { role: m.settings_team_role_owner_name(), desc: m.settings_team_role_owner_desc() },
+            { role: m.settings_team_role_manager_name(), desc: m.settings_team_role_manager_desc() },
+            { role: m.settings_team_role_inspector_name(), desc: m.settings_team_role_inspector_desc() },
+            { role: m.settings_team_role_agent_name(), desc: m.settings_team_role_agent_desc() },
           ].map((r) => (
             <div key={r.role} className="p-3 border border-ih-border rounded-md">
               <p className="text-[13px] font-bold text-ih-fg-1">{r.role}</p>

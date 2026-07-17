@@ -33,7 +33,7 @@
     "setup-code:ensure": "node scripts/ensure-setup-code.mjs",
     "vendor:copy": "node scripts/vendor-copy.js",
     "gen-version": "node scripts/gen-version.js",
-    "i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./app/paraglide --strategy cookie baseLocale --emit-ts-declarations",
+    "i18n:compile": "paraglide-js compile --project ./project.inlang --outdir ./app/paraglide --strategy cookie baseLocale --output-structure locale-modules --emit-ts-declarations",
     "type-check": "npm run i18n:compile && react-router typegen && npm run type-check:app && npm run type-check:api",
     "type-check:app": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile ./.tsbuildinfo.app",
     "type-check:api": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.api.json --noEmit --incremental --tsBuildInfoFile ./.tsbuildinfo.api",

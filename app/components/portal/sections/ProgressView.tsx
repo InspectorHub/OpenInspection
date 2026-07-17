@@ -11,6 +11,7 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /* Types */
@@ -63,9 +64,9 @@ export function ProgressView(props: ProgressViewProps) {
   if (error) {
     return (
       <div className="p-8 text-center">
-        <h1 className="text-2xl font-bold">Inspection Not Found</h1>
+        <h1 className="text-2xl font-bold">{m.portal_progress_notfound_title()}</h1>
         <p className="text-ih-fg-3 mt-2">
-          {error ?? "This observation link is invalid or expired."}
+          {error ?? m.portal_progress_notfound_body()}
         </p>
       </div>
     );
@@ -83,14 +84,14 @@ export function ProgressView(props: ProgressViewProps) {
           </span>
         </div>
         <p className="text-[13px] text-ih-fg-3">
-          Inspector: {inspectorName}
+          {m.portal_progress_inspector_label({ name: inspectorName })}
           {date && <span> &middot; {date}</span>}
         </p>
       </div>
 
       {/* Read-only section progress */}
       <h2 className="text-sm font-semibold uppercase tracking-wide text-ih-fg-3 mb-3">
-        Progress
+        {m.portal_hub_nav_progress()}
       </h2>
       <div className="space-y-2">
         {bars.map((section, i) => (

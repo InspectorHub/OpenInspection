@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { unzipSync, strFromU8 } from "fflate";
+import { m } from "~/paraglide/messages";
 
 interface AuditEvent {
   id: string;
@@ -81,7 +82,7 @@ async function verifyChain(events: AuditEvent[], publicKeyPem: string): Promise<
 }
 
 export function meta() {
-  return [{ title: "Offline Verify - OpenInspection" }];
+  return [{ title: m.report_verify_offline_meta_title() }];
 }
 
 export default function VerifyOffline() {
@@ -93,7 +94,7 @@ export default function VerifyOffline() {
     setResult(null);
     try {
       if (!file.name.endsWith(".zip")) {
-        setResult({ valid: false, errors: ["Please drop an evidence.zip file."], eventCount: 0 });
+        setResult({ valid: false, errors: [m.report_verify_offline_error_not_zip()], eventCount: 0 });
         return;
       }
       const buf = await file.arrayBuffer();
@@ -101,7 +102,7 @@ export default function VerifyOffline() {
       const trailFile = unzipped["audit-trail.json"];
       const pemFile = unzipped["public-key.pem"];
       if (!trailFile || !pemFile) {
-        setResult({ valid: false, errors: ["Missing audit-trail.json or public-key.pem in zip."], eventCount: 0 });
+        setResult({ valid: false, errors: [m.report_verify_offline_error_missing_files()], eventCount: 0 });
         return;
       }
       const trail = JSON.parse(strFromU8(trailFile));
@@ -128,21 +129,19 @@ export default function VerifyOffline() {
 
   return (
     <main className="max-w-2xl mx-auto p-8">
-      <h1 className="text-2xl font-bold">Offline Verification</h1>
+      <h1 className="text-2xl font-bold">{m.report_verify_offline_heading()}</h1>
       <p className="mt-2 text-sm text-ih-fg-3">
-        Drop your <code className="bg-ih-bg-muted px-1 rounded">evidence.zip</code> below. All
-        cryptographic verification runs in your browser using the Web Crypto API — this page does
-        not transmit the zip back to our server.
+        {m.report_verify_offline_intro_before()}<code className="bg-ih-bg-muted px-1 rounded">evidence.zip</code>{m.report_verify_offline_intro_after()}
       </p>
       <label
         onDrop={onDrop}
         onDragOver={(e) => e.preventDefault()}
         className="mt-6 block border-2 border-dashed border-ih-border rounded-lg p-12 text-center cursor-pointer hover:bg-ih-bg-muted/50"
       >
-        <span className="block text-sm">Drop evidence.zip here, or click to select</span>
+        <span className="block text-sm">{m.report_verify_offline_dropzone()}</span>
         <input type="file" accept=".zip,application/zip" onChange={onSelect} className="hidden" />
       </label>
-      {busy && <p className="mt-4 text-sm text-ih-fg-3">Verifying...</p>}
+      {busy && <p className="mt-4 text-sm text-ih-fg-3">{m.report_verify_offline_verifying()}</p>}
       {result && (
         <div
           className={
@@ -152,8 +151,8 @@ export default function VerifyOffline() {
         >
           <p className="font-semibold">
             {result.valid
-              ? `✓ All ${result.eventCount} chain events verified.`
-              : `✗ ${result.errors.length} error(s) found`}
+              ? m.report_verify_offline_result_valid({ count: result.eventCount })
+              : m.report_verify_offline_result_invalid({ count: result.errors.length })}
           </p>
           {result.errors.map((err, i) => (
             <p key={i} className="text-sm mt-1">
@@ -163,10 +162,7 @@ export default function VerifyOffline() {
         </div>
       )}
       <p className="mt-12 text-xs text-ih-fg-3">
-        To verify offline without trusting this server, View Source on this page, save it locally
-        along with evidence.zip, and open the local HTML file in a fresh browser session. All
-        cryptography uses the browser's built-in Web Crypto API; no external network requests
-        happen during verification.
+        {m.report_verify_offline_footer()}
       </p>
     </main>
   );

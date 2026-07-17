@@ -4,6 +4,7 @@ import { usePointerGesture } from '../../hooks/usePointerGesture';
 import { MobileBottomDrawer } from '../MobileBottomDrawer';
 import { SpeedModeUndoToast } from './SpeedModeUndoToast';
 import { shouldShowSpeedModeCoach, markSpeedModeCoached } from '../../lib/speedmode-coach';
+import { m } from "~/paraglide/messages";
 
 interface JumpToSection {
   id: string;
@@ -115,8 +116,8 @@ export function SpeedMode({
       levels.find((l) => l.id === newRating)?.label
       ?? newRating;
     const message = prevRating
-      ? `Changed to ${ratingLabel}.`
-      : `Rated as ${ratingLabel}.`;
+      ? m.editor_speedmode_undo_changed({ rating: ratingLabel })
+      : m.editor_speedmode_undo_rated({ rating: ratingLabel });
     setPendingUndo({
       message,
       onUndo: () => {
@@ -129,14 +130,14 @@ export function SpeedMode({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Speed-rate inspection items"
+      aria-label={m.editor_speedmode_aria_label()}
       className="fixed inset-0 z-[100] bg-ih-bg-card flex flex-col"
     >
       {/* Top bar */}
       <div className="h-12 flex items-center justify-between px-4 border-b border-ih-border">
         <span className="text-[12px] text-ih-fg-3 font-bold uppercase tracking-wide">{sectionTitle}</span>
         <span className="text-[12px] text-ih-fg-3 font-mono">{currentIndex + 1} / {totalCount}</span>
-        <Button variant="ghost" size="sm" onClick={onExit}>Exit Speed Mode</Button>
+        <Button variant="ghost" size="sm" onClick={onExit}>{m.editor_speedmode_exit()}</Button>
       </div>
 
       {/* Item — gesture surface wraps the title/status area, NOT the rating buttons */}
@@ -147,7 +148,7 @@ export function SpeedMode({
         >
           <h2 className="text-2xl font-bold text-ih-fg-1 mb-2 text-center">{item.label}</h2>
           <p className="text-[11px] text-ih-fg-4 uppercase tracking-wide">
-            Swipe to navigate · Long-press to jump
+            {m.editor_speedmode_gesture_hint()}
           </p>
         </div>
 
@@ -170,14 +171,14 @@ export function SpeedMode({
 
         {/* Nav */}
         <div className="flex gap-4 mt-8">
-          <Button variant="secondary" onClick={onPrev} disabled={currentIndex === 0} icon={<Icon name="chevL" size={16} />}>Prev</Button>
-          <Button variant="secondary" onClick={onNext} disabled={currentIndex >= totalCount - 1}>Next <Icon name="chevR" size={16} /></Button>
+          <Button variant="secondary" onClick={onPrev} disabled={currentIndex === 0} icon={<Icon name="chevL" size={16} />}>{m.editor_speedmode_prev()}</Button>
+          <Button variant="secondary" onClick={onNext} disabled={currentIndex >= totalCount - 1}>{m.common_next()} <Icon name="chevR" size={16} /></Button>
         </div>
       </div>
 
       {/* Footer */}
       <div className="h-10 flex items-center justify-center text-[11px] text-ih-fg-3 border-t border-ih-border">
-        Press <kbd className="mx-1 px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">Z</kbd> or <kbd className="mx-1 px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">Esc</kbd> to exit
+        {m.editor_speedmode_footer_press()} <kbd className="mx-1 px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">Z</kbd> {m.editor_speedmode_footer_or()} <kbd className="mx-1 px-1.5 py-0.5 bg-ih-bg-muted rounded text-[10px] font-mono border border-ih-border">Esc</kbd> {m.editor_speedmode_footer_exit()}
       </div>
 
       {/* IA-17 — first-run coach mark: tap anywhere (or press any key) to dismiss */}
@@ -187,25 +188,25 @@ export function SpeedMode({
           onPointerDown={dismissCoach}
           data-testid="speedmode-coach"
           role="dialog"
-          aria-label="Speed Mode tips"
+          aria-label={m.editor_speedmode_coach_aria()}
         >
           <div className="mx-6 max-w-sm rounded-xl border border-ih-border bg-ih-bg-card px-6 py-5 text-ih-fg-2 shadow-ih-popover">
-            <h3 className="text-[15px] font-bold text-ih-fg-1 mb-3">Speed Mode</h3>
+            <h3 className="text-[15px] font-bold text-ih-fg-1 mb-3">{m.editor_speedmode_coach_title()}</h3>
             <ul className="space-y-2 text-[13px]">
               <li className="flex items-center gap-3">
                 <kbd className="px-1.5 py-0.5 bg-ih-bg-muted rounded text-[11px] font-mono border border-ih-border shrink-0">1–5</kbd>
-                <span>Rate the current item</span>
+                <span>{m.editor_speedmode_coach_rate()}</span>
               </li>
               <li className="flex items-center gap-3">
                 <span className="text-[16px] shrink-0" aria-hidden="true">⇄</span>
-                <span>Swipe left / right to change item</span>
+                <span>{m.editor_speedmode_coach_swipe()}</span>
               </li>
               <li className="flex items-center gap-3">
                 <span className="text-[16px] shrink-0" aria-hidden="true">⊙</span>
-                <span>Long-press to jump to a section</span>
+                <span>{m.editor_speedmode_coach_longpress()}</span>
               </li>
             </ul>
-            <p className="mt-4 text-[11px] text-ih-fg-3">Tap anywhere to start</p>
+            <p className="mt-4 text-[11px] text-ih-fg-3">{m.editor_speedmode_coach_start()}</p>
           </div>
         </div>
       )}
@@ -220,7 +221,7 @@ export function SpeedMode({
       <MobileBottomDrawer
         open={showJumpTo}
         onClose={() => setShowJumpTo(false)}
-        title="Jump to"
+        title={m.editor_speedmode_jumpto_title()}
         heightFraction={0.85}
       >
         <div className="p-2 text-[13px]">
@@ -234,7 +235,7 @@ export function SpeedMode({
                     {secTitle}
                   </div>
                   {items.length === 0 ? (
-                    <div className="px-3 py-1 text-[12px] text-ih-fg-3 italic">No items</div>
+                    <div className="px-3 py-1 text-[12px] text-ih-fg-3 italic">{m.editor_speedmode_no_items()}</div>
                   ) : (
                     <ul>
                       {items.map((it) => {
@@ -263,7 +264,7 @@ export function SpeedMode({
             })
           ) : (
             <div className="p-4 text-ih-fg-3 italic">
-              Sections list unavailable.
+              {m.editor_speedmode_sections_unavailable()}
             </div>
           )}
         </div>

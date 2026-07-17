@@ -4,6 +4,7 @@
  * All logic is side-effect-free so it can be tested in isolation (no DOM, no
  * network) and reused from both the loader (server) and the component (client).
  */
+import { m } from "~/paraglide/messages";
 
 export interface OnboardingInput {
   /** True when the tenant has saved a company/site name other than the system default. */
@@ -37,37 +38,37 @@ export function computeOnboardingSteps(input: OnboardingInput): OnboardingStep[]
   return [
     {
       id: 'company',
-      label: 'Set your company name',
+      label: m.helper_onboarding_company_label(),
       done: input.companyNameSet,
       href: '/settings/workspace',
     },
     {
       id: 'timezone',
-      label: 'Set your timezone',
+      label: m.helper_onboarding_timezone_label(),
       done: input.timezoneSet,
       href: '/settings/workspace',
     },
     {
       id: 'template',
-      label: 'Have an inspection template',
+      label: m.helper_onboarding_template_label(),
       done: input.templateCount > 0,
       href: '/library/templates',
     },
     {
       id: 'services',
-      label: 'Price your services',
+      label: m.helper_onboarding_services_label(),
       done: input.serviceCount > 0,
       href: '/settings/services',
     },
     {
       id: 'schedule',
-      label: 'Set up your schedule',
+      label: m.helper_onboarding_schedule_label(),
       done: input.scheduleSet,
       href: '/settings/schedule',
     },
     {
       id: 'first-inspection',
-      label: 'Create your first inspection',
+      label: m.helper_onboarding_first_inspection_label(),
       done: input.inspectionCount > 0,
       href: '#new-inspection',
     },

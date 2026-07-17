@@ -1,3 +1,4 @@
+import { m } from "~/paraglide/messages";
 import type { AstmConformance } from "./types";
 
 /**
@@ -8,10 +9,12 @@ import type { AstmConformance } from "./types";
  */
 export function ConformanceStatement({ conformance }: { conformance: AstmConformance | null }) {
   if (conformance == null) return null;
-  const verb = conformance.conforms ? "conforms" : "does not conform";
+  const verb = conformance.conforms
+    ? m.pca_conformance_verb_conforms()
+    : m.pca_conformance_verb_does_not_conform();
   return (
     <p data-pca-conformance className="text-sm text-ih-fg-1 print:break-inside-avoid">
-      This report {verb} to ASTM {conformance.standard}.
+      {m.pca_conformance_statement({ verb, standard: conformance.standard })}
     </p>
   );
 }

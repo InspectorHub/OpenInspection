@@ -1,8 +1,9 @@
 import { useFetcher } from "react-router";
 import { useForm, type SubmissionResult } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
-import { addContactSchema } from "~/lib/forms/contacts.schema";
+import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 import { Modal, Button } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 import type { Contact } from "./contacts-helpers";
 
 export function ContactModal({
@@ -29,7 +30,7 @@ export function ContactModal({
   const [form, fields] = useForm({
     lastResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: addContactSchema });
+      return parseWithZod(formData, { schema: makeAddContactSchema() });
     },
     // eager-after-error: validate on blur first; once there's an error, switch
     // to real-time revalidation on every keystroke (project validation pattern).
@@ -44,12 +45,12 @@ export function ContactModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Edit Contact" : "Add Contact"}
+      title={isEdit ? m.contacts_modal_edit_title() : m.contacts_action_add()}
       size="lg"
       footer={
         <>
-          <Button variant="secondary" type="button" onClick={onClose}>Cancel</Button>
-          <Button variant="primary" type="submit" form={form.id}>Save</Button>
+          <Button variant="secondary" type="button" onClick={onClose}>{m.common_cancel()}</Button>
+          <Button variant="primary" type="submit" form={form.id}>{m.common_save()}</Button>
         </>
       }
     >
@@ -67,26 +68,26 @@ export function ContactModal({
         {isEdit && <input type="hidden" name="id" value={contact.id} />}
 
           <div>
-            <label htmlFor={fields.type.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">Type</label>
+            <label htmlFor={fields.type.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_modal_type_label()}</label>
             <select
               id={fields.type.id}
               name={fields.type.name}
               defaultValue={contact?.type || "client"}
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"
             >
-              <option value="client">Client</option>
-              <option value="agent">Agent</option>
+              <option value="client">{m.contacts_type_client()}</option>
+              <option value="agent">{m.contacts_type_agent()}</option>
             </select>
           </div>
 
           <div>
-            <label htmlFor={fields.name.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">Full Name *</label>
+            <label htmlFor={fields.name.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_modal_name_label()}</label>
             <input
               id={fields.name.id}
               name={fields.name.name}
               type="text"
               defaultValue={contact?.name || ""}
-              placeholder="Jane Smith"
+              placeholder={m.contacts_modal_name_placeholder()}
               aria-invalid={fields.name.errors ? true : undefined}
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"
             />
@@ -97,13 +98,13 @@ export function ContactModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor={fields.email.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">Email</label>
+              <label htmlFor={fields.email.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_field_email()}</label>
               <input
                 id={fields.email.id}
                 name={fields.email.name}
                 type="email"
                 defaultValue={contact?.email || ""}
-                placeholder="jane@realty.com"
+                placeholder={m.contacts_modal_email_placeholder()}
                 aria-invalid={fields.email.errors ? true : undefined}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"
               />
@@ -112,26 +113,26 @@ export function ContactModal({
               )}
             </div>
             <div>
-              <label htmlFor={fields.phone.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">Phone</label>
+              <label htmlFor={fields.phone.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_field_phone()}</label>
               <input
                 id={fields.phone.id}
                 name={fields.phone.name}
                 type="tel"
                 defaultValue={contact?.phone || ""}
-                placeholder="(555) 123-4567"
+                placeholder={m.contacts_modal_phone_placeholder()}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor={fields.agency.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">Agency</label>
+            <label htmlFor={fields.agency.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_field_agency()}</label>
             <input
               id={fields.agency.id}
               name={fields.agency.name}
               type="text"
               defaultValue={contact?.agency || ""}
-              placeholder="Sunrise Realty"
+              placeholder={m.contacts_modal_agency_placeholder()}
               className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"
             />
           </div>

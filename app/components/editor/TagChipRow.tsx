@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { Button } from '@core/shared-ui';
+import { m } from "~/paraglide/messages";
 
 export interface TagPin {
     id:    string;
@@ -50,9 +51,9 @@ export function TagChipRow({ pinnedTags, activeTagIds, onToggle, onOpenLibrary }
                     size="sm"
                     onClick={onOpenLibrary}
                     className="h-auto px-2 py-0.5 rounded-full border border-dashed border-ih-border text-ih-fg-4 hover:bg-ih-bg-muted"
-                    aria-label="Open tag library"
+                    aria-label={m.editor_tagchiprow_open_library_aria()}
                 >
-                    + more
+                    {m.editor_tagchiprow_more()}
                 </Button>
             )}
         </div>

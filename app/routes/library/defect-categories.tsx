@@ -6,9 +6,10 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, Button, EmptyState } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { DefectCategoryEditor, type EditorDefectCategory } from "~/components/DefectCategoryEditor";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Defect Categories - OpenInspection" }];
+  return [{ title: m.library_defect_meta_title() }];
 }
 
 type DefectCategory = { id: string; name: string; color: string; drivesSummary: boolean; sortOrder: number; isSeed: boolean };
@@ -66,18 +67,18 @@ export default function DefectCategoriesPage() {
 
   return (
     <div className="space-y-ih-list">
-      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Defect Categories" }]} />
+      <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_defect_heading() }]} />
       <PageHeader
-        title="Defect Categories"
-        meta={`${categories.length} ${categories.length === 1 ? "category" : "categories"}`}
-        actions={<Button variant="primary" onClick={openNew}>+ New category</Button>}
+        title={m.library_defect_heading()}
+        meta={categories.length === 1 ? m.library_defect_meta_one({ count: categories.length }) : m.library_defect_meta_other({ count: categories.length })}
+        actions={<Button variant="primary" onClick={openNew}>{m.library_defect_new()}</Button>}
       />
 
       {sorted.length === 0 ? (
         <Card>
           <EmptyState
-            title="No defect categories yet"
-            description='Click "+ New category" above to group defects for reporting.'
+            title={m.library_defect_empty_title()}
+            description={m.library_defect_empty_desc()}
           />
         </Card>
       ) : (
@@ -96,22 +97,22 @@ export default function DefectCategoriesPage() {
                     />
                     <p className="text-[13px] font-semibold text-ih-fg-1 truncate">{cat.name}</p>
                     {cat.drivesSummary && (
-                      <span className="shrink-0 inline-flex items-center h-4 px-1.5 rounded text-[9px] font-bold uppercase tracking-wide bg-ih-primary-tint text-ih-primary">Summary</span>
+                      <span className="shrink-0 inline-flex items-center h-4 px-1.5 rounded text-[9px] font-bold uppercase tracking-wide bg-ih-primary-tint text-ih-primary">{m.library_defect_summary_badge()}</span>
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => openEdit(cat)} className="text-[13px] text-ih-primary hover:opacity-80 font-semibold px-1">
-                      Edit
+                      {m.common_edit()}
                     </button>
                     {!cat.isSeed && (
                       confirming ? (
                         <deleteFetcher.Form method="post" onSubmit={() => setConfirmId(null)}>
                           <input type="hidden" name="intent" value="delete" />
                           <input type="hidden" name="id" value={cat.id} />
-                          <button type="submit" className="text-[12px] font-bold text-ih-bad-fg hover:opacity-80 px-1">Confirm?</button>
+                          <button type="submit" className="text-[12px] font-bold text-ih-bad-fg hover:opacity-80 px-1">{m.library_action_confirm()}</button>
                         </deleteFetcher.Form>
                       ) : (
-                        <button onClick={() => setConfirmId(cat.id)} className="text-[13px] text-ih-fg-4 hover:text-ih-bad-fg font-semibold px-1" title="Delete">Delete</button>
+                        <button onClick={() => setConfirmId(cat.id)} className="text-[13px] text-ih-fg-4 hover:text-ih-bad-fg font-semibold px-1" title={m.common_delete()}>{m.common_delete()}</button>
                       )
                     )}
                   </div>

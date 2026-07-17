@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Icon, IconButton, Button } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface Capture {
   id: string;
@@ -122,7 +123,7 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
 
   return (
     /* ds-allow: fixed-dark full-screen camera overlay (stays dark in both themes) */
-    <div className="fixed inset-0 z-50 bg-black flex flex-col" role="dialog" aria-label="Burst camera" aria-modal="true">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col" role="dialog" aria-label={m.editor_burst_camera_aria()} aria-modal="true">
       <video ref={videoRef} autoPlay muted playsInline className="absolute inset-0 w-full h-full object-cover" />
       <canvas ref={canvasRef} className="hidden" />
 
@@ -130,14 +131,14 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
       {/* ds-allow: fixed-dark camera overlay chrome (light-on-dark) */}
       <div className="relative z-10 flex items-center justify-between px-4 pt-4">
         {/* ds-allow: over-video control — stays light-on-dark regardless of theme (legible over arbitrary camera footage) */}
-        <IconButton type="button" onClick={onClose} aria-label="Close camera" className="w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60">
+        <IconButton type="button" onClick={onClose} aria-label={m.editor_burst_close_aria()} className="w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60">
           <Icon name="x" className="w-5 h-5" />
         </IconButton>
         {captures.length > 0 && (
-          <div className="text-white text-xs font-mono px-3 py-1 rounded-full bg-black/40">{captures.length} captured</div>
+          <div className="text-white text-xs font-mono px-3 py-1 rounded-full bg-black/40">{m.editor_burst_captured_count({ count: captures.length })}</div>
         )}
         {/* ds-allow: over-video control — stays light-on-dark regardless of theme (legible over arbitrary camera footage) */}
-        <IconButton type="button" onClick={switchFacing} aria-label="Switch camera" className="w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60">
+        <IconButton type="button" onClick={switchFacing} aria-label={m.editor_burst_switch_camera_aria()} className="w-10 h-10 rounded-full bg-black/40 text-white hover:bg-black/60">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h5M20 20v-5h-5M4 9a8 8 0 0114-3M20 15a8 8 0 01-14 3" /></svg>
         </IconButton>
       </div>
@@ -151,11 +152,11 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
           <div className="flex gap-2 overflow-x-auto pb-1" data-testid="burst-thumbnails">
             {captures.map((c) => (
               <div key={c.id} className="relative flex-shrink-0">
-                <img src={c.url} className="w-16 h-16 object-cover rounded-md border-2 border-white/30" alt="Captured frame" />
+                <img src={c.url} className="w-16 h-16 object-cover rounded-md border-2 border-white/30" alt={m.editor_burst_captured_frame_alt()} />
                 <IconButton
                   type="button"
                   onClick={() => discardOne(c.id)}
-                  aria-label="Discard this frame"
+                  aria-label={m.editor_burst_discard_frame_aria()}
                   variant="danger"
                   className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold"
                 >
@@ -171,7 +172,7 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
       <div className="relative z-10 pb-8 px-4 flex items-center justify-between gap-4">
         {/* ds-allow: over-video control — rose accent kept for legibility against arbitrary camera footage, theme-independent */}
         {captures.length > 0 ? (
-          <Button type="button" variant="danger-link" size="sm" onClick={discardAll} className="text-rose-300 hover:text-rose-200">Discard all</Button>
+          <Button type="button" variant="danger-link" size="sm" onClick={discardAll} className="text-rose-300 hover:text-rose-200">{m.editor_burst_discard_all()}</Button>
         ) : <div className="w-20" />}
 
         {/* ds-allow: fixed-dark camera shutter (white button + rose burst ring + dark label, stays fixed in both themes) */}
@@ -184,20 +185,20 @@ export function BurstCamera({ open, onClose, onCommit }: BurstCameraProps) {
           onTouchEnd={onShutterUp}
           onTouchCancel={onShutterUp}
           className={`w-20 h-20 rounded-full bg-white border-4 transition flex items-center justify-center ${burstActive ? "border-rose-500 scale-110" : "border-white/40 hover:scale-105"}`}
-          aria-label="Capture (tap for single, hold for burst)"
+          aria-label={m.editor_burst_capture_aria()}
           data-testid="burst-shutter"
         >
           {burstActive ? (
-            <span className="text-ih-bad-fg text-xs font-bold animate-pulse">{burstCount} / 30</span>
+            <span className="text-ih-bad-fg text-xs font-bold animate-pulse">{m.editor_burst_progress({ count: burstCount })}</span>
           ) : (
             /* ds-allow: dark label on the white shutter button (fixed-dark camera overlay) */
-            <span className="text-slate-700 text-[10px] font-bold tracking-widest uppercase">Shoot</span>
+            <span className="text-slate-700 text-[10px] font-bold tracking-widest uppercase">{m.editor_burst_shoot()}</span>
           )}
         </button>
 
         {captures.length > 0 ? (
           <Button type="button" variant="primary" onClick={commit} className="rounded-full px-5 py-2.5 shadow-ih-popover" data-testid="burst-done">
-            {uploading ? "Uploading..." : "Done"}
+            {uploading ? m.editor_burst_uploading() : m.common_done()}
           </Button>
         ) : <div className="w-20" />}
       </div>

@@ -25,9 +25,10 @@ import { CalendarLoadingSkeleton } from "~/components/calendar/CalendarLoadingSk
 import { MonthView } from "~/components/calendar/MonthView";
 import { WeekView } from "~/components/calendar/WeekView";
 import { DayView } from "~/components/calendar/DayView";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Calendar - OpenInspection" }];
+  return [{ title: m.calendar_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -148,7 +149,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return {
       ok: res.ok,
       intent,
-      message: res.ok ? null : await responseMessage(res, "Unable to save blocked time."),
+      message: res.ok ? null : await responseMessage(res, m.calendar_action_block_save_error()),
     };
   }
 
@@ -159,11 +160,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     return {
       ok: res.ok,
       intent,
-      message: res.ok ? null : await responseMessage(res, "Unable to delete blocked time."),
+      message: res.ok ? null : await responseMessage(res, m.calendar_action_block_delete_error()),
     };
   }
 
-  return { ok: false, intent, message: "Unknown calendar action." };
+  return { ok: false, intent, message: m.calendar_action_unknown() };
 }
 
 export default function CalendarPage() {
@@ -280,13 +281,13 @@ export default function CalendarPage() {
   return (
     <div className="space-y-ih-list">
       <PageHeader
-        title="Calendar"
+        title={m.calendar_page_title()}
         meta={
           thisWeekEvents.length === 0
-            ? "No inspections scheduled this week"
+            ? m.calendar_meta_none()
             : drafts.length > 0
-              ? `${confirmed} confirmed · ${drafts.length} draft${drafts.length === 1 ? "" : "s"}`
-              : `${thisWeekEvents.length} this week`
+              ? m.calendar_meta_confirmed_drafts({ confirmed, drafts: drafts.length, plural: drafts.length === 1 ? "" : "s" })
+              : m.calendar_meta_this_week({ count: thisWeekEvents.length })
         }
       />
 

@@ -12,6 +12,7 @@ import type {
 } from "../useInspection";
 import { fKey } from "../useInspection";
 import type { Severity } from "~/lib/severity";
+import { m } from "~/paraglide/messages";
 
 /**
  * Pure helpers + shared context type for the composed `useInspectionState`
@@ -27,35 +28,40 @@ import type { Severity } from "~/lib/severity";
 /*  Fallback rating level descriptions                                 */
 /* ------------------------------------------------------------------ */
 
-const FALLBACK_DESCRIPTIONS: Record<string, string> = {
-  S: "Item is functioning as intended; no concerns observed.",
-  Sat: "Item is functioning as intended; no concerns observed.",
-  Satisfactory: "Item is functioning as intended; no concerns observed.",
-  M: "Item is functional but shows wear; recommend periodic re-inspection.",
-  Mon: "Item is functional but shows wear; recommend periodic re-inspection.",
-  Monitor: "Item is functional but shows wear; recommend periodic re-inspection.",
-  D: "Item is broken, deteriorated, or unsafe; recommend repair or replacement.",
-  Defect: "Item is broken, deteriorated, or unsafe; recommend repair or replacement.",
-  Defective: "Item is not functioning as intended; repair or replacement is recommended.",
-  NI: "Item could not be inspected (inaccessible, unsafe, or excluded).",
-  "Not Inspected": "Item could not be inspected (inaccessible, unsafe, or excluded).",
-  NP: "Item is not present at this property.",
-  "Not Present": "Item is not present at this property.",
-  I: "Item was inspected and meets the Standards of Practice.",
-  Inspected: "Item was inspected and meets the Standards of Practice.",
-  F: "Item visually inspected and observed to be in serviceable, functional condition.",
-  Functional: "Item visually inspected and observed to be in serviceable, functional condition.",
-  H: "Item presents an immediate safety hazard and should be addressed without delay.",
-  Hazardous: "Item presents an immediate safety hazard and should be addressed without delay.",
-};
+// Built at call time (never frozen at import) so each description resolves the
+// active locale through the paraglide message functions.
+function fallbackDescriptions(): Record<string, string> {
+  return {
+    S: m.helper_rating_desc_satisfactory(),
+    Sat: m.helper_rating_desc_satisfactory(),
+    Satisfactory: m.helper_rating_desc_satisfactory(),
+    M: m.helper_rating_desc_monitor(),
+    Mon: m.helper_rating_desc_monitor(),
+    Monitor: m.helper_rating_desc_monitor(),
+    D: m.helper_rating_desc_defect(),
+    Defect: m.helper_rating_desc_defect(),
+    Defective: m.helper_rating_desc_defective(),
+    NI: m.helper_rating_desc_not_inspected(),
+    "Not Inspected": m.helper_rating_desc_not_inspected(),
+    NP: m.helper_rating_desc_not_present(),
+    "Not Present": m.helper_rating_desc_not_present(),
+    I: m.helper_rating_desc_inspected(),
+    Inspected: m.helper_rating_desc_inspected(),
+    F: m.helper_rating_desc_functional(),
+    Functional: m.helper_rating_desc_functional(),
+    H: m.helper_rating_desc_hazardous(),
+    Hazardous: m.helper_rating_desc_hazardous(),
+  };
+}
 
 export function backfillLevelDescriptions(levels: RatingLevel[]): RatingLevel[] {
+  const descriptions = fallbackDescriptions();
   return levels.map((lvl) => {
     if (lvl.description) return lvl;
     const fb =
-      FALLBACK_DESCRIPTIONS[lvl.id] ||
-      FALLBACK_DESCRIPTIONS[lvl.abbreviation ?? ""] ||
-      FALLBACK_DESCRIPTIONS[lvl.label] ||
+      descriptions[lvl.id] ||
+      descriptions[lvl.abbreviation ?? ""] ||
+      descriptions[lvl.label] ||
       "";
     return fb ? { ...lvl, description: fb } : lvl;
   });

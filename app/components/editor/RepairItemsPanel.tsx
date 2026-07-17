@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@core/shared-ui";
 import type { AttachedRepairItem } from "~/hooks/useFindings";
+import { m } from "~/paraglide/messages";
 
 interface RepairItemOption {
   id: string; name: string; category: string | null;
@@ -54,7 +55,7 @@ export function RepairItemsPanel({
   return (
     <div className="mt-3 border-t border-ih-border pt-3">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Repair items</span>
+        <span className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.editor_repair_label()}</span>
         <Button
           variant="link"
           size="sm"
@@ -62,7 +63,7 @@ export function RepairItemsPanel({
           aria-expanded={open}
           aria-controls="repair-items-disclosure"
         >
-          + Attach repair item
+          {m.editor_repair_attach()}
         </Button>
       </div>
 
@@ -86,9 +87,9 @@ export function RepairItemsPanel({
                   size="sm"
                   className="shrink-0"
                   onClick={() => onDetach(a.recommendationId)}
-                  aria-label={`Remove ${a.summarySnapshot}`}
+                  aria-label={m.editor_repair_remove_aria({ name: a.summarySnapshot })}
                 >
-                  Remove
+                  {m.common_remove()}
                 </Button>
               </li>
             );
@@ -98,11 +99,11 @@ export function RepairItemsPanel({
 
       {open && (
         <div id="repair-items-disclosure" className="mt-2 border border-ih-border rounded-md p-2 bg-ih-bg-muted/40">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search repair items…" aria-label="Search repair items" autoFocus
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={m.editor_repair_search_placeholder()} aria-label={m.editor_repair_search_aria()} autoFocus
             className="w-full px-2 py-1.5 rounded border border-ih-border bg-ih-bg-card text-[12px] text-ih-fg-1 focus:border-ih-primary outline-none" />
-          <ul role="listbox" aria-label="Repair items" className="mt-2 max-h-48 overflow-auto divide-y divide-ih-border">
+          <ul role="listbox" aria-label={m.editor_repair_label()} className="mt-2 max-h-48 overflow-auto divide-y divide-ih-border">
             {filtered.length === 0 ? (
-              <li className="py-2 text-[12px] text-ih-fg-4">No matching repair items. Add some under Library → Repair Items.</li>
+              <li className="py-2 text-[12px] text-ih-fg-4">{m.editor_repair_empty()}</li>
             ) : filtered.map((o) => (
               <li key={o.id} role="option" aria-selected={false}>
                 <button type="button" onClick={() => attach(o)} className="w-full text-left flex items-center py-2 hover:bg-ih-bg-card rounded px-1">

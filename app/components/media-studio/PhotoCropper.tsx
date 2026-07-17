@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
 import Cropper from "react-easy-crop";
 import { bakeCrop, type PixelCrop } from "./cropImage";
+import { m } from "~/paraglide/messages";
 
 const RATIOS: Record<string, number> = { "3:2": 3 / 2, "16:9": 16 / 9, "1.91:1": 1.91, "4:3": 4 / 3 };
 
@@ -33,8 +34,8 @@ export function PhotoCropper({
   presets = DEFAULT_PRESETS,
   allowFree = true,
   initialAspect,
-  title = "Crop photo",
-  saveLabel = "Save crop",
+  title = m.media_cropper_title(),
+  saveLabel = m.media_cropper_save(),
   onCancel,
   onSave,
 }: PhotoCropperProps) {
@@ -81,23 +82,23 @@ export function PhotoCropper({
           {options.map((a) => (
             <button key={a} type="button" onClick={() => setAspectKey(a)}
               className={`h-8 px-3 rounded-md text-[12px] font-bold border transition-colors ${aspectKey === a ? "border-ih-primary text-ih-primary" : "border-ih-border text-ih-fg-2 hover:border-ih-primary/60"}`}>
-              {a === "free" ? "Free" : a}
+              {a === "free" ? m.media_cropper_free() : a}
             </button>
           ))}
-          <button type="button" onClick={() => setPortrait((p) => !p)} title="Switch portrait/landscape"
+          <button type="button" onClick={() => setPortrait((p) => !p)} title={m.media_cropper_orientation_toggle()}
             aria-pressed={portrait} disabled={isFree}
             className={`h-8 px-3 rounded-md text-[12px] font-bold border transition-colors disabled:opacity-40 ${portrait ? "border-ih-primary text-ih-primary" : "border-ih-border text-ih-fg-2 hover:border-ih-primary/60"}`}>
-            ↔ {portrait ? "Portrait" : "Landscape"}
+            ↔ {portrait ? m.media_cropper_portrait() : m.media_cropper_landscape()}
           </button>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Zoom</span>
-          <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="flex-1 accent-ih-primary" aria-label="Zoom" />
+          <span className="text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.media_common_zoom()}</span>
+          <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="flex-1 accent-ih-primary" aria-label={m.media_common_zoom()} />
         </div>
         <div className="flex items-center justify-end gap-3">
-          <button type="button" onClick={onCancel} className="h-9 px-4 rounded-md border border-ih-border text-ih-fg-2 text-[13px] font-bold hover:bg-ih-bg-muted">Cancel</button>
+          <button type="button" onClick={onCancel} className="h-9 px-4 rounded-md border border-ih-border text-ih-fg-2 text-[13px] font-bold hover:bg-ih-bg-muted">{m.common_cancel()}</button>
           <button type="button" onClick={handleSave} disabled={busy || !pixels} className="h-9 px-4 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 disabled:opacity-50">
-            {busy ? "Saving…" : saveLabel}
+            {busy ? m.common_saving() : saveLabel}
           </button>
         </div>
       </div>

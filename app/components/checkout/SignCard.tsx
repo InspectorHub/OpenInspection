@@ -8,6 +8,7 @@ import {
     type OnBehalfValue,
 } from "~/components/agreements/OnBehalfFields";
 import type { StepState } from "~/lib/checkout-steps";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Step 1 — Sign card                                                 */
@@ -41,7 +42,7 @@ export function SignCard({
     useEffect(() => {
         if (fetcher.state === "idle" && fetcher.data) {
             if (fetcher.data.ok) onSigned();
-            else setErrorMsg(fetcher.data.error ?? "Signing failed. Please try again.");
+            else setErrorMsg(fetcher.data.error ?? m.checkout_sign_error_failed());
         }
     }, [fetcher.state, fetcher.data, onSigned]);
 
@@ -94,7 +95,7 @@ export function SignCard({
     // Sign POST goes through the route action (BFF) — never a client fetch.
     function submitSignature() {
         if (!hasMark) {
-            setErrorMsg("Please draw your signature before submitting.");
+            setErrorMsg(m.checkout_sign_error_no_mark());
             return;
         }
         const canvas = canvasRef.current;
@@ -116,11 +117,11 @@ export function SignCard({
     return (
         <section className="border-b border-ih-border">
             <div className="px-6 py-5 sm:px-8 border-b border-ih-border">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">Step 1 · Agreement</p>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4">{m.checkout_sign_step_label()}</p>
                 <h2 className="text-[15px] font-bold text-ih-fg-1 mt-0.5">{agreementName}</h2>
                 {progress.total > 1 && (
                     <p className="text-[12px] text-ih-fg-3 mt-0.5">
-                        Signature {Math.min(progress.signed + (isDone ? 0 : 1), progress.total)} of {progress.total}
+                        {m.checkout_sign_signature_progress({ current: Math.min(progress.signed + (isDone ? 0 : 1), progress.total), total: progress.total })}
                     </p>
                 )}
             </div>
@@ -140,20 +141,23 @@ export function SignCard({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                     </div>
-                    <h3 className="text-[15px] font-bold text-ih-fg-1">Agreement signed</h3>
+                    <h3 className="text-[15px] font-bold text-ih-fg-1">{m.checkout_sign_done_heading()}</h3>
                     {state === "waiting" ? (
                         <p className="text-[13px] text-ih-fg-3 mt-1">
-                            Thank you, {signerName}. We&rsquo;re waiting on the other signer
-                            {progress.total - progress.signed > 1 ? "s" : ""} to complete this agreement
-                            ({progress.signed} of {progress.total} signed).
+                            {m.checkout_sign_waiting_body({
+                                signerName,
+                                plural: progress.total - progress.signed > 1 ? "s" : "",
+                                signed: progress.signed,
+                                total: progress.total,
+                            })}
                         </p>
                     ) : (
-                        <p className="text-[13px] text-ih-fg-3 mt-1">Thank you, {signerName}.</p>
+                        <p className="text-[13px] text-ih-fg-3 mt-1">{m.checkout_sign_thankyou({ signerName })}</p>
                     )}
                 </div>
             ) : (
                 <div className="px-6 py-5 sm:px-8">
-                    <p className="text-sm font-bold text-ih-fg-3 mb-3">Draw your signature below:</p>
+                    <p className="text-sm font-bold text-ih-fg-3 mb-3">{m.checkout_sign_draw_prompt()}</p>
                     <div
                         className="border-2 border-ih-border rounded-2xl overflow-hidden bg-ih-bg-app mb-3"
                         style={{ touchAction: "none" }}
@@ -161,7 +165,7 @@ export function SignCard({
                         <canvas
                             ref={canvasRef}
                             role="img"
-                            aria-label="Signature pad — draw your signature here"
+                            aria-label={m.checkout_sign_canvas_aria()}
                             width={580}
                             height={180}
                             className="w-full cursor-crosshair block"
@@ -190,7 +194,7 @@ export function SignCard({
                             disabled={submitting}
                             className="flex-1 h-10 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-3 text-sm font-semibold hover:bg-ih-bg-muted transition-all disabled:opacity-50"
                         >
-                            Clear
+                            {m.common_clear()}
                         </button>
                         <button
                             type="button"
@@ -198,7 +202,7 @@ export function SignCard({
                             disabled={submitting}
                             className="flex-[2] h-10 px-4 bg-ih-primary text-ih-primary-fg rounded-md font-bold text-sm hover:bg-ih-primary-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            {submitting ? "Signing..." : "Sign Agreement"}
+                            {submitting ? m.checkout_sign_submit_pending() : m.checkout_sign_submit()}
                         </button>
                     </div>
                 </div>

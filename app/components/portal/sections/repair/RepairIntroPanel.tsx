@@ -5,6 +5,7 @@
  *
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
+import { m } from "~/paraglide/messages";
 
 interface RepairIntroPanelProps {
   customIntro: string;
@@ -22,10 +23,10 @@ export function RepairIntroPanel({
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-xl p-5 space-y-3">
       <p className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">
-        Custom Introduction
+        {m.repair_intro_heading()}
       </p>
       <textarea
-        placeholder="Add a personal message to appear at the top of the shared repair request…"
+        placeholder={m.repair_intro_placeholder()}
         rows={4}
         value={customIntro}
         onChange={(e) => onChange(e.target.value)}
@@ -33,7 +34,7 @@ export function RepairIntroPanel({
         className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 resize-none focus:outline-none focus:border-ih-primary"
       />
       {saving && (
-        <p className="text-[11px] text-ih-fg-4">Saving…</p>
+        <p className="text-[11px] text-ih-fg-4">{m.common_saving()}</p>
       )}
     </div>
   );

@@ -9,6 +9,7 @@
  * lint:ds — only `ih-*` design tokens; raw Tailwind colors are forbidden.
  */
 import { Icon } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 import type { ReportItem } from "./types";
 
 export interface ReportRepairPanelProps {
@@ -23,7 +24,7 @@ export function ReportRepairPanel({ selectedRepairList, showEstimates, onClose }
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-ih-fg-1">
-            Repair Request
+            {m.pca_repair_panel_title()}
           </h3>
           <button
             type="button"
@@ -35,7 +36,7 @@ export function ReportRepairPanel({ selectedRepairList, showEstimates, onClose }
         </div>
         {selectedRepairList.length === 0 ? (
           <div className="text-center py-8 text-ih-fg-4">
-            No items selected. Check "Add to repair request" on defect cards above.
+            {m.pca_repair_panel_empty()}
           </div>
         ) : (
           <>
@@ -64,7 +65,7 @@ export function ReportRepairPanel({ selectedRepairList, showEstimates, onClose }
             ))}
             <div className="mt-4 flex items-center justify-between">
               <div className="text-sm font-semibold text-ih-fg-1">
-                {selectedRepairList.length} items
+                {m.pca_repair_panel_item_count({ count: selectedRepairList.length })}
               </div>
               <div className="flex gap-2">
                 <button
@@ -72,13 +73,13 @@ export function ReportRepairPanel({ selectedRepairList, showEstimates, onClose }
                   onClick={() => window.print()}
                   className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3"
                 >
-                  Export PDF
+                  {m.pca_repair_panel_export_pdf()}
                 </button>
                 <button
                   type="button"
                   className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg"
                 >
-                  Send to Inspector
+                  {m.pca_repair_panel_send()}
                 </button>
               </div>
             </div>

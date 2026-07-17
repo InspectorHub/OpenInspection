@@ -1,5 +1,6 @@
 import { Skeleton } from "@core/shared-ui";
 import { InspectionCardSkeleton } from "./InspectionCardSkeleton";
+import { m } from "~/paraglide/messages";
 
 /**
  * Route-matched loading skeleton for the inspections list (issue #202, Tier 2).
@@ -13,7 +14,7 @@ import { InspectionCardSkeleton } from "./InspectionCardSkeleton";
 export function InspectionsListSkeleton() {
   return (
     <div aria-busy="true" aria-live="polite" className="space-y-ih-list">
-      <span className="sr-only">Loading inspections…</span>
+      <span className="sr-only">{m.dashboard_skeleton_loading()}</span>
 
       {/* Header: greeting + meta on the left, action buttons on the right */}
       <div className="flex items-start justify-between gap-4">

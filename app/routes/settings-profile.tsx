@@ -9,10 +9,11 @@ import { createApi } from "~/lib/api-client.server";
 import { SignaturePad } from "~/components/SignaturePad";
 import { AvatarCropper } from "~/components/media-studio/AvatarCropper";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
-import { profileSchema } from "~/lib/forms/settings.schema";
+import { makeProfileSchema } from "~/lib/forms/settings.schema";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { LOCALE_OPTIONS } from "~/lib/locales";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -57,7 +58,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "save-signature") {
     const signatureBase64 = fd.get("signatureBase64") as string | null;
     if (!signatureBase64) {
-      return { success: false, error: "No signature data provided", intent };
+      return { success: false, error: m.settings_profile_error_no_signature(), intent };
     }
     // TODO(C-10 collapse): hono/client collapses api.users.me so .signature is not
     // accessible; localized assertion until the typed-hono spike resolves it. Binding preserved.
@@ -67,7 +68,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      return { success: false, error: (err as Record<string, string>)?.message || "Save failed", intent };
+      return { success: false, error: (err as Record<string, string>)?.message || m.settings_error_save_failed(), intent };
     }
     return { success: true, error: null, intent };
   }
@@ -76,19 +77,19 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "photo-upload") {
     const photo = fd.get("photo");
     if (!(photo instanceof File) || photo.size === 0) {
-      return { success: false, error: "No valid photo provided", intent };
+      return { success: false, error: m.settings_profile_error_no_photo(), intent };
     }
     // hono/client form: keys must match the API schema field names
     const res = await api.profile.photo.$post({ form: { photo } } as Parameters<typeof api.profile.photo.$post>[0]);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      return { success: false, error: (err as Record<string, string>)?.message || "Upload failed", intent };
+      return { success: false, error: (err as Record<string, string>)?.message || m.settings_profile_error_upload_failed(), intent };
     }
     return { success: true, error: null, intent };
   }
 
   // Default: save profile fields
-  const submission = parseWithZod(fd, { schema: profileSchema });
+  const submission = parseWithZod(fd, { schema: makeProfileSchema() });
   if (submission.status !== "success") {
     return submission.reply();
   }
@@ -110,7 +111,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     return submission.reply({
-      formErrors: [(err as Record<string, string>)?.message || "Save failed"],
+      formErrors: [(err as Record<string, string>)?.message || m.settings_error_save_failed()],
     });
   }
   return { success: true, error: null, intent };
@@ -132,7 +133,7 @@ export default function SettingsProfilePage() {
   const [form, fields] = useForm({
     lastResult: actionData && "status" in actionData ? actionData : undefined,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: profileSchema });
+      return parseWithZod(formData, { schema: makeProfileSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -162,13 +163,13 @@ export default function SettingsProfilePage() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Profile" }]} />
-      <p className="text-[13px] text-ih-fg-3">Inspector identity that appears on every report you generate.</p>
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_profile_crumb() }]} />
+      <p className="text-[13px] text-ih-fg-3">{m.settings_profile_subtitle()}</p>
 
       {/* Flash */}
       {flashSuccess && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          Profile saved.
+          {m.settings_profile_flash_saved()}
         </div>
       )}
       {flashError ? (
@@ -188,21 +189,21 @@ export default function SettingsProfilePage() {
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-2">
-              <label htmlFor={fields.name.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Full Name</label>
+              <label htmlFor={fields.name.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_name_label()}</label>
               <input type="text" id={fields.name.id} name={fields.name.name} defaultValue={profile.name ?? ""}
-                placeholder="John Smith"
+                placeholder={m.settings_profile_name_placeholder()}
                 aria-invalid={fields.name.errors ? true : undefined}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
               {fields.name.errors ? (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.name.errors[0]}</p>
               ) : (
-                <p className="text-[11px] text-ih-fg-3">Displayed on inspection reports.</p>
+                <p className="text-[11px] text-ih-fg-3">{m.settings_profile_name_hint()}</p>
               )}
             </div>
             <div className="space-y-2">
-              <label htmlFor={fields.phone.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Phone</label>
+              <label htmlFor={fields.phone.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_phone_label()}</label>
               <input type="tel" id={fields.phone.id} name={fields.phone.name} defaultValue={profile.phone ?? ""}
-                placeholder="(555) 123-4567"
+                placeholder={m.settings_profile_phone_placeholder()}
                 aria-invalid={fields.phone.errors ? true : undefined}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
               {fields.phone.errors && (
@@ -210,27 +211,27 @@ export default function SettingsProfilePage() {
               )}
             </div>
             <div className="space-y-2">
-              <label htmlFor={fields.licenseNumber.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">License #</label>
+              <label htmlFor={fields.licenseNumber.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_license_label()}</label>
               <input type="text" id={fields.licenseNumber.id} name={fields.licenseNumber.name} defaultValue={profile.licenseNumber ?? ""}
-                placeholder="HI-12345"
+                placeholder={m.settings_profile_license_placeholder()}
                 aria-invalid={fields.licenseNumber.errors ? true : undefined}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all font-medium text-[13px] placeholder:text-ih-fg-4 text-ih-fg-1" />
               {fields.licenseNumber.errors ? (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.licenseNumber.errors[0]}</p>
               ) : (
-                <p className="text-[11px] text-ih-fg-3">State inspector license number.</p>
+                <p className="text-[11px] text-ih-fg-3">{m.settings_profile_license_hint()}</p>
               )}
             </div>
           </div>
 
           <div className="max-w-md">
             <Select
-              label="Your timezone"
+              label={m.settings_profile_timezone_label()}
               name="timezone"
               defaultValue={profile.timezone ?? ""}
-              hint="Overrides how times appear for you only. Reports and calendar events always use the company timezone."
+              hint={m.settings_profile_timezone_hint()}
               options={[
-                { value: "", label: "Use company timezone" },
+                { value: "", label: m.settings_profile_timezone_inherit_option() },
                 ...TIMEZONE_SELECT_OPTIONS,
               ]}
             />
@@ -238,12 +239,12 @@ export default function SettingsProfilePage() {
 
           <div className="max-w-md">
             <Select
-              label="Your language / locale"
+              label={m.settings_profile_locale_label()}
               name="locale"
               defaultValue={profile.locale ?? ""}
-              hint="Overrides how dates, times, and numbers are formatted for you only. Leave on the workspace default to inherit the company setting."
+              hint={m.settings_profile_locale_hint()}
               options={[
-                { value: "", label: "Use workspace default" },
+                { value: "", label: m.settings_profile_locale_inherit_option() },
                 ...LOCALE_OPTIONS,
               ]}
             />
@@ -256,19 +257,19 @@ export default function SettingsProfilePage() {
         {/* Photo placeholder */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
           <header className="space-y-1">
-            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Profile photo</h3>
-            <p className="text-[12px] text-ih-fg-3">Your avatar on the public company booking page.</p>
+            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_photo_heading()}</h3>
+            <p className="text-[12px] text-ih-fg-3">{m.settings_profile_photo_subtitle()}</p>
           </header>
 
           {/* Photo */}
           <div className="space-y-2">
-            <label className="block text-[13px] font-semibold text-ih-fg-1">Profile photo</label>
+            <label className="block text-[13px] font-semibold text-ih-fg-1">{m.settings_profile_photo_heading()}</label>
             <div className="flex items-center gap-4">
               <div className="w-24 h-24 rounded-full bg-ih-bg-muted border border-ih-border overflow-hidden flex items-center justify-center text-ih-fg-4 text-[11px]">
                 {profile.photoUrl ? (
-                  <img src={profile.photoUrl} alt="Profile" className="w-full h-full object-cover" />
+                  <img src={profile.photoUrl} alt={m.settings_profile_photo_alt()} className="w-full h-full object-cover" />
                 ) : (
-                  <span>No photo</span>
+                  <span>{m.settings_profile_photo_none()}</span>
                 )}
               </div>
               <div className="space-y-2">
@@ -282,7 +283,7 @@ export default function SettingsProfilePage() {
                     e.target.value = "";
                   }}
                 />
-                <p className="text-[11px] text-ih-fg-3">JPG, PNG, or WebP. Max 2 MB. Square crop renders best.</p>
+                <p className="text-[11px] text-ih-fg-3">{m.settings_profile_photo_hint()}</p>
               </div>
             </div>
           </div>
@@ -292,25 +293,25 @@ export default function SettingsProfilePage() {
         {/* Email signature (business-card footer) — independent of Point of Contact */}
         <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
           <header className="space-y-1">
-            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Email signature</h3>
+            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_signature_heading()}</h3>
             <p className="text-[12px] text-ih-fg-3">
-              The business-card footer added to emails you send. Built from the fields above — save your profile to refresh the preview.
+              {m.settings_profile_signature_subtitle()}
             </p>
           </header>
 
           <input type="hidden" name="signatureEnabled" value="false" />
           <label className="flex items-center gap-2 text-[13px] text-ih-fg-1">
             <input type="checkbox" name="signatureEnabled" value="true" defaultChecked={profile.signatureEnabled ?? true} />
-            Add to my emails
+            {m.settings_profile_signature_toggle()}
           </label>
 
           {profile.signaturePreviewHtml ? (
             <div className="rounded-md border border-ih-border bg-ih-bg-muted p-4">
-              <div className="text-[11px] text-ih-fg-3 mb-2 uppercase tracking-[0.2em]">Preview</div>
+              <div className="text-[11px] text-ih-fg-3 mb-2 uppercase tracking-[0.2em]">{m.settings_profile_signature_preview_label()}</div>
               <div dangerouslySetInnerHTML={{ __html: profile.signaturePreviewHtml }} />
             </div>
           ) : (
-            <p className="text-[12px] text-ih-fg-3">Add your name (and phone/license) above to build a signature.</p>
+            <p className="text-[12px] text-ih-fg-3">{m.settings_profile_signature_empty()}</p>
           )}
         </section>
 
@@ -321,21 +322,21 @@ export default function SettingsProfilePage() {
         )}
 
         {/* Save — sticky bar pinned to the bottom of the settings scroll area */}
-        <SettingsSaveBar label="Save Profile" />
+        <SettingsSaveBar label={m.settings_profile_save_button()} />
       </Form>
 
       {/* Saved signature */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
         <header className="space-y-1">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Saved Signature</h3>
+          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_saved_signature_heading()}</h3>
           <p className="text-[12px] text-ih-fg-3">
-            Your signature is applied to agreements you send and can be used for auto-sign on report publish.
+            {m.settings_profile_saved_signature_subtitle()}
           </p>
         </header>
 
         {sigSaved && (
           <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-            Signature saved.
+            {m.settings_profile_signature_saved_flash()}
           </div>
         )}
         {sigError && (
@@ -346,7 +347,7 @@ export default function SettingsProfilePage() {
 
         {showSigPad ? (
           <SignaturePad
-            label="Save Signature"
+            label={m.settings_profile_signature_pad_save()}
             onCancel={() => setShowSigPad(false)}
             onSubmit={async (dataUri) => {
               const fd = new FormData();
@@ -362,7 +363,7 @@ export default function SettingsProfilePage() {
             onClick={() => setShowSigPad(true)}
             className="px-4 py-2 bg-ih-bg-muted border border-ih-border text-ih-fg-1 rounded-md font-semibold text-[13px] hover:bg-ih-bg-card hover:border-ih-primary transition-all"
           >
-            {sigSaved ? "Update signature" : "Add signature"}
+            {sigSaved ? m.settings_profile_signature_update() : m.settings_profile_signature_add()}
           </button>
         )}
       </section>

@@ -8,7 +8,7 @@ import type { Route } from "./+types/settings-communication";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useFlash } from "~/hooks/useFlash";
-import { communicationEmailSchema } from "~/lib/forms/settings-config.schema";
+import { makeCommunicationEmailSchema } from "~/lib/forms/settings-config.schema";
 import { ownEmailProviderConfigured } from "~/lib/email-provider-config";
 import { TemplateList } from "~/components/email-template/TemplateList";
 import { useSessionContext } from "~/hooks/useSessionContext";
@@ -20,9 +20,10 @@ import { SmsDeliveryPanel, type SmsModeValue } from "~/components/settings/SmsDe
 import { GoogleCalendarPanel } from "~/components/settings/GoogleCalendarPanel";
 import { ManagedComplianceWizard, type ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
 import { parseTestResults } from "~/lib/connection-test";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Communication - Settings - OpenInspection" }];
+  return [{ title: m.settings_comms_meta_title() }];
 }
 
 interface CommConfig {
@@ -197,7 +198,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
 
   if (intent === "save-email") {
-    const submission = parseWithZod(form, { schema: communicationEmailSchema });
+    const submission = parseWithZod(form, { schema: makeCommunicationEmailSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -213,7 +214,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     });
     if (!res.ok) {
       const errBody = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
-      const serverMsg = errBody?.error?.message ?? "Failed to save email settings.";
+      const serverMsg = errBody?.error?.message ?? m.settings_comms_email_save_error();
       return { intent: "save-email", ok: false, error: serverMsg };
     }
     return { intent: "save-email", ok: true, error: null };
@@ -242,9 +243,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       json: { emailByoProvider },
     }).catch(() => null);
     if (cfgRes && !cfgRes.ok) {
-      return { intent, ok: false, error: "Failed to save provider selection.", field: null, test: null };
+      return { intent, ok: false, error: m.settings_comms_provider_save_error(), field: null, test: null };
     }
-    return saveSecrets(api, intent, body, "Failed to save email secrets.");
+    return saveSecrets(api, intent, body, m.settings_comms_email_secrets_save_error());
   }
 
   if (intent === "test-resend") {
@@ -256,7 +257,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         ok: false,
-        error: body?.error?.message ?? "Connection test failed.",
+        error: body?.error?.message ?? m.settings_connection_test_failed(),
         field: null,
         test: null,
       };
@@ -269,7 +270,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     type EmailProvider = typeof VALID_PROVIDERS[number];
     const rawProvider = form.get("provider");
     if (!rawProvider || !(VALID_PROVIDERS as ReadonlyArray<string>).includes(rawProvider as string)) {
-      return { intent, ok: false, error: "Unknown provider.", field: null, test: null };
+      return { intent, ok: false, error: m.settings_comms_unknown_provider(), field: null, test: null };
     }
     const provider = rawProvider as EmailProvider;
     const res = await api.integrations.email.validate.$post({ json: { provider } });
@@ -280,7 +281,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         ok: false,
-        error: body?.error?.message ?? "Credential validation failed.",
+        error: body?.error?.message ?? m.settings_comms_credential_validation_failed(),
         field: null,
         test: null,
       };
@@ -294,7 +295,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const clientSecret = form.get("GOOGLE_CLIENT_SECRET");
     if (clientId && typeof clientId === "string" && clientId.trim()) body.GOOGLE_CLIENT_ID = clientId;
     if (clientSecret && typeof clientSecret === "string" && clientSecret.trim()) body.GOOGLE_CLIENT_SECRET = clientSecret;
-    return saveSecrets(api, intent, body, "Failed to save calendar secrets.");
+    return saveSecrets(api, intent, body, m.settings_comms_calendar_secrets_save_error());
   }
 
   if (intent === "save-google-oauth-mode") {
@@ -316,7 +317,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       },
     });
     if (!patchRes.ok) {
-      return { intent, ok: false, error: "Failed to save Google OAuth mode.", field: null, test: null };
+      return { intent, ok: false, error: m.settings_comms_google_oauth_mode_save_error(), field: null, test: null };
     }
     return { intent, ok: true, error: null, field: null, test: null };
   }
@@ -334,7 +335,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.admin["tenant-config"].$patch({
       json: { smsMode, companyPhone: companyPhone || null },
     });
-    if (!res.ok) return { intent, ok: false, error: "Failed to save SMS settings.", field: null, test: null };
+    if (!res.ok) return { intent, ok: false, error: m.settings_comms_sms_settings_save_error(), field: null, test: null };
     return { intent, ok: true, error: null, field: null, test: null };
   }
 
@@ -359,9 +360,9 @@ export async function action({ request, context }: Route.ActionArgs) {
       json: { smsByoProvider: byoProvider },
     }).catch(() => null);
     if (cfgRes && !cfgRes.ok) {
-      return { intent, ok: false, error: "Failed to save provider selection.", field: null, test: null };
+      return { intent, ok: false, error: m.settings_comms_provider_save_error(), field: null, test: null };
     }
-    return saveSecrets(api, intent, body, "Failed to save SMS credentials.");
+    return saveSecrets(api, intent, body, m.settings_comms_sms_credentials_save_error());
   }
 
   if (intent === "test-sms") {
@@ -369,7 +370,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.smsAdmin.sms.test.$post({ json: { to } });
     const body = (await res.json().catch(() => null)) as { success?: boolean; error?: string } | null;
     if (!res.ok || !body?.success) {
-      return { intent, ok: false, error: body?.error ?? "Test SMS failed.", field: null, test: null };
+      return { intent, ok: false, error: body?.error ?? m.settings_comms_test_sms_failed(), field: null, test: null };
     }
     return { intent, ok: true, error: null, field: null, test: { sent: true } };
   }
@@ -381,7 +382,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const isSaasAction =
       (context as { cloudflare?: { env?: { APP_MODE?: string } } }).cloudflare?.env?.APP_MODE === "saas";
     if (!isSaasAction) {
-      return { intent, ok: false as const, error: "Managed SMS is only available on the SaaS platform.", field: null, test: null };
+      return { intent, ok: false as const, error: m.settings_comms_managed_saas_only(), field: null, test: null };
     }
 
     // Validate required business-info fields.
@@ -393,11 +394,11 @@ export async function action({ request, context }: Route.ActionArgs) {
     const rawChannel = form.get("channel");
     const channel: "sp10dlc" | "tollfree" = rawChannel === "tollfree" ? "tollfree" : "sp10dlc";
 
-    if (!legalName) return { intent, ok: false as const, error: "Legal name is required.", field: "legalName", test: null };
-    if (!address) return { intent, ok: false as const, error: "Business address is required.", field: "address", test: null };
-    if (!repName) return { intent, ok: false as const, error: "Representative name is required.", field: "repName", test: null };
+    if (!legalName) return { intent, ok: false as const, error: m.settings_comms_legal_name_required(), field: "legalName", test: null };
+    if (!address) return { intent, ok: false as const, error: m.settings_comms_business_address_required(), field: "address", test: null };
+    if (!repName) return { intent, ok: false as const, error: m.settings_comms_rep_name_required(), field: "repName", test: null };
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return { intent, ok: false as const, error: "Enter a valid email address.", field: "email", test: null };
+      return { intent, ok: false as const, error: m.settings_comms_email_invalid(), field: "email", test: null };
     }
 
     const businessInfo = {
@@ -416,12 +417,12 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!res.ok) {
       const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
       const msg = errBody?.error === "managed_provision_unavailable"
-        ? "Managed SMS provisioning is not available in standalone mode."
+        ? m.settings_comms_managed_provision_unavailable()
         : errBody?.error === "managed_not_configured"
-          ? "Managed Twilio credentials are not configured on this deployment."
+          ? m.settings_comms_managed_not_configured()
           : errBody?.error ?? (intent === "sms-compliance-provision"
-            ? "Failed to start provisioning."
-            : "Failed to resubmit.");
+            ? m.settings_comms_provision_start_failed()
+            : m.settings_comms_resubmit_failed());
       return { intent, ok: false as const, error: msg, field: null, test: null };
     }
     return { intent, ok: true as const, error: null, field: null, test: null };
@@ -435,7 +436,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       json: { managedProvider },
     }).catch(() => null);
     if (!res || !res.ok) {
-      return { intent, ok: false as const, error: "Failed to save managed provider.", field: null, test: null };
+      return { intent, ok: false as const, error: m.settings_comms_managed_provider_save_error(), field: null, test: null };
     }
     return { intent, ok: true as const, error: null, field: null, test: null };
   }
@@ -447,7 +448,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       param: { trigger },
       json: { subject: null, blocks: null, enabled },
     });
-    if (!res.ok) return { ok: false, error: "Failed to update template." };
+    if (!res.ok) return { ok: false, error: m.settings_comms_template_update_error() };
     return { ok: true };
   }
 
@@ -506,7 +507,7 @@ export default function SettingsCommunication() {
   const [emailForm, emailFields] = useForm({
     lastResult: emailResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: communicationEmailSchema });
+      return parseWithZod(formData, { schema: makeCommunicationEmailSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -606,15 +607,15 @@ export default function SettingsCommunication() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Communication" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_root(), href: "/settings" }, { label: m.settings_comms_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">
-        Configure email delivery, templates, and calendar sync.
+        {m.settings_comms_intro()}
       </p>
 
       {/* Flash — transient success for secret saves */}
       {flashVisible && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          Settings saved.
+          {m.settings_flash_saved()}
         </div>
       )}
 
@@ -675,10 +676,9 @@ export default function SettingsCommunication() {
       {/* Managed dedicated — onboarding wizard + status timeline (SaaS only) */}
       {isSaas && smsMode === "managed_dedicated" && (
         <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Dedicated number setup</h3>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_comms_dedicated_heading()}</h3>
           <p className="text-[13px] text-ih-fg-3">
-            Provision your own dedicated local or toll-free number managed by the platform.
-            Submit your business information below to begin TCR / TFV registration.
+            {m.settings_comms_dedicated_desc()}
           </p>
           <ManagedComplianceWizard
             compliance={compliance}
@@ -701,12 +701,12 @@ export default function SettingsCommunication() {
       {/* Managed shared — minimal status note (SaaS only, no per-tenant form) */}
       {isSaas && smsMode === "managed_shared" && (
         <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5">
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 mb-2">Shared pool status</h3>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 mb-2">{m.settings_comms_shared_pool_heading()}</h3>
           <p className="text-[13px] text-ih-fg-3">
-            Your messages are sent from a platform-managed shared number. No additional setup is required.
+            {m.settings_comms_shared_pool_desc()}
           </p>
           {compliance.complianceStatus === "approved" && (
-            <p className="text-[12px] text-ih-ok-fg font-medium mt-2">Platform pool: Active</p>
+            <p className="text-[12px] text-ih-ok-fg font-medium mt-2">{m.settings_comms_shared_pool_active()}</p>
           )}
         </section>
       )}
@@ -714,16 +714,16 @@ export default function SettingsCommunication() {
       {/* Email templates */}
       <section className="space-y-4">
         <div className="flex items-baseline justify-between">
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Email templates</h3>
+          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_comms_email_templates_heading()}</h3>
           <div className="flex items-center gap-3">
             <Link to="/settings/communication/templates" className="inline-flex items-center gap-1 text-[12px] text-ih-primary font-semibold hover:underline">
-              Manage templates <Icon name="arrowR" size={12} />
+              {m.settings_comms_manage_templates_link()} <Icon name="arrowR" size={12} />
             </Link>
-            <span className="text-[11px] text-ih-fg-4">{emailTemplates.length} templates · click to customize</span>
+            <span className="text-[11px] text-ih-fg-4">{m.settings_comms_templates_count({ count: emailTemplates.length })}</span>
           </div>
         </div>
         {emailTemplates.length === 0 ? (
-          <div className="bg-ih-bg-card border border-ih-border rounded-lg py-8 text-center text-[13px] text-ih-fg-3">No email templates available.</div>
+          <div className="bg-ih-bg-card border border-ih-border rounded-lg py-8 text-center text-[13px] text-ih-fg-3">{m.settings_comms_no_templates()}</div>
         ) : (
           <TemplateList rows={emailTemplates} />
         )}

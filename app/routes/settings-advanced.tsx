@@ -6,13 +6,14 @@ import type { Route } from "./+types/settings-advanced";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useFlash } from "~/hooks/useFlash";
-import { stripeConnectSchema } from "~/lib/forms/settings-config.schema";
+import { makeStripeConnectSchema } from "~/lib/forms/settings-config.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { StripeConnectPanel } from "~/components/settings/advanced/StripeConnectPanel";
 import { AiFeaturesPanel } from "~/components/settings/advanced/AiFeaturesPanel";
 import { IntegrationKeysPanel } from "~/components/settings/advanced/IntegrationKeysPanel";
 import { parseTestResults } from "~/lib/connection-test";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -82,7 +83,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
 
   if (intent === "connect-stripe") {
-    const submission = parseWithZod(fd, { schema: stripeConnectSchema });
+    const submission = parseWithZod(fd, { schema: makeStripeConnectSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -91,7 +92,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return submission.reply({
-        formErrors: [(err as Record<string, string>)?.message || "Failed to connect Stripe account."],
+        formErrors: [(err as Record<string, string>)?.message || m.settings_advanced_stripe_connect_error()],
       });
     }
     return { success: true, error: null };
@@ -100,7 +101,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "disconnect-stripe") {
     const res = await api.admin["stripe-connect"].$delete();
     if (!res.ok) {
-      return { intent, success: false, error: "Failed to disconnect Stripe account.", field: null, test: null };
+      return { intent, success: false, error: m.settings_advanced_stripe_disconnect_error(), field: null, test: null };
     }
     return { intent, success: true, error: null, field: null, test: null };
   }
@@ -108,7 +109,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   if (intent === "save-ai") {
     const geminiApiKey = fd.get("GEMINI_API_KEY");
     if (!geminiApiKey || typeof geminiApiKey !== "string" || !geminiApiKey.trim()) {
-      return { intent, success: false, error: "API key is required.", field: "GEMINI_API_KEY", test: null };
+      return { intent, success: false, error: m.settings_advanced_api_key_required(), field: "GEMINI_API_KEY", test: null };
     }
     const res = await api.secrets.secrets.$put({ json: { GEMINI_API_KEY: geminiApiKey } });
     if (!res.ok) {
@@ -118,7 +119,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         success: false,
-        error: errBody?.error?.message ?? "Failed to save AI configuration.",
+        error: errBody?.error?.message ?? m.settings_advanced_ai_save_error(),
         field: errBody?.error?.field ?? null,
         test: null,
       };
@@ -135,7 +136,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         success: false,
-        error: body?.error?.message ?? "Connection test failed.",
+        error: body?.error?.message ?? m.settings_connection_test_failed(),
         field: null,
         test: null,
       };
@@ -158,7 +159,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         return {
           intent,
           success: false,
-          error: errBody?.error?.message ?? "Failed to save integration keys.",
+          error: errBody?.error?.message ?? m.settings_advanced_integration_keys_save_error(),
           field: errBody?.error?.field ?? null,
           test: null,
         };
@@ -167,7 +168,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, success: true, error: null, field: null, test: null };
   }
 
-  return { intent: null, success: false, error: "Unknown action", field: null, test: null };
+  return { intent: null, success: false, error: m.settings_unknown_action(), field: null, test: null };
 }
 
 /* ------------------------------------------------------------------ */
@@ -188,7 +189,7 @@ export default function SettingsAdvancedPage() {
   const [stripeForm, stripeFields] = useForm({
     lastResult: stripeResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: stripeConnectSchema });
+      return parseWithZod(formData, { schema: makeStripeConnectSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -224,13 +225,13 @@ export default function SettingsAdvancedPage() {
 
   return (
     <div className="space-y-ih-list max-w-3xl">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Advanced" }]} />
-      <p className="text-[13px] text-ih-fg-3">Stripe payments, AI features, and integrations.</p>
+      <SettingsCrumb items={[{ label: m.settings_crumb_root(), href: "/settings" }, { label: m.settings_advanced_crumb() }]} />
+      <p className="text-[13px] text-ih-fg-3">{m.settings_advanced_intro()}</p>
 
       {/* Flash */}
       {flashVisible && actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          Settings saved.
+          {m.settings_flash_saved()}
         </div>
       )}
       {actionData &&
@@ -274,14 +275,14 @@ export default function SettingsAdvancedPage() {
 
       {/* Data import/export */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
-        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Data management</h3>
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_advanced_data_heading()}</h3>
         <p className="text-[13px] text-ih-fg-3">
-          Import data from another inspection platform or export your data for backup.
+          {m.settings_advanced_data_desc()}
         </p>
         <div className="flex flex-wrap gap-3">
           <Link to="/settings/data"
             className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-2 text-[13px] font-semibold hover:bg-ih-bg-muted transition-colors inline-flex items-center">
-            Import / Export data
+            {m.settings_advanced_import_export()}
           </Link>
         </div>
       </section>

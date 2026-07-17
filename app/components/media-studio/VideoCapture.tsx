@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { m } from "~/paraglide/messages";
 
 /**
  * Plan 7 — video walk-through capture (pluggable backend: Stream or R2).
@@ -48,10 +49,10 @@ type Phase = "pick" | "uploading" | "finalizing";
 /** Pure validation (type + size). Duration is enforced server-side by Stream. */
 export function validateVideoFile(file: File): string | null {
   if (!(ALLOWED_VIDEO_TYPES as readonly string[]).includes(file.type)) {
-    return "Unsupported format. Use MP4, MOV, or WebM.";
+    return m.media_video_err_format();
   }
   if (file.size > MAX_VIDEO_BYTES) {
-    return "Video is too large (max 200 MB).";
+    return m.media_video_err_too_large();
   }
   return null;
 }
@@ -97,7 +98,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
       };
       if (!data?.uploadURL || !data?.ref) {
         setPhase("pick");
-        setError("The video service returned an unexpected response. Please try again.");
+        setError(m.media_video_err_unexpected());
         return;
       }
 
@@ -118,7 +119,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
           uploadResponseText = await uploadWithProgressBody(data.uploadURL, file, setProgress);
         } catch {
           setPhase("pick");
-          setError("Upload failed. Check your connection and try again.");
+          setError(m.media_video_err_upload());
           return;
         }
 
@@ -133,7 +134,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
         }
         if (!r2Data?.mediaId || !r2Data?.r2Key) {
           setPhase("pick");
-          setError("The video service returned an unexpected response. Please try again.");
+          setError(m.media_video_err_unexpected());
           return;
         }
 
@@ -174,7 +175,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
           await uploadWithProgress(data.uploadURL, file, setProgress);
         } catch {
           setPhase("pick");
-          setError("Upload failed. Check your connection and try again.");
+          setError(m.media_video_err_upload());
           return;
         }
         finalRef = data.ref as { provider: "stream"; streamUid: string };
@@ -201,7 +202,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
       onClose();
     } catch {
       setPhase("pick");
-      setError("Upload failed. Check your connection and try again.");
+      setError(m.media_video_err_upload());
     }
   };
 
@@ -211,18 +212,18 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
   const pickDisabled = busy || (provider === "r2" && !accepted);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Add video">
-      <button type="button" aria-label="Close" className="absolute inset-0 bg-ih-backdrop" onClick={busy ? undefined : onClose} />
+    <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true" aria-label={m.media_video_add_aria()}>
+      <button type="button" aria-label={m.common_close()} className="absolute inset-0 bg-ih-backdrop" onClick={busy ? undefined : onClose} />
       <div data-testid="video-capture" className="relative w-full max-w-md rounded-t-2xl bg-ih-bg-card p-4 shadow-ih-popover">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-[15px] font-bold text-ih-fg-1">Add video walk-through</h2>
+          <h2 className="text-[15px] font-bold text-ih-fg-1">{m.media_video_add_heading()}</h2>
           <button
             type="button"
             onClick={onClose}
             disabled={busy}
             className="min-h-[44px] min-w-[44px] rounded-lg px-3 text-[13px] font-bold text-ih-fg-3 hover:text-ih-fg-1 disabled:opacity-40"
           >
-            Cancel
+            {m.common_cancel()}
           </button>
         </div>
 
@@ -256,8 +257,8 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
               className="mt-0.5 accent-ih-primary"
             />
             <span>
-              This clip is stored as recorded. Location data embedded in the file is{" "}
-              <strong>not</strong> removed. I understand and want to upload.
+              {m.media_video_privacy_before()}{" "}
+              <strong>{m.media_video_privacy_not()}</strong> {m.media_video_privacy_after()}
             </span>
           </label>
         )}
@@ -265,7 +266,7 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
         {phase === "uploading" || phase === "finalizing" ? (
           <div className="py-2">
             <div className="mb-1 flex items-center justify-between text-[12px] font-semibold text-ih-fg-2">
-              <span>{phase === "finalizing" ? "Processing…" : "Uploading…"}</span>
+              <span>{phase === "finalizing" ? m.media_video_processing() : m.media_video_uploading()}</span>
               <span className="tabular-nums">{Math.round(progress)}%</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-ih-bg-muted">
@@ -284,11 +285,11 @@ export function VideoCapture({ inspectionId, provider, itemId, onClose, onUpload
             onClick={() => inputRef.current?.click()}
             className="min-h-[44px] w-full rounded-xl bg-ih-primary px-5 text-[14px] font-bold text-white hover:bg-ih-primary-600 disabled:opacity-50"
           >
-            Choose or record a clip
+            {m.media_video_pick()}
           </button>
         )}
 
-        <p className="mt-3 text-[11px] text-ih-fg-4">MP4 / MOV / WebM · up to {MAX_VIDEO_SEC}s · max 200 MB</p>
+        <p className="mt-3 text-[11px] text-ih-fg-4">{m.media_video_formats_hint({ maxSec: MAX_VIDEO_SEC })}</p>
       </div>
     </div>
   );
@@ -307,7 +308,7 @@ export async function apiErrorReason(res: Response): Promise<string> {
   } catch {
     // non-JSON / body already consumed — fall through to the generic message
   }
-  return `Upload failed (${res.status}). Please try again.`;
+  return m.media_video_err_upload_status({ status: res.status });
 }
 
 /**

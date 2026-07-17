@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pill } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 /**
  * Track I-a Task 9 — shared multi-signer list for an agreement envelope.
@@ -68,10 +69,10 @@ export function remindState(
     nowMs: number,
 ): { canRemind: boolean; reason: string | null } {
     if (isTerminal(signer.status)) {
-        return { canRemind: false, reason: "This signer is no longer awaiting signature." };
+        return { canRemind: false, reason: m.agreement_signers_remind_terminal() };
     }
     if (signer.lastRemindedAt && nowMs - signer.lastRemindedAt < 3600_000) {
-        return { canRemind: false, reason: "Reminded within the last hour. Try again later." };
+        return { canRemind: false, reason: m.agreement_signers_remind_ratelimited() };
     }
     return { canRemind: true, reason: null };
 }
@@ -103,7 +104,7 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
     const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
 
     if (signers.length === 0) {
-        return <p className="text-[13px] text-ih-fg-3">No signers on this agreement yet.</p>;
+        return <p className="text-[13px] text-ih-fg-3">{m.agreement_signers_empty()}</p>;
     }
 
     const handleRemind = async (id: string) => {
@@ -113,7 +114,7 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
         try {
             await onRemind(id);
         } catch (e) {
-            setRowError({ id, message: e instanceof Error ? e.message : "Could not send reminder. Try again later." });
+            setRowError({ id, message: e instanceof Error ? e.message : m.agreement_signers_remind_error() });
         } finally {
             setRemindingId(null);
         }
@@ -128,7 +129,7 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
             setCopiedId(id);
             setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1800);
         } catch {
-            setRowError({ id, message: "Could not copy link. Try again." });
+            setRowError({ id, message: m.agreement_signers_copy_error() });
         }
     };
 
@@ -145,12 +146,12 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                                 <span className="text-[13px] font-semibold text-ih-fg-1 truncate">{s.name}</span>
                                 <Pill tone="neutral">{roleLabel(s.role)}</Pill>
                                 <Pill tone={chip.tone}>{chip.label}</Pill>
-                                {s.channel === "in_person" && <Pill tone="info">In person</Pill>}
+                                {s.channel === "in_person" && <Pill tone="info">{m.agreement_signers_in_person()}</Pill>}
                             </div>
                             <div className="text-[12px] text-ih-fg-3 mt-0.5 truncate">{s.email}</div>
                             {s.onBehalfOf && (
                                 <div className="text-[12px] text-ih-fg-3 mt-0.5">
-                                    On behalf of <span className="font-medium text-ih-fg-2">{s.onBehalfOf}</span>
+                                    {m.agreement_signers_on_behalf_of()}<span className="font-medium text-ih-fg-2">{s.onBehalfOf}</span>
                                 </div>
                             )}
                             {rowError?.id === s.id && (
@@ -168,7 +169,7 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                                         title={reason ?? undefined}
                                         className="text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed disabled:hover:opacity-100"
                                     >
-                                        {remindingId === s.id ? "Sending…" : "Remind"}
+                                        {remindingId === s.id ? m.agreement_signers_remind_pending() : m.agreement_signers_remind()}
                                     </button>
                                 )}
                                 {onCopyLink && (
@@ -178,7 +179,7 @@ export function SignerList({ signers, onRemind, onCopyLink, busy, nowMs }: Signe
                                         disabled={!!busy}
                                         className="text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:text-ih-fg-4 disabled:cursor-not-allowed"
                                     >
-                                        {copiedId === s.id ? "Copied" : "Copy link"}
+                                        {copiedId === s.id ? m.common_copied() : m.agreement_signers_copy()}
                                     </button>
                                 )}
                             </div>

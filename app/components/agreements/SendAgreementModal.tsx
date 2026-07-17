@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Modal, Button } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 /**
  * Track I-a Task 9 — shared multi-signer send modal. Self-contained (no route
@@ -47,13 +48,13 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * null when the draft is submittable.
  */
 export function validateSigners(signers: SignerDraft[]): string | null {
-    if (signers.length === 0) return "Add at least one signer.";
+    if (signers.length === 0) return m.agreement_send_error_no_signers();
     const seen = new Set<string>();
     for (const s of signers) {
-        if (!s.name.trim()) return "Every signer needs a name.";
+        if (!s.name.trim()) return m.agreement_send_error_no_name();
         const email = s.email.trim().toLowerCase();
-        if (!EMAIL_RE.test(email)) return `"${s.email || "(empty)"}" is not a valid email.`;
-        if (seen.has(email)) return `Duplicate signer email: ${s.email}.`;
+        if (!EMAIL_RE.test(email)) return m.agreement_send_error_invalid_email({ email: s.email || m.agreement_send_email_empty() });
+        if (seen.has(email)) return m.agreement_send_error_duplicate({ email: s.email });
         seen.add(email);
     }
     return null;
@@ -128,19 +129,19 @@ export function SendAgreementModal({
         <Modal
             open={open}
             onClose={onClose}
-            title="Send for signing"
+            title={m.agreement_send_title()}
             size="lg"
             footer={
                 <>
-                    <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+                    <Button variant="secondary" onClick={onClose} disabled={busy}>{m.common_cancel()}</Button>
                     <Button variant="primary" onClick={submit} disabled={busy}>
-                        {busy ? "Sending…" : "Send"}
+                        {busy ? m.agreement_send_pending() : m.agreement_send_submit()}
                     </Button>
                 </>
             }
         >
             <p className="text-[13px] text-ih-fg-3 mb-4">
-                Add each person who must sign. They each receive their own private link.
+                {m.agreement_send_intro()}
             </p>
 
             <div className="space-y-3">
@@ -150,8 +151,8 @@ export function SendAgreementModal({
                             <input
                                 type="text"
                                 value={s.name}
-                                placeholder="Full name"
-                                aria-label="Signer name"
+                                placeholder={m.agreement_send_name_placeholder()}
+                                aria-label={m.agreement_send_name_aria()}
                                 disabled={busy}
                                 onChange={(e) => update(i, { name: e.target.value })}
                                 className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
@@ -159,8 +160,8 @@ export function SendAgreementModal({
                             <input
                                 type="email"
                                 value={s.email}
-                                placeholder="email@example.com"
-                                aria-label="Signer email"
+                                placeholder={m.agreement_send_email_placeholder()}
+                                aria-label={m.agreement_send_email_aria()}
                                 disabled={busy}
                                 onChange={(e) => update(i, { email: e.target.value })}
                                 className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
@@ -171,7 +172,7 @@ export function SendAgreementModal({
                             disabled={busy}
                             onChange={(e) => update(i, { role: e.target.value as SignerRole })}
                             className="px-2 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none"
-                            aria-label="Signer role"
+                            aria-label={m.agreement_send_role_aria()}
                         >
                             {ROLE_OPTIONS.map((o) => (
                                 <option key={o.value} value={o.value}>{o.label}</option>
@@ -181,7 +182,7 @@ export function SendAgreementModal({
                             type="button"
                             onClick={() => removeRow(i)}
                             disabled={busy || signers.length === 1}
-                            aria-label="Remove signer"
+                            aria-label={m.agreement_send_remove_aria()}
                             className="px-2 py-2 text-ih-fg-3 hover:text-ih-bad-fg disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             ✕
@@ -196,11 +197,11 @@ export function SendAgreementModal({
                 disabled={busy}
                 className="mt-3 text-[13px] font-semibold text-ih-primary hover:opacity-80 disabled:opacity-40"
             >
-                + Add signer
+                {m.agreement_send_add()}
             </button>
 
             <fieldset className="mt-5">
-                <legend className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-2">Completion</legend>
+                <legend className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 mb-2">{m.agreement_send_completion_legend()}</legend>
                 <div className="space-y-2">
                     <label className="flex items-start gap-2.5 cursor-pointer">
                         <input
@@ -211,7 +212,7 @@ export function SendAgreementModal({
                             onChange={() => setCompletionPolicy("all")}
                             className="mt-0.5 h-4 w-4 text-ih-primary focus:ring-ih-primary/30"
                         />
-                        <span className="text-[13px] text-ih-fg-2">Everyone must sign</span>
+                        <span className="text-[13px] text-ih-fg-2">{m.agreement_send_policy_all()}</span>
                     </label>
                     <label className="flex items-start gap-2.5 cursor-pointer">
                         <input
@@ -222,7 +223,7 @@ export function SendAgreementModal({
                             onChange={() => setCompletionPolicy("one")}
                             className="mt-0.5 h-4 w-4 text-ih-primary focus:ring-ih-primary/30"
                         />
-                        <span className="text-[13px] text-ih-fg-2">Any one signature completes it</span>
+                        <span className="text-[13px] text-ih-fg-2">{m.agreement_send_policy_one()}</span>
                     </label>
                 </div>
             </fieldset>

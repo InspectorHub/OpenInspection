@@ -5,6 +5,8 @@
  * portal to link to (the CTA is hidden in that case; the message still
  * explains what happened).
  */
+import { m } from "~/paraglide/messages";
+
 export function QuotaExceededPanel({
   billingPortalUrl,
   onClose,
@@ -15,22 +17,21 @@ export function QuotaExceededPanel({
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex-1 overflow-y-auto px-6 py-8 text-center">
-        <p className="text-[14px] font-bold text-ih-fg-1 mb-2">Free plan limit reached</p>
+        <p className="text-[14px] font-bold text-ih-fg-1 mb-2">{m.newinsp_quota_title()}</p>
         <p className="text-[13px] text-ih-fg-3 max-w-[38ch] mx-auto">
-          You&rsquo;ve used all 5 free inspections. Everything you created stays fully usable
-          — subscribe to create new ones.
+          {m.newinsp_quota_body()}
         </p>
       </div>
       <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-ih-border">
         <button onClick={onClose} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
-          Close
+          {m.common_close()}
         </button>
         {billingPortalUrl && (
           <a
             href={billingPortalUrl}
             className="h-8 px-4 inline-flex items-center justify-center rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
           >
-            Subscribe
+            {m.newinsp_quota_subscribe()}
           </a>
         )}
       </div>

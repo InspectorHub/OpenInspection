@@ -1,25 +1,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Modal, Button } from "@core/shared-ui";
 import type { ItemType } from "~/lib/editor/structure-ops";
+import { m } from "~/paraglide/messages";
 
 export interface AddItemTypeModalProps {
   open: boolean;
   onConfirm: (label: string, type: ItemType) => void;
   onCancel: () => void;
 }
-
-/** The 9 item types (D8) with field-friendly labels. */
-const ITEM_TYPES: Array<{ value: ItemType; label: string }> = [
-  { value: "rich", label: "Rating + comments" },
-  { value: "boolean", label: "Yes / No" },
-  { value: "text", label: "Short text" },
-  { value: "textarea", label: "Long text" },
-  { value: "number", label: "Number" },
-  { value: "select", label: "Single choice" },
-  { value: "multi_select", label: "Multiple choice" },
-  { value: "date", label: "Date" },
-  { value: "photo_only", label: "Photos only" },
-];
 
 /**
  * "Add item" modal (D8) — label input + type picker. NEVER window.prompt.
@@ -31,6 +19,20 @@ export function AddItemTypeModal({ open, onConfirm, onCancel }: AddItemTypeModal
   const [label, setLabel] = useState("");
   const [type, setType] = useState<ItemType>("rich");
   const labelRef = useRef<HTMLInputElement>(null);
+
+  /** The 9 item types (D8) with field-friendly labels. Built in render so the
+   *  message functions resolve per-render (never frozen at import). */
+  const ITEM_TYPES: Array<{ value: ItemType; label: string }> = [
+    { value: "rich", label: m.editor_additem_type_rich() },
+    { value: "boolean", label: m.editor_additem_type_boolean() },
+    { value: "text", label: m.editor_additem_type_text() },
+    { value: "textarea", label: m.editor_additem_type_textarea() },
+    { value: "number", label: m.editor_additem_type_number() },
+    { value: "select", label: m.editor_additem_type_select() },
+    { value: "multi_select", label: m.editor_additem_type_multi_select() },
+    { value: "date", label: m.editor_additem_type_date() },
+    { value: "photo_only", label: m.editor_additem_type_photo_only() },
+  ];
 
   useEffect(() => {
     if (open) { setLabel(""); setType("rich"); }
@@ -46,7 +48,7 @@ export function AddItemTypeModal({ open, onConfirm, onCancel }: AddItemTypeModal
     <Modal
       open={open}
       onClose={onCancel}
-      title="Add item"
+      title={m.editor_additem_title()}
       size="sm"
       initialFocusRef={labelRef}
       footer={
@@ -55,33 +57,33 @@ export function AddItemTypeModal({ open, onConfirm, onCancel }: AddItemTypeModal
             variant="ghost"
             onClick={onCancel}
           >
-            Cancel
+            {m.common_cancel()}
           </Button>
           <Button
             variant="primary"
             onClick={submit}
             data-testid="add-item-confirm"
           >
-            Add item
+            {m.editor_additem_title()}
           </Button>
         </>
       }
     >
       <label className="block text-[12px] font-bold text-ih-fg-2">
-        Label
+        {m.editor_additem_label_label()}
         <input
           ref={labelRef}
           type="text"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="New item"
+          placeholder={m.editor_additem_label_placeholder()}
           className="mt-1 w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[13px] font-normal"
           onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
           data-testid="add-item-label"
         />
       </label>
       <label className="block mt-4 text-[12px] font-bold text-ih-fg-2">
-        Type
+        {m.editor_additem_type_label()}
         <select
           value={type}
           onChange={(e) => setType(e.target.value as ItemType)}

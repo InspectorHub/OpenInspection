@@ -5,6 +5,7 @@ import { TestConnectionButton } from "~/components/settings/TestConnectionButton
 import { ConnectionTestStatus, type ConnectionTestResult } from "~/components/settings/ConnectionTestStatus";
 import { WebhookStatusBadge } from "./WebhookStatusBadge";
 import type { action } from "~/routes/settings-integrations";
+import { m } from "~/paraglide/messages";
 
 type WebhookLogEntry = { ts: string; eventType: string; result: string };
 
@@ -75,19 +76,19 @@ export function StripePaymentsPanel({
           ST
         </div>
         <div>
-          <h3 className="text-[13px] font-bold text-ih-fg-1">Stripe payments</h3>
-          <p className="text-[11px] text-ih-fg-3">Connect your own Stripe account to accept card payments on invoices.</p>
+          <h3 className="text-[13px] font-bold text-ih-fg-1">{m.settings_stripe_heading()}</h3>
+          <p className="text-[11px] text-ih-fg-3">{m.settings_stripe_subtitle()}</p>
         </div>
       </div>
 
       {/* Test-mode guidance — start in the Stripe sandbox */}
       <div className="rounded-md bg-ih-bg-muted border border-ih-border px-4 py-3 text-[12px] text-ih-fg-3 leading-relaxed">
-        <span className="font-semibold text-ih-fg-2">Start in test mode.</span> Use your{" "}
-        <span className="font-mono">pk_test_…</span> / <span className="font-mono">sk_test_…</span> keys from{" "}
+        <span className="font-semibold text-ih-fg-2">{m.settings_stripe_test_mode_label()}</span> {m.settings_stripe_use_your()}{" "}
+        <span className="font-mono">pk_test_…</span> / <span className="font-mono">sk_test_…</span> {m.settings_stripe_keys_from()}{" "}
         <a href="https://dashboard.stripe.com/test/apikeys" target="_blank" rel="noopener noreferrer" className="text-ih-primary hover:underline">
           dashboard.stripe.com/test/apikeys
         </a>{" "}
-        and pay with card <span className="font-mono">4242&nbsp;4242&nbsp;4242&nbsp;4242</span> (any future date / CVC) to verify the flow before going live.
+        {m.settings_stripe_pay_with_card()} <span className="font-mono">4242&nbsp;4242&nbsp;4242&nbsp;4242</span> {m.settings_stripe_verify_flow()}
       </div>
 
       <Form
@@ -108,29 +109,29 @@ export function StripePaymentsPanel({
         <input type="hidden" name="intent" value="save-stripe-secrets" />
         <SecretField
           name="STRIPE_PUBLISHABLE_KEY"
-          label="Publishable Key"
+          label={m.settings_stripe_publishable_label()}
           value={secrets.STRIPE_PUBLISHABLE_KEY}
           error={fieldError("STRIPE_PUBLISHABLE_KEY")}
-          hint="Sent to the browser to render the card field. Starts with pk_test_ (test) or pk_live_ (live)."
+          hint={m.settings_stripe_publishable_hint()}
         />
         <SecretField
           name="STRIPE_SECRET_KEY"
-          label="Secret Key"
+          label={m.settings_stripe_secret_label()}
           value={secrets.STRIPE_SECRET_KEY}
           error={fieldError("STRIPE_SECRET_KEY")}
-          hint="Server-side key that creates the charge. Starts with sk_test_ or sk_live_. Never shared with the browser."
+          hint={m.settings_stripe_secret_hint()}
         />
         <SecretField
           name="STRIPE_WEBHOOK_SECRET"
-          label="Webhook Signing Secret"
+          label={m.settings_stripe_webhook_secret_label()}
           value={secrets.STRIPE_WEBHOOK_SECRET}
           error={fieldError("STRIPE_WEBHOOK_SECRET")}
-          hint="Verifies payment notifications. Found after you add the webhook endpoint below (starts with whsec_)."
+          hint={m.settings_stripe_webhook_secret_hint()}
         />
         <div className="flex justify-end pt-2 border-t border-ih-border">
           <button type="submit" disabled={saving}
             className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
-            {saving ? "Saving…" : "Save Stripe keys"}
+            {saving ? m.common_saving() : m.settings_stripe_save()}
           </button>
         </div>
       </Form>
@@ -139,13 +140,13 @@ export function StripePaymentsPanel({
       <TestConnectionButton fetcher={testFetcher} intent="test-stripe">
         {testFetcher.data?.intent === "test-stripe" && testFetcher.data.test && (
           <span className="text-[12px] text-ih-fg-2">
-            Connected: <span className="font-semibold">{testFetcher.data.test.accountName}</span>
+            {m.settings_stripe_test_connected_prefix()} <span className="font-semibold">{testFetcher.data.test.accountName}</span>
             <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
               testFetcher.data.test.livemode
                 ? "bg-ih-bad-bg text-ih-bad-fg"
                 : "bg-ih-ok-bg text-ih-ok-fg"
             }`}>
-              {testFetcher.data.test.livemode ? "Live" : "Test"}
+              {testFetcher.data.test.livemode ? m.settings_stripe_livemode_live() : m.settings_stripe_livemode_test()}
             </span>
           </span>
         )}
@@ -159,11 +160,10 @@ export function StripePaymentsPanel({
 
       {/* Webhook endpoint to register in the Stripe dashboard */}
       <div className="pt-1 space-y-1.5">
-        <p className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.14em]">Webhook endpoint</p>
+        <p className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.14em]">{m.settings_stripe_webhook_endpoint()}</p>
         <p className="text-[12px] text-ih-fg-3 leading-relaxed">
-          In Stripe → Developers → Webhooks, add an endpoint for the{" "}
-          <span className="font-semibold text-ih-fg-2">payment_intent.succeeded</span> event pointing at this URL, then paste its signing secret above.
-          If you registered an endpoint before, re-point it to this URL — the signing secret stays the same.
+          {m.settings_stripe_webhook_desc_prefix()}{" "}
+          <span className="font-semibold text-ih-fg-2">payment_intent.succeeded</span> {m.settings_stripe_webhook_desc_suffix()}
         </p>
         <code className="block w-full px-3 py-2 rounded-md bg-ih-bg-muted border border-ih-border text-[12px] font-mono text-ih-fg-1 break-all select-all">
           {webhookUrl}
@@ -173,17 +173,17 @@ export function StripePaymentsPanel({
       {/* Recent webhook deliveries — diagnostics log */}
       <div className="pt-3 space-y-1.5">
         <div className="flex items-center justify-between">
-          <p className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.14em]">Recent webhook deliveries</p>
+          <p className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.14em]">{m.settings_stripe_recent_deliveries()}</p>
           <button type="button" onClick={() => revalidator.revalidate()}
             disabled={revalidator.state !== "idle"}
             className="h-7 px-2.5 rounded-md border border-ih-border bg-ih-bg-card text-[11px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
-            {revalidator.state !== "idle" ? "Refreshing…" : "Refresh"}
+            {revalidator.state !== "idle" ? m.settings_stripe_refreshing() : m.settings_stripe_refresh()}
           </button>
         </div>
         {webhookLog.length === 0 ? (
           <p className="text-[12px] text-ih-fg-3 leading-relaxed">
-            No deliveries yet. In Stripe → Developers → Webhooks → your endpoint, click{" "}
-            <span className="font-semibold text-ih-fg-2">Send test event</span>, then hit Refresh.
+            {m.settings_stripe_no_deliveries_prefix()}{" "}
+            <span className="font-semibold text-ih-fg-2">{m.settings_stripe_send_test_event()}</span>{m.settings_stripe_no_deliveries_suffix()}
           </p>
         ) : (
           <ul className="divide-y divide-ih-border rounded-md border border-ih-border bg-ih-bg-card">

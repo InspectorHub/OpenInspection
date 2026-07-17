@@ -5,9 +5,10 @@ import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
 import { readLegalLinks } from "~/lib/legal-links.server";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Book inspection" }];
+  return [{ title: m.booking_embed_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -68,7 +69,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
         ? ({
             slug: params.slug ?? "",
             inspectorId: d.inspectorId ?? "",
-            inspectorName: d.name ?? "Inspector",
+            inspectorName: d.name ?? m.booking_inspector_default_name(),
             tenantSlug: params.tenant ?? "",
             siteKey: d.turnstileSiteKey ?? "",
             theme,
@@ -113,7 +114,7 @@ export function EmbedWizard({
   if (error || !data) {
     return (
       <div style={{ padding: 16 }}>
-        <p style={{ color: "#64748b", fontSize: 13 }}>Booking unavailable.</p>
+        <p style={{ color: "#64748b", fontSize: 13 }}>{m.booking_embed_unavailable()}</p>
       </div>
     );
   }
@@ -127,24 +128,24 @@ export function EmbedWizard({
         {data.theme === "branded" && data.brand?.logoUrl && (
           <img
             src={data.brand.logoUrl}
-            alt={data.brand.companyName ?? "Logo"}
+            alt={data.brand.companyName ?? m.booking_logo_alt()}
             className="h-7 w-auto mb-3"
           />
         )}
         <h2 className="text-base font-bold text-ih-fg-1 mb-1">
-          Book with {data.inspectorName}
+          {m.booking_embed_book_with_heading({ name: data.inspectorName })}
         </h2>
         {data.bookingOpen ? (
           <>
             <p className="text-[13px] text-ih-fg-3 mb-4">
-              Pick a date and we&rsquo;ll confirm by email.
+              {m.booking_embed_confirm_by_email()}
             </p>
             <BookingForm data={data} privacyUrl={data.privacyUrl} />
           </>
         ) : (
           // B-16 — no working hours configured: honest not-open state.
           <p className="text-[13px] text-ih-fg-3">
-            Online booking isn&rsquo;t open yet — please contact {data.inspectorName} directly to schedule.
+            {m.booking_embed_not_open({ name: data.inspectorName })}
           </p>
         )}
       </div>
@@ -198,7 +199,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
       });
       const json = await res.json().catch(() => ({}));
       if (res.ok && (json as Record<string, unknown>).success) {
-        setStatus({ text: "Booking request sent! Check your email.", ok: true });
+        setStatus({ text: m.booking_embed_status_success(), ok: true });
         // Notify parent iframe
         window.parent?.postMessage(
           { type: "oi-embed", kind: "success", slug: data.slug },
@@ -206,10 +207,10 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
         );
       } else {
         const err = (json as Record<string, Record<string, string>>)?.error;
-        setStatus({ text: err?.message || "Could not submit", ok: false });
+        setStatus({ text: err?.message || m.booking_embed_status_could_not_submit(), ok: false });
       }
     } catch {
-      setStatus({ text: "Network error", ok: false });
+      setStatus({ text: m.booking_embed_status_network_error(), ok: false });
     } finally {
       setSubmitting(false);
     }
@@ -222,13 +223,13 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
 
       <div className="mb-3">
         <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
-          Property address
+          {m.booking_field_address_label()}
         </label>
         <input
           type="text"
           name="address"
           required
-          placeholder="123 Main St, Austin, TX"
+          placeholder={m.booking_embed_address_placeholder()}
           className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
         />
       </div>
@@ -236,25 +237,25 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
       <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
           <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
-            Your name
+            {m.booking_embed_name_label()}
           </label>
           <input
             type="text"
             name="clientName"
             required
-            placeholder="Jane Doe"
+            placeholder={m.booking_placeholder_name()}
             className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
           />
         </div>
         <div>
           <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
-            Email
+            {m.booking_field_email_label()}
           </label>
           <input
             type="email"
             name="clientEmail"
             required
-            placeholder="jane@example.com"
+            placeholder={m.booking_placeholder_email()}
             className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
           />
         </div>
@@ -263,18 +264,18 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
       <div className="grid grid-cols-2 gap-3 mb-4">
         <div>
           <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
-            Phone
+            {m.booking_embed_phone_label()}
           </label>
           <input
             type="tel"
             name="clientPhone"
-            placeholder="(555) 555-5555"
+            placeholder={m.booking_embed_phone_placeholder()}
             className="w-full px-2.5 py-2 border border-ih-border rounded-md text-sm bg-ih-bg-card text-ih-fg-1 outline-none focus:border-ih-primary focus:shadow-ih-focus"
           />
         </div>
         <div>
           <label className="block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3 mb-1">
-            Preferred date
+            {m.booking_embed_date_label()}
           </label>
           <input
             type="date"
@@ -286,15 +287,15 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
       </div>
 
       <p className="mb-2 text-xs text-ih-fg-3">
-        Your information is shared with {data.inspectorName} to schedule your inspection.
-        {privacyUrl && <> See our <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">Privacy Policy</a>.</>}
+        {m.booking_privacy_shared_notice({ name: data.inspectorName })}
+        {privacyUrl && <> {m.booking_privacy_see_our()} <a href={privacyUrl} target="_blank" rel="noreferrer" className="underline">{m.booking_link_privacy_policy()}</a>.</>}
       </p>
       <button
         type="submit"
         disabled={submitting}
         className="w-full px-4 py-3 bg-ih-primary text-ih-primary-fg rounded-lg font-bold text-sm hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
       >
-        {submitting ? "Submitting..." : "Request booking"}
+        {submitting ? m.booking_submitting() : m.booking_embed_submit()}
       </button>
 
       {status && (

@@ -1,13 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button, MenuItem } from '@core/shared-ui';
+import { m } from '~/paraglide/messages';
 
 export type CloneScope = 'rating' | 'rating_notes' | 'all';
-
-const SCOPE_LABELS: Record<CloneScope, string> = {
-    rating:       'Rating only',
-    rating_notes: 'Rating + Notes',
-    all:          'Everything',
-};
 
 export interface CloneLastButtonProps {
     defaultScope: CloneScope;
@@ -25,6 +20,14 @@ export function CloneLastButton({ defaultScope, onClone, disabled }: CloneLastBu
     const [open, setOpen] = useState(false);
     const [sessionScope, setSessionScope] = useState<CloneScope>(defaultScope);
     const ref = useRef<HTMLDivElement>(null);
+
+    // Built in render so the message functions resolve per-render (never frozen
+    // at import).
+    const SCOPE_LABELS: Record<CloneScope, string> = {
+        rating:       m.editor_clone_scope_rating(),
+        rating_notes: m.editor_clone_scope_rating_notes(),
+        all:          m.editor_clone_scope_all(),
+    };
 
     useEffect(() => { setSessionScope(defaultScope); }, [defaultScope]);
 
@@ -53,7 +56,7 @@ export function CloneLastButton({ defaultScope, onClone, disabled }: CloneLastBu
                 aria-haspopup="menu"
                 aria-expanded={open}
             >
-                Clone last
+                {m.editor_clone_last()}
                 <span className="text-[10px]">▾</span>
             </Button>
             {open && (

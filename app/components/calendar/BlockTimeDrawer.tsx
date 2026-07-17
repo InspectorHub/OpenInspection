@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { Drawer, Modal } from "@core/shared-ui";
 import { blockFormSeed, type CalendarEvent } from "./calendar-helpers";
+import { m } from "~/paraglide/messages";
 
 export interface CalendarMember {
   id: string;
@@ -103,7 +104,7 @@ export function BlockTimeDrawer({
       <Drawer
         open={open}
         onClose={onClose}
-        title={block ? "Edit blocked time" : "Block time"}
+        title={block ? m.calendar_block_edit_heading() : m.calendar_block_time()}
         initialFocusRef={titleRef}
         footer={
           <>
@@ -114,7 +115,7 @@ export function BlockTimeDrawer({
                 disabled={submitting}
                 className="mr-auto h-9 px-3 rounded-md border border-ih-bad text-[13px] font-bold text-ih-bad-fg hover:bg-ih-bad-tint disabled:opacity-50"
               >
-                Delete
+                {m.common_delete()}
               </button>
             )}
             <button
@@ -122,7 +123,7 @@ export function BlockTimeDrawer({
               onClick={onClose}
               className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted"
             >
-              Cancel
+              {m.common_cancel()}
             </button>
             <button
               type="submit"
@@ -130,28 +131,28 @@ export function BlockTimeDrawer({
               disabled={submitting}
               className="h-9 px-4 rounded-md bg-ih-primary text-[13px] font-bold text-white hover:bg-ih-primary-600 disabled:opacity-50"
             >
-              {submitting ? "Saving..." : block ? "Save changes" : "Block time"}
+              {submitting ? m.calendar_block_saving() : block ? m.calendar_block_save_changes() : m.calendar_block_time()}
             </button>
           </>
         }
       >
         <form id="block-time-form" onSubmit={submitBlock} className="space-y-4">
           <label className="block">
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Title</span>
+            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.calendar_block_field_title()}</span>
             <input
               ref={titleRef}
               required
               maxLength={200}
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              placeholder="Personal appointment"
+              placeholder={m.calendar_block_title_placeholder()}
               className="w-full rounded-md border border-ih-border bg-ih-bg-card px-3 py-2 text-[13px] text-ih-fg-1"
             />
           </label>
 
           {canManageTeam && members.length > 0 && (
             <label className="block">
-              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Inspector</span>
+              <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.calendar_block_field_inspector()}</span>
               <select
                 value={userId}
                 onChange={(event) => setUserId(event.target.value)}
@@ -165,7 +166,7 @@ export function BlockTimeDrawer({
           )}
 
           <label className="block">
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Date</span>
+            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.calendar_block_field_date()}</span>
             <input
               type="date"
               required
@@ -177,13 +178,13 @@ export function BlockTimeDrawer({
 
           <label className="flex items-center gap-2 text-[13px] font-medium text-ih-fg-2">
             <input type="checkbox" checked={allDay} onChange={(event) => setAllDay(event.target.checked)} />
-            All day
+            {m.calendar_all_day()}
           </label>
 
           {!allDay && (
             <div className="grid grid-cols-2 gap-3">
               <label>
-                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Starts</span>
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.calendar_block_field_starts()}</span>
                 <input
                   type="time"
                   required
@@ -193,7 +194,7 @@ export function BlockTimeDrawer({
                 />
               </label>
               <label>
-                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Ends</span>
+                <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.calendar_block_field_ends()}</span>
                 <input
                   type="time"
                   required
@@ -206,7 +207,7 @@ export function BlockTimeDrawer({
           )}
 
           <label className="block">
-            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">Notes</span>
+            <span className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-ih-fg-3">{m.calendar_block_field_notes()}</span>
             <textarea
               rows={4}
               maxLength={2000}
@@ -222,7 +223,7 @@ export function BlockTimeDrawer({
       <Modal
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
-        title="Delete blocked time?"
+        title={m.calendar_block_delete_confirm_title()}
         size="sm"
         footer={
           <>
@@ -231,7 +232,7 @@ export function BlockTimeDrawer({
               onClick={() => setConfirmDelete(false)}
               className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3"
             >
-              Keep block
+              {m.calendar_block_delete_keep()}
             </button>
             <button
               type="button"
@@ -239,12 +240,12 @@ export function BlockTimeDrawer({
               disabled={submitting}
               className="h-9 px-3 rounded-md bg-ih-bad text-[13px] font-bold text-white disabled:opacity-50"
             >
-              Delete
+              {m.common_delete()}
             </button>
           </>
         }
       >
-        <p className="text-[13px] text-ih-fg-3">This blocked time will be removed from the calendar.</p>
+        <p className="text-[13px] text-ih-fg-3">{m.calendar_block_delete_confirm_body()}</p>
       </Modal>
     </>
   );

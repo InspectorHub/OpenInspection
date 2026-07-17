@@ -11,6 +11,7 @@
  */
 import { useMemo } from "react";
 import type { ConnectionTestResult } from "~/lib/connection-test";
+import { m } from "~/paraglide/messages";
 
 export type { ConnectionTestResult };
 
@@ -18,12 +19,12 @@ export type { ConnectionTestResult };
 function relativeTime(epochMs: number, nowMs: number): string {
   const diff = Math.max(0, nowMs - epochMs);
   const min = Math.floor(diff / 60_000);
-  if (min < 1) return "just now";
-  if (min < 60) return `${min}m ago`;
+  if (min < 1) return m.settings_conn_time_just_now();
+  if (min < 60) return m.settings_conn_time_minutes({ min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
+  if (hr < 24) return m.settings_conn_time_hours({ hr });
   const day = Math.floor(hr / 24);
-  if (day < 7) return `${day}d ago`;
+  if (day < 7) return m.settings_conn_time_days({ day });
   return new Date(epochMs).toLocaleDateString();
 }
 
@@ -54,7 +55,7 @@ export function ConnectionTestStatus({
   if (mine.length === 0) {
     return (
       <span className="text-[11px] text-ih-fg-4" aria-live="polite">
-        Not tested yet
+        {m.settings_conn_status_not_tested()}
       </span>
     );
   }
@@ -70,10 +71,10 @@ export function ConnectionTestStatus({
           aria-hidden
         />
         <span className={`font-bold ${latest.ok ? "text-ih-ok-fg" : "text-ih-bad-fg"}`}>
-          {latest.ok ? "Connected" : "Failed"}
+          {latest.ok ? m.settings_conn_status_connected() : m.settings_conn_status_failed()}
         </span>
         <span className="text-ih-fg-3">
-          · Last tested{" "}
+          {m.settings_conn_last_tested()}{" "}
           <time dateTime={new Date(latest.testedAt).toISOString()} title={absoluteTime(latest.testedAt)}>
             {relativeTime(latest.testedAt, now)}
           </time>
@@ -88,7 +89,7 @@ export function ConnectionTestStatus({
       {history.length > 0 ? (
         <details className="mt-0.5">
           <summary className="cursor-pointer text-ih-fg-4 hover:text-ih-fg-2 select-none">
-            Recent tests ({history.length})
+            {m.settings_conn_recent_tests({ count: history.length })}
           </summary>
           <ul className="mt-1 flex flex-col gap-0.5 pl-3">
             {history.map((r) => (

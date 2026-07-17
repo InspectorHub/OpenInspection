@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { Icon } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 import type { TemplateItem, TemplateSection } from "./types";
 import { CannedCommentRow } from "../editor-shared/CannedCommentRow";
 import { CommentTypeahead } from "../editor/CommentTypeahead";
@@ -71,10 +72,10 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                   onClick={() => onOpenLibrary(tab)}
                   className="text-[10px] font-bold text-ih-fg-4 hover:text-ih-primary"
                 >
-                  Browse library
+                  {m.templates_comments_browse_library()}
                 </button>
               )}
-              <button onClick={() => addCannedToItem(tab)} className="text-[10px] font-bold text-ih-primary hover:text-ih-primary">+ Add</button>
+              <button onClick={() => addCannedToItem(tab)} className="text-[10px] font-bold text-ih-primary hover:text-ih-primary">{m.templates_comments_add()}</button>
             </div>
           </div>
           {(selectedItem.tabs?.[tab] || []).map((c, ci, arr) => {
@@ -89,7 +90,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                 leading={
                   <div className="flex flex-col gap-0.5 pt-0.5">
                     <button
-                      aria-label="Move up"
+                      aria-label={m.templates_comments_move_up()}
                       disabled={ci === 0}
                       onClick={() => updateSections((s) => {
                         const it = s[activeSection].items.find((i) => i.id === editingItem);
@@ -100,7 +101,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                       className="text-[10px] text-ih-fg-4 hover:text-ih-fg-2 disabled:opacity-30"
                     ><Icon name="chevU" size={14} /></button>
                     <button
-                      aria-label="Move down"
+                      aria-label={m.templates_comments_move_down()}
                       disabled={ci === arr.length - 1}
                       onClick={() => updateSections((s) => {
                         const it = s[activeSection].items.find((i) => i.id === editingItem);
@@ -122,7 +123,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                         return s;
                       });
                     }}
-                    placeholder="Title"
+                    placeholder={m.templates_comments_title_placeholder()}
                     className="w-full text-[11px] font-bold bg-transparent border-b border-ih-border outline-none text-ih-fg-2 mb-0.5"
                   />
                 }
@@ -130,7 +131,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                   <button
                     onClick={() => removeCannedFromItem(tab, ci)}
                     className="text-ih-fg-4 hover:text-ih-bad-fg text-[10px] mt-1"
-                    aria-label="Delete comment"
+                    aria-label={m.templates_comments_delete_aria()}
                   >
                     &times;
                   </button>
@@ -146,9 +147,9 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                           return s;
                         });
                       }}
-                      placeholder="abbr"
+                      placeholder={m.templates_comments_abbr_placeholder()}
                       maxLength={12}
-                      title="Shortcode — type this in the report to fill this comment"
+                      title={m.templates_comments_abbr_title()}
                       className="w-16 text-[10px] font-mono bg-transparent border-b border-ih-border outline-none text-ih-fg-3 mb-0.5"
                     />
                     <div className="relative">
@@ -180,7 +181,7 @@ export function ItemCommentsPanel({ selectedItem, activeSection, editingItem, up
                             if (e.key === "Escape") { e.preventDefault(); setTaOpen(false); return; }
                           }
                         }}
-                        placeholder="Comment text..."
+                        placeholder={m.templates_comments_text_placeholder()}
                         rows={2}
                         className="w-full text-[11px] bg-transparent border border-ih-border rounded px-1 py-0.5 outline-none text-ih-fg-3"
                       />

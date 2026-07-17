@@ -8,10 +8,11 @@ import { createApi } from "~/lib/api-client.server";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
+import { m } from "~/paraglide/messages";
 
 interface ContractorType { id: string; name: string; sortOrder: number }
 
-export function meta() { return [{ title: "Contractor Types - OpenInspection" }]; }
+export function meta() { return [{ title: m.settings_contractor_types_meta_title() }]; }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const { forbidden, token } = await requireAdminLoader(context, request);
@@ -65,22 +66,22 @@ function ContractorTypeRow({ t, idx, count, onMove, onRequestDelete }: { t: Cont
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <div className="flex flex-col">
-        <button onClick={() => onMove(idx, -1)} disabled={idx === 0} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={`Move ${t.name} up`}><Icon name="chevU" size={14} /></button>
-        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={`Move ${t.name} down`}><Icon name="chevD" size={14} /></button>
+        <button onClick={() => onMove(idx, -1)} disabled={idx === 0} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_up_aria({ name: t.name })}><Icon name="chevU" size={14} /></button>
+        <button onClick={() => onMove(idx, 1)} disabled={idx === count - 1} className="text-ih-fg-4 hover:text-ih-fg-1 disabled:opacity-30 leading-none" aria-label={m.settings_contractor_types_move_down_aria({ name: t.name })}><Icon name="chevD" size={14} /></button>
       </div>
       {editing ? (
         <fetcher.Form method="POST" className="flex-1 flex gap-2" onSubmit={() => setEditing(false)}>
           <input type="hidden" name="intent" value="rename" />
           <input type="hidden" name="id" value={t.id} />
           <input name="name" value={name} onChange={(e) => setName(e.target.value)} autoFocus className={`flex-1 ${INPUT} py-1.5`} />
-          <button type="submit" disabled={!name.trim()} className="text-[12px] text-ih-primary font-bold disabled:opacity-50">Save</button>
-          <button type="button" onClick={() => { setEditing(false); setName(t.name); }} className="text-[12px] text-ih-fg-3">Cancel</button>
+          <button type="submit" disabled={!name.trim()} className="text-[12px] text-ih-primary font-bold disabled:opacity-50">{m.common_save()}</button>
+          <button type="button" onClick={() => { setEditing(false); setName(t.name); }} className="text-[12px] text-ih-fg-3">{m.common_cancel()}</button>
         </fetcher.Form>
       ) : (
         <>
           <span className="flex-1 font-bold text-[13px] text-ih-fg-1">{t.name}</span>
-          <button onClick={() => { setEditing(true); setName(t.name); }} className="text-[12px] text-ih-primary hover:underline font-bold">Rename</button>
-          <button onClick={onRequestDelete} aria-label={`Delete ${t.name}`} className="text-[12px] text-ih-bad-fg hover:underline font-bold">Delete</button>
+          <button onClick={() => { setEditing(true); setName(t.name); }} className="text-[12px] text-ih-primary hover:underline font-bold">{m.settings_contractor_types_rename()}</button>
+          <button onClick={onRequestDelete} aria-label={m.settings_contractor_types_delete_aria({ name: t.name })} className="text-[12px] text-ih-bad-fg hover:underline font-bold">{m.common_delete()}</button>
         </>
       )}
     </div>
@@ -110,20 +111,20 @@ export default function SettingsContractorTypes() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Contractor types" }]} />
-      <p className="text-[13px] text-ih-fg-3">Recommended contractor categories shown on repair items and reports.</p>
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_contractor_types_crumb() }]} />
+      <p className="text-[13px] text-ih-fg-3">{m.settings_contractor_types_intro()}</p>
 
       <div className="bg-ih-bg-card border border-ih-border rounded-lg p-4">
         <createFetcher.Form method="POST" className="flex gap-2" onSubmit={() => setNewName("")}>
           <input type="hidden" name="intent" value="create" />
-          <input name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="e.g., Licensed Electrician" className={`flex-1 ${INPUT}`} />
-          <button type="submit" disabled={!newName.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold disabled:opacity-50">Add</button>
+          <input name="name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={m.settings_contractor_types_name_placeholder()} className={`flex-1 ${INPUT}`} />
+          <button type="submit" disabled={!newName.trim()} className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold disabled:opacity-50">{m.common_add()}</button>
         </createFetcher.Form>
       </div>
 
       {types.length === 0 ? (
         <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
-          <p className="font-bold text-[14px] text-ih-fg-2">No contractor types yet.</p>
+          <p className="font-bold text-[14px] text-ih-fg-2">{m.settings_contractor_types_empty()}</p>
         </div>
       ) : (
         <div className="bg-ih-bg-card border border-ih-border rounded-lg divide-y divide-ih-border">
@@ -135,8 +136,8 @@ export default function SettingsContractorTypes() {
 
       <ConfirmDialog
         open={!!pendingDelete}
-        title="Delete contractor type"
-        message={pendingDelete ? `Delete "${pendingDelete.name}"? This can't be undone.` : ""}
+        title={m.settings_contractor_types_delete_title()}
+        message={pendingDelete ? m.settings_contractor_types_delete_confirm({ name: pendingDelete.name }) : ""}
         busy={deleteFetcher.state !== "idle"}
         onConfirm={() => {
           if (pendingDelete) deleteFetcher.submit({ intent: "delete", id: pendingDelete.id }, { method: "POST" });

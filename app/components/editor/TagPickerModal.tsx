@@ -1,4 +1,5 @@
 import { Modal } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export interface TagPickerModalProps {
  open: boolean;
@@ -12,7 +13,7 @@ export interface TagPickerModalProps {
 export function TagPickerModal({ open, activeItemId, tagsByItem, presetTags, onToggle, onClose }: TagPickerModalProps) {
  const selected = tagsByItem[activeItemId] || [];
  return (
- <Modal open={open} onClose={onClose} title="Tags" size="sm">
+ <Modal open={open} onClose={onClose} title={m.editor_tagpicker_title()} size="sm">
   <div className="space-y-1.5">
    {presetTags.map((tag) => {
    const isActive = selected.some(t => t.id === tag.id);

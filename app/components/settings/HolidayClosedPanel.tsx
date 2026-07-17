@@ -9,6 +9,7 @@ import {
   HolidayRegionPickerModal,
   type HolidayPresetId,
 } from "./HolidayPresetCards";
+import { m } from "~/paraglide/messages";
 
 export type HolidayPublicPolicy = "open" | "block" | "advisory";
 export type HolidayInternalPolicy = "advisory" | "block";
@@ -214,10 +215,10 @@ export function HolidayClosedPanel({
     >
       <div>
         <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-          Company holidays
+          {m.settings_holiday_panel_heading()}
         </h3>
         <p className="text-[12px] text-ih-fg-3 mt-1">
-          Apply federal and state holidays to public booking and internal scheduling.
+          {m.settings_holiday_panel_desc()}
         </p>
       </div>
 
@@ -240,10 +241,10 @@ export function HolidayClosedPanel({
           />
           <span>
             <span className="block text-[13px] font-bold text-ih-fg-1">
-              Require office confirmation
+              {m.settings_holiday_concierge_label()}
             </span>
             <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-              Bookings on holiday dates stay pending until someone on your team confirms.
+              {m.settings_holiday_concierge_desc()}
             </span>
           </span>
         </label>
@@ -251,7 +252,7 @@ export function HolidayClosedPanel({
 
       {publicPolicy === "advisory" && region && !concierge && (
         <Banner tone="warn">
-          Bookings may confirm without review on holiday dates.
+          {m.settings_holiday_concierge_warn()}
         </Banner>
       )}
 
@@ -305,9 +306,9 @@ export function HolidayClosedPanel({
 
       <ConfirmDialog
         open={openConfirmOpen}
-        title="Allow bookings on holidays?"
-        message="Customers can still book on listed holidays. Confirm only if that is intentional."
-        confirmLabel="Allow bookings"
+        title={m.settings_holiday_confirm_title()}
+        message={m.settings_holiday_confirm_message()}
+        confirmLabel={m.settings_holiday_public_open()}
         onConfirm={confirmOpenSave}
         onCancel={() => setOpenConfirmOpen(false)}
       />

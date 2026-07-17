@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import { Modal } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface SpectoraMappingModalProps {
   open: boolean;
@@ -11,7 +12,7 @@ export function SpectoraMappingModal({ open, handleMappingDismiss }: SpectoraMap
     <Modal
       open={open}
       onClose={handleMappingDismiss}
-      title="Coming from Spectora?"
+      title={m.templates_mapping_title()}
       size="md"
       footer={
         <div className="flex items-center justify-between w-full">
@@ -20,55 +21,55 @@ export function SpectoraMappingModal({ open, handleMappingDismiss }: SpectoraMap
             className="text-[12px] text-ih-fg-3 hover:text-ih-primary underline underline-offset-2"
             onClick={handleMappingDismiss}
           >
-            Review editor settings
+            {m.templates_mapping_review_settings()}
           </Link>
           <button
             type="button"
             onClick={handleMappingDismiss}
             className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
           >
-            Got it
+            {m.templates_mapping_dismiss()}
           </button>
         </div>
       }
     >
-      <p className="text-[12px] text-ih-fg-3 mb-4">Here&apos;s how Spectora concepts map to OpenInspection.</p>
+      <p className="text-[12px] text-ih-fg-3 mb-4">{m.templates_mapping_intro()}</p>
 
       <div className="divide-y divide-ih-border rounded-lg border border-ih-border overflow-hidden">
         {/* Row 1 */}
         <div className="px-4 py-3">
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-[12px] font-bold text-ih-fg-3 line-through">Comments</span>
+            <span className="text-[12px] font-bold text-ih-fg-3 line-through">{m.templates_mapping_row1_from()}</span>
             <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
-            <span className="text-[12px] font-bold text-ih-primary">Defects</span>
+            <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row1_to1()}</span>
             <span className="text-ih-fg-4 text-[10px] font-bold">+</span>
-            <span className="text-[12px] font-bold text-ih-primary">Notes</span>
+            <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row1_to2()}</span>
           </div>
-          <p className="text-[12px] text-ih-fg-3">Your comment library becomes canned defects; free text lives in Notes.</p>
+          <p className="text-[12px] text-ih-fg-3">{m.templates_mapping_row1_desc()}</p>
         </div>
         {/* Row 2 */}
         <div className="px-4 py-3">
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-[12px] font-bold text-ih-fg-3 line-through">Rating icons</span>
+            <span className="text-[12px] font-bold text-ih-fg-3 line-through">{m.templates_mapping_row2_from()}</span>
             <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
-            <span className="text-[12px] font-bold text-ih-good-fg">Satisfactory</span>
+            <span className="text-[12px] font-bold text-ih-good-fg">{m.templates_mapping_row2_to1()}</span>
             <span className="text-ih-fg-4 text-[10px]">&middot;</span>
-            <span className="text-[12px] font-bold text-ih-watch-fg">Monitor</span>
+            <span className="text-[12px] font-bold text-ih-watch-fg">{m.templates_mapping_row2_to2()}</span>
             <span className="text-ih-fg-4 text-[10px]">&middot;</span>
-            <span className="text-[12px] font-bold text-ih-bad-fg">Defect</span>
+            <span className="text-[12px] font-bold text-ih-bad-fg">{m.templates_mapping_row2_to3()}</span>
           </div>
-          <p className="text-[12px] text-ih-fg-3">Ratings are full-word buttons with semantic colors.</p>
+          <p className="text-[12px] text-ih-fg-3">{m.templates_mapping_row2_desc()}</p>
         </div>
         {/* Row 3 */}
         <div className="px-4 py-3">
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-[12px] font-bold text-ih-fg-3 line-through">Orders</span>
+            <span className="text-[12px] font-bold text-ih-fg-3 line-through">{m.templates_mapping_row3_from()}</span>
             <span className="text-ih-fg-4 text-[11px]">&rarr;</span>
-            <span className="text-[12px] font-bold text-ih-primary">Inspections</span>
+            <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row3_to1()}</span>
             <span className="text-ih-fg-4 text-[10px] font-bold">+</span>
-            <span className="text-[12px] font-bold text-ih-primary">Invoices</span>
+            <span className="text-[12px] font-bold text-ih-primary">{m.templates_mapping_row3_to2()}</span>
           </div>
-          <p className="text-[12px] text-ih-fg-3">One order = an inspection plus its invoice and agreement.</p>
+          <p className="text-[12px] text-ih-fg-3">{m.templates_mapping_row3_desc()}</p>
         </div>
       </div>
     </Modal>

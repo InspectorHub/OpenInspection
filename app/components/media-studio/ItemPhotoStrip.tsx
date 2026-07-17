@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Sortable from "sortablejs";
 import { Button } from "@core/shared-ui";
 import { resolvePhotoDisplayKey } from "./photo-display-key";
+import { m } from "~/paraglide/messages";
 
 export interface StripPhoto {
   key: string;
@@ -172,18 +173,18 @@ export function ItemPhotoStrip({
           {selecting ? (
             <>
               <Button variant="ghost" size="sm" onClick={exitSelect}>
-                Cancel
+                {m.common_cancel()}
               </Button>
               <div className="flex items-center gap-3">
                 {onBulkMove && moveTargets && moveTargets.length > 0 && (
                   <label className="flex items-center gap-1 text-[12px] font-bold text-ih-fg-2">
-                    Move to
+                    {m.media_strip_move_to()}
                     <select
                       className="h-8 rounded-lg border border-ih-border bg-ih-surface px-2 text-[12px] disabled:opacity-40"
                       defaultValue=""
                       disabled={sel.size === 0}
                       onChange={(e) => {
-                        const t = moveTargets.find((m) => m.itemId === e.target.value);
+                        const t = moveTargets.find((mt) => mt.itemId === e.target.value);
                         e.currentTarget.value = "";
                         if (!t) return;
                         onBulkMove([...sel].sort((a, b) => b - a), { itemId: t.itemId, sectionId: t.sectionId });
@@ -191,11 +192,11 @@ export function ItemPhotoStrip({
                       }}
                     >
                       <option value="" disabled>
-                        Choose item…
+                        {m.media_strip_choose_item()}
                       </option>
-                      {moveTargets.map((m) => (
-                        <option key={m.itemId} value={m.itemId}>
-                          {m.label}
+                      {moveTargets.map((mt) => (
+                        <option key={mt.itemId} value={mt.itemId}>
+                          {mt.label}
                         </option>
                       ))}
                     </select>
@@ -211,14 +212,14 @@ export function ItemPhotoStrip({
                       exitSelect();
                     }}
                   >
-                    Delete {sel.size}
+                    {m.media_strip_delete_count({ count: sel.size })}
                   </Button>
                 )}
               </div>
             </>
           ) : (
             <Button variant="link" size="sm" onClick={() => setSelecting(true)} className="ml-auto">
-              Select
+              {m.media_strip_select()}
             </Button>
           )}
         </div>
@@ -305,7 +306,7 @@ export function ItemPhotoStrip({
                     data-testid={`pending-badge-${i}`}
                     className="absolute inset-x-0 bottom-0 bg-ih-watch-bg text-ih-watch-fg text-[8px] font-bold text-center py-0.5 uppercase tracking-wide"
                   >
-                    Uploading
+                    {m.media_strip_uploading()}
                   </span>
                 </>
               ) : (
@@ -337,7 +338,7 @@ export function ItemPhotoStrip({
               )}
               {isCover && !selecting && (
                 <span className="absolute inset-x-0 bottom-0 bg-ih-primary text-white text-[8px] font-bold text-center py-0.5 uppercase tracking-wide">
-                  Cover
+                  {m.media_strip_cover()}
                 </span>
               )}
             </button>
@@ -347,7 +348,7 @@ export function ItemPhotoStrip({
           type="button"
           onClick={onAddPhoto}
           disabled={photoUploading}
-          aria-label="Add photo"
+          aria-label={m.media_strip_add_photo_aria()}
           className="strip-add w-16 h-16 shrink-0 rounded-lg border-2 border-dashed border-ih-border flex items-center justify-center text-ih-fg-4 hover:border-ih-primary hover:text-ih-primary transition-colors disabled:opacity-50"
         >
           {photoUploading ? (

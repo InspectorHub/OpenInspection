@@ -1,6 +1,7 @@
 import type React from "react";
 import { COLUMN_REGISTRY, ALWAYS_ON } from "~/lib/dashboard-schema";
 import { Button, Popover } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface ColumnsPopoverProps {
   open: boolean;
@@ -31,8 +32,8 @@ export function ColumnsPopover({
     <Popover open={open} onClose={onClose} anchorRef={anchorRef} align="right">
       <div className="w-64 p-4">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[13px] font-bold text-ih-fg-1">Customize Columns</h2>
-          <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none" aria-label="Close">
+          <h2 className="text-[13px] font-bold text-ih-fg-1">{m.dashboard_columns_title()}</h2>
+          <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none" aria-label={m.common_close()}>
             &times;
           </button>
         </div>
@@ -48,14 +49,14 @@ export function ColumnsPopover({
               />
               <span className="text-[13px] text-ih-fg-2">
                 {col.label}
-                {ALWAYS_ON.has(col.id) && <span className="ml-1 text-[10px] text-ih-fg-4">(required)</span>}
+                {ALWAYS_ON.has(col.id) && <span className="ml-1 text-[10px] text-ih-fg-4">{m.dashboard_columns_required()}</span>}
               </span>
             </label>
           ))}
         </div>
         <div className="mt-4">
           <Button variant="ghost" size="sm" onClick={resetColumns}>
-            Reset to defaults
+            {m.dashboard_columns_reset()}
           </Button>
         </div>
       </div>

@@ -6,6 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Modal } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface ApiInspectionType {
   id: string;
@@ -153,16 +154,16 @@ export default function SettingsInspectionTypes() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Inspection types" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_inspection_types_crumb() }]} />
 
       {/* Platform subtypes */}
       <section className="space-y-3">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
-            Platform
+            {m.settings_inspection_types_platform_eyebrow()}
           </p>
           <p className="text-[12px] text-ih-fg-3 mt-0.5">
-            Standard types that ship with the platform.
+            {m.settings_inspection_types_platform_desc()}
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -177,8 +178,7 @@ export default function SettingsInspectionTypes() {
                     {pt.name}
                   </p>
                   <p className="text-[11px] text-ih-fg-3 mt-1">
-                    {pt.templateCount} templates &middot; {pt.inspectionCount}{" "}
-                    inspections
+                    {m.settings_inspection_types_counts({ templates: pt.templateCount, inspections: pt.inspectionCount })}
                   </p>
                 </div>
                 <span
@@ -188,7 +188,7 @@ export default function SettingsInspectionTypes() {
  : "border-ih-border bg-ih-bg-muted text-ih-fg-3"
  }`}
                 >
-                  {pt.enabled ? "Enabled" : "Disabled"}
+                  {pt.enabled ? m.settings_inspection_types_status_enabled() : m.settings_inspection_types_status_disabled()}
                 </span>
               </div>
             </div>
@@ -201,24 +201,24 @@ export default function SettingsInspectionTypes() {
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
-              Your organization
+              {m.settings_inspection_types_org_eyebrow()}
             </p>
             <p className="text-[12px] text-ih-fg-3 mt-0.5">
-              Custom types based on platform types.
+              {m.settings_inspection_types_org_desc()}
             </p>
           </div>
           <button
             onClick={openAdd}
             className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors"
           >
-            + Add custom subtype
+            {m.settings_inspection_types_add_button()}
           </button>
         </div>
 
         {orgSubtypes.length === 0 ? (
           <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
             <p className="font-bold text-[14px] text-ih-fg-3">
-              No custom subtypes yet.
+              {m.settings_inspection_types_empty()}
             </p>
           </div>
         ) : (
@@ -236,15 +236,13 @@ export default function SettingsInspectionTypes() {
                       </p>
                       {!ot.enabled && (
                         <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ih-bg-muted text-ih-fg-3 flex-shrink-0">
-                          Disabled
+                          {m.settings_inspection_types_status_disabled()}
                         </span>
                       )}
                     </div>
                     {ot.basedOn && (
                       <p className="text-[11px] text-ih-fg-3 mt-1">
-                        Based on{" "}
-                        {platformSubtypes.find((pt) => pt.slug === ot.basedOn)?.name ??
-                          ot.basedOn}
+                        {m.settings_inspection_types_based_on({ name: platformSubtypes.find((pt) => pt.slug === ot.basedOn)?.name ?? ot.basedOn })}
                       </p>
                     )}
                     {ot.description && (
@@ -258,7 +256,7 @@ export default function SettingsInspectionTypes() {
                       onClick={() => openEdit(ot)}
                       className="text-[12px] text-ih-primary hover:underline font-bold"
                     >
-                      Edit
+                      {m.common_edit()}
                     </button>
                     <button
                       onClick={() => toggleOrg(ot)}
@@ -268,7 +266,7 @@ export default function SettingsInspectionTypes() {
  : "text-ih-ok-fg"
  }`}
                     >
-                      {ot.enabled ? "Disable" : "Enable"}
+                      {ot.enabled ? m.settings_inspection_types_action_disable() : m.settings_inspection_types_action_enable()}
                     </button>
                   </div>
                 </div>
@@ -282,7 +280,7 @@ export default function SettingsInspectionTypes() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingId ? "Edit custom subtype" : "Add custom subtype"}
+        title={editingId ? m.settings_inspection_types_modal_edit_title() : m.settings_inspection_types_modal_add_title()}
         initialFocusRef={nameRef}
         footer={
           <>
@@ -290,14 +288,14 @@ export default function SettingsInspectionTypes() {
               onClick={() => setModalOpen(false)}
               className="px-4 py-2 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
             >
-              Cancel
+              {m.common_cancel()}
             </button>
             <button
               onClick={save}
               disabled={saving}
               className="px-4 py-2 rounded-md bg-ih-primary text-white text-[13px] font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-50"
             >
-              {saving ? "Saving..." : "Save"}
+              {saving ? m.settings_common_saving() : m.common_save()}
             </button>
           </>
         }
@@ -305,7 +303,7 @@ export default function SettingsInspectionTypes() {
         <div className="space-y-3">
               <div>
                 <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                  Name
+                  {m.settings_inspection_types_name_label()}
                 </label>
                 <input
                   ref={nameRef}
@@ -314,13 +312,13 @@ export default function SettingsInspectionTypes() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, name: e.target.value }))
                   }
-                  placeholder="e.g., Medical Office"
+                  placeholder={m.settings_inspection_types_name_placeholder()}
                   className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                  Based on
+                  {m.settings_inspection_types_based_on_label()}
                 </label>
                 <select
                   value={form.basedOn}
@@ -329,7 +327,7 @@ export default function SettingsInspectionTypes() {
                   }
                   className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 >
-                  <option value="">Select a platform type...</option>
+                  <option value="">{m.settings_inspection_types_based_on_placeholder()}</option>
                   {platformSubtypes.map((pt) => (
                     <option key={pt.slug} value={pt.slug}>
                       {pt.name}
@@ -339,7 +337,7 @@ export default function SettingsInspectionTypes() {
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-ih-fg-3 mb-1 uppercase tracking-widest">
-                  Description
+                  {m.settings_inspection_types_description_label()}
                 </label>
                 <textarea
                   value={form.description}
@@ -347,7 +345,7 @@ export default function SettingsInspectionTypes() {
                     setForm((f) => ({ ...f, description: e.target.value }))
                   }
                   rows={2}
-                  placeholder="Optional details..."
+                  placeholder={m.settings_inspection_types_description_placeholder()}
                   className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
                 />
               </div>

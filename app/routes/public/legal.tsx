@@ -1,12 +1,13 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/legal";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { m } from "~/paraglide/messages";
 
 export function meta({ data }: Route.MetaArgs) {
-  if (!data) return [{ title: "Legal - OpenInspection" }];
+  if (!data) return [{ title: m.public_legal_meta_default() }];
   const company = data.companyName ?? "OpenInspection";
-  const docTitle = data.doc === "privacy" ? "Privacy Policy" : "Terms of Service";
-  return [{ title: `${docTitle} — ${company}` }];
+  const docTitle = data.doc === "privacy" ? m.public_legal_doc_privacy() : m.public_legal_doc_terms();
+  return [{ title: m.public_legal_title({ doc: docTitle, company }) }];
 }
 
 // ---------------------------------------------------------------------------
@@ -261,10 +262,9 @@ export default function LegalPage() {
   const { doc, companyName } = useLoaderData<typeof loader>();
 
   const isPrivacy = doc === "privacy";
-  const heading = isPrivacy
-    ? `Privacy Policy — ${companyName}`
-    : `Terms of Service — ${companyName}`;
-  const effectiveDate = "Effective: January 1, 2025";
+  const docTitle = isPrivacy ? m.public_legal_doc_privacy() : m.public_legal_doc_terms();
+  const heading = m.public_legal_title({ doc: docTitle, company: companyName });
+  const effectiveDate = m.public_legal_effective();
 
   return (
     <div className="min-h-screen bg-ih-bg-card text-ih-fg-1 py-12 px-4">
@@ -289,14 +289,14 @@ export default function LegalPage() {
 
         <footer className="mt-10 pt-6 border-t border-ih-border">
           <p className="text-xs text-ih-fg-3">
-            Powered by{" "}
+            {m.public_legal_powered_by()}{" "}
             <a
               href="https://openinspection.app"
               className="underline hover:text-ih-fg-2 transition-colors"
             >
               OpenInspection
             </a>
-            . Inspection services provided by {companyName}.
+            {m.public_legal_provided_by({ company: companyName })}
           </p>
         </footer>
       </main>

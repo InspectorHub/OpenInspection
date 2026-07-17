@@ -10,9 +10,10 @@
 import { redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/portal-auth";
 import { createApi } from "~/lib/api-client.server";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Signing in - OpenInspection" }];
+  return [{ title: m.portal_auth_meta_title() }];
 }
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
@@ -47,15 +48,15 @@ export default function PortalAuth() {
   const data = useLoaderData<typeof loader>();
   return (
     <div className="max-w-md mx-auto px-4 py-16 text-center">
-      <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">This link has expired</h1>
+      <h1 className="text-2xl font-bold text-ih-fg-1 mb-2">{m.portal_auth_expired_heading()}</h1>
       <p className="text-[14px] text-ih-fg-3 mb-6">
-        Sign-in links expire after 15 minutes. Request a new one to continue.
+        {m.portal_auth_expired_body()}
       </p>
       <a
         href={`/portal/${data.tenant}`}
         className="inline-flex items-center h-10 px-5 rounded-lg bg-ih-primary text-ih-fg-inverse text-[14px] font-bold hover:bg-ih-primary-600 transition-colors"
       >
-        Request a new link
+        {m.portal_auth_expired_cta()}
       </a>
     </div>
   );

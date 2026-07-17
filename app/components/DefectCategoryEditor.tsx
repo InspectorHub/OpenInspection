@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { Modal, Button } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export interface EditorDefectCategory {
   id: string;
@@ -60,7 +61,7 @@ export function DefectCategoryEditor({
     }
   }, [fetcher.state, fetcher.data, onClose]);
 
-  const error = !name.trim() ? "Name is required" : fetcher.data?.error ?? null;
+  const error = !name.trim() ? m.defect_category_editor_error_name_required() : fetcher.data?.error ?? null;
 
   function save() {
     if (error && error !== fetcher.data?.error) return;
@@ -82,12 +83,12 @@ export function DefectCategoryEditor({
     <Modal
       open={open}
       onClose={onClose}
-      title={editing ? "Edit defect category" : "New defect category"}
+      title={editing ? m.defect_category_editor_title_edit() : m.defect_category_editor_title_new()}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{m.common_cancel()}</Button>
           <Button variant="primary" onClick={save} disabled={saving || (!!error && error !== fetcher.data?.error)}>
-            {saving ? "Saving…" : editing ? "Save changes" : "Create category"}
+            {saving ? m.common_saving() : editing ? m.defect_category_editor_save_changes() : m.defect_category_editor_create()}
           </Button>
         </>
       }
@@ -99,30 +100,30 @@ export function DefectCategoryEditor({
           <label
             className="relative w-9 h-9 rounded-md shrink-0 cursor-pointer ring-1 ring-inset ring-black/10"
             style={{ backgroundColor: color }}
-            title="Pick color"
+            title={m.defect_category_editor_pick_color()}
           >
             <input
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
               className="absolute inset-0 opacity-0 cursor-pointer"
-              aria-label="Category color"
+              aria-label={m.defect_category_editor_color_aria()}
             />
           </label>
           <div className="flex-1 min-w-0">
-            <label htmlFor="defect-category-name" className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">Name</label>
+            <label htmlFor="defect-category-name" className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">{m.defect_category_editor_name_label()}</label>
             <input
               id="defect-category-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Safety"
+              placeholder={m.defect_category_editor_name_placeholder()}
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
           </div>
         </div>
 
         <div>
-          <label htmlFor="defect-category-sort-order" className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">Sort order</label>
+          <label htmlFor="defect-category-sort-order" className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">{m.defect_category_editor_sort_label()}</label>
           <input
             id="defect-category-sort-order"
             type="number"
@@ -142,7 +143,7 @@ export function DefectCategoryEditor({
             onChange={(e) => setDrivesSummary(e.target.checked)}
             className="h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary/30"
           />
-          Include defects in this category in the report Summary
+          {m.defect_category_editor_drives_summary()}
         </label>
 
         {error && (

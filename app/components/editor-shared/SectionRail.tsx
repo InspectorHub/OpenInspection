@@ -7,6 +7,7 @@ import type { EditorMode } from './editor-mode';
 import { useSortableReorder } from './useSortableReorder';
 import { InlineRename } from './InlineRename';
 import { findingKey } from '~/hooks/findings/shared';
+import { m } from '~/paraglide/messages';
 
 // Handle + ⋮ live in reserved flex slots so they never occlude the section name
 // or progress donut. On desktop the glyph shows on hover; on touch (no hover) it
@@ -128,7 +129,7 @@ export function SectionRail({
    data-testid="inspection-details-entry"
    aria-current={overviewActive ? "true" : undefined}
    onClick={onSelectOverview}
-   title="Inspection Details"
+   title={m.editor_shared_inspection_details()}
    className={`w-full text-left px-3 py-2 rounded-md text-[13px] transition-all ${
     overviewActive
      ? "bg-ih-primary-tint text-ih-primary font-bold border-l-2 border-ih-primary"
@@ -137,7 +138,7 @@ export function SectionRail({
   >
    <div className="flex items-center gap-1">
     <span className="mr-1 shrink-0 text-ih-fg-3"><OverviewIcon /></span>
-    <span className="truncate">Inspection Details</span>
+    <span className="truncate">{m.editor_shared_inspection_details()}</span>
    </div>
   </button>
   <hr className="my-1 border-ih-border" />
@@ -159,9 +160,9 @@ export function SectionRail({
  const defects = sectionDefectCount?.(section.id) ?? 0;
  const hasDefect = progress?.hasDefect ?? (defects > 0);
  const unrated = total - rated;
- const tipParts = [`${rated} of ${total} rated`];
- if (unrated > 0) tipParts.push(`${unrated} unrated`);
- if (defects > 0) tipParts.push(`${defects} defect${defects > 1 ? 's' : ''}`);
+ const tipParts = [m.editor_shared_section_rated({ rated, total })];
+ if (unrated > 0) tipParts.push(m.editor_shared_section_unrated({ unrated }));
+ if (defects > 0) tipParts.push(m.editor_shared_section_defects({ defects, s: defects > 1 ? 's' : '' }));
  const menuOpen = openMenuId === section.id;
  const editing = editingId === section.id;
 
@@ -191,8 +192,8 @@ export function SectionRail({
   {onReorderSection && (
    <span
     data-drag-handle
-    aria-label={`Drag ${section.title}`}
-    title="Drag to reorder"
+    aria-label={m.editor_shared_drag_label({ label: section.title })}
+    title={m.editor_shared_drag_to_reorder()}
     className={`shrink-0 w-5 flex items-center justify-center cursor-grab select-none text-ih-fg-4 touch-none ${REVEAL}`}
    >☰</span>
   )}
@@ -202,7 +203,7 @@ export function SectionRail({
     <span className="shrink-0 text-ih-fg-3">{sectionIconFor(section.title ?? section.id)}</span>
     <InlineRename
      value={section.title}
-     ariaLabel="Section name"
+     ariaLabel={m.editor_shared_section_name_aria()}
      onCommit={(next) => { onRenameSection(section.id, next); setEditingId(null); }}
      onCancel={() => setEditingId(null)}
      className="min-w-0 flex-1 bg-transparent border-b border-ih-primary outline-none text-[13px] text-ih-fg-1"
@@ -233,7 +234,7 @@ export function SectionRail({
    onClick={(e) => { e.stopPropagation(); openSectionMenu(section.id, e.currentTarget); }}
    size="sm"
    className="w-6 h-6 text-ih-fg-4 hover:text-ih-fg-2"
-   aria-label={`Section options for ${section.title}`}
+   aria-label={m.editor_shared_section_options({ title: section.title })}
    aria-haspopup="true"
    aria-expanded={menuOpen}
    >
@@ -251,28 +252,28 @@ export function SectionRail({
     <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); setEditingId(section.id); }}
     >
-     Rename
+     {m.editor_shared_menu_rename()}
     </MenuItem>
     )}
     {onDuplicateSection && (
     <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onDuplicateSection(section.id); }}
     >
-     Duplicate
+     {m.editor_shared_menu_duplicate()}
     </MenuItem>
     )}
     {onMoveSection && idx > 0 && (
     <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onMoveSection(section.id, -1); }}
     >
-     Move up
+     {m.editor_shared_menu_move_up()}
     </MenuItem>
     )}
     {onMoveSection && idx < sections.length - 1 && (
     <MenuItem
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onMoveSection(section.id, 1); }}
     >
-     Move down
+     {m.editor_shared_menu_move_down()}
     </MenuItem>
     )}
     {onDeleteSection && (
@@ -282,7 +283,7 @@ export function SectionRail({
      tone="danger"
      onClick={(e) => { e.stopPropagation(); closeSectionMenu(); onDeleteSection(section.id); }}
      >
-     Delete
+     {m.common_delete()}
      </MenuItem>
     </>
     )}
@@ -308,7 +309,7 @@ export function SectionRail({
    data-testid="add-section-btn"
    className="w-full justify-start h-auto py-2 border border-dashed border-ih-border text-ih-fg-4 hover:bg-transparent hover:border-ih-primary hover:text-ih-primary"
   >
-   + Add section
+   {m.editor_shared_add_section()}
   </Button>
   </div>
  )}

@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { Modal, Button, IconButton, Icon } from "@core/shared-ui";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL, SEVERITY_DOT } from "~/lib/severity";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Types + presets (mirrors server CreateRatingSystemSchema)         */
@@ -115,10 +116,10 @@ export function RatingSystemEditor({
   }, [fetcher.state, fetcher.data, onClose]);
 
   const error =
-    !name.trim() ? "Name is required"
-    : effectiveSlug.length < 2 ? "Name must produce a 2+ character slug"
-    : levels.length < 2 ? "Add at least 2 levels"
-    : levels.some((l) => !l.abbreviation.trim() || !l.label.trim()) ? "Every level needs an abbreviation and a label"
+    !name.trim() ? m.rating_editor_error_name_required()
+    : effectiveSlug.length < 2 ? m.rating_editor_error_slug()
+    : levels.length < 2 ? m.rating_editor_error_min_levels()
+    : levels.some((l) => !l.abbreviation.trim() || !l.label.trim()) ? m.rating_editor_error_level_fields()
     : fetcher.data?.error ?? null;
 
   function patchLevel(idx: number, patch: Partial<EditorLevel>) {
@@ -172,13 +173,13 @@ export function RatingSystemEditor({
     <Modal
       open={open}
       onClose={onClose}
-      title={editing ? "Edit rating system" : "New rating system"}
+      title={editing ? m.rating_editor_title_edit() : m.rating_editor_title_new()}
       size="xl"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{m.common_cancel()}</Button>
           <Button variant="primary" onClick={save} disabled={saving || (!!error && error !== fetcher.data?.error)}>
-            {saving ? "Saving…" : editing ? "Save changes" : "Create system"}
+            {saving ? m.common_saving() : editing ? m.rating_editor_save_changes() : m.rating_editor_create()}
           </Button>
         </>
       }
@@ -187,11 +188,11 @@ export function RatingSystemEditor({
         {/* Identity */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">Name</label>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">{m.rating_editor_name_label()}</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Standard 5-Level"
+              placeholder={m.rating_editor_name_placeholder()}
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
             {name.trim() && (
@@ -199,11 +200,11 @@ export function RatingSystemEditor({
             )}
           </div>
           <div>
-            <label className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">Description <span className="font-medium normal-case tracking-normal text-ih-fg-4">· optional</span></label>
+            <label className="block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5">{m.rating_editor_description_label()} <span className="font-medium normal-case tracking-normal text-ih-fg-4">{m.rating_editor_optional()}</span></label>
             <input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="When inspectors should reach for this scale"
+              placeholder={m.rating_editor_description_placeholder()}
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none"
             />
           </div>
@@ -213,10 +214,10 @@ export function RatingSystemEditor({
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4">
-              Rating levels <span className="text-ih-fg-4 font-mono normal-case tracking-normal">· {levels.length}</span>
+              {m.rating_editor_levels_heading()} <span className="text-ih-fg-4 font-mono normal-case tracking-normal">· {levels.length}</span>
             </span>
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-ih-fg-4 mr-1">Start from</span>
+              <span className="text-[11px] text-ih-fg-4 mr-1">{m.rating_editor_start_from()}</span>
               {PRESETS.map((p) => (
                 <Button
                   key={p.name}
@@ -241,7 +242,7 @@ export function RatingSystemEditor({
                 <label
                   className="relative w-9 h-9 rounded-md shrink-0 cursor-pointer ring-1 ring-inset ring-black/10 flex items-center justify-center text-[11px] font-extrabold text-white"
                   style={{ backgroundColor: lvl.color }}
-                  title="Pick color"
+                  title={m.rating_editor_pick_color()}
                 >
                   {lvl.abbreviation.slice(0, 3) || "·"}
                   <input
@@ -249,21 +250,21 @@ export function RatingSystemEditor({
                     value={lvl.color}
                     onChange={(e) => patchLevel(i, { color: e.target.value })}
                     className="absolute inset-0 opacity-0 cursor-pointer"
-                    aria-label="Level color"
+                    aria-label={m.rating_editor_level_color_aria()}
                   />
                 </label>
 
                 <input
                   value={lvl.abbreviation}
                   onChange={(e) => patchLevel(i, { abbreviation: e.target.value })}
-                  placeholder="ABBR"
+                  placeholder={m.rating_editor_abbr_placeholder()}
                   maxLength={8}
                   className="w-16 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold uppercase text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none"
                 />
                 <input
                   value={lvl.label}
                   onChange={(e) => patchLevel(i, { label: e.target.value })}
-                  placeholder="Full label, e.g. Satisfactory"
+                  placeholder={m.rating_editor_label_placeholder()}
                   maxLength={40}
                   className="flex-1 min-w-0 h-8 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none"
                 />
@@ -277,53 +278,53 @@ export function RatingSystemEditor({
                     value={lvl.severity}
                     onChange={(e) => patchLevel(i, { severity: e.target.value as Severity })}
                     className="h-8 pl-6 pr-6 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-semibold text-ih-fg-2 focus:shadow-ih-focus focus:border-ih-primary outline-none appearance-none"
-                    title="Severity"
+                    title={m.rating_editor_severity_title()}
                   >
                     {SEVERITIES.map((s) => (
                       <option key={s} value={s}>{SEVERITY_LABEL[s]}</option>
                     ))}
                   </select>
                 </div>
-                <label className="flex items-center gap-1 text-[10px] text-ih-fg-3 shrink-0" title="Counts as a defect in rollups">
+                <label className="flex items-center gap-1 text-[10px] text-ih-fg-3 shrink-0" title={m.rating_editor_defect_title()}>
                   <input type="checkbox" checked={lvl.isDefect} onChange={(e) => patchLevel(i, { isDefect: e.target.checked })} className="accent-ih-bad-fg" />
-                  Defect
+                  {m.rating_editor_defect()}
                 </label>
-                <label className="flex items-center gap-1 text-[10px] text-ih-fg-3 shrink-0" title="Pause auto-advance after selecting this level">
+                <label className="flex items-center gap-1 text-[10px] text-ih-fg-3 shrink-0" title={m.rating_editor_pause_title()}>
                   <input type="checkbox" checked={!!lvl.pausesAdvance} onChange={(e) => patchLevel(i, { pausesAdvance: e.target.checked })} className="accent-ih-primary" />
-                  Pause
+                  {m.rating_editor_pause()}
                 </label>
 
                 {/* Reorder + remove */}
                 <div className="flex items-center shrink-0">
                   <IconButton
-                    aria-label="Move up"
+                    aria-label={m.rating_editor_move_up()}
                     variant="ghost"
                     size="sm"
                     onClick={() => moveLevel(i, -1)}
                     disabled={i === 0}
-                    title="Move up"
+                    title={m.rating_editor_move_up()}
                     className="w-6 text-ih-fg-4 hover:text-ih-fg-1"
                   >
                     <Icon name="chevU" size={14} />
                   </IconButton>
                   <IconButton
-                    aria-label="Move down"
+                    aria-label={m.rating_editor_move_down()}
                     variant="ghost"
                     size="sm"
                     onClick={() => moveLevel(i, 1)}
                     disabled={i === levels.length - 1}
-                    title="Move down"
+                    title={m.rating_editor_move_down()}
                     className="w-6 text-ih-fg-4 hover:text-ih-fg-1"
                   >
                     <Icon name="chevD" size={14} />
                   </IconButton>
                   <IconButton
-                    aria-label="Remove level"
+                    aria-label={m.rating_editor_remove_level()}
                     variant="ghost"
                     size="sm"
                     onClick={() => setLevels((prev) => prev.filter((_, j) => j !== i))}
                     disabled={levels.length <= 2}
-                    title="Remove level"
+                    title={m.rating_editor_remove_level()}
                     className="w-6 text-ih-fg-4 hover:text-ih-bad-fg"
                   >
                     <Icon name="x" size={14} />
@@ -340,7 +341,7 @@ export function RatingSystemEditor({
               onClick={() => setLevels((prev) => [...prev, blankLevel()])}
               className="mt-2 w-full h-8 rounded-lg border-dashed text-[12px] text-ih-fg-3 hover:text-ih-primary hover:border-ih-primary"
             >
-              + Add level
+              {m.rating_editor_add_level()}
             </Button>
           )}
         </div>
@@ -349,7 +350,7 @@ export function RatingSystemEditor({
         {!onSaveLevels && (
           <label className="flex items-center gap-2 text-[13px] text-ih-fg-2 select-none cursor-pointer">
             <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="h-4 w-4 rounded border-ih-border text-ih-primary focus:ring-ih-primary/30" />
-            Use as the default rating system for new templates
+            {m.rating_editor_default_toggle()}
           </label>
         )}
 

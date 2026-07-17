@@ -4,6 +4,7 @@ import { Modal, Button } from "@core/shared-ui";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL } from "~/lib/severity";
 import { MoneyInput } from "~/components/MoneyInput";
+import { m } from "~/paraglide/messages";
 
 export interface CommentEditorProps {
   open: boolean;
@@ -57,7 +58,7 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
     }
   }, [fetcher.state, fetcher.data, onClose]);
 
-  const error = !text.trim() ? "Comment text is required" : null;
+  const error = !text.trim() ? m.comment_editor_error_text_required() : null;
   const saving = fetcher.state !== "idle";
   const isDefect = severity === "significant";
 
@@ -86,35 +87,35 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
   const labelCls = "block text-[11px] font-bold uppercase tracking-[0.14em] text-ih-fg-4 mb-1.5";
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? "Edit comment" : "New comment"} size="lg"
+    <Modal open={open} onClose={onClose} title={editing ? m.comment_editor_title_edit() : m.comment_editor_title_new()} size="lg"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="secondary" onClick={onClose}>{m.common_cancel()}</Button>
           <Button variant="primary" onClick={save} disabled={saving || !!error}>
-            {saving ? "Saving…" : editing ? "Save changes" : "Add comment"}
+            {saving ? m.common_saving() : editing ? m.comment_editor_save_changes() : m.comment_editor_add()}
           </Button>
         </>
       }>
       <div className="space-y-4">
         <div>
-          <label htmlFor="ce-text" className={labelCls}>Comment text</label>
+          <label htmlFor="ce-text" className={labelCls}>{m.comment_editor_text_label()}</label>
           <textarea id="ce-text" value={text} onChange={(e) => setText(e.target.value)} rows={3}
-            placeholder="Evidence of previous repair was observed."
+            placeholder={m.comment_editor_text_placeholder()}
             className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:shadow-ih-focus focus:border-ih-primary outline-none" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
-            <label htmlFor="ce-section" className={labelCls}>Section <span className="font-medium normal-case tracking-normal text-ih-fg-4">· optional</span></label>
-            <input id="ce-section" value={section} onChange={(e) => setSection(e.target.value)} placeholder="Roof" className={inputCls} />
+            <label htmlFor="ce-section" className={labelCls}>{m.comment_editor_section_label()} <span className="font-medium normal-case tracking-normal text-ih-fg-4">{m.comment_editor_optional()}</span></label>
+            <input id="ce-section" value={section} onChange={(e) => setSection(e.target.value)} placeholder={m.comment_editor_section_placeholder()} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="ce-item" className={labelCls}>Item label <span className="font-medium normal-case tracking-normal text-ih-fg-4">· optional</span></label>
-            <input id="ce-item" value={itemLabel} onChange={(e) => setItemLabel(e.target.value)} placeholder="Roof Covering" className={inputCls} />
+            <label htmlFor="ce-item" className={labelCls}>{m.comment_editor_item_label()} <span className="font-medium normal-case tracking-normal text-ih-fg-4">{m.comment_editor_optional()}</span></label>
+            <input id="ce-item" value={itemLabel} onChange={(e) => setItemLabel(e.target.value)} placeholder={m.comment_editor_item_placeholder()} className={inputCls} />
           </div>
           <div>
-            <label htmlFor="ce-severity" className={labelCls}>Severity</label>
+            <label htmlFor="ce-severity" className={labelCls}>{m.comment_editor_severity_label()}</label>
             <select id="ce-severity" value={severity} onChange={(e) => setSeverity(e.target.value as Severity | "")} className={inputCls + " appearance-none"}>
-              <option value="">Unclassified</option>
+              <option value="">{m.comment_editor_severity_unclassified()}</option>
               {SEVERITIES.map((s) => <option key={s} value={s}>{SEVERITY_LABEL[s]}</option>)}
             </select>
           </div>
@@ -123,26 +124,26 @@ export function CommentEditor({ open, onClose, comment, contractorTypes = [] }: 
         {isDefect && (
           <div className="space-y-3 rounded-lg border border-ih-border bg-ih-bg-app/40 p-3">
             <div>
-              <label htmlFor="ce-repair" className={labelCls}>Repair summary</label>
-              <input id="ce-repair" value={repairSummary} onChange={(e) => setRepairSummary(e.target.value)} placeholder="Recommend licensed roofer evaluate and repair." className={inputCls} />
+              <label htmlFor="ce-repair" className={labelCls}>{m.comment_editor_repair_label()}</label>
+              <input id="ce-repair" value={repairSummary} onChange={(e) => setRepairSummary(e.target.value)} placeholder={m.comment_editor_repair_placeholder()} className={inputCls} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label htmlFor="ce-min" className={labelCls}>Est. low</label>
-                <MoneyInput id="ce-min" ariaLabel="Est. low"
+                <label htmlFor="ce-min" className={labelCls}>{m.comment_editor_est_low()}</label>
+                <MoneyInput id="ce-min" ariaLabel={m.comment_editor_est_low()}
                   cents={estimateMin === "" ? null : Math.round(Number(estimateMin) * 100)}
                   onChange={(c) => setEstimateMin(c == null ? "" : String(c / 100))} className={inputCls} />
               </div>
               <div>
-                <label htmlFor="ce-max" className={labelCls}>Est. high</label>
-                <MoneyInput id="ce-max" ariaLabel="Est. high"
+                <label htmlFor="ce-max" className={labelCls}>{m.comment_editor_est_high()}</label>
+                <MoneyInput id="ce-max" ariaLabel={m.comment_editor_est_high()}
                   cents={estimateMax === "" ? null : Math.round(Number(estimateMax) * 100)}
                   onChange={(c) => setEstimateMax(c == null ? "" : String(c / 100))} className={inputCls} />
               </div>
               <div>
-                <label htmlFor="ce-ct" className={labelCls}>Contractor type</label>
+                <label htmlFor="ce-ct" className={labelCls}>{m.comment_editor_contractor_label()}</label>
                 <select id="ce-ct" value={contractorTypeId} onChange={(e) => setContractorTypeId(e.target.value)} className={inputCls + " appearance-none"}>
-                  <option value="">None</option>
+                  <option value="">{m.comment_editor_contractor_none()}</option>
                   {contractorTypes.map((ct) => <option key={ct.id} value={ct.id}>{ct.name}</option>)}
                 </select>
               </div>

@@ -10,9 +10,10 @@ import {
 import { CheckoutShell, StepPill, CompleteCard } from "~/components/checkout/CheckoutShell";
 import { SignCard } from "~/components/checkout/SignCard";
 import { PayCard } from "~/components/checkout/PayCard";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-    return [{ title: "Sign & Pay - OpenInspection" }];
+    return [{ title: m.checkout_meta_title() }];
 }
 
 interface CheckoutData {
@@ -61,7 +62,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
     if (intent === "sign") {
         const signatureBase64 = String(form.get("signatureBase64") ?? "");
-        if (!signatureBase64) return { ok: false, error: "Signature is required." };
+        if (!signatureBase64) return { ok: false, error: m.checkout_sign_error_signature_required() };
         const onBehalfOf = form.get("onBehalfOf");
         const onBehalfDisclaimer = form.get("onBehalfDisclaimer");
         const res = (await api.bookings.agreements[":token"].sign.$post({
@@ -74,10 +75,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         })) as unknown as Response;
         if (res.ok) return { ok: true };
         const d = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        return { ok: false, error: d?.error?.message ?? "Signing failed. Please try again." };
+        return { ok: false, error: d?.error?.message ?? m.checkout_sign_error_failed() };
     }
 
-    return { ok: false, error: "Unknown action." };
+    return { ok: false, error: m.checkout_action_error_unknown() };
 }
 
 /* ------------------------------------------------------------------ */
@@ -119,9 +120,9 @@ export default function CheckoutPage() {
         return (
             <CheckoutShell brandStyle={brandStyle} companyName={checkout.branding.companyName}>
                 <div className="px-6 py-10 text-center">
-                    <h1 className="text-xl font-bold text-ih-fg-1">Agreement declined</h1>
+                    <h1 className="text-xl font-bold text-ih-fg-1">{m.checkout_declined_heading()}</h1>
                     <p className="text-ih-fg-3 mt-2">
-                        You declined this agreement. Contact {checkout.branding.companyName} if this was a mistake.
+                        {m.checkout_declined_body({ companyName: checkout.branding.companyName })}
                     </p>
                 </div>
             </CheckoutShell>
@@ -133,16 +134,16 @@ export default function CheckoutPage() {
             {/* Progress header */}
             <div className="px-6 pt-6 sm:px-8 border-b border-ih-border pb-5">
                 <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-primary mb-2">
-                    Sign &amp; Pay
+                    {m.checkout_progress_eyebrow()}
                 </p>
                 <h1 className="text-lg font-bold text-ih-fg-1 tracking-tight">{checkout.agreement.name}</h1>
                 {checkout.inspection.propertyAddress && (
                     <p className="text-[13px] text-ih-fg-3 mt-0.5">{checkout.inspection.propertyAddress}</p>
                 )}
                 <div className="flex items-center gap-3 mt-4">
-                    <StepPill index={1} label="Sign" state={state.sign} />
+                    <StepPill index={1} label={m.checkout_step_sign()} state={state.sign} />
                     <div className="h-px flex-1 bg-ih-border" />
-                    <StepPill index={2} label="Pay" state={state.pay} />
+                    <StepPill index={2} label={m.checkout_step_pay()} state={state.pay} />
                 </div>
             </div>
 

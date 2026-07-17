@@ -7,11 +7,12 @@ import type { Route } from "./+types/settings-security";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { useFlash } from "~/hooks/useFlash";
-import { changePasswordSchema, deleteAccountSchema } from "~/lib/forms/settings.schema";
+import { makeChangePasswordSchema, makeDeleteAccountSchema } from "~/lib/forms/settings.schema";
 import { ChangePasswordPanel } from "~/components/settings/security/ChangePasswordPanel";
 import { TwoFactorPanel } from "~/components/settings/security/TwoFactorPanel";
 import { TurnstilePanel } from "~/components/settings/security/TurnstilePanel";
 import { DataExportPanel } from "~/components/settings/security/DataExportPanel";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -63,7 +64,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const intent = fd.get("intent");
 
   if (intent === "change-password") {
-    const submission = parseWithZod(fd, { schema: changePasswordSchema });
+    const submission = parseWithZod(fd, { schema: makeChangePasswordSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -78,7 +79,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       return submission.reply({
-        formErrors: [(err as Record<string, string>)?.message || "Password change failed"],
+        formErrors: [(err as Record<string, string>)?.message || m.settings_security_error_password_change_failed()],
       });
     }
     return { success: true, error: null };
@@ -97,7 +98,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         return {
           intent,
           success: false,
-          error: errBody?.error?.message ?? "Failed to save Turnstile key.",
+          error: errBody?.error?.message ?? m.settings_security_error_turnstile_save_failed(),
           field: errBody?.error?.field ?? null,
         };
       }
@@ -111,13 +112,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     const identityClient = api.identity as unknown as { account: { export: { $post: (args?: unknown) => Promise<Response> }; delete: { $post: (args: { json: { confirmEmail: string } }) => Promise<Response> } } };
     const res = await identityClient.account.export.$post();
     if (!res.ok) {
-      return { success: false, error: "Data export failed. Please try again." };
+      return { success: false, error: m.settings_security_error_export_failed() };
     }
-    return { success: true, error: null, message: "Data export complete. Your account data is available below." };
+    return { success: true, error: null, message: m.settings_security_export_success_message() };
   }
 
   if (intent === "delete-account") {
-    const submission = parseWithZod(fd, { schema: deleteAccountSchema });
+    const submission = parseWithZod(fd, { schema: makeDeleteAccountSchema() });
     if (submission.status !== "success") {
       return submission.reply();
     }
@@ -128,13 +129,13 @@ export async function action({ request, context }: Route.ActionArgs) {
       const err = await res.json().catch(() => ({}));
       const msg = (err as { error?: { message?: string } })?.error?.message
         ?? (err as Record<string, string>)?.message
-        ?? "Account deletion failed.";
+        ?? m.settings_security_error_delete_failed();
       return submission.reply({ formErrors: [msg] });
     }
-    return { success: true, error: null, message: "Account deleted." };
+    return { success: true, error: null, message: m.settings_security_delete_success_message() };
   }
 
-  return { success: false, error: "Unknown action" };
+  return { success: false, error: m.settings_security_error_unknown_action() };
 }
 
 /* ------------------------------------------------------------------ */
@@ -177,7 +178,7 @@ export default function SettingsSecurityPage() {
   const [pwForm, pwFields] = useForm({
     lastResult: pwResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: changePasswordSchema });
+      return parseWithZod(formData, { schema: makeChangePasswordSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -191,7 +192,7 @@ export default function SettingsSecurityPage() {
   const [deleteForm, deleteFields] = useForm({
     lastResult: deleteResult,
     onValidate({ formData }) {
-      return parseWithZod(formData, { schema: deleteAccountSchema });
+      return parseWithZod(formData, { schema: makeDeleteAccountSchema() });
     },
     shouldValidate: "onBlur",
     shouldRevalidate: "onInput",
@@ -199,13 +200,13 @@ export default function SettingsSecurityPage() {
 
   return (
     <div className="space-y-ih-list max-w-3xl">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Account & Security" }]} />
-      <p className="text-[13px] text-ih-fg-3">Password, two-factor authentication, account data, and security settings.</p>
+      <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_security_crumb() }]} />
+      <p className="text-[13px] text-ih-fg-3">{m.settings_security_subtitle()}</p>
 
       {/* Flash */}
       {flashVisible && actionData && "success" in actionData && actionData.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          {(actionData as Record<string, unknown>).message as string || "Saved."}
+          {(actionData as Record<string, unknown>).message as string || m.settings_security_flash_saved()}
         </div>
       )}
       {actionData &&
@@ -220,15 +221,15 @@ export default function SettingsSecurityPage() {
 
       {/* Account info */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
-        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Account details</h3>
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_security_account_details_heading()}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">Email</p>
-            <p className="text-[13px] text-ih-fg-1 font-medium">{user.email || "Not set"}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">{m.settings_security_email_label()}</p>
+            <p className="text-[13px] text-ih-fg-1 font-medium">{user.email || m.settings_security_not_set()}</p>
           </div>
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">Name</p>
-            <p className="text-[13px] text-ih-fg-1 font-medium">{user.name || "Not set"}</p>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-1">{m.settings_security_name_label()}</p>
+            <p className="text-[13px] text-ih-fg-1 font-medium">{user.name || m.settings_security_not_set()}</p>
           </div>
         </div>
       </section>
@@ -256,7 +257,7 @@ export default function SettingsSecurityPage() {
 
       {/* Active sessions placeholder */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
-        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">Active sessions</h3>
+        <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_security_sessions_heading()}</h3>
         <div className="flex items-center gap-3 p-3 rounded-md bg-ih-bg-muted border border-ih-border">
           <div className="w-8 h-8 rounded-full bg-ih-primary-tint text-ih-primary flex items-center justify-center">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -264,11 +265,11 @@ export default function SettingsSecurityPage() {
             </svg>
           </div>
           <div>
-            <p className="text-[13px] font-medium text-ih-fg-1">Current session</p>
-            <p className="text-[11px] text-ih-fg-3">Active now</p>
+            <p className="text-[13px] font-medium text-ih-fg-1">{m.settings_security_sessions_current()}</p>
+            <p className="text-[11px] text-ih-fg-3">{m.settings_security_sessions_active_now()}</p>
           </div>
         </div>
-        <p className="text-[11px] text-ih-fg-3">Full session management coming soon.</p>
+        <p className="text-[11px] text-ih-fg-3">{m.settings_security_sessions_coming_soon()}</p>
       </section>
 
       {/* Data export */}
@@ -276,12 +277,11 @@ export default function SettingsSecurityPage() {
 
       {/* Danger zone */}
       <section className="bg-ih-bg-card rounded-lg border border-ih-bad p-6 space-y-4">
-        <h3 className="text-[11px] font-bold text-ih-bad-fg uppercase tracking-[0.2em]">Danger zone</h3>
+        <h3 className="text-[11px] font-bold text-ih-bad-fg uppercase tracking-[0.2em]">{m.settings_security_danger_heading()}</h3>
         <div className="p-4 rounded-md bg-ih-bad-bg border border-ih-bad">
-          <p className="text-[13px] font-bold text-ih-bad-fg mb-1">Delete account</p>
+          <p className="text-[13px] font-bold text-ih-bad-fg mb-1">{m.settings_security_delete_title()}</p>
           <p className="text-[12px] text-ih-bad-fg leading-relaxed">
-            Permanently delete your account and all associated data including inspections,
-            reports, templates, and client records. This action cannot be undone.
+            {m.settings_security_delete_description()}
           </p>
         </div>
 
@@ -291,7 +291,7 @@ export default function SettingsSecurityPage() {
             onClick={() => setShowDeleteConfirm(true)}
             className="h-9 px-4 rounded-md border border-ih-bad text-ih-bad-fg text-[13px] font-bold hover:bg-ih-bad-bg transition-colors"
           >
-            Delete my account
+            {m.settings_security_delete_button()}
           </button>
         ) : (
           <Form
@@ -304,7 +304,7 @@ export default function SettingsSecurityPage() {
             <input type="hidden" name="intent" value="delete-account" />
             <div className="space-y-2">
               <label htmlFor={deleteFields.confirmEmail.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">
-                Retype your email to confirm
+                {m.settings_security_delete_confirm_label()}
               </label>
               <input
                 type="email"
@@ -312,7 +312,7 @@ export default function SettingsSecurityPage() {
                 name={deleteFields.confirmEmail.name}
                 autoComplete="off"
                 aria-invalid={deleteFields.confirmEmail.errors ? true : undefined}
-                placeholder={user.email ?? "your@email.com"}
+                placeholder={user.email ?? m.settings_security_delete_confirm_placeholder()}
                 className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-bad focus:shadow-ih-focus outline-none text-[13px] text-ih-fg-1"
               />
               {deleteFields.confirmEmail.errors && (
@@ -327,11 +327,11 @@ export default function SettingsSecurityPage() {
             <div className="flex gap-2">
               <button type="button" onClick={() => setShowDeleteConfirm(false)}
                 className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
-                Cancel
+                {m.common_cancel()}
               </button>
               <button type="submit"
                 className="h-9 px-4 rounded-md bg-ih-bad text-white font-bold text-[13px] hover:bg-ih-bad/85 active:scale-[.98] transition-all">
-                Permanently delete
+                {m.settings_security_delete_confirm_button()}
               </button>
             </div>
           </Form>

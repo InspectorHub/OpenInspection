@@ -1,17 +1,22 @@
 import { useState } from "react";
 import type { PcaNarrativeData } from "~/components/portal/sections/report/types";
+import { m } from "~/paraglide/messages";
 
-const BLOCKS: { key: keyof PcaNarrativeData; label: string }[] = [
-  { key: "transmittalLetter", label: "Transmittal Letter" },
-  { key: "summaryGeneralDescription", label: "1.1 General Description" },
-  { key: "summaryPhysicalCondition", label: "1.2 General Physical Condition" },
-  { key: "summaryRecommendations", label: "1.5 Recommendations" },
-  { key: "purpose", label: "2.1 Purpose" },
-  { key: "scopeOfWork", label: "2.2 Scope of Work (methodology folds in here)" },
-  { key: "limitationsExceptions", label: "2.3 Limitations & Exceptions" },
-  { key: "reconnaissance", label: "2.4 General Property Reconnaissance" },
-  { key: "additionalConsiderations", label: "Additional Considerations" },
-];
+// Thunk (not a module const) so each label resolves at render time — a
+// module-level const would freeze the message at import.
+function blocks(): { key: keyof PcaNarrativeData; label: string }[] {
+  return [
+    { key: "transmittalLetter", label: m.editor_pca_block_transmittal() },
+    { key: "summaryGeneralDescription", label: m.editor_pca_block_general_description() },
+    { key: "summaryPhysicalCondition", label: m.editor_pca_block_physical_condition() },
+    { key: "summaryRecommendations", label: m.editor_pca_block_recommendations() },
+    { key: "purpose", label: m.editor_pca_block_purpose() },
+    { key: "scopeOfWork", label: m.editor_pca_block_scope() },
+    { key: "limitationsExceptions", label: m.editor_pca_block_limitations() },
+    { key: "reconnaissance", label: m.editor_pca_block_reconnaissance() },
+    { key: "additionalConsiderations", label: m.editor_pca_block_additional() },
+  ];
+}
 
 /**
  * Commercial PCA Phase S — narrative editor. One textarea per editable report
@@ -33,9 +38,9 @@ export function PcaNarrativePanel({
   return (
     <div className="space-y-4">
       <h2 className="text-sm font-semibold text-ih-fg-2">
-        Report Narrative {saving ? <span className="text-ih-fg-3">(saving…)</span> : null}
+        {m.editor_pca_heading()} {saving ? <span className="text-ih-fg-3">{m.editor_pca_saving()}</span> : null}
       </h2>
-      {BLOCKS.map((b) => (
+      {blocks().map((b) => (
         <label key={b.key} className="block">
           <span className="mb-1 block text-xs font-medium text-ih-fg-3">{b.label}</span>
           <textarea

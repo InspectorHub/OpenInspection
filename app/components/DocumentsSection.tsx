@@ -16,6 +16,7 @@ import { useRef, useState } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /* Allowlist (mirrors server/services/client-document.service.ts) */
@@ -71,14 +72,16 @@ export const DOCUMENT_CATEGORIES = [
 ] as const;
 export type DocumentCategory = (typeof DOCUMENT_CATEGORIES)[number];
 
+// Labels are exposed as getters so each resolves at access time under the active
+// paraglide locale; the category ids/keys are unchanged (used as React keys + values).
 export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
-  prior_reports: "Prior Reports",
-  plans_drawings: "Plans & Drawings",
-  environmental: "Environmental",
-  leases_financials: "Leases & Financials",
-  permits_certificates: "Permits & Certificates",
-  photos: "Photos",
-  other: "Other",
+  get prior_reports() { return m.label_doccategory_prior_reports(); },
+  get plans_drawings() { return m.label_doccategory_plans_drawings(); },
+  get environmental() { return m.label_doccategory_environmental(); },
+  get leases_financials() { return m.label_doccategory_leases_financials(); },
+  get permits_certificates() { return m.label_doccategory_permits_certificates(); },
+  get photos() { return m.label_doccategory_photos(); },
+  get other() { return m.label_doccategory_other(); },
 };
 
 export type DocumentVisibility = "client_visible" | "internal";
@@ -150,7 +153,7 @@ function isDeletable(item: DocumentItem, allowDeleteAny: boolean, currentUserRef
 
 function uploaderLabel(item: DocumentItem): string {
   if (item.uploadedByName) return item.uploadedByName;
-  return item.uploadedByKind === "inspector" ? "Inspector" : "Client";
+  return item.uploadedByKind === "inspector" ? m.documents_uploader_inspector() : m.documents_uploader_client();
 }
 
 export default function DocumentsSection({
@@ -180,7 +183,7 @@ export default function DocumentsSection({
   const handleFile = (file: File | undefined | null) => {
     if (!file) return;
     if (!isAcceptedDocument(file)) {
-      setLocalError("That file type or size isn't allowed (max 100 MB).");
+      setLocalError(m.documents_error_rejected());
       return;
     }
     setLocalError(null);
@@ -193,16 +196,16 @@ export default function DocumentsSection({
 
   return (
     <section className="rounded-xl border border-ih-border bg-ih-bg-card p-5">
-      <h2 className="text-sm font-bold text-ih-fg-1">Documents</h2>
+      <h2 className="text-sm font-bold text-ih-fg-1">{m.documents_heading()}</h2>
       <p className="mt-0.5 text-[12px] text-ih-fg-3">
-        Share files for this inspection. PDF, images, Office docs and CAD up to 100 MB.
+        {m.documents_description()}
       </p>
 
       {canUpload && (
         <div className="mt-4">
           <div className="flex flex-wrap gap-2">
             <label className="flex flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">Category</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{m.documents_category_label()}</span>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as DocumentCategory)}
@@ -217,27 +220,27 @@ export default function DocumentsSection({
 
             {showVisibilityToggle && (
               <label className="flex flex-col gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">Visibility</span>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{m.documents_visibility_label()}</span>
                 <select
                   value={visibility}
                   onChange={(e) => setVisibility(e.target.value as DocumentVisibility)}
                   disabled={uploading}
                   className="rounded-md border border-ih-border bg-ih-bg-card px-2 py-1.5 text-[13px] text-ih-fg-1 disabled:opacity-50"
                 >
-                  <option value="client_visible">Client visible</option>
-                  <option value="internal">Internal only</option>
+                  <option value="client_visible">{m.documents_visibility_client()}</option>
+                  <option value="internal">{m.documents_visibility_internal()}</option>
                 </select>
               </label>
             )}
 
             <label className="flex flex-1 flex-col gap-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">Label (optional)</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-3">{m.documents_label_optional()}</span>
               <input
                 type="text"
                 value={label}
                 onChange={(e) => setLabel(e.target.value)}
                 disabled={uploading}
-                placeholder="e.g. 2019 termite report"
+                placeholder={m.documents_label_placeholder()}
                 className="rounded-md border border-ih-border bg-ih-bg-card px-2 py-1.5 text-[13px] text-ih-fg-1 placeholder:text-ih-fg-3 disabled:opacity-50"
               />
             </label>
@@ -256,16 +259,16 @@ export default function DocumentsSection({
             }`}
           >
             {uploading ? (
-              <span className="text-[13px] font-semibold text-ih-fg-2">Uploading…</span>
+              <span className="text-[13px] font-semibold text-ih-fg-2">{m.documents_uploading()}</span>
             ) : (
               <>
-                <span className="text-[13px] text-ih-fg-2">Drag a file here, or</span>
+                <span className="text-[13px] text-ih-fg-2">{m.documents_drag()}</span>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="rounded-md bg-ih-primary px-3 py-1.5 text-[13px] font-bold text-white transition-opacity hover:opacity-90"
                 >
-                  Choose file
+                  {m.documents_choose_file()}
                 </button>
                 <span className="text-[11px] text-ih-fg-3">{ACCEPT_ATTR.replace(/\./g, "").replace(/,/g, ", ")}</span>
               </>
@@ -289,7 +292,7 @@ export default function DocumentsSection({
       <div className="mt-5 flex flex-col gap-5">
         {groups.length === 0 ? (
           <p className="rounded-lg bg-ih-bg-muted px-4 py-6 text-center text-[13px] text-ih-fg-3">
-            No documents yet.
+            {m.documents_empty()}
           </p>
         ) : (
           groups.map((group) => (
@@ -317,7 +320,7 @@ export default function DocumentsSection({
                           <span>{formatDate(item.createdAt, { locale, timeZone: tz, month: "short" })}</span>
                           {item.visibility === "internal" && (
                             <span className="rounded bg-ih-watch-bg px-1.5 py-0.5 font-bold text-ih-watch-fg">
-                              Internal
+                              {m.documents_internal_badge()}
                             </span>
                           )}
                         </div>
@@ -328,7 +331,7 @@ export default function DocumentsSection({
                           onClick={() => setPendingDeleteId(item.id)}
                           className="shrink-0 rounded-md px-2 py-1 text-[12px] font-bold text-ih-bad-fg transition-colors hover:bg-ih-bad-bg"
                         >
-                          Delete
+                          {m.common_delete()}
                         </button>
                       )}
                     </li>
@@ -342,9 +345,9 @@ export default function DocumentsSection({
 
       <ConfirmDialog
         open={pendingDeleteId != null}
-        title="Delete document?"
-        message="This permanently removes the file. This cannot be undone."
-        confirmLabel="Delete"
+        title={m.documents_delete_title()}
+        message={m.documents_delete_message()}
+        confirmLabel={m.common_delete()}
         onConfirm={() => {
           if (pendingDeleteId != null) onDelete(pendingDeleteId);
           setPendingDeleteId(null);

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { Button } from '@core/shared-ui';
+import { m } from "~/paraglide/messages";
 
 export interface SpeedModeUndoToastProps {
     /** Null = hide */
@@ -33,7 +34,7 @@ export function SpeedModeUndoToast({ pending, onDismiss, durationMs = 3000 }: Sp
                 onClick={() => { pending.onUndo(); onDismiss(); }}
                 className="px-2 py-1 hover:bg-ih-bg-muted rounded"
             >
-                Undo
+                {m.common_undo()}
             </Button>
         </div>
     );

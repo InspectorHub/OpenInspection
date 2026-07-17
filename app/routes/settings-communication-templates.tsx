@@ -7,6 +7,7 @@ import { createApi } from "~/lib/api-client.server";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Button, Pill, TabStrip, EmptyState, Card, Modal } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 // ─── Exported pure helper ────────────────────────────────────────────────────
 
@@ -41,7 +42,7 @@ interface ReferencingAutomation {
 // ─── Meta ────────────────────────────────────────────────────────────────────
 
 export function meta() {
-  return [{ title: "Message Templates - Settings - OpenInspection" }];
+  return [{ title: m.settings_msgtpl_meta_title() }];
 }
 
 // ─── Loader ──────────────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.messageTemplates.index.$post({
       json: { name, channel, subject, body, variables },
     });
-    if (!res.ok) return { ok: false, error: "Failed to create template.", intent };
+    if (!res.ok) return { ok: false, error: m.settings_msgtpl_create_error(), intent };
     return { ok: true, intent };
   }
 
@@ -99,7 +100,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         json: { name?: string; subject?: string | null; body?: string; variables?: string[] };
       }) => Promise<Response>
     )({ param: { id }, json: { name, subject, body, variables } });
-    if (!res.ok) return { ok: false, error: "Failed to update template.", intent };
+    if (!res.ok) return { ok: false, error: m.settings_msgtpl_update_error(), intent };
     return { ok: true, intent };
   }
 
@@ -110,7 +111,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         param: { id: string };
       }) => Promise<Response>
     )({ param: { id } });
-    if (!res.ok) return { ok: false, error: "Failed to duplicate template.", intent };
+    if (!res.ok) return { ok: false, error: m.settings_msgtpl_duplicate_error(), intent };
     return { ok: true, intent };
   }
 
@@ -131,10 +132,10 @@ export async function action({ request, context }: Route.ActionArgs) {
         intent,
         conflict: true,
         referencing: body?.referencing ?? [],
-        error: body?.error ?? "Template is in use.",
+        error: body?.error ?? m.settings_msgtpl_in_use(),
       };
     }
-    if (!res.ok) return { ok: false, error: "Failed to delete template.", intent };
+    if (!res.ok) return { ok: false, error: m.settings_msgtpl_delete_error(), intent };
     return { ok: true, intent };
   }
 
@@ -145,7 +146,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     const res = await api.messageTemplates.preview.$post({
       json: { channel, subject: subject || null, body },
     });
-    if (!res.ok) return { ok: false, error: "Preview failed.", intent };
+    if (!res.ok) return { ok: false, error: m.settings_msgtpl_preview_error(), intent };
     const data = (
       (await res.json()) as { data?: { subject?: string; html?: string; text?: string } }
     ).data ?? {};
@@ -166,7 +167,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       success?: boolean;
       error?: string;
     } | null;
-    if (!resBody?.success) return { ok: false, error: resBody?.error ?? "Test send failed.", intent };
+    if (!resBody?.success) return { ok: false, error: resBody?.error ?? m.settings_msgtpl_test_send_error(), intent };
     return { ok: true, intent };
   }
 
@@ -190,26 +191,26 @@ export default function SettingsCommunicationTemplates() {
     <div className="space-y-ih-list">
       <SettingsCrumb
         items={[
-          { label: "Settings", href: "/settings" },
-          { label: "Communication", href: "/settings/communication" },
-          { label: "Templates" },
+          { label: m.settings_crumb_root(), href: "/settings" },
+          { label: m.settings_comms_crumb(), href: "/settings/communication" },
+          { label: m.settings_msgtpl_crumb() },
         ]}
       />
 
       <div className="flex items-start justify-between gap-4">
-        <p className="text-[13px] text-ih-fg-3">Reusable message templates for automations.</p>
+        <p className="text-[13px] text-ih-fg-3">{m.settings_msgtpl_intro()}</p>
         <Button
           variant="primary"
           onClick={() => setEditing(activeTab === "email" ? "new-email" : "new-sms")}
         >
-          + New template
+          {m.settings_msgtpl_new_button()}
         </Button>
       </div>
 
       <TabStrip
         tabs={[
-          { id: "email", label: "Email", count: emailTemplates.length },
-          { id: "sms", label: "SMS", count: smsTemplates.length },
+          { id: "email", label: m.settings_channel_email(), count: emailTemplates.length },
+          { id: "sms", label: m.settings_channel_sms(), count: smsTemplates.length },
         ]}
         activeId={activeTab}
         onChange={(id) => setActiveTab(id as "email" | "sms")}
@@ -264,8 +265,8 @@ function TemplateList({
     return (
       <Card>
         <EmptyState
-          title="No templates yet"
-          description="Create a template to reuse across your automations."
+          title={m.settings_msgtpl_empty_title()}
+          description={m.settings_msgtpl_empty_desc()}
         />
       </Card>
     );
@@ -282,14 +283,14 @@ function TemplateList({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[13px] font-bold text-ih-fg-1">{t.name}</span>
-                {t.isSeeded && <Pill tone="info">Built-in</Pill>}
+                {t.isSeeded && <Pill tone="info">{m.settings_msgtpl_builtin_pill()}</Pill>}
               </div>
               {t.subject && (
-                <p className="text-[11px] text-ih-fg-3 mt-0.5 truncate">Subject: {t.subject}</p>
+                <p className="text-[11px] text-ih-fg-3 mt-0.5 truncate">{m.settings_msgtpl_subject_prefix({ subject: t.subject })}</p>
               )}
               {t.variables.length > 0 && (
                 <p className="text-[11px] text-ih-fg-4 mt-0.5">
-                  Variables: {t.variables.map((v) => `{{${v}}}`).join(", ")}
+                  {m.settings_msgtpl_variables_prefix({ vars: t.variables.map((v) => `{{${v}}}`).join(", ") })}
                 </p>
               )}
             </div>
@@ -298,7 +299,7 @@ function TemplateList({
                 onClick={() => onEdit(t)}
                 className="text-[12px] text-ih-primary font-semibold hover:underline"
               >
-                Edit
+                {m.common_edit()}
               </button>
               <fetcher.Form method="post">
                 <input type="hidden" name="intent" value="duplicate" />
@@ -307,7 +308,7 @@ function TemplateList({
                   type="submit"
                   className="text-[12px] text-ih-fg-3 font-semibold hover:text-ih-fg-1"
                 >
-                  Duplicate
+                  {m.settings_msgtpl_duplicate()}
                 </button>
               </fetcher.Form>
               {!t.isSeeded && (
@@ -315,7 +316,7 @@ function TemplateList({
                   onClick={() => onDelete(t)}
                   className="text-[12px] text-ih-bad-fg font-semibold hover:underline"
                 >
-                  Delete
+                  {m.common_delete()}
                 </button>
               )}
             </div>
@@ -354,18 +355,18 @@ function DeleteModal({
     <Modal
       open
       onClose={onClose}
-      title="Delete template"
+      title={m.settings_msgtpl_delete_title()}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Cancel
+            {m.common_cancel()}
           </Button>
           {!isConflict && (
             <fetcher.Form method="post">
               <input type="hidden" name="intent" value="delete" />
               <input type="hidden" name="id" value={template.id} />
               <Button type="submit" variant="danger" disabled={fetcher.state !== "idle"}>
-                Delete
+                {m.common_delete()}
               </Button>
             </fetcher.Form>
           )}
@@ -375,8 +376,7 @@ function DeleteModal({
       {isConflict ? (
         <div className="space-y-3">
           <p className="text-[13px] text-ih-fg-1">
-            This template is used by {referencing.length} automation
-            {referencing.length !== 1 ? "s" : ""} and cannot be deleted:
+            {m.settings_msgtpl_delete_conflict({ count: referencing.length, plural: referencing.length !== 1 ? "s" : "" })}
           </p>
           <ul className="space-y-1">
             {referencing.map((a) => (
@@ -389,13 +389,12 @@ function DeleteModal({
             ))}
           </ul>
           <p className="text-[12px] text-ih-fg-3">
-            Remove the template from those automations first, then retry.
+            {m.settings_msgtpl_delete_conflict_hint()}
           </p>
         </div>
       ) : (
         <p className="text-[13px] text-ih-fg-2">
-          Delete <strong className="text-ih-fg-1">{template.name}</strong>? This cannot be
-          undone.
+          {m.settings_msgtpl_delete_confirm_prefix()} <strong className="text-ih-fg-1">{template.name}</strong>{m.settings_msgtpl_delete_confirm_suffix()}
         </p>
       )}
     </Modal>
@@ -487,12 +486,12 @@ function TemplateEditorModal({
     <Modal
       open
       onClose={onClose}
-      title={template ? "Edit template" : `New ${channel} template`}
+      title={template ? m.settings_msgtpl_edit_title() : m.settings_msgtpl_new_channel_title({ channel })}
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Cancel
+            {m.common_cancel()}
           </Button>
           <fetcher.Form method="post">
             <input type="hidden" name="intent" value={template ? "update" : "create"} />
@@ -509,7 +508,7 @@ function TemplateEditorModal({
               variant="primary"
               disabled={isSaving || !name.trim() || !body.trim()}
             >
-              {template ? "Save" : "Create"}
+              {template ? m.common_save() : m.settings_msgtpl_create()}
             </Button>
           </fetcher.Form>
         </>
@@ -518,7 +517,7 @@ function TemplateEditorModal({
       <div className="space-y-4">
         {fetcher.data && !fetcher.data.ok && fetcher.data.intent !== "test-send" && (
           <div className="px-3 py-2 rounded-md bg-ih-bad-bg text-ih-bad-fg text-[12px]">
-            {fetcher.data.error ?? "An error occurred."}
+            {fetcher.data.error ?? m.settings_error_generic()}
           </div>
         )}
 
@@ -528,13 +527,13 @@ function TemplateEditorModal({
             htmlFor="tpl-name"
             className="block text-xs font-bold text-ih-fg-2 mb-1"
           >
-            Template name
+            {m.settings_msgtpl_name_label()}
           </label>
           <input
             id="tpl-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Report ready — email"
+            placeholder={m.settings_msgtpl_name_placeholder()}
             required
             className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
           />
@@ -547,13 +546,13 @@ function TemplateEditorModal({
               htmlFor="tpl-subject"
               className="block text-xs font-bold text-ih-fg-2 mb-1"
             >
-              Subject line
+              {m.settings_msgtpl_subject_line_label()}
             </label>
             <input
               id="tpl-subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              placeholder="Your inspection report is ready"
+              placeholder={m.settings_msgtpl_subject_placeholder()}
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
             />
           </div>
@@ -565,11 +564,11 @@ function TemplateEditorModal({
             htmlFor="tpl-body"
             className="block text-xs font-bold text-ih-fg-2 mb-1"
           >
-            {isEmail ? "Email body" : "SMS body"}
+            {isEmail ? m.settings_msgtpl_email_body_label() : m.settings_msgtpl_sms_body_label()}
           </label>
           {variables.length > 0 && (
             <div className="flex flex-wrap gap-1 mb-2">
-              <span className="text-[11px] text-ih-fg-3 self-center">Insert:</span>
+              <span className="text-[11px] text-ih-fg-3 self-center">{m.settings_msgtpl_insert_label()}</span>
               {variables.map((v) => (
                 <button
                   key={v}
@@ -598,8 +597,8 @@ function TemplateEditorModal({
           {!isEmail && (
             <p className="text-[11px] text-ih-fg-3 mt-1">
               {segmentCount === 0
-                ? "0 characters · 0 segments"
-                : `${[...body].length} characters · ${segmentCount} segment${segmentCount !== 1 ? "s" : ""}`}
+                ? m.settings_msgtpl_segments_zero()
+                : m.settings_msgtpl_segments_count({ chars: [...body].length, segments: segmentCount, plural: segmentCount !== 1 ? "s" : "" })}
             </p>
           )}
         </div>
@@ -609,7 +608,7 @@ function TemplateEditorModal({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-ih-fg-2 uppercase tracking-wide">
-                Preview
+                {m.settings_msgtpl_preview_label()}
               </span>
               <previewFetcher.Form method="post">
                 <input type="hidden" name="intent" value="preview" />
@@ -622,7 +621,7 @@ function TemplateEditorModal({
                   size="sm"
                   disabled={isPreviewing || !body.trim()}
                 >
-                  {isPreviewing ? "Loading…" : "Refresh preview"}
+                  {isPreviewing ? m.common_loading() : m.settings_msgtpl_refresh_preview()}
                 </Button>
               </previewFetcher.Form>
             </div>
@@ -630,7 +629,7 @@ function TemplateEditorModal({
               <div className="rounded-md border border-ih-border bg-ih-bg-muted p-3 space-y-2">
                 {previewData.subject && (
                   <p className="text-[12px] font-bold text-ih-fg-2">
-                    Subject:{" "}
+                    {m.settings_msgtpl_preview_subject_label()}{" "}
                     <span className="font-normal text-ih-fg-1">{previewData.subject}</span>
                   </p>
                 )}
@@ -648,12 +647,12 @@ function TemplateEditorModal({
         {/* Test send */}
         <div className="border-t border-ih-border pt-3">
           <p className="text-xs font-bold text-ih-fg-2 uppercase tracking-wide mb-2">
-            Send test {isEmail ? "email" : "SMS"}
+            {isEmail ? m.settings_msgtpl_test_send_email_heading() : m.settings_msgtpl_test_send_sms_heading()}
           </p>
           <div className="flex gap-2 items-end">
             <div className="flex-1">
               <label className="block text-xs font-bold text-ih-fg-2 mb-1">
-                {isEmail ? "To email" : "To phone (+1 555 000 0000)"}
+                {isEmail ? m.settings_msgtpl_to_email_label() : m.settings_msgtpl_to_phone_label()}
               </label>
               <input
                 value={testTo}
@@ -661,7 +660,7 @@ function TemplateEditorModal({
                   setTestTo(e.target.value);
                   setTestSent(false);
                 }}
-                placeholder={isEmail ? "you@example.com" : "+15550001234"}
+                placeholder={isEmail ? m.settings_msgtpl_to_email_placeholder() : m.settings_msgtpl_to_phone_placeholder()}
                 type={isEmail ? "email" : "tel"}
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4"
               />
@@ -677,12 +676,12 @@ function TemplateEditorModal({
                 variant="secondary"
                 disabled={isTesting || !testTo.trim() || !body.trim()}
               >
-                {isTesting ? "Sending…" : "Send"}
+                {isTesting ? m.settings_sending() : m.settings_send()}
               </Button>
             </fetcher.Form>
           </div>
           {testSent && (
-            <p className="text-[12px] text-ih-ok-fg mt-1">Test sent.</p>
+            <p className="text-[12px] text-ih-ok-fg mt-1">{m.settings_msgtpl_test_sent()}</p>
           )}
           {fetcher.data && !fetcher.data.ok && fetcher.data.intent === "test-send" && (
             <p className="text-[12px] text-ih-bad-fg mt-1">{fetcher.data.error}</p>
@@ -699,26 +698,23 @@ function ComplianceSmsSection() {
   return (
     <section className="space-y-2">
       <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">
-        Compliance SMS
+        {m.settings_msgtpl_compliance_heading()}
       </h3>
       <Card className="p-4 space-y-3">
         <div>
-          <p className="text-[13px] font-semibold text-ih-fg-1 mb-1">Opt-in disclosure</p>
+          <p className="text-[13px] font-semibold text-ih-fg-1 mb-1">{m.settings_msgtpl_optin_heading()}</p>
           <p className="text-[12px] text-ih-fg-3">
-            Your opt-in disclosure text is configured in{" "}
+            {m.settings_msgtpl_optin_desc_before()}{" "}
             <Link to="/settings/communication" className="text-ih-primary hover:underline">
-              Communication settings
+              {m.settings_msgtpl_optin_link()}
             </Link>{" "}
-            under SMS delivery. Tenants using BYO Twilio manage disclosure copy there.
+            {m.settings_msgtpl_optin_desc_after()}
           </p>
         </div>
         <div>
-          <p className="text-[13px] font-semibold text-ih-fg-1 mb-1">STOP / START / HELP</p>
+          <p className="text-[13px] font-semibold text-ih-fg-1 mb-1">{m.settings_msgtpl_stopstart_heading()}</p>
           <p className="text-[12px] text-ih-fg-3">
-            Inbound opt-out (STOP), opt-in (START), and help (HELP) keywords are handled
-            automatically by your SMS provider. When a recipient texts STOP, future messages
-            are suppressed at the provider level. You do not need to handle these replies
-            manually — they are recorded in the compliance log in Communication settings.
+            {m.settings_msgtpl_stopstart_desc()}
           </p>
         </div>
       </Card>

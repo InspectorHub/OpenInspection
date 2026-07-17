@@ -12,6 +12,7 @@
  */
 import type { AppLoadContext } from "react-router";
 import { createApi } from "~/lib/api-client.server";
+import { m } from "~/paraglide/messages";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { EMPTY_BRAND } from "~/lib/brand";
 import type { HubSection } from "~/components/portal/InspectionHub";
@@ -105,7 +106,7 @@ export async function loadReportSection(
       reportTimeZone: d?.reportTimeZone ?? "UTC",
       isDelivered: d?.isDelivered ?? false,
       brand,
-      error: res.ok ? null : "Report not found",
+      error: res.ok ? null : m.helper_section_report_not_found(),
       notPublished: (res.status as number) === 403,
       reportTheme: (raw?.reportTheme as string | undefined) ?? meta?.theme,
       initialFilter,
@@ -150,7 +151,7 @@ export async function loadReportSection(
       reportTimeZone: "UTC",
       isDelivered: false,
       brand: EMPTY_BRAND,
-      error: "Service unavailable",
+      error: m.helper_section_service_unavailable(),
       notPublished: false,
       initialFilter,
       printMode,
@@ -217,7 +218,7 @@ export async function loadProgressSection(
       inspectorName: (d.inspectorName as string | undefined) ?? "",
       status: (d.status as string | undefined) ?? "",
       sections: (d.sections as ProgressSection[] | undefined) ?? [],
-      error: res.ok && has ? null : "Inspection not found",
+      error: res.ok && has ? null : m.helper_section_inspection_not_found(),
     };
   } catch {
     return {
@@ -226,7 +227,7 @@ export async function loadProgressSection(
       inspectorName: "",
       status: "",
       sections: [],
-      error: "Service unavailable",
+      error: m.helper_section_service_unavailable(),
     };
   }
 }
@@ -326,10 +327,10 @@ export async function loadInvoiceSection(
     return {
       invoice,
       brand: d?.brand ?? EMPTY_BRAND,
-      error: res.ok ? null : "Invoice not found",
+      error: res.ok ? null : m.helper_section_invoice_not_found(),
     };
   } catch {
-    return { invoice: null, brand: EMPTY_BRAND, error: "Service unavailable" };
+    return { invoice: null, brand: EMPTY_BRAND, error: m.helper_section_service_unavailable() };
   }
 }
 
@@ -358,9 +359,9 @@ export async function loadAgreementSection(
     })) as unknown as Response;
     const body = res.ok ? ((await res.json()) as { data?: AgreementData }) : {};
     const d = (body as { data?: AgreementData }).data ?? null;
-    return { agreement: d, error: res.ok ? null : "Agreement not found" };
+    return { agreement: d, error: res.ok ? null : m.helper_section_agreement_not_found() };
   } catch {
-    return { agreement: null, error: "Service unavailable" };
+    return { agreement: null, error: m.helper_section_service_unavailable() };
   }
 }
 

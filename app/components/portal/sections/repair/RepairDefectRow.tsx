@@ -9,6 +9,7 @@
  */
 import type { Defect } from "../RepairBuilderSection";
 import { MoneyInput } from "~/components/MoneyInput";
+import { m } from "~/paraglide/messages";
 
 interface ItemDraft {
   requestedCreditCents: number | null;
@@ -95,22 +96,22 @@ export function RepairDefectRow({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">
-                Credit Request ($)
+                {m.repair_defect_credit_label()}
               </label>
               <MoneyInput
                 cents={creditCents}
                 onChange={(c) => onUpdateCredit(defect, c)}
-                ariaLabel={`Credit request for ${defect.itemLabel}`}
+                ariaLabel={m.repair_defect_credit_aria({ label: defect.itemLabel })}
                 className="w-full h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:border-ih-primary"
               />
             </div>
           </div>
           <div>
             <label className="block text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">
-              Note
+              {m.repair_defect_note_label()}
             </label>
             <textarea
-              placeholder="Optional — describe the repair or credit rationale"
+              placeholder={m.repair_defect_note_placeholder()}
               rows={2}
               value={draft?.note ?? ""}
               onChange={(e) => onUpdateNote(defect, e.target.value)}

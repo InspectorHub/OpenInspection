@@ -7,14 +7,17 @@ import { ServicesStep } from "./new-inspection/ServicesStep";
 import { ScheduleStep } from "./new-inspection/ScheduleStep";
 import { TeamStep } from "./new-inspection/TeamStep";
 import { QuotaExceededPanel } from "./new-inspection/QuotaExceededPanel";
+import { m } from "~/paraglide/messages";
 
-const STEP_LABELS: Record<WizardStepId, string> = {
-  property: "Property",
-  people: "People",
-  services: "Services",
-  schedule: "Schedule",
-  team: "Team",
-};
+function stepLabel(id: WizardStepId): string {
+  switch (id) {
+    case "property": return m.new_inspection_step_property();
+    case "people": return m.new_inspection_step_people();
+    case "services": return m.new_inspection_step_services();
+    case "schedule": return m.new_inspection_step_schedule();
+    case "team": return m.new_inspection_step_team();
+  }
+}
 
 export interface WizardTemplate {
   id: string;
@@ -391,7 +394,7 @@ export function NewInspectionWizard({
     <div className="w-full max-w-[720px] mx-auto flex flex-col bg-ih-bg-card rounded-xl border border-ih-border shadow-ih-popover">
         {/* Header */}
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-ih-border">
-          <h2 className="text-[16px] font-bold">New Inspection</h2>
+          <h2 className="text-[16px] font-bold">{m.new_inspection_title()}</h2>
           <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none">&times;</button>
         </div>
 
@@ -404,7 +407,7 @@ export function NewInspectionWizard({
           {steps.map((s, i) => (
             <div key={s} className="flex items-center gap-1 flex-1">
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${i <= stepIdx ? "bg-ih-primary text-white" : "bg-ih-bg-muted text-ih-fg-4"}`}>{i + 1}</div>
-              <span className={`text-[11px] font-medium hidden sm:inline ${i <= stepIdx ? "text-ih-primary" : "text-ih-fg-4"}`}>{STEP_LABELS[s]}</span>
+              <span className={`text-[11px] font-medium hidden sm:inline ${i <= stepIdx ? "text-ih-primary" : "text-ih-fg-4"}`}>{stepLabel(s)}</span>
               {i < steps.length - 1 && <div className={`flex-1 h-px mx-1 ${i < stepIdx ? "bg-ih-primary" : "bg-ih-bg-muted"}`} />}
             </div>
           ))}
@@ -491,15 +494,15 @@ export function NewInspectionWizard({
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 border-t border-ih-border">
           <button onClick={() => stepIdx > 0 ? setStepIdx(stepIdx - 1) : onClose()} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
-            {stepIdx > 0 ? "Back" : "Cancel"}
+            {stepIdx > 0 ? m.common_back() : m.common_cancel()}
           </button>
           {stepIdx < steps.length - 1 ? (
             <button disabled={!canNext} onClick={() => setStepIdx(stepIdx + 1)} className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed">
-              Next
+              {m.common_next()}
             </button>
           ) : (
             <button disabled={!canNext} onClick={handleSubmit} className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed">
-              Create Inspection
+              {m.new_inspection_create()}
             </button>
           )}
         </div>

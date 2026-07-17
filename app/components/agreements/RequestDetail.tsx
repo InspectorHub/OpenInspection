@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useFetcher } from "react-router";
 import { SignerList, type SignerRow } from "~/components/agreements/SignerList";
 import type { action } from "~/routes/agreements";
+import { m } from "~/paraglide/messages";
 
 /** Expandable per-request signer detail — mounts the shared SignerList. */
 export function RequestDetail({ requestId }: { requestId: string }) {
@@ -32,7 +33,7 @@ export function RequestDetail({ requestId }: { requestId: string }) {
     : []) as SignerRow[];
 
   if (loadFetcher.state !== "idle" && signers.length === 0) {
-    return <div className="px-4 py-3 text-[13px] text-ih-fg-3">Loading signers…</div>;
+    return <div className="px-4 py-3 text-[13px] text-ih-fg-3">{m.agreement_detail_loading()}</div>;
   }
 
   // Remind is fire-and-forget through its own fetcher; the result (including a
@@ -51,9 +52,9 @@ export function RequestDetail({ requestId }: { requestId: string }) {
         const data = copyFetcher.data;
         if (data && data.intent === "copy-link" && data.signerId === signerId && copyFetcher.state === "idle") {
           if (data.ok && "url" in data && data.url) return resolve(data.url);
-          return reject(new Error(!data.ok && "error" in data ? data.error : "Could not get link."));
+          return reject(new Error(!data.ok && "error" in data ? data.error : m.agreement_detail_error_no_link()));
         }
-        if (Date.now() - started > 6000) return reject(new Error("Timed out fetching link."));
+        if (Date.now() - started > 6000) return reject(new Error(m.agreement_detail_error_timeout()));
         setTimeout(poll, 120);
       };
       poll();

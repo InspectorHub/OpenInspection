@@ -1,24 +1,7 @@
 import { SUPPORTED_STATE_CODES } from "./holiday-region-options";
+import { m } from "~/paraglide/messages";
 
 export type HolidayPresetId = "standard" | "on-call" | "off";
-
-const PRESETS = [
-  {
-    id: "standard" as const,
-    title: "Standard office",
-    detail: "Block public booking; warn on internal schedule",
-  },
-  {
-    id: "on-call" as const,
-    title: "Holiday on-call",
-    detail: "Allow with notice; require office confirmation",
-  },
-  {
-    id: "off" as const,
-    title: "Holidays off",
-    detail: "No holiday catalog (legacy behavior)",
-  },
-] as const;
 
 export function HolidayPresetCards({
   activePreset,
@@ -29,6 +12,23 @@ export function HolidayPresetCards({
   saving: boolean;
   onSelect: (preset: HolidayPresetId) => void;
 }) {
+  const PRESETS = [
+    {
+      id: "standard" as const,
+      title: m.settings_holiday_preset_standard_title(),
+      detail: m.settings_holiday_preset_standard_detail(),
+    },
+    {
+      id: "on-call" as const,
+      title: m.settings_holiday_preset_oncall_title(),
+      detail: m.settings_holiday_preset_oncall_detail(),
+    },
+    {
+      id: "off" as const,
+      title: m.settings_holiday_preset_off_title(),
+      detail: m.settings_holiday_preset_off_detail(),
+    },
+  ] as const;
   return (
     <div
       data-testid="holiday-preset-row"
@@ -73,12 +73,12 @@ export function HolidayRegionPickerModal({
       className="fixed inset-0 z-50 flex items-center justify-center bg-ih-backdrop p-4"
       role="dialog"
       aria-modal="true"
-      aria-label="Choose holiday region"
+      aria-label={m.settings_holiday_region_dialog_aria()}
     >
       <div className="w-full max-w-sm rounded-lg border border-ih-border bg-ih-bg-card p-4 space-y-3 shadow-ih-popover">
-        <h4 className="text-[14px] font-bold text-ih-fg-1">Choose region</h4>
+        <h4 className="text-[14px] font-bold text-ih-fg-1">{m.settings_holiday_region_dialog_title()}</h4>
         <p className="text-[12px] text-ih-fg-3">
-          Federal only, or federal plus a state holiday calendar.
+          {m.settings_holiday_region_dialog_desc()}
         </p>
         <div className="space-y-1 max-h-64 overflow-y-auto">
           <button
@@ -86,7 +86,7 @@ export function HolidayRegionPickerModal({
             onClick={() => onPick("US")}
             className="w-full text-left px-3 py-2 rounded-md text-[13px] font-bold text-ih-fg-1 hover:bg-ih-bg-muted"
           >
-            Federal only (US)
+            {m.settings_holiday_region_federal_only()}
           </button>
           {SUPPORTED_STATE_CODES.map((code) => (
             <button
@@ -95,7 +95,7 @@ export function HolidayRegionPickerModal({
               onClick={() => onPick(code)}
               className="w-full text-left px-3 py-2 rounded-md text-[13px] font-bold text-ih-fg-1 hover:bg-ih-bg-muted"
             >
-              Federal + {code}
+              {m.settings_holiday_region_federal_plus({ code })}
             </button>
           ))}
         </div>
@@ -104,7 +104,7 @@ export function HolidayRegionPickerModal({
           onClick={onCancel}
           className="text-[12px] font-bold text-ih-fg-3 hover:underline"
         >
-          Cancel
+          {m.common_cancel()}
         </button>
       </div>
     </div>

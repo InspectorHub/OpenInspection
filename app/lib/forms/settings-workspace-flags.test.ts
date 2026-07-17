@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseWithZod } from '@conform-to/zod/v4';
-import { workspaceSchema } from '../../../app/lib/forms/settings.schema';
+import { makeWorkspaceSchema } from '../../../app/lib/forms/settings.schema';
 
 /**
  * Regression: the "Report Features" checkboxes (enableRepairList /
@@ -23,7 +23,7 @@ describe('workspace settings — report-feature checkboxes coerce to booleans', 
   it('checked ("on") → success with the flag true', () => {
     const submission = parseWithZod(
       fd([['companyName', 'Acme'], ['reportTheme', 'modern'], ['enableCustomerRepairExport', 'on']]),
-      { schema: workspaceSchema },
+      { schema: makeWorkspaceSchema() },
     );
     expect(submission.status).toBe('success');
     if (submission.status === 'success') {
@@ -34,7 +34,7 @@ describe('workspace settings — report-feature checkboxes coerce to booleans', 
   it('unchecked (absent) → success with the flag falsy', () => {
     const submission = parseWithZod(
       fd([['companyName', 'Acme'], ['reportTheme', 'modern']]),
-      { schema: workspaceSchema },
+      { schema: makeWorkspaceSchema() },
     );
     expect(submission.status).toBe('success');
     if (submission.status === 'success') {

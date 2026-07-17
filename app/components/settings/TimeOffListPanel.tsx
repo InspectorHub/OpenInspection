@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { m } from "~/paraglide/messages";
 
 export interface TimeOffBlock {
   id: string;
@@ -10,9 +11,9 @@ export interface TimeOffBlock {
 }
 
 function formatBlockWindow(block: TimeOffBlock): string {
-  if (block.allDay || (!block.startTime && !block.endTime)) return "All day";
+  if (block.allDay || (!block.startTime && !block.endTime)) return m.settings_timeoff_all_day();
   if (block.startTime && block.endTime) return `${block.startTime}–${block.endTime}`;
-  return block.startTime ?? block.endTime ?? "All day";
+  return block.startTime ?? block.endTime ?? m.settings_timeoff_all_day();
 }
 
 export function TimeOffListPanel({
@@ -22,10 +23,9 @@ export function TimeOffListPanel({
 }) {
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-      <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">Time off</h3>
+      <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_timeoff_heading()}</h3>
       <p className="text-[12px] text-ih-fg-3">
-        Personal time off lives on the calendar. Add or edit blocks there — this list is a quick
-        view of what you already scheduled.
+        {m.settings_timeoff_desc()}
       </p>
 
       {blocks.length > 0 ? (
@@ -45,19 +45,19 @@ export function TimeOffListPanel({
                 to="/calendar"
                 className="text-[12px] text-ih-primary font-bold hover:underline shrink-0"
               >
-                Open calendar
+                {m.settings_timeoff_open_calendar()}
               </Link>
             </div>
           ))}
         </div>
       ) : (
         <div className="space-y-2" data-testid="time-off-empty">
-          <p className="text-[12px] text-ih-fg-4 italic">No time off scheduled.</p>
+          <p className="text-[12px] text-ih-fg-4 italic">{m.settings_timeoff_none()}</p>
           <Link
             to="/calendar"
             className="inline-flex h-8 px-3 items-center rounded-md bg-ih-primary text-white font-bold text-[12px] hover:bg-ih-primary-600 transition-colors"
           >
-            Block time on calendar
+            {m.settings_timeoff_block_time()}
           </Link>
         </div>
       )}

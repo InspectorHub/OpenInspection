@@ -4,6 +4,7 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 import type { StepState } from "~/lib/checkout-steps";
 import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /*  Step 2 — Pay card (reuses the invoice page's Stripe pay flow)       */
@@ -26,23 +27,23 @@ export function PayCard({
 }) {
     return (
         <section className="px-6 py-5 sm:px-8">
-            <p className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4 mb-3">Step 2 · Payment</p>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-ih-fg-4 mb-3">{m.checkout_pay_step_label()}</p>
 
             {state === "na" && (
-                <p className="text-[13px] text-ih-fg-3">No payment is required for this inspection.</p>
+                <p className="text-[13px] text-ih-fg-3">{m.checkout_pay_none_required()}</p>
             )}
 
             {state === "done" && (
                 <div className="rounded-xl border border-ih-ok bg-ih-ok-bg p-4 text-center">
-                    <p className="text-[13px] font-semibold text-ih-ok-fg">Payment received — thank you.</p>
+                    <p className="text-[13px] font-semibold text-ih-ok-fg">{m.checkout_pay_received()}</p>
                 </div>
             )}
 
             {state === "todo" && invoice && justPaid && (
                 <div className="rounded-xl border border-ih-ok bg-ih-ok-bg p-4 text-center">
-                    <p className="text-[13px] font-semibold text-ih-ok-fg">Payment received — thank you.</p>
+                    <p className="text-[13px] font-semibold text-ih-ok-fg">{m.checkout_pay_received()}</p>
                     <p className="text-[12px] text-ih-fg-3 mt-1">
-                        We&rsquo;re finalizing your receipt; it will appear here shortly.
+                        {m.checkout_pay_finalizing()}
                     </p>
                 </div>
             )}
@@ -116,7 +117,7 @@ function PayPanel({
     return (
         <div className="rounded-xl border border-ih-border bg-ih-bg-muted p-4">
             <div className="flex items-center justify-between mb-3">
-                <span className="text-[13px] font-semibold text-ih-fg-1">Pay for your inspection</span>
+                <span className="text-[13px] font-semibold text-ih-fg-1">{m.checkout_pay_heading()}</span>
                 <span className="font-serif text-[18px] font-semibold text-ih-fg-1">{formatCurrency(amountCents, { locale, currency })}</span>
             </div>
 
@@ -128,14 +129,14 @@ function PayPanel({
                         disabled={phase === "loading"}
                         className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
                     >
-                        {phase === "loading" ? "Starting secure checkout…" : `Pay ${formatCurrency(amountCents, { locale, currency })}`}
+                        {phase === "loading" ? m.checkout_pay_starting() : m.checkout_pay_button({ amount: formatCurrency(amountCents, { locale, currency }) })}
                     </button>
                     <div className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-ih-fg-4">
                         <svg className="w-3 h-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
                             <rect x="3" y="7" width="10" height="6" rx="1" />
                             <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
                         </svg>
-                        Secured by Stripe
+                        {m.checkout_pay_secured_by_stripe()}
                     </div>
                 </>
             )}
@@ -157,14 +158,14 @@ function PayPanel({
 
             {phase === "paid_already" && (
                 <p className="mt-1 text-[12px] text-ih-fg-3 leading-relaxed">
-                    This invoice has already been paid. Refresh the page to see your receipt.
+                    {m.checkout_pay_already_paid()}
                 </p>
             )}
 
             {phase === "unavailable" && (
                 <p className="mt-1 text-[12px] text-ih-fg-3 leading-relaxed">
-                    Secure online card payment isn&rsquo;t available right now. Please contact{" "}
-                    <span className="font-semibold text-ih-fg-2">{companyName}</span> to arrange payment.
+                    {m.checkout_pay_unavailable_before()}{" "}
+                    <span className="font-semibold text-ih-fg-2">{companyName}</span>{m.checkout_pay_unavailable_after()}
                 </p>
             )}
         </div>
@@ -190,7 +191,7 @@ function CheckoutPayForm({ amountCents, returnUrl, currency: invoiceCurrency }: 
             confirmParams: { return_url: returnUrl },
         });
         if (payErr) {
-            setError(payErr.message ?? "Payment could not be completed. Please try again.");
+            setError(payErr.message ?? m.checkout_pay_error_failed());
             setSubmitting(false);
         }
     }
@@ -203,7 +204,7 @@ function CheckoutPayForm({ amountCents, returnUrl, currency: invoiceCurrency }: 
                 disabled={!stripe || submitting}
                 className="w-full h-11 rounded-lg bg-ih-primary text-ih-primary-fg font-bold text-sm hover:opacity-95 transition-all shadow-ih-card disabled:opacity-60 disabled:cursor-wait"
             >
-                {submitting ? "Processing…" : `Pay ${formatCurrency(amountCents, { locale, currency })}`}
+                {submitting ? m.checkout_pay_processing() : m.checkout_pay_button({ amount: formatCurrency(amountCents, { locale, currency }) })}
             </button>
             {error && <p className="text-[12px] text-ih-bad-fg font-medium">{error}</p>}
         </form>

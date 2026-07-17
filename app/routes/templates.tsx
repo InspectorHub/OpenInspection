@@ -13,9 +13,10 @@ import { CreateTemplateModal } from "~/components/templates/CreateTemplateModal"
 import { ImportSpectoraModal } from "~/components/templates/ImportSpectoraModal";
 import { DeleteTemplateModal } from "~/components/templates/DeleteTemplateModal";
 import { SpectoraMappingModal } from "~/components/templates/SpectoraMappingModal";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Templates - OpenInspection" }];
+  return [{ title: m.templates_list_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -83,7 +84,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "create") {
     const name = (formData.get("name") as string)?.trim();
-    if (!name) return { error: "Name is required" };
+    if (!name) return { error: m.templates_create_error_name_required() };
     const res = await api.inspections.templates.$post({
       json: { name, schema: { schemaVersion: 2, sections: [] } },
     });
@@ -91,7 +92,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return { ok: true, newId: extractTemplateId(await res.json()) };
     }
     const err = await res.json().catch(() => ({}));
-    return { error: (err as Record<string, unknown>)?.message || "Failed to create" };
+    return { error: (err as Record<string, unknown>)?.message || m.templates_create_error_failed() };
   }
 
   if (intent === "delete") {
@@ -105,22 +106,22 @@ export async function action({ request, context }: Route.ActionArgs) {
     const schema = formData.get("schema") as string;
     const res = await api.inspections.templates.$post({
       json: {
-        name: name + " (Copy)",
+        name: m.templates_duplicate_copy_suffix({ name }),
         schema: schema ? JSON.parse(schema) : { schemaVersion: 2, sections: [] },
       },
     });
     if (res.ok) {
       return { ok: true, newId: extractTemplateId(await res.json()), intent: "duplicate" };
     }
-    return { error: "Duplication failed", intent: "duplicate" };
+    return { error: m.templates_duplicate_error_failed(), intent: "duplicate" };
   }
 
   if (intent === "import-spectora") {
     const name = (formData.get("name") as string)?.trim();
     const payload = (formData.get("payload") as string)?.trim();
-    if (!name || !payload) return { error: "Name and JSON are required" };
+    if (!name || !payload) return { error: m.templates_import_error_name_json_required() };
     let parsed: unknown;
-    try { parsed = JSON.parse(payload); } catch { return { error: "Invalid JSON" }; }
+    try { parsed = JSON.parse(payload); } catch { return { error: m.templates_import_error_invalid_json() }; }
     const res = await api.inspections.templates["import-spectora"].$post({
       json: { name, spectora: parsed as Record<string, unknown> },
     });
@@ -131,7 +132,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return { ok: true, newId: extractTemplateId(result), stats, intent: "import-spectora" };
     }
     const err = await res.json().catch(() => ({}));
-    return { error: (err as Record<string, unknown>)?.message || "Import failed" };
+    return { error: (err as Record<string, unknown>)?.message || m.templates_import_error_failed() };
   }
 
   if (intent === "mark-spectora-mapping-seen") {
@@ -273,24 +274,28 @@ export default function TemplatesPage() {
   };
 
   /* ---- Meta text ---- */
-  const metaParts: string[] = [`${templates.length} template${templates.length === 1 ? "" : "s"}`];
-  if (imported > 0) metaParts.push(`${imported} imported from Marketplace`);
-  if (withUpdates > 0) metaParts.push(`${withUpdates} with updates available`);
+  const metaParts: string[] = [
+    templates.length === 1
+      ? m.templates_list_count_one({ count: templates.length })
+      : m.templates_list_count_other({ count: templates.length }),
+  ];
+  if (imported > 0) metaParts.push(m.templates_list_meta_imported({ count: imported }));
+  if (withUpdates > 0) metaParts.push(m.templates_list_meta_updates({ count: withUpdates }));
 
   return (
     <div className="space-y-ih-list">
-      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Templates" }]} />
+      <Breadcrumb items={[{ label: m.templates_breadcrumb_library(), href: "/library" }, { label: m.templates_breadcrumb_current() }]} />
       <PageHeader
-        title="Inspection Templates"
+        title={m.templates_list_heading()}
         meta={metaParts.join(" · ")}
         actions={
           <>
             <button onClick={() => setImportOpen(true)} className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2">
               <Icon name="download" size={16} strokeWidth={1.75} />
-              Import Spectora
+              {m.templates_action_import_spectora()}
             </button>
             <button onClick={() => setCreateOpen(true)} className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2">
-              + New Template
+              {m.templates_action_new_template()}
             </button>
           </>
         }
@@ -305,7 +310,7 @@ export default function TemplatesPage() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search templates..."
+            placeholder={m.templates_search_placeholder()}
             className="h-9 w-44 pl-8 pr-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-2 focus:border-ih-primary focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
           />
           <svg className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-ih-fg-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -317,22 +322,22 @@ export default function TemplatesPage() {
           onChange={(e) => setSortBy(e.target.value as SortKey)}
           className="h-9 px-2 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-3 outline-none"
         >
-          <option value="name">Name</option>
-          <option value="date">Last modified</option>
-          <option value="usage">Most used</option>
+          <option value="name">{m.templates_col_name()}</option>
+          <option value="date">{m.templates_sort_date()}</option>
+          <option value="usage">{m.templates_sort_usage()}</option>
         </select>
         <div className="flex bg-ih-bg-muted rounded-md p-0.5 ml-auto">
           <button
             onClick={() => setView("card")}
             className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "card" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
           >
-            Cards
+            {m.templates_view_cards()}
           </button>
           <button
             onClick={() => setView("list")}
             className={`px-3 py-1.5 rounded text-[12px] font-bold ${view === "list" ? "bg-ih-bg-card text-ih-primary shadow-ih-card" : "text-ih-fg-3"}`}
           >
-            List
+            {m.templates_view_list()}
           </button>
         </div>
       </div>

@@ -1,14 +1,17 @@
 import { Link, useFetcher } from "react-router";
+import { m } from "~/paraglide/messages";
 
 export interface TemplateRow {
   trigger: string; name: string; category: string; required: boolean; enabled: boolean; isCustomized: boolean; subject: string;
 }
 
-const GROUPS: { key: string; label: string }[] = [
-  { key: "client", label: "Client" },
-  { key: "agent", label: "Agent" },
-  { key: "concierge", label: "Concierge" },
-  { key: "system", label: "Workspace" },
+// `label` is a thunk so each group heading resolves at render inside the
+// paraglide request scope, not once at module import.
+const GROUPS: { key: string; label: () => string }[] = [
+  { key: "client", label: () => m.email_list_group_client() },
+  { key: "agent", label: () => m.email_list_group_agent() },
+  { key: "concierge", label: () => m.email_list_group_concierge() },
+  { key: "system", label: () => m.email_list_group_system() },
 ];
 
 export function TemplateList({ rows }: { rows: TemplateRow[] }) {
@@ -19,7 +22,7 @@ export function TemplateList({ rows }: { rows: TemplateRow[] }) {
         if (!items.length) return null;
         return (
           <div key={g.key}>
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-2 px-1">{g.label}</h4>
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-4 mb-2 px-1">{g.label()}</h4>
             <div className="bg-ih-bg-card border border-ih-border rounded-lg divide-y divide-ih-border overflow-hidden">
               {items.map((r) => <TemplateRowItem key={r.trigger} row={r} />)}
             </div>
@@ -38,26 +41,26 @@ function TemplateRowItem({ row }: { row: TemplateRow }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <Link to={`/settings/communication/templates/${row.trigger}`} className="text-[13px] font-semibold text-ih-fg-1 hover:text-ih-primary transition-colors truncate">{row.name}</Link>
-          {row.isCustomized && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-primary-tint text-ih-primary">Customized</span>}
-          {row.required && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-4">Always on</span>}
+          {row.isCustomized && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-primary-tint text-ih-primary">{m.email_list_customized()}</span>}
+          {row.required && <span className="text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded bg-ih-bg-muted text-ih-fg-4">{m.email_list_alwayson()}</span>}
         </div>
         <p className="text-[11px] text-ih-fg-4 mt-0.5 font-mono truncate">{row.subject}</p>
       </div>
       {row.required ? (
-        <span className="text-[10px] font-bold uppercase tracking-widest text-ih-ok-fg shrink-0">Active</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-ih-ok-fg shrink-0">{m.email_list_active()}</span>
       ) : row.isCustomized ? (
-        <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${enabled ? "text-ih-ok-fg" : "text-ih-fg-4"}`}>{enabled ? "Active" : "Disabled"}</span>
+        <span className={`text-[10px] font-bold uppercase tracking-widest shrink-0 ${enabled ? "text-ih-ok-fg" : "text-ih-fg-4"}`}>{enabled ? m.email_list_active() : m.email_list_disabled()}</span>
       ) : (
         <fetcher.Form method="post" className="shrink-0">
           <input type="hidden" name="intent" value="toggle-template" />
           <input type="hidden" name="trigger" value={row.trigger} />
           <input type="hidden" name="enabled" value={(!enabled).toString()} />
-          <button type="submit" aria-pressed={enabled} aria-label={`${enabled ? "Disable" : "Enable"} ${row.name}`} className={`relative h-5 w-9 rounded-full transition-colors ${enabled ? "bg-ih-primary" : "bg-ih-border"}`}>
+          <button type="submit" aria-pressed={enabled} aria-label={enabled ? m.email_list_disable_aria({ name: row.name }) : m.email_list_enable_aria({ name: row.name })} className={`relative h-5 w-9 rounded-full transition-colors ${enabled ? "bg-ih-primary" : "bg-ih-border"}`}>
             <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-ih-bg-card shadow-ih-card transition-all ${enabled ? "left-[18px]" : "left-0.5"}`} />
           </button>
         </fetcher.Form>
       )}
-      <Link to={`/settings/communication/templates/${row.trigger}`} className="shrink-0 h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card hover:border-ih-primary hover:text-ih-primary transition-colors">Edit</Link>
+      <Link to={`/settings/communication/templates/${row.trigger}`} className="shrink-0 h-7 px-3 rounded-md border border-ih-border text-[12px] font-medium text-ih-fg-2 hover:bg-ih-bg-card hover:border-ih-primary hover:text-ih-primary transition-colors">{m.common_edit()}</Link>
     </div>
   );
 }

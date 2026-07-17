@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { Icon } from "@core/shared-ui";
 import { TemplateIcon } from "./TemplateIcon";
 import { countItems, type Template } from "./types";
+import { m } from "~/paraglide/messages";
 
 interface TemplatesCardViewProps {
   filtered: Template[];
@@ -26,8 +27,8 @@ export function TemplatesCardView({
         <div className="col-span-full py-16 bg-ih-bg-card rounded-lg border border-ih-border flex flex-col items-center gap-4">
           {searchQuery ? (
             <>
-              <p className="font-semibold text-ih-fg-2">No matching templates</p>
-              <p className="text-[13px] text-ih-fg-3">Try a different search term.</p>
+              <p className="font-semibold text-ih-fg-2">{m.templates_card_empty_search_title()}</p>
+              <p className="text-[13px] text-ih-fg-3">{m.templates_card_empty_search_body()}</p>
             </>
           ) : (
             <>
@@ -35,9 +36,9 @@ export function TemplatesCardView({
                 <TemplateIcon size="lg" />
               </div>
               <div className="text-center">
-                <p className="text-[15px] font-bold text-ih-fg-1">Start with a template</p>
+                <p className="text-[15px] font-bold text-ih-fg-1">{m.templates_empty_title()}</p>
                 <p className="text-[13px] text-ih-fg-3 mt-1 max-w-xs">
-                  Your workspace ships with starter templates — but if you&apos;re migrating, bring your own.
+                  {m.templates_empty_body()}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -46,13 +47,13 @@ export function TemplatesCardView({
                   className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 inline-flex items-center gap-2"
                 >
                   <Icon name="download" size={16} strokeWidth={1.75} />
-                  Import from Spectora
+                  {m.templates_import_title()}
                 </button>
                 <button
                   onClick={() => setCreateOpen(true)}
                   className="h-9 px-3 rounded-md border border-ih-border text-[13px] font-bold text-ih-fg-3 hover:bg-ih-bg-muted inline-flex items-center gap-2"
                 >
-                  + New template
+                  {m.templates_empty_new()}
                 </button>
               </div>
             </>
@@ -78,21 +79,21 @@ export function TemplatesCardView({
                 <span className="inline-flex items-center rounded border border-ih-primary/20 px-1.5 py-0.5 bg-ih-primary-tint text-ih-primary">
                   v{t.version || 1}.0
                 </span>
-                <span>{items} items</span>
-                <span>used {t.usageCount || 0}&times;</span>
+                <span>{m.templates_row_items({ count: items })}</span>
+                <span>{m.templates_card_used({ count: t.usageCount || 0 })}</span>
                 {t.source === "marketplace" && (
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-ih-info-fg bg-ih-info-bg px-1 py-0.5 rounded">MP</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-ih-info-fg bg-ih-info-bg px-1 py-0.5 rounded">{m.templates_card_badge_mp()}</span>
                 )}
               </div>
               <div className="flex items-center gap-3 pt-1 border-t border-ih-border mt-auto">
                 <Link to={`/templates/${t.id}/edit`} className="text-[11px] font-bold text-ih-primary hover:text-ih-primary transition-colors">
-                  Edit
+                  {m.common_edit()}
                 </Link>
                 <button onClick={() => handleDuplicate(t)} className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary transition-colors">
-                  Duplicate
+                  {m.templates_action_duplicate()}
                 </button>
                 <button onClick={() => setDeleteConfirm(t.id)} className="text-[11px] font-bold text-ih-fg-4 hover:text-ih-bad-fg transition-colors ml-auto">
-                  Delete
+                  {m.common_delete()}
                 </button>
               </div>
             </div>

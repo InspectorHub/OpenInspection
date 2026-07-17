@@ -18,9 +18,10 @@ import { VideoIntegrationPanel } from "~/components/settings/integrations/VideoI
 import { IntegrationCardsGrid } from "~/components/settings/integrations/IntegrationCardsGrid";
 import { parseTestResults } from "~/lib/connection-test";
 import { SaveVideoSchema } from "../../server/lib/validations/video.schema";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Integrations - Settings - OpenInspection" }];
+  return [{ title: m.settings_integrations_meta_title() }];
 }
 
 type WebhookLogEntry = { ts: string; eventType: string; result: string };
@@ -92,7 +93,7 @@ export async function action({ request, context }: Route.ActionArgs) {
         return {
           intent,
           success: false,
-          error: errBody?.error?.message ?? "Failed to save Stripe keys.",
+          error: errBody?.error?.message ?? m.settings_integrations_stripe_save_error(),
           field: errBody?.error?.field ?? null,
           test: null,
         };
@@ -111,7 +112,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         success: false,
-        error: body?.error?.message ?? "Connection test failed.",
+        error: body?.error?.message ?? m.settings_connection_test_failed(),
         field: null,
         test: null,
       };
@@ -126,7 +127,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         success: false,
-        error: "Video backend is plan-managed in hosted mode.",
+        error: m.settings_integrations_video_plan_managed(),
         field: null,
         test: null,
       };
@@ -144,7 +145,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         success: false,
-        error: issue?.message ?? "Invalid video settings.",
+        error: issue?.message ?? m.settings_integrations_video_invalid(),
         field: "streamCustomerSubdomain",
         test: null,
       };
@@ -160,7 +161,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         success: false,
-        error: "Failed to read current configuration. No changes were saved.",
+        error: m.settings_integrations_video_read_error(),
         field: null,
         test: null,
       };
@@ -197,7 +198,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         success: false,
-        error: "Failed to save video mode.",
+        error: m.settings_integrations_video_mode_save_error(),
         field: null,
         test: null,
       };
@@ -206,7 +207,7 @@ export async function action({ request, context }: Route.ActionArgs) {
       return {
         intent,
         success: false,
-        error: "Failed to save integration configuration.",
+        error: m.settings_integrations_video_config_save_error(),
         field: null,
         test: null,
       };
@@ -215,7 +216,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { intent, success: true, error: null, field: null, test: null };
   }
 
-  return { intent: null, success: false, error: "Unknown action", field: null, test: null };
+  return { intent: null, success: false, error: m.settings_unknown_action(), field: null, test: null };
 }
 
 export default function SettingsIntegrations() {
@@ -254,15 +255,15 @@ export default function SettingsIntegrations() {
 
   return (
     <div className="space-y-ih-list">
-      <SettingsCrumb items={[{ label: "Settings", href: "/settings" }, { label: "Integrations" }]} />
+      <SettingsCrumb items={[{ label: m.settings_crumb_root(), href: "/settings" }, { label: m.settings_integrations_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">
-        Connect OpenInspection to your other business tools.
+        {m.settings_integrations_intro()}
       </p>
 
       {/* Flash — Stripe save */}
       {flashVisible && actionData?.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          Settings saved.
+          {m.settings_flash_saved()}
         </div>
       )}
       {actionData?.intent === "save-stripe-secrets" && actionData.error && (
@@ -274,7 +275,7 @@ export default function SettingsIntegrations() {
       {/* Flash — Video save */}
       {videoFlashVisible && actionData?.success && (
         <div className="px-4 py-2.5 rounded-md bg-ih-ok-bg border border-ih-ok-fg/20 text-[13px] text-ih-ok-fg font-medium">
-          Video settings saved.
+          {m.settings_integrations_video_saved()}
         </div>
       )}
 

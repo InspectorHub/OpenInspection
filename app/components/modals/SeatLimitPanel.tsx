@@ -9,6 +9,8 @@
  * configured (the CTA is hidden in that case; the message still explains
  * what happened).
  */
+import { m } from "~/paraglide/messages";
+
 export function SeatLimitPanel({
   used,
   max,
@@ -23,22 +25,21 @@ export function SeatLimitPanel({
   return (
     <div className="flex-1 min-h-0 flex flex-col">
       <div className="flex-1 overflow-y-auto px-6 py-8 text-center">
-        <p className="text-[14px] font-bold text-ih-fg-1 mb-2">Seat limit reached</p>
+        <p className="text-[14px] font-bold text-ih-fg-1 mb-2">{m.modal_seatlimit_title()}</p>
         <p className="text-[13px] text-ih-fg-3 max-w-[38ch] mx-auto">
-          You&rsquo;ve reached your seat limit ({used}/{max}). Upgrade your plan to invite more
-          team members.
+          {m.modal_seatlimit_body({ used, max })}
         </p>
       </div>
       <div className="flex items-center justify-end gap-2 px-6 py-4 border-t border-ih-border">
         <button onClick={onClose} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
-          Close
+          {m.common_close()}
         </button>
         {billingUrl && (
           <a
             href={billingUrl}
             className="h-8 px-4 inline-flex items-center justify-center rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600"
           >
-            Upgrade
+            {m.modal_seatlimit_upgrade()}
           </a>
         )}
       </div>

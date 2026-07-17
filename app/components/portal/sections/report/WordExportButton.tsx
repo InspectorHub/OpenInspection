@@ -27,6 +27,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
+import { m } from "~/paraglide/messages";
 
 export type WordExportStatus = "queued" | "building" | "ready" | "failed";
 
@@ -93,7 +94,7 @@ export function WordExportButton({
         if (data.code === "EXPORT_UNAVAILABLE") {
           setUnavailable(true);
         } else {
-          setErrorMessage(data.error ?? "Couldn't start the Word export. Please try again.");
+          setErrorMessage(data.error ?? m.pca_word_export_error_start());
           setStatus("failed");
         }
         return;
@@ -105,13 +106,13 @@ export function WordExportButton({
 
     if (data.intent === "export-word-status") {
       if (!data.ok) {
-        setErrorMessage(data.error ?? "Couldn't check the export status.");
+        setErrorMessage(data.error ?? m.pca_word_export_error_status());
         setStatus("failed");
         return;
       }
       setStatus(data.status ?? null);
       if (data.status === "failed") {
-        setErrorMessage(data.error ?? "Word export failed. Please retry.");
+        setErrorMessage(data.error ?? m.pca_word_export_error_failed());
       }
     }
   }, [fetcher.state, fetcher.data]);
@@ -139,10 +140,10 @@ export function WordExportButton({
     return (
       <span
         className={`${PILL_BASE} bg-ih-bg-muted text-ih-fg-4 cursor-not-allowed opacity-70`}
-        title="Word export is not configured on this deployment."
+        title={m.pca_word_export_unavailable_title()}
         data-testid="word-export-unavailable"
       >
-        Export to Word
+        {m.pca_word_export_label()}
       </span>
     );
   }
@@ -155,7 +156,7 @@ export function WordExportButton({
         className={`${PILL_BASE} bg-ih-primary text-ih-primary-fg hover:opacity-90`}
         data-testid="word-export-download-link"
       >
-        Download Word
+        {m.pca_word_export_download()}
       </a>
     );
   }
@@ -169,7 +170,7 @@ export function WordExportButton({
         title={errorMessage ?? undefined}
         data-testid="word-export-retry"
       >
-        Export failed — Retry
+        {m.pca_word_export_retry()}
       </button>
     );
   }
@@ -184,7 +185,7 @@ export function WordExportButton({
       className={`${PILL_BASE} bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted disabled:opacity-60 disabled:cursor-not-allowed`}
       data-testid="word-export-button"
     >
-      {busy ? "Preparing…" : "Export to Word"}
+      {busy ? m.pca_word_export_preparing() : m.pca_word_export_label()}
     </button>
   );
 }

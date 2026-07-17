@@ -14,6 +14,7 @@ import {
   type Stroke,
   type StrokePoint,
 } from "./signaturePad.logic";
+import { m } from "~/paraglide/messages";
 
 /** Ink color for the signature (matches the proto `--ink`). */
 const INK = "#1e293b";
@@ -51,7 +52,7 @@ interface SignaturePadProps {
  * call canvas.toDataURL().
  */
 export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(function SignaturePad(
-  { disabled = false, onMarkChange, ariaLabel = "Signature pad — draw your signature here" },
+  { disabled = false, onMarkChange, ariaLabel = m.media_signature_aria() },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -61,7 +62,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
   const curRef = useRef<Stroke | null>(null);
 
   const [state, dispatch] = useReducer(signatureReducer, initialSignatureState);
-  const [penLabel, setPenLabel] = useState("mouse / touch");
+  const [penLabel, setPenLabel] = useState(m.media_signature_pen_mouse_touch());
   const [isPen, setIsPen] = useState(false);
 
   const hasMark = state.strokes.length > 0;
@@ -163,7 +164,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
       canvasRef.current?.setPointerCapture(e.pointerId);
       const pen = e.pointerType === "pen";
       setIsPen(pen);
-      setPenLabel(pen ? "pen · pressure" : e.pointerType === "touch" ? "touch" : "mouse / touch");
+      setPenLabel(pen ? m.media_signature_pen_pressure() : e.pointerType === "touch" ? m.media_signature_pen_touch() : m.media_signature_pen_mouse_touch());
       curRef.current = { pen, pts: [pointFrom(e)] };
       redraw();
     },
@@ -223,7 +224,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
   return (
     <div>
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-ih-fg-3">Sign here</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.09em] text-ih-fg-3">{m.media_signature_heading()}</span>
         <span
           className={`ml-auto font-mono text-[10px] font-bold px-2 py-0.5 rounded-md ${
             isPen ? "bg-ih-ok-bg text-ih-ok-fg" : "bg-ih-bg-muted text-ih-fg-4"
@@ -254,7 +255,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
         <div className="pointer-events-none absolute left-6 right-6 bottom-12 border-b-2 border-dotted border-ih-fg-4/60" />
         {!hasMark && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center text-ih-fg-4/70 text-[15px] italic">
-            sign above the line
+            {m.media_signature_hint()}
           </div>
         )}
       </div>
@@ -269,7 +270,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 14L4 9l5-5M4 9h11a5 5 0 015 5v0a5 5 0 01-5 5H9" />
           </svg>
-          Undo
+          {m.common_undo()}
         </button>
         <button
           type="button"
@@ -280,7 +281,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 14l5-5-5-5M20 9H9a5 5 0 00-5 5v0a5 5 0 005 5h6" />
           </svg>
-          Redo
+          {m.common_redo()}
         </button>
         <button
           type="button"
@@ -291,7 +292,7 @@ export const SignaturePad = forwardRef<SignaturePadHandle, SignaturePadProps>(fu
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 7h14M10 7V5a1 1 0 011-1h2a1 1 0 011 1v2M6 7l1 13a1 1 0 001 1h8a1 1 0 001-1l1-13" />
           </svg>
-          Clear
+          {m.common_clear()}
         </button>
       </div>
     </div>

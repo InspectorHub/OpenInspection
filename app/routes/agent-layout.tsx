@@ -1,17 +1,20 @@
 import { Outlet, NavLink } from "react-router";
 import type { Route } from "./+types/agent-layout";
 import { requireToken } from "~/lib/session.server";
+import { m } from "~/paraglide/messages";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   await requireToken(context, request);
   return null;
 }
 
-const NAV_ITEMS = [
-  { to: "/agent-dashboard", label: "Dashboard" },
-  { to: "/agent-recommendations", label: "Repair Items" },
-  { to: "/agent-inspectors", label: "Inspectors" },
-  { to: "/agent-settings/profile", label: "Settings" },
+// `label` is a thunk so the message resolves at render (inside paraglide's ALS
+// scope), not at module load.
+const NAV_ITEMS: { to: string; label: () => string }[] = [
+  { to: "/agent-dashboard", label: () => m.agent_portal_nav_dashboard() },
+  { to: "/agent-recommendations", label: () => m.agent_portal_repair_items() },
+  { to: "/agent-inspectors", label: () => m.agent_portal_nav_inspectors() },
+  { to: "/agent-settings/profile", label: () => m.agent_portal_settings_title() },
 ];
 
 export default function AgentLayout() {
@@ -26,7 +29,7 @@ export default function AgentLayout() {
               OpenInspection
             </span>
             <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4 ml-2 hidden sm:inline">
-              Agent Portal
+              {m.agent_portal_layout_badge()}
             </span>
           </div>
           <nav className="flex items-center gap-1">
@@ -42,14 +45,14 @@ export default function AgentLayout() {
                   }`
                 }
               >
-                {item.label}
+                {item.label()}
               </NavLink>
             ))}
             <a
               href="/logout"
               className="px-3 py-1.5 rounded-md text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bad-bg hover:text-ih-bad-fg transition-colors ml-2"
             >
-              Log out
+              {m.agent_portal_layout_logout()}
             </a>
           </nav>
         </div>
