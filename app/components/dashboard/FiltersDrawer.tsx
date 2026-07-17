@@ -1,4 +1,5 @@
 import { Button, Drawer } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface FiltersDrawerProps {
   open: boolean;
@@ -25,30 +26,30 @@ export function FiltersDrawer({
     <Drawer
       open={open}
       onClose={onClose}
-      title="Filters"
+      title={m.dashboard_filters_title()}
       footer={
         <>
           <Button variant="ghost" size="sm" onClick={() => { setFilterDateFrom(""); setFilterDateTo(""); setFilterAgentId(""); }}>
-            Reset
+            {m.dashboard_filters_reset()}
           </Button>
           <Button variant="primary" size="sm" onClick={onClose}>
-            Apply
+            {m.dashboard_filters_apply()}
           </Button>
         </>
       }
     >
       <div className="space-y-4">
         <div>
-          <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Date from</label>
+          <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">{m.dashboard_filters_date_from()}</label>
           <input type="date" value={filterDateFrom} onChange={(e) => setFilterDateFrom(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
         </div>
         <div>
-          <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Date to</label>
+          <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">{m.dashboard_filters_date_to()}</label>
           <input type="date" value={filterDateTo} onChange={(e) => setFilterDateTo(e.target.value)} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
         </div>
         <div>
-          <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">Agent ID</label>
-          <input type="text" value={filterAgentId} onChange={(e) => setFilterAgentId(e.target.value)} placeholder="Agent ID" className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
+          <label className="block text-[12px] font-bold text-ih-fg-3 mb-1">{m.dashboard_filters_agent_id()}</label>
+          <input type="text" value={filterAgentId} onChange={(e) => setFilterAgentId(e.target.value)} placeholder={m.dashboard_filters_agent_id()} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] outline-none" />
         </div>
       </div>
     </Drawer>

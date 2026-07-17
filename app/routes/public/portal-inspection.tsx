@@ -53,9 +53,10 @@ import {
 } from "~/lib/section-loaders";
 import { HubSectionSlot } from "~/components/portal/hub/HubSectionSlot";
 import type { TenantBrand } from "~/lib/brand";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Inspection - OpenInspection" }];
+  return [{ title: m.portal_inspection_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -271,12 +272,12 @@ export default function PortalInspection() {
         },
       );
       if (!res.ok) {
-        setDocError("Upload failed. Please try again.");
+        setDocError(m.portal_inspection_doc_upload_error());
         return;
       }
       revalidator.revalidate();
     } catch {
-      setDocError("Upload failed. Please try again.");
+      setDocError(m.portal_inspection_doc_upload_error());
     } finally {
       setDocUploading(false);
     }
@@ -290,12 +291,12 @@ export default function PortalInspection() {
         { method: "DELETE" },
       );
       if (!res.ok) {
-        setDocError("Could not delete the document. Please try again.");
+        setDocError(m.portal_inspection_doc_delete_error());
         return;
       }
       revalidator.revalidate();
     } catch {
-      setDocError("Could not delete the document. Please try again.");
+      setDocError(m.portal_inspection_doc_delete_error());
     }
   };
 

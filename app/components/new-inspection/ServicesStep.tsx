@@ -2,6 +2,7 @@ import { formatPriceCents } from "~/lib/wizard-steps";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { MoneyInput } from "~/components/MoneyInput";
 import type { WizardService } from "../NewInspectionWizard";
+import { m } from "~/paraglide/messages";
 
 export function ServicesStep({
   serviceCatalog,
@@ -18,7 +19,7 @@ export function ServicesStep({
 }) {
   return (
     <div className="space-y-2">
-      <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">Select Services</label>
+      <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_services_label()}</label>
       <div className="space-y-1.5">
         {serviceCatalog.map((s) => {
           const selected = services.has(s.id);
@@ -48,7 +49,7 @@ export function ServicesStep({
                   cents={priceCents}
                   onChange={(c) => handlePriceOverrideChange(s.id, c, catalogCents)}
                   className="w-24 h-7 px-1.5 rounded border border-ih-border bg-ih-bg-card text-[12px] text-right focus:shadow-ih-focus outline-none"
-                  ariaLabel={`Price for ${s.name}`}
+                  ariaLabel={m.newinsp_services_price_aria({ name: s.name })}
                 />
               ) : catalogCents !== null ? (
                 // FE-7: price is stored in cents — "$400.00", not "$40000"
@@ -65,7 +66,7 @@ export function ServicesStep({
       {services.size > 0 && (
         <div className="flex justify-end pt-1 border-t border-ih-border mt-2">
           <span className="text-[12px] font-bold text-ih-fg-2">
-            Total:{" "}
+            {m.newinsp_services_total()}{" "}
             {formatPriceCents(
               getEffectivePriceCents({
                 serviceLines: [...services].map((id) => {

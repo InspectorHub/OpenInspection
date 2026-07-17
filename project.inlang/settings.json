@@ -28,7 +28,11 @@
       "./messages/{locale}/editor-2.json",
       "./messages/{locale}/library.json",
       "./messages/{locale}/reports.json",
-      "./messages/{locale}/metrics.json"
+      "./messages/{locale}/metrics.json",
+      "./messages/{locale}/public.json",
+      "./messages/{locale}/media.json",
+      "./messages/{locale}/components.json",
+      "./messages/{locale}/checkout.json"
     ]
   }
 }

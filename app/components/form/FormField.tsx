@@ -1,3 +1,5 @@
+import { m } from "~/paraglide/messages";
+
 /* ------------------------------------------------------------------ */
 /* Types */
 /* ------------------------------------------------------------------ */
@@ -77,7 +79,7 @@ export function FormField({
  case "select":
  return (
  <select value={String(value || "")} onChange={(e) => onChange(e.target.value)} className={base}>
- <option value="">Select...</option>
+ <option value="">{m.form_field_select_placeholder()}</option>
  {item.options?.choices?.map((opt) => (
  <option key={opt} value={opt}>{opt}</option>
  ))}
@@ -135,7 +137,7 @@ export function FormField({
  case "photo_only":
  return (
  <div className="p-4 rounded-lg border border-dashed border-ih-border-strong text-center text-[13px] text-ih-fg-4">
- Photo capture is available in the inspection editor
+ {m.form_field_photo_hint()}
  </div>
  );
  case "rich":

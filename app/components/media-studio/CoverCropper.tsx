@@ -1,5 +1,6 @@
 import { PhotoCropper, type PhotoCrop } from "./PhotoCropper";
 import type { PixelCrop } from "./cropImage";
+import { m } from "~/paraglide/messages";
 
 type Aspect = "3:2" | "16:9" | "1.91:1" | "4:3";
 
@@ -20,8 +21,8 @@ export function CoverCropper({ sourceUrl, sourceKey, onCancel, onSave }: CoverCr
       presets={["3:2", "16:9", "1.91:1", "4:3"]}
       allowFree={false}
       initialAspect="3:2"
-      title="Crop cover photo"
-      saveLabel="Save cover"
+      title={m.media_cover_crop_title()}
+      saveLabel={m.media_cover_crop_save()}
       onCancel={onCancel}
       onSave={(blob, c: PhotoCrop) => onSave(blob, { aspect: c.aspect as Aspect, orientation: c.orientation, pixels: c.pixels })}
     />

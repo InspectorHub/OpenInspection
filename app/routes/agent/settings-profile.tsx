@@ -2,9 +2,10 @@ import { useState } from "react";
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/settings-profile";
 import { PageHeader } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Agent Settings - OpenInspection" }];
+  return [{ title: m.agent_portal_settings_meta_title() }];
 }
 
 interface AgentProfile {
@@ -39,33 +40,32 @@ export default function AgentSettingsProfilePage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <PageHeader title="Settings" meta="Your public referral slug and the emails we send you." />
+      <PageHeader title={m.agent_portal_settings_title()} meta={m.agent_portal_settings_subtitle()} />
 
       {/* Slug card */}
       <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
-        <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">Referral slug</p>
-        <h2 className="text-sm font-bold text-ih-fg-1 mb-1">Your referral link</h2>
+        <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{m.agent_portal_settings_slug_eyebrow()}</p>
+        <h2 className="text-sm font-bold text-ih-fg-1 mb-1">{m.agent_portal_settings_slug_heading()}</h2>
         <p className="text-[13px] text-ih-fg-3 mb-4">
-          When you share a booking link with a client, this slug attributes the
-          referral to you so the inspector knows where the client came from.
+          {m.agent_portal_settings_slug_desc()}
         </p>
 
-        <label htmlFor="agentSlug" className="block text-[12px] font-semibold text-ih-fg-3 mb-1.5">Slug</label>
+        <label htmlFor="agentSlug" className="block text-[12px] font-semibold text-ih-fg-3 mb-1.5">{m.agent_portal_settings_slug_label()}</label>
         <div className="flex gap-2">
           <input
             id="agentSlug"
             type="text"
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
-            placeholder="jane"
+            placeholder={m.agent_portal_settings_slug_placeholder()}
             className="flex-1 h-9 px-3 rounded-md border border-ih-border focus:border-ih-primary focus:ring-1 focus:ring-ih-primary/30 outline-none text-[13px] font-medium placeholder:text-ih-fg-4 transition-all"
           />
           <button className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors uppercase tracking-wide">
-            Save slug
+            {m.agent_portal_settings_slug_save()}
           </button>
         </div>
         <p className="text-[12px] text-ih-fg-4 mt-2">
-          Lowercase letters, numbers, and hyphens (3-32 chars).
+          {m.agent_portal_settings_slug_hint()}
         </p>
         {previewLink && (
           <div className="mt-3 bg-ih-bg-app/40 rounded-md px-3 py-2 text-[12px] font-mono text-ih-fg-3 break-all">
@@ -76,25 +76,25 @@ export default function AgentSettingsProfilePage() {
 
       {/* Notifications */}
       <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
-        <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">Notifications</p>
-        <h2 className="text-sm font-bold text-ih-fg-1 mb-1">Email me when...</h2>
+        <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{m.agent_portal_settings_notifications_eyebrow()}</p>
+        <h2 className="text-sm font-bold text-ih-fg-1 mb-1">{m.agent_portal_settings_notifications_heading()}</h2>
         <p className="text-[13px] text-ih-fg-3 mb-4">
-          High-signal alerts default ON. Toggle off any you don't want.
+          {m.agent_portal_settings_notifications_desc()}
         </p>
         <div className="divide-y divide-ih-border">
           <ToggleRow
-            title="A new referral is booked"
-            subtitle="When a client books an inspection using your referral link."
+            title={m.agent_portal_settings_notify_referral_title()}
+            subtitle={m.agent_portal_settings_notify_referral_subtitle()}
             defaultOn={agent.notifyOnReferral}
           />
           <ToggleRow
-            title="A report is ready to read"
-            subtitle="When the inspector publishes the report for one of your referrals."
+            title={m.agent_portal_settings_notify_report_title()}
+            subtitle={m.agent_portal_settings_notify_report_subtitle()}
             defaultOn={agent.notifyOnReport}
           />
           <ToggleRow
-            title="An invoice is paid"
-            subtitle="When your client pays the inspection invoice."
+            title={m.agent_portal_settings_notify_paid_title()}
+            subtitle={m.agent_portal_settings_notify_paid_subtitle()}
             defaultOn={agent.notifyOnPaid}
           />
         </div>

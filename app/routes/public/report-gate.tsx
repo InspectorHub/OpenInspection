@@ -3,9 +3,10 @@ import type { Route } from "./+types/report-gate";
 import { createApi } from "~/lib/api-client.server";
 import { ErrorState } from "~/components/ErrorState";
 import { brandTokens } from "~/lib/brand";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Report access - OpenInspection" }];
+  return [{ title: m.report_gate_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -91,25 +92,25 @@ export default function ReportGatePage() {
   if (error || !gate) {
     return (
       <ErrorState
-        title="Report not found"
-        message="This report link is invalid or has expired. Please contact your inspector for an up-to-date link."
+        title={m.report_gate_notfound_title()}
+        message={m.report_gate_notfound_message()}
       />
     );
   }
 
   const title =
-    gate.reason === "payment" ? "Pending payment" : "Pending agreement signature";
+    gate.reason === "payment" ? m.report_gate_status_payment() : m.report_gate_status_agreement();
   const message =
     gate.reason === "payment"
-      ? "Your inspection report is ready, but the invoice has not been paid yet. Please complete payment to view the report -- your inspector's contact details are listed below."
-      : "Your inspection report is ready, but the inspection agreement has not been signed yet. Please sign the agreement to view the report.";
+      ? m.report_gate_message_payment()
+      : m.report_gate_message_agreement();
 
   const locale = gate.locale || "en-US";
   const formattedDate = formatDate(gate.scheduledDate, locale);
   const formattedAmount = formatAmount(gate.amountCents, gate.currency, locale);
   const ctaLabel =
     gate.reason === "payment" && formattedAmount
-      ? `Pay ${formattedAmount} now`
+      ? m.report_gate_cta_pay({ amount: formattedAmount })
       : gate.actionLabel;
   const hasContact = !!(gate.inspectorEmail || gate.inspectorPhone || gate.inspectorLicense);
 
@@ -123,7 +124,7 @@ export default function ReportGatePage() {
         </span>
 
         <h1 className="font-serif text-[26px] font-semibold tracking-tight leading-tight mb-2 text-ih-fg-1">
-          Your report is almost ready.
+          {m.report_gate_heading()}
         </h1>
         <p className="text-sm text-ih-fg-3 leading-relaxed mb-6">
           {message}
@@ -135,7 +136,7 @@ export default function ReportGatePage() {
             {formattedAmount && (
               <div className="flex justify-between items-baseline pb-3 mb-3 border-b border-ih-border">
                 <span className="text-[11px] uppercase tracking-wide text-ih-fg-4">
-                  Amount due
+                  {m.report_gate_meta_amount_due()}
                 </span>
                 <span className="font-serif text-[22px] font-semibold text-ih-fg-1 tracking-tight">
                   {formattedAmount}
@@ -143,19 +144,19 @@ export default function ReportGatePage() {
               </div>
             )}
             {gate.propertyAddress && (
-              <MetaRow label="Property">
+              <MetaRow label={m.report_gate_meta_property()}>
                 <strong className="text-ih-fg-1 font-semibold">
                   {gate.propertyAddress}
                 </strong>
               </MetaRow>
             )}
-            {formattedDate && <MetaRow label="Scheduled">{formattedDate}</MetaRow>}
-            {gate.inspectorName && <MetaRow label="Inspector">{gate.inspectorName}</MetaRow>}
+            {formattedDate && <MetaRow label={m.report_gate_meta_scheduled()}>{formattedDate}</MetaRow>}
+            {gate.inspectorName && <MetaRow label={m.report_gate_meta_inspector()}>{gate.inspectorName}</MetaRow>}
             {hasContact && (gate.propertyAddress || gate.inspectorName || formattedDate) && (
               <div className="h-px bg-ih-bg-muted my-3" />
             )}
             {gate.inspectorEmail && (
-              <MetaRow label="Email">
+              <MetaRow label={m.report_gate_meta_email()}>
                 <a
                   href={`mailto:${gate.inspectorEmail}`}
                   className="text-ih-primary hover:underline"
@@ -165,7 +166,7 @@ export default function ReportGatePage() {
               </MetaRow>
             )}
             {gate.inspectorPhone && (
-              <MetaRow label="Phone">
+              <MetaRow label={m.report_gate_meta_phone()}>
                 <a
                   href={`tel:${gate.inspectorPhone}`}
                   className="text-ih-primary hover:underline"
@@ -175,7 +176,7 @@ export default function ReportGatePage() {
               </MetaRow>
             )}
             {gate.inspectorLicense && (
-              <MetaRow label="License">{gate.inspectorLicense}</MetaRow>
+              <MetaRow label={m.report_gate_meta_license()}>{gate.inspectorLicense}</MetaRow>
             )}
           </div>
         )}
@@ -201,7 +202,7 @@ export default function ReportGatePage() {
               <rect x="3" y="7" width="10" height="6" rx="1" />
               <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
             </svg>
-            Secured by Stripe &middot; {gate.companyName}
+            {m.report_gate_secured_by_stripe({ company: gate.companyName })}
           </div>
         ) : (
           <div className="mt-5 text-center text-[11px] text-ih-fg-4">

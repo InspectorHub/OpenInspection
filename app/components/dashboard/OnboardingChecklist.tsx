@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { Card } from "@core/shared-ui";
 import type { OnboardingStep } from "~/lib/onboarding-progress";
 import { allDone } from "~/lib/onboarding-progress";
+import { m } from "~/paraglide/messages";
 
 interface OnboardingChecklistProps {
   steps: OnboardingStep[];
@@ -40,9 +41,9 @@ export function OnboardingChecklist({
       {/* Header row */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-ih-border">
         <div className="flex items-center gap-3">
-          <h2 className="text-[14px] font-bold text-ih-fg-1">Getting started</h2>
+          <h2 className="text-[14px] font-bold text-ih-fg-1">{m.dashboard_onboarding_title()}</h2>
           <span className="text-[12px] font-medium text-ih-fg-4">
-            {doneCount} of {total} complete
+            {m.dashboard_onboarding_progress({ done: doneCount, total })}
           </span>
         </div>
         <button
@@ -50,7 +51,7 @@ export function OnboardingChecklist({
           onClick={onDismiss}
           className="text-[12px] font-medium text-ih-fg-4 hover:text-ih-fg-2 transition-colors"
         >
-          Dismiss
+          {m.dashboard_onboarding_dismiss()}
         </button>
       </div>
 

@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
 import { Button, Icon } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 interface InspectionsToolbarProps {
   searchQuery: string;
@@ -31,20 +32,20 @@ export function InspectionsToolbar({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search..."
+          placeholder={m.dashboard_toolbar_search()}
           className="h-8 w-full sm:w-56 pl-8 pr-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-2 focus:ring-2 focus:ring-ih-primary/30 focus:border-ih-primary outline-none placeholder:text-ih-fg-4"
         />
         <Icon name="search" size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ih-fg-4" />
       </div>
       <Button variant="secondary" size="sm" icon={<Icon name="filter" size={14} />} onClick={onOpenFilters}>
-        Filters
+        {m.dashboard_toolbar_filters()}
       </Button>
       {/* onMouseDown stopPropagation excludes the trigger from the Popover's
           click-outside handler so a click toggles cleanly (no close-then-reopen).
           columnsBtnRef anchors the ColumnsPopover to this button. */}
       <Button ref={columnsBtnRef} variant="secondary" size="sm" icon={<Icon name="panel" size={14} />}
         onMouseDown={(e) => e.stopPropagation()} onClick={onToggleColumns}>
-        Columns
+        {m.dashboard_toolbar_columns()}
       </Button>
     </div>
   );

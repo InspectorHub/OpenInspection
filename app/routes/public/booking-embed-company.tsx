@@ -8,9 +8,10 @@ import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { readLegalLinks } from "~/lib/legal-links.server";
 import { EmbedWizard, type EmbedData } from "./booking-embed";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Book inspection" }];
+  return [{ title: m.booking_embed_meta_title() }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -49,7 +50,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
         ? ({
             slug: "",
             inspectorId: "",
-            inspectorName: d.company ?? "Inspection company",
+            inspectorName: d.company ?? m.booking_embed_company_default_name(),
             tenantSlug: params.tenant ?? "",
             siteKey: d.turnstileSiteKey ?? "",
             theme,

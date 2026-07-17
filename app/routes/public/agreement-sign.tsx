@@ -5,9 +5,10 @@ import {
     AgreementSection,
     type AgreementData,
 } from "~/components/portal/sections/AgreementSection";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-    return [{ title: "Sign Agreement - OpenInspection" }];
+    return [{ title: m.agreement_sign_meta_title() }];
 }
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -43,7 +44,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
     if (intent === "sign") {
         const signatureBase64 = String(form.get("signatureBase64") ?? "");
-        if (!signatureBase64) return { ok: false, intent, error: "Signature is required." };
+        if (!signatureBase64) return { ok: false, intent, error: m.checkout_sign_error_signature_required() };
         const onBehalfOf = form.get("onBehalfOf");
         const onBehalfDisclaimer = form.get("onBehalfDisclaimer");
         const res = (await api.bookings.agreements[":token"].sign.$post({
@@ -56,7 +57,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         })) as unknown as Response;
         if (res.ok) return { ok: true, intent };
         const d = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        return { ok: false, intent, error: d?.error?.message ?? "Signing failed. Please try again." };
+        return { ok: false, intent, error: d?.error?.message ?? m.checkout_sign_error_failed() };
     }
 
     if (intent === "decline") {
@@ -67,10 +68,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         })) as unknown as Response;
         if (res.ok) return { ok: true, intent };
         const d = (await res.json().catch(() => ({}))) as { error?: { message?: string } };
-        return { ok: false, intent, error: d?.error?.message ?? "Failed to decline. Please try again." };
+        return { ok: false, intent, error: d?.error?.message ?? m.agreement_sign_error_decline_failed() };
     }
 
-    return { ok: false, intent, error: "Unknown action." };
+    return { ok: false, intent, error: m.checkout_action_error_unknown() };
 }
 
 /* ------------------------------------------------------------------ */
@@ -106,7 +107,7 @@ export default function AgreementSignPage() {
                     actionPath={actionPath}
                 />
 
-                <p className="text-center text-[11px] text-ih-fg-4 mt-6">Powered by OpenInspection</p>
+                <p className="text-center text-[11px] text-ih-fg-4 mt-6">{m.checkout_powered_by()}</p>
             </div>
         </div>
     );

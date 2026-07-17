@@ -6,9 +6,10 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Marketplace - OpenInspection" }];
+  return [{ title: m.marketplace_meta_title() }];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -35,12 +36,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 }
 
-const TABS = [
-  { id: "all", label: "All" },
-  { id: "templates", label: "Templates" },
-  { id: "comments", label: "Comments" },
-  { id: "agreements", label: "Agreements" },
-];
+// A function (not a module const) so `m.*()` resolves inside the per-request
+// paraglide locale scope, not once at import time.
+function getTabs() {
+  return [
+    { id: "all", label: m.marketplace_tab_all() },
+    { id: "templates", label: m.marketplace_tab_templates() },
+    { id: "comments", label: m.marketplace_tab_comments() },
+    { id: "agreements", label: m.marketplace_tab_agreements() },
+  ];
+}
 
 export default function MarketplacePage() {
   const { templates, meta } = useLoaderData<typeof loader>();
@@ -49,19 +54,19 @@ export default function MarketplacePage() {
 
   return (
     <div className="space-y-ih-list">
-      <Breadcrumb items={[{ label: "Library", href: "/library" }, { label: "Marketplace" }]} />
+      <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.marketplace_heading() }]} />
       <PageHeader
-        title="Marketplace"
-        meta={`${meta.total} available`}
+        title={m.marketplace_heading()}
+        meta={m.marketplace_meta({ count: meta.total })}
       />
 
-      <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
+      <TabStrip tabs={getTabs()} activeId={activeTab} onChange={setActiveTab} />
 
       {templates.length === 0 ? (
         <Card>
           <EmptyState
-            title="Marketplace is empty"
-            description="Community templates and content packs will appear here."
+            title={m.marketplace_empty_title()}
+            description={m.marketplace_empty_desc()}
           />
         </Card>
       ) : (
@@ -84,7 +89,7 @@ export default function MarketplacePage() {
                       <span className="text-[11px] text-ih-fg-4">{t.author}</span>
                     )}
                   </div>
-                  <Button variant="primary" size="sm">Install</Button>
+                  <Button variant="primary" size="sm">{m.marketplace_install()}</Button>
                 </div>
               </Card>
               );

@@ -4,9 +4,10 @@ import { createApi } from "~/lib/api-client.server";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 import { readLegalLinks } from "~/lib/legal-links.server";
 import { PaymentSection, type InvoiceData } from "~/components/portal/sections/PaymentSection";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Invoice - OpenInspection" }];
+  return [{ title: m.invoice_meta_title() }];
 }
 
 /** Wire shape of GET /api/public/inspections/:id/invoice (cents + ISO dates + brand). */
@@ -45,12 +46,12 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     return {
       invoice,
       brand: d?.brand ?? EMPTY_BRAND,
-      error: res.ok ? null : "Invoice not found",
+      error: res.ok ? null : m.invoice_error_not_found(),
       id: params.id ?? "",
       privacyUrl,
     };
   } catch {
-    return { invoice: null, brand: EMPTY_BRAND, error: "Service unavailable", id: params.id ?? "", privacyUrl };
+    return { invoice: null, brand: EMPTY_BRAND, error: m.invoice_error_service_unavailable(), id: params.id ?? "", privacyUrl };
   }
 }
 
@@ -72,8 +73,8 @@ export default function InvoicePage() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6 bg-ih-bg-app">
         <div className="text-center">
-          <h1 className="font-serif text-2xl font-semibold text-ih-fg-1">Invoice not found</h1>
-          <p className="text-sm text-ih-fg-3 mt-2">{error ?? "This invoice is not available."}</p>
+          <h1 className="font-serif text-2xl font-semibold text-ih-fg-1">{m.invoice_error_not_found()}</h1>
+          <p className="text-sm text-ih-fg-3 mt-2">{error ?? m.invoice_not_available()}</p>
         </div>
       </div>
     );
@@ -86,7 +87,7 @@ export default function InvoicePage() {
         {(brand.logoUrl || brand.companyName) && (
           <div className="mb-4 flex items-center gap-2.5">
             {brand.logoUrl ? (
-              <img src={brand.logoUrl} alt={brand.companyName ?? "Logo"} className="h-8 w-auto" />
+              <img src={brand.logoUrl} alt={brand.companyName ?? m.invoice_brand_logo_alt()} className="h-8 w-auto" />
             ) : (
               <span className="font-serif text-[16px] font-semibold text-ih-fg-2">{brand.companyName}</span>
             )}

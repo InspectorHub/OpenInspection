@@ -2,9 +2,10 @@ import { Form, useLoaderData, useNavigation, redirect } from "react-router";
 import type { Route } from "./+types/concierge-confirm-token";
 import { createApi } from "~/lib/api-client.server";
 import { ErrorState } from "~/components/ErrorState";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Confirm your inspection - OpenInspection" }];
+  return [{ title: m.concierge_confirm_meta_title() }];
 }
 
 interface ConfirmView {
@@ -68,8 +69,8 @@ export default function ConciergeConfirmTokenPage() {
   if (status === "not-found" || status === "error" || !view) {
     return (
       <ErrorState
-        title="Confirmation link unavailable"
-        message="This link may have been mistyped or the booking was cancelled. Contact your agent for a fresh confirmation link."
+        title={m.concierge_confirm_error_unavailable_title()}
+        message={m.concierge_confirm_error_unavailable_body()}
       />
     );
   }
@@ -77,8 +78,8 @@ export default function ConciergeConfirmTokenPage() {
   if (status === "expired") {
     return (
       <ErrorState
-        title="This confirmation link has expired"
-        message="Confirmation links are valid for 7 days. Your agent or inspector can send you a fresh one in a minute."
+        title={m.concierge_confirm_expired_title()}
+        message={m.concierge_confirm_expired_body()}
       />
     );
   }
@@ -86,8 +87,8 @@ export default function ConciergeConfirmTokenPage() {
   if (status === "already") {
     return (
       <ErrorState
-        title="Already confirmed"
-        message="This inspection has already been confirmed. You're all set — your inspector has the details."
+        title={m.concierge_confirm_already_title()}
+        message={m.concierge_confirm_already_body()}
       />
     );
   }
@@ -101,25 +102,24 @@ export default function ConciergeConfirmTokenPage() {
           </svg>
         </div>
         <h1 className="font-serif text-2xl font-bold leading-tight mb-2.5 text-ih-fg-1">
-          Confirm your inspection
+          {m.concierge_confirm_heading()}
         </h1>
         <p className="text-[15px] text-ih-fg-3 leading-relaxed mb-5">
-          {view.inspection.clientName ? `Hi ${view.inspection.clientName}, please` : "Please"} review and confirm
-          the details below.
+          {view.inspection.clientName ? m.concierge_confirm_greeting_named({ clientName: view.inspection.clientName }) : m.concierge_confirm_greeting_anon()}{m.concierge_confirm_greeting_rest()}
         </p>
 
         <dl className="text-sm border border-ih-border rounded-lg divide-y divide-ih-border mb-6">
           <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ih-fg-4">Property</dt>
+            <dt className="text-ih-fg-4">{m.concierge_confirm_label_property()}</dt>
             <dd className="text-ih-fg-1 font-medium text-right">{view.inspection.propertyAddress}</dd>
           </div>
           <div className="flex justify-between gap-4 px-4 py-3">
-            <dt className="text-ih-fg-4">Date</dt>
+            <dt className="text-ih-fg-4">{m.concierge_confirm_label_date()}</dt>
             <dd className="text-ih-fg-1 font-medium text-right">{view.inspection.date}</dd>
           </div>
           {view.inspector?.name && (
             <div className="flex justify-between gap-4 px-4 py-3">
-              <dt className="text-ih-fg-4">Inspector</dt>
+              <dt className="text-ih-fg-4">{m.concierge_confirm_label_inspector()}</dt>
               <dd className="text-ih-fg-1 font-medium text-right">{view.inspector.name}</dd>
             </div>
           )}
@@ -127,7 +127,7 @@ export default function ConciergeConfirmTokenPage() {
 
         {view.inspection.agreementRequired && (
           <p className="text-[13px] text-ih-fg-4 mb-4">
-            After confirming, you'll be taken to sign the inspection agreement.
+            {m.concierge_confirm_agreement_notice()}
           </p>
         )}
 
@@ -137,7 +137,7 @@ export default function ConciergeConfirmTokenPage() {
             disabled={submitting}
             className="w-full h-11 rounded-lg bg-ih-primary text-white text-sm font-bold hover:bg-ih-primary-600 transition-colors disabled:opacity-60"
           >
-            {submitting ? "Confirming…" : "Confirm inspection"}
+            {submitting ? m.concierge_confirm_submit_pending() : m.concierge_confirm_submit()}
           </button>
         </Form>
       </main>

@@ -3,9 +3,10 @@ import type { Route } from "./+types/recommendations";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 export function meta() {
-  return [{ title: "Repair Items - OpenInspection" }];
+  return [{ title: m.agent_portal_recommendations_meta_title() }];
 }
 
 interface Recommendation {
@@ -43,10 +44,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 const GROUP_META = [
-  { key: "safety" as const, label: "Safety", color: "text-ih-bad-fg" },
-  { key: "recommendation" as const, label: "Recommendation", color: "text-ih-watch-fg" },
-  { key: "maintenance" as const, label: "Maintenance", color: "text-ih-info-fg" },
+  { key: "safety" as const, color: "text-ih-bad-fg" },
+  { key: "recommendation" as const, color: "text-ih-watch-fg" },
+  { key: "maintenance" as const, color: "text-ih-info-fg" },
 ];
+
+// Resolved at call time (not module load) so paraglide's ALS scope is active.
+function groupLabel(key: "safety" | "recommendation" | "maintenance"): string {
+  switch (key) {
+    case "safety":
+      return m.agent_portal_repair_group_safety();
+    case "recommendation":
+      return m.agent_portal_repair_group_recommendation();
+    case "maintenance":
+      return m.agent_portal_repair_group_maintenance();
+  }
+}
 
 export default function AgentRecommendationsPage() {
   const { groups } = useLoaderData<typeof loader>();
@@ -55,11 +68,11 @@ export default function AgentRecommendationsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Repair Items"
+        title={m.agent_portal_repair_items()}
         meta={
           <>
-            Every defect flagged in delivered inspection reports, grouped by category.
-            {total > 0 && ` ${total} total items.`}
+            {m.agent_portal_recommendations_meta()}
+            {total > 0 && m.agent_portal_recommendations_total({ count: total })}
           </>
         }
         actions={
@@ -67,31 +80,32 @@ export default function AgentRecommendationsPage() {
             onClick={() => window.print()}
             className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors shrink-0"
           >
-            Print as PDF
+            {m.agent_portal_recommendations_print()}
           </button>
         }
       />
 
-      {GROUP_META.map(({ key, label, color }) => {
+      {GROUP_META.map(({ key, color }) => {
         const items = groups[key];
+        const label = groupLabel(key);
         return (
           <section key={key} className="bg-ih-bg-card border border-ih-border rounded-xl p-5">
             <div className="flex items-baseline justify-between mb-4 pb-3 border-b border-ih-border">
               <h2 className={`text-lg font-bold ${color}`}>{label}</h2>
               <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">
-                {items.length} {items.length === 1 ? "item" : "items"}
+                {items.length} {items.length === 1 ? m.agent_portal_recommendations_item_one() : m.agent_portal_recommendations_item_other()}
               </span>
             </div>
             {items.length === 0 ? (
               <p className="text-[13px] text-ih-fg-4 py-2">
-                No {label.toLowerCase()} items in your referred reports.
+                {m.agent_portal_recommendations_empty({ label: label.toLowerCase() })}
               </p>
             ) : (
               <div className="space-y-3">
                 {items.map((r, i) => (
                   <div key={`${r.inspectionId}-${r.defectTitle}-${i}`} className="p-4 border border-ih-border rounded-md bg-ih-bg-app/30">
                     <p className="text-[11px] font-mono text-ih-fg-4 mb-1">
-                      {r.propertyAddress || "No address"} &middot; {r.sectionTitle}
+                      {r.propertyAddress || m.agent_portal_no_address()} &middot; {r.sectionTitle}
                     </p>
                     <p className="text-[14px] font-semibold text-ih-fg-1">{r.defectTitle}</p>
                     {r.location && (

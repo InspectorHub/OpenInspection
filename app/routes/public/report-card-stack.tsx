@@ -14,6 +14,7 @@ import { createApi } from "~/lib/api-client.server";
 import { getToken } from "~/lib/session.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { EMPTY_BRAND } from "~/lib/brand";
+import { m } from "~/paraglide/messages";
 import {
   ReportView,
   reportViewProps,
@@ -44,7 +45,7 @@ type LoaderResult = ReportLoaderResult;
 
 export function meta({ data }: Route.MetaArgs) {
  const d = data as LoaderResult | undefined;
- return [{ title: `Report - ${d?.address ?? "Inspection"} - OpenInspection` }];
+ return [{ title: m.report_meta_title({ name: d?.address ?? m.report_meta_title_fallback() }) }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -227,7 +228,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  if (!res.ok) {
  const bodyText = await res.text().catch(() => "");
  let code: string | undefined;
- let message = "Couldn't start the Word export. Please try again.";
+ let message: string = m.report_word_export_error_generic();
  try {
  const parsed = JSON.parse(bodyText) as { error?: { code?: string; message?: string } };
  code = parsed?.error?.code;
@@ -244,11 +245,11 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  if (intent === "export-word-status") {
  const exportId = String(formData.get("exportId") ?? "");
  if (!exportId) {
- return { ok: false, intent: "export-word-status", error: "Missing exportId" } satisfies ExportWordActionResult;
+ return { ok: false, intent: "export-word-status", error: m.report_word_export_error_missing_id() } satisfies ExportWordActionResult;
  }
  const res = await api.inspections[":id"].export[":exportId"].$get({ param: { id, exportId } });
  if (!res.ok) {
- return { ok: false, intent: "export-word-status", error: "Export not found" } satisfies ExportWordActionResult;
+ return { ok: false, intent: "export-word-status", error: m.report_word_export_error_not_found() } satisfies ExportWordActionResult;
  }
  const body = await res.json();
  return {

@@ -2,6 +2,7 @@ import type React from "react";
 import { Link } from "react-router";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
 import InspectionStatusCards, { type StatusOverview } from "./InspectionStatusCards";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /* Types */
@@ -46,16 +47,20 @@ export function hubSectionNavHref(section: HubSection, ctx: HubLinkCtx): string 
 /* Component */
 /* ------------------------------------------------------------------ */
 
-const NAV: Array<{ section: HubSection; label: string }> = [
-  { section: "overview", label: "Overview" },
-  { section: "report", label: "Report" },
-  { section: "agreement", label: "Agreement" },
-  { section: "payment", label: "Payment" },
-  { section: "progress", label: "Progress" },
-  { section: "messages", label: "Messages" },
-  { section: "repair", label: "Repair Request" },
-  { section: "documents", label: "Documents" },
-];
+// Factory (not a module const) so the labels resolve inside the request's
+// paraglide scope on each render rather than being frozen at import time.
+function navItems(): Array<{ section: HubSection; label: string }> {
+  return [
+    { section: "overview", label: m.portal_hub_nav_overview() },
+    { section: "report", label: m.portal_hub_nav_report() },
+    { section: "agreement", label: m.portal_hub_nav_agreement() },
+    { section: "payment", label: m.portal_hub_nav_payment() },
+    { section: "progress", label: m.portal_hub_nav_progress() },
+    { section: "messages", label: m.portal_hub_nav_messages() },
+    { section: "repair", label: m.portal_hub_nav_repair() },
+    { section: "documents", label: m.portal_hub_nav_documents() },
+  ];
+}
 
 export default function InspectionHub({
   overview,
@@ -94,7 +99,7 @@ export default function InspectionHub({
               {brand.logoUrl && (
                 <img
                   src={brand.logoUrl}
-                  alt={brand.companyName ?? "Company"}
+                  alt={brand.companyName ?? m.portal_brand_logo_alt()}
                   className="h-8 w-auto"
                 />
               )}
@@ -104,7 +109,7 @@ export default function InspectionHub({
             </div>
           )}
           <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-ih-fg-1">
-            {overview.address || "Inspection"}
+            {overview.address || m.portal_address_fallback()}
           </h1>
           {overview.date && <p className="mt-1 text-sm text-ih-fg-3">{overview.date}</p>}
         </div>
@@ -114,14 +119,14 @@ export default function InspectionHub({
             onClick={onSignOut}
             className="shrink-0 h-9 px-3 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
           >
-            Sign out
+            {m.portal_signout()}
           </button>
         )}
       </div>
 
       {/* Top nav — client-side <Link>s switching the ?section= query. */}
       <nav className="mb-6 flex flex-wrap gap-2 border-b border-ih-border pb-3">
-        {NAV.map((n) => {
+        {navItems().map((n) => {
           const active = n.section === activeSection;
           const base =
             "px-3 py-1.5 text-xs font-semibold rounded-full transition-colors";

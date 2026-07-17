@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { PhotoGrid } from "./PhotoGrid";
 import { MediaViewer } from "./MediaViewer";
 import type { GalleryPhoto } from "~/lib/inspection-media";
+import { m } from "~/paraglide/messages";
 
 export interface PhotoGalleryProps {
   inspectionId: string;
@@ -16,8 +17,8 @@ export function PhotoGallery({ inspectionId, onSetCover, onAnnotate }: PhotoGall
   useEffect(() => {
     if (inspectionId) load.load(`/resources/inspection-media?inspectionId=${encodeURIComponent(inspectionId)}`);
   }, [inspectionId]);
-  if (load.state === "loading" && photos.length === 0) return <p className="text-[13px] text-ih-fg-3 text-center py-8">Loading photos…</p>;
-  if (photos.length === 0) return <p className="text-[13px] text-ih-fg-3 text-center py-8">No photos in this inspection yet.</p>;
+  if (load.state === "loading" && photos.length === 0) return <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.media_gallery_loading()}</p>;
+  if (photos.length === 0) return <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.media_gallery_empty()}</p>;
   return (
     <div className="space-y-3">
       <PhotoGrid items={photos.map((p) => ({ key: p.key, src: p.url, width: 4, height: 3, label: p.label }))} onClick={(i) => setLightbox(i)} />

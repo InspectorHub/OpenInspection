@@ -1,4 +1,5 @@
 import { Pill } from "@core/shared-ui";
+import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
 /* Types */
@@ -52,38 +53,38 @@ export function statusCardModels(ov: StatusOverview): StatusCardModel[] {
   return [
     {
       key: "appointment",
-      label: "Appointment",
+      label: m.portal_status_appointment_label(),
       value: capitalize(ov.inspectionStatus) + (ov.date ? ` · ${ov.date}` : ""),
       tone: "neutral",
     },
     {
       key: "agreement",
-      label: "Agreement",
-      value: ov.agreementSigned ? "Signed" : "Not signed",
+      label: m.portal_status_agreement_label(),
+      value: ov.agreementSigned ? m.portal_status_agreement_signed() : m.portal_status_agreement_unsigned(),
       tone: ov.agreementSigned ? "ok" : "warn",
     },
     {
       key: "payment",
-      label: "Payment",
+      label: m.portal_status_payment_label(),
       value: capitalize(ov.paymentStatus),
       tone: paymentTone(ov.paymentStatus),
     },
     {
       key: "report",
-      label: "Report",
-      value: ov.reportPublished ? "Published" : "Not published",
+      label: m.portal_status_report_label(),
+      value: ov.reportPublished ? m.portal_status_report_published() : m.portal_status_report_unpublished(),
       tone: ov.reportPublished ? "ok" : "neutral",
     },
     {
       key: "progress",
-      label: "Progress",
+      label: m.portal_status_progress_label(),
       value: `${ov.progress.completed}/${ov.progress.total}`,
       tone: "neutral",
     },
     {
       key: "messages",
-      label: "Messages",
-      value: ov.unreadMessages > 0 ? `${ov.unreadMessages} unread` : "No new messages",
+      label: m.portal_status_messages_label(),
+      value: ov.unreadMessages > 0 ? m.portal_status_messages_unread({ count: ov.unreadMessages }) : m.portal_status_messages_none(),
       badge: ov.unreadMessages || undefined,
       // CardTone has no 'info'; the badge conveys the unread state.
       tone: "neutral",

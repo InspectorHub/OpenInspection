@@ -1,4 +1,5 @@
 import type { ItemResult, TemplateItem } from "./FormField";
+import { m } from "~/paraglide/messages";
 
 /* ---- Rich item renderer (rating + notes) ---- */
 export function RichItemRenderer({
@@ -38,7 +39,7 @@ export function RichItemRenderer({
  value={result.notes || ""}
  onChange={(e) => onNotesChange(e.target.value)}
  rows={2}
- placeholder="Notes..."
+ placeholder={m.form_rich_notes_placeholder()}
  className="w-full px-3 py-2 rounded-lg border border-ih-border bg-ih-bg-card text-ih-fg-1 text-[13px] focus:shadow-ih-focus focus:border-ih-primary outline-none"
  />
  {/* Canned comments (quick insert) */}
