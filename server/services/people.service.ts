@@ -83,4 +83,25 @@ export class PeopleService {
             .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
         return rows.filter(r => capabilitiesForKind(r.kind as RoleKind)[cap]).map(r => r.key);
     }
+
+    /**
+     * Resolves the single contact id occupying `roleKey` on an inspection (e.g.
+     * the buyer's-agent or listing-agent contact), replacing the legacy
+     * `inspections.referredByAgentId` / `.sellingAgentId` column reads. Returns
+     * null when no `inspection_people` row carries that role for this
+     * inspection. Does not join `contacts` — callers that also need contact
+     * fields (email, name, ...) should follow up with their own tenant-scoped
+     * `contacts` lookup, same shape as the legacy two-step column read.
+     */
+    async contactIdForRole(tenantId: string, inspectionId: string, roleKey: string): Promise<string | null> {
+        const row = await this.db.select({ contactId: inspectionPeople.contactId })
+            .from(inspectionPeople)
+            .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.inspectionId, inspectionId),
+                eq(contactRoleProfiles.key, roleKey),
+            )).get();
+        return row?.contactId ?? null;
+    }
 }

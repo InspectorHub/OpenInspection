@@ -42,4 +42,24 @@ describe('PeopleService', () => {
     const keys = await svc.roleKeysWithCapability('t1', 'selfRetrieveReport');
     expect(keys.sort()).toEqual(['client', 'co_client']);
   });
+
+  it('contactIdForRole resolves the contact id for a given inspection + role key', async () => {
+    await svc.addPerson('t1', 'i1', 'c1', rp('buyer_agent'));
+    const id = await svc.contactIdForRole('t1', 'i1', 'buyer_agent');
+    expect(id).toBe('c1');
+  });
+
+  it('contactIdForRole returns null when no person has that role on the inspection', async () => {
+    const id = await svc.contactIdForRole('t1', 'i1', 'buyer_agent');
+    expect(id).toBeNull();
+  });
+
+  it('contactIdForRole is tenant-scoped — a same-inspectionId row in another tenant does not leak', async () => {
+    await seedRoleProfiles(db, 't2', new Date(1));
+    await db.insert(schema.tenants).values({ id: 't2', name: 'T2', slug: 't2', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(1) });
+    await db.insert(schema.contacts).values({ id: 'c3', tenantId: 't2', type: 'agent', name: 'Other Agent', email: 'o@x.com', createdAt: new Date(1) });
+    await svc.addPerson('t2', 'i1', 'c3', `crp_t2_buyer_agent`);
+    const id = await svc.contactIdForRole('t1', 'i1', 'buyer_agent');
+    expect(id).toBeNull();
+  });
 });
