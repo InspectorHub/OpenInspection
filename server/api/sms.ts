@@ -454,7 +454,7 @@ export const smsAdminRoutes = createApiRouter()
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).get();
         if (!insp) throw Errors.NotFound('Inspection not found.');
 
-        const contactId = await ensureClientContact(c.env.DB, tenantId, insp);
+        const contactId = await ensureClientContact(c.env.DB, tenantId, inspectionId);
         if (!contactId) throw Errors.BadRequest('This inspection has no client to attest consent for.');
 
         await new SmsConsentService(c.env.DB).record(tenantId, contactId, 'granted', 'admin', {

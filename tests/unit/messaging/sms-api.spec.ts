@@ -7,6 +7,7 @@ import { AppError } from '../../../server/lib/errors';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { SAAS_PROFILE, STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
 /**
  * Track L Task 8 — SMS consent API (in-process Hono harness, mirrors
@@ -120,12 +121,27 @@ describe('SMS consent API (Track L Task 8)', () => {
         expect(ev?.capturedVia).toBe('admin');
     });
 
-    it('attestation auto-creates + links a contact for a free-typed client (D6b)', async () => {
+    it('attestation backfills clientContactId from the inspection_people primary-client join (Task 9b)', async () => {
+        // Pre-Task-9b this exercised ensureClientContact's free-typed-string
+        // dedupe/create path (no linked contact, just inline clientName/
+        // clientEmail). That path was retired: a primary client is now always
+        // an EXISTING contacts row referenced via inspection_people, so this
+        // seeds that join instead of relying on the (dropped) denormalized
+        // columns.
         const inspId = crypto.randomUUID();
         await db.insert(schema.inspections).values({
-            id: inspId, tenantId: TENANT, propertyAddress: '2 Oak', clientName: 'Bob',
-            clientEmail: 'bob@x.com', clientContactId: null, date: '2026-07-02',
+            id: inspId, tenantId: TENANT, propertyAddress: '2 Oak',
+            clientContactId: null, date: '2026-07-02',
             status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as never);
+        await seedRoleProfiles(db, TENANT, new Date(1));
+        const bobContactId = crypto.randomUUID();
+        await db.insert(schema.contacts).values({
+            id: bobContactId, tenantId: TENANT, type: 'client', name: 'Bob', email: 'bob@x.com', createdAt: new Date(),
+        } as never);
+        await db.insert(schema.inspectionPeople).values({
+            id: `ip_${inspId}_client`, tenantId: TENANT, inspectionId: inspId,
+            contactId: bobContactId, roleProfileId: `crp_${TENANT}_client`, createdAt: new Date(),
         } as never);
 
         const app = buildApp(db);
@@ -135,7 +151,7 @@ describe('SMS consent API (Track L Task 8)', () => {
         expect(res.status).toBe(200);
 
         const insp = await db.select().from(schema.inspections).where(eq(schema.inspections.id, inspId)).get();
-        expect(insp?.clientContactId).toBeTruthy();
+        expect(insp?.clientContactId).toBe(bobContactId);
         expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, insp!.clientContactId!)).toBe('granted');
     });
 

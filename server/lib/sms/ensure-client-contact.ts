@@ -1,40 +1,33 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, isNull } from 'drizzle-orm';
-import { contacts, inspections } from '../db/schema';
-import { nanoid } from 'nanoid';
+import { and, eq } from 'drizzle-orm';
+import { inspections } from '../db/schema';
+import { PeopleService } from '../../services/people.service';
 
 /**
  * Track L (D6b) — guarantee a client contact to attach SMS consent to. Returns
- * the linked contact id if present; else find-or-creates one (dedupe by
- * (tenant,email) when an email exists) and back-links inspections.client_contact_id.
- * Returns null only when the inspection has neither a contact nor any client
- * name/email/phone to create from (degenerate; caller skips consent).
+ * the already-linked contact id when present; otherwise resolves the
+ * inspection's primary client via PeopleService.getPrimaryClient (Task 9b —
+ * inspection_people is the source of truth for who the client is, superseding
+ * the dropped inspections.client_name/_email/_phone columns) and back-links
+ * inspections.client_contact_id to that already-existing contact. Returns
+ * null when the inspection does not exist, or exists but has no primary
+ * client at all (degenerate; caller skips consent).
  */
 export async function ensureClientContact(
-    dbRaw: D1Database, tenantId: string, inspection: typeof inspections.$inferSelect,
+    dbRaw: D1Database, tenantId: string, inspectionId: string,
 ): Promise<string | null> {
     const db = drizzle(dbRaw);
-    if (inspection.clientContactId) return inspection.clientContactId;
+    const insp = await db.select({ clientContactId: inspections.clientContactId })
+        .from(inspections)
+        .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+        .get();
+    if (!insp) return null;
+    if (insp.clientContactId) return insp.clientContactId;
 
-    const email = inspection.clientEmail?.trim() || null;
-    const name = inspection.clientName?.trim() || email || inspection.clientPhone?.trim() || null;
-    if (!name && !email && !inspection.clientPhone) return null;
+    const client = await new PeopleService({ DB: dbRaw }).getPrimaryClient(tenantId, inspectionId);
+    if (!client) return null;
 
-    let contactId: string | null = null;
-    if (email) {
-        const existing = await db.select({ id: contacts.id }).from(contacts)
-            .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, email), isNull(contacts.archivedAt)))
-            .get();
-        if (existing) contactId = existing.id;
-    }
-    if (!contactId) {
-        contactId = nanoid();
-        await db.insert(contacts).values({
-            id: contactId, tenantId, type: 'client', name: name ?? 'Client',
-            email, phone: inspection.clientPhone ?? null, createdAt: new Date(),
-        } as never);
-    }
-    await db.update(inspections).set({ clientContactId: contactId })
-        .where(and(eq(inspections.id, inspection.id), eq(inspections.tenantId, tenantId)));
-    return contactId;
+    await db.update(inspections).set({ clientContactId: client.contactId })
+        .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
+    return client.contactId;
 }
