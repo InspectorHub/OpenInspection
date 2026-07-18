@@ -5,6 +5,10 @@ import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { EmailService } from '../../../server/services/email.service';
 import { eq } from 'drizzle-orm';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { PeopleService } from '../../../server/services/people.service';
+
+const roleProfileId = (tenantId: string, key: string) => `crp_${tenantId}_${key}`;
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -29,6 +33,8 @@ describe('AgentService.listReferrals — A2', () => {
             { id: T1, name: 'Acme Inspections', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: T2, name: 'BobsInsp', slug: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
+        await seedRoleProfiles(testDb, T1, new Date(1));
+        await seedRoleProfiles(testDb, T2, new Date(1));
 
         await testDb.insert(schema.users).values([
             { id: AGENT_USER, tenantId: null, email: 'jane@realty.com', role: 'agent', name: 'Jane', createdAt: new Date(), passwordHash: 'h' },
@@ -60,7 +66,18 @@ describe('AgentService.listReferrals — A2', () => {
             { id: 'no-referral-inspection', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '11 Pine', clientName: 'Eve', date: '2026-06-05', status: 'requested', paymentStatus: 'unpaid', referredByAgentId: null, price: 0, createdAt: new Date() },
         ]);
 
+        // Buyer-agent attribution now lives on inspection_people (Task 9c) —
+        // every fixture inspection that carries a legacy referredByAgentId
+        // must ALSO get the matching inspection_people row, or the
+        // post-rewrite queries (which read inspection_people, not the
+        // legacy column) will no longer see it as referred.
+        const people = new PeopleService({ DB: {} as D1Database });
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
+        await people.addPerson(T1, 'i-1', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
+        await people.addPerson(T1, 'i-2', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
+        await people.addPerson(T2, 'i-3', 'jane-c2', roleProfileId(T2, 'buyer_agent'));
+        await people.addPerson(T1, 'other-agent-inspection', 'other-c1', roleProfileId(T1, 'buyer_agent'));
+        // 'no-referral-inspection' intentionally gets NO inspection_people row.
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
@@ -108,6 +125,19 @@ describe('AgentService.listReferrals — A2', () => {
     it('respects opts.limit', async () => {
         const refs = await svc.listReferrals(AGENT_USER, { limit: 1 });
         expect(refs.length).toBe(1);
+    });
+
+    it('Task 9c — legacy referredByAgentId NULL, buyer_agent inspection_people row present — still resolves as a referral', async () => {
+        await testDb.insert(schema.inspections).values({
+            id: 'i-people-only', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '77 Birch',
+            clientName: 'Pat', date: '2026-06-06', status: 'requested', paymentStatus: 'unpaid',
+            referredByAgentId: null, price: 0, createdAt: new Date(),
+        });
+        const people = new PeopleService({ DB: {} as D1Database });
+        await people.addPerson(T1, 'i-people-only', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
+
+        const refs = await svc.listReferrals(AGENT_USER, { limit: 50 });
+        expect(refs.find((r) => r.id === 'i-people-only')).toBeDefined();
     });
 });
 

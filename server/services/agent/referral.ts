@@ -3,6 +3,7 @@ import { and, desc, eq } from 'drizzle-orm';
 import { agentTenantLinks, tenants, users } from '../../lib/db/schema/tenant';
 import { contacts } from '../../lib/db/schema/contact';
 import { inspections, inspectionResults } from '../../lib/db/schema/inspection';
+import { inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { REPORT_STATUS } from '../../lib/status/report-status';
@@ -91,7 +92,7 @@ export async function listReferrals(
             status:          inspections.status,
             reportStatus:    inspections.reportStatus,
             paymentStatus:   inspections.paymentStatus,
-            referredById:    inspections.referredByAgentId,
+            referredById:    inspectionPeople.contactId,
             contactEmail:    contacts.email,
             inspectorName:   users.name,
             linkContactId:   agentTenantLinks.inspectorContactId,
@@ -106,10 +107,34 @@ export async function listReferrals(
             ),
         )
         .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
+        // Buyer's-agent attribution: inspections -> contact_role_profiles
+        // (this tenant's buyer_agent profile) -> inspection_people -> contacts.
+        // contact_role_profiles is joined FIRST (correlated on tenantId only,
+        // so it narrows to at most one row per tenant) so the inspection_people
+        // join below only ever matches buyer_agent rows — joining
+        // inspection_people first would fan out over every role (client,
+        // co_client, listing_agent, ...) on the inspection. Replaces the
+        // legacy inspections.referredByAgentId column read (see PeopleService).
+        .leftJoin(
+            contactRoleProfiles,
+            and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            inspectionPeople,
+            and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ),
+        )
         .leftJoin(
             contacts,
             and(
-                eq(contacts.id, inspections.referredByAgentId),
+                eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
             ),
         )
@@ -171,7 +196,7 @@ export async function accessToInspection(
     const rows = await db
         .select({
             tenantId:      inspections.tenantId,
-            referredById:  inspections.referredByAgentId,
+            referredById:  inspectionPeople.contactId,
             contactEmail:  contacts.email,
             linkContactId: agentTenantLinks.inspectorContactId,
         })
@@ -184,10 +209,29 @@ export async function accessToInspection(
                 eq(agentTenantLinks.status, 'active'),
             ),
         )
+        // Buyer's-agent attribution via inspection_people — see listReferrals
+        // above for why contact_role_profiles is joined before
+        // inspection_people (avoids fanning out over every role).
+        .leftJoin(
+            contactRoleProfiles,
+            and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            inspectionPeople,
+            and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ),
+        )
         .leftJoin(
             contacts,
             and(
-                eq(contacts.id, inspections.referredByAgentId),
+                eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
             ),
         )
@@ -226,7 +270,7 @@ export async function listRecommendationsForAgent(
             propertyAddress:   inspections.propertyAddress,
             date:              inspections.date,
             templateSnapshot:  inspections.templateSnapshot,
-            referredById:      inspections.referredByAgentId,
+            referredById:      inspectionPeople.contactId,
             contactEmail:      contacts.email,
             linkContactId:     agentTenantLinks.inspectorContactId,
             resultsData:       inspectionResults.data,
@@ -240,10 +284,29 @@ export async function listRecommendationsForAgent(
                 eq(agentTenantLinks.status, 'active'),
             ),
         )
+        // Buyer's-agent attribution via inspection_people — see listReferrals
+        // above for why contact_role_profiles is joined before
+        // inspection_people (avoids fanning out over every role).
+        .leftJoin(
+            contactRoleProfiles,
+            and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            inspectionPeople,
+            and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ),
+        )
         .leftJoin(
             contacts,
             and(
-                eq(contacts.id, inspections.referredByAgentId),
+                eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
             ),
         )
@@ -338,7 +401,7 @@ export async function referralsByDay(
     const rows = await db
         .select({
             createdAt:    inspections.createdAt,
-            referredById: inspections.referredByAgentId,
+            referredById: inspectionPeople.contactId,
             linkContactId: agentTenantLinks.inspectorContactId,
         })
         .from(inspections)
@@ -348,6 +411,30 @@ export async function referralsByDay(
                 eq(agentTenantLinks.tenantId, inspections.tenantId),
                 eq(agentTenantLinks.agentUserId, agentUserId),
                 eq(agentTenantLinks.status, 'active'),
+            ),
+        )
+        // Buyer's-agent attribution via inspection_people — see listReferrals
+        // above for why contact_role_profiles is joined before
+        // inspection_people (avoids fanning out over every role). NOTE: if an
+        // inspection ever carries more than one buyer_agent inspection_people
+        // row for this same agent contact, it would be double-counted here
+        // (no downstream dedup, unlike listReferrals' predicate filter) — not
+        // possible via the current create paths (single buyer_agent per
+        // inspection), flagged for awareness.
+        .leftJoin(
+            contactRoleProfiles,
+            and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            inspectionPeople,
+            and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
             ),
         )
         .all();
