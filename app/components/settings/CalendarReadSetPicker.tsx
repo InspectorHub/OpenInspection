@@ -3,7 +3,7 @@ import { useFetcher } from "react-router";
 import type { action } from "~/routes/settings-schedule";
 import { m } from "~/paraglide/messages";
 
-export interface CalendarEntry {
+interface CalendarEntry {
   id: string;
   summary: string;
   accessRole: string;

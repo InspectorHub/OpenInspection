@@ -5,5 +5,3 @@ export const SaveReadSetSchema = z.object({
     readCalendarIds: z.array(z.string().min(1)).min(1),
     writeCalendarId: z.string().min(1),
 });
-
-export type SaveReadSetInput = z.infer<typeof SaveReadSetSchema>;
