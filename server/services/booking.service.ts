@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
-import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, tenantConfigs, users, services as servicesTable, agentTenantLinks } from '../lib/db/schema';
+import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, tenantConfigs, users, services as servicesTable, agentTenantLinks, contactRoleProfiles } from '../lib/db/schema';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../lib/tz';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
@@ -18,6 +18,7 @@ import {
 import { canPushEvents } from '../lib/calendar/provider';
 import { getBookingHost, getBaseUrl } from '../lib/url';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
+import { PeopleService } from './people.service';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { buildSlotGrid } from '../lib/booking/slot-grid';
 import { loadSlotGridOptions } from '../lib/booking/slot-rules';
@@ -518,6 +519,11 @@ export class BookingService {
         let createdRequestId: string;
         let primaryInspectionId: string;
         let allInspectionIds: string[] = [];
+        // Task 7b (people-role-profiles) — set only by the direct-insert
+        // (legacy single-service) branch below. The multi-service branch
+        // routes through InspectionRequestService.create, which owns its
+        // own inspection_people write for the inspections it creates.
+        let directInsertInspectionId: string | null = null;
         // Booked duration from the chosen service(s); NULL when the legacy path
         // carries no explicit service (falls back to the time-slot window below).
         let bookedServiceDurationMin: number | null = null;
@@ -606,6 +612,7 @@ export class BookingService {
                 logger.error('booking.assignment-sync.failed', { inspectionId: primaryInspectionId }, e instanceof Error ? e : undefined);
             }
             allInspectionIds = [primaryInspectionId];
+            directInsertInspectionId = primaryInspectionId;
         }
         const inspectionId = primaryInspectionId;
 
@@ -693,6 +700,35 @@ export class BookingService {
                     inspectionIds: allInspectionIds,
                     error: e instanceof Error ? e.message : String(e),
                 });
+            }
+        }
+
+        // Task 7b (people-role-profiles) — mirror the client + buyer's agent
+        // into inspection_people for the legacy single-service direct-insert
+        // path, alongside the legacy clientContactId / referredByAgentId
+        // columns above (kept until Task 13 retires them). Scoped to
+        // directInsertInspectionId only — the multi-service branch's
+        // inspections were created by InspectionRequestService.create, which
+        // owns its own people-write for those rows. Runs after
+        // bookingClientContactId resolves above since both roles are written
+        // together. Non-fatal: a people-write failure must never roll back an
+        // already-committed inspection row.
+        if (directInsertInspectionId) {
+            try {
+                const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
+                    .from(contactRoleProfiles)
+                    .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
+                const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
+                const people = new PeopleService({ DB: this.db });
+                const links: Array<[string | null, string | undefined]> = [
+                    [bookingClientContactId, roleIdByKey.get('client')],
+                    [resolvedAgentContactId, roleIdByKey.get('buyer_agent')],
+                ];
+                for (const [contactId, roleProfileId] of links) {
+                    if (contactId && roleProfileId) await people.addPerson(tenantId, directInsertInspectionId, contactId, roleProfileId);
+                }
+            } catch (err) {
+                logger.error('inspection-people write from booking create failed', { inspectionId: directInsertInspectionId }, err instanceof Error ? err : undefined);
             }
         }
 
