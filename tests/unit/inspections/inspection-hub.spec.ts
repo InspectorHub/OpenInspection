@@ -49,6 +49,12 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
             { id: 'client-1',        tenantId: TENANT, type: 'client', name: 'Jane Buyer',        email: 'jane@example.com', phone: '+15551234567', createdAt: new Date() },
             { id: 'agent-buyer-1',   tenantId: TENANT, type: 'agent', name: 'Bob Buyer-Agent',    email: 'bob@bba.com',  phone: '+15550001111', createdAt: new Date() },
             { id: 'agent-listing-1', tenantId: TENANT, type: 'agent', name: 'Lisa Listing-Agent', email: 'lisa@lla.com', phone: null,            createdAt: new Date() },
+            // Task 9c — decoy contacts backing the deliberately-WRONG legacy
+            // referredByAgentId/sellingAgentId column values below (sellingAgentId
+            // carries a frozen legacy FK to contacts.id, so the decoy must be a
+            // real row — just not the one inspection_people actually links).
+            { id: 'stale-agent-buyer',   tenantId: TENANT, type: 'agent', name: 'Decoy Buyer-Agent',   email: 'decoy-buyer@example.com',   createdAt: new Date() },
+            { id: 'stale-agent-listing', tenantId: TENANT, type: 'agent', name: 'Decoy Listing-Agent', email: 'decoy-listing@example.com', createdAt: new Date() },
         ]);
         await testDb.insert(schema.templates).values({
             id: 'tpl-1', tenantId: TENANT, name: 'Standard', version: 1,
@@ -56,9 +62,18 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         });
         await testDb.insert(schema.inspections).values({
             id: 'insp-full', tenantId: TENANT, inspectorId: 'user-insp',
-            propertyAddress: '1 Main St', clientContactId: 'client-1',
-            clientName: 'Jane Buyer', clientEmail: 'jane@example.com', clientPhone: '+15551234567',
-            templateId: 'tpl-1', referredByAgentId: 'agent-buyer-1', sellingAgentId: 'agent-listing-1',
+            propertyAddress: '1 Main St',
+            // Task 9c — legacy client/agent columns intentionally DIVERGE from
+            // inspection_people below (stale decoy values). getInspectionHub
+            // must resolve `inspection.clientName/clientEmail/clientPhone/
+            // clientContactId/referredByAgentId/sellingAgentId` from
+            // inspection_people (PeopleService.getPrimaryClient /
+            // contactIdForRole), never these columns — they survive GDPR
+            // erasure as a stale denormalized cache and would leak an erased
+            // subject's PII.
+            clientContactId: 'stale-contact-id',
+            clientName: 'STALE-LEGACY-NAME', clientEmail: 'stale-legacy@example.com', clientPhone: '000-000-0000',
+            templateId: 'tpl-1', referredByAgentId: 'stale-agent-buyer', sellingAgentId: 'stale-agent-listing',
             coverPhotoId: 'cover-1', date: '2026-06-01', status: 'completed',
             paymentStatus: 'unpaid', price: 35000, paymentRequired: true, agreementRequired: true,
             createdAt: new Date(),
@@ -95,7 +110,8 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
         expect(hub).not.toBeNull();
         if (!hub) throw new Error('unreachable');
 
-        // inspection block
+        // inspection block — sourced from inspection_people (Task 9c), not the
+        // deliberately-divergent legacy columns seeded above.
         expect(hub.inspection).toMatchObject({
             id: 'insp-full', propertyAddress: '1 Main St', clientName: 'Jane Buyer',
             clientEmail: 'jane@example.com', clientPhone: '+15551234567', clientContactId: 'client-1',
@@ -103,6 +119,12 @@ describe('Issue #111 — InspectionService.getInspectionHub', () => {
             paymentStatus: 'unpaid', paymentRequired: true, agreementRequired: true,
             coverPhoto: 'cover-1', referredByAgentId: 'agent-buyer-1', sellingAgentId: 'agent-listing-1',
         });
+        expect(hub.inspection.clientName).not.toBe('STALE-LEGACY-NAME');
+        expect(hub.inspection.clientEmail).not.toBe('stale-legacy@example.com');
+        expect(hub.inspection.clientPhone).not.toBe('000-000-0000');
+        expect(hub.inspection.clientContactId).not.toBe('stale-contact-id');
+        expect(hub.inspection.referredByAgentId).not.toBe('stale-agent-buyer');
+        expect(hub.inspection.sellingAgentId).not.toBe('stale-agent-listing');
         expect(hub.tenantSlug).toBe(SLUG);
 
         // people block (reuses getPeopleCard shape)

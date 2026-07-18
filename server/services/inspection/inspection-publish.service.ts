@@ -4,6 +4,7 @@ import { Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
 import { resolveLocale } from '../../lib/locale';
 import { InvoiceService } from '../invoice.service';
+import { PeopleService } from '../people.service';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import type { AgreementService } from '../agreement.service';
@@ -315,20 +316,33 @@ export class InspectionPublishService extends InspectionSubService {
         // D1Database, same handle this service holds) per the DI guidance: no
         // constructor-chain redesign, just compose the read.
         const invoiceSvc = new InvoiceService(this.db);
-        const [people, readiness, invoice] = await Promise.all([
+        const peopleSvc = new PeopleService({ DB: this.db });
+        // Task 9c — the flat `inspection.*` client/agent fields (kept for the
+        // hub page's bare-text client fallback + the /contacts/:id link, and
+        // for API-consumer back-compat) are resolved via inspection_people,
+        // NOT the legacy inspections.client_name/_email/_phone/_contact_id/
+        // referred_by_agent_id/selling_agent_id columns — those survive GDPR
+        // erasure as a stale denormalized cache and would leak an erased
+        // subject's PII. `people` below (getPeopleCard) already sources the
+        // same way; this projection is a separate, intentionally-duplicated
+        // read for the flat shape this endpoint has always returned.
+        const [people, readiness, invoice, primaryClient, buyerAgentId, listingAgentId] = await Promise.all([
             this.facade.getPeopleCard(inspectionId, tenantId),
             this.computePublishReadiness(inspectionId, tenantId),
             invoiceSvc.findByInspectionId(tenantId, inspectionId),
+            peopleSvc.getPrimaryClient(tenantId, inspectionId),
+            peopleSvc.contactIdForRole(tenantId, inspectionId, 'buyer_agent'),
+            peopleSvc.contactIdForRole(tenantId, inspectionId, 'listing_agent'),
         ]);
 
         return {
             inspection: {
                 id:                insp.id,
                 propertyAddress:   insp.propertyAddress,
-                clientName:        insp.clientName ?? null,
-                clientEmail:       insp.clientEmail ?? null,
-                clientPhone:       insp.clientPhone ?? null,
-                clientContactId:   insp.clientContactId ?? null,
+                clientName:        primaryClient?.name ?? null,
+                clientEmail:       primaryClient?.email ?? null,
+                clientPhone:       primaryClient?.phone ?? null,
+                clientContactId:   primaryClient?.contactId ?? null,
                 status:            insp.status,
                 reportStatus:      insp.reportStatus as string,
                 date:              insp.date ?? null,
@@ -339,8 +353,8 @@ export class InspectionPublishService extends InspectionSubService {
                 paymentRequired:   insp.paymentRequired === true,
                 agreementRequired: insp.agreementRequired === true,
                 coverPhoto:        insp.coverPhotoId ?? null,
-                referredByAgentId: insp.referredByAgentId ?? null,
-                sellingAgentId:    insp.sellingAgentId ?? null,
+                referredByAgentId: buyerAgentId,
+                sellingAgentId:    listingAgentId,
                 createdAt:         safeISODate(insp.createdAt),
             },
             tenantSlug,
