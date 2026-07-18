@@ -323,9 +323,12 @@ export default function CalendarPage() {
       <CalendarNavBar
         title={headerTitle}
         viewMode={viewMode}
+        currentDate={currentDate}
+        locale={locale}
         onPrev={prev}
         onNext={next}
         onToday={() => setCurrentDate(new Date())}
+        onJumpToMonth={setCurrentDate}
         onViewModeChange={setViewMode}
       />
 

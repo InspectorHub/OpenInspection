@@ -59,5 +59,6 @@
   "server/lib/email-templates/registry.ts": 413,
   "app/routes/settings-schedule.tsx": 412,
   "app/routes/templates.tsx": 411,
+  "app/routes/calendar.tsx": 402,
   "server/api/secrets.ts": 401
 }
