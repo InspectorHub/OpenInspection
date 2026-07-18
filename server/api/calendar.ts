@@ -5,6 +5,9 @@ import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema';
 import { resolveTenantTimeZone } from '../lib/tz';
 import { syncGoogleBusyOverrides } from '../lib/calendar/sync-busy';
+import { resolveReadSet, saveReadSet } from '../lib/calendar/read-set';
+import { SaveReadSetSchema } from '../lib/validations/calendar-read-set.schema';
+import { AppError } from '../lib/errors';
 import {
     CalendarSyncResponseSchema,
     CalendarCallbackQuerySchema,
@@ -235,6 +238,58 @@ export const calendarRoutes = createApiRouter()
             logger.error('[calendar] listCalendars failed', { tenantId }, e instanceof Error ? e : undefined);
             return c.json({ success: false, error: { message: 'Failed to fetch Google calendars' } }, 500);
         }
+    })
+    /**
+     * PUT /api/calendar/connections/:id/calendars
+     * A-polish 10b — save the multi-read set + single write target under the
+     * locked invariants (write editable, write ∈ read, Primary always read).
+     */
+    .put('/connections/:id/calendars', async (c) => {
+        const jwtUser = c.get('user');
+        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
+        const tenantId = c.get('tenantId') as string;
+        const connId = c.req.param('id');
+        const open = await loadOpenGoogleConnection(
+            c.env.DB, tenantId, jwtUser.sub, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+        );
+        if (!open || open.connection.id !== connId) {
+            return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 404);
+        }
+        const parsed = SaveReadSetSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+            return c.json({ success: false, error: { message: 'Invalid read set', details: parsed.error.flatten() } }, 400);
+        }
+        const provider = getCalendarProvider('google');
+        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+        if (!oauthCreds) {
+            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
+        }
+        let available;
+        try {
+            available = await provider.listCalendars({
+                clientId: oauthCreds.clientId,
+                clientSecret: oauthCreds.clientSecret,
+                refreshToken: open.credentials.refreshToken,
+            });
+        } catch (e) {
+            logger.error('[calendar] listCalendars (save) failed', { tenantId }, e instanceof Error ? e : undefined);
+            return c.json({ success: false, error: { message: 'Failed to fetch Google calendars' } }, 500);
+        }
+        let resolved;
+        try {
+            resolved = resolveReadSet(available, parsed.data);
+        } catch (e) {
+            if (e instanceof AppError) {
+                return c.json({ success: false, error: { code: e.code, message: e.message } }, e.status as 400);
+            }
+            throw e;
+        }
+        await saveReadSet(drizzle(c.env.DB), { tenantId, connectionId: connId, resolved });
+        return c.json({
+            success: true,
+            data: { readCalendarIds: resolved.readCalendarIds, writeCalendarId: resolved.writeCalendarId },
+        }, 200);
     })
     /**
      * POST /api/calendar/sync-events
