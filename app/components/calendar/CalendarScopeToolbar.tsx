@@ -60,7 +60,10 @@ export function CalendarScopeToolbar({
       </div>
 
       {scope === "team" && canManageTeam && (
-        <div className="flex flex-wrap gap-2" aria-label={m.calendar_scope_inspectors_aria()}>
+        // Wider gap BETWEEN members than the gap-1 tying each chip to its own
+        // sync badge, so a scanned row reads as [chip badge] [chip badge] rather
+        // than an ambiguous run of equally-spaced pills.
+        <div className="flex flex-wrap gap-x-5 gap-y-2" aria-label={m.calendar_scope_inspectors_aria()}>
           {members.map((member) => {
             const selected = selectedUserIds.includes(member.id);
             return (

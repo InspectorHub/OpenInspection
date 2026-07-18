@@ -1,4 +1,3 @@
-import { Pill, type PillTone } from "@core/shared-ui";
 import { formatRelativeTime } from "~/lib/format";
 import { m } from "~/paraglide/messages";
 
@@ -23,10 +22,19 @@ export function syncBadgeState(
   return now - lastSyncAt > STALE_AFTER_MS ? "stale" : "connected";
 }
 
-const TONE: Record<SyncBadgeState, PillTone> = {
-  connected: "sat",
-  stale: "warning",
-  "not-connected": "neutral",
+// A dot carries the state at a glance; the text colour decides how loud it is.
+// Connected stays quiet (muted text, green dot) so a healthy row reads calm;
+// stale/never use amber text that pops precisely because everything else is
+// muted; not-connected is a neutral "not set up", not an error, so it stays grey.
+const DOT: Record<SyncBadgeState, string> = {
+  connected: "bg-ih-ok-fg",
+  stale: "bg-ih-watch-fg",
+  "not-connected": "bg-ih-fg-4",
+};
+const TEXT: Record<SyncBadgeState, string> = {
+  connected: "text-ih-fg-3",
+  stale: "text-ih-watch-fg",
+  "not-connected": "text-ih-fg-4",
 };
 
 function stateLabel(state: SyncBadgeState): string {
@@ -77,13 +85,16 @@ export function InspectorSyncBadge({
           : m.calendar_sync_not_connected_short();
 
   return (
-    <span data-sync-state={state} title={title} className="inline-flex items-center">
-      <Pill tone={TONE[state]} dot>
-        <span data-sync-label aria-hidden="true" className="text-[11px] font-medium">
-          {visibleLabel}
-        </span>
-        <span className="sr-only">{title}</span>
-      </Pill>
+    <span
+      data-sync-state={state}
+      title={title}
+      className="inline-flex items-center gap-1 text-[11px] font-medium"
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${DOT[state]}`} aria-hidden="true" />
+      <span data-sync-label aria-hidden="true" className={TEXT[state]}>
+        {visibleLabel}
+      </span>
+      <span className="sr-only">{title}</span>
     </span>
   );
 }
