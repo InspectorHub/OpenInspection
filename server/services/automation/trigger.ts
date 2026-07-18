@@ -149,23 +149,32 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             // filtered to (tenant, key, active) FIRST, then inspection_people scoped to
             // this inspection, then contacts — keeps the join to at most one row.
             const contactForRole = async (roleKey: string): Promise<{ email: string | null; phone: string | null } | null> => {
-                const row = await db.select({ email: contacts.email, phone: contacts.phone })
-                    .from(contactRoleProfiles)
-                    .innerJoin(inspectionPeople, and(
-                        eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
-                        eq(inspectionPeople.inspectionId, insp.id),
-                        eq(inspectionPeople.tenantId, insp.tenantId),
-                    ))
-                    .innerJoin(contacts, and(
-                        eq(contacts.id, inspectionPeople.contactId),
-                        eq(contacts.tenantId, insp.tenantId),
-                    ))
-                    .where(and(
-                        eq(contactRoleProfiles.tenantId, insp.tenantId),
-                        eq(contactRoleProfiles.key, roleKey),
-                        eq(contactRoleProfiles.active, true),
-                    )).get();
-                return row ?? null;
+                // Resilience: a transient read failure resolves to "no address" rather
+                // than throwing out of resolveAddress and aborting the whole trigger /
+                // reminder batch (matches the prior phoneOf `.catch(() => null)` posture).
+                // A try/catch (not `.get().catch()`) is used so it works under both the
+                // async D1 driver and the synchronous better-sqlite3 test driver.
+                try {
+                    const row = await db.select({ email: contacts.email, phone: contacts.phone })
+                        .from(contactRoleProfiles)
+                        .innerJoin(inspectionPeople, and(
+                            eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                            eq(inspectionPeople.inspectionId, insp.id),
+                            eq(inspectionPeople.tenantId, insp.tenantId),
+                        ))
+                        .innerJoin(contacts, and(
+                            eq(contacts.id, inspectionPeople.contactId),
+                            eq(contacts.tenantId, insp.tenantId),
+                        ))
+                        .where(and(
+                            eq(contactRoleProfiles.tenantId, insp.tenantId),
+                            eq(contactRoleProfiles.key, roleKey),
+                            eq(contactRoleProfiles.active, true),
+                        )).get();
+                    return row ?? null;
+                } catch {
+                    return null;
+                }
             };
 
             if (channel === 'email') {
