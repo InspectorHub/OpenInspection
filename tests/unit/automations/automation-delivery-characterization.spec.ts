@@ -19,9 +19,12 @@ import { AutomationService } from '../../../server/services/automation.service';
 import { AUTOMATION_SEEDS } from '../../../server/data/automation-seeds';
 import { interpolate } from '../../../server/services/automation/shared';
 import { reportUrl } from '../../../server/lib/public-urls';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { EmailService } from '../../../server/services/email.service';
 
 const T = '00000000-0000-0000-0000-0000000000a8';
+const roleProfileId = (key: string) => `crp_${T}_${key}`;
 let db: BetterSQLite3Database<typeof schema>;
 
 beforeEach(async () => {
@@ -35,6 +38,7 @@ beforeEach(async () => {
         id: T, name: 'Acme Inspections', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
+    await seedRoleProfiles(db, T, new Date(1));
 });
 
 describe('SP2 delivery characterization — Report Ready output unchanged after decoupling', () => {
@@ -43,12 +47,18 @@ describe('SP2 delivery characterization — Report Ready output unchanged after 
         const inspId = '00000000-0000-0000-0000-0000000000b1';
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: T, propertyAddress: '1 Main St',
-            clientName: 'Jane', clientEmail: 'client@example.com',
             date: '2026-06-01', status: 'completed',
             reportStatus: 'published', paymentStatus: 'unpaid',
             price: 50000, agreementRequired: false, paymentRequired: false,
             createdAt: new Date(),
         } as never);
+        // Task 11a — client_name now resolves via inspection_people (not the
+        // legacy inspections.client_name/_email columns).
+        await db.insert(schema.contacts).values({
+            id: 'contact-chartest-1', tenantId: T, type: 'client', name: 'Jane',
+            email: 'client@example.com', createdAt: new Date(),
+        } as never);
+        await new PeopleService({ DB: {} as D1Database }).addPerson(T, inspId, 'contact-chartest-1', roleProfileId('client'));
 
         // Construct service — the vi.mock above redirects drizzle(d1) to in-memory db.
         const svc = new AutomationService({} as D1Database);
