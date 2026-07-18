@@ -1,8 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, like, sql, isNull, or, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, like, sql, isNull, inArray, isNotNull } from 'drizzle-orm';
 import { contacts } from '../lib/db/schema/contact';
 import { inspections } from '../lib/db/schema/inspection';
 import { invoices } from '../lib/db/schema/invoice';
+import { inspectionPeople } from '../lib/db/schema/inspection/role-profiles';
 import { Errors } from '../lib/errors';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
@@ -21,18 +22,18 @@ export class ContactService {
 
         const rows = await db.select().from(contacts).where(and(...conditions)).limit(opts.limit).offset(opts.offset).all();
 
+        // "Which inspections is this contact on" is uniform across contact
+        // types (agent vs client): any inspection_people row naming this
+        // contact in ANY role, on ANY inspection in this tenant. Replaces the
+        // legacy dual-path (referredByAgentId for agents, clientEmail match
+        // for clients) — a contact could hold >1 role on one inspection, so
+        // count DISTINCT inspection ids.
         const withCounts = await Promise.all(rows.map(async (c) => {
-            if (c.type === 'agent') {
-                const res = await db.select({ count: sql<number>`count(*)` }).from(inspections)
-                    .where(and(eq(inspections.tenantId, tenantId), eq(inspections.referredByAgentId, c.id))).get();
-                return { ...c, inspectionCount: res?.count ?? 0 };
-            }
-            if (c.type === 'client' && c.email) {
-                const res = await db.select({ count: sql<number>`count(*)` }).from(inspections)
-                    .where(and(eq(inspections.tenantId, tenantId), eq(inspections.clientEmail, c.email))).get();
-                return { ...c, inspectionCount: res?.count ?? 0 };
-            }
-            return { ...c, inspectionCount: 0 };
+            const res = await db.select({ count: sql<number>`count(distinct ${inspectionPeople.inspectionId})` })
+                .from(inspectionPeople)
+                .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.contactId, c.id)))
+                .get();
+            return { ...c, inspectionCount: res?.count ?? 0 };
         }));
 
         return withCounts.map(c => ({ ...c, createdAt: safeISODate(c.createdAt) }));
@@ -42,13 +43,13 @@ export class ContactService {
      * IA-18 (#111) — contact detail page payload: the contact, its inspection
      * history (date desc), and aggregate stats.
      *
-     * History linkage:
-     *  - agent  → inspections where referredByAgentId = id OR sellingAgentId = id
-     *             (legacy FK), deduped by inspection id.
-     *  - client → inspections where clientContactId = id OR (the contact has an
-     *             email AND clientEmail = that email) — the DUAL PATH that
-     *             recovers legacy rows created before IA-1 stamped
-     *             clientContactId. Deduped by inspection id.
+     * History linkage (uniform across agent/client, Task 9c-X2): inspections
+     * that have an inspection_people row naming this contact in ANY role
+     * (buyer_agent, listing_agent, client, co_client, ...), replacing the
+     * legacy dual-path (referredByAgentId/sellingAgentId for agents,
+     * clientContactId/clientEmail for clients — frozen cache, dropped Task 13).
+     * A contact could hold >1 role on one inspection, so the join is deduped
+     * by inspection id.
      *
      * Archived contacts STILL return detail (the history stays useful after a
      * soft-delete). Cross-tenant / unknown ids return null.
@@ -65,21 +66,6 @@ export class ContactService {
             .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
         if (!contact) return null;
 
-        // Build the tenant-scoped linkage predicate per contact type.
-        let linkage;
-        if (contact.type === 'agent') {
-            linkage = or(
-                eq(inspections.referredByAgentId, id),
-                eq(inspections.sellingAgentId, id),
-            );
-        } else {
-            const clientPaths = [eq(inspections.clientContactId, id)];
-            if (contact.email) {
-                clientPaths.push(eq(inspections.clientEmail, contact.email));
-            }
-            linkage = clientPaths.length > 1 ? or(...clientPaths) : clientPaths[0];
-        }
-
         const rows = await db.select({
             id:            inspections.id,
             propertyAddress: inspections.propertyAddress,
@@ -88,7 +74,12 @@ export class ContactService {
             price:         inspections.price,
             paymentStatus: inspections.paymentStatus,
         }).from(inspections)
-            .where(and(eq(inspections.tenantId, tenantId), linkage))
+            .innerJoin(inspectionPeople, eq(inspectionPeople.inspectionId, inspections.id))
+            .where(and(
+                eq(inspections.tenantId, tenantId),
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.contactId, id),
+            ))
             .all();
 
         // Dedup by inspection id (a row matched by both linkage paths appears
