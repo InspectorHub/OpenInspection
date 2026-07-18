@@ -18,8 +18,6 @@ import { logger } from '../../lib/logger';
 import { MAX_DURATION_SEC } from '../media-video.service';
 import type { VideoBackend, VideoDetails, VideoRef } from './types';
 
-export { MAX_DURATION_SEC };
-
 export class StreamVideoBackend implements VideoBackend {
     /**
      * @param stream      the `env.STREAM` binding

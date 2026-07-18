@@ -327,7 +327,7 @@ export interface AppServices {
 /**
  * Global variables injected into the Hono context via middlewares.
  */
-export type AppVariables = AuthVariables & {
+type AppVariables = AuthVariables & {
     services: AppServices;
     profile: DeploymentProfile;
     /** Unified client portal — verified email from the __Host-portal_session

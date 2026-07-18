@@ -74,7 +74,7 @@ const eventsRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
 }, { scopes: ['read'], tier: 'primary' }));
 
-export const calendarEventsRoutes = createApiRouter()
+const calendarEventsRoutes = createApiRouter()
     .openapi(eventsRoute, async (c) => {
     const { start, end } = c.req.valid('query');
     const tenantId = c.get('tenantId') as string;

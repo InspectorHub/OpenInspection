@@ -27,7 +27,7 @@ const DB_VERSION = 1;
 
 // ─── Record shape ─────────────────────────────────────────────────────────────
 
-export type PendingMediaKind = 'photo' | 'crop' | 'annotate';
+type PendingMediaKind = 'photo' | 'crop' | 'annotate';
 
 export interface PendingMediaRecord {
     /** crypto.randomUUID() — the IndexedDB primary key. */

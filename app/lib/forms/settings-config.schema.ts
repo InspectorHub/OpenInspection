@@ -63,5 +63,3 @@ export function makeCommunicationEmailSchema() {
     pointOfContact: z.enum(["inspector", "company"]).default("company"),
   });
 }
-
-export type CommunicationEmailInput = z.infer<ReturnType<typeof makeCommunicationEmailSchema>>;

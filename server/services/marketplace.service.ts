@@ -18,7 +18,7 @@ import { TemplateService } from './template.service';
  * old rows alongside new. Replace deletes the prior import's rows first then
  * inserts the new pack.
  */
-export type LibraryUpdateMode = 'append' | 'replace';
+type LibraryUpdateMode = 'append' | 'replace';
 
 export interface UpdateLibraryImportOptions {
     mode?: LibraryUpdateMode;

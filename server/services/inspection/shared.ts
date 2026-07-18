@@ -141,7 +141,7 @@ export function resolveDefectMustacheVars(
     return vars;
 }
 
-export interface PublishBlockingDefect {
+interface PublishBlockingDefect {
     sectionId:        string;
     sectionTitle:     string;
     itemId:           string;
@@ -271,7 +271,7 @@ export interface PropertyFacts {
 // is expected to fetch the section's comments first, then rank in memory.
 // -----------------------------------------------------------------------
 
-export type CannedSeverity = Severity | null;
+type CannedSeverity = Severity | null;
 
 export interface CannedCommentLike {
     id:         string;

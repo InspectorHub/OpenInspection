@@ -53,7 +53,7 @@ const ParamsIdItemId = z.object({
     itemId: z.string().describe('Cost item identifier'),
 });
 
-export const listCostItemsRoute = createRoute(withMcpMetadata({
+const listCostItemsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/cost-items',
     tags: ['inspections'],
@@ -84,7 +84,7 @@ export const listCostItemsRoute = createRoute(withMcpMetadata({
     description: 'List every commercial PCA cost line item recorded for the inspection, in display order, for the editor panel and downstream export routes.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const createCostItemRoute = createRoute(withMcpMetadata({
+const createCostItemRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/cost-items',
     tags: ['inspections'],
@@ -108,7 +108,7 @@ export const createCostItemRoute = createRoute(withMcpMetadata({
     description: 'Create a new commercial PCA cost line item on the inspection. When findingKey is set and no explicit cost/remedy is given, the line is best-effort seeded from the finding\'s recommendation snapshot.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const updateCostItemRoute = createRoute(withMcpMetadata({
+const updateCostItemRoute = createRoute(withMcpMetadata({
     method: 'patch',
     path: '/{id}/cost-items/{itemId}',
     tags: ['inspections'],
@@ -128,7 +128,7 @@ export const updateCostItemRoute = createRoute(withMcpMetadata({
     description: 'Patch any subset of fields on an existing commercial PCA cost line item, tenant-scoped and restricted to the inspection it already belongs to.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const deleteCostItemRoute = createRoute(withMcpMetadata({
+const deleteCostItemRoute = createRoute(withMcpMetadata({
     method: 'delete',
     path: '/{id}/cost-items/{itemId}',
     tags: ['inspections'],

@@ -17,7 +17,7 @@ export interface WordExportJob {
     format: 'docx';
 }
 
-export const wordExportJobSchema = z.object({
+const wordExportJobSchema = z.object({
     exportId: z.string().min(1),
     tenantId: z.string().min(1),
     inspectionId: z.string().min(1),

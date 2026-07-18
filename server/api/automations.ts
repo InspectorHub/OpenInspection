@@ -77,7 +77,7 @@ const deleteRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteAutomation (DELETE /{id}, automations domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const automationsRoutes = createApiRouter()
+const automationsRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         await c.var.services.automation.ensureSeeds(tenantId);

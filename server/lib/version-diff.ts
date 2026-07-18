@@ -15,7 +15,7 @@ export interface Snapshot {
     units:       Array<{ id: string; [key: string]: unknown }>;
 }
 
-export interface ItemDiff {
+interface ItemDiff {
     itemId:  string;
     kind:    'added' | 'removed' | 'changed';
     field?:  string;
@@ -23,7 +23,7 @@ export interface ItemDiff {
     to?:     unknown;
 }
 
-export interface UnitDiff {
+interface UnitDiff {
     added:   Array<{ id: string; [key: string]: unknown }>;
     removed: Array<{ id: string; [key: string]: unknown }>;
 }

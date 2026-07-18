@@ -155,7 +155,7 @@ const addSubRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createInspectionRequestInspections (POST /{id}/inspections, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const inspectionRequestsRoutes = createApiRouter()
+const inspectionRequestsRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const q = c.req.valid('query');

@@ -10,7 +10,7 @@
  * no-login report links). Pass `action` only where there is a sensible place to
  * send the user; public report errors omit it.
  */
-export interface ErrorStateAction {
+interface ErrorStateAction {
   label: string;
   href: string;
 }

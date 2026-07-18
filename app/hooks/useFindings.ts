@@ -2,10 +2,7 @@ import { useCallback } from "react";
 import type { ResultMap } from "./useInspection";
 import {
   findingKey,
-  cloneByScope,
   type FindingsOptions,
-  type TabStateEntry,
-  type CustomCommentEntry,
   type AttachedRepairItem,
 } from "./findings/shared";
 import { buildCollabFindingsApi, type CollabFindingsApi } from "~/lib/collab/collab-findings-api";
@@ -15,10 +12,6 @@ import type { useFetcher } from "react-router";
 // type/helper definitions live in ./findings/shared; consumers and tests see
 // the same names and signatures.
 export {
-  findingKey,
-  cloneByScope,
-  type TabStateEntry,
-  type CustomCommentEntry,
   type AttachedRepairItem,
 };
 

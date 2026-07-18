@@ -4,7 +4,7 @@ import { syncOutbox } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 import { toCloudEvent } from '../lib/sync-events/envelope';
 import type { SyncEnvelope } from '../lib/sync-events/envelope';
-import type { UserSyncEvent, UserSyncEventType, UserSyncOutbox } from '../lib/integration/user-sync';
+import type { UserSyncEvent, UserSyncOutbox } from '../lib/integration/user-sync';
 
 /**
  * Core -> Portal sync outbox (A-13/A-14, Cloudflare Queues transport).
@@ -31,8 +31,7 @@ import type { UserSyncEvent, UserSyncEventType, UserSyncOutbox } from '../lib/in
 // (replies are not user-lifecycle events).
 type CmdReplyEventType = 'reply.tenant.updated' | 'reply.tenant.export_completed' | 'reply.tenant.purged';
 /** Tenant-lifecycle events that are NOT user events (no user SID involved). */
-export type TenantSyncEventType = 'io.inspectorhub.tenant.compliance_status_updated';
-export type OutboxEventType = UserSyncEventType | CmdReplyEventType | TenantSyncEventType;
+type TenantSyncEventType = 'io.inspectorhub.tenant.compliance_status_updated';
 export type OutboxEvent = UserSyncEvent | {
     type: CmdReplyEventType;
     payload: Record<string, unknown>;

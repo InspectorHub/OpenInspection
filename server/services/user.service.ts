@@ -20,7 +20,7 @@ const { users, slugReservations } = schema;
  * the DB table happens to be seeded; the `slug_reservations` table is still
  * consulted on top of this so runtime/per-deploy additions keep working.
  */
-export const RESERVED_SLUGS: ReadonlySet<string> = new Set([
+const RESERVED_SLUGS: ReadonlySet<string> = new Set([
     'admin', 'api', 'book', 'r', 'report', 'settings', 'login', 'logout',
     'dashboard', 'library', 'inspections', 'inspection', 'calendar', 'contacts',
     'invoices', 'messages', 'sign', 'agreement-sign', 'not-found', 'sysadmin',

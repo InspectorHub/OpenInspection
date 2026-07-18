@@ -70,7 +70,7 @@ export const INTEGRATION_SECRET_KEYS = [
     'APP_BASE_URL',
 ] as const;
 
-export type IntegrationSecretKey = (typeof INTEGRATION_SECRET_KEYS)[number];
+type IntegrationSecretKey = (typeof INTEGRATION_SECRET_KEYS)[number];
 
 /**
  * Key format rules — the slot a value lands in is inferred from its prefix so
@@ -361,7 +361,7 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
     return c.json({ success: true as const }, 200);
 }
 
-export const secretsRoutes = createApiRouter()
+const secretsRoutes = createApiRouter()
     .openapi(getSecretsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);

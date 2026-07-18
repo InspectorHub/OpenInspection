@@ -101,5 +101,3 @@ export function PaymentSection({
     </div>
   );
 }
-
-export default PaymentSection;

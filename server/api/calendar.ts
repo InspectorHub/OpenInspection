@@ -113,7 +113,7 @@ const syncRoute = createRoute(withMcpMetadata({
     security: [{ bearerAuth: [] }],
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const calendarRoutes = createApiRouter()
+const calendarRoutes = createApiRouter()
     .route('/', calendarBlockRoutes)
     .route('/', calendarItemsRoutes)
     .openapi(disconnectRoute, async (c) => {
@@ -541,6 +541,6 @@ export const calendarRoutes = createApiRouter()
 
 export type CalendarApi = typeof calendarRoutes;
 
-export { createCalendarEvent, syncEventsToGcal };
+export { createCalendarEvent };
 
 export default calendarRoutes;

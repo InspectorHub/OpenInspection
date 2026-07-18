@@ -239,7 +239,7 @@ const inspectorsRoute = createRoute(withMcpMetadata({
     description: "Lists every inspecting team the signed-in agent has an active link with, with the public profile slug + slug needed to build shareable booking links for clients.",
 }, { scopes: ['agent'], tier: 'extended' }));
 
-export const agentRoutes = createApiRouter()
+const agentRoutes = createApiRouter()
     .openapi(getReportsRoute, async (c) => {
         // Move RBAC check inside to fix OpenAPIHono type inference issues with context
         await requireRole('manager')(c, async () => {});

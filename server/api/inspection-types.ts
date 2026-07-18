@@ -9,7 +9,7 @@ import {
 // Settings + Library IA — tenant-defined inspection subtypes CRUD. Mirrors the
 // event-types router shape (server/api/events.ts). Mounted at /api/admin so the
 // client URL is /api/admin/inspection-types, matching /api/admin/event-types.
-export const inspectionTypesRoutes = createApiRouter()
+const inspectionTypesRoutes = createApiRouter()
     .get('/inspection-types', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const data = await c.var.services.inspectionType.listInspectionTypes(c.get('tenantId'));
         return c.json({ success: true, data });

@@ -7,7 +7,7 @@ import { inspections, inspectionServices, contacts } from '../lib/db/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-export const metricsRoutes = createApiRouter()
+const metricsRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["metrics"],

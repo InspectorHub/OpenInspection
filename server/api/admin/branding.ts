@@ -116,7 +116,7 @@ const uploadLogoRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-export const adminBrandingRoutes = createApiRouter()
+const adminBrandingRoutes = createApiRouter()
     .openapi(getBrandingRoute, async (c) => {
         const brandingService = c.var.services.branding;
         const branding = await brandingService.getBranding(c.get('tenantId'), {

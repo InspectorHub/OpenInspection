@@ -17,7 +17,6 @@ import {
     CreateVideoUploadSchema,
     FinalizeVideoSchema,
     SetPosterSchema,
-    VideoRefSchema,
 } from '../../lib/validations/media.schema';
 import { MediaVideoService } from '../../services/media-video.service';
 import { resolveVideoBackend } from '../../services/video/resolve';
@@ -50,7 +49,7 @@ import { registerR2VideoRoutes } from './media-video-r2';
 
 // ── OpenAPI response schemas ─────────────────────────────────────────────────
 
-export const VideoCreateUploadResponseSchema = z.object({
+const VideoCreateUploadResponseSchema = z.object({
     uploadURL: z.string().describe('One-shot upload URL (Cloudflare Stream or worker r2-upload endpoint)'),
     provider: z.enum(['stream', 'r2']).describe('Video backend provider selected for this tenant'),
     ref: z.union([
@@ -59,7 +58,7 @@ export const VideoCreateUploadResponseSchema = z.object({
     ]).describe('Backend-specific video reference — echo this back to finalize'),
 }).openapi('VideoCreateUploadResponse');
 
-export const VideoFinalizeResponseSchema = z.object({
+const VideoFinalizeResponseSchema = z.object({
     poolId:      z.string().describe('inspection_media_pool row id'),
     streamUid:   z.string().nullable().describe('Cloudflare Stream UID (null for R2 videos)'),
     durationSec: z.number().nullable().describe('Video duration in seconds (null if not yet known)'),
@@ -68,7 +67,7 @@ export const VideoFinalizeResponseSchema = z.object({
 
 // ── OpenAPI route definitions ────────────────────────────────────────────────
 
-export const videoCreateUploadRoute = createRoute(withMcpMetadata({
+const videoCreateUploadRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/media/video/create-upload',
     tags: ["inspections"],
@@ -88,7 +87,7 @@ export const videoCreateUploadRoute = createRoute(withMcpMetadata({
     description: "Mint a one-shot video upload URL. For paid tenants (SaaS) or stream-mode self-host, returns a Cloudflare Stream direct-creator-upload URL; otherwise returns a worker-proxied R2 upload URL."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const videoFinalizeRoute = createRoute(withMcpMetadata({
+const videoFinalizeRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/media/video/finalize',
     tags: ["inspections"],
@@ -108,7 +107,7 @@ export const videoFinalizeRoute = createRoute(withMcpMetadata({
     description: "Insert an inspection_media_pool video row after the upload completes. Idempotent. Body is a discriminated VideoRef (stream or r2)."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const videoPosterRoute = createRoute(withMcpMetadata({
+const videoPosterRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/media/video/poster',
     tags: ["inspections"],
@@ -128,7 +127,7 @@ export const videoPosterRoute = createRoute(withMcpMetadata({
     description: "Set the Cloudflare Stream poster frame and persist posterPct on the pool row. Stream-only — R2 videos use the r2-upload-poster route."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const videoDeleteRoute = createRoute(withMcpMetadata({
+const videoDeleteRoute = createRoute(withMcpMetadata({
     method: 'delete',
     path:   '/{id}/media/video/{streamUid}',
     tags: ["inspections"],
@@ -153,7 +152,7 @@ export const videoDeleteRoute = createRoute(withMcpMetadata({
 // Design System 0520 M14 — PhotoStudio annotation save (subsystem A, phase 4).
 // Opaque JSON-encoded shape array (≤8 KB) + caption (≤200 chars). Tenant-
 // isolated via ScopedDB; 404 on cross-tenant access (no enumeration leak).
-export const updateMediaAnnotationsRoute = createRoute(withMcpMetadata({
+const updateMediaAnnotationsRoute = createRoute(withMcpMetadata({
     method:     'put',
     path:       '/{id}/media/{mediaId}/annotations',
     tags: ["inspections"],
@@ -193,7 +192,7 @@ export const updateMediaAnnotationsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 // ── Phase T (T12): Photo annotation save ────────────────────────────────────────
-export const saveAnnotationRoute = createRoute(withMcpMetadata({
+const saveAnnotationRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/items/{itemId}/photos/{photoIndex}/annotation',
     tags: ["inspections"],
@@ -230,7 +229,7 @@ export const saveAnnotationRoute = createRoute(withMcpMetadata({
 // ── Media Studio (cover crop): POST /api/inspections/:id/cover ───────────────
 // Bakes a cropped JPEG derivative of the chosen cover source photo to R2 and
 // records the re-editable crop transform. Mirrors the annotation save shape.
-export const setCoverCropRoute = createRoute(withMcpMetadata({
+const setCoverCropRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/cover',
     tags: ["inspections"],
@@ -263,7 +262,7 @@ export const setCoverCropRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 // ── Media Studio (Plan 4): crop an item/defect photo ─────────────────────────
-export const cropItemPhotoRoute = createRoute(withMcpMetadata({
+const cropItemPhotoRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/items/{itemId}/photos/{photoIndex}/crop',
     tags: ["inspections"],
@@ -525,9 +524,5 @@ const mediaStudioRoutes = createApiRouter()
 // Register R2 binary routes (upload + Range serve) — split into media-video-r2.ts
 // to keep this file under the large-file ceiling.
 registerR2VideoRoutes(mediaStudioRoutes);
-
-// VideoRefSchema is re-exported here so callers can import it from the
-// stable media-studio entry point rather than reaching into validations/.
-export { VideoRefSchema };
 
 export default mediaStudioRoutes;

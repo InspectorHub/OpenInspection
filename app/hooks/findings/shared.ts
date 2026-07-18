@@ -15,18 +15,6 @@ export function findingKey(
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-export interface TabStateEntry {
-  cannedId: string;
-  included: boolean;
-  comment?: string;
-  category?: string;
-  location?: string;
-  photos?: Array<{ key: string }>;
-  recommendationId?: string | null;
-  estimateLow?: number | null;
-  estimateHigh?: number | null;
-}
-
 export interface CustomCommentEntry {
   id: string;
   title: string;

@@ -11,7 +11,7 @@
  * en-US/USD (behavior-preserving) and callers thread the viewer values when known.
  */
 
-import { INSPECTION_STATUS, INSPECTION_STATUS_LABELS, isReportPublished } from '~/lib/status';
+import { INSPECTION_STATUS, isReportPublished } from '~/lib/status';
 import { formatCurrency } from '~/lib/format';
 import { m } from '~/paraglide/messages';
 
@@ -29,7 +29,7 @@ export type PillTone =
     | 'warning';
 
 /** A single derived status pill: a tone + a human-readable label. */
-export interface BlockState {
+interface BlockState {
     tone: PillTone;
     label: string;
 }
@@ -135,21 +135,8 @@ function deriveInvoice(hub: HubPayload): BlockState {
     }
 }
 
-/** Inspection lifecycle pill (appointment axis). */
-export function deriveInspectionPill(status: string): BlockState {
-    const label = INSPECTION_STATUS_LABELS[status as keyof typeof INSPECTION_STATUS_LABELS] ?? status;
-    switch (status) {
-        case 'requested':  return { tone: 'ni',      label };
-        case 'scheduled':  return { tone: 'info',    label };
-        case 'confirmed':  return { tone: 'info',    label };
-        case 'completed':  return { tone: 'sat',     label };
-        case 'cancelled':  return { tone: 'gen',     label };
-        default:           return { tone: 'neutral', label };
-    }
-}
-
 /** Report deliverable pill (report axis). */
-export function deriveReportPill(reportStatus: string): BlockState {
+function deriveReportPill(reportStatus: string): BlockState {
     switch (reportStatus) {
         case 'in_progress': return { tone: 'neutral', label: m.label_hub_report_in_progress() };
         case 'submitted':   return { tone: 'warning', label: m.label_hub_report_submitted() };

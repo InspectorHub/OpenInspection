@@ -32,7 +32,7 @@ export function secretsCacheKey(tenantId: string): string {
     return `${SECRETS_CACHE_PREFIX}${tenantId}`;
 }
 
-export interface TenantSecretsCipher { blob: string; dekEnc: string | null }
+interface TenantSecretsCipher { blob: string; dekEnc: string | null }
 
 /**
  * Returns the tenant's ciphertext pair {blob, dekEnc}, or null when the
@@ -40,7 +40,7 @@ export interface TenantSecretsCipher { blob: string; dekEnc: string | null }
  * plaintext never lands in KV. A stale pre-envelope cache entry (raw blob
  * string, not JSON) is treated as a miss and overwritten.
  */
-export async function loadTenantSecretsCipher(
+async function loadTenantSecretsCipher(
     db: D1Database,
     kv: KVNamespace | undefined,
     tenantId: string,

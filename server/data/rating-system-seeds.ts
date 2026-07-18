@@ -10,7 +10,7 @@
  * tokens.
  */
 
-export interface SeedLevel {
+interface SeedLevel {
     abbreviation: string;
     label:        string;
     color:        string;

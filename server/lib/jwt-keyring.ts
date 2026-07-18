@@ -16,7 +16,7 @@
 
 import { verify as honoVerify } from 'hono/jwt';
 
-export interface JwtKeyringEntry {
+interface JwtKeyringEntry {
     privateKey: CryptoKey;
     publicKey: CryptoKey;
 }
@@ -192,15 +192,4 @@ export async function verifyJwt(
     }
 
     return (await honoVerify(token, entry.publicKey, ALG)) as Record<string, unknown>;
-}
-
-/**
- * Convenience helper for routes / middleware that already have an env-shaped
- * binding. Builds the keyring on demand. Callers that fire many sign/verify
- * operations in one request should build once and reuse.
- */
-export async function getKeyringFromEnv(
-    env: Record<string, string | undefined>,
-): Promise<JwtKeyring> {
-    return buildKeyring(env);
 }

@@ -140,7 +140,7 @@ export interface ReportSignature {
    server/app boundary (app/ cannot import server/lib/). Shapes mirror
    server/lib/pca-section-registry.ts, pca-narrative.ts, pca-systems-summary.ts,
    pca-deviations.ts exactly. */
-export interface PcaSectionEntry {
+interface PcaSectionEntry {
   id: string;
   level: number;
   title: string;
@@ -174,7 +174,7 @@ export interface SystemsSummaryRow {
   worstSeverity: 'good' | 'marginal' | 'significant' | 'minor';
   counts: { safety: number; recommendation: number; maintenance: number };
 }
-export interface Deviation {
+interface Deviation {
   id: string;
   area: string;
   baselineRequirement: string;
@@ -250,11 +250,11 @@ export interface CostItemView {
   sectionRef: string | null; photoRef: string | null; sortOrder: number;
 }
 export interface Table1Row { item: CostItemView; total: number }
-export interface Table1 {
+interface Table1 {
   immediate: Table1Row[]; shortTerm: Table1Row[];
   immediateTotalCents: number; shortTermTotalCents: number;
 }
-export interface ReserveRow {
+interface ReserveRow {
   item: CostItemView; placementYear: number; replacementCents: number;
   /** Commercial PCA Phase P/C seam — resolved appendix photo number for
    *  `item.photoRef` (server resolves via buildPhotoRefIndex/resolvePhotoRef).
@@ -262,13 +262,13 @@ export interface ReserveRow {
    *  didn't resolve; the PHOTO NO. cell renders nothing in either case. */
   photoNo?: number | null;
 }
-export interface ReserveSchedule {
+interface ReserveSchedule {
   startYear: number; termYears: number; years: number[]; rows: ReserveRow[];
   uninflatedByYear: number[]; inflatedByYear: number[]; cumulativeInflatedByYear: number[];
   totalUninflatedCents: number; totalInflatedCents: number;
   perSfUninflatedAllYears: number | null; perSfInflatedAllYears: number | null; perSfInflatedPerYear: number | null;
 }
-export interface BucketRollup { immediateCents: number; shortTermCents: number; reserveCents: number }
+interface BucketRollup { immediateCents: number; shortTermCents: number; reserveCents: number }
 export interface CostTables {
   table1: Table1; reserveSchedule: ReserveSchedule | null;
   rollup: BucketRollup; droppedCount: number;

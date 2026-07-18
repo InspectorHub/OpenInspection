@@ -1,20 +1,20 @@
 /** Email-template Phase 2 — shared types for the registry + renderer. */
 
 /** One editable text block in a template (heading / paragraph / button label). */
-export interface Block {
+interface Block {
   key: string;            // stable key (override storage + editor)
   label: string;          // editor display label
   default: string;        // default value; may contain {{var}} tokens
   multiline: boolean;     // editor renders a textarea vs an input
 }
 
-export interface Variable {
+interface Variable {
   name: string;           // {{name}} token
   desc: string;           // editor help text
 }
 
 /** System (non-editable, data-driven) block kinds the layout can render. */
-export type SystemBlockKind = 'auditMetadata' | 'attachmentManifest' | 'icsHint';
+type SystemBlockKind = 'auditMetadata' | 'attachmentManifest' | 'icsHint';
 
 export interface EmailTemplateDescriptor {
   trigger: string;

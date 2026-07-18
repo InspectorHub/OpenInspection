@@ -1,6 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { agreementSignPath } from '../lib/public-urls';
@@ -80,7 +79,7 @@ const confirmRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for confirmConcierge (POST /confirm, bookings domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: [], tier: 'extended' }));
 
-export const conciergeRoutes = createApiRouter()
+const conciergeRoutes = createApiRouter()
     .openapi(confirmViewRoute, async (c) => {
         const { token } = c.req.valid('query');
         const view = await c.var.services.concierge.resolveToken(token);
@@ -149,6 +148,3 @@ export const conciergeRoutes = createApiRouter()
 export type ConciergeApi = typeof conciergeRoutes;
 
 export default conciergeRoutes;
-
-// Re-export Errors so callers don't need a separate import.
-export { Errors };

@@ -1,6 +1,6 @@
 import type { Role } from '../lib/auth/roles';
 
-export interface User {
+interface User {
     sub: string;
     role: Role;
     // Agent Accounts A1 — tenantId is undefined for global agent accounts
@@ -68,23 +68,4 @@ export interface AuthVariables {
      *  with private/public keys imported once. Handlers that sign or verify
      *  JWTs should `await c.var.keyringPromise`. */
     keyringPromise?: Promise<JwtKeyring>;
-}
-
-export interface InspectionData {
-    sections: Array<{
-        id: string;
-        title: string;
-        items: Array<{
-            id: string;
-            label: string;
-            description?: string;
-            status?: 'Satisfactory' | 'Monitor' | 'Defect' | 'Not Inspected';
-            notes?: string;
-            photos?: Array<{
-                key: string;
-                pending?: boolean;
-                dataUrl?: string;
-            }>;
-        }>;
-    }>;
 }

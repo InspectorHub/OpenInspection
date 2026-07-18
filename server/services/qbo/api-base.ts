@@ -4,10 +4,10 @@ import { qboConnections, qboSyncErrors } from '../../lib/db/schema/qbo';
 import { encryptToken, decryptToken } from '../../lib/qbo-crypto';
 import { QBOTokenResponseSchema } from '../../lib/validations/qbo.schema';
 
-export const QBO_API_BASE = 'https://quickbooks.api.intuit.com/v3/company';
-export const QBO_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
+const QBO_API_BASE = 'https://quickbooks.api.intuit.com/v3/company';
+const QBO_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 export const QBO_REVOKE_URL = 'https://developer.api.intuit.com/v2/oauth2/tokens/revoke';
-export const MINOR_VERSION = '75';
+const MINOR_VERSION = '75';
 export const ACCESS_TOKEN_TTL_SEC = 3600;
 export const CDC_PAGE_SIZE = 1000;
 

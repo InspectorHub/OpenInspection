@@ -9,7 +9,7 @@ import {
 } from 'docx';
 import type { ReportOutlineEntry } from './report-outline'; // Phase O registry type
 
-export interface DocxSignatory { name: string; title: string }
+interface DocxSignatory { name: string; title: string }
 
 /** Commercial PCA Phase F — Building Profile row, grouped two-column display. */
 export interface DocxProfileRow {
@@ -21,14 +21,14 @@ export interface DocxProfileRow {
 }
 
 /** A single narrative bullet under a section (rating + free-text observation). */
-export interface DocxSectionItem {
+interface DocxSectionItem {
     label: string;
     ratingLabel?: string;
     narrative?: string;
 }
 
 /** Phase S Deviations sub-table row. */
-export interface DocxDeviationRow {
+interface DocxDeviationRow {
     area: string;
     description: string;
 }
@@ -55,7 +55,7 @@ export interface DocxCostLine {
 
 /** Commercial PCA Phase C — TABLE 2 (Capital Replacement Reserve Schedule) row.
  *  One item placed in a single reserve year (`placementYear`). */
-export interface DocxReserveScheduleRow {
+interface DocxReserveScheduleRow {
     system: string;
     description: string;
     placementYear: number;
@@ -79,7 +79,7 @@ export interface DocxReserveSchedule {
     perSfInflatedPerYear: number | null;
 }
 
-export interface DocxCostTables {
+interface DocxCostTables {
     table1: DocxCostLine[];
     /** Opt-in (tenant Reserve Schedule config); TABLE 2 renders only when non-null. */
     reserveSchedule: DocxReserveSchedule | null;

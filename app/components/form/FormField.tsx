@@ -15,7 +15,7 @@ export interface ItemOptions {
  minPhotos?: number | null;
 }
 
-export interface CannedComment {
+interface CannedComment {
  id: string;
  title: string;
  comment: string;
@@ -36,13 +36,6 @@ export interface TemplateItem {
  limitations?: CannedComment[];
  defects?: CannedComment[];
  };
-}
-
-export interface ItemResult {
- rating?: string | null;
- value?: string | boolean | number | null;
- notes?: string;
- photos?: { key: string }[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -141,7 +134,7 @@ export function FormField({
  </div>
  );
  case "rich":
- return null; // Handled by RichItemRenderer
+ return null; // Rich items (rating + canned-comment tabs) are rendered by ItemEditor; FormField handles only non-rich data points.
  default:
  return (
  <input

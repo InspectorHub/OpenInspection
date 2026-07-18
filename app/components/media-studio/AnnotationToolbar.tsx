@@ -4,7 +4,7 @@ import { m } from "~/paraglide/messages";
 /* Tool palette (ported from editor/PhotoStudio.tsx)                   */
 /* ------------------------------------------------------------------ */
 
-export const TOOLS = [
+const TOOLS = [
   { id: "pan", icon: "M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" },
   { id: "circle", icon: "M21 12a9 9 0 11-18 0 9 9 0 0118 0z" },
   { id: "arrow", icon: "M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" },

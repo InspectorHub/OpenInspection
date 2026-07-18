@@ -40,7 +40,7 @@ interface ParsedVideoKey {
  * Returns `null` when the key does not match this shape (fail-closed: finalize
  * will throw rather than inserting a row with a garbage inspectionId).
  */
-export function parseInspectionVideoKey(r2Key: string): ParsedVideoKey | null {
+function parseInspectionVideoKey(r2Key: string): ParsedVideoKey | null {
     // Match: <tenantId>/inspections/<inspectionId>/videos/<mediaId>.<ext>
     const match = /^([^/]+)\/inspections\/([^/]+)\/videos\/([^/.]+)\.([^/]+)$/.exec(r2Key);
     if (!match) return null;

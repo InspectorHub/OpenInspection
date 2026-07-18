@@ -137,7 +137,7 @@ export async function sha256Hex(input: Uint8Array | string): Promise<string> {
 }
 
 /** Copy a possibly-SharedArrayBuffer-backed view into a fresh ArrayBuffer-backed Uint8Array. */
-export function toArrayBufferBacked(src: Uint8Array): Uint8Array {
+function toArrayBufferBacked(src: Uint8Array): Uint8Array {
     const out = new Uint8Array(new ArrayBuffer(src.byteLength));
     out.set(src);
     return out;

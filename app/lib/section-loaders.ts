@@ -17,7 +17,6 @@ import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { EMPTY_BRAND } from "~/lib/brand";
 import type { HubSection } from "~/components/portal/InspectionHub";
 import {
-  reportViewProps,
   type ReportLoaderResult,
   type FilterKey,
 } from "~/components/portal/sections/ReportView";
@@ -35,7 +34,7 @@ import type { TenantBrand } from "~/lib/brand";
 /* Section validation */
 /* ------------------------------------------------------------------ */
 
-export const HUB_SECTIONS: HubSection[] = [
+const HUB_SECTIONS: HubSection[] = [
   "overview",
   "report",
   "agreement",
@@ -364,5 +363,3 @@ export async function loadAgreementSection(
     return { agreement: null, error: m.helper_section_service_unavailable() };
   }
 }
-
-export { reportViewProps };

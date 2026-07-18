@@ -33,7 +33,7 @@ export const ContactListQuerySchema = z.object({
 }).openapi('ContactListQuery');
 
 // ─── IA-18 (#111) — contact detail page payload ─────────────────────────────
-export const ContactDetailSchema = z.object({
+const ContactDetailSchema = z.object({
     contact: z.object({
         id:         z.string().describe('Contact id'),
         type:       z.enum(['agent', 'client']).describe('Contact type'),

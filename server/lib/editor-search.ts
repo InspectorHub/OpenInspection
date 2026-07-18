@@ -21,7 +21,7 @@
 
 /** A canned-comment entry as stored under `results[itemId].cannedComments`.
  *  Only the fields we actually scan. */
-export interface SearchableCanned {
+interface SearchableCanned {
     cannedId?: string;
     title?: string;
     comment?: string;
@@ -30,7 +30,7 @@ export interface SearchableCanned {
 
 /** A custom-comment entry as stored under `results[itemId].customComments`.
  *  Only the fields we actually scan. */
-export interface SearchableCustom {
+interface SearchableCustom {
     id?: string;
     title?: string;
     comment?: string;
@@ -39,7 +39,7 @@ export interface SearchableCustom {
 
 /** Per-item editor state — shape matches the live `results` payload that
  *  Alpine populates from `/api/inspections/:id/results`. */
-export interface SearchableResult {
+interface SearchableResult {
     notes?: string | null;
     recommendation?: string | null;
     cannedComments?: {

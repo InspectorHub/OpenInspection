@@ -193,5 +193,3 @@ export const servicesRoutes = createApiRouter()
     });
 
 export type ServicesApi = typeof servicesRoutes;
-
-export default servicesRoutes;

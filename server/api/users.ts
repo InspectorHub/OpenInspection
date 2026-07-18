@@ -62,7 +62,7 @@ const saveSignatureRoute = createRoute(withMcpMetadata({
     description: 'Stores users.default_signature_base64 for the authenticated user. Reused by D2 auto-sign-on-publish + Settings -> Profile pad.',
 }, { scopes: [], tier: 'extended' }));
 
-export const userRoutes = createApiRouter()
+const userRoutes = createApiRouter()
     .openapi(getOnboardingRoute, async (c) => {
         const jwtUser = c.get('user');
         const tenantId = c.get('tenantId');

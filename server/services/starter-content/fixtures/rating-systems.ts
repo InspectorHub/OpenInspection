@@ -8,4 +8,3 @@
  */
 
 export { RATING_SYSTEM_SEEDS as RATING_SYSTEMS } from '../../../data/rating-system-seeds';
-export type { SeedRatingSystem, SeedLevel } from '../../../data/rating-system-seeds';

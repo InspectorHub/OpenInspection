@@ -9,7 +9,7 @@ export interface PixelCrop { x: number; y: number; width: number; height: number
 const MAX_LONG_EDGE = 2048;
 /** Cap the in-memory DECODE long edge so a 20MB+ "original quality" photo can't OOM a tablet. */
 const MAX_SOURCE_LONG_EDGE = 4096;
-export const JPEG_QUALITY = 0.82;
+const JPEG_QUALITY = 0.82;
 
 /** Shared `canvas.toBlob` promise wrapper — JPEG encode, rejects on null blob. */
 export function canvasToJpegBlob(canvas: HTMLCanvasElement, quality = JPEG_QUALITY): Promise<Blob> {

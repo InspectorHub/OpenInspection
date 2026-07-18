@@ -38,7 +38,7 @@ function getStorage(context?: AppLoadContext) {
   return _storage;
 }
 
-export async function getSession(context: AppLoadContext, request: Request) {
+async function getSession(context: AppLoadContext, request: Request) {
   return getStorage(context).getSession(request.headers.get("Cookie"));
 }
 

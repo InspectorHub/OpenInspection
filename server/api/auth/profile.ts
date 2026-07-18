@@ -168,7 +168,7 @@ const logoutRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-export const profileRoutes = createApiRouter()
+const profileRoutes = createApiRouter()
     .openapi(skipSetupRoute, async (c) => {
         const user = c.get('user');
         if (!user?.sub) throw Errors.Unauthorized('Not signed in');

@@ -1,7 +1,7 @@
 import Lightbox from "yet-another-react-lightbox";
 import Zoom from "yet-another-react-lightbox/plugins/zoom";
 import "yet-another-react-lightbox/styles.css";
-export interface LightboxSlide { src?: string; alt?: string }
+interface LightboxSlide { src?: string; alt?: string }
 /**
  * Plan 7 — a slide may also be a custom video slide ({ type: 'video-stream' }).
  * YARL renders unknown slide types via the `render.slide` callback supplied by

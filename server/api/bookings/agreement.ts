@@ -192,7 +192,7 @@ const declineAgreementRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for declineBooking (POST /agreements/:token/decline, bookings domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const agreementRoutes = createApiRouter()
+const agreementRoutes = createApiRouter()
     .openapi(getAgreementByTokenRoute, async (c) => {
         const { token } = c.req.valid('param');
         const svc = c.var.services.agreement;

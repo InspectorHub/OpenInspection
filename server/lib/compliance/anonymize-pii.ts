@@ -20,7 +20,7 @@
  * be, so they get this non-PII marker instead (matches the standing
  * "sentinel-clear for NOT NULL columns" convention). Carries no personal data.
  */
-export const ERASED_SENTINEL = '[erased]';
+const ERASED_SENTINEL = '[erased]';
 
 /**
  * Satellite-PII SET for `agreement_signers` (D5 field set). `name` + `email` are

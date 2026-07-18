@@ -1,4 +1,4 @@
-export enum LogLevel {
+enum LogLevel {
     DEBUG = 'DEBUG',
     INFO = 'INFO',
     WARN = 'WARN',
@@ -17,7 +17,7 @@ interface LogContext {
  * Structured Logger for Cloudflare Workers.
  * Outputs JSON for easy ingestion by log aggregators.
  */
-export class Logger {
+class Logger {
     constructor(private context: LogContext = {}) {}
 
     /**

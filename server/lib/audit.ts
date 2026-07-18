@@ -96,7 +96,7 @@ export type AuditAction =
     | 'inspection.compliance.psq_updated'
     | 'inspection.compliance.psq_status_changed';
 
-export interface AuditParams {
+interface AuditParams {
     db: D1Database;
     tenantId: string;
     userId?: string | undefined;
@@ -115,7 +115,7 @@ export interface AuditParams {
  * Write an audit log entry. Uses waitUntil when executionCtx is provided
  * so it never blocks the response path.
  */
-export function writeAuditLog(params: AuditParams): void {
+function writeAuditLog(params: AuditParams): void {
     const { db, executionCtx, ...rest } = params;
     const write = drizzle(db).insert(auditLogs).values({
         id: crypto.randomUUID(),

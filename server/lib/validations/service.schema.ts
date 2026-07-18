@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
 
-export const ServiceSchema = z.object({
+const ServiceSchema = z.object({
     id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
     tenantId:        z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     name:            z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
@@ -28,19 +28,6 @@ export const CreateServiceSchema = z.object({
 export const UpdateServiceSchema = CreateServiceSchema.partial().extend({
     active: z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
 }).openapi('UpdateService');
-
-export const DiscountCodeSchema = z.object({
-    id:         z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId:   z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    code:       z.string().describe('TODO describe code field for the OpenInspection MCP integration'),
-    type:       z.enum(['fixed', 'percent']).describe('TODO describe type field for the OpenInspection MCP integration'),
-    value:      z.number().int().describe('TODO describe value field for the OpenInspection MCP integration'),
-    maxUses:    z.number().int().nullable().describe('TODO describe maxUses field for the OpenInspection MCP integration'),
-    usesCount:  z.number().int().describe('TODO describe usesCount field for the OpenInspection MCP integration'),
-    expiresAt:  z.string().nullable().describe('TODO describe expiresAt field for the OpenInspection MCP integration'),
-    active:     z.boolean().describe('TODO describe active field for the OpenInspection MCP integration'),
-    createdAt:  z.string().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-}).openapi('DiscountCode');
 
 export const CreateDiscountCodeSchema = z.object({
     code:      z.string().min(1).max(50).describe('TODO describe code field for the OpenInspection MCP integration'),

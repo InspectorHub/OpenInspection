@@ -25,5 +25,3 @@ export const SaveVideoSchema = z.discriminatedUnion('videoMode', [
             ),
     }),
 ]);
-
-export type SaveVideoInput = z.infer<typeof SaveVideoSchema>;

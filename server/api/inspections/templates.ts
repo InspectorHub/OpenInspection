@@ -13,7 +13,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 /**
  * GET /api/inspections/templates
  */
-export const listTemplatesRoute = createRoute(withMcpMetadata({
+const listTemplatesRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/templates',
     tags: ["inspections", "templates"],
@@ -51,7 +51,7 @@ export const listTemplatesRoute = createRoute(withMcpMetadata({
  * local copy in this tenant. The Marketplace duplicate banner consumes this
  * to suggest compare/use-new/keep-both actions on /templates.
  */
-export const listTemplateDuplicatesRoute = createRoute(withMcpMetadata({
+const listTemplateDuplicatesRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/templates/duplicates',
     tags: ["inspections", "templates"],
@@ -86,7 +86,7 @@ export const listTemplateDuplicatesRoute = createRoute(withMcpMetadata({
 /**
  * GET /api/inspections/templates/:id
  */
-export const getTemplateRoute = createRoute(withMcpMetadata({
+const getTemplateRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/templates/{id}',
     tags: ["inspections", "templates"],
@@ -112,7 +112,7 @@ export const getTemplateRoute = createRoute(withMcpMetadata({
 /**
  * POST /api/inspections/templates
  */
-export const createTemplateRoute = createRoute(withMcpMetadata({
+const createTemplateRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/templates',
     tags: ["inspections", "templates"],
@@ -149,7 +149,7 @@ export const createTemplateRoute = createRoute(withMcpMetadata({
  * created template row and the conversion stats (for the diff display in
  * the upcoming import-from-Spectora UI).
  */
-export const importSpectoraRoute = createRoute(withMcpMetadata({
+const importSpectoraRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/templates/import-spectora',
     tags: ["inspections", "templates"],
@@ -194,7 +194,7 @@ export const importSpectoraRoute = createRoute(withMcpMetadata({
 /**
  * PUT /api/inspections/templates/:id
  */
-export const updateTemplateRoute = createRoute(withMcpMetadata({
+const updateTemplateRoute = createRoute(withMcpMetadata({
     method: 'put',
     path: '/templates/{id}',
     tags: ["inspections", "templates"],
@@ -228,7 +228,7 @@ export const updateTemplateRoute = createRoute(withMcpMetadata({
 /**
  * DELETE /api/inspections/templates/:id
  */
-export const deleteTemplateRoute = createRoute(withMcpMetadata({
+const deleteTemplateRoute = createRoute(withMcpMetadata({
     method: 'delete',
     path: '/templates/{id}',
     tags: ["inspections", "templates"],

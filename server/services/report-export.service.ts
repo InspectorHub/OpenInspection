@@ -6,7 +6,6 @@ import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 
 export type ReportExportFormat = 'docx';
-export type ReportExportStatus = 'queued' | 'building' | 'ready' | 'failed';
 
 /**
  * Commercial PCA Phase W Task 4 — `report_exports` status-row CRUD + R2

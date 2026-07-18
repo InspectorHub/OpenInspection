@@ -263,7 +263,7 @@ const erasureLogRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-export const adminDataRoutes = createApiRouter()
+const adminDataRoutes = createApiRouter()
     .openapi(exportDataRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const adminService = c.var.services.admin;
@@ -391,5 +391,4 @@ export const adminDataRoutes = createApiRouter()
         return c.json({ success: true as const, data }, 200);
     });
 
-export type AdminDataApi = typeof adminDataRoutes;
 export default adminDataRoutes;

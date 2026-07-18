@@ -27,7 +27,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
 /**
  * POST /api/inspections/:id/complete
  */
-export const completeInspectionRoute = createRoute(withMcpMetadata({
+const completeInspectionRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/complete',
     tags: ["inspections"],
@@ -57,7 +57,7 @@ export const completeInspectionRoute = createRoute(withMcpMetadata({
  * required fields (location + trade). The frontend pre-publish modal
  * consumes this before allowing the inspector to publish the report.
  */
-export const PublishDefectEntrySchema = z.object({
+const PublishDefectEntrySchema = z.object({
     sectionId:        z.string(),
     sectionTitle:     z.string(),
     itemId:           z.string(),
@@ -68,7 +68,7 @@ export const PublishDefectEntrySchema = z.object({
     unresolvedTokens: z.array(z.string()),
 });
 
-export const publishReadinessRoute = createRoute(withMcpMetadata({
+const publishReadinessRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/publish-readiness',
     tags: ['inspections'],
@@ -101,7 +101,7 @@ export const publishReadinessRoute = createRoute(withMcpMetadata({
  * Submits a completed report for review (in_progress → submitted).
  * Does NOT require the `publish` capability — any inspector/manager/owner can submit.
  */
-export const submitReportRoute = createRoute(withMcpMetadata({
+const submitReportRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/submit',
     tags: ['inspections'],
@@ -126,7 +126,7 @@ export const submitReportRoute = createRoute(withMcpMetadata({
  * Returns a submitted report to the inspector for revision (submitted → in_progress).
  * Requires the `publish` capability (owner/manager by default; inspector only if not overridden).
  */
-export const returnReportRoute = createRoute(withMcpMetadata({
+const returnReportRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/return',
     tags: ['inspections'],
@@ -152,7 +152,7 @@ export const returnReportRoute = createRoute(withMcpMetadata({
  * Unpublishes a published report, reverting it to in_progress (published → in_progress).
  * Requires the `publish` capability.
  */
-export const unpublishReportRoute = createRoute(withMcpMetadata({
+const unpublishReportRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/unpublish',
     tags: ['inspections'],
@@ -176,7 +176,7 @@ export const unpublishReportRoute = createRoute(withMcpMetadata({
 /**
  * POST /api/inspections/:id/publish
  */
-export const publishRoute = createRoute(withMcpMetadata({
+const publishRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/publish',
     tags: ["inspections"],
@@ -215,7 +215,7 @@ export const publishRoute = createRoute(withMcpMetadata({
  * flagged items from a published baseline report. 400 when the baseline is not
  * published.
  */
-export const reinspectRoute = createRoute(withMcpMetadata({
+const reinspectRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/reinspect',
     tags: ['inspections'],
@@ -239,7 +239,7 @@ export const reinspectRoute = createRoute(withMcpMetadata({
  * "Create re-inspection" modal can list them with the carry-forward set
  * pre-checked. Empty array when the baseline is unpublished.
  */
-export const reinspectCandidatesRoute = createRoute(withMcpMetadata({
+const reinspectCandidatesRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/reinspect-candidates',
     tags: ['inspections'],

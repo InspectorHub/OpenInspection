@@ -29,7 +29,7 @@ interface RawOperation {
     'x-tier'?: unknown;
 }
 
-export interface ParameterEntry {
+interface ParameterEntry {
     /** Parameter name as declared in the OpenAPI path/query string. */
     name: string;
     /** Location of the parameter: "path" or "query". */
@@ -42,7 +42,7 @@ export interface ParameterEntry {
     schema: Record<string, unknown> | null;
 }
 
-export interface InputSchema {
+interface InputSchema {
     /** Path and query parameters for the operation. */
     parameters: ParameterEntry[];
     /** JSON Schema for the request body (application/json), or null if absent. */

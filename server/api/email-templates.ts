@@ -195,7 +195,7 @@ const previewRoute = createRoute(withMcpMetadata({
 
 // ─── Router ────────────────────────────────────────────────────────────────
 
-export const emailTemplateRoutes = createApiRouter()
+const emailTemplateRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const svc = new EmailTemplateService(c.env.DB);

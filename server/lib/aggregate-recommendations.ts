@@ -1,6 +1,6 @@
 import { parseFindingKey } from './finding-key';
 
-export interface AggregatedRecItem {
+interface AggregatedRecItem {
     recommendationId: string;
     estimateSnapshotMin: number | null;
     estimateSnapshotMax: number | null;

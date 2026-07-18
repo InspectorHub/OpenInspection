@@ -309,7 +309,7 @@ portalRouter.use('/:tenant/inspections/*', portalSession);
 // `typeof portalRoutes` carries every registered route into PortalApi. Assigning
 // the bare router (and applying `.openapi()` as discarded statements) would type
 // the client surface as `unknown` — mirror repair-builder.ts here.
-export const portalRoutes = portalRouter
+const portalRoutes = portalRouter
     .openapi(requestLinkRoute, async (c) => {
         const tenantId = resolveTenantId(c);
         if (!tenantId) return c.json({ error: 'Tenant not found' }, 404);

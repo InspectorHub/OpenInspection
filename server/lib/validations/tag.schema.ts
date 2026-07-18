@@ -12,7 +12,7 @@ import { createApiResponseSchema } from './shared.schema';
 
 const TAG_COLOR_PATTERN = /^[a-z]{3,20}$/;
 
-export const TagSchema = z.object({
+const TagSchema = z.object({
     id:        z.string().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
     name:      z.string().min(1).max(40).describe('TODO describe name field for the OpenInspection MCP integration'),
     color:     z.string().regex(TAG_COLOR_PATTERN).nullable().optional().describe('TODO describe color field for the OpenInspection MCP integration'),
@@ -40,9 +40,6 @@ export const TagDeleteResponseSchema = z.object({
     success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
     data:    z.object({ deleted: z.literal(true).describe('TODO describe deleted field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration'),
 }).openapi('TagDeleteResponse');
-
-/** Itemised tag link — what /api/inspections/:id/items/:itemId/tags returns. */
-export const ItemTagsResponseSchema  = createApiResponseSchema(z.array(TagSchema)).openapi('ItemTagsResponse');
 
 /** Empty link/unlink response. */
 export const TagLinkResponseSchema   = z.object({

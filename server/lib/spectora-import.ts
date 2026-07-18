@@ -32,7 +32,7 @@ export interface SpectoraTemplate {
     ratingLevels?: SpectoraRatingLevel[];
 }
 
-export interface SpectoraRatingLevel {
+interface SpectoraRatingLevel {
     id?: string;
     name?: string;
     label?: string;
@@ -44,7 +44,7 @@ export interface SpectoraRatingLevel {
     description?: string;
 }
 
-export interface SpectoraSection {
+interface SpectoraSection {
     id?: string;
     name?: string;
     title?: string;
@@ -55,7 +55,7 @@ export interface SpectoraSection {
     disclaimer_text?: string;
 }
 
-export interface SpectoraItem {
+interface SpectoraItem {
     id?: string;
     name?: string;
     label?: string;
@@ -64,9 +64,9 @@ export interface SpectoraItem {
     comments?: SpectoraComment[];
 }
 
-export type SpectoraCommentType = 'INFORMATIONAL' | 'SATISFACTORY' | 'MONITOR' | 'DEFECT' | string;
+type SpectoraCommentType = 'INFORMATIONAL' | 'SATISFACTORY' | 'MONITOR' | 'DEFECT' | string;
 
-export interface SpectoraComment {
+interface SpectoraComment {
     id?: string;
     type?: SpectoraCommentType;
     title?: string;

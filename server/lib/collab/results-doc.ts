@@ -248,19 +248,6 @@ export function setItemAttribute(
     });
 }
 
-/** Delete a key from the item's `attributes` Y.Map. */
-export function deleteItemAttribute(
-    doc: Y.Doc,
-    findingKey: FindingKey,
-    key: string,
-): void {
-    const results = doc.getMap<unknown>('results');
-    doc.transact(() => {
-        const item = getOrSeedItem(results, findingKey);
-        getOrCreateMap(item, 'attributes').delete(key);
-    });
-}
-
 /**
  * Append (or merge) a photo into the item's `photos` Y.Array.
  * If a photo Y.Map with the same `key` exists, its fields are replaced/merged;
@@ -522,21 +509,6 @@ export function upsertCanned(
     });
 }
 
-/** Remove the canned-comment entry in `tabs[tab]` matching `cannedId`. */
-export function removeCanned(
-    doc: Y.Doc,
-    findingKey: FindingKey,
-    tab: CannedTab,
-    cannedId: string,
-): void {
-    const results = doc.getMap<unknown>('results');
-    doc.transact(() => {
-        const item = getOrSeedItem(results, findingKey);
-        const tabs = getOrCreateMap(item, 'tabs');
-        removeElement(getOrCreateArray(tabs, tab), 'cannedId', cannedId);
-    });
-}
-
 /**
  * Upsert a custom-comment entry into `customComments[tab]`, keyed by `id`.
  * Provided fields are merged onto the existing entry (or a new one is created).
@@ -552,21 +524,6 @@ export function upsertCustomComment(
         const item = getOrSeedItem(results, findingKey);
         const cc = getOrCreateMap(item, 'customComments');
         upsertElement(getOrCreateArray(cc, tab), 'id', { ...entry });
-    });
-}
-
-/** Remove the custom-comment entry in `customComments[tab]` matching `id`. */
-export function removeCustomComment(
-    doc: Y.Doc,
-    findingKey: FindingKey,
-    tab: CannedTab,
-    id: string,
-): void {
-    const results = doc.getMap<unknown>('results');
-    doc.transact(() => {
-        const item = getOrSeedItem(results, findingKey);
-        const cc = getOrCreateMap(item, 'customComments');
-        removeElement(getOrCreateArray(cc, tab), 'id', id);
     });
 }
 

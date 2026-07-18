@@ -6,11 +6,8 @@ import type {
   SchemaItem,
   ResultMap,
   ActiveView,
-  ViewMode,
   ItemFilter,
-  SaveStatus,
 } from "../useInspection";
-import { fKey } from "../useInspection";
 import type { Severity } from "~/lib/severity";
 import { m } from "~/paraglide/messages";
 
@@ -125,17 +122,9 @@ export interface InspectionContext {
   severityForRatingId: (ratingId: string | null | undefined) => Severity | "all";
 }
 
-// Re-export shared types/values used by the slices and consumers.
-export { fKey };
+// Re-export shared types used by the slices and consumers.
 export type {
   RatingLevel,
-  Inspection,
-  InspectionSchema,
   SchemaSection,
   SchemaItem,
-  ResultMap,
-  ActiveView,
-  ViewMode,
-  ItemFilter,
-  SaveStatus,
 };

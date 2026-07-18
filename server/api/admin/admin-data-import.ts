@@ -94,7 +94,7 @@ const migrateFindingKeysRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-export const adminDataImportRoutes = createApiRouter()
+const adminDataImportRoutes = createApiRouter()
     .openapi(importDataRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const body = c.req.valid('json');
@@ -305,5 +305,4 @@ export const adminDataImportRoutes = createApiRouter()
         }, 200);
     });
 
-export type AdminDataImportApi = typeof adminDataImportRoutes;
 export default adminDataImportRoutes;

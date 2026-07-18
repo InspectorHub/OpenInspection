@@ -22,14 +22,14 @@ import { m } from "~/paraglide/messages";
 /* Allowlist (mirrors server/services/client-document.service.ts) */
 /* ------------------------------------------------------------------ */
 
-export const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
+const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
 
-export const ACCEPTED_EXTENSIONS = new Set([
+const ACCEPTED_EXTENSIONS = new Set([
   "pdf", "jpg", "jpeg", "png", "heic", "heif", "webp",
   "doc", "docx", "xls", "xlsx", "csv", "dwg", "dxf",
 ]);
-export const CAD_EXTENSIONS = new Set(["dwg", "dxf"]);
-export const ACCEPTED_CONTENT_TYPES = new Set([
+const CAD_EXTENSIONS = new Set(["dwg", "dxf"]);
+const ACCEPTED_CONTENT_TYPES = new Set([
   "application/pdf",
   "image/jpeg", "image/png", "image/heic", "image/heif", "image/webp",
   "application/msword",
@@ -66,7 +66,7 @@ export function formatSize(bytes: number): string {
 /* Categories */
 /* ------------------------------------------------------------------ */
 
-export const DOCUMENT_CATEGORIES = [
+const DOCUMENT_CATEGORIES = [
   "prior_reports", "plans_drawings", "environmental",
   "leases_financials", "permits_certificates", "photos", "other",
 ] as const;

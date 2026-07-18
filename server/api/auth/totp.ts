@@ -119,7 +119,7 @@ const login2faRoute = createRoute(withMcpMetadata({
     }
 }, { scopes: [], tier: 'excluded' }));
 
-export const totpRoutes = createApiRouter()
+const totpRoutes = createApiRouter()
     .openapi(totpSetupRoute, async (c) => {
         const me = await loadCurrentUser(c);
         const totpSvc = c.var.services.totp;

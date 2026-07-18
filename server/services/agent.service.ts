@@ -24,7 +24,6 @@ import { updateProfile, type AgentProfilePatch } from './agent/profile';
 export type { AgentReferralRow, AgentInspectorRow } from './agent/referral';
 export type { ResolvedInvite, AcceptInviteInput, AcceptInviteResult } from './agent/invite';
 export type { AgentProfilePatch } from './agent/profile';
-export { getAgentReferralFilter } from './agent/referral';
 
 /**
  * Agent Accounts A1 — invites, accepts, signups, and the same-email auto-link

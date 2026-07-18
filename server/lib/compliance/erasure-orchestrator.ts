@@ -48,7 +48,7 @@ import {
 } from './anonymize-pii';
 
 /** A single recorded erasure decision (serialized into `decisions_json`). */
-export interface ErasureDecision {
+interface ErasureDecision {
     table: string;
     action: 'delete' | 'null' | 'anonymize';
     count: number;

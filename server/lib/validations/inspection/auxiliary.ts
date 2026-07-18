@@ -7,7 +7,7 @@ import { z } from '@hono/zod-openapi';
  * of bulk-uploaded shots awaiting placement. The drawer renders both groups
  * with the same card UI, but only attached photos carry an itemId/section.
  */
-export const MediaCenterAttachedPhotoSchema = z.object({
+const MediaCenterAttachedPhotoSchema = z.object({
     key:           z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
     originalKey:   z.string().describe('Source R2 key (revert target); differs from key when the photo is annotated'),
     url:           z.string().describe('TODO describe url field for the OpenInspection MCP integration'),
@@ -20,7 +20,7 @@ export const MediaCenterAttachedPhotoSchema = z.object({
     defectId:      z.string().optional().describe('Defect id when the photo hangs off a canned/custom defect rather than the item'),
 }).openapi('MediaCenterAttachedPhoto');
 
-export const MediaCenterPoolPhotoSchema = z.object({
+const MediaCenterPoolPhotoSchema = z.object({
     id:            z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
     key:           z.string().describe('TODO describe key field for the OpenInspection MCP integration'),
     url:           z.string().describe('TODO describe url field for the OpenInspection MCP integration'),

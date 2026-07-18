@@ -15,8 +15,6 @@ export const CreateInvoiceSchema = z.object({
     notes: z.string().max(500).optional().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
 }).openapi('CreateInvoice');
 
-export const UpdateInvoiceSchema = CreateInvoiceSchema.partial().openapi('UpdateInvoice');
-
 /**
  * Task 8 (Issue #111) — body for POST /api/invoices/request-payment. The hub
  * Invoice card "Request payment" button posts here; the endpoint resolves (or

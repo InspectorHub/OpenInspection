@@ -12,7 +12,7 @@
  * always safe (old data simply doesn't reference it).
  */
 
-export const DEFECT_TRADES = [
+const DEFECT_TRADES = [
     'general-contractor', 'licensed-electrician', 'licensed-plumber', 'licensed-roofer',
     'hvac-technician', 'structural-engineer', 'mold-remediation-specialist', 'septic-contractor',
     'chimney-sweep', 'pest-control', 'arborist', 'garage-door-technician',
@@ -21,13 +21,13 @@ export const DEFECT_TRADES = [
 ] as const;
 export type DefectTrade = typeof DEFECT_TRADES[number];
 
-export const DEFECT_DEADLINES = [
+const DEFECT_DEADLINES = [
     'immediate', 'before-closing', 'within-30-days',
     'within-90-days', 'next-maintenance', 'monitor',
 ] as const;
 export type DefectDeadline = typeof DEFECT_DEADLINES[number];
 
-export const DEFECT_TIMEFRAMES = [
+const DEFECT_TIMEFRAMES = [
     '0-1-year', '1-3-years', '3-5-years',
     '5-10-years', '10-plus-years', 'end-of-life',
 ] as const;
@@ -73,20 +73,6 @@ export const DEFECT_TIMEFRAME_LABELS: Record<DefectTimeframe, string> = {
     '10-plus-years':  '10 or more years',
     'end-of-life':    'at end of expected service life',
 };
-
-const TRADE_SET     = new Set<string>(DEFECT_TRADES);
-const DEADLINE_SET  = new Set<string>(DEFECT_DEADLINES);
-const TIMEFRAME_SET = new Set<string>(DEFECT_TIMEFRAMES);
-
-export function isDefectTrade(v: unknown): v is DefectTrade {
-    return typeof v === 'string' && TRADE_SET.has(v);
-}
-export function isDefectDeadline(v: unknown): v is DefectDeadline {
-    return typeof v === 'string' && DEADLINE_SET.has(v);
-}
-export function isDefectTimeframe(v: unknown): v is DefectTimeframe {
-    return typeof v === 'string' && TIMEFRAME_SET.has(v);
-}
 
 // React-friendly option arrays for <select> / dropdown UI.
 // These do not exist in the API mirror — frontend-only convenience.

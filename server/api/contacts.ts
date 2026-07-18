@@ -96,7 +96,7 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteContact (DELETE /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'primary' }));
 
-export const contactRoutes = createApiRouter()
+const contactRoutes = createApiRouter()
     .openapi(listContactsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const q = c.req.valid('query');

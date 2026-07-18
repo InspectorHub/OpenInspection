@@ -131,7 +131,7 @@ const getSignerLinkRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-export const adminEsignRoutes = createApiRouter()
+const adminEsignRoutes = createApiRouter()
     .openapi(listSigningRequestsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);
@@ -376,5 +376,4 @@ export const adminEsignRoutes = createApiRouter()
         return c.json({ success: true as const, data: { remindedAt: now } }, 200);
     });
 
-export type AdminEsignApi = typeof adminEsignRoutes;
 export default adminEsignRoutes;

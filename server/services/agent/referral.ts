@@ -49,7 +49,7 @@ export interface AgentInspectorRow {
  * byte-identical (and the where-condition / row filter stays the same SQL +
  * post-fetch logic across all of them).
  */
-export function getAgentReferralFilter(
+function getAgentReferralFilter(
     agentEmail: string | null,
 ): (r: { referredById: string | null; linkContactId: string | null; contactEmail: string | null }) => boolean {
     return (r) => {

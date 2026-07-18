@@ -57,5 +57,3 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', collabRoutes);
 
 export type InspectionsApi = typeof inspectionsRoutes;
-
-export default inspectionsRoutes;

@@ -759,5 +759,3 @@ export function ReportView(props: ReportViewProps) {
     </div>
   );
 }
-
-export default ReportView;

@@ -36,10 +36,6 @@ import { TelnyxComplianceProvider } from '../messaging/providers/telnyx-complian
 // existing import path without change.
 export type { ComplianceEvent } from '../messaging/compliance-provider';
 
-// ComplianceEventEntity kept for backward compat — consumers may also import
-// from compliance-provider directly.
-export type ComplianceEventEntity = 'brand' | 'campaign' | 'tfv';
-
 /**
  * Build the public compliance-status webhook URL for a tenant slug.
  *

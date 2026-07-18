@@ -20,10 +20,3 @@ export async function requireServiceBinding(c: Context<HonoConfig>, next: () => 
     }
     return next();
 }
-
-export async function isServiceBindingCall(c: Context<HonoConfig>): Promise<boolean> {
-    return verifyM2mHeader(
-        c.env as unknown as Record<string, string | undefined>,
-        c.req.header(M2M_HEADER),
-    );
-}

@@ -10,7 +10,7 @@ import { m } from "~/paraglide/messages";
  * DS tokens, light/dark via data-color-scheme. No native confirm/alert.
  */
 
-export type SignerRole = "client" | "co_client" | "agent" | "other";
+type SignerRole = "client" | "co_client" | "agent" | "other";
 
 export interface SignerDraft {
     name: string;

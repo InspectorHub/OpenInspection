@@ -239,20 +239,6 @@ export function revertPhoto(
 }
 
 /**
- * Replace a photo entry IN PLACE with `entry` (a full PhotoEntry). Used by the
- * crop flow to drop the annotation while setting the new crop. `findingKey` is
- * the composite key. No-op if `key` is absent.
- */
-export function replacePhoto(
-    doc: Y.Doc,
-    findingKey: string,
-    key: string,
-    entry: PhotoEntry,
-): void {
-    docReplacePhoto(doc, findingKey, key, entry);
-}
-
-/**
  * #181 — mirror a server crop bake into the doc. Builds the post-crop entry
  * from the photo's CURRENT fields MINUS any annotation (sequential-layering
  * rule: a re-crop discards the prior annotation, whose coords were in the OLD
@@ -365,7 +351,7 @@ export function markPhotoPending(
  * #181 PR-G — read one photo entry by `key` from the live doc (or undefined).
  * Used by the drain swap + the pending-mark helpers to rebuild a fresh entry.
  */
-export function findPhotoEntry(
+function findPhotoEntry(
     doc: Y.Doc,
     findingKey: string,
     key: string,

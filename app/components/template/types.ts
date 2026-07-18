@@ -27,7 +27,7 @@ export interface CannedComment {
   abbrev?: string;
 }
 
-export interface ItemOptions {
+interface ItemOptions {
   min?: number | null;
   max?: number | null;
   unit?: string;
@@ -38,7 +38,7 @@ export interface ItemOptions {
   minPhotos?: number | null;
 }
 
-export interface Attribute {
+interface Attribute {
   id: string;
   name: string;
   type: string;

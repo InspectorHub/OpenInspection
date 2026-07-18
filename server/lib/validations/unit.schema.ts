@@ -44,7 +44,3 @@ export const BulkCreateUnitsSchema = z.discriminatedUnion('mode', [
 export const UnitModeSwitchSchema = z.object({
     mode: z.enum(['tagged', 'per_unit']).describe('Target unit-inspection mode: "per_unit" (promote to per-unit matrix) or "tagged" (flatten back to common scope + location tags).'),
 }).openapi('UnitModeSwitch');
-
-export type CreateUnitInput = z.infer<typeof CreateUnitSchema>;
-export type UpdateUnitInput = z.infer<typeof UpdateUnitSchema>;
-export type MoveUnitInput   = z.infer<typeof MoveUnitSchema>;

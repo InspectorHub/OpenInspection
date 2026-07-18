@@ -52,5 +52,3 @@ export const costItems = sqliteTable('cost_items', {
     index('idx_cost_items_tenant_inspection').on(t.tenantId, t.inspectionId),
     index('idx_cost_items_finding_key').on(t.findingKey),
 ]);
-
-export type CostItemRow = typeof costItems.$inferSelect;

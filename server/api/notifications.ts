@@ -131,7 +131,7 @@ const archiveRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteNotification (DELETE /{id}, notifications domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'primary' }));
 
-export const notificationsRoutes = createApiRouter()
+const notificationsRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const userId   = requireUserId(c);

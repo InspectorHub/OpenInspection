@@ -1,7 +1,7 @@
 import { z } from '@hono/zod-openapi';
 
-export const PAGE_SIZES = [12, 25, 50, 100] as const;
-export const DEFAULT_PAGE_SIZE = 50;
+const PAGE_SIZES = [12, 25, 50, 100] as const;
+const DEFAULT_PAGE_SIZE = 50;
 
 /**
  * Shared pagination query parameter schema. Pages are 1-indexed; pageSize is

@@ -119,7 +119,7 @@ const photoUploadRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const profileRoutes = createApiRouter()
+const profileRoutes = createApiRouter()
     .openapi(getProfileRoute, async (c) => {
         const userId = c.get('user')?.sub;
         const tenantId = c.get('tenantId');

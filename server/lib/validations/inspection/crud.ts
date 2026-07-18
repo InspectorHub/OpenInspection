@@ -155,17 +155,6 @@ export const InspectionCountsSchema = z.object({
     unconfirmed: z.number().openapi({ example: 2 }).describe('TODO describe unconfirmed field for the OpenInspection MCP integration'),
     inProgress:  z.number().openapi({ example: 1 }).describe('TODO describe inProgress field for the OpenInspection MCP integration'),
 }).openapi('InspectionCounts');
-export type InspectionCounts = z.infer<typeof InspectionCountsSchema>;
-
-/**
- * Stats Schema
- */
-export const InspectionStatsSchema = z.object({
-    total: z.number().openapi({ example: 100 }).describe('TODO describe total field for the OpenInspection MCP integration'),
-    draft: z.number().openapi({ example: 20 }).describe('TODO describe draft field for the OpenInspection MCP integration'),
-    completed: z.number().openapi({ example: 50 }).describe('TODO describe completed field for the OpenInspection MCP integration'),
-    delivered: z.number().openapi({ example: 30 }).describe('TODO describe delivered field for the OpenInspection MCP integration'),
-}).openapi('InspectionStats');
 
 /**
  * Validation schema for bulk operations.
@@ -180,11 +169,9 @@ export const BulkInspectionSchema = z.object({
 /**
  * Response Schemas
  */
-export const InspectionResponseSchema = createApiResponseSchema(InspectionSchema).openapi('InspectionResponse');
 export const InspectionListResponseSchema = createApiResponseSchema(z.array(InspectionSchema)).openapi('InspectionListResponse');
-export const InspectionStatsResponseSchema = createApiResponseSchema(InspectionStatsSchema).openapi('InspectionStatsResponse');
 
-export const CancellationReasonSchema = z.enum([
+const CancellationReasonSchema = z.enum([
     'client_cancelled',
     'weather',
     'inspector_unavailable',
@@ -200,7 +187,7 @@ export const CancelInspectionSchema = z.object({
 
 // Round-2 F1 — per-recipient delivery selection. Each recipient row chooses
 // zero-or-more channels. Empty `channels` means "skip this recipient".
-export const PublishRecipientSchema = z.object({
+const PublishRecipientSchema = z.object({
   contactId: z.string().nullable().describe('TODO describe contactId field for the OpenInspection MCP integration'),
   channels:  z.array(z.enum(['email', 'text'])).default([]).describe('TODO describe channels field for the OpenInspection MCP integration'),
 }).openapi('PublishRecipient');

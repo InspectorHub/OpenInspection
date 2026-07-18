@@ -48,7 +48,7 @@ export const ReportSignoffRowSchema = z.object({
     dualRole: z.boolean(),
 });
 
-export const PsqResponseRowSchema = z.object({
+const PsqResponseRowSchema = z.object({
     id: z.string(),
     tenantId: z.string(),
     inspectionId: z.string(),
@@ -60,7 +60,7 @@ export const PsqResponseRowSchema = z.object({
     updatedAt: z.number(),
 });
 
-export const DocumentReviewItemRowSchema = z.object({
+const DocumentReviewItemRowSchema = z.object({
     id: z.string(),
     tenantId: z.string(),
     inspectionId: z.string(),
@@ -74,7 +74,7 @@ export const DocumentReviewItemRowSchema = z.object({
     sortOrder: z.number().int(),
 });
 
-export const AstmConformanceSchema = z.object({
+const AstmConformanceSchema = z.object({
     standard: z.literal('E2018-24'),
     conforms: z.boolean(),
 });

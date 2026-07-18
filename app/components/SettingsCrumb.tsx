@@ -1,6 +1,6 @@
 import { m } from "~/paraglide/messages";
 
-export interface CrumbItem {
+interface CrumbItem {
   label: string;
   href?: string;
 }

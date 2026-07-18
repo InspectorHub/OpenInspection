@@ -5,19 +5,19 @@ import type { FilterId, Inspection, TabKey } from "~/lib/dashboard-schema";
 /*  Time filter helpers                                                */
 /* ------------------------------------------------------------------ */
 
-export function startOfDay(d: Date) {
+function startOfDay(d: Date) {
   const x = new Date(d);
   x.setHours(0, 0, 0, 0);
   return x;
 }
 
-export function addDays(d: Date, days: number) {
+function addDays(d: Date, days: number) {
   const x = new Date(d);
   x.setDate(x.getDate() + days);
   return x;
 }
 
-export function startOfWeek(d: Date) {
+function startOfWeek(d: Date) {
   const x = startOfDay(d);
   x.setDate(x.getDate() - x.getDay());
   return x;

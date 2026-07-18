@@ -103,7 +103,7 @@ const seedDefaultsRecommendationRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for seedDefaultsRecommendation (POST /seed-defaults, recommendations domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const recommendationsRoutes = createApiRouter()
+const recommendationsRoutes = createApiRouter()
     .openapi(listRecommendationsRoute, async (c) => {
         const { category, severity } = c.req.valid('query');
         const tenantId = c.get('tenantId') as string;

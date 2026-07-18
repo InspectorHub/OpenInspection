@@ -52,7 +52,7 @@ export interface SyncEnvelope {
 /** Zod schemas for each event's `data` shape. Tolerant readers: additive
  *  optional fields are allowed without a version bump, so these do NOT use
  *  `.strict()`. */
-export const userInvitedDataSchema = z.object({
+const userInvitedDataSchema = z.object({
     tenantId: z.string(),
     email: z.string(),
     role: z.string(),
@@ -60,13 +60,13 @@ export const userInvitedDataSchema = z.object({
     name: z.string().optional(),
 });
 
-export const userPasswordChangedDataSchema = z.object({
+const userPasswordChangedDataSchema = z.object({
     tenantId: z.string(),
     email: z.string(),
     passwordHash: z.string(),
 });
 
-export const userDeletedDataSchema = z.object({
+const userDeletedDataSchema = z.object({
     tenantId: z.string(),
     email: z.string(),
 });
@@ -76,7 +76,7 @@ export const userDeletedDataSchema = z.object({
  *  (`wf:onboarding:<instanceId>`) the portal consumer uses to wake the
  *  waiting Workflow instance. `result` is the consumer's terminal verdict —
  *  duplicates re-emit a reply so a lost reply self-heals on command retry. */
-export const replyTenantUpdatedDataSchema = z.object({
+const replyTenantUpdatedDataSchema = z.object({
     tenantId: z.string(),
     correlationId: z.string(),
     replyto: z.string(),
@@ -85,7 +85,7 @@ export const replyTenantUpdatedDataSchema = z.object({
 
 /** A-21 batch 3 — export finished: the ZIP is at `r2Key` in the shared
  *  EXPORTS_BUCKET; manifest mirrors DataExportService.ExportManifest. */
-export const replyTenantExportCompletedDataSchema = z.object({
+const replyTenantExportCompletedDataSchema = z.object({
     tenantId: z.string(),
     correlationId: z.string(),
     replyto: z.string(),
@@ -99,7 +99,7 @@ export const replyTenantExportCompletedDataSchema = z.object({
 
 /** A-21 batch 3 — purge finished: destruction counts (A-20 compliance; core
  *  also keeps the durable tenant_destruction_records row). */
-export const replyTenantPurgedDataSchema = z.object({
+const replyTenantPurgedDataSchema = z.object({
     tenantId: z.string(),
     correlationId: z.string(),
     replyto: z.string(),
@@ -108,13 +108,6 @@ export const replyTenantPurgedDataSchema = z.object({
     r2Bytes: z.number(),
     kv: z.number(),
 });
-
-export type UserInvitedData = z.infer<typeof userInvitedDataSchema>;
-export type UserPasswordChangedData = z.infer<typeof userPasswordChangedDataSchema>;
-export type UserDeletedData = z.infer<typeof userDeletedDataSchema>;
-export type ReplyTenantUpdatedData = z.infer<typeof replyTenantUpdatedDataSchema>;
-export type ReplyTenantExportCompletedData = z.infer<typeof replyTenantExportCompletedDataSchema>;
-export type ReplyTenantPurgedData = z.infer<typeof replyTenantPurgedDataSchema>;
 
 /** Registry mapping each event type to its supported dataschema versions.
  *  Portal's `isKnown(type, dataschema)` consults the equivalent registry; a
@@ -147,7 +140,7 @@ function kebabEventName(eventType: string): string {
 }
 
 /** Build the `dataschema` for an event type at v1 (the only version today). */
-export function dataschemaFor(eventType: string, version = 'v1'): string {
+function dataschemaFor(eventType: string, version = 'v1'): string {
     return `${kebabEventName(eventType)}/${version}`;
 }
 

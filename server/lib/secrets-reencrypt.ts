@@ -1,6 +1,6 @@
 import { openSecrets, sealSecrets, unwrapDek, wrapDek } from './config-crypto';
 
-export interface SecretsRow { tenantId: string; blob: string; dekEnc: string | null }
+interface SecretsRow { tenantId: string; blob: string; dekEnc: string | null }
 export interface SecretsStore {
     listRows(): Promise<SecretsRow[]>;
     updateRow(tenantId: string, patch: { blob?: string; dekEnc?: string }): Promise<void>;

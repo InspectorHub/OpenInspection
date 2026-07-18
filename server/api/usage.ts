@@ -37,7 +37,7 @@ const summaryRoute = createRoute(withMcpMetadata({
     description: "Returns the calling tenant's lifetime usage per metric, seat usage, and (free tier only) the caps those metrics are measured against."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const usageRoutes = createApiRouter()
+const usageRoutes = createApiRouter()
     .openapi(summaryRoute, async (c) => {
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized();

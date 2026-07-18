@@ -92,7 +92,7 @@ const deleteDefectCategoryRoute = createRoute(withMcpMetadata({
     description: 'Delete a custom (non-seed) defect category. Seed rows (maintenance/recommendation/safety) are protected and silently no-op.',
 }, { scopes: ['admin'], tier: 'extended' }));
 
-export const adminDefectCategoriesRoutes = createApiRouter()
+const adminDefectCategoriesRoutes = createApiRouter()
     .openapi(listDefectCategoriesRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const svc = new DefectCategoryService(c.env.DB);

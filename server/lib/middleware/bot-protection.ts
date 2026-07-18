@@ -1,6 +1,3 @@
-import { Context, Next } from 'hono';
-import { Errors } from '../errors';
-
 /**
  * Verifies a Cloudflare Turnstile challenge token server-side.
  * Returns true if the token is valid.
@@ -19,17 +16,3 @@ export async function verifyTurnstile(token: string, secretKey: string): Promise
     const data = await res.json() as { success: boolean };
     return data.success;
 }
-
-/**
- * Middleware: reject requests from IPs flagged by Cloudflare's threat intelligence.
- * threat_score is 0-100; scores >= 50 indicate likely bot/malicious traffic.
- * Silently skipped in local dev where the cf object is absent.
- */
-export const blockHighThreatScore = async (c: Context, next: Next) => {
-    const cf = (c.req.raw as Request & { cf?: Record<string, unknown> }).cf;
-    const score = typeof cf?.threat_score === 'number' ? cf.threat_score : 0;
-    if (score >= 50) {
-        throw Errors.Forbidden('Request blocked.');
-    }
-    return next();
-};

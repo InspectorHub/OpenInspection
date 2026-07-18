@@ -147,7 +147,7 @@ export function bucketEventsByCivilDate(events: CalendarEvent[]): Map<string, Ca
   return map;
 }
 
-export const STATUS_COLORS: Record<string, string> = {
+const STATUS_COLORS: Record<string, string> = {
   draft: "bg-ih-bg-muted",
   scheduled: "bg-ih-primary-600",
   confirmed: "bg-ih-primary",

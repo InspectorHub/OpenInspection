@@ -26,19 +26,6 @@ import { safeReturnTo } from '../lib/mcp/safe-return-to';
 import totpRoutes from './auth/totp';
 import profileRoutes from './auth/profile';
 
-/**
- * Interface for the decoded JWT payload. Intentionally does not carry email or any other
- * PII — JWTs are signed, not encrypted.
- */
-export interface AuthPayload {
-    sub: string;
-    'custom:tenantId': string;
-    'custom:userRole': string;
-    role: string;
-    exp: number;
-    iat?: number;
-}
-
 // --- Routes ---
 
 const loginRoute = createRoute(withMcpMetadata({
@@ -262,7 +249,7 @@ const setupStatusRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login check of whether the instance has completed first-run setup (any tenant-scoped user exists). Drives the /setup page redirect guard.',
 }, { scopes: [], tier: 'excluded' }));
 
-export const coreAuthRoutes = createApiRouter()
+const coreAuthRoutes = createApiRouter()
     .openapi(loginRoute, async (c) => {
         // SaaS deploys disable the local password form (login via portal) —
         // see the matching guard on GET /login. Returning Gone (410) + a

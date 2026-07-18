@@ -33,7 +33,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
  * Round-2 backlog G1 (Spectora §E.2) — GET /api/inspections/:id/property-facts
  * Returns the six Property Facts columns for the strip + report banner.
  */
-export const getPropertyFactsRoute = createRoute(withMcpMetadata({
+const getPropertyFactsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/property-facts',
     tags: ["inspections"],
@@ -82,7 +82,7 @@ export const updatePropertyFactsRoute = createRoute(withMcpMetadata({
  * Partial-patch handler for the report narrative panel. Omitted keys are
  * unchanged. Returns the resolved narrative (seed fallbacks applied).
  */
-export const updatePcaNarrativeRoute = createRoute(withMcpMetadata({
+const updatePcaNarrativeRoute = createRoute(withMcpMetadata({
     method: 'patch',
     path: '/{id}/pca-narrative',
     tags: ["inspections"],
@@ -113,7 +113,7 @@ export const updatePcaNarrativeRoute = createRoute(withMcpMetadata({
  * inspection-settings.js patches each field via the existing PATCH
  * /property-facts endpoint, preserving the inspector's manual overrides.
  */
-export const autofillPropertyFactsRoute = createRoute(withMcpMetadata({
+const autofillPropertyFactsRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/property-facts/autofill',
     tags: ["inspections"],
@@ -136,7 +136,7 @@ export const autofillPropertyFactsRoute = createRoute(withMcpMetadata({
 /**
  * GET /api/inspections/:id/results
  */
-export const getResultsRoute = createRoute(withMcpMetadata({
+const getResultsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/results',
     tags: ["inspections"],
@@ -173,10 +173,10 @@ export const getResultsRoute = createRoute(withMcpMetadata({
  * here without touching the source template row. (Save-back-to-template
  * and save-as-new-template come in later phases.)
  */
-export const PatchTemplateSnapshotBodySchema = z.object({
+const PatchTemplateSnapshotBodySchema = z.object({
     snapshot: TemplateSchemaV2Schema.describe('Full v2 template structure to overwrite the inspection snapshot with'),
 });
-export const updateTemplateSnapshotRoute = createRoute(withMcpMetadata({
+const updateTemplateSnapshotRoute = createRoute(withMcpMetadata({
     method: 'patch',
     path: '/{id}/template-snapshot',
     tags: ["inspections"],
@@ -202,16 +202,16 @@ export const updateTemplateSnapshotRoute = createRoute(withMcpMetadata({
  * system re-freezes on next write. Notes / photos / canned comments are
  * always preserved.
  */
-export const SwitchRatingSystemSchema = z.object({
+const SwitchRatingSystemSchema = z.object({
     ratingSystemId: z.string().uuid().describe('Target rating system ID to apply to this inspection'),
     mode:           z.enum(['remap', 'clear']).default('remap').describe('How to handle existing ratings: remap by severity bucket or clear them'),
 });
-export const SwitchRatingSystemResultSchema = z.object({
+const SwitchRatingSystemResultSchema = z.object({
     remapped: z.number(),
     cleared:  z.number(),
     total:    z.number(),
 });
-export const switchRatingSystemRoute = createRoute(withMcpMetadata({
+const switchRatingSystemRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/switch-rating-system',
     tags: ["inspections"],
@@ -233,7 +233,7 @@ export const switchRatingSystemRoute = createRoute(withMcpMetadata({
  * Flattens all attached recommendations across all items + computes totals.
  * Spec 3 report renderer will consume this to build the consolidated repair list.
  */
-export const aggregateRecommendationsRoute = createRoute(withMcpMetadata({
+const aggregateRecommendationsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/recommendations',
     tags: ["inspections"],
@@ -248,7 +248,7 @@ export const aggregateRecommendationsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['read'], tier: 'extended' }));
 
 // Design System 0520 subsystem E P1.3 — Publish pre-flight gates.
-export const preflightRoute = createRoute(withMcpMetadata({
+const preflightRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/{id}/preflight',
     tags: ["inspections"],
@@ -269,7 +269,7 @@ export const preflightRoute = createRoute(withMcpMetadata({
 // value }` patches and folds them into inspection_results.data in one
 // round-trip with forced last-writer-wins semantics (NOT the retired CAS
 // version-check path). See inspection-results.service for the upsert semantics.
-export const resultsBatchRoute = createRoute(withMcpMetadata({
+const resultsBatchRoute = createRoute(withMcpMetadata({
     method:     'post',
     path:       '/{id}/results/batch',
     tags:       ['inspections'],

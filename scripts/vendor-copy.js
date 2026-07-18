@@ -34,10 +34,7 @@ for (const [src, dest] of jsFiles) {
 
 // Dexie removed — offline IndexedDB code migrated to React Router v7 frontend.
 
-// ── node-diff3 (server-side three-way merge) ───────────────────────────────────
-// Vendored to public/ for the SW only — server uses the npm package directly.
-cpSync(join(nm, 'node-diff3/index.mjs'), join(vendorDir, 'node-diff3.mjs'));
-console.log('  vendor/node-diff3.mjs');
+// node-diff3 removed — diff3 three-way merge replaced by projection diffing (FindingDiff).
 
 // Quill, Konva, FullCalendar removed — old Hono SSR templates deleted.
 

@@ -42,6 +42,3 @@ export const CreateCostItemSchema = z.object({
 });
 
 export const UpdateCostItemSchema = CreateCostItemSchema.partial();
-
-export type CreateCostItemInput = z.infer<typeof CreateCostItemSchema>;
-export type UpdateCostItemInput = z.infer<typeof UpdateCostItemSchema>;

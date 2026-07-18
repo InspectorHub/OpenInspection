@@ -28,7 +28,7 @@ import adminSettingsRoutes from './admin/admin-settings';
 import adminConfigRoutes from './admin/admin-config';
 import adminHolidayRoutes from './admin/admin-holidays';
 
-export const adminRoutes = createApiRouter()
+const adminRoutes = createApiRouter()
     .route('/', adminAgreementsRoutes)
     .route('/', adminEsignRoutes)
     .route('/', adminCommentsRoutes)

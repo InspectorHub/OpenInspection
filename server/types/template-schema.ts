@@ -76,11 +76,11 @@ export type ItemType =
     | 'date'
     | 'photo_only';
 
-export type ItemAttributeType =
+type ItemAttributeType =
     | 'boolean' | 'text' | 'number' | 'select' | 'multi_select' | 'date';
 
 /** Optional sub-fields nested under an item, e.g. tonnage on an HVAC unit. */
-export interface ItemAttribute {
+interface ItemAttribute {
     id: string;
     name: string;
     type: ItemAttributeType;
@@ -107,7 +107,7 @@ export interface ItemOptions {
 }
 
 /** Provenance for templates imported from upstream platforms. */
-export interface ItemSource {
+interface ItemSource {
     platform: string;
     externalId: string;
 }
@@ -135,7 +135,7 @@ export interface TemplateItem {
     source?: ItemSource | null;
 }
 
-export interface SectionApplicability {
+interface SectionApplicability {
     propertyTypes?: ('single-family' | 'multi-unit' | 'commercial')[];
     commercialSubtypes?: string[];
 }
@@ -173,7 +173,7 @@ export interface RatingLevel {
     pausesAdvance?: boolean;
 }
 
-export interface RatingSystem {
+interface RatingSystem {
     name?: string;
     defaultLevelId?: string;
     source?: string | null;
@@ -192,7 +192,7 @@ export interface TemplateBuilding {
     units: TemplateUnit[];
 }
 
-export interface TemplateStructure {
+interface TemplateStructure {
     buildings: TemplateBuilding[];
 }
 
@@ -211,7 +211,7 @@ export interface TemplateSchemaV2 {
     propertyMetadataFields?: PropertyMetaField[];
 }
 
-export interface PropertyMetaField {
+interface PropertyMetaField {
     id: string;
     label: string;
     type: 'text' | 'number' | 'select' | 'boolean' | 'date';
@@ -219,13 +219,4 @@ export interface PropertyMetaField {
     required?: boolean;
     unit?: string;
     options?: string[];
-}
-
-/**
- * Structural type-guard. Useful at I/O boundaries (DB read, API ingest).
- */
-export function isTemplateSchemaV2(value: unknown): value is TemplateSchemaV2 {
-    if (!value || typeof value !== 'object') return false;
-    const v = value as { schemaVersion?: unknown; sections?: unknown };
-    return v.schemaVersion === 2 && Array.isArray(v.sections);
 }

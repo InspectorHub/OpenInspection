@@ -29,7 +29,7 @@ export function getCapabilities(role: Role, overrides: PermissionOverrides | nul
   return base;
 }
 
-export function parseOverrides(json: string | null | undefined): PermissionOverrides | null {
+function parseOverrides(json: string | null | undefined): PermissionOverrides | null {
   if (!json) return null;
   try {
     return whitelistOverrides(JSON.parse(json) as Record<string, unknown>);

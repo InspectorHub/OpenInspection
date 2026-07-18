@@ -11,6 +11,3 @@ export const CreateInspectionTypeSchema = z.object({
 }).openapi('CreateInspectionType');
 
 export const UpdateInspectionTypeSchema = CreateInspectionTypeSchema.partial().openapi('UpdateInspectionType');
-
-export type CreateInspectionTypeInput = z.infer<typeof CreateInspectionTypeSchema>;
-export type UpdateInspectionTypeInput = z.infer<typeof UpdateInspectionTypeSchema>;

@@ -209,7 +209,7 @@ const inviteInfoRoute = createRoute(withMcpMetadata({
     operationId: "getAgentInviteInfo",
 }, { scopes: [], tier: 'extended' }));
 
-export const agentsRoutes = createApiRouter()
+const agentsRoutes = createApiRouter()
     .openapi(inviteRoute, async (c) => {
         // RBAC moved inside to keep OpenAPIHono context typing happy. Owners, admins,
         // and rank-and-file inspectors can all invite agents.

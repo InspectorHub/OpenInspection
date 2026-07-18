@@ -45,8 +45,6 @@ export const ICON_PATHS: Record<string, string> = {
     panelRO:    '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/><polyline points="7 9 10 12 7 15"/>',
 };
 
-export type IconName = keyof typeof ICON_PATHS;
-
 export function Icon({ name, size = 16, class: className = '', strokeWidth = 2 }: {
     name: string;
     size?: number;

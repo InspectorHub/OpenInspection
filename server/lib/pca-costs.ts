@@ -83,7 +83,7 @@ export function applyThreshold(
   return { kept, dropped };
 }
 
-export interface Table1Row {
+interface Table1Row {
   item: CostItem;
   total: number;
 }
@@ -128,7 +128,7 @@ export function bucketRollup(items: CostItem[]): BucketRollup {
   };
 }
 
-export interface ReserveRow {
+interface ReserveRow {
   item: CostItem;
   placementYear: number;
   replacementCents: number;
