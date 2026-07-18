@@ -633,6 +633,25 @@ export class InspectionCoreService extends InspectionSubService {
             lastSyncedAt: createdAt,
         });
 
+        // Task 7c (people-role-profiles fix) — copy the baseline's
+        // inspection_people rows (client / buyer_agent / listing_agent / ...)
+        // onto the new re-inspection, alongside the legacy clientContactId /
+        // clientName / clientEmail / clientPhone carry-forward above (kept
+        // until Task 13 retires those columns). Without this,
+        // getInspection/listInspections (Task 9c-reads) resolve the client
+        // via inspection_people ONLY and would show a null client on every
+        // re-inspection. Non-fatal: a people-write failure must never roll
+        // back the already-committed re-inspection row.
+        try {
+            const people = new PeopleService({ DB: this.db });
+            const baselinePeople = await people.listPeople(tenantId, baselineId);
+            for (const p of baselinePeople) {
+                await people.addPerson(tenantId, id, p.contactId, p.roleProfileId);
+            }
+        } catch (err) {
+            logger.error('inspection-people copy from reinspection create failed', { inspectionId: id }, err instanceof Error ? err : undefined);
+        }
+
         const created = await db.select().from(inspections).where(eq(inspections.id, id)).get();
         return created as unknown as Inspection;
     }
