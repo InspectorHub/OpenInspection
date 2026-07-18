@@ -113,7 +113,7 @@ const accountDeleteRoute = createRoute(withMcpMetadata({
     },
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const identityRoutes = createApiRouter()
+const identityRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
         const items = await c.var.services.identity.list(getCallerUserId(c));
         return c.json({ success: true as const, data: { identities: items } }, 200);

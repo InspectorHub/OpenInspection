@@ -183,7 +183,7 @@ const inspectorSignRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-export const adminAgreementsRoutes = createApiRouter()
+const adminAgreementsRoutes = createApiRouter()
     .openapi(listAgreementsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const agreementService = c.var.services.agreement;

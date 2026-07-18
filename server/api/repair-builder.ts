@@ -236,7 +236,7 @@ const setIntroRoute = createRoute(withMcpMetadata({
 // Router
 // ---------------------------------------------------------------------------
 
-export const repairBuilderRoutes = createApiRouter()
+const repairBuilderRoutes = createApiRouter()
     .openapi(sourceRoute, async (c) => {
         const { id } = c.req.valid('param');
 

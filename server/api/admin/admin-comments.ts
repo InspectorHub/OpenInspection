@@ -149,7 +149,7 @@ const touchCommentRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-export const adminCommentsRoutes = createApiRouter()
+const adminCommentsRoutes = createApiRouter()
     .openapi(listCommentsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const { severity, section, sectionId, triggerCode, search, sort, filterMode, itemLabel, page, pageSize } = c.req.valid('query');

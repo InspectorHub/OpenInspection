@@ -47,7 +47,7 @@ const patchRoute = withMcpMetadata(createRoute({
     },
 }), { scopes: ['write'], tier: 'extended' });
 
-export const inspectionPrefsRoutes = createApiRouter()
+const inspectionPrefsRoutes = createApiRouter()
     .openapi(getRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const db = drizzle(c.env.DB as never);

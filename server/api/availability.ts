@@ -267,5 +267,3 @@ export const availabilityRoutes = createApiRouter()
     });
 
 export type AvailabilityApi = typeof availabilityRoutes;
-
-export default availabilityRoutes;

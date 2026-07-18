@@ -31,7 +31,7 @@ const summaryRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listBillingSummary (GET /summary, invoices domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const billingRoutes = createApiRouter()
+const billingRoutes = createApiRouter()
     .openapi(summaryRoute, async (c) => {
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized();

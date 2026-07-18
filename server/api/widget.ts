@@ -34,7 +34,7 @@ const recordEventRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createWidgetEvent (POST /event, webhooks domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: [], tier: 'excluded' }));
 
-export const widgetRoutes = createApiRouter()
+const widgetRoutes = createApiRouter()
     .openapi(recordEventRoute, async (c) => {
         const tenantId = c.get('resolvedTenantId') || c.get('tenantId');
         if (!tenantId) {

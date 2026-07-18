@@ -189,5 +189,3 @@ export function WordExportButton({
     </button>
   );
 }
-
-export default WordExportButton;

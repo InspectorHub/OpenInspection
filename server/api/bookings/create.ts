@@ -47,7 +47,7 @@ const createBookingRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createBookingBook (POST /book, bookings domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const createBookingRoutes = createApiRouter()
+const createBookingRoutes = createApiRouter()
     .openapi(createBookingRoute, async (c) => {
         await checkRateLimit(c, 'book');
 

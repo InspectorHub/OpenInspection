@@ -114,5 +114,3 @@ export function ProgressView(props: ProgressViewProps) {
     </div>
   );
 }
-
-export default ProgressView;

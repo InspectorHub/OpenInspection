@@ -33,7 +33,7 @@ const heatmapRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listAnalyticFindingsHeatmap (GET /findings-heatmap, metrics domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const analyticsRoutes = createApiRouter()
+const analyticsRoutes = createApiRouter()
     .openapi(growthRoute, async (c) => {
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');

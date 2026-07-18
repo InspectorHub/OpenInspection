@@ -4,7 +4,7 @@ import { requireRole } from '../lib/middleware/rbac';
 import { DataService } from '../services/data.service';
 import { Errors } from '../lib/errors';
 
-export const dataRoutes = createApiRouter()
+const dataRoutes = createApiRouter()
     // GET /api/data/export/inspections — CSV download
     .get('/export/inspections', requireRole('owner', 'manager'), async (c) => {
         const tenantId = c.get('tenantId');

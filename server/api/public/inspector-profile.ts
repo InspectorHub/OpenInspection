@@ -47,7 +47,7 @@ const brandAssetRoute = createRoute(withMcpMetadata({
     description: 'Streams a tenant brand asset (logo) from R2. Only keys under the public `branding/` prefix are servable; everything else in the bucket stays scoped to its own routes.',
 }, { scopes: [], tier: 'extended' }));
 
-export const publicInspectorProfileRoutes = createApiRouter()
+const publicInspectorProfileRoutes = createApiRouter()
     .openapi(brandRoute, async (c) => {
         const { tenant } = c.req.valid('param');
         // Resolve by slug directly (works in every deploy mode — the slug is

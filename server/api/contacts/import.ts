@@ -46,7 +46,7 @@ const importRoute = createRoute(withMcpMetadata({
     description: 'Bulk-inserts contacts from a previously-previewed CSV blob using the user-confirmed column mapping. Two-phase (B-29+): every row is validated first (name, email format, in-file duplicate emails) and ANY error returns the full error list with ZERO rows written; valid files insert atomically in one chunked db.batch. Blank names and already-existing emails are skips, not errors.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const contactsImportRoutes = createApiRouter()
+const contactsImportRoutes = createApiRouter()
     .openapi(importPreviewRoute, async (c) => {
         const { csv } = c.req.valid('json');
         const data = parseCsvPreview(csv);

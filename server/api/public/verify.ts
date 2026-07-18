@@ -95,7 +95,7 @@ const reportVerifyPdfRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login download of the immutable archived PDF for a specific published report version. Identified by the report_versions verification token (same token as the verifier page). Rendered once on-demand and cached forever by version number.',
 }, { scopes: [], tier: 'extended' }));
 
-export const publicVerifyRoutes = createApiRouter()
+const publicVerifyRoutes = createApiRouter()
     .openapi(verifyRoute, async (c) => {
         const { envelopeId } = c.req.valid('param');
         const data = await loadVerifyData(c, envelopeId);

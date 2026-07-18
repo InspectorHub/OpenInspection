@@ -92,7 +92,7 @@ const reorderContractorTypesRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for reorderContractorTypes (POST /reorder, contractor-types domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const contractorTypesRoutes = createApiRouter()
+const contractorTypesRoutes = createApiRouter()
     .openapi(listContractorTypesRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const data = await c.var.services.contractorType.listByTenant(tenantId);

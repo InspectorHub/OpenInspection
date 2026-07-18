@@ -276,7 +276,7 @@ const reportGateRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login report-gate status resolved by tenant slug + inspection id. Returns the outstanding gate (agreement before payment) with branding, inspector contact, and amount due — or null when the report is not gated.',
 }, { scopes: [], tier: 'extended' }));
 
-export const publicReportRoutes = createApiRouter()
+const publicReportRoutes = createApiRouter()
     .route('/', publicVerifyRoutes)
     .openapi(reportRoute, async (c) => {
         const { tenant, id } = c.req.valid('param');

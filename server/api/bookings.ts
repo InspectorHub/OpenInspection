@@ -474,5 +474,3 @@ export const bookingsRoutes = createApiRouter()
     });
 
 export type BookingsApi = typeof bookingsRoutes;
-
-export default bookingsRoutes;

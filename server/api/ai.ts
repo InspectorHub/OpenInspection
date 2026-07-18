@@ -130,7 +130,7 @@ const suggestCommentRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createAiSuggestComment (POST /suggest-comment, ai domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const aiRoutes = createApiRouter()
+const aiRoutes = createApiRouter()
     .openapi(commentAssistRoute, async (c) => {
         const { text, context } = c.req.valid('json');
         const service = c.var.services.ai;

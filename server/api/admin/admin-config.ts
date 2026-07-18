@@ -305,7 +305,7 @@ const togglePdfPipelineRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-export const adminConfigRoutes = createApiRouter()
+const adminConfigRoutes = createApiRouter()
     .openapi(getConfigRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const svc = c.var.services.branding;

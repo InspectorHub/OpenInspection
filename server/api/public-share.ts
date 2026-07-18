@@ -50,7 +50,7 @@ const shareTokenRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createPublicShareInspectionsShareToken (POST /inspections/{id}/share-token, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: [], tier: 'extended' }));
 
-export const publicShareRoutes = createApiRouter()
+const publicShareRoutes = createApiRouter()
     .openapi(shareTokenRoute, async (c) => {
         const { id } = c.req.valid('param');
         const { token } = c.req.valid('query');

@@ -90,7 +90,7 @@ const testSendRoute = createRoute(withMcpMetadata({
     description: 'Sends a test email or SMS rendering of the template to a typed recipient via the tenant-resolved transport (metering + consent respected).',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const messageTemplateRoutes = createApiRouter()
+const messageTemplateRoutes = createApiRouter()
     .openapi(listRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         const { channel } = c.req.valid('query');

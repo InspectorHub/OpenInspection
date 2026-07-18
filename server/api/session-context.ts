@@ -23,7 +23,7 @@ import { mcpEnabled } from '../lib/mcp/flag';
  *
  * Mounted at `/api/session/context` — requires JWT auth.
  */
-export const sessionContextRoutes = createApiRouter()
+const sessionContextRoutes = createApiRouter()
     .get('/context', async (c) => {
         const user = c.get('user');
         if (!user?.sub) {

@@ -361,7 +361,7 @@ async function saveSecretsImpl(c: Context<HonoConfig>, rawBody: Record<string, s
     return c.json({ success: true as const }, 200);
 }
 
-export const secretsRoutes = createApiRouter()
+const secretsRoutes = createApiRouter()
     .openapi(getSecretsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);

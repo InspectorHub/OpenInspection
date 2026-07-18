@@ -28,7 +28,7 @@ const EventStatusBody = z.object({
 
 // ---- Event types CRUD ----
 
-export const eventsRoutes = createApiRouter()
+const eventsRoutes = createApiRouter()
     .get('/event-types', requireRole('owner', 'manager', 'inspector'), async (c) => {
         const data = await c.var.services.event.listEventTypes(c.get('tenantId'));
         return c.json({ success: true, data });

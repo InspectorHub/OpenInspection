@@ -59,7 +59,7 @@ const migrateRoute = createRoute(withMcpMetadata({
     operationId: "createTemplateMigrationMigrateTo"
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const templateMigrationRoutes = createApiRouter()
+const templateMigrationRoutes = createApiRouter()
     .openapi(migrateRoute, async (c) => {
         const { oldId, newId } = c.req.valid('param');
         const body = c.req.valid('json');

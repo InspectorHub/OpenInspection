@@ -179,7 +179,7 @@ const testResultsRoute = createRoute(withMcpMetadata({
 
 // ─── Router ───────────────────────────────────────────────────────────────────
 
-export const integrationsRoutes = createApiRouter()
+const integrationsRoutes = createApiRouter()
     .openapi(statusRoute, async (c) => {
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized('Missing tenant scope');

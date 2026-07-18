@@ -251,7 +251,7 @@ export type InspectorMessagesApi = typeof inspectorMessageRoutes;
 
 // ── Cross-cutting summary router (mounted at /api/messages) ───────────────────
 
-export const messageRoutes = createApiRouter()
+const messageRoutes = createApiRouter()
     .openapi(unreadRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const count = await c.var.services.message.unreadCountForTenant(tenantId);

@@ -262,7 +262,7 @@ const setupStatusRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login check of whether the instance has completed first-run setup (any tenant-scoped user exists). Drives the /setup page redirect guard.',
 }, { scopes: [], tier: 'excluded' }));
 
-export const coreAuthRoutes = createApiRouter()
+const coreAuthRoutes = createApiRouter()
     .openapi(loginRoute, async (c) => {
         // SaaS deploys disable the local password form (login via portal) —
         // see the matching guard on GET /login. Returning Gone (410) + a

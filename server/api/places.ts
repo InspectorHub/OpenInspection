@@ -100,7 +100,7 @@ const detailsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listPlaceDetails (GET /details, bookings domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const placesRoutes = createApiRouter()
+const placesRoutes = createApiRouter()
     .openapi(autocompleteRoute, async (c) => {
     const apiKey = c.env.GOOGLE_PLACES_API_KEY;
     if (!apiKey) throw Errors.BadRequest('Address autocomplete unavailable: GOOGLE_PLACES_API_KEY not configured');

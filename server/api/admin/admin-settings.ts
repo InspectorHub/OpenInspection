@@ -369,7 +369,7 @@ const patchCommunicationRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-export const adminSettingsRoutes = createApiRouter()
+const adminSettingsRoutes = createApiRouter()
     .openapi(getAttentionThresholdsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);

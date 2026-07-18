@@ -49,7 +49,7 @@ const checkSlugRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listSlugCheckSlug (GET /check/slug, profile domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: [], tier: 'extended' }));
 
-export const publicSlugRoutes = createApiRouter()
+const publicSlugRoutes = createApiRouter()
     .openapi(checkSlugRoute, async (c) => {
         const { value, namespace } = c.req.valid('query');
 

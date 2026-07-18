@@ -124,7 +124,7 @@ const requestPaymentRoute = createRoute(withMcpMetadata({
     description: 'Resolves or creates the inspection invoice (money authority chain), marks it sent, and emails the client a link to the public payment page.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const invoiceRoutes = createApiRouter()
+const invoiceRoutes = createApiRouter()
     .openapi(listInvoicesRoute, async (c) => {
         const rows = await c.var.services.invoice.listInvoices(c.get('tenantId'));
         return c.json({ success: true as const, data: rows }, 200);

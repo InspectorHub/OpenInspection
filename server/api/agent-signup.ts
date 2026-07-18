@@ -58,7 +58,7 @@ const signupRoute = createRoute(withMcpMetadata({
     operationId: "createAgent"
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const agentSignupRoutes = createApiRouter()
+const agentSignupRoutes = createApiRouter()
     .openapi(signupRoute, async (c) => {
         const body = c.req.valid('json');
 

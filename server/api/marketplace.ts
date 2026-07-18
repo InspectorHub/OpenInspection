@@ -18,7 +18,7 @@ import {
 } from '../lib/validations/pagination.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-export const marketplaceRoutes = createApiRouter()
+const marketplaceRoutes = createApiRouter()
 // GET /api/templates/marketplace
     .openapi(createRoute(withMcpMetadata({
     method: 'get', path: '/',

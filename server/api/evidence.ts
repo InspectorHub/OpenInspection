@@ -135,7 +135,7 @@ const downloadEvidenceRoute = createRoute(withMcpMetadata({
     description: 'Returns evidence.zip from R2 (signed.pdf + certificate.pdf + audit-trail.json + public-key.pem).',
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const evidenceRoutes = createApiRouter()
+const evidenceRoutes = createApiRouter()
     .openapi(downloadAgreementRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = c.get('tenantId') as string;

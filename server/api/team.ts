@@ -105,7 +105,7 @@ const DefaultsSchema = z.object({
     teamModeDefault:          z.boolean().optional().describe('TODO describe teamModeDefault field for the OpenInspection MCP integration'),
 });
 
-export const teamRoutes = createApiRouter()
+const teamRoutes = createApiRouter()
     .openapi(listTeamMembersRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const teamService = c.var.services.team;

@@ -131,7 +131,7 @@ const getSignerLinkRoute = createRoute(withMcpMetadata({
 }, { scopes: ['admin'], tier: 'extended' }));
 
 
-export const adminEsignRoutes = createApiRouter()
+const adminEsignRoutes = createApiRouter()
     .openapi(listSigningRequestsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const db = drizzle(c.env.DB);

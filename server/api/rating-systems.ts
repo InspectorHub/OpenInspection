@@ -115,7 +115,7 @@ const deleteRatingSystemRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteRatingSystem (DELETE /{id}, ratings domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const ratingSystemsRoutes = createApiRouter()
+const ratingSystemsRoutes = createApiRouter()
     .openapi(listRatingSystemsRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         // Lazy-seed defaults so first-time tenants always see the four canonical

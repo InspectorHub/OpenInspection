@@ -127,7 +127,7 @@ const deleteTagRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteTag (DELETE /{id}, tags domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const tagsRoutes = createApiRouter()
+const tagsRoutes = createApiRouter()
     .openapi(listTagsRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
         // Lazy-seed canonical tags so first-time tenants always see the five.

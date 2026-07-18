@@ -11,7 +11,7 @@ import {
 import { inspections, inspectionResults, templates } from '../lib/db/schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
-export const syncRoutes = createApiRouter()
+const syncRoutes = createApiRouter()
 /* ── DELETE /api/inspections/:id/items/:itemId/photos/:photoIndex ─────────── */
     .openapi(createRoute(withMcpMetadata({
     method: 'delete',

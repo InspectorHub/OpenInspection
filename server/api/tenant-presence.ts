@@ -9,7 +9,7 @@
 import {} from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 
-export const tenantPresenceRoutes = createApiRouter()
+const tenantPresenceRoutes = createApiRouter()
     .get('/presence/ws', async (c) => {
         if (c.req.header('Upgrade') !== 'websocket') {
             return new Response('expected websocket', { status: 426 });
