@@ -278,7 +278,10 @@ export class ConciergeService {
         if (insp.conciergeStatus !== 'awaiting_inspector') {
             throw Errors.Conflict('Inspection is not awaiting inspector approval');
         }
-        if (!insp.clientEmail) {
+        // Resolve the client via the inspection_people primary-client join
+        // (insp.clientEmail is a frozen legacy cache, dropped Task 13).
+        const client = await new PeopleService({ DB: this.db }).getPrimaryClient(tenantId, inspectionId);
+        if (!client?.email) {
             throw Errors.BadRequest('Inspection has no client email on file');
         }
 
@@ -298,7 +301,7 @@ export class ConciergeService {
             .set({ conciergeStatus: 'awaiting_client' })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
 
-        await this.mintTokenAndEmailClient(inspectionId, tenantId, insp.clientEmail, {
+        await this.mintTokenAndEmailClient(inspectionId, tenantId, client.email, {
             propertyAddress: insp.propertyAddress,
             date: insp.date,
             inspectorName,

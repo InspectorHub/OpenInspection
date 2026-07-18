@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { ConciergeService } from '../../../server/services/concierge.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { hashToken } from '../../../server/lib/token-hash';
@@ -166,6 +167,23 @@ describe('ConciergeService — A3', () => {
         it('transitions awaiting_inspector → awaiting_client + mints token + emails client', async () => {
             await seedFixture(testDb, { reviewRequired: true });
             const created = await svc.createBooking(baseParams());
+
+            // Task 9b (people-role-profiles) — approveByInspector now resolves
+            // the client-confirm recipient via PeopleService.getPrimaryClient
+            // (inspection_people join) instead of the legacy
+            // inspection.clientEmail column. createBooking does not itself
+            // write a client-role person (see concierge-people.spec.ts), so
+            // seed one matching baseParams()'s client identity.
+            const clientContactId = 'contact-client-sarah';
+            await seedRoleProfiles(testDb, T1, new Date(1));
+            await testDb.insert(schema.contacts).values({
+                id: clientContactId, tenantId: T1, type: 'client', name: 'Sarah Buyer',
+                email: 'sarah@example.com', createdAt: new Date(),
+            });
+            await testDb.insert(schema.inspectionPeople).values({
+                id: `ip_${created.inspectionId}_client`, tenantId: T1, inspectionId: created.inspectionId,
+                contactId: clientContactId, roleProfileId: `crp_${T1}_client`, createdAt: new Date(),
+            });
 
             await svc.approveByInspector(created.inspectionId, T1);
 
