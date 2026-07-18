@@ -4,6 +4,7 @@ import { inspectionMessages, inspections } from '../lib/db/schema';
 import type { MessageAttachment } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import type { NotificationService } from './notification.service';
+import { PeopleService } from './people.service';
 
 interface CreateMessageInput {
     tenantId: string;
@@ -90,26 +91,27 @@ export class MessageService {
     }
 
     /**
-     * Resolves the inspection's stored client display name (for attribution on
-     * client-authored messages). Null when the inspection is missing or has no
-     * recorded client name. Tenant-scoped.
+     * Resolves the inspection's primary-client display name (for attribution on
+     * client-authored messages), via the inspection_people join
+     * (PeopleService.getPrimaryClient) rather than the legacy
+     * inspections.clientName column (dropped, Task 13). Null when the
+     * inspection has no primary client. Tenant-scoped.
      */
     async clientNameForInspection(inspectionId: string, tenantId: string): Promise<string | null> {
-        const [insp] = await this.db().select({ clientName: inspections.clientName }).from(inspections)
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-            .limit(1);
-        return insp?.clientName ?? null;
+        const client = await new PeopleService({ DB: this.d1 }).getPrimaryClient(tenantId, inspectionId);
+        return client?.name ?? null;
     }
 
     /**
-     * Resolves the inspection's stored client email (for building the portal
-     * message-notification deep-link). Null when missing. Tenant-scoped.
+     * Resolves the inspection's primary-client email (for building the portal
+     * message-notification deep-link), via the inspection_people join
+     * (PeopleService.getPrimaryClient) rather than the legacy
+     * inspections.clientEmail column (dropped, Task 13). Null when missing.
+     * Tenant-scoped.
      */
     async clientEmailForInspection(inspectionId: string, tenantId: string): Promise<string | null> {
-        const [insp] = await this.db().select({ clientEmail: inspections.clientEmail }).from(inspections)
-            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
-            .limit(1);
-        return insp?.clientEmail ?? null;
+        const client = await new PeopleService({ DB: this.d1 }).getPrimaryClient(tenantId, inspectionId);
+        return client?.email ?? null;
     }
 
     /**

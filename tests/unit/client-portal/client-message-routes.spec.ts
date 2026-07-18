@@ -13,6 +13,8 @@ import { Hono } from 'hono';
 import type { HonoConfig } from '../../../server/types/hono';
 import { MessageService } from '../../../server/services/message.service';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { signPortalSession } from '../../../server/lib/portal-session';
 import { createApiRouter } from '../../../server/lib/openapi-router';
 import { clientMessageRoutes, inspectorMessageRoutes } from '../../../server/api/messages';
@@ -60,11 +62,23 @@ describe('client message routes (resolveClientActor-gated)', () => {
 
     async function seed() {
         const inspectionId = 'insp1';
+        // Legacy client columns are intentionally NULL — clientNameForInspection
+        // / clientEmailForInspection resolve the primary client via the
+        // inspection_people join (PeopleService), not these dropped columns
+        // (Task 9a, people-role-profiles).
         await testDb.insert(schema.inspections).values({
             id: inspectionId, tenantId: TENANT, propertyAddress: '1 Main St', date: '2026-06-01',
             status: 'requested', reportStatus: 'in_progress', paymentStatus: 'unpaid',
-            clientName: 'Pat Client', clientEmail: 'client@x.com', createdAt: new Date(), price: 0,
+            clientName: null, clientEmail: null, createdAt: new Date(), price: 0,
         });
+        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await testDb.insert(schema.contacts).values({
+            id: 'contact-client-1', tenantId: TENANT, type: 'client', name: 'Pat Client',
+            email: 'client@x.com', phone: null, createdAt: new Date(),
+        });
+        const people = new PeopleService({ DB: {} as D1Database });
+        await people.addPerson(TENANT, inspectionId, 'contact-client-1', `crp_${TENANT}_client`);
+
         const portalAccess = new PortalAccessService({} as D1Database, { jwtSecret: SECRET });
         const clientEmail = 'client@x.com';
         const clientToken = await portalAccess.issueToken({
