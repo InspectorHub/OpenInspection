@@ -24,6 +24,7 @@ import * as schema from '../../server/lib/db/schema';
 import { ReportVersionService } from '../../server/services/report-version.service';
 import { InspectionService } from '../../server/services/inspection.service';
 import { PortalAccessService } from '../../server/services/portal-access.service';
+import { seedRoleProfiles } from '../../server/services/seed/seed-role-profiles';
 import publicReportRoutes from '../../server/api/public-report';
 import type { HonoConfig } from '../../server/types/hono';
 
@@ -120,6 +121,10 @@ async function seedTenant(tenantId: string, slug: string): Promise<void> {
         id: tenantId, name: 'Acme', slug, status: 'active',
         deploymentMode: 'shared', tier: 'free', maxUsers: 5, createdAt: new Date(),
     });
+    // PortalAccessService.issueToken validates `role` against the tenant's
+    // active role profiles — seed the defaults so the 'client' role used by
+    // the public-report token mint below (line ~275) resolves.
+    await seedRoleProfiles(db, tenantId);
 }
 
 /** Seed an inspector user (inspections.inspector_id is an FK to users.id). */
@@ -184,7 +189,7 @@ async function setFollowupStatuses(tenantId: string, inspectionId: string, statu
 }
 
 async function clearAll(): Promise<void> {
-    for (const t of ['inspection_access_tokens', 'report_versions', 'signing_keys', 'inspection_results', 'inspection_units', 'tenant_configs', 'inspections', 'users', 'tenants']) {
+    for (const t of ['inspection_access_tokens', 'report_versions', 'signing_keys', 'inspection_results', 'inspection_units', 'tenant_configs', 'contact_role_profiles', 'inspections', 'users', 'tenants']) {
         await b.DB.exec(`DELETE FROM ${t};`);
     }
 }

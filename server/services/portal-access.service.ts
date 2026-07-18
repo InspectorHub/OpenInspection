@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspectionAccessTokens } from '../lib/db/schema/portal-access';
+import { contactRoleProfiles } from '../lib/db/schema';
 import type { PortalAccessRow, PortalRole } from '../lib/public-access';
 import { mintToken, hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
 import { sealToken, openToken } from '../lib/config-crypto';
@@ -50,6 +51,24 @@ export class PortalAccessService {
         return openToken(row.tokenEnc, row.tenantId, s.jwtSecret, s.jwtSecretPrevious);
     }
 
+    /**
+     * The `role` column is a free-form role-profile KEY, not a fixed enum —
+     * validate it against the tenant's active `contact_role_profiles` so a
+     * typo'd/retired key can never be written. `client` is a seeded default so
+     * this lookup passes for it too (no special-casing).
+     */
+    private async validateRole(tenantId: string, role: string): Promise<void> {
+        const db = this.getDrizzle();
+        const profile = await db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
+            .where(and(
+                eq(contactRoleProfiles.tenantId, tenantId),
+                eq(contactRoleProfiles.key, role),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .get();
+        if (!profile) throw Errors.BadRequest('Unknown role for tenant: ' + role);
+    }
+
     /** Idempotent: returns the existing live token for (inspection, recipient), else mints one. */
     async issueToken(input: { tenantId: string; inspectionId: string; recipientEmail: string; role?: PortalRole }): Promise<string> {
         const db = this.getDrizzle();
@@ -71,6 +90,8 @@ export class PortalAccessService {
         const tokenEnc = await sealToken(token, input.tenantId, s.jwtSecret);
         if (existing) {
             // Revoked previously → re-arm the same row with a fresh token.
+            const effectiveRole = input.role ?? existing.role;
+            await this.validateRole(input.tenantId, effectiveRole);
             await db.update(inspectionAccessTokens)
                 .set({
                     token: deadTokenSentinel(existing.id),
@@ -78,20 +99,22 @@ export class PortalAccessService {
                     tokenEnc,
                     revokedAt: null,
                     expiresAt: null,
-                    role: input.role ?? existing.role,
+                    role: effectiveRole,
                     createdAt: new Date(),
                 })
                 .where(eq(inspectionAccessTokens.id, existing.id))
                 .run();
             return token;
         }
+        const effectiveRole = input.role ?? 'client';
+        await this.validateRole(input.tenantId, effectiveRole);
         const id = crypto.randomUUID();
         await db.insert(inspectionAccessTokens).values({
             id,
             tenantId: input.tenantId,
             inspectionId: input.inspectionId,
             recipientEmail: input.recipientEmail,
-            role: input.role ?? 'client',
+            role: effectiveRole,
             // Never distributed — satisfies NOT NULL + UNIQUE on the legacy column.
             token: deadTokenSentinel(id),
             tokenHash,
@@ -132,7 +155,7 @@ export class PortalAccessService {
         return {
             inspectionId: row.inspectionId,
             tenantId: row.tenantId,
-            role: row.role as PortalRole,
+            role: row.role,
             recipientEmail: row.recipientEmail,
             // PortalAccessRow keeps the epoch-ms number contract (consistent
             // with Date.now(), consumed by resolvePortalAccess) independent of
@@ -152,7 +175,7 @@ export class PortalAccessService {
         email: string,
         inspectionId: string,
         now: number = Date.now(),
-    ): Promise<{ tenantId: string; role: 'client' | 'co_client' | 'agent'; recipientEmail: string } | null> {
+    ): Promise<{ tenantId: string; role: PortalRole; recipientEmail: string } | null> {
         const db = this.getDrizzle();
         const row = await db.select().from(inspectionAccessTokens)
             .where(and(
@@ -161,7 +184,7 @@ export class PortalAccessService {
             )).get();
         if (!row || row.revokedAt != null) return null;
         if (row.expiresAt != null && row.expiresAt.getTime() <= now) return null;
-        return { tenantId: row.tenantId, role: row.role as 'client' | 'co_client' | 'agent', recipientEmail: row.recipientEmail };
+        return { tenantId: row.tenantId, role: row.role, recipientEmail: row.recipientEmail };
     }
 
     /** Inspector "Reset access link" — revoke a recipient's current token. */

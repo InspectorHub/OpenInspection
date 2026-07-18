@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { resolvePortalAccess } from '../../../server/lib/public-access';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { hashToken, deadTokenSentinel } from '../../../server/lib/token-hash';
@@ -54,6 +55,10 @@ describe('PortalAccessService — token hash-at-rest (tier-2)', () => {
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
+        // issueToken validates `role` against the tenant's active role
+        // profiles — seed the defaults so the (unqualified) 'client' role
+        // used throughout this suite resolves.
+        await seedRoleProfiles(testDb, TENANT);
         svc = new PortalAccessService({} as D1Database, { jwtSecret: JWT });
     });
 

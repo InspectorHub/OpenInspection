@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -29,6 +30,11 @@ describe('PortalAccessService tenant scoping', () => {
                 id: t, name: t, slug: t, status: 'active',
                 deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
             });
+            // issueToken validates `role` against the tenant's active role
+            // profiles — seed both tenants so the 'client' role used below
+            // resolves and the UNIQUE-constraint discriminator (not role
+            // validation) is what the cross-tenant test exercises.
+            await seedRoleProfiles(db, t);
         }
         svc = new PortalAccessService({} as D1Database, { jwtSecret: JWT });
     });
