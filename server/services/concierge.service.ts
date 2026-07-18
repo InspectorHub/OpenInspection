@@ -370,26 +370,28 @@ export class ConciergeService {
                 ),
             );
 
-        // Notify the originating agent. The referredByAgentId on the
-        // inspection points at the agent's contact row in this tenant; the
-        // contact carries the agent's email.
+        // Notify the originating agent. The buyer's-agent contact is resolved
+        // via the inspection_people (buyer_agent) join (Task 9c-X2) — not the
+        // legacy inspections.referredByAgentId column (frozen cache, dropped
+        // Task 13) — then looked up in contacts as before.
         try {
             const insp = await db
                 .select({
-                    referredByAgentId: inspections.referredByAgentId,
                     propertyAddress: inspections.propertyAddress,
                     date: inspections.date,
                 })
                 .from(inspections)
                 .where(eq(inspections.id, row.inspectionId))
                 .get();
-            if (insp?.referredByAgentId) {
+            const buyerAgentContactId = await new PeopleService({ DB: this.db })
+                .contactIdForRole(row.tenantId, row.inspectionId, 'buyer_agent');
+            if (insp && buyerAgentContactId) {
                 const agentContact = await db
                     .select({ email: contacts.email, name: contacts.name })
                     .from(contacts)
                     .where(
                         and(
-                            eq(contacts.id, insp.referredByAgentId),
+                            eq(contacts.id, buyerAgentContactId),
                             eq(contacts.tenantId, row.tenantId),
                         ),
                     )

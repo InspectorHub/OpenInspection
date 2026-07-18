@@ -25,7 +25,7 @@
   "app/hooks/useInspection.ts": 599,
   "app/components/portal/sections/RepairBuilderSection.tsx": 592,
   "server/services/marketplace.service.ts": 587,
-  "server/services/concierge.service.ts": 576,
+  "server/services/concierge.service.ts": 578,
   "app/lib/collab/results-binding.ts": 560,
   "server/api/inspections/publish.ts": 556,
   "server/api/calendar.ts": 547,

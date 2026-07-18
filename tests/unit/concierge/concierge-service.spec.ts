@@ -56,6 +56,10 @@ async function seedFixture(testDb: BetterSQLite3Database<typeof schema>, opts: S
         invitedByUserId: INSPECTOR,
         createdAt: new Date(),
     });
+    // Task 9c-X2 — confirmByClient's agent-notify now resolves the buyer_agent
+    // contact via inspection_people, which createBooking only populates when
+    // role profiles exist for the tenant (see its try/catch mirror-write).
+    await seedRoleProfiles(testDb, T1, new Date(1));
 }
 
 const baseParams = () => ({
