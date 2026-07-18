@@ -5,9 +5,14 @@
  * (link.inspectorContactId, already stamped onto referredByAgentId) into
  * inspection_people (buyer_agent), non-fatal like Task 7.
  *
- * No client contact id is resolved anywhere in this service (clientName /
- * clientEmail stay inline strings on the inspection row — there is no
- * contact-upsert here), so only buyer_agent is written.
+ * FIXED (Task 9b regression): the client contact is now resolved via the
+ * same idempotent upsert booking.service/core.ts use (ContactService.
+ * upsertClientContact, matched by tenant + normalized email) and mirrored
+ * into inspection_people (client), alongside buyer_agent. Without this,
+ * ConciergeService.approveByInspector's PeopleService.getPrimaryClient join
+ * (Task 9b) never resolves a client for a concierge booking, and every
+ * reviewer-mode approval throws BadRequest once the legacy clientEmail
+ * column is dropped (Task 13).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
@@ -110,7 +115,7 @@ describe('ConciergeService.createBooking — writes inspection_people (Task 7b)'
         people = new PeopleService({ DB: {} as D1Database });
     });
 
-    it('writes the buyer_agent role from the resolved agent-tenant-link contact', async () => {
+    it('writes the buyer_agent role from the resolved agent-tenant-link contact, plus a client role for the booking client', async () => {
         await seedFixture(testDb, { reviewRequired: false });
         const result = await svc.createBooking(baseParams());
 
@@ -119,16 +124,24 @@ describe('ConciergeService.createBooking — writes inspection_people (Task 7b)'
         expect(insp?.referredByAgentId).toBe(CONTACT_AGENT);
 
         const rows = await people.listPeople(T1, result.inspectionId);
-        expect(rows.map(r => r.roleKey).sort()).toEqual(['buyer_agent']);
+        expect(rows.map(r => r.roleKey).sort()).toEqual(['buyer_agent', 'client']);
         expect(rows.find(r => r.roleKey === 'buyer_agent')?.contactId).toBe(CONTACT_AGENT);
+        const clientRow = rows.find(r => r.roleKey === 'client');
+        expect(clientRow?.email).toBe('sarah@example.com');
+        expect(clientRow?.name).toBe('Sarah Buyer');
+
+        // Task 9b regression guard: approveByInspector resolves the client via
+        // PeopleService.getPrimaryClient — must not throw "no client email on file".
+        const primaryClient = await people.getPrimaryClient(T1, result.inspectionId);
+        expect(primaryClient?.email).toBe('sarah@example.com');
     });
 
-    it('writes buyer_agent in the reviewer (awaiting_inspector) branch too', async () => {
+    it('writes buyer_agent + client in the reviewer (awaiting_inspector) branch too', async () => {
         await seedFixture(testDb, { reviewRequired: true });
         const result = await svc.createBooking(baseParams());
 
         const rows = await people.listPeople(T1, result.inspectionId);
-        expect(rows.map(r => r.roleKey).sort()).toEqual(['buyer_agent']);
+        expect(rows.map(r => r.roleKey).sort()).toEqual(['buyer_agent', 'client']);
     });
 
     it('does not fail booking creation when the people-write throws (non-fatal)', async () => {

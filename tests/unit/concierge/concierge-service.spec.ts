@@ -166,25 +166,15 @@ describe('ConciergeService — A3', () => {
     describe('approveByInspector', () => {
         it('transitions awaiting_inspector → awaiting_client + mints token + emails client', async () => {
             await seedFixture(testDb, { reviewRequired: true });
+            await seedRoleProfiles(testDb, T1, new Date(1));
             const created = await svc.createBooking(baseParams());
 
-            // Task 9b (people-role-profiles) — approveByInspector now resolves
-            // the client-confirm recipient via PeopleService.getPrimaryClient
+            // Task 9b (people-role-profiles) — approveByInspector resolves the
+            // client-confirm recipient via PeopleService.getPrimaryClient
             // (inspection_people join) instead of the legacy
-            // inspection.clientEmail column. createBooking does not itself
-            // write a client-role person (see concierge-people.spec.ts), so
-            // seed one matching baseParams()'s client identity.
-            const clientContactId = 'contact-client-sarah';
-            await seedRoleProfiles(testDb, T1, new Date(1));
-            await testDb.insert(schema.contacts).values({
-                id: clientContactId, tenantId: T1, type: 'client', name: 'Sarah Buyer',
-                email: 'sarah@example.com', createdAt: new Date(),
-            });
-            await testDb.insert(schema.inspectionPeople).values({
-                id: `ip_${created.inspectionId}_client`, tenantId: T1, inspectionId: created.inspectionId,
-                contactId: clientContactId, roleProfileId: `crp_${T1}_client`, createdAt: new Date(),
-            });
-
+            // inspection.clientEmail column. createBooking itself now mirrors
+            // the booking client into inspection_people (client role) — see
+            // concierge-people.spec.ts — so no manual seeding is needed here.
             await svc.approveByInspector(created.inspectionId, T1);
 
             const insp = await testDb.select().from(schema.inspections)

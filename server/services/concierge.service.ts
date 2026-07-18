@@ -15,6 +15,7 @@ import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
 import { PeopleService } from './people.service';
+import { ContactService } from './contact.service';
 import type { EmailService } from './email.service';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
@@ -203,22 +204,42 @@ export class ConciergeService {
         // DB-8: mirror assignment into inspection_inspectors link table.
         await syncInspectionAssignments(db, params.tenantId, inspectionId, { inspectorId: inspector.id });
 
-        // Task 7b (people-role-profiles) — mirror the referring agent into
-        // inspection_people (buyer_agent), alongside the legacy
-        // referredByAgentId column above (kept until Task 13 retires it).
-        // No client contact id is resolved anywhere in this flow (clientName /
-        // clientEmail stay inline strings — there is no contact-upsert here),
-        // so only the agent role is written. Non-fatal: a people-write
-        // failure must never roll back an already-committed inspection row.
+        // Task 7b (people-role-profiles), FIXED (Task 9b regression) — mirror
+        // both the client and the referring agent into inspection_people
+        // (client / buyer_agent), alongside the legacy clientName/clientEmail/
+        // clientPhone and referredByAgentId columns above (kept until Task 13
+        // retires them). The client contact is resolved via the same
+        // idempotent upsert booking.service/core.ts use (matches by tenant +
+        // normalized email), so approveByInspector's PeopleService.getPrimaryClient
+        // join (Task 9b) always resolves a client for a concierge booking.
+        // Non-fatal: a people-write failure must never roll back an
+        // already-committed inspection row.
         try {
             const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
                 .from(contactRoleProfiles)
                 .where(and(eq(contactRoleProfiles.tenantId, params.tenantId), eq(contactRoleProfiles.active, true)));
             const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
-            const buyerAgentRoleId = roleIdByKey.get('buyer_agent');
-            if (link.inspectorContactId && buyerAgentRoleId) {
-                const people = new PeopleService({ DB: this.db });
-                await people.addPerson(params.tenantId, inspectionId, link.inspectorContactId, buyerAgentRoleId);
+            const people = new PeopleService({ DB: this.db });
+
+            let clientContactId: string | null = null;
+            if (params.clientEmail || params.clientName) {
+                const { id } = await new ContactService(this.db).upsertClientContact(params.tenantId, {
+                    name: params.clientName,
+                    email: params.clientEmail,
+                    type: 'client',
+                    ...(params.clientPhone ? { phone: params.clientPhone } : {}),
+                });
+                clientContactId = id;
+            }
+
+            const links: Array<[string | null, string | undefined]> = [
+                [clientContactId, roleIdByKey.get('client')],
+                [link.inspectorContactId, roleIdByKey.get('buyer_agent')],
+            ];
+            for (const [contactId, roleProfileId] of links) {
+                if (contactId && roleProfileId) {
+                    await people.addPerson(params.tenantId, inspectionId, contactId, roleProfileId);
+                }
             }
         } catch (err) {
             logger.error('inspection-people write from concierge create failed', { inspectionId }, err instanceof Error ? err : undefined);
