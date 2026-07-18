@@ -8,7 +8,7 @@
   "server/services/inspection/inspection-report.service.ts": 889,
   "server/lib/collab/results-doc.ts": 874,
   "server/index.ts": 848,
-  "server/api/sms.ts": 818,
+  "server/api/sms.ts": 824,
   "app/components/portal/sections/ReportView.tsx": 762,
   "server/services/inspection.service.ts": 747,
   "app/routes/settings-communication.tsx": 746,

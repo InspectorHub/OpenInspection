@@ -100,6 +100,7 @@ function form(fields: Record<string, string>): RequestInit {
 
 describe('SMS consent API (Track L Task 8)', () => {
     it('inspector attestation records granted for an already-linked client contact', async () => {
+        await seedRoleProfiles(db, TENANT, new Date(1));
         const contactId = crypto.randomUUID();
         await db.insert(schema.contacts).values({
             id: contactId, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', createdAt: new Date(),
@@ -109,6 +110,14 @@ describe('SMS consent API (Track L Task 8)', () => {
             id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
             clientEmail: 'jane@x.com', clientContactId: contactId, date: '2026-07-01',
             status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as never);
+        // Task 9c — ensureClientContact/consentStatusRoute resolve the client
+        // via the inspection_people primary-client join (PeopleService), not
+        // the legacy clientContactId column above (kept only as a backfilled
+        // cache for other, not-yet-converted readers).
+        await db.insert(schema.inspectionPeople).values({
+            id: `ip_${inspId}_client`, tenantId: TENANT, inspectionId: inspId,
+            contactId, roleProfileId: `crp_${TENANT}_client`, createdAt: new Date(),
         } as never);
 
         const app = buildApp(db);
@@ -156,6 +165,7 @@ describe('SMS consent API (Track L Task 8)', () => {
     });
 
     it('GET /sms/consent reports the latest action', async () => {
+        await seedRoleProfiles(db, TENANT, new Date(1));
         const contactId = crypto.randomUUID();
         await db.insert(schema.contacts).values({
             id: contactId, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', createdAt: new Date(),
@@ -165,6 +175,13 @@ describe('SMS consent API (Track L Task 8)', () => {
             id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
             clientContactId: contactId, date: '2026-07-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as never);
+        // Task 9c — consentStatusRoute resolves the client contact via the
+        // inspection_people primary-client join (PeopleService), not the
+        // legacy clientContactId column above.
+        await db.insert(schema.inspectionPeople).values({
+            id: `ip_${inspId}_client`, tenantId: TENANT, inspectionId: inspId,
+            contactId, roleProfileId: `crp_${TENANT}_client`, createdAt: new Date(),
         } as never);
         await new SmsConsentService({} as D1Database).record(TENANT, contactId, 'granted', 'booking_form', {});
 
