@@ -53,6 +53,7 @@
   "server/api/inspections/results.ts": 430,
   "server/api/inspections/hierarchy.ts": 428,
   "server/portal/integration.routes.ts": 427,
+  "server/services/inspection-request.service.ts": 426,
   "app/hooks/useStructureEdit.ts": 424,
   "server/lib/middleware/di.ts": 421,
   "app/routes/settings-workspace.tsx": 417,

@@ -12,12 +12,14 @@ import {
     inspectionRequests,
     inspections,
     templates,
+    contactRoleProfiles,
 } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
+import { PeopleService } from './people.service';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
 export interface CreateRequestInput {
@@ -269,6 +271,32 @@ export class InspectionRequestService {
         for (const row of subRows) {
             await syncInspectionAssignments(db, tenantId, row.id, { inspectorId: row.inspectorId });
         }
+
+        // Task 7b (people-role-profiles) — mirror the agent referral into
+        // inspection_people (buyer_agent) for EVERY sub-inspection this
+        // request created, alongside the legacy referredByAgentId column
+        // above (kept until Task 13 retires it). No resolved client contact
+        // id is available anywhere in this service (clientName/clientEmail
+        // stay inline strings — there is no contact-upsert here), so only
+        // the agent role is written. Non-fatal: a people-write failure must
+        // never roll back an already-committed inspection row.
+        if (input.referredByAgentId) {
+            try {
+                const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
+                    .from(contactRoleProfiles)
+                    .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
+                const buyerAgentRoleId = roleRows.find(r => r.key === 'buyer_agent')?.id;
+                if (buyerAgentRoleId) {
+                    const people = new PeopleService({ DB: this.db });
+                    for (const row of subRows) {
+                        await people.addPerson(tenantId, row.id, input.referredByAgentId, buyerAgentRoleId);
+                    }
+                }
+            } catch (err) {
+                logger.error('inspection-people write from inspection-request create failed', { requestId }, err instanceof Error ? err : undefined);
+            }
+        }
+
         logger.info('inspection-request.created', { requestId, tenantId, subCount: subs.length });
 
         const detail = await this.get(tenantId, requestId);
