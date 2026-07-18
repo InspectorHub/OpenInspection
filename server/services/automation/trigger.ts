@@ -6,6 +6,7 @@ import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
 import { type Constructor, type TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
+import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 
 /**
  * Trigger mixin: fan out pending automation_log rows when a domain event fires,
@@ -127,6 +128,15 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
          * email → existing behavior (client only; agents/inspector deferred). sms →
          * E.164 phone for client / selling_agent / buying_agent / inspector. Returns
          * null → the caller skips creating that log (never throws).
+         *
+         * Task 11a — client/selling_agent/buying_agent addresses are resolved from
+         * `inspection_people` (via `contact_role_profiles`), NOT the legacy
+         * inspections.client_email/_phone/_contact_id/selling_agent_id/
+         * referred_by_agent_id columns (frozen cache, dropped Task 13).
+         * selling_agent → role key 'listing_agent' (the seller's-side agent);
+         * buying_agent → role key 'buyer_agent' — matches the automations.recipient
+         * enum naming against the newer contact_role_profiles key naming.
+         * inspector stays on the users table — unrelated to inspection_people.
          */
         // Public (was `private` on the monolith) so the reminders mixin can call it
         // through a typed cross-mixin contract; no runtime behavior change.
@@ -134,26 +144,43 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             recipient: string, channel: 'email' | 'sms',
             insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
         ): Promise<string | null> {
+            const { contacts, users, inspectionPeople, contactRoleProfiles } = await import('../../lib/db/schema');
+            // Join order mirrors api/metrics.ts / data.service.ts: contact_role_profiles
+            // filtered to (tenant, key, active) FIRST, then inspection_people scoped to
+            // this inspection, then contacts — keeps the join to at most one row.
+            const contactForRole = async (roleKey: string): Promise<{ email: string | null; phone: string | null } | null> => {
+                const row = await db.select({ email: contacts.email, phone: contacts.phone })
+                    .from(contactRoleProfiles)
+                    .innerJoin(inspectionPeople, and(
+                        eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                        eq(inspectionPeople.inspectionId, insp.id),
+                        eq(inspectionPeople.tenantId, insp.tenantId),
+                    ))
+                    .innerJoin(contacts, and(
+                        eq(contacts.id, inspectionPeople.contactId),
+                        eq(contacts.tenantId, insp.tenantId),
+                    ))
+                    .where(and(
+                        eq(contactRoleProfiles.tenantId, insp.tenantId),
+                        eq(contactRoleProfiles.key, roleKey),
+                        eq(contactRoleProfiles.active, true),
+                    )).get();
+                return row ?? null;
+            };
+
             if (channel === 'email') {
-                return recipient === 'client' ? (insp.clientEmail ?? null) : null;
+                if (recipient !== 'client') return null;
+                const c = await contactForRole(PRIMARY_CLIENT_KEY);
+                return c?.email ?? null;
             }
             // channel === 'sms'
-            const { contacts, users } = await import('../../lib/db/schema');
-            const phoneOf = async (contactId: string | null | undefined) => {
-                if (!contactId) return null;
-                const c = await db.select({ phone: contacts.phone }).from(contacts)
-                    .where(eq(contacts.id, contactId)).get().catch(() => null);
-                return c?.phone ?? null;
-            };
             let raw: string | null = null;
             if (recipient === 'client') {
-                raw = insp.clientPhone ?? (await phoneOf(insp.clientContactId));
+                raw = (await contactForRole(PRIMARY_CLIENT_KEY))?.phone ?? null;
             } else if (recipient === 'selling_agent') {
-                raw = await phoneOf(insp.sellingAgentId);
+                raw = (await contactForRole('listing_agent'))?.phone ?? null;
             } else if (recipient === 'buying_agent') {
-                // referredByAgentId is an unkeyed TEXT (backward-compat); treat it as a
-                // contacts.id and resolve a phone if it happens to be one, else null.
-                raw = await phoneOf(insp.referredByAgentId);
+                raw = (await contactForRole('buyer_agent'))?.phone ?? null;
             } else if (recipient === 'inspector') {
                 // Verified against server/lib/db/schema/inspection.ts: the assigned
                 // inspector is `inspections.inspector_id` (text FK → users.id, line 46).
@@ -161,6 +188,7 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 // to inspector_id per its schema comment, so prefer lead then inspector.
                 // (The inspection_inspectors join table from DB-8 is a query face only;
                 // inspectorId/leadInspectorId remain canonical for single-value reads.)
+                // Unchanged by Task 11a — inspector is not an inspection_people role.
                 const inspectorId = insp.leadInspectorId ?? insp.inspectorId ?? null;
                 if (inspectorId) {
                     const u = await db.select({ phone: users.phone }).from(users)
