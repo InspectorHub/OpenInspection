@@ -22,6 +22,7 @@ import {
   CalendarConnectPanel,
   type CalendarCapability,
 } from "~/components/settings/CalendarConnectPanel";
+import type { CalendarPickerData } from "~/components/settings/CalendarReadSetPicker";
 import { ScheduleLinksPanel } from "~/components/settings/ScheduleLinksPanel";
 import { m } from "~/paraglide/messages";
 
@@ -138,6 +139,34 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       }).data
     : null;
 
+  // A-polish 10b — the read-set / write-target picker data. Owner-only (the
+  // endpoint uses the current user's connection), so skip it when managing
+  // someone else's schedule. Best-effort: a Google hiccup just hides the picker.
+  let calendarPicker: CalendarPickerData | null = null;
+  if (calendarStatus?.connected && !inspectorId) {
+    const readSetRes = await api.calendar["read-set"].$get().catch(() => null);
+    if (readSetRes?.ok) {
+      const body = (await readSetRes.json()) as {
+        data?: {
+          connected?: boolean;
+          connectionId?: string;
+          writeCalendarId?: string;
+          readCalendarIds?: string[];
+          calendars?: CalendarPickerData["calendars"];
+        };
+      };
+      const d = body.data;
+      if (d?.connected && d.connectionId) {
+        calendarPicker = {
+          connectionId: d.connectionId,
+          writeCalendarId: d.writeCalendarId ?? "",
+          readCalendarIds: d.readCalendarIds ?? [],
+          calendars: d.calendars ?? [],
+        };
+      }
+    }
+  }
+
   let timeOffBlocks: TimeOffBlock[] = [];
   if (blocksRes?.ok) {
     const body = (await blocksRes.json()) as { data?: { blocks?: TimeOffBlock[] } };
@@ -197,6 +226,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       connected: calendarStatus?.connected ?? false,
       capability: calendarStatus?.capability ?? null,
       oauthConfigured: calendarStatus?.oauthConfigured ?? false,
+      picker: calendarPicker,
     },
   };
 }
@@ -258,6 +288,32 @@ export async function action({ request, context }: Route.ActionArgs) {
     };
   }
 
+  if (intent === "calendar-read-set-save") {
+    const connectionId = String(form.get("connectionId") ?? "");
+    let readCalendarIds: string[] = [];
+    try {
+      readCalendarIds = JSON.parse(String(form.get("readCalendarIds") ?? "[]"));
+    } catch {
+      return { ok: false, intent };
+    }
+    const writeCalendarId = String(form.get("writeCalendarId") ?? "");
+    // The PUT route validates the body by hand (no client-visible validator),
+    // so the client type omits `json`; the hono client still sends it at runtime.
+    const putCalendars = api.calendar.connections[":id"].calendars.$put as unknown as (
+      args: { param: { id: string }; json: { readCalendarIds: string[]; writeCalendarId: string } },
+    ) => Promise<Response>;
+    const res = await putCalendars({
+      param: { id: connectionId },
+      json: { readCalendarIds, writeCalendarId },
+    });
+    const body = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    return {
+      ok: res.ok,
+      intent,
+      message: res.ok ? null : body?.error?.message ?? m.settings_calpicker_save_failed(),
+    };
+  }
+
   return { ok: false, intent };
 }
 
@@ -290,6 +346,7 @@ export default function SettingsSchedulePage() {
         capability={data.calendar.capability}
         oauthConfigured={data.calendar.oauthConfigured}
         disabled={data.managedInspectorId !== null}
+        picker={data.calendar.picker}
       />
       <WeeklySchedulePanel
         key={data.managedInspectorId ?? "self"}

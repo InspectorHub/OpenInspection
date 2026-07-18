@@ -8,6 +8,10 @@ import {
   openCalendarOAuthPopup,
 } from "~/lib/calendar-oauth-popup";
 import { pushToast } from "~/hooks/useToast";
+import {
+  CalendarReadSetPicker,
+  type CalendarPickerData,
+} from "~/components/settings/CalendarReadSetPicker";
 import type { action } from "~/routes/settings-schedule";
 import { m } from "~/paraglide/messages";
 
@@ -18,11 +22,13 @@ export function CalendarConnectPanel({
   capability: connectedCapability,
   oauthConfigured,
   disabled = false,
+  picker = null,
 }: {
   connected: boolean;
   capability: CalendarCapability | null;
   oauthConfigured: boolean;
   disabled?: boolean;
+  picker?: CalendarPickerData | null;
 }) {
   const CAPABILITY_LABELS: Record<CalendarCapability, string> = {
     availability_read: m.settings_calconnect_cap_availability(),
@@ -183,6 +189,7 @@ export function CalendarConnectPanel({
                 : syncResult.message ?? m.settings_calconnect_sync_failed()}
             </p>
           )}
+          {picker && <CalendarReadSetPicker picker={picker} />}
         </div>
       ) : (
         <div className="space-y-3">

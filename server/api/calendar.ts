@@ -212,6 +212,55 @@ export const calendarRoutes = createApiRouter()
         return c.json({ success: true, data: await getGoogleCalendarStatus(c.env, tenantId, user.sub) });
     })
     /**
+     * GET /api/calendar/read-set
+     * A-polish 10b — everything the My-Schedule picker needs in one call for the
+     * current user's connection: the available calendars, the current read set,
+     * and the write target. Returns { connected:false } when not connected.
+     */
+    .get('/read-set', async (c) => {
+        const jwtUser = c.get('user');
+        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
+        const tenantId = c.get('tenantId') as string;
+        const open = await loadOpenGoogleConnection(
+            c.env.DB, tenantId, jwtUser.sub, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+        );
+        if (!open) return c.json({ success: true, data: { connected: false } }, 200);
+
+        const db = drizzle(c.env.DB);
+        const readCalendarIds = await resolveReadCalendarIds(db, {
+            tenantId,
+            connectionId: open.connection.id,
+            fallbackCalendarId: open.connection.calendarId,
+        });
+        const provider = getCalendarProvider('google');
+        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+        let calendars: Awaited<ReturnType<typeof provider.listCalendars>> = [];
+        if (oauthCreds) {
+            try {
+                calendars = await provider.listCalendars({
+                    clientId: oauthCreds.clientId,
+                    clientSecret: oauthCreds.clientSecret,
+                    refreshToken: open.credentials.refreshToken,
+                });
+            } catch (e) {
+                logger.warn('[calendar] read-set listCalendars failed', {
+                    tenantId, error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+        return c.json({
+            success: true,
+            data: {
+                connected: true,
+                connectionId: open.connection.id,
+                writeCalendarId: open.connection.calendarId,
+                readCalendarIds,
+                calendars,
+            },
+        }, 200);
+    })
+    /**
      * GET /api/calendar/connections/:id/calendars
      * A-polish 10b — the user's Google calendars, for choosing the multi-read
      * set and the single write target. Owner-only: loads the requester's own
