@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
+import { logger } from '../logger';
 import { calendarConnections } from '../db/schema/calendar';
 import type { CalendarCapability, CalendarProviderId } from './provider';
 import {
@@ -59,13 +60,24 @@ export async function loadOpenGoogleConnection(
 ): Promise<OpenCalendarConnection | null> {
     const connection = await getCalendarConnection(db, tenantId, userId, 'google');
     if (!connection) return null;
-    const credentials = await openCredentials(
-        connection.credentialsEnc,
-        connection.credentialsDekEnc,
-        tenantId,
-        jwtSecret,
-        jwtSecretPrevious,
-    ) as CalendarOAuthCredentials;
+    // A connection whose credentials no longer decrypt (e.g. a key rotation, or
+    // corrupted/placeholder secrets) is unusable — treat it as not-open rather
+    // than throwing, so callers degrade to "not connected" instead of a 500.
+    let credentials: CalendarOAuthCredentials;
+    try {
+        credentials = await openCredentials(
+            connection.credentialsEnc,
+            connection.credentialsDekEnc,
+            tenantId,
+            jwtSecret,
+            jwtSecretPrevious,
+        ) as CalendarOAuthCredentials;
+    } catch (e) {
+        logger.warn('[calendar] connection credentials failed to decrypt', {
+            tenantId, userId, error: e instanceof Error ? e.message : String(e),
+        });
+        return null;
+    }
     if (!credentials.refreshToken) return null;
     return { connection, credentials };
 }
@@ -119,6 +131,28 @@ export async function upsertCalendarConnection(input: {
     const row = await getCalendarConnection(input.db, input.tenantId, input.userId, input.provider);
     if (!row) throw new Error('Failed to persist calendar connection');
     return row;
+}
+
+/**
+ * Records a completed busy pull. Distinct from updatedAt, which tracks writes
+ * to the connection itself: re-authenticating is not a sync. Only call this
+ * once the provider fetch has actually succeeded — the freshness badge vouches
+ * for data we hold.
+ */
+export async function markCalendarSynced(
+    db: D1Database,
+    tenantId: string,
+    userId: string,
+    provider: CalendarProviderId = 'google',
+): Promise<void> {
+    const drizzleDb = drizzle(db);
+    await drizzleDb.update(calendarConnections)
+        .set({ lastSyncAt: new Date() })
+        .where(and(
+            eq(calendarConnections.tenantId, tenantId),
+            eq(calendarConnections.userId, userId),
+            eq(calendarConnections.provider, provider),
+        ));
 }
 
 export async function deleteCalendarConnection(

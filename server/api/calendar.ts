@@ -1,8 +1,13 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
-import { availabilityOverrides } from '../lib/db/schema/inspection';
+import { eq } from 'drizzle-orm';
+import { tenantConfigs } from '../lib/db/schema';
+import { resolveTenantTimeZone } from '../lib/tz';
+import { syncGoogleBusyOverrides, mergeBusyIntervals } from '../lib/calendar/sync-busy';
+import { resolveReadSet, saveReadSet, resolveReadCalendarIds } from '../lib/calendar/read-set';
+import { SaveReadSetSchema } from '../lib/validations/calendar-read-set.schema';
+import { AppError } from '../lib/errors';
 import {
     CalendarSyncResponseSchema,
     CalendarCallbackQuerySchema,
@@ -25,6 +30,7 @@ import {
     deleteCalendarConnection,
     getCalendarConnection,
     loadOpenGoogleConnection,
+    markCalendarSynced,
     upsertCalendarConnection,
     type PendingCalendarOAuth,
 } from '../lib/calendar/connection';
@@ -142,53 +148,61 @@ export const calendarRoutes = createApiRouter()
         }
         const timeMin = new Date();
         const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const db = drizzle(c.env.DB);
+
+        // A-polish 10b — union busy across the multi-read calendar set (falls
+        // back to the write/primary calendar when no read set is configured).
+        const readCalendarIds = await resolveReadCalendarIds(db, {
+            tenantId,
+            connectionId: open.connection.id,
+            fallbackCalendarId: open.connection.calendarId,
+        });
         let busyBlocks;
         try {
-            busyBlocks = await provider.listBusy({
-                clientId: oauthCreds.clientId,
-                clientSecret: oauthCreds.clientSecret,
-                refreshToken: open.credentials.refreshToken,
-                calendarId: open.connection.calendarId,
-                range: { from: timeMin, to: timeMax },
-                capability: open.connection.capabilities,
-            });
+            const perCalendar = await Promise.all(readCalendarIds.map((calendarId) =>
+                provider.listBusy({
+                    clientId: oauthCreds.clientId,
+                    clientSecret: oauthCreds.clientSecret,
+                    refreshToken: open.credentials.refreshToken,
+                    calendarId,
+                    range: { from: timeMin, to: timeMax },
+                    capability: open.connection.capabilities,
+                }),
+            ));
+            busyBlocks = mergeBusyIntervals(perCalendar.flat());
         } catch (e) {
             logger.error('[calendar] sync listBusy failed', { tenantId }, e instanceof Error ? e : undefined);
             return c.json({ success: false, error: { message: 'Failed to fetch Google Calendar busy blocks' } }, 500);
         }
 
-        const db = drizzle(c.env.DB);
         const inspectorId = jwtUser.sub;
-        let created = 0;
 
-        for (const block of busyBlocks) {
-            const date = block.start.slice(0, 10);
-            const existing = await db.select({ id: availabilityOverrides.id })
-                .from(availabilityOverrides)
-                .where(and(
-                    eq(availabilityOverrides.tenantId, tenantId),
-                    eq(availabilityOverrides.inspectorId, inspectorId),
-                    eq(availabilityOverrides.date, date),
-                ))
-                .limit(1);
-            if (existing.length) continue;
-
-            await db.insert(availabilityOverrides).values({
-                id: crypto.randomUUID(),
+        // A-polish 10 — store busy time as TIMED overrides in the tenant tz
+        // (delete-in-range + keyed upsert), so only the busy hours block slots
+        // and transparent events are carried but ignored. Replaces the old
+        // all-day blocking-date insert.
+        const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        const tenantTz = resolveTenantTimeZone(tzRow?.defaultTimezone);
+        const { upserted } = await syncGoogleBusyOverrides(
+            db,
+            {
                 tenantId,
                 inspectorId,
-                date,
-                isAvailable: false,
-                startTime: null,
-                endTime: null,
-                createdAt: new Date(),
-            });
-            created++;
-        }
+                tenantTz,
+                rangeFromMs: timeMin.getTime(),
+                rangeToMs: timeMax.getTime(),
+            },
+            busyBlocks,
+        );
+
+        await markCalendarSynced(c.env.DB, tenantId, inspectorId, 'google');
 
         return c.json({
             success: true,
-            data: { blockedDatesCreated: created, totalEvents: busyBlocks.length },
+            data: { blockedDatesCreated: upserted, totalEvents: busyBlocks.length },
         }, 200);
     })
     .get('/status', async (c) => {
@@ -196,6 +210,146 @@ export const calendarRoutes = createApiRouter()
         if (!user) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
         const tenantId = c.get('tenantId') as string;
         return c.json({ success: true, data: await getGoogleCalendarStatus(c.env, tenantId, user.sub) });
+    })
+    /**
+     * GET /api/calendar/read-set
+     * A-polish 10b — everything the My-Schedule picker needs in one call for the
+     * current user's connection: the available calendars, the current read set,
+     * and the write target. Returns { connected:false } when not connected.
+     */
+    .get('/read-set', async (c) => {
+        const jwtUser = c.get('user');
+        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
+        const tenantId = c.get('tenantId') as string;
+        const open = await loadOpenGoogleConnection(
+            c.env.DB, tenantId, jwtUser.sub, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+        );
+        if (!open) return c.json({ success: true, data: { connected: false } }, 200);
+
+        const db = drizzle(c.env.DB);
+        const readCalendarIds = await resolveReadCalendarIds(db, {
+            tenantId,
+            connectionId: open.connection.id,
+            fallbackCalendarId: open.connection.calendarId,
+        });
+        const provider = getCalendarProvider('google');
+        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+        let calendars: Awaited<ReturnType<typeof provider.listCalendars>> = [];
+        if (oauthCreds) {
+            try {
+                calendars = await provider.listCalendars({
+                    clientId: oauthCreds.clientId,
+                    clientSecret: oauthCreds.clientSecret,
+                    refreshToken: open.credentials.refreshToken,
+                });
+            } catch (e) {
+                logger.warn('[calendar] read-set listCalendars failed', {
+                    tenantId, error: e instanceof Error ? e.message : String(e),
+                });
+            }
+        }
+        return c.json({
+            success: true,
+            data: {
+                connected: true,
+                connectionId: open.connection.id,
+                writeCalendarId: open.connection.calendarId,
+                readCalendarIds,
+                calendars,
+            },
+        }, 200);
+    })
+    /**
+     * GET /api/calendar/connections/:id/calendars
+     * A-polish 10b — the user's Google calendars, for choosing the multi-read
+     * set and the single write target. Owner-only: loads the requester's own
+     * connection and 404s if :id is not theirs.
+     */
+    .get('/connections/:id/calendars', async (c) => {
+        const jwtUser = c.get('user');
+        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
+        const tenantId = c.get('tenantId') as string;
+        const connId = c.req.param('id');
+        const open = await loadOpenGoogleConnection(
+            c.env.DB,
+            tenantId,
+            jwtUser.sub,
+            c.env.JWT_SECRET,
+            c.env.JWT_SECRET_PREVIOUS,
+        );
+        if (!open || open.connection.id !== connId) {
+            return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 404);
+        }
+        const provider = getCalendarProvider('google');
+        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+        if (!oauthCreds) {
+            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
+        }
+        try {
+            const calendars = await provider.listCalendars({
+                clientId: oauthCreds.clientId,
+                clientSecret: oauthCreds.clientSecret,
+                refreshToken: open.credentials.refreshToken,
+            });
+            return c.json({ success: true, data: { calendars } }, 200);
+        } catch (e) {
+            logger.error('[calendar] listCalendars failed', { tenantId }, e instanceof Error ? e : undefined);
+            return c.json({ success: false, error: { message: 'Failed to fetch Google calendars' } }, 500);
+        }
+    })
+    /**
+     * PUT /api/calendar/connections/:id/calendars
+     * A-polish 10b — save the multi-read set + single write target under the
+     * locked invariants (write editable, write ∈ read, Primary always read).
+     */
+    .put('/connections/:id/calendars', async (c) => {
+        const jwtUser = c.get('user');
+        if (!jwtUser) return c.json({ success: false, error: { message: 'Not authenticated' } }, 401);
+        const tenantId = c.get('tenantId') as string;
+        const connId = c.req.param('id');
+        const open = await loadOpenGoogleConnection(
+            c.env.DB, tenantId, jwtUser.sub, c.env.JWT_SECRET, c.env.JWT_SECRET_PREVIOUS,
+        );
+        if (!open || open.connection.id !== connId) {
+            return c.json({ success: false, error: { message: 'Google Calendar not connected' } }, 404);
+        }
+        const parsed = SaveReadSetSchema.safeParse(await c.req.json().catch(() => null));
+        if (!parsed.success) {
+            return c.json({ success: false, error: { message: 'Invalid read set', details: parsed.error.flatten() } }, 400);
+        }
+        const provider = getCalendarProvider('google');
+        const oauthMode = await loadGoogleOAuthMode(c.env.DB, tenantId);
+        const oauthCreds = await resolveGoogleOAuthCredentials(c.env, tenantId, oauthMode);
+        if (!oauthCreds) {
+            return c.json({ success: false, error: { message: 'Google Calendar integration is not configured' } }, 400);
+        }
+        let available;
+        try {
+            available = await provider.listCalendars({
+                clientId: oauthCreds.clientId,
+                clientSecret: oauthCreds.clientSecret,
+                refreshToken: open.credentials.refreshToken,
+            });
+        } catch (e) {
+            logger.error('[calendar] listCalendars (save) failed', { tenantId }, e instanceof Error ? e : undefined);
+            return c.json({ success: false, error: { message: 'Failed to fetch Google calendars' } }, 500);
+        }
+        let resolved;
+        try {
+            resolved = resolveReadSet(available, parsed.data);
+        } catch (e) {
+            if (e instanceof AppError) {
+                return c.json({ success: false, error: { code: e.code, message: e.message } }, e.status as 400);
+            }
+            throw e;
+        }
+        await saveReadSet(drizzle(c.env.DB), { tenantId, connectionId: connId, resolved });
+        return c.json({
+            success: true,
+            data: { readCalendarIds: resolved.readCalendarIds, writeCalendarId: resolved.writeCalendarId },
+        }, 200);
     })
     /**
      * POST /api/calendar/sync-events

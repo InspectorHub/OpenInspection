@@ -64,6 +64,34 @@
       "when": 1784207480662,
       "tag": "0008_swift_stryfe",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1784286920455,
+      "tag": "0009_aspiring_mathemanic",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1784334758784,
+      "tag": "0010_broad_bishop",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1784337027884,
+      "tag": "0011_light_stark_industries",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1784338953390,
+      "tag": "0012_minor_ares",
+      "breakpoints": true
     }
   ]
 }

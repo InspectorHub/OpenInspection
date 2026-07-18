@@ -7662,6 +7662,45 @@
     "description": "IA-6 — advisory same-day-hour collision check counting lead and helper assignments. Callers render a warning; scheduling is never blocked."
   },
   {
+    "operationId": "getScheduleWeekSummary",
+    "method": "GET",
+    "pathTemplate": "/api/schedule/week-summary",
+    "scopes": [
+      "read"
+    ],
+    "tag": "calendar",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "start",
+          "in": "query",
+          "required": true,
+          "description": "First civil date of the seven-day window",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "First civil date of the seven-day window"
+          }
+        },
+        {
+          "name": "userId",
+          "in": "query",
+          "required": false,
+          "description": "Restrict the summary to one inspector; owners and managers only",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Restrict the summary to one inspector; owners and managers only"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Summarize seven days of availability",
+    "description": "Returns one availability status per civil day for the week beginning at start, batching the shared per-week setup into a single call. Owners and managers may summarize any inspector via userId; inspectors are always summarized against themselves."
+  },
+  {
     "operationId": "getServiceInspectors",
     "method": "GET",
     "pathTemplate": "/api/services/{id}/inspectors",

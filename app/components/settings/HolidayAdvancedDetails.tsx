@@ -1,6 +1,6 @@
 import { Banner, SegmentedControl, Select } from "@core/shared-ui";
 import type { CustomHoliday, HolidayInternalPolicy, HolidayPublicPolicy } from "./HolidayClosedPanel";
-import { SUPPORTED_STATE_CODES } from "./holiday-region-options";
+import { SUPPORTED_STATE_CODES, regionOptionLabel } from "./holiday-region-options";
 import { m } from "~/paraglide/messages";
 
 export function HolidayAdvancedDetails({
@@ -61,7 +61,7 @@ export function HolidayAdvancedDetails({
     { value: "US", label: m.settings_holiday_region_federal_only() },
     ...SUPPORTED_STATE_CODES.map((code) => ({
       value: `US-${code}`,
-      label: m.settings_holiday_region_federal_plus({ code }),
+      label: regionOptionLabel(code),
     })),
   ];
 

@@ -12,6 +12,7 @@ import {
     agreementSigners,
     tenants,
     tenantConfigs,
+    calendarConnections,
 } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { runErasure } from '../lib/compliance/erasure-orchestrator';
@@ -20,8 +21,19 @@ import type { Role } from '../lib/auth/roles';
 import { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { safeTimestamp } from '../lib/date';
 
+/** A workspace member plus the freshness of their Google calendar sync. */
+export interface MemberWithCalendarSync {
+    id: string;
+    email: string;
+    role: string;
+    createdAt: Date;
+    calendarConnected: boolean;
+    /** Epoch ms of the last successful busy pull; null when never synced. */
+    calendarLastSyncAt: number | null;
+}
+
 /**
- * Service to handle administrative tasks such as member management, 
+ * Service to handle administrative tasks such as member management,
  * data compliance, and infrastructure configuration.
  */
 export class AdminService {
@@ -35,17 +47,43 @@ export class AdminService {
     }
 
     /**
-     * Lists all workspace members and pending invitations.
+     * Lists all workspace members and pending invitations, each carrying its
+     * Google calendar-sync freshness.
+     *
+     * @see MemberWithCalendarSync — the row shape, exported so route handlers
+     * do not hand-copy it.
+     *
+     * The sync lookup is a separate keyed read rather than a join: callers use
+     * this list as an authorization roster, so a row multiplied by a join would
+     * be a correctness bug, not just a display one.
      */
     async getMembers(tenantId: string) {
         const db = this.getDrizzle();
-        const [members, invites] = await Promise.all([
+        const [members, invites, connections] = await Promise.all([
             db.select({ id: users.id, email: users.email, role: users.role, createdAt: users.createdAt })
                 .from(users)
                 .where(eq(users.tenantId, tenantId)),
             db.select().from(tenantInvites).where(eq(tenantInvites.tenantId, tenantId)),
+            db.select({
+                userId: calendarConnections.userId,
+                lastSyncAt: calendarConnections.lastSyncAt,
+            })
+                .from(calendarConnections)
+                .where(dbAnd(
+                    eq(calendarConnections.tenantId, tenantId),
+                    eq(calendarConnections.provider, 'google'),
+                )),
         ]);
-        return { members, invites };
+
+        const syncByUser = new Map(connections.map((c) => [c.userId, c.lastSyncAt]));
+        return {
+            members: members.map((m) => ({
+                ...m,
+                calendarConnected: syncByUser.has(m.id),
+                calendarLastSyncAt: syncByUser.get(m.id)?.getTime() ?? null,
+            })),
+            invites,
+        };
     }
 
     /**

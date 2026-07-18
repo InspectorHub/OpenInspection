@@ -5,10 +5,10 @@ import { ConfirmDialog } from "~/components/ConfirmDialog";
 import type { action } from "~/routes/settings-booking";
 import { HolidayAdvancedDetails } from "./HolidayAdvancedDetails";
 import {
-  HolidayPresetCards,
-  HolidayRegionPickerModal,
-  type HolidayPresetId,
-} from "./HolidayPresetCards";
+  HolidayPolicyCards,
+  HolidayRegionSwitch,
+  type HolidayPolicyId,
+} from "./HolidayPolicyCards";
 import { m } from "~/paraglide/messages";
 
 export type HolidayPublicPolicy = "open" | "block" | "advisory";
@@ -27,30 +27,29 @@ export interface CustomHoliday {
   name: string;
 }
 
-function detectPreset(config: HolidayConfig): HolidayPresetId | null {
-  if (!config.holidayRegion) return "off";
-  if (
-    config.holidayPublicPolicy === "block" &&
-    config.holidayInternalPolicy === "advisory"
-  ) {
-    return "standard";
-  }
-  if (
-    config.holidayPublicPolicy === "advisory" &&
-    config.holidayInternalPolicy === "advisory" &&
-    config.conciergeReviewRequired
-  ) {
-    return "on-call";
-  }
+/**
+ * Which policy card reads as selected. `open` is deliberately unmatched: it is
+ * an Advanced-only escape hatch (bookings taken on holidays anyway), and the
+ * panel surfaces a notice rather than pretending it is one of the two cards.
+ */
+function detectPolicy(publicPolicy: HolidayPublicPolicy): HolidayPolicyId | null {
+  if (publicPolicy === "block") return "closed";
+  if (publicPolicy === "advisory") return "on-request";
   return null;
 }
 
 export function HolidayClosedPanel({
   initialConfig,
   initialCustomHolidays,
+  dataMaxYear,
+  currentYear,
 }: {
   initialConfig: HolidayConfig;
   initialCustomHolidays: CustomHoliday[];
+  /** Last year the bundled holiday catalog covers; used to warn before the cliff. */
+  dataMaxYear?: number;
+  /** Current civil year (from the loader) — compared against `dataMaxYear`. */
+  currentYear?: number;
 }) {
   const fetcher = useFetcher<typeof action>();
   const [region, setRegion] = useState<string | null>(initialConfig.holidayRegion);
@@ -63,8 +62,6 @@ export function HolidayClosedPanel({
   const [concierge, setConcierge] = useState(initialConfig.conciergeReviewRequired);
   const [customHolidays, setCustomHolidays] = useState(initialCustomHolidays);
   const [dirty, setDirty] = useState(false);
-  const [statePickerOpen, setStatePickerOpen] = useState(false);
-  const [pendingPreset, setPendingPreset] = useState<"standard" | "on-call" | null>(null);
   const [openConfirmOpen, setOpenConfirmOpen] = useState(false);
   const [newDate, setNewDate] = useState("");
   const [newName, setNewName] = useState("");
@@ -97,12 +94,16 @@ export function HolidayClosedPanel({
     }
   }, [fetcher.state, fetcher.data]);
 
-  const activePreset = detectPreset({
-    holidayRegion: region,
-    holidayPublicPolicy: publicPolicy,
-    holidayInternalPolicy: internalPolicy,
-    conciergeReviewRequired: concierge,
-  });
+  const activePolicy = detectPolicy(publicPolicy);
+
+  // Once the calendar has caught up to the last year we ship dates for, the
+  // catalog is about to (or already does) run dry. Surface it while the region
+  // is on — with no region there are no holidays to miss.
+  const coverageExpiring =
+    region != null &&
+    dataMaxYear != null &&
+    currentYear != null &&
+    currentYear >= dataMaxYear;
 
   function submitSave(next: {
     holidayRegion: string | null;
@@ -123,66 +124,50 @@ export function HolidayClosedPanel({
     );
   }
 
-  function applyStandard(regionValue: string) {
-    setRegion(regionValue);
-    setPublicPolicy("block");
+  function applyPolicy(policy: HolidayPolicyId, regionValue: string) {
+    const nextPublic: HolidayPublicPolicy = policy === "closed" ? "block" : "advisory";
+    // Only "open on request" needs someone to confirm each request; turning it
+    // on is what makes the policy mean anything. Switching back to "closed"
+    // leaves concierge review alone — it is also used outside holidays.
+    const nextConcierge = policy === "on-request" ? true : concierge;
+    setPublicPolicy(nextPublic);
     setInternalPolicy("advisory");
+    setConcierge(nextConcierge);
     setDirty(true);
     submitSave({
       holidayRegion: regionValue,
-      holidayPublicPolicy: "block",
+      holidayPublicPolicy: nextPublic,
       holidayInternalPolicy: "advisory",
-      conciergeReviewRequired: concierge,
+      conciergeReviewRequired: nextConcierge,
     });
   }
 
-  function applyOnCall(regionValue: string) {
-    setRegion(regionValue);
-    setPublicPolicy("advisory");
-    setInternalPolicy("advisory");
-    setConcierge(true);
+  function handlePolicy(policy: HolidayPolicyId) {
+    if (!region) return;
+    applyPolicy(policy, region);
+  }
+
+  function handleRegion(next: string | null) {
+    setRegion(next);
     setDirty(true);
-    submitSave({
-      holidayRegion: regionValue,
-      holidayPublicPolicy: "advisory",
-      holidayInternalPolicy: "advisory",
-      conciergeReviewRequired: true,
-    });
-  }
-
-  function applyOff() {
-    setRegion(null);
-    setPublicPolicy("open");
-    setInternalPolicy("advisory");
-    setDirty(true);
-    submitSave({
-      holidayRegion: null,
-      holidayPublicPolicy: "open",
-      holidayInternalPolicy: "advisory",
-      conciergeReviewRequired: concierge,
-    });
-  }
-
-  function handlePreset(preset: HolidayPresetId) {
-    if (preset === "off") {
-      applyOff();
+    if (!next) {
+      // Catalog off: no holidays exist, so the policies are inert. Park them at
+      // the permissive values so a later re-enable does not silently resurrect
+      // a policy the user never chose in this session.
+      setPublicPolicy("open");
+      setInternalPolicy("advisory");
+      submitSave({
+        holidayRegion: null,
+        holidayPublicPolicy: "open",
+        holidayInternalPolicy: "advisory",
+        conciergeReviewRequired: concierge,
+      });
       return;
     }
-    if (region) {
-      if (preset === "standard") applyStandard(region);
-      else applyOnCall(region);
-      return;
-    }
-    setPendingPreset(preset);
-    setStatePickerOpen(true);
-  }
-
-  function handleStatePick(code: string) {
-    const regionValue = code === "US" ? "US" : `US-${code}`;
-    setStatePickerOpen(false);
-    if (pendingPreset === "on-call") applyOnCall(regionValue);
-    else applyStandard(regionValue);
-    setPendingPreset(null);
+    // Turning the catalog on with no real policy yet: default to the safe one
+    // rather than leaving both cards unselected.
+    const policy = detectPolicy(publicPolicy) ?? "closed";
+    applyPolicy(policy, next);
   }
 
   function handleAdvancedSave() {
@@ -222,11 +207,27 @@ export function HolidayClosedPanel({
         </p>
       </div>
 
-      <HolidayPresetCards
-        activePreset={activePreset}
-        saving={saving}
-        onSelect={handlePreset}
-      />
+      {coverageExpiring && (
+        <div data-testid="holiday-coverage-warn">
+          <Banner tone="warn">
+            {m.settings_holiday_coverage_warn({ year: dataMaxYear! })}
+          </Banner>
+        </div>
+      )}
+
+      <HolidayRegionSwitch region={region} saving={saving} onChange={handleRegion} />
+
+      {region && (
+        <HolidayPolicyCards
+          activePolicy={activePolicy}
+          saving={saving}
+          onSelect={handlePolicy}
+        />
+      )}
+
+      {region && publicPolicy === "open" && (
+        <Banner tone="warn">{m.settings_holiday_policy_open_notice()}</Banner>
+      )}
 
       {publicPolicy === "advisory" && region && (
         <label className="flex items-start gap-3 cursor-pointer select-none">
@@ -293,15 +294,6 @@ export function HolidayClosedPanel({
         saved={saved}
         failed={failed}
         failMessage={fetcher.data?.message}
-      />
-
-      <HolidayRegionPickerModal
-        open={statePickerOpen}
-        onPick={handleStatePick}
-        onCancel={() => {
-          setStatePickerOpen(false);
-          setPendingPreset(null);
-        }}
       />
 
       <ConfirmDialog

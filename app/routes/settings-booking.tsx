@@ -20,6 +20,7 @@ import {
   type HolidayInternalPolicy,
   type HolidayPublicPolicy,
 } from "~/components/settings/HolidayClosedPanel";
+import { getHolidayDataCoverage } from "../../server/lib/holidays/resolve-closed-dates";
 import { m } from "~/paraglide/messages";
 
 interface TenantConfig {
@@ -110,7 +111,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     customHolidays = body.data?.holidays ?? [];
   }
 
-  return { config, members, customHolidays };
+  return {
+    config,
+    members,
+    customHolidays,
+    holidayDataMaxYear: getHolidayDataCoverage().maxYear,
+    currentYear: new Date().getUTCFullYear(),
+  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -256,6 +263,8 @@ export default function SettingsBookingPage() {
           conciergeReviewRequired: data.config.conciergeReviewRequired,
         }}
         initialCustomHolidays={data.customHolidays}
+        dataMaxYear={data.holidayDataMaxYear}
+        currentYear={data.currentYear}
       />
       <BookingSlotRulesPanel
         initial={{

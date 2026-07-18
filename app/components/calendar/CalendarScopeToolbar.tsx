@@ -1,6 +1,7 @@
 import { isAdminRole } from "~/lib/access";
 import type { CalendarScope } from "~/components/calendar/calendar-helpers";
 import type { CalendarMember } from "~/components/calendar/BlockTimeDrawer";
+import { InspectorSyncBadge } from "~/components/calendar/InspectorSyncBadge";
 import { m } from "~/paraglide/messages";
 
 export interface CalendarScopeToolbarProps {
@@ -10,6 +11,9 @@ export interface CalendarScopeToolbarProps {
   selectedUserIds: string[];
   onScopeChange: (scope: CalendarScope) => void;
   onToggleMember: (memberId: string) => void;
+  locale: string;
+  /** Injected by tests; production reads the clock at render time. */
+  now?: number;
 }
 
 /**
@@ -23,6 +27,8 @@ export function CalendarScopeToolbar({
   selectedUserIds,
   onScopeChange,
   onToggleMember,
+  locale,
+  now,
 }: CalendarScopeToolbarProps) {
   const canManageTeam = isAdminRole(role);
 
@@ -54,23 +60,35 @@ export function CalendarScopeToolbar({
       </div>
 
       {scope === "team" && canManageTeam && (
-        <div className="flex flex-wrap gap-2" aria-label={m.calendar_scope_inspectors_aria()}>
+        // Wider gap BETWEEN members than the gap-1 tying each chip to its own
+        // sync badge, so a scanned row reads as [chip badge] [chip badge] rather
+        // than an ambiguous run of equally-spaced pills.
+        <div className="flex flex-wrap gap-x-5 gap-y-2" aria-label={m.calendar_scope_inspectors_aria()}>
           {members.map((member) => {
             const selected = selectedUserIds.includes(member.id);
             return (
-              <button
-                key={member.id}
-                type="button"
-                onClick={() => onToggleMember(member.id)}
-                aria-pressed={selected}
-                className={`h-8 rounded-full border px-3 text-[12px] font-bold ${
-                  selected
-                    ? "border-ih-primary bg-ih-primary-tint text-ih-primary"
-                    : "border-ih-border bg-ih-bg-card text-ih-fg-3 hover:bg-ih-bg-muted"
-                }`}
-              >
-                {member.name}
-              </button>
+              // The badge sits outside the button so its label does not become
+              // part of the chip's accessible name.
+              <span key={member.id} className="inline-flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onToggleMember(member.id)}
+                  aria-pressed={selected}
+                  className={`h-8 rounded-full border px-3 text-[12px] font-bold ${
+                    selected
+                      ? "border-ih-primary bg-ih-primary-tint text-ih-primary"
+                      : "border-ih-border bg-ih-bg-card text-ih-fg-3 hover:bg-ih-bg-muted"
+                  }`}
+                >
+                  {member.name}
+                </button>
+                <InspectorSyncBadge
+                  connected={member.calendarConnected ?? false}
+                  lastSyncAt={member.calendarLastSyncAt ?? null}
+                  locale={locale}
+                  {...(now === undefined ? {} : { now })}
+                />
+              </span>
             );
           })}
         </div>

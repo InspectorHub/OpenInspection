@@ -1,11 +1,36 @@
 import federalByYear from './data/us-federal.json';
 import statesByCode from './data/us-states.json';
+import { logger } from '../logger';
 import type { HolidayEntry, HolidayRegion, TenantCustomHoliday } from './types';
 
 type YearBucket = Record<string, HolidayEntry[]>;
 
 const FEDERAL = federalByYear as YearBucket;
 const STATES = statesByCode as Record<string, YearBucket>;
+
+/**
+ * The span of years the bundled federal catalog actually ships. Beyond `maxYear`
+ * there is no data, so the resolver silently returns no built-in holidays — a
+ * booking on next decade's Christmas would sail through unflagged. Callers use
+ * this to warn operators before that cliff (settings banner) and the resolver
+ * logs when a lookup lands past it. Extend the JSON, and this widens for free.
+ */
+const COVERED_YEARS = Object.keys(FEDERAL)
+    .map(Number)
+    .filter((y) => Number.isFinite(y))
+    .sort((a, b) => a - b);
+
+const DATA_MIN_YEAR = COVERED_YEARS[0] ?? 0;
+const DATA_MAX_YEAR = COVERED_YEARS[COVERED_YEARS.length - 1] ?? 0;
+
+export interface HolidayDataCoverage {
+    minYear: number;
+    maxYear: number;
+}
+
+export function getHolidayDataCoverage(): HolidayDataCoverage {
+    return { minYear: DATA_MIN_YEAR, maxYear: DATA_MAX_YEAR };
+}
 
 export interface ResolveClosedDatesInput {
     region: HolidayRegion | null;
@@ -22,6 +47,17 @@ export function resolveCompanyClosedDates(
 ): Map<string, string> {
     const out = new Map<string, string>();
     if (!input.region) return out;
+
+    if (input.year > DATA_MAX_YEAR || input.year < DATA_MIN_YEAR) {
+        // Past the shipped range the catalog is empty, so holidays stop being
+        // detected. Custom rows below still apply; surface the gap so it is not
+        // a silent no-op.
+        logger.warn('[holidays] requested year is outside bundled catalog coverage', {
+            requestedYear: input.year,
+            minYear: DATA_MIN_YEAR,
+            maxYear: DATA_MAX_YEAR,
+        });
+    }
 
     const yearKey = String(input.year);
     for (const entry of FEDERAL[yearKey] ?? []) {

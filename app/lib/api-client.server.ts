@@ -48,6 +48,7 @@ import type {
     RatingSystemsApi,
     RecommendationsApi,
     RepairBuilderApi,
+    ScheduleApi,
     SecretsApi,
     ServicesApi,
     SessionContextApi,
@@ -156,6 +157,7 @@ export interface Api {
     ratingSystems:      ReturnType<typeof hc<RatingSystemsApi>>;
     recommendations:    ReturnType<typeof hc<RecommendationsApi>>;
     repairBuilder:      ReturnType<typeof hc<RepairBuilderApi>>;
+    schedule:           ReturnType<typeof hc<ScheduleApi>>;
     secrets:            ReturnType<typeof hc<SecretsApi>>;
     services:           ReturnType<typeof hc<ServicesApi>>;
     sessionContext:     ReturnType<typeof hc<SessionContextApi>>;
@@ -224,6 +226,7 @@ const MOUNT: Record<keyof Api, string> = {
     ratingSystems:      "/api/rating-systems",
     recommendations:    "/api/recommendations",
     repairBuilder:      "/api/public",
+    schedule:           "/api/schedule",
     secrets:            "/api/admin",
     services:           "/api/services",
     sessionContext:     "/api/session",
@@ -310,6 +313,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         ratingSystems:      mk<RatingSystemsApi>(MOUNT.ratingSystems),
         recommendations:    mk<RecommendationsApi>(MOUNT.recommendations),
         repairBuilder:      mk<RepairBuilderApi>(MOUNT.repairBuilder),
+        schedule:           mk<ScheduleApi>(MOUNT.schedule),
         secrets:            mk<SecretsApi>(MOUNT.secrets),
         services:           mk<ServicesApi>(MOUNT.services),
         sessionContext:     mk<SessionContextApi>(MOUNT.sessionContext),

@@ -5,6 +5,19 @@ export type CalendarCapability = 'availability_read' | 'events_read_write';
 export interface BusyBlock {
     start: string;
     end: string;
+    // A-polish 10 — provider event id (for keyed upsert) and free/busy status.
+    // freeBusy ranges carry neither; the sync helper synthesizes an id and
+    // defaults transparency to 'opaque'.
+    externalId?: string;
+    transparency?: 'opaque' | 'transparent';
+}
+
+/** A-polish 10b — one calendar from the provider's calendar list. */
+export interface CalendarListEntry {
+    id: string;
+    summary: string;
+    accessRole: string; // owner | writer | reader | freeBusyReader
+    primary: boolean;
 }
 
 interface CalendarPushEventInput {
@@ -56,6 +69,13 @@ export interface CalendarProvider {
         range: { from: Date; to: Date };
         capability: CalendarCapability;
     }): Promise<BusyBlock[]>;
+    // A-polish 10b — the user's calendars, for choosing the multi-read set and
+    // the single write target.
+    listCalendars(params: {
+        clientId: string;
+        clientSecret: string;
+        refreshToken: string;
+    }): Promise<CalendarListEntry[]>;
     pushEvent(params: {
         clientId: string;
         clientSecret: string;

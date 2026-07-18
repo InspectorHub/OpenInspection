@@ -32,6 +32,36 @@ export function formatDate(
   }).format(d);
 }
 
+/** Largest-first, so the first unit the gap clears is the one we render. */
+const RELATIVE_UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
+  ["year", 31_536_000_000],
+  ["month", 2_592_000_000],
+  ["day", 86_400_000],
+  ["hour", 3_600_000],
+  ["minute", 60_000],
+];
+
+/**
+ * Locale-aware "1 hour ago" / "in 3 days". `now` is injected so callers stay
+ * testable and so server and client agree on a rendered value.
+ */
+export function formatRelativeTime(
+  value: DateInput,
+  opts: { locale: string; now?: number; style?: Intl.RelativeTimeFormatStyle },
+): string {
+  const d = toDate(value);
+  if (!d) return "";
+  const diffMs = d.getTime() - (opts.now ?? Date.now());
+  const fmt = new Intl.RelativeTimeFormat(opts.locale, {
+    numeric: "auto",
+    style: opts.style ?? "long",
+  });
+  for (const [unit, unitMs] of RELATIVE_UNITS) {
+    if (Math.abs(diffMs) >= unitMs) return fmt.format(Math.round(diffMs / unitMs), unit);
+  }
+  return fmt.format(0, "minute");
+}
+
 export function formatTime(
   value: DateInput,
   opts: { locale: string; timeZone?: string; timeZoneName?: "short" | "long" },

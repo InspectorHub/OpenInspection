@@ -1,7 +1,8 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
-import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, users, services as servicesTable, agentTenantLinks } from '../lib/db/schema';
+import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, tenantConfigs, users, services as servicesTable, agentTenantLinks } from '../lib/db/schema';
+import { wallClockToEpochMs, resolveTenantTimeZone } from '../lib/tz';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
@@ -124,8 +125,9 @@ export class BookingService {
             )).all(),
         ]);
 
-        // If a blocking override exists, no slots available
-        const blocked = overrides.some(o => !o.isAvailable);
+        // If a blocking override exists, no slots available. Transparent (free)
+        // Google events are stored as overrides but never block (A-polish 10).
+        const blocked = overrides.some(o => !o.isAvailable && o.transparency !== 'transparent');
         const effectiveWindows = blocked ? overrides.filter(o => o.isAvailable) : windows;
         if (effectiveWindows.length === 0) return [];
 
@@ -516,6 +518,9 @@ export class BookingService {
         let createdRequestId: string;
         let primaryInspectionId: string;
         let allInspectionIds: string[] = [];
+        // Booked duration from the chosen service(s); NULL when the legacy path
+        // carries no explicit service (falls back to the time-slot window below).
+        let bookedServiceDurationMin: number | null = null;
 
         if (body.services && body.services.length > 0) {
             const serviceIds = body.services.map(s => s.serviceId);
@@ -525,6 +530,10 @@ export class BookingService {
             if (svcRows.length !== serviceIds.length) {
                 throw Errors.BadRequest('One or more services were not found.');
             }
+            // Total booked minutes across the selected services (back-to-back);
+            // NULL when none carry a duration, so the time-slot window is used.
+            bookedServiceDurationMin =
+                svcRows.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0) || null;
             const subs = svcRows.map(s => {
                 const sub: { templateId: string; price: number } = {
                     templateId: s.templateId ?? '',
@@ -612,6 +621,42 @@ export class BookingService {
         if (verdict === 'lose') {
             await service.revokeBooking(tenantId, createdRequestId);
             throw Errors.Conflict('That time slot is no longer available. Please pick another time.');
+        }
+
+        // A-polish 9b — stamp the precise scheduled instant on every inspection
+        // this booking created. The wall-clock slot time is interpreted in the
+        // TENANT tz (not the naive :00Z of the startIso busy-check key), so
+        // downstream conflict detection, Google push, and the ICS feed reason
+        // about real instants. inspections.date is deliberately left untouched —
+        // it still keys the HH:MM busy-checks via slice(11,16). Non-fatal: the
+        // inspection rows already committed, so a stamp failure must not 500 the
+        // booker (conflict detection just falls back to the hour-bucket).
+        const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+            .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+        const tenantTz = resolveTenantTimeZone(tzRow?.defaultTimezone);
+        const scheduledStartMs = wallClockToEpochMs(body.date, requestedTime, tenantTz);
+        const slotWindowMin =
+            body.timeSlot === 'all-day' ? 540
+            : body.timeSlot === 'morning' || body.timeSlot === 'afternoon' ? 240
+            : 180;
+        const durationMin = bookedServiceDurationMin ?? slotWindowMin;
+        const scheduledEndMs = scheduledStartMs + durationMin * 60000;
+        try {
+            await db.update(inspections)
+                .set({
+                    scheduledStartMs: new Date(scheduledStartMs),
+                    scheduledEndMs: new Date(scheduledEndMs),
+                    durationMin,
+                })
+                .where(and(
+                    inArray(inspections.id, allInspectionIds),
+                    eq(inspections.tenantId, tenantId),
+                ));
+        } catch (e) {
+            logger.warn('booking.scheduled-instant.stamp.failed', {
+                inspectionIds: allInspectionIds,
+                error: e instanceof Error ? e.message : String(e),
+            });
         }
 
         // IA-18 (#111) — capture the booker as a Client contact and link it to

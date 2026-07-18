@@ -20,7 +20,9 @@ interface SideRailProps {
   photoCount?: number;
   onGallerySetCover?: (photo: { key: string; url: string }) => void;
   onGalleryAnnotate?: (photo: { key: string; url: string }) => void;
-  serverComments?: Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>;
+  serverComments?: Array<{ id: string; text: string; useCount?: number; lastUsedAt?: string | null }>;
+  /** Viewer locale for the comment library timestamps; the route owns it. */
+  locale: string;
   librarySort?: string;
   onLibrarySearch?: (q: string) => void;
   onLibraryInsert?: (text: string, id: string) => void;
@@ -41,7 +43,7 @@ const TABS: Array<{ id: TabId; label: () => string; icon: string }> = [
   { id: "photos", label: () => m.editor_siderail_tab_photos(), icon: "M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 6h16a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V8a2 2 0 012-2z" },
 ];
 
-export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, categoryColor }: SideRailProps) {
+export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRatingLabel, inspectionId, photoCount, onGallerySetCover, onGalleryAnnotate, serverComments, librarySort, onLibrarySearch, onLibraryInsert, onLibraryTabChange, initialOpen, categoryColor, locale }: SideRailProps) {
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [open, setOpen] = useState(initialOpen ?? false);
   // Photos: fill-only (Plan 1). Library: rich-only in fill mode — the canned
@@ -219,6 +221,7 @@ export function SideRail({ mode, activeItem, activeResult, getRatingColor, getRa
                   selectedIndex={-1}
                   sort={librarySort ?? "relevance"}
                   onInsertText={(text, id) => onLibraryInsert?.(text, id)}
+                  locale={locale}
                 />
               </div>
             )}

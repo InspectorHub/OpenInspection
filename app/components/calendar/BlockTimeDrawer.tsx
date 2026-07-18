@@ -9,6 +9,9 @@ export interface CalendarMember {
   name: string;
   email: string;
   role: string;
+  /** Google calendar-sync freshness, surfaced on the Team chips. */
+  calendarConnected?: boolean;
+  calendarLastSyncAt?: number | null;
 }
 
 interface BlockActionData {

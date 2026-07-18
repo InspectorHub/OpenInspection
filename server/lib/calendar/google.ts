@@ -8,7 +8,7 @@ import {
     type GoogleEvent,
 } from '../google-calendar';
 import { capabilityToScopes } from './provider';
-import type { CalendarProvider, OAuthExchangeResult, BusyBlock } from './provider';
+import type { CalendarProvider, OAuthExchangeResult, BusyBlock, CalendarListEntry } from './provider';
 
 function toRfc3339(d: Date): string {
     return d.toISOString();
@@ -115,9 +115,35 @@ export const googleCalendarProvider: CalendarProvider = {
         for (const event of eventsData.items ?? []) {
             const start = event.start?.dateTime ?? (event.start?.date ? `${event.start.date}T00:00:00.000Z` : null);
             const end = event.end?.dateTime ?? (event.end?.date ? `${event.end.date}T23:59:59.000Z` : null);
-            if (start && end) blocks.push({ start, end });
+            if (start && end) {
+                blocks.push({
+                    start,
+                    end,
+                    externalId: event.id,
+                    transparency: event.transparency === 'transparent' ? 'transparent' : 'opaque',
+                });
+            }
         }
         return blocks;
+    },
+
+    async listCalendars({ clientId, clientSecret, refreshToken }): Promise<CalendarListEntry[]> {
+        const accessToken = await accessTokenFor(clientId, clientSecret, refreshToken);
+        const res = await fetch(`${GOOGLE_CALENDAR_API}/users/me/calendarList`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!res.ok) throw new Error('Failed to fetch Google calendar list');
+        const data = await res.json() as {
+            items?: Array<{ id?: string; summary?: string; accessRole?: string; primary?: boolean }>;
+        };
+        return (data.items ?? [])
+            .filter((c) => Boolean(c.id))
+            .map((c) => ({
+                id: c.id!,
+                summary: c.summary ?? c.id!,
+                accessRole: c.accessRole ?? 'reader',
+                primary: c.primary === true,
+            }));
     },
 
     async pushEvent({ clientId, clientSecret, refreshToken, calendarId, event }): Promise<string> {

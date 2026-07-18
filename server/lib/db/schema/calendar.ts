@@ -15,9 +15,34 @@ export const calendarConnections = sqliteTable('calendar_connections', {
     calendarId: text('calendar_id').notNull(),
     connectedAt: integer('connected_at', { mode: 'timestamp_ms' }).notNull(),
     updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+    /**
+     * Last successful busy pull from the provider. Distinct from updatedAt,
+     * which tracks writes to the connection itself (credentials, calendar id):
+     * a re-auth is not a sync. NULL until the first sync succeeds. Drives the
+     * sync-freshness badge on the calendar Team chips.
+     */
+    lastSyncAt: integer('last_sync_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     uniqueIndex('uq_calendar_connections_user_provider').on(t.userId, t.provider),
     index('idx_calendar_connections_tenant_user').on(t.tenantId, t.userId),
+]);
+
+// A-polish 10b — multi-read / single-write. The read set of Google calendars
+// whose busy time is unioned for conflict-checking. The write destination stays
+// calendar_connections.calendar_id. App-layer integrity (no DB FK per Schema
+// Rules); Primary is always included in the effective read set.
+export const calendarConnectionReadCalendars = sqliteTable('calendar_connection_read_calendars', {
+    id: text('id').primaryKey(),
+    tenantId: text('tenant_id').notNull(),
+    connectionId: text('connection_id').notNull(),           // calendar_connections.id (app-layer)
+    externalCalendarId: text('external_calendar_id').notNull(), // Google calendar id
+    summary: text('summary'),                                // cached display name
+    accessRole: text('access_role'),                         // owner|writer|reader|freeBusyReader
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+}, (t) => [
+    uniqueIndex('uq_conn_read_cal').on(t.connectionId, t.externalCalendarId),
+    index('idx_conn_read_cal_tenant').on(t.tenantId, t.connectionId),
 ]);
 
 export const calendarBlocks = sqliteTable('calendar_blocks', {

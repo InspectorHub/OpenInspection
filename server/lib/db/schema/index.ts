@@ -49,7 +49,7 @@ export type { ReportPdf, NewReportPdf } from './report-pdf';
 export { signingKeys, esignAuditLogs } from './esign';
 export type { SigningKey, NewSigningKey, EsignAuditLog, NewEsignAuditLog } from './esign';
 export { qboConnections, qboEntityMap, qboSyncErrors } from './qbo';
-export { calendarBlocks, calendarConnections } from './calendar';
+export { calendarBlocks, calendarConnections, calendarConnectionReadCalendars } from './calendar';
 export { tenantCustomHolidays } from './holidays';
 // Apprentice review-queue subsystem removed 2026-06-13. The physical
 // `apprentice_reviews` table is orphaned (D1 cannot drop tables) but all

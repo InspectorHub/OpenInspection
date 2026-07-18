@@ -15,13 +15,14 @@ describe('Commercial PCA Phase F foundation columns', () => {
     expect(byName.get('unit_inspection_mode')?.notNull).toBe(true);
   });
 
-  it('additive PCA columns are appended at the end in order (OI #196 — no mid-list insert)', () => {
+  it('additive columns are appended at the end in order (OI #196 — no mid-list insert)', () => {
     // Phase F appended unit_inspection_mode/location_options/sampling_declaration;
     // Phase S then appended pca_narrative/deviations after them; Phase P then
-    // appended report_photo_mode. All appended at the tail (never mid-list) so
-    // db:generate emits ALTER ADD COLUMN, not a rebuild.
+    // appended report_photo_mode; A-polish 9b then appended the scheduled instant
+    // trio. All appended at the tail (never mid-list) so db:generate emits ALTER
+    // ADD COLUMN, not a rebuild.
     const names = getTableConfig(inspections).columns.map((c) => c.name);
-    const tail = names.slice(-6);
+    const tail = names.slice(-9);
     expect(tail).toEqual([
       'unit_inspection_mode',
       'location_options',
@@ -29,6 +30,9 @@ describe('Commercial PCA Phase F foundation columns', () => {
       'pca_narrative',
       'deviations',
       'report_photo_mode',
+      'scheduled_start_ms',
+      'scheduled_end_ms',
+      'duration_min',
     ]);
   });
 

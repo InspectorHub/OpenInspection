@@ -37,6 +37,8 @@ export interface GoogleEvent {
     summary?: string;
     start?: { date?: string; dateTime?: string };
     end?: { date?: string; dateTime?: string };
+    // 'transparent' = the event shows the owner as free (does not block).
+    transparency?: string;
 }
 
 export async function refreshAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<string> {

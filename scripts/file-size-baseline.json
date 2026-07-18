@@ -1,13 +1,13 @@
 {
-  "app/routes/inspection-edit.tsx": 2431,
+  "app/routes/inspection-edit.tsx": 2434,
   "app/routes/inspection-hub.tsx": 991,
   "server/services/inspection/inspection-core.service.ts": 991,
+  "server/services/booking.service.ts": 930,
   "server/lib/collab/results-doc.ts": 917,
   "server/durable-objects/inspection-doc.ts": 896,
   "app/routes/inspections.tsx": 892,
   "server/services/inspection/inspection-report.service.ts": 889,
-  "server/services/booking.service.ts": 885,
-  "server/index.ts": 846,
+  "server/index.ts": 848,
   "server/api/sms.ts": 818,
   "app/components/portal/sections/ReportView.tsx": 764,
   "server/services/inspection.service.ts": 755,
@@ -27,6 +27,7 @@
   "server/services/marketplace.service.ts": 587,
   "app/lib/collab/results-binding.ts": 574,
   "server/api/inspections/publish.ts": 551,
+  "server/api/calendar.ts": 547,
   "server/api/inspections/core.ts": 541,
   "server/api/auth.ts": 536,
   "server/api/inspections/media-studio.ts": 534,
@@ -56,6 +57,8 @@
   "app/routes/settings-workspace.tsx": 417,
   "server/lib/middleware/di.ts": 417,
   "server/lib/email-templates/registry.ts": 413,
+  "app/routes/settings-schedule.tsx": 412,
   "app/routes/templates.tsx": 411,
+  "app/routes/calendar.tsx": 402,
   "server/api/secrets.ts": 401
 }

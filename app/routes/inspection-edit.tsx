@@ -4,6 +4,7 @@ import { findRatingLevel, ratingAdvanceDecision } from "~/lib/rating-levels";
 import { makeCustomDefect } from "~/lib/custom-defects";
 import { useInspectionState, type InspectionSchema, type ItemFilter } from "~/hooks/useInspection";
 import { findingKey } from "~/hooks/findings/shared";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { useFindings, type AttachedRepairItem } from "~/hooks/useFindings";
 import { usePhotoOps } from "~/hooks/usePhotoOps";
 import { useScopeLoader } from "~/hooks/useScopeLoader";
@@ -142,6 +143,7 @@ export { action } from "./inspection-edit/action.server";
 
 export default function InspectionEditPage() {
  const loaderData = useLoaderData<typeof loader>();
+ const displayLocale = useDisplayLocale();
  const fetcher = useFetcher();
  // B-17: notes commit on blur and rating click fire in the same gesture;
  // sharing one fetcher made the rating submit CANCEL the in-flight notes
@@ -448,7 +450,7 @@ export default function InspectionEditPage() {
  /* ---------------------------------------------------------------- */
 
  const [serverComments, setServerComments] = useState<Array<{
- id: string; text: string; useCount?: number; lastUsedAt?: number | null;
+ id: string; text: string; useCount?: number; lastUsedAt?: string | null;
  }>>([]);
 
  // Tracks whether the SideRail library tab is open; combined with
@@ -478,7 +480,7 @@ export default function InspectionEditPage() {
  const t = setTimeout(() => {
  comments.fetchFiltered(ctx).then((rows) => {
  if (cancelled) return;
- setServerComments(rows as Array<{ id: string; text: string; useCount?: number; lastUsedAt?: number | null }>);
+ setServerComments(rows as Array<{ id: string; text: string; useCount?: number; lastUsedAt?: string | null }>);
  });
  }, q ? 250 : 0);
  return () => { cancelled = true; clearTimeout(t); };
@@ -1610,6 +1612,7 @@ export default function InspectionEditPage() {
 
  const sideRailEl = (
  <SideRail
+ locale={displayLocale}
  mode="fill"
  activeItem={state.activeItem ? { id: state.activeItem.id, label: (state.activeItem.label || state.activeItem.name || "") as string, type: state.activeItem.type } : null}
  activeResult={state.activeItemId ? state.getResult(state.activeItemId) : null}
