@@ -1,12 +1,21 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import { agentTenantLinks, tenants, users } from '../../lib/db/schema/tenant';
 import { contacts } from '../../lib/db/schema/contact';
 import { inspections, inspectionResults } from '../../lib/db/schema/inspection';
 import { inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
+import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { REPORT_STATUS } from '../../lib/status/report-status';
+
+// Task 9c — the CLIENT role join, aliased so it can coexist in the same query
+// as the buyer_agent join (contactRoleProfiles/inspectionPeople/contacts,
+// unaliased above) without column/table-name collisions.
+const clientRoleProfiles = alias(contactRoleProfiles, 'client_role_profiles');
+const clientPeople = alias(inspectionPeople, 'client_people');
+const clientContacts = alias(contacts, 'client_contacts');
 import {
     flattenInspectionToRecommendations,
     groupRecommendations,
@@ -88,7 +97,11 @@ export async function listReferrals(
             tenantName:      tenants.name,
             tenantSlug: tenants.slug,
             propertyAddress: inspections.propertyAddress,
-            clientName:      inspections.clientName,
+            // Task 9c — sourced via the client-role inspection_people join
+            // below, NOT the legacy inspections.client_name column (which
+            // survives GDPR erasure as a stale denormalized cache and would
+            // leak the erased subject's name).
+            clientName:      clientContacts.name,
             date:            inspections.date,
             status:          inspections.status,
             reportStatus:    inspections.reportStatus,
@@ -137,6 +150,36 @@ export async function listReferrals(
             and(
                 eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
+            ),
+        )
+        // Client attribution: inspections -> contact_role_profiles (this
+        // tenant's client profile) -> inspection_people -> contacts, aliased
+        // to coexist with the buyer_agent join above. Role filter joined
+        // FIRST for the same fan-out-avoidance reason as buyer_agent.
+        // Replaces the legacy inspections.clientName column read (see
+        // PeopleService.getPrimaryClient) — at most one client row per
+        // inspection (PeopleService.addPerson enforces this), so no fan-out.
+        .leftJoin(
+            clientRoleProfiles,
+            and(
+                eq(clientRoleProfiles.tenantId, inspections.tenantId),
+                eq(clientRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                eq(clientRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            clientPeople,
+            and(
+                eq(clientPeople.roleProfileId, clientRoleProfiles.id),
+                eq(clientPeople.inspectionId, inspections.id),
+                eq(clientPeople.tenantId, inspections.tenantId),
+            ),
+        )
+        .leftJoin(
+            clientContacts,
+            and(
+                eq(clientContacts.id, clientPeople.contactId),
+                eq(clientContacts.tenantId, inspections.tenantId),
             ),
         )
         .leftJoin(users, eq(users.id, inspections.inspectorId))

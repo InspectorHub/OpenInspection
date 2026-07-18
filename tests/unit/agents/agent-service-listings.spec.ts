@@ -50,6 +50,10 @@ describe('AgentService.listReferrals — A2', () => {
             { id: 'jane-c1', tenantId: T1, type: 'agent', name: 'Jane', email: 'jane@realty.com', createdAt: new Date() },
             { id: 'jane-c2', tenantId: T2, type: 'agent', name: 'Jane', email: 'jane@realty.com', createdAt: new Date() },
             { id: 'other-c1', tenantId: T1, type: 'agent', name: 'Other', email: 'other@realty.com', createdAt: new Date() },
+            // Task 9c — client contact backing i-1's inspection_people 'client'
+            // row (see beforeEach below); listReferrals now sources clientName
+            // from here, not the legacy inspections.client_name column.
+            { id: 'client-i1', tenantId: T1, type: 'client', name: 'Sarah', email: 'sarah@example.com', createdAt: new Date() },
         ]);
 
         await testDb.insert(schema.agentTenantLinks).values([
@@ -78,6 +82,8 @@ describe('AgentService.listReferrals — A2', () => {
         await people.addPerson(T2, 'i-3', 'jane-c2', roleProfileId(T2, 'buyer_agent'));
         await people.addPerson(T1, 'other-agent-inspection', 'other-c1', roleProfileId(T1, 'buyer_agent'));
         // 'no-referral-inspection' intentionally gets NO inspection_people row.
+        // Task 9c — client role for i-1, backing the clientName assertion below.
+        await people.addPerson(T1, 'i-1', 'client-i1', roleProfileId(T1, 'client'));
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
@@ -138,6 +144,28 @@ describe('AgentService.listReferrals — A2', () => {
 
         const refs = await svc.listReferrals(AGENT_USER, { limit: 50 });
         expect(refs.find((r) => r.id === 'i-people-only')).toBeDefined();
+    });
+
+    it('ANTI-LEAK (Task 9c) — after GDPR erasure deletes the client\'s inspection_people + contacts rows, ' +
+        'the stale legacy inspections.client_name column must NOT leak through listReferrals', async () => {
+        // Mirrors erasure-orchestrator.ts: the subject's contacts row and
+        // inspection_people row are DELETED outright (not anonymized) — the
+        // legacy inspections.client_name column is a denormalized cache the
+        // erasure job never touches, so it is the leak vector this closes.
+        await testDb.insert(schema.inspections).values({
+            id: 'i-erased', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '5 Cedar',
+            clientName: 'LEAKED-PII-SHOULD-NOT-APPEAR', date: '2026-06-07', status: 'requested',
+            paymentStatus: 'unpaid', referredByAgentId: 'jane-c1', price: 0, createdAt: new Date(),
+        });
+        const people = new PeopleService({ DB: {} as D1Database });
+        await people.addPerson(T1, 'i-erased', 'jane-c1', roleProfileId(T1, 'buyer_agent'));
+        // No client inspection_people row is added — simulates post-erasure state.
+
+        const refs = await svc.listReferrals(AGENT_USER, { limit: 50 });
+        const erased = refs.find((r) => r.id === 'i-erased');
+        expect(erased).toBeDefined();
+        expect(erased?.clientName).toBeNull();
+        expect(erased?.clientName).not.toBe('LEAKED-PII-SHOULD-NOT-APPEAR');
     });
 });
 
