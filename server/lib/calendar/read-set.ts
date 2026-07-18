@@ -96,3 +96,23 @@ export async function saveReadSet(
             eq(calendarConnections.id, connectionId),
         ));
 }
+
+/**
+ * A-polish 10b.4 — the external calendar ids to READ busy time from for a
+ * connection. Falls back to the write/primary calendar when no read set has
+ * been configured yet, so existing single-calendar connections keep working.
+ */
+export async function resolveReadCalendarIds(
+    db: DrizzleD1Database,
+    params: { tenantId: string; connectionId: string; fallbackCalendarId: string },
+): Promise<string[]> {
+    const rows = await db.select({ externalCalendarId: calendarConnectionReadCalendars.externalCalendarId })
+        .from(calendarConnectionReadCalendars)
+        .where(and(
+            eq(calendarConnectionReadCalendars.tenantId, params.tenantId),
+            eq(calendarConnectionReadCalendars.connectionId, params.connectionId),
+        ))
+        .all();
+    const ids = rows.map((r) => r.externalCalendarId);
+    return ids.length ? ids : [params.fallbackCalendarId];
+}

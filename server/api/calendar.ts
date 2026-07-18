@@ -4,8 +4,8 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenantConfigs } from '../lib/db/schema';
 import { resolveTenantTimeZone } from '../lib/tz';
-import { syncGoogleBusyOverrides } from '../lib/calendar/sync-busy';
-import { resolveReadSet, saveReadSet } from '../lib/calendar/read-set';
+import { syncGoogleBusyOverrides, mergeBusyIntervals } from '../lib/calendar/sync-busy';
+import { resolveReadSet, saveReadSet, resolveReadCalendarIds } from '../lib/calendar/read-set';
 import { SaveReadSetSchema } from '../lib/validations/calendar-read-set.schema';
 import { AppError } from '../lib/errors';
 import {
@@ -148,22 +148,33 @@ export const calendarRoutes = createApiRouter()
         }
         const timeMin = new Date();
         const timeMax = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+        const db = drizzle(c.env.DB);
+
+        // A-polish 10b — union busy across the multi-read calendar set (falls
+        // back to the write/primary calendar when no read set is configured).
+        const readCalendarIds = await resolveReadCalendarIds(db, {
+            tenantId,
+            connectionId: open.connection.id,
+            fallbackCalendarId: open.connection.calendarId,
+        });
         let busyBlocks;
         try {
-            busyBlocks = await provider.listBusy({
-                clientId: oauthCreds.clientId,
-                clientSecret: oauthCreds.clientSecret,
-                refreshToken: open.credentials.refreshToken,
-                calendarId: open.connection.calendarId,
-                range: { from: timeMin, to: timeMax },
-                capability: open.connection.capabilities,
-            });
+            const perCalendar = await Promise.all(readCalendarIds.map((calendarId) =>
+                provider.listBusy({
+                    clientId: oauthCreds.clientId,
+                    clientSecret: oauthCreds.clientSecret,
+                    refreshToken: open.credentials.refreshToken,
+                    calendarId,
+                    range: { from: timeMin, to: timeMax },
+                    capability: open.connection.capabilities,
+                }),
+            ));
+            busyBlocks = mergeBusyIntervals(perCalendar.flat());
         } catch (e) {
             logger.error('[calendar] sync listBusy failed', { tenantId }, e instanceof Error ? e : undefined);
             return c.json({ success: false, error: { message: 'Failed to fetch Google Calendar busy blocks' } }, 500);
         }
 
-        const db = drizzle(c.env.DB);
         const inspectorId = jwtUser.sub;
 
         // A-polish 10 — store busy time as TIMED overrides in the tenant tz

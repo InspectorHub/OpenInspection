@@ -5,6 +5,40 @@ import { epochMsToRfc3339 } from '../tz';
 import type { BusyBlock } from './provider';
 
 /**
+ * A-polish 10b.4 — union busy time across the multi-read calendar set. Drops
+ * transparent (free) events, then merges overlapping/adjacent [start, end)
+ * ranges into a minimal set of unioned busy blocks. The merged blocks are
+ * anonymous (opaque, no event id) — the sync helper synthesizes a stable id
+ * from the range, so a re-sync is idempotent.
+ */
+export function mergeBusyIntervals(blocks: BusyBlock[]): BusyBlock[] {
+    const ranges = blocks
+        .filter((b) => b.transparency !== 'transparent')
+        .map((b) => ({ startMs: new Date(b.start).getTime(), endMs: new Date(b.end).getTime(), start: b.start, end: b.end }))
+        .filter((b) => Number.isFinite(b.startMs) && Number.isFinite(b.endMs) && b.endMs > b.startMs)
+        .sort((a, b) => a.startMs - b.startMs);
+
+    const merged: BusyBlock[] = [];
+    let cur: { startMs: number; endMs: number; start: string; end: string } | null = null;
+    for (const r of ranges) {
+        if (!cur) {
+            cur = { ...r };
+        } else if (r.startMs <= cur.endMs) {
+            // Overlapping or touching → extend the current union.
+            if (r.endMs > cur.endMs) {
+                cur.endMs = r.endMs;
+                cur.end = r.end;
+            }
+        } else {
+            merged.push({ start: cur.start, end: cur.end, transparency: 'opaque' });
+            cur = { ...r };
+        }
+    }
+    if (cur) merged.push({ start: cur.start, end: cur.end, transparency: 'opaque' });
+    return merged;
+}
+
+/**
  * A-polish 10.3 — persist a provider's busy blocks as timed availability_overrides.
  *
  * Each block (an instant range) is converted to the tenant's civil date +
