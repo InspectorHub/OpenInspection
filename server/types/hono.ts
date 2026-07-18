@@ -280,6 +280,7 @@ export interface AppServices {
     contact: ContactService;
     invoice: InvoiceService;
     portalAccess: PortalAccessService;
+    people: import('../services/people.service').PeopleService;
     portal: import('../services/portal.service').PortalService;
     service: ServiceService;
     automation: AutomationService;
