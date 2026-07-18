@@ -4,6 +4,7 @@ import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { mintToken, hashToken } from '../../lib/token-hash';
 import { sealToken } from '../../lib/config-crypto';
+import { PeopleService } from '../people.service';
 import { sha256Hex, type Constructor, type SignerInput } from './base';
 import type { AgreementServiceBase } from './base';
 
@@ -113,11 +114,10 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 }
                 return { token, status: env.status, alreadyExists: true, requestId: env.id };
             }
-            // Find inspection + a usable agreement template
-            const inspRows = await db.select().from(inspections)
+            // Verify the inspection exists in this tenant.
+            const inspRows = await db.select({ id: inspections.id }).from(inspections)
                 .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).limit(1);
             if (inspRows.length === 0) throw Errors.NotFound('Inspection not found');
-            const insp = inspRows[0];
             // Pick the agreement template: explicit id (tenant-scoped) or the tenant's first template.
             let agrRows;
             if (opts?.agreementId) {
@@ -131,10 +131,16 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
             }
             const agreement = agrRows[0];
 
+            // Task 9b (people-role-profiles) — the default signer (no explicit
+            // opts.signers) resolves via the inspection_people primary-client
+            // join instead of the legacy insp.clientName/.clientEmail columns
+            // (dropped, Task 13). An explicit opts.signers[0] still wins.
+            const primaryClient = await new PeopleService({ DB: this.db }).getPrimaryClient(tenantId, inspectionId);
+
             // Resolve the signer set (default = single client signer from the inspection)
             const signerInputs: SignerInput[] = opts?.signers && opts.signers.length > 0
                 ? opts.signers
-                : [{ name: insp.clientName || insp.clientEmail || 'Client', email: insp.clientEmail || '', role: 'client' }];
+                : [{ name: primaryClient?.name || primaryClient?.email || 'Client', email: primaryClient?.email || '', role: 'client' }];
             // Validate duplicate emails BEFORE any insert (the UNIQUE index is the backstop)
             const seen = new Set<string>();
             for (const s of signerInputs) {
@@ -145,8 +151,8 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
 
             // Use the first explicit signer's email as the envelope clientEmail when provided,
             // so callers that pass opts.signers[0].email see it reflected in the envelope row.
-            const resolvedClientEmail = opts?.signers?.[0]?.email || insp.clientEmail || '';
-            const resolvedClientName = opts?.signers?.[0]?.name ?? insp.clientName;
+            const resolvedClientEmail = opts?.signers?.[0]?.email || primaryClient?.email || '';
+            const resolvedClientName = opts?.signers?.[0]?.name ?? primaryClient?.name;
 
             const completionPolicy = opts?.completionPolicy ?? 'all';
             const now = new Date();

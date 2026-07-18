@@ -10,11 +10,13 @@ import { ScopedDB } from '../../../server/lib/db/scoped';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { inspectionsRoutes } from '../../../server/api/inspections';
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
 export const TENANT_ID = '00000000-0000-0000-0000-000000000001';
 export const INSP_ID = '00000000-0000-0000-0000-000000000010';
 export const AGR_ID = '00000000-0000-0000-0000-000000000020';
 export const JWT_SECRET = 'test-secret';
+export const CLIENT_CONTACT_ID = '00000000-0000-0000-0000-0000000000c1';
 
 export const FAKE_ENV = {
     DB: {},
@@ -90,6 +92,20 @@ export async function seedBase(db: BetterSQLite3Database<typeof schema>, opts: {
         id: INSP_ID, tenantId: TENANT_ID, propertyAddress: '1 Main St', clientName: 'Jane',
         clientEmail: 'jane@test.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid',
         price: 50000, agreementRequired: true, paymentRequired: false, createdAt: new Date(),
+    } as any);
+    // Task 9b (people-role-profiles) — AgreementService.findOrCreate's default
+    // signer now resolves via the inspection_people primary-client join
+    // (PeopleService.getPrimaryClient) instead of the legacy
+    // inspection.clientName/.clientEmail columns above. Seed a matching
+    // contact + primary-client role so specs relying on the no-opts default
+    // signer being "Jane" / "jane@test.com" keep passing.
+    await seedRoleProfiles(db, TENANT_ID, new Date(1));
+    await db.insert(schema.contacts).values({
+        id: CLIENT_CONTACT_ID, tenantId: TENANT_ID, type: 'client', name: 'Jane', email: 'jane@test.com', createdAt: new Date(),
+    } as any);
+    await db.insert(schema.inspectionPeople).values({
+        id: `ip_${INSP_ID}_client`, tenantId: TENANT_ID, inspectionId: INSP_ID,
+        contactId: CLIENT_CONTACT_ID, roleProfileId: `crp_${TENANT_ID}_client`, createdAt: new Date(),
     } as any);
     if (opts.withTemplate ?? true) {
         await db.insert(schema.agreements).values({
