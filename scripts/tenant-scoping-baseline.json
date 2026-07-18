@@ -19,7 +19,7 @@
   "server/api/public-report.ts:356",
   "server/api/sms.ts:84",
   "server/services/agent/referral.ts:194",
-  "server/services/agreement.service.ts:56",
+  "server/services/agreement.service.ts:55",
   "server/services/agreement/envelope-legacy.ts:252",
   "server/services/agreement/envelope-legacy.ts:259",
   "server/services/agreement/signer-state.ts:108",
