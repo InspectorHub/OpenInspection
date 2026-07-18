@@ -2,10 +2,11 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { requireRole } from '../lib/middleware/rbac';
 import { inspections } from '../lib/db/schema/inspection';
 import { contacts } from '../lib/db/schema/contact';
+import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { ROLE } from '../lib/auth/roles';
 import {
@@ -256,12 +257,32 @@ const agentRoutes = createApiRouter()
                 ? (queryAgentId ?? user.sub)
                 : user.sub;
 
-        const rows = await db
+        // Buyer's-agent attribution now lives on inspection_people (role
+        // buyer_agent) rather than the legacy inspections.referredByAgentId
+        // column. Resolve the set of inspection ids first (two-step, rather
+        // than joining inspections directly) so `db.select()` below keeps
+        // returning flat inspection rows unchanged.
+        const buyerAgentRows = await db
+            .select({ inspectionId: inspectionPeople.inspectionId })
+            .from(inspectionPeople)
+            .innerJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.id, inspectionPeople.roleProfileId),
+                eq(contactRoleProfiles.tenantId, tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.contactId, agentId),
+            ));
+        const inspectionIds = buyerAgentRows.map((r) => r.inspectionId);
+
+        const rows = inspectionIds.length === 0 ? [] : await db
             .select()
             .from(inspections)
             .where(and(
                 eq(inspections.tenantId, tenantId),
-                eq(inspections.referredByAgentId, agentId)
+                inArray(inspections.id, inspectionIds),
             ));
 
         return c.json({
@@ -283,18 +304,32 @@ const agentRoutes = createApiRouter()
 
         // JOIN contacts to surface agent name + agency in one query (Round 28
         // — UI was an orphan; now leaderboard card needs displayable rows).
+        // Buyer's-agent attribution via inspection_people (role buyer_agent)
+        // — contact_role_profiles is joined before inspection_people so the
+        // join stays scoped to buyer_agent only (joining inspection_people
+        // first would fan out over every role on the inspection).
         const rows = await db
             .select({
-                agentId: inspections.referredByAgentId,
+                agentId: inspectionPeople.contactId,
                 name:    contacts.name,
                 agency:  contacts.agency,
                 email:   contacts.email,
                 total:   sql<number>`count(*)`,
             })
             .from(inspections)
-            .leftJoin(contacts, eq(inspections.referredByAgentId, contacts.id))
+            .leftJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .leftJoin(inspectionPeople, and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ))
+            .leftJoin(contacts, eq(inspectionPeople.contactId, contacts.id))
             .where(eq(inspections.tenantId, tenantId))
-            .groupBy(inspections.referredByAgentId, contacts.name, contacts.agency, contacts.email)
+            .groupBy(inspectionPeople.contactId, contacts.name, contacts.agency, contacts.email)
             .orderBy(sql`count(*) DESC`);
 
         // Exclude rows where agentId is null (un-referred inspections)
