@@ -41,8 +41,8 @@ export interface AgentInspectorRow {
  * The agent↔inspection association predicate, shared verbatim by listReferrals,
  * accessToInspection, and listRecommendationsForAgent. An agent is associated
  * with a referral row when either:
- *   1. the inspection's `referredByAgentId` equals the active link's
- *      `inspectorContactId` (canonical link), OR
+ *   1. the inspection's buyer_agent `inspection_people` contactId equals the
+ *      active link's `inspectorContactId` (canonical link), OR
  *   2. the referred contact's email matches the agent's email (legacy
  *      contacts pre-A1 promotion).
  *
@@ -65,10 +65,11 @@ function getAgentReferralFilter(
  * `agent_tenant_links` (active only) so the agent only sees inspections in
  * tenants they currently have access to. Restricts to inspections that
  * either:
- *   1. Carry a `referredByAgentId` matching this agent's contact id in
- *      that tenant (canonical link, populated by inspection create), OR
- *   2. Carry a `referredByAgentId` whose contact email matches the agent
- *      user's email (legacy contacts pre-A1 promotion).
+ *   1. Carry a buyer_agent `inspection_people` contactId matching this
+ *      agent's contact id in that tenant (canonical link, populated by
+ *      inspection create), OR
+ *   2. Carry a buyer_agent contact whose email matches the agent user's
+ *      email (legacy contacts pre-A1 promotion).
  *
  * The compound predicate keeps the query single-roundtrip while remaining
  * resilient to tenants that haven't backfilled `inspectorContactId` on
@@ -151,8 +152,8 @@ export async function listReferrals(
     const agentEmail = agent?.email ?? null;
 
     // Filter rows in JS — SQLite's join planner doesn't compose the OR
-    // predicate (link.contactId == inspection.referredByAgentId OR
-    // contact.email == agentEmail) cleanly when contacts is a left-join.
+    // predicate (link.contactId == inspection_people's buyer_agent contactId
+    // OR contact.email == agentEmail) cleanly when contacts is a left-join.
     // Doing the filter post-fetch is fine: the inner join on links already
     // narrows to ≤ N tenants × inspections, and N is small in practice.
     const filtered = refRows.filter(getAgentReferralFilter(agentEmail));
@@ -181,8 +182,9 @@ export async function listReferrals(
  *
  * Uses the same association predicate as listReferrals:
  *   - active agent_tenant_links row for (agentUserId, inspection.tenantId), AND
- *   - inspection.referredByAgentId matches either the link's inspectorContactId
- *     OR a contacts row (type='agent') whose email equals the agent's email.
+ *   - the inspection's buyer_agent inspection_people contactId matches either
+ *     the link's inspectorContactId OR a contacts row (type='agent') whose
+ *     email equals the agent's email.
  *
  * Single inspection id → at most one tenant; the inner join + filter keeps
  * this O(1) in practice.
