@@ -1,6 +1,7 @@
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions, contactRoleProfiles } from '../../lib/db/schema';
 import { contacts } from '../../lib/db/schema/contact';
+import { PeopleService } from '../people.service';
 import { Errors } from '../../lib/errors';
 import { getRatingBucket, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
@@ -407,16 +408,21 @@ export class InspectionCoreService extends InspectionSubService {
         // Soft-upsert the client into Contacts so it shows up in the Contacts list
         // for future re-use (search, agent linking). Idempotent on tenantId+email
         // (or tenantId+name if no email). Failures are non-fatal — inspection
-        // creation must not break because of a contact-side issue.
+        // creation must not break because of a contact-side issue. Captures the
+        // resolved/created contact id for the inspection_people write below.
+        let resolvedClientContactId: string | null = newInspection.clientContactId;
         if (newInspection.clientName && newInspection.clientName !== 'Private Client') {
             try {
                 const matchConds = [eq(contacts.tenantId, tenantId), eq(contacts.type, 'client')];
                 if (newInspection.clientEmail) matchConds.push(eq(contacts.email, newInspection.clientEmail));
                 else matchConds.push(eq(contacts.name, newInspection.clientName));
                 const existing = await db.select().from(contacts).where(and(...matchConds)).get();
-                if (!existing) {
+                if (existing) {
+                    resolvedClientContactId = resolvedClientContactId ?? existing.id;
+                } else {
+                    const newContactId = crypto.randomUUID();
                     await db.insert(contacts).values({
-                        id: crypto.randomUUID(),
+                        id: newContactId,
                         tenantId,
                         type: 'client',
                         name: newInspection.clientName,
@@ -426,10 +432,35 @@ export class InspectionCoreService extends InspectionSubService {
                         notes: null,
                         createdAt: createdAt,
                     });
+                    resolvedClientContactId = resolvedClientContactId ?? newContactId;
                 }
             } catch (err) {
                 logger.error('contact upsert from inspection failed', { inspectionId: id }, err instanceof Error ? err : undefined);
             }
+        }
+
+        // Task 7 (people-role-profiles) — mirror the primary client, buyer's
+        // agent, and listing agent into the inspection_people join table
+        // alongside the legacy clientContactId / referredByAgentId /
+        // sellingAgentId columns above (kept until Task 13 retires them).
+        // Best-effort: a people-write failure must never roll back an
+        // already-committed inspection row.
+        try {
+            const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
+                .from(contactRoleProfiles)
+                .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
+            const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
+            const people = new PeopleService({ DB: this.db });
+            const links: Array<[string | null, string | undefined]> = [
+                [resolvedClientContactId,          roleIdByKey.get('client')],
+                [newInspection.referredByAgentId,  roleIdByKey.get('buyer_agent')],
+                [newInspection.sellingAgentId,     roleIdByKey.get('listing_agent')],
+            ];
+            for (const [contactId, roleProfileId] of links) {
+                if (contactId && roleProfileId) await people.addPerson(tenantId, id, contactId, roleProfileId);
+            }
+        } catch (err) {
+            logger.error('inspection-people write from inspection create failed', { inspectionId: id }, err instanceof Error ? err : undefined);
         }
 
         // Link selected services.
