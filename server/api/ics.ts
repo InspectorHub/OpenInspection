@@ -1,8 +1,10 @@
 import { Hono } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { inspections } from '../lib/db/schema/inspection';
-import { tenantConfigs } from '../lib/db/schema';
+import { tenantConfigs, contactRoleProfiles, inspectionPeople } from '../lib/db/schema';
+import { contacts } from '../lib/db/schema/contact';
+import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { logger } from '../lib/logger';
 import type { AppEnv } from '../types/hono';
 
@@ -33,14 +35,34 @@ icsRoutes.get('/:token', async (c) => {
     const today = new Date().toISOString().slice(0, 10);
     const future = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
-    let upcoming: Array<typeof inspections.$inferSelect> = [];
+    // Task 9c (people-role-profiles) — the client name embedded in each
+    // VEVENT's DESCRIPTION is sourced from the inspection_people
+    // primary-client join (contact_role_profiles filtered to 'client' BEFORE
+    // joining inspection_people, mirroring the join order in api/metrics.ts),
+    // not the legacy inspections.client_name column (frozen cache, dropped
+    // Task 13). One LEFT JOIN keeps the up-to-90-day feed N+1-free.
+    let upcoming: Array<{ inspection: typeof inspections.$inferSelect; primaryClientName: string | null }> = [];
     try {
         const allRows = await db
-            .select()
+            .select({ inspection: inspections, primaryClientName: contacts.name })
             .from(inspections)
+            .leftJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .leftJoin(inspectionPeople, and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ))
+            .leftJoin(contacts, and(
+                eq(contacts.id, inspectionPeople.contactId),
+                eq(contacts.tenantId, inspections.tenantId),
+            ))
             .where(eq(inspections.tenantId, tenantId));
         upcoming = allRows.filter((r) => {
-            const d = r.date ?? '';
+            const d = r.inspection.date ?? '';
             return d >= today && d <= future;
         });
     } catch (e) {
@@ -71,13 +93,13 @@ icsRoutes.get('/:token', async (c) => {
         ? `https://${reqHost}`
         : (c.env.APP_BASE_URL ?? 'https://openinspection.app');
 
-    const vevents = upcoming.map((r) => [
+    const vevents = upcoming.map(({ inspection: r, primaryClientName }) => [
         'BEGIN:VEVENT',
         `UID:${r.id}@openinspection`,
         `SUMMARY:${escICS(r.propertyAddress ?? 'Inspection')}`,
         `DTSTART:${fmtDT(r.date)}`,
         `DTEND:${fmtDTEnd(r.date)}`,
-        `DESCRIPTION:Client: ${escICS(r.clientName ?? '')} | Fee: $${r.price ?? 0}`,
+        `DESCRIPTION:Client: ${escICS(primaryClientName ?? '')} | Fee: $${r.price ?? 0}`,
         `URL:${baseUrl}/inspections/${r.id}/edit`,
         'END:VEVENT',
     ].join('\r\n')).join('\r\n');
