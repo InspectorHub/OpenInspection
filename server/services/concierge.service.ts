@@ -481,6 +481,13 @@ export class ConciergeService {
             }
         }
 
+        // Task 9c (people-role-profiles) — clientName/clientEmail are sourced
+        // from the inspection_people primary-client join (PeopleService), not
+        // the legacy inspections.client_name/_email columns (frozen cache,
+        // dropped Task 13). Hard cutover, no legacy-column fallback, mirroring
+        // approveByInspector's PeopleService.getPrimaryClient use above.
+        const primaryClient = await new PeopleService({ DB: this.db }).getPrimaryClient(insp.tenantId, insp.id);
+
         const expMs = toMs(row.expiresAt);
         return {
             inspection: {
@@ -489,8 +496,8 @@ export class ConciergeService {
                 tenantSlug,
                 propertyAddress: insp.propertyAddress,
                 date: insp.date,
-                clientName: insp.clientName ?? null,
-                clientEmail: insp.clientEmail ?? null,
+                clientName: primaryClient?.name ?? null,
+                clientEmail: primaryClient?.email ?? null,
                 agreementRequired: !!insp.agreementRequired,
                 inspectorId: insp.inspectorId ?? null,
             },
