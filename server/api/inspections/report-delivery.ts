@@ -41,7 +41,7 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
             content: {
                 'application/json': {
                     schema: z.object({
-                        // Optional override; defaults to inspection.clientEmail
+                        // Optional override; defaults to the inspection's primary client email
                         toEmail: z.string().email().optional().describe('TODO describe toEmail field for the OpenInspection MCP integration'),
                     }).optional().describe('TODO describe schema field for the OpenInspection MCP integration'),
                 },
@@ -344,9 +344,13 @@ const reportDeliveryRoutes = createApiRouter()
         const service = c.var.services.inspection;
         const { inspection } = await service.getInspection(id, tenantId);
 
-        const recipient = body.toEmail || inspection.clientEmail;
+        // Task 9a (people-role-profiles) — fall back to the primary client
+        // resolved via the inspection_people join (PeopleService) instead of
+        // the legacy inspection.clientEmail column, which is being dropped.
+        const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, id);
+        const recipient = body.toEmail || primaryClient?.email || null;
         if (!recipient) {
-            throw Errors.BadRequest('No recipient email — set inspection.clientEmail or pass toEmail.');
+            throw Errors.BadRequest('No recipient email — the inspection has no primary client email; pass toEmail.');
         }
 
         const tenantSlug = await resolveTenantSlug(c, tenantId);
