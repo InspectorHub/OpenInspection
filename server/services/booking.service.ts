@@ -125,8 +125,9 @@ export class BookingService {
             )).all(),
         ]);
 
-        // If a blocking override exists, no slots available
-        const blocked = overrides.some(o => !o.isAvailable);
+        // If a blocking override exists, no slots available. Transparent (free)
+        // Google events are stored as overrides but never block (A-polish 10).
+        const blocked = overrides.some(o => !o.isAvailable && o.transparency !== 'transparent');
         const effectiveWindows = blocked ? overrides.filter(o => o.isAvailable) : windows;
         if (effectiveWindows.length === 0) return [];
 

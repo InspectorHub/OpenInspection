@@ -2,7 +2,7 @@
   "app/routes/inspection-edit.tsx": 2434,
   "app/routes/inspection-hub.tsx": 991,
   "server/services/inspection/inspection-core.service.ts": 991,
-  "server/services/booking.service.ts": 929,
+  "server/services/booking.service.ts": 930,
   "server/lib/collab/results-doc.ts": 917,
   "server/durable-objects/inspection-doc.ts": 896,
   "app/routes/inspections.tsx": 892,
