@@ -119,10 +119,8 @@ describe('ConciergeService.createBooking — writes inspection_people (Task 7b)'
         await seedFixture(testDb, { reviewRequired: false });
         const result = await svc.createBooking(baseParams());
 
-        const insp = await testDb.select().from(schema.inspections)
-            .where(eq(schema.inspections.id, result.inspectionId)).get();
-        expect(insp?.referredByAgentId).toBe(CONTACT_AGENT);
-
+        // Task 13 dropped inspections.referredByAgentId — the buyer_agent link
+        // now lives ONLY in inspection_people.
         const rows = await people.listPeople(T1, result.inspectionId);
         expect(rows.map(r => r.roleKey).sort()).toEqual(['buyer_agent', 'client']);
         expect(rows.find(r => r.roleKey === 'buyer_agent')?.contactId).toBe(CONTACT_AGENT);

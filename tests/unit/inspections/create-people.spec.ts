@@ -1,9 +1,10 @@
 /**
- * Task 7 (people-role-profiles): InspectionCoreService.createInspection also
+ * Task 7 (people-role-profiles): InspectionCoreService.createInspection
  * writes inspection_people rows for the primary client, buyer's agent, and
- * listing agent via PeopleService.addPerson — alongside the legacy
- * clientContactId / referredByAgentId / sellingAgentId columns, which are
- * still populated until Task 13 retires them.
+ * listing agent via PeopleService.addPerson. Task 13 (DESTRUCTIVE) dropped
+ * the legacy clientContactId / referredByAgentId / sellingAgentId columns
+ * from `inspections` entirely — inspection_people is now the SOLE
+ * persistence of WHO.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InspectionCoreService } from '../../../server/services/inspection/inspection-core.service';
@@ -74,18 +75,6 @@ describe('InspectionCoreService.createInspection — writes inspection_people (T
         expect(buyerAgent?.contactId).toBe(BUYER_AGENT);
         const listingAgent = rows.find(r => r.roleKey === 'listing_agent');
         expect(listingAgent?.contactId).toBe(LISTING_AGENT);
-    });
-
-    it('still writes the legacy columns alongside inspection_people', async () => {
-        const svc = makeSvc();
-        const created = await svc.createInspection(T1, {
-            ...BASE_DATA,
-            referredByAgentId: BUYER_AGENT,
-            sellingAgentId: LISTING_AGENT,
-        });
-
-        expect(created.referredByAgentId).toBe(BUYER_AGENT);
-        expect(created.sellingAgentId).toBe(LISTING_AGENT);
     });
 
     it('skips the client role when there is no named client (Private Client, no contact)', async () => {

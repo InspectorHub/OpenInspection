@@ -5,7 +5,23 @@ import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profil
 import { backfillInspectionPeople } from '../../../server/services/seed/backfill-people';
 import { eq } from 'drizzle-orm';
 
-describe('backfillInspectionPeople', () => {
+/**
+ * Task 13 (DESTRUCTIVE) — backfillInspectionPeople reads the legacy
+ * clientContactId/clientEmail/referredByAgentId/sellingAgentId columns off
+ * `inspections` via the Drizzle-typed schema object. Now that those columns
+ * are DROPPED from the schema (and the table), the Drizzle select never
+ * surfaces them regardless of what a remote row physically still holds — the
+ * function degrades to a permanent no-op in code built at or after this
+ * commit.
+ *
+ * This is expected, not a regression: the deploy runbook requires operators
+ * to run this backfill against each pre-existing-tenant environment BEFORE
+ * this commit's migration reaches it (checked out at the ref just before
+ * Task 13 — see .superpowers/sdd/progress.md Task 13 entry), while the
+ * columns still exist there. Once that has run, the source data has already
+ * been copied into inspection_people and this utility has nothing left to do.
+ */
+describe('backfillInspectionPeople (Task 13 — retired: reads dropped columns, now a no-op)', () => {
   let f: ReturnType<typeof createTestDb>;
   beforeEach(async () => {
     f = createTestDb(); await setupSchema(f.sqlite);
@@ -16,21 +32,16 @@ describe('backfillInspectionPeople', () => {
       { id: 'agentB',  tenantId: 't1', type: 'agent',  name: 'BuyerAgent', email: 'ba@x.com', createdAt: new Date(1) },
       { id: 'agentL',  tenantId: 't1', type: 'agent',  name: 'ListAgent',  email: 'la@x.com', createdAt: new Date(1) },
     ]);
-    // inspection row with the OLD people columns still present
     await f.db.insert(schema.inspections).values({
       id: 'i1', tenantId: 't1', propertyAddress: '1 Main', date: '2026-06-01', status: 'confirmed',
       paymentStatus: 'paid', price: 0, createdAt: new Date(1),
-      clientContactId: 'client1', clientName: 'Buyer', clientEmail: 'b@x.com',
-      referredByAgentId: 'agentB', sellingAgentId: 'agentL',
     } as any);
   });
 
-  it('creates client + buyer_agent + listing_agent people, idempotently', async () => {
+  it('is a permanent no-op now that the source columns are dropped', async () => {
     const r1 = await backfillInspectionPeople(f.db as any, 't1');
-    const r2 = await backfillInspectionPeople(f.db as any, 't1'); // idempotent
     const rows = await f.db.select().from(schema.inspectionPeople).where(eq(schema.inspectionPeople.inspectionId, 'i1'));
-    expect(rows).toHaveLength(3);
-    expect(r2.created).toBe(0);
-    expect(r1.created).toBe(3);
+    expect(rows).toHaveLength(0);
+    expect(r1.created).toBe(0);
   });
 });

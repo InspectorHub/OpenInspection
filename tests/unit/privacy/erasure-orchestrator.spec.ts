@@ -310,12 +310,12 @@ describe('runErasure', () => {
         expect(decisions.some(d => d.table === 'contacts' && d.action === 'delete' && d.count > 0)).toBe(true);
         expect(decisions.some(d => d.table === 'inspection_people' && d.action === 'delete' && d.count > 0)).toBe(true);
 
-        // The frozen inspections.client_* columns are NOT written by this
-        // orchestrator anymore (they are an unread cache, dropped in a later
-        // migration) — seeded NULL here and left untouched either way.
+        // Task 13 — inspections.client_name/client_email/client_phone (the
+        // legacy cache this orchestrator never wrote) are dropped columns now,
+        // not just an unread cache. Nothing left to assert on that row.
         const insp = await db.select().from(schema.inspections)
             .where(eq(schema.inspections.id, inspId)).get();
-        expect(insp!.clientName).toBeNull();
+        expect(insp).toBeTruthy();
     });
 
     it('tenant-scoped: other tenant contact + inspection_people rows with same email untouched', async () => {

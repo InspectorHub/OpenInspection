@@ -102,14 +102,14 @@ describe('PATCH /api/inspections/:id — settings save (B-22 follow-up)', () => 
     });
 
     it('still updates a normal scalar field', async () => {
-        expect(await patch('manager', { clientName: 'Updated Name' })).toBe(200);
+        expect(await patch('manager', { county: 'Updated County' })).toBe(200);
         const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, INSP_ID)).get();
-        expect((row as { clientName?: string }).clientName).toBe('Updated Name');
+        expect((row as { county?: string }).county).toBe('Updated County');
     });
 
     it('accepts the inspector/lead and owner roles (RBAC)', async () => {
-        expect(await patch('inspector', { clientName: 'A' })).toBe(200);
-        expect(await patch('owner', { clientName: 'B' })).toBe(200);
+        expect(await patch('inspector', { county: 'A' })).toBe(200);
+        expect(await patch('owner', { county: 'B' })).toBe(200);
     });
 
     // ── DB-16: coverPhotoId write path ──────────────────────────────────────

@@ -219,10 +219,8 @@ describe('POST /book — writes inspection_people (Task 7b)', () => {
         const body = await res.json() as any;
         expect(body.success).toBe(true);
 
-        const insp = await db.select().from(inspections)
-            .where((await import('drizzle-orm')).eq(inspections.id, body.data.inspectionId)).get();
-        expect(insp?.referredByAgentId).toBe(AGENT_CONTACT);
-
+        // Task 13 dropped inspections.referredByAgentId — the buyer_agent link
+        // now lives ONLY in inspection_people.
         const rows = await people.listPeople(T1, body.data.inspectionId);
         expect(rows.map(r => r.roleKey).sort()).toEqual(['buyer_agent', 'client']);
         expect(rows.find(r => r.roleKey === 'buyer_agent')?.contactId).toBe(AGENT_CONTACT);

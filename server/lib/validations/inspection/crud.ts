@@ -51,7 +51,8 @@ export const CreateInspectionSchema = z.object({
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     referredByAgentId: z.string().uuid().optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440003' }).describe('TODO describe referredByAgentId field for the OpenInspection MCP integration'),
-    // R7-09: Buyer's Agent — separate from listing agent. Maps to inspections.sellingAgentId column.
+    // R7-09: Buyer's Agent — separate from listing agent. Input-only DTO field;
+    // mirrored into inspection_people (listing_agent role), not an inspections column (dropped, Task 13).
     sellingAgentId: z.string().uuid().optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440004' }).describe('TODO describe sellingAgentId field for the OpenInspection MCP integration'),
     // Spec 5D — geocoded address fields (set when client picked from Places autocomplete).
     addressPlaceId: z.string().min(1).max(200).optional().nullable().describe('TODO describe addressPlaceId field for the OpenInspection MCP integration'),
@@ -99,8 +100,12 @@ export const CreateInspectionSchema = z.object({
  */
 export const UpdateInspectionSchema = z.object({
     propertyAddress: z.string().min(5).optional().openapi({ example: '123 Main St, Anytown' }).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-    clientName: z.string().min(1).optional().openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
-    clientEmail: z.string().email().optional().nullable().openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
+    // Task 13 — clientName/clientEmail removed. They mapped 1:1 to the now-dropped
+    // inspections.client_name/client_email columns and the app never sends them
+    // through this PATCH (client identity is managed via inspection_people /
+    // the People card, not this metadata route). Zod strips unknown keys, so
+    // any legacy caller still posting these two fields degrades to a no-op on
+    // them (same "unrecognised field" no-op as templateId used to before B-22).
     date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     price: z.number().int().min(0).optional().openapi({ example: 450 }).describe('TODO describe price field for the OpenInspection MCP integration'),

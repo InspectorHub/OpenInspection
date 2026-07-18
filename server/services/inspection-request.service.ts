@@ -289,9 +289,6 @@ export class InspectionRequestService {
                 tenantId,
                 inspectorId:              input.inspectorId ?? null,
                 propertyAddress:          input.propertyAddress,
-                clientName:               input.clientName,
-                clientEmail:              input.clientEmail ?? null,
-                clientPhone:              input.clientPhone ?? null,
                 templateId:               s.templateId,
                 templateSnapshot:         tpl ? tpl.schema : null,
                 templateSnapshotVersion:  tpl ? tpl.version : 1,
@@ -300,7 +297,6 @@ export class InspectionRequestService {
                 paymentStatus:            'unpaid' as const,
                 price:                    s.price ?? 0,
                 requestId,
-                referredByAgentId:        input.referredByAgentId ?? null,
                 createdAt:                now,
             };
         });
@@ -313,9 +309,9 @@ export class InspectionRequestService {
 
         // Task 7b/7c (people-role-profiles) — mirror the client AND the agent
         // referral into inspection_people for EVERY sub-inspection this
-        // request created, alongside the legacy clientName/clientEmail/
-        // referredByAgentId columns above (kept until Task 13 retires them).
-        // The client contact is resolved via the same idempotent upsert
+        // request created. Task 13 dropped the legacy clientName/clientEmail/
+        // referredByAgentId columns from inspections, so this is now the ONLY
+        // persistence of WHO. The client contact is resolved via the same idempotent upsert
         // booking.service/core.ts use (matches by tenant + normalized email),
         // so getInspection/listInspections (Task 9c-reads), which resolve the
         // client ONLY via inspection_people, always find one for a
@@ -386,9 +382,6 @@ export class InspectionRequestService {
             id,
             tenantId,
             propertyAddress:          req.propertyAddress,
-            clientName:               req.clientName,
-            clientEmail:              req.clientEmail ?? null,
-            clientPhone:              req.clientPhone ?? null,
             templateId:               sub.templateId,
             templateSnapshot:         tpl.schema,
             templateSnapshotVersion:  tpl.version,
@@ -407,10 +400,11 @@ export class InspectionRequestService {
 
         // Task 7c (people-role-profiles fix) — mirror the client (inherited
         // from the parent request — this call site carries no separate
-        // client input) into inspection_people for the new sub-inspection,
-        // alongside the legacy clientName/clientEmail columns above (kept
-        // until Task 13 retires them). No agent referral is captured on
-        // CreateSubInspectionInput, so only the client role is written.
+        // client input) into inspection_people for the new sub-inspection.
+        // Task 13 dropped the legacy clientName/clientEmail columns from
+        // inspections, so this is now the ONLY persistence of the client. No
+        // agent referral is captured on CreateSubInspectionInput, so only
+        // the client role is written.
         // Non-fatal: a people-write failure must never roll back an
         // already-committed inspection row.
         try {

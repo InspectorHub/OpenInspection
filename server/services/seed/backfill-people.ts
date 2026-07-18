@@ -5,6 +5,16 @@ import { contacts, contactRoleProfiles, inspectionPeople } from '../../lib/db/sc
 
 // One-time data move (idempotent via the uq_ip_insp_contact_role index). Reads
 // the legacy fixed columns; safe to run before they are dropped.
+//
+// RETIRED as of Task 13 (DESTRUCTIVE) — clientContactId/clientEmail/
+// referredByAgentId/sellingAgentId were dropped from the `inspections`
+// schema. Reads through this Drizzle-typed `inspections` import can no
+// longer surface those fields (regardless of what a remote row still
+// physically holds), so this is now a permanent no-op in code built at or
+// after that commit. Deploy runbook: operators must run this against every
+// pre-existing-tenant environment BEFORE the Task 13 migration reaches it
+// (checked out at the ref just before that commit). Kept for that runbook
+// step and for history; do not extend it.
 export async function backfillInspectionPeople(db: DrizzleD1Database, tenantId: string): Promise<{ created: number }> {
     const profiles = await db.select().from(contactRoleProfiles).where(eq(contactRoleProfiles.tenantId, tenantId));
     const byKey = new Map(profiles.map(p => [p.key, p.id]));

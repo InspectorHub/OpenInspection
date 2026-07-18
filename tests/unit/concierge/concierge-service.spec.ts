@@ -152,12 +152,13 @@ describe('ConciergeService — A3', () => {
             await expect(svc.createBooking(baseParams())).rejects.toThrow(/not linked|forbidden/i);
         });
 
-        it('auto-binds referredByAgentId from agentTenantLinks.inspectorContactId reverse lookup', async () => {
+        it('auto-binds the buyer_agent from agentTenantLinks.inspectorContactId reverse lookup (inspection_people — Task 13 dropped referredByAgentId)', async () => {
             await seedFixture(testDb, { reviewRequired: false });
             const result = await svc.createBooking(baseParams());
-            const insp = await testDb.select().from(schema.inspections)
-                .where(eq(schema.inspections.id, result.inspectionId)).get();
-            expect(insp?.referredByAgentId).toBe(CONTACT_AGENT);
+            const { PeopleService } = await import('../../../server/services/people.service');
+            const buyerAgentContactId = await new PeopleService({ DB: {} as D1Database })
+                .contactIdForRole(T1, result.inspectionId, 'buyer_agent');
+            expect(buyerAgentContactId).toBe(CONTACT_AGENT);
         });
 
         it('rejects when inspector contact is not found in tenant', async () => {

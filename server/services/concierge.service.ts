@@ -187,11 +187,7 @@ export class ConciergeService {
             id: inspectionId,
             tenantId: params.tenantId,
             inspectorId: inspector.id,
-            referredByAgentId: link.inspectorContactId ?? null,
             propertyAddress: params.propertyAddress,
-            clientName: params.clientName,
-            clientEmail: params.clientEmail,
-            clientPhone: params.clientPhone ?? null,
             date: params.date,
             status: 'scheduled',
             paymentStatus: 'unpaid',
@@ -206,12 +202,13 @@ export class ConciergeService {
 
         // Task 7b (people-role-profiles), FIXED (Task 9b regression) — mirror
         // both the client and the referring agent into inspection_people
-        // (client / buyer_agent), alongside the legacy clientName/clientEmail/
-        // clientPhone and referredByAgentId columns above (kept until Task 13
-        // retires them). The client contact is resolved via the same
-        // idempotent upsert booking.service/core.ts use (matches by tenant +
-        // normalized email), so approveByInspector's PeopleService.getPrimaryClient
-        // join (Task 9b) always resolves a client for a concierge booking.
+        // (client / buyer_agent). Task 13 dropped the legacy clientName/
+        // clientEmail/clientPhone/referredByAgentId columns from inspections,
+        // so this is now the ONLY persistence of WHO. The client contact is
+        // resolved via the same idempotent upsert booking.service/core.ts use
+        // (matches by tenant + normalized email), so approveByInspector's
+        // PeopleService.getPrimaryClient join (Task 9b) always resolves a
+        // client for a concierge booking.
         // Non-fatal: a people-write failure must never roll back an
         // already-committed inspection row.
         try {

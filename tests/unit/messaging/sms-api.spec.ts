@@ -130,7 +130,7 @@ describe('SMS consent API (Track L Task 8)', () => {
         expect(ev?.capturedVia).toBe('admin');
     });
 
-    it('attestation backfills clientContactId from the inspection_people primary-client join (Task 9b)', async () => {
+    it('attestation resolves the primary client from the inspection_people join (Task 9b; Task 13 dropped clientContactId)', async () => {
         // Pre-Task-9b this exercised ensureClientContact's free-typed-string
         // dedupe/create path (no linked contact, just inline clientName/
         // clientEmail). That path was retired: a primary client is now always
@@ -140,7 +140,7 @@ describe('SMS consent API (Track L Task 8)', () => {
         const inspId = crypto.randomUUID();
         await db.insert(schema.inspections).values({
             id: inspId, tenantId: TENANT, propertyAddress: '2 Oak',
-            clientContactId: null, date: '2026-07-02',
+            date: '2026-07-02',
             status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         } as never);
         await seedRoleProfiles(db, TENANT, new Date(1));
@@ -159,9 +159,7 @@ describe('SMS consent API (Track L Task 8)', () => {
             FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(200);
 
-        const insp = await db.select().from(schema.inspections).where(eq(schema.inspections.id, inspId)).get();
-        expect(insp?.clientContactId).toBe(bobContactId);
-        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, insp!.clientContactId!)).toBe('granted');
+        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, bobContactId)).toBe('granted');
     });
 
     it('GET /sms/consent reports the latest action', async () => {

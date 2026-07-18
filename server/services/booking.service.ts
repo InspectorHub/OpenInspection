@@ -588,8 +588,6 @@ export class BookingService {
                 tenantId,
                 inspectorId,
                 propertyAddress: body.address,
-                clientName: body.clientName,
-                clientEmail: body.clientEmail,
                 // B-28 adjacent fix — store the full start ISO like the
                 // multi-service path (inspection-request.service create) does.
                 // Busy checks read HH:MM at slice(11,16) of this value; the old
@@ -600,7 +598,6 @@ export class BookingService {
                 paymentStatus: 'unpaid',
                 price: 0,
                 requestId: createdRequestId,
-                referredByAgentId: resolvedAgentContactId,
                 createdAt: now
             });
             // DB-8: mirror assignment into inspection_inspectors link table.
@@ -689,12 +686,6 @@ export class BookingService {
                     type:  'client',
                 });
                 bookingClientContactId = clientContactId;
-                await db.update(inspections)
-                    .set({ clientContactId })
-                    .where(and(
-                        inArray(inspections.id, allInspectionIds),
-                        eq(inspections.tenantId, tenantId),
-                    ));
             } catch (e) {
                 logger.warn('booking.client-contact.upsert.failed', {
                     inspectionIds: allInspectionIds,
@@ -704,9 +695,10 @@ export class BookingService {
         }
 
         // Task 7b (people-role-profiles), FIXED — mirror client + buyer_agent
-        // into inspection_people alongside the legacy clientContactId /
-        // referredByAgentId columns above. Client covers EVERY allInspectionIds
-        // entry (clientContactId is linked to all of them above, incl.
+        // into inspection_people. Task 13 dropped the legacy clientContactId /
+        // referredByAgentId columns from inspections, so this is now the ONLY
+        // persistence of WHO. Client covers EVERY allInspectionIds entry
+        // (bookingClientContactId is linked to all of them, incl.
         // multi-service sub-inspections, which only get buyer_agent from
         // InspectionRequestService.create — the original bug wrongly scoped
         // the client write to directInsertInspectionId alone). Non-fatal.

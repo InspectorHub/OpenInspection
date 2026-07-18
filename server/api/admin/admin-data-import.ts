@@ -167,12 +167,10 @@ const adminDataImportRoutes = createApiRouter()
             // Imported historical inspections deliberately do not consume plan quota.
             await db.insert(inspections).values({
                 id: ins.id, tenantId, propertyAddress: ins.propertyAddress,
-                inspectorId: ins.inspectorId || null, clientName: ins.clientName || null,
-                clientEmail: ins.clientEmail || null, templateId: ins.templateId || null,
+                inspectorId: ins.inspectorId || null,
+                templateId: ins.templateId || null,
                 date: ins.date || new Date().toISOString(), status: ins.status || INSPECTION_STATUS.REQUESTED,
                 paymentStatus: ins.paymentStatus || 'unpaid', price: ins.price || 0,
-                referredByAgentId: ins.referredByAgentId || null,
-                sellingAgentId: ins.sellingAgentId || null,
                 createdAt: ins.createdAt ? new Date(ins.createdAt) : new Date(),
             }).onConflictDoNothing().run();
             // DB-8: mirror the import row's assignment into the link table. NOTE: on
@@ -184,9 +182,9 @@ const adminDataImportRoutes = createApiRouter()
             counts.inspections++;
 
             // Task 7c (people-role-profiles fix) — getInspection/listInspections
-            // (Task 9c-reads) resolve the client ONLY via inspection_people, not
-            // the legacy inline clientName/clientEmail/referredByAgentId/
-            // sellingAgentId columns above (kept until Task 13 retires them),
+            // (Task 9c-reads) resolve the client ONLY via inspection_people; the
+            // legacy inline clientName/clientEmail/referredByAgentId/
+            // sellingAgentId columns were dropped from inspections (Task 13),
             // so every imported inspection needs matching inspection_people
             // rows. Client is upserted as a contact (same idempotent match
             // booking.service/core.ts use); agent ids are assumed to already be
