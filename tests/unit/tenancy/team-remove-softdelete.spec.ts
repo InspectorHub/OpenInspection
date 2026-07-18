@@ -141,7 +141,7 @@ describe('TeamService.removeMember — soft-delete (Task 8a)', () => {
         // validateCredentials should reject with the same generic error it
         // uses for an unknown email, never reach a password comparison that
         // could succeed.
-        await expect(auth.validateCredentials(MEMBER_EMAIL, 'whatever'))
+        await expect(auth.validateCredentials(MEMBER_EMAIL, 'whatever', TENANT))
             .rejects.toThrow('Invalid email or password');
     });
 

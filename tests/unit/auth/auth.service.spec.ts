@@ -82,7 +82,7 @@ describe('AuthService', () => {
             createdAt: new Date(),
         });
 
-        const result = await authService.validateCredentials(email, password);
+        const result = await authService.validateCredentials(email, password, 't1');
         expect(result.id).toBe('u1');
     });
 
@@ -99,7 +99,7 @@ describe('AuthService', () => {
             createdAt: new Date(),
         });
 
-        await expect(authService.validateCredentials(email, 'wrong'))
+        await expect(authService.validateCredentials(email, 'wrong', 't1'))
             .rejects.toThrow('Invalid email or password');
     });
 

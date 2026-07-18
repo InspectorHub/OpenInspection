@@ -48,15 +48,37 @@ export class AuthService {
     }
 
     /**
+     * Standalone login row selection. Scoped to the resolved single tenant so a same-email
+     * global agent (tenant_id NULL) or another tenant's row can never be authenticated, and
+     * fails closed if the composite unique index is ever violated. See spec login-email-ambiguity.
+     */
+    async findLoginUser(email: string, tenantId: string) {
+        const db = this.getDrizzle();
+        const rows = await db.select().from(users)
+            .where(and(
+                eq(users.email, email),
+                eq(users.tenantId, tenantId),   // excludes NULL-tenant agents + other tenants
+                isNull(users.deletedAt),
+            ))
+            .all();
+        if (rows.length === 0) return null;
+        if (rows.length > 1) {
+            logger.error('[login] ambiguous email within tenant — refusing auth', { tenantId });
+            return null;
+        }
+        return rows[0];
+    }
+
+    /**
      * Validates a user's credentials. Lazily upgrades legacy SHA-256 hashes to PBKDF2.
      * Runs PBKDF2 even when the email is unknown to hide user-existence via timing.
      */
-    async validateCredentials(email: string, password: string) {
+    async validateCredentials(email: string, password: string, tenantId: string) {
         const db = this.getDrizzle();
         // Soft-deleted (removed member / self-deleted account) rows are
         // excluded — a matching row that isn't NULL-deleted-at must never
         // authenticate, even if the caller somehow still knows the password.
-        const user = await db.select().from(users).where(and(eq(users.email, email), isNull(users.deletedAt))).get();
+        const user = await this.findLoginUser(email, tenantId);
 
         if (!user) {
             // Perform a throwaway verification against a fixed hash so the response time
