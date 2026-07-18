@@ -902,6 +902,24 @@ export class InspectionCoreService extends InspectionSubService {
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await this.getDrizzle().insert(inspections).values(clone as any);
+
+        // Task 7c (people-role-profiles fix) — copy the source inspection's
+        // inspection_people rows (client + any agents) onto the clone,
+        // alongside the legacy client/agent columns already carried via the
+        // `...source` spread above. Without this, getInspection/
+        // listInspections (Task 9c-reads) resolve the client via
+        // inspection_people ONLY and would show a null client on every
+        // clone. Non-fatal: a people-write failure must never roll back the
+        // already-committed clone row.
+        try {
+            const people = new PeopleService({ DB: this.db });
+            const sourcePeople = await people.listPeople(tenantId, id);
+            for (const p of sourcePeople) {
+                await people.addPerson(tenantId, clone.id, p.contactId, p.roleProfileId);
+            }
+        } catch (err) {
+            logger.error('inspection-people copy from clone create failed', { inspectionId: clone.id }, err instanceof Error ? err : undefined);
+        }
         // DB-8: mirror the cloned inspection's assignment into inspection_inspectors.
         // Non-fatal — the link table is a denormalized mirror; a sync failure must
         // not abort a clone whose canonical inspection row already committed.
