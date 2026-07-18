@@ -110,7 +110,7 @@ export class InspectionCoreService extends InspectionSubService {
             const term = `%${escapeLikePattern(params.search)}%`;
             conditions.push(or(
                 sql`lower(${inspections.propertyAddress}) like lower(${term})`,
-                sql`lower(${inspections.clientName}) like lower(${term})`
+                sql`lower(${contacts.name}) like lower(${term})` // primary-client join below, not the frozen legacy inspections.client_name
             )!);
         }
 

@@ -109,5 +109,22 @@ describe('InspectionCoreService.getInspection / .listInspections — primary-cli
             expect(withoutClient?.clientName).toBeNull();
             expect(withoutClient?.clientEmail).toBeNull();
         });
+
+        it('free-text search matches a client name that lives ONLY in inspection_people (no legacy inspections.client_name column)', async () => {
+            const svc = makeSvc();
+            // "Jane Client" is seeded exclusively via inspection_people ->
+            // contacts (INSP_WITH_CLIENT's legacy clientName column is NULL) —
+            // search must still find it via the primary-client join, not the
+            // frozen legacy column.
+            const { inspections } = await svc.listInspections(T1, { limit: 20, search: 'Jane' });
+            expect(inspections.map(i => i.id)).toEqual([INSP_WITH_CLIENT]);
+
+            const noMatch = await svc.listInspections(T1, { limit: 20, search: 'Nobody Named This' });
+            expect(noMatch.inspections).toHaveLength(0);
+
+            // Address search on the same predicate keeps working alongside it.
+            const byAddress = await svc.listInspections(T1, { limit: 20, search: 'Oak Ave' });
+            expect(byAddress.inspections.map(i => i.id)).toEqual([INSP_NO_CLIENT]);
+        });
     });
 });
