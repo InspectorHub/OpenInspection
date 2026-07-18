@@ -481,19 +481,23 @@ const reportDeliveryRoutes = createApiRouter()
         const inspectionRow = await db.select({
             id: inspectionTable.id,
             propertyAddress: inspectionTable.propertyAddress,
-            referredByAgentId: inspectionTable.referredByAgentId,
             inspectorId: inspectionTable.inspectorId,
         }).from(inspectionTable)
             .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)))
             .get();
         if (!inspectionRow) throw Errors.NotFound('Inspection not found');
-        if (!inspectionRow.referredByAgentId) {
+
+        // Buyer's-agent attribution now lives on inspection_people (role
+        // buyer_agent) rather than the legacy inspections.referredByAgentId
+        // column — see PeopleService.contactIdForRole.
+        const buyerAgentContactId = await c.var.services.people.contactIdForRole(tenantId, id, 'buyer_agent');
+        if (!buyerAgentContactId) {
             throw Errors.BadRequest('No agent linked to this inspection');
         }
 
         const agentRow = await db.select({ email: contacts.email })
             .from(contacts)
-            .where(and(eq(contacts.id, inspectionRow.referredByAgentId), eq(contacts.tenantId, tenantId)))
+            .where(and(eq(contacts.id, buyerAgentContactId), eq(contacts.tenantId, tenantId)))
             .get();
         if (!agentRow || !agentRow.email) {
             throw Errors.BadRequest('Agent has no email on file');
