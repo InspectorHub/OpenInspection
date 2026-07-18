@@ -1,5 +1,6 @@
 import { eq, and, lte, ne } from 'drizzle-orm';
-import { automations, automationLogs, inspections, tenants, tenantConfigs } from '../../lib/db/schema';
+import { automations, automationLogs, inspections, tenants, tenantConfigs, contacts, contactRoleProfiles, inspectionPeople } from '../../lib/db/schema';
+import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
 import { resolveLocale } from '../../lib/locale';
 import { formatDateTime } from '../../lib/format';
@@ -20,6 +21,13 @@ import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
  * stays well under D1's result-set column cap — selecting the full row pushed the
  * total past 100 columns and failed every cron tick (see shared.ts). Exported so
  * the `flush-column-budget` spec can assert the column count.
+ *
+ * Task 11a — clientContactId/clientName project from the inspection_people
+ * primary-client join (contacts.id / contacts.name via the LEFT JOINs added to
+ * baseSelect() below), NOT the legacy inspections.client_contact_id/client_name
+ * columns (frozen cache, dropped Task 13). The column COUNT is unchanged (still
+ * 2 fields under these names) — only the source table moves — so this keeps the
+ * `flush-column-budget` spec's total the same.
  */
 export const FLUSH_SELECTION = {
     log: automationLogs,
@@ -27,7 +35,7 @@ export const FLUSH_SELECTION = {
     tenant: tenants,
     inspection: {
         id: inspections.id, tenantId: inspections.tenantId,
-        clientContactId: inspections.clientContactId, clientName: inspections.clientName,
+        clientContactId: contacts.id, clientName: contacts.name,
         propertyAddress: inspections.propertyAddress, date: inspections.date,
         status: inspections.status, reportStatus: inspections.reportStatus,
         paymentStatus: inspections.paymentStatus,
@@ -60,11 +68,32 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             // reminder live-due path) select the same shape. `inspection` is a
             // narrowed projection (FLUSH_SELECTION) — selecting the whole inspections
             // row overflows D1's result-set column cap; see FLUSH_SELECTION above.
+            // Task 11a — the trailing 3 LEFT JOINs resolve the primary client
+            // (contact_role_profiles filtered to 'client' FIRST, then
+            // inspection_people, then contacts — same join order as
+            // api/metrics.ts / data.service.ts) into FLUSH_SELECTION.inspection's
+            // clientContactId/clientName; they add no extra SELECTed columns
+            // (FLUSH_SELECTION only projects contacts.id/contacts.name from them),
+            // so the column-budget total is unaffected.
             const baseSelect = () => db.select(FLUSH_SELECTION)
                 .from(automationLogs)
                 .innerJoin(automations, eq(automationLogs.automationId, automations.id))
                 .innerJoin(inspections, eq(automationLogs.inspectionId, inspections.id))
-                .innerJoin(tenants, eq(tenants.id, inspections.tenantId));
+                .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
+                .leftJoin(contactRoleProfiles, and(
+                    eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                    eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                    eq(contactRoleProfiles.active, true),
+                ))
+                .leftJoin(inspectionPeople, and(
+                    eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                    eq(inspectionPeople.inspectionId, inspections.id),
+                    eq(inspectionPeople.tenantId, inspections.tenantId),
+                ))
+                .leftJoin(contacts, and(
+                    eq(contacts.id, inspectionPeople.contactId),
+                    eq(contacts.tenantId, inspections.tenantId),
+                ));
 
             // Non-reminder logs: indexed, batch-limited fast path (unchanged semantics —
             // gated on the stored send_at).
