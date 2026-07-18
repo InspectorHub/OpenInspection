@@ -6,6 +6,7 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
 import { AgreementService } from '../../../server/services/agreement.service';
 import { InspectionService } from '../../../server/services/inspection.service';
+import { PeopleService } from '../../../server/services/people.service';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { inspectionsRoutes } from '../../../server/api/inspections';
@@ -66,6 +67,7 @@ export function buildApp(db: BetterSQLite3Database<typeof schema>, stubs: Stubs 
         c.set('services', {
             agreement,
             inspection: new InspectionService({} as D1Database, undefined, new ScopedDB(db as never, TENANT_ID)),
+            people: new PeopleService({ DB: {} as D1Database }),
             auditLog: { append: auditAppend },
             automation: { trigger: automationTrigger },
             notification: { createForAllAdmins: notificationCreate },

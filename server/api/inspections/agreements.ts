@@ -26,8 +26,9 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
  * Task 7 (Issue #111) — the hub Agreement card "Send agreement" button. Creates
  * a signing request and emails it to the client. Both body fields are optional:
  * agreementId defaults to the tenant's first agreement template, email defaults
- * to the inspection's clientEmail. 422 when no template exists, no email is
- * resolvable, or the supplied agreementId does not belong to the tenant.
+ * to the inspection's primary client (PeopleService.getPrimaryClient — Task 9b).
+ * 422 when no template exists, no email is resolvable, or the supplied
+ * agreementId does not belong to the tenant.
  */
 const sendAgreementRequestRoute = createRoute(withMcpMetadata({
     method:  'post',
@@ -77,15 +78,18 @@ const agreementsRoutes = createApiRouter()
             if (!agreement) throw Errors.UnprocessableEntity('No agreement template exists yet. Create one in Settings before sending.');
         }
 
-        // Resolve the recipient: explicit email or the inspection's client email.
-        const clientEmail = body.email ?? inspection.clientEmail ?? null;
+        // Resolve the recipient: explicit email or the inspection's primary
+        // client (Task 9b — inspection_people join via PeopleService, not the
+        // legacy inspection.clientEmail column, which is being dropped, Task 13).
+        const client = await c.var.services.people.getPrimaryClient(tenantId, id);
+        const clientEmail = body.email ?? client?.email ?? null;
         if (!clientEmail) throw Errors.UnprocessableEntity('No client email on this inspection. Add a client email or enter one to send.');
 
         // One send model: create (or reuse) the inspection's envelope with the
         // client as a single signer, then email that signer their persistent link.
         const env = await c.var.services.agreement.findOrCreate(tenantId, id, {
             agreementId: agreement.id,
-            signers: [{ name: inspection.clientName ?? clientEmail, email: clientEmail, role: 'client' }],
+            signers: [{ name: client?.name ?? clientEmail, email: clientEmail, role: 'client' }],
             completionPolicy: 'one',
         });
 
@@ -101,7 +105,7 @@ const agreementsRoutes = createApiRouter()
         // Sign the email with the assigned inspector's rebooking footer (B-4a).
         const sigInspector = await resolveSignatureInspector(c, inspection.inspectorId, tenantId);
         await c.var.services.email.sendAgreementRequest(
-            clientEmail, inspection.clientName ?? null, agreement.name, signUrl, sigInspector, getBookingHost(c),
+            clientEmail, client?.name ?? null, agreement.name, signUrl, sigInspector, getBookingHost(c),
         );
 
         // findOrCreate already sets status: 'sent' — no manual update needed.
