@@ -59,12 +59,25 @@ export const availabilityOverrides = sqliteTable('availability_overrides', {
     startTime: text('start_time'),
     endTime: text('end_time'),
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // A-polish 10 — origin of this override. NULL = manual (inspector-entered).
+    // 'google' = pulled from a Google calendar sync (upserted/deleted by external_id).
+    source: text('source', { enum: ['google'] }),
+    // Provider event id for google-sourced rows; unique per (inspector, source).
+    externalId: text('external_id'),
+    // Google event transparency: 'opaque' (busy) or 'transparent' (free).
+    // 'transparent' rows are kept for provenance but never mark a slot busy.
+    transparency: text('transparency', { enum: ['opaque', 'transparent'] }),
 }, (t) => [
     index('idx_avail_overrides_insp').on(t.inspectorId),
     // DB-9 — contradictory same-day rows policy: at most ONE blocking
     // (is_available = 0) override per inspector per date. A blocking row wins
     // over recurring windows (see BookingService slot computation); multiple
     // is_available = 1 rows remain allowed (they add extra windows).
+    // A-polish 10: scoped to MANUAL rows (source IS NULL) — Google sync stores
+    // many timed blocking blocks per day, keyed instead by the unique index below.
     uniqueIndex('idx_avail_overrides_block_unique').on(t.inspectorId, t.date)
-        .where(sql`is_available = 0`),
+        .where(sql`is_available = 0 AND source IS NULL`),
+    // A-polish 10 — upsert target for the Google sync: one row per external event
+    // per inspector. NULLs are distinct in SQLite, so manual rows never collide.
+    uniqueIndex('uq_avail_overrides_external').on(t.inspectorId, t.source, t.externalId),
 ]);
