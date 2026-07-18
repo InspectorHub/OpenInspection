@@ -13,6 +13,8 @@ import {
     tenants,
     tenantConfigs,
     calendarConnections,
+    contacts,
+    inspectionPeople,
 } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { runErasure } from '../lib/compliance/erasure-orchestrator';
@@ -203,12 +205,19 @@ export class AdminService {
     async eraseClientData(tenantId: string, clientEmail: string, opts?: { requestedBy?: string; identityBasis?: string }) {
         const db = this.getDrizzle();
 
-        // How many inspections this subject is on — preserves the legacy
-        // `matched`/`deletedAgreements` contract for existing callers.
-        const matched = await db.select({ id: inspections.id })
-            .from(inspections)
-            .where(dbAnd(eq(inspections.tenantId, tenantId), eq(inspections.clientEmail, clientEmail)));
-        const matchedIds = matched.map((r) => r.id);
+        // How many inspections this subject is on — sourced from the LIVE
+        // client-identity path (inspection_people -> contacts), not the frozen
+        // `inspections.client_email` cache (dropped in a later migration).
+        // Preserves the legacy `matched`/`deletedAgreements` contract for
+        // existing callers.
+        const matchedRows = await db.select({ id: inspectionPeople.inspectionId })
+            .from(inspectionPeople)
+            .innerJoin(contacts, dbAnd(
+                eq(contacts.id, inspectionPeople.contactId),
+                eq(contacts.tenantId, tenantId),
+            ))
+            .where(dbAnd(eq(inspectionPeople.tenantId, tenantId), eq(contacts.email, clientEmail)));
+        const matchedIds = [...new Set(matchedRows.map((r) => r.id))];
 
         // Per-tenant retention window (default 6) from tenant_configs.
         const cfg = await db.select({ years: tenantConfigs.agreementRetentionYears })
