@@ -1,8 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte, asc } from 'drizzle-orm';
-import { eventTypes, inspectionEvents, inspections, automations, automationLogs } from '../lib/db/schema';
+import { eventTypes, inspectionEvents, automations, automationLogs } from '../lib/db/schema';
 import { EVENT_TYPE_SEEDS } from '../data/event-type-seeds';
 import { logger } from '../lib/logger';
+import { PeopleService } from './people.service';
 
 const REMINDER_MIN_DELAY_MS = 5 * 60_000;
 const REMINDER_LEAD_MS      = 24 * 3600_000;
@@ -139,15 +140,18 @@ export class EventService {
         const rule = await d.select().from(automations)
             .where(and(eq(automations.tenantId, tenantId), eq(automations.trigger, 'event.created' as never))).get();
         if (!rule || !rule.active) return;
-        const insp = await d.select().from(inspections).where(eq(inspections.id, inspectionId)).get();
-        if (!insp?.clientEmail) return;
+        // Task 9b (people-role-profiles) — resolve the recipient via the
+        // inspection_people primary-client join instead of the legacy
+        // inspection.clientEmail column (dropped, Task 13).
+        const client = await new PeopleService({ DB: this.db }).getPrimaryClient(tenantId, inspectionId);
+        if (!client?.email) return;
         const sendAt = this.computeReminderSendAt(scheduledAtMs);
         await d.insert(automationLogs).values({
             id:             crypto.randomUUID(),
             tenantId,
             automationId:   rule.id as string,
             inspectionId,
-            recipient:      insp.clientEmail as string,
+            recipient:      client.email,
             sendAt:         new Date(sendAt),
             status:         'pending',
             eventId,
@@ -160,15 +164,18 @@ export class EventService {
         const rule = await d.select().from(automations)
             .where(and(eq(automations.tenantId, tenantId), eq(automations.trigger, 'event.completed' as never))).get();
         if (!rule || !rule.active) return;
-        const insp = await d.select().from(inspections).where(eq(inspections.id, inspectionId)).get();
-        if (!insp?.clientEmail) return;
+        // Task 9b (people-role-profiles) — resolve the recipient via the
+        // inspection_people primary-client join instead of the legacy
+        // inspection.clientEmail column (dropped, Task 13).
+        const client = await new PeopleService({ DB: this.db }).getPrimaryClient(tenantId, inspectionId);
+        if (!client?.email) return;
         const sendAt = completedAtMs + FOLLOWUP_DELAY_MS;
         await d.insert(automationLogs).values({
             id:             crypto.randomUUID(),
             tenantId,
             automationId:   rule.id as string,
             inspectionId,
-            recipient:      insp.clientEmail as string,
+            recipient:      client.email,
             sendAt:         new Date(sendAt),
             status:         'pending',
             eventId,
