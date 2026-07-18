@@ -3,12 +3,22 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { HolidayClosedPanel, type HolidayConfig } from "./HolidayClosedPanel";
 
-function renderPanel(config: HolidayConfig) {
+function renderPanel(
+  config: HolidayConfig,
+  coverage?: { dataMaxYear: number; currentYear: number },
+) {
   const router = createMemoryRouter(
     [
       {
         path: "/",
-        element: <HolidayClosedPanel initialConfig={config} initialCustomHolidays={[]} />,
+        element: (
+          <HolidayClosedPanel
+            initialConfig={config}
+            initialCustomHolidays={[]}
+            dataMaxYear={coverage?.dataMaxYear}
+            currentYear={coverage?.currentYear}
+          />
+        ),
       },
     ],
     { initialEntries: ["/"] },
@@ -63,6 +73,22 @@ describe("HolidayClosedPanel", () => {
     expect(html).toMatch(/<details[^>]*data-testid="holiday-advanced"/);
     expect(html).not.toMatch(/<details[^>]*open[^>]*data-testid="holiday-advanced"/);
     expect(html).not.toMatch(/<details[^>]*data-testid="holiday-advanced"[^>]*open/);
+  });
+
+  it("warns when the current year has reached the last covered data year", () => {
+    const html = renderPanel(CATALOG_ON, { dataMaxYear: 2031, currentYear: 2031 });
+    expect(html).toContain('data-testid="holiday-coverage-warn"');
+    expect(html).toContain("2031");
+  });
+
+  it("stays quiet while covered years remain ahead", () => {
+    const html = renderPanel(CATALOG_ON, { dataMaxYear: 2031, currentYear: 2026 });
+    expect(html).not.toContain('data-testid="holiday-coverage-warn"');
+  });
+
+  it("does not warn about coverage when the catalog is off", () => {
+    const html = renderPanel(CATALOG_OFF, { dataMaxYear: 2031, currentYear: 2035 });
+    expect(html).not.toContain('data-testid="holiday-coverage-warn"');
   });
 
   it("keeps the open-bookings escape hatch out of the primary controls", () => {

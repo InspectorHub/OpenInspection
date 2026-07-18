@@ -36,5 +36,44 @@
     { "date": "2028-11-10", "name": "Veterans Day" },
     { "date": "2028-11-23", "name": "Thanksgiving Day" },
     { "date": "2028-12-25", "name": "Christmas Day" }
+  ],
+  "2029": [
+    { "date": "2029-01-01", "name": "New Year's Day" },
+    { "date": "2029-01-15", "name": "Birthday of Martin Luther King, Jr." },
+    { "date": "2029-02-19", "name": "Washington's Birthday" },
+    { "date": "2029-05-28", "name": "Memorial Day" },
+    { "date": "2029-06-19", "name": "Juneteenth National Independence Day" },
+    { "date": "2029-07-04", "name": "Independence Day" },
+    { "date": "2029-09-03", "name": "Labor Day" },
+    { "date": "2029-10-08", "name": "Columbus Day" },
+    { "date": "2029-11-12", "name": "Veterans Day" },
+    { "date": "2029-11-22", "name": "Thanksgiving Day" },
+    { "date": "2029-12-25", "name": "Christmas Day" }
+  ],
+  "2030": [
+    { "date": "2030-01-01", "name": "New Year's Day" },
+    { "date": "2030-01-21", "name": "Birthday of Martin Luther King, Jr." },
+    { "date": "2030-02-18", "name": "Washington's Birthday" },
+    { "date": "2030-05-27", "name": "Memorial Day" },
+    { "date": "2030-06-19", "name": "Juneteenth National Independence Day" },
+    { "date": "2030-07-04", "name": "Independence Day" },
+    { "date": "2030-09-02", "name": "Labor Day" },
+    { "date": "2030-10-14", "name": "Columbus Day" },
+    { "date": "2030-11-11", "name": "Veterans Day" },
+    { "date": "2030-11-28", "name": "Thanksgiving Day" },
+    { "date": "2030-12-25", "name": "Christmas Day" }
+  ],
+  "2031": [
+    { "date": "2031-01-01", "name": "New Year's Day" },
+    { "date": "2031-01-20", "name": "Birthday of Martin Luther King, Jr." },
+    { "date": "2031-02-17", "name": "Washington's Birthday" },
+    { "date": "2031-05-26", "name": "Memorial Day" },
+    { "date": "2031-06-19", "name": "Juneteenth National Independence Day" },
+    { "date": "2031-07-04", "name": "Independence Day" },
+    { "date": "2031-09-01", "name": "Labor Day" },
+    { "date": "2031-10-13", "name": "Columbus Day" },
+    { "date": "2031-11-11", "name": "Veterans Day" },
+    { "date": "2031-11-27", "name": "Thanksgiving Day" },
+    { "date": "2031-12-25", "name": "Christmas Day" }
   ]
 }

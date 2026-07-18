@@ -68,6 +68,7 @@
   "settings_holiday_concierge_warn": "Bookings may confirm without review on holiday dates.",
   "settings_holiday_confirm_title": "Allow bookings on holidays?",
   "settings_holiday_confirm_message": "Customers can still book on listed holidays. Confirm only if that is intentional.",
+  "settings_holiday_coverage_warn": "Built-in holiday dates run through {year}. Bookings after that won't be flagged as holidays automatically — add them below as custom dates, or update the app for newer years.",
   "settings_teamsched_heading": "Team schedules",
   "settings_teamsched_desc": "Weekly hours and time off live under My Schedule",
   "settings_teamsched_members_count": " ({count} schedulable members)",

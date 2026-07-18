@@ -41,9 +41,15 @@ function detectPolicy(publicPolicy: HolidayPublicPolicy): HolidayPolicyId | null
 export function HolidayClosedPanel({
   initialConfig,
   initialCustomHolidays,
+  dataMaxYear,
+  currentYear,
 }: {
   initialConfig: HolidayConfig;
   initialCustomHolidays: CustomHoliday[];
+  /** Last year the bundled holiday catalog covers; used to warn before the cliff. */
+  dataMaxYear?: number;
+  /** Current civil year (from the loader) — compared against `dataMaxYear`. */
+  currentYear?: number;
 }) {
   const fetcher = useFetcher<typeof action>();
   const [region, setRegion] = useState<string | null>(initialConfig.holidayRegion);
@@ -89,6 +95,15 @@ export function HolidayClosedPanel({
   }, [fetcher.state, fetcher.data]);
 
   const activePolicy = detectPolicy(publicPolicy);
+
+  // Once the calendar has caught up to the last year we ship dates for, the
+  // catalog is about to (or already does) run dry. Surface it while the region
+  // is on — with no region there are no holidays to miss.
+  const coverageExpiring =
+    region != null &&
+    dataMaxYear != null &&
+    currentYear != null &&
+    currentYear >= dataMaxYear;
 
   function submitSave(next: {
     holidayRegion: string | null;
@@ -191,6 +206,14 @@ export function HolidayClosedPanel({
           {m.settings_holiday_panel_desc()}
         </p>
       </div>
+
+      {coverageExpiring && (
+        <div data-testid="holiday-coverage-warn">
+          <Banner tone="warn">
+            {m.settings_holiday_coverage_warn({ year: dataMaxYear! })}
+          </Banner>
+        </div>
+      )}
 
       <HolidayRegionSwitch region={region} saving={saving} onChange={handleRegion} />
 
