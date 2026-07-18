@@ -391,5 +391,4 @@ const adminDataRoutes = createApiRouter()
         return c.json({ success: true as const, data }, 200);
     });
 
-export type AdminDataApi = typeof adminDataRoutes;
 export default adminDataRoutes;

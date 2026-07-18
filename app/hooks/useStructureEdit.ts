@@ -9,7 +9,7 @@ import type { Snapshot, ItemType } from "~/lib/editor/structure-ops";
 import { m } from "~/paraglide/messages";
 
 /** Impact data shown in the StructureDeleteModal — for a section OR a single item. */
-export interface DeletePending {
+interface DeletePending {
   kind: "section" | "item";
   sectionId: string;
   /** Present only when kind === 'item'. */
@@ -19,7 +19,7 @@ export interface DeletePending {
 }
 
 /** Open "Add item" type-picker state. */
-export interface AddItemPending {
+interface AddItemPending {
   sectionId: string;
 }
 
@@ -49,7 +49,7 @@ export interface UseStructureEditOptions {
 }
 
 /** Open "save structure to template" modal state. */
-export interface SaveTemplatePending {
+interface SaveTemplatePending {
   mode: "back" | "new";
 }
 

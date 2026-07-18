@@ -25,7 +25,7 @@ export interface StripPhoto {
 }
 
 /** Plan 7 — format a duration in seconds as m:ss (e.g. 75 → "1:15"). */
-export function formatDuration(sec: number): string {
+function formatDuration(sec: number): string {
   const s = Math.max(0, Math.round(sec));
   const m = Math.floor(s / 60);
   const r = s % 60;

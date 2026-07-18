@@ -24,7 +24,7 @@ export const AgentReportsResponseSchema = createApiResponseSchema(
 /**
  * Schema for the agent performance leaderboard.
  */
-export const LeaderboardEntrySchema = z.object({
+const LeaderboardEntrySchema = z.object({
     agentId: z.string().uuid().nullable().describe('TODO describe agentId field for the OpenInspection MCP integration'),
     name:    z.string().nullable().optional().describe('TODO describe name field for the OpenInspection MCP integration'),
     agency:  z.string().nullable().optional().describe('TODO describe agency field for the OpenInspection MCP integration'),

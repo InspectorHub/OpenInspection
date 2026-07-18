@@ -20,7 +20,7 @@ export const AgreementListResponseSchema = createApiResponseSchema(z.array(z.obj
 }))).openapi('AgreementListResponse');
 
 /** Track I-a Task 9 — one recipient row in a multi-signer envelope. */
-export const SignerInputSchema = z.object({
+const SignerInputSchema = z.object({
     name: z.string().min(1).max(120).openapi({ example: 'John Smith' }).describe('Full name of this signer as it appears on the agreement'),
     email: z.string().email().openapi({ example: 'client@example.com' }).describe('Email address the per-signer signing link is sent to'),
     role: z.enum(['client', 'co_client', 'agent', 'other']).optional().openapi({ example: 'client' }).describe('Relationship of this signer to the inspection (client, co_client, agent, other)'),

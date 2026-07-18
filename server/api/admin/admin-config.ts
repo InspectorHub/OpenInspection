@@ -468,5 +468,4 @@ const adminConfigRoutes = createApiRouter()
         }, 200);
     });
 
-export type AdminConfigApi = typeof adminConfigRoutes;
 export default adminConfigRoutes;

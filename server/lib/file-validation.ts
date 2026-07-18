@@ -12,6 +12,3 @@ export function detectMime(bytes: Uint8Array): string | null {
     return null;
 }
 
-export const ALLOWED_MIMES = new Set([
-    'image/jpeg', 'image/png', 'image/webp', 'image/heic', 'application/pdf',
-]);

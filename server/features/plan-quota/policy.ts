@@ -4,5 +4,3 @@
  * metrics. Spec: free-tier usage quotas (2026-07).
  */
 export const FREE_TIER_CAPS = { inspections: 5, sms: 50, email: 50 } as const;
-
-export type QuotaMetric = keyof typeof FREE_TIER_CAPS;

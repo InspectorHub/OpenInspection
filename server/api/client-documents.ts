@@ -132,7 +132,6 @@ clientDocumentsRoutes.delete('/inspections/:id/documents/:docId', async (c) => {
     return c.json({ data: { ok: true } });
 });
 
-export type ClientDocumentsApi = typeof clientDocumentsRoutes;
 export default clientDocumentsRoutes;
 
 // ---------------------------------------------------------------------------
@@ -260,5 +259,4 @@ inspectorDocumentsRoutes.delete('/:id/documents/:docId', async (c) => {
     return c.json({ data: { ok: true } });
 });
 
-export type InspectorDocumentsApi = typeof inspectorDocumentsRoutes;
 export { inspectorDocumentsRoutes };

@@ -25,5 +25,3 @@ export const PcaNarrativePatchSchema = z.object({
   pointInTime: z.string().optional().describe('Reliance §4.2.3 — point-in-time assessment limitation'),
   siteSpecific: z.string().optional().describe('Reliance §4.2.4 — site-specific scope limitation'),
 });
-
-export type PcaNarrativePatch = z.infer<typeof PcaNarrativePatchSchema>;

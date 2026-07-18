@@ -10,7 +10,7 @@ import type { RatingLevel } from './report-utils';
 export type Severity = 'good' | 'marginal' | 'significant' | 'minor';
 const SEV_RANK: Record<Severity, number> = { significant: 3, marginal: 2, minor: 1, good: 0 };
 
-export interface MatrixCell {
+interface MatrixCell {
     worst: Severity | null;
     counts: { safety: number; recommendation: number; maintenance: number };
 }

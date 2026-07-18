@@ -18,13 +18,13 @@ export function escapeHtml(s: string): string {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export function appendSignature(html: string, inspector?: SignatureUser, host?: string): string {
+function appendSignature(html: string, inspector?: SignatureUser, host?: string): string {
     if (!inspector || !host) return html;
     const sig = inspectorSignature(inspector, host);
     return html + sig.html;
 }
 
-export function arrayBufferToBase64(buf: ArrayBuffer): string {
+function arrayBufferToBase64(buf: ArrayBuffer): string {
     const bytes = new Uint8Array(buf);
     let binary = '';
     const chunk = 0x8000;

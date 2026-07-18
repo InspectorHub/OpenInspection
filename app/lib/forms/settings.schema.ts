@@ -48,8 +48,6 @@ export function makeDeleteAccountSchema() {
   });
 }
 
-export type DeleteAccountInput = z.infer<ReturnType<typeof makeDeleteAccountSchema>>;
-
 /* ------------------------------------------------------------------ */
 /*  Security (settings-security.tsx)                                   */
 /* ------------------------------------------------------------------ */
@@ -74,17 +72,6 @@ export function makeChangePasswordSchema() {
 }
 
 export type ChangePasswordInput = z.infer<ReturnType<typeof makeChangePasswordSchema>>;
-
-/**
- * Turnstile secret key — the only validated field on the bot-protection form.
- * The action only writes when non-empty, so a blank value is allowed (no-op);
- * any non-blank value is trimmed and saved.
- */
-export const turnstileSchema = z.object({
-  TURNSTILE_SECRET_KEY: z.string(),
-});
-
-export type TurnstileInput = z.infer<typeof turnstileSchema>;
 
 /* ------------------------------------------------------------------ */
 /*  Profile (settings-profile.tsx)                                     */
@@ -113,8 +100,6 @@ export function makeProfileSchema() {
     locale: z.string().optional(),
   });
 }
-
-export type ProfileInput = z.infer<ReturnType<typeof makeProfileSchema>>;
 
 /* ------------------------------------------------------------------ */
 /*  Workspace (settings-workspace.tsx)                                 */
@@ -164,8 +149,6 @@ export function makeWorkspaceSchema() {
   });
 }
 
-export type WorkspaceInput = z.infer<ReturnType<typeof makeWorkspaceSchema>>;
-
 /* ------------------------------------------------------------------ */
 /*  Services (settings-services.tsx)                                   */
 /* ------------------------------------------------------------------ */
@@ -193,4 +176,3 @@ export function makeCreateServiceSchema() {
   });
 }
 
-export type CreateServiceInput = z.infer<ReturnType<typeof makeCreateServiceSchema>>;

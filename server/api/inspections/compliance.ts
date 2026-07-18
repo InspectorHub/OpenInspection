@@ -94,7 +94,7 @@ function serializePsq(row: typeof psqResponses.$inferSelect | null) {
 
 // ── routes ───────────────────────────────────────────────────────────────────
 
-export const getComplianceRoute = createRoute(withMcpMetadata({
+const getComplianceRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/compliance',
     tags: ['inspections'],
@@ -111,7 +111,7 @@ export const getComplianceRoute = createRoute(withMcpMetadata({
     description: 'Returns the ASTM E2018 compliance artifacts for the inspection — dual sign-off attestations, the Pre-Survey Questionnaire, the Document Review checklist, and the derived conformance verdict computed from all three plus the Deviations store.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const signoffRoute = createRoute(withMcpMetadata({
+const signoffRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/compliance/signoff',
     tags: ['inspections'],
@@ -132,7 +132,7 @@ export const signoffRoute = createRoute(withMcpMetadata({
     description: 'Signs a dual sign-off attestation (field_observer or pcr_reviewer) with the tenant Ed25519 signing key. Re-signing the same role upserts and replaces the prior attestation. Requires report_tier=full_pca.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const removeSignoffRoute = createRoute(withMcpMetadata({
+const removeSignoffRoute = createRoute(withMcpMetadata({
     method: 'delete',
     path: '/{id}/compliance/signoff/{role}',
     tags: ['inspections'],
@@ -147,7 +147,7 @@ export const removeSignoffRoute = createRoute(withMcpMetadata({
     description: 'Removes the sign-off attestation for the given role. Requires report_tier=full_pca.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const seedDocReviewRoute = createRoute(withMcpMetadata({
+const seedDocReviewRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/compliance/doc-review/seed',
     tags: ['inspections'],
@@ -161,7 +161,7 @@ export const seedDocReviewRoute = createRoute(withMcpMetadata({
     description: 'Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const patchDocReviewItemRoute = createRoute(withMcpMetadata({
+const patchDocReviewItemRoute = createRoute(withMcpMetadata({
     method: 'patch',
     path: '/{id}/compliance/doc-review/{documentKey}',
     tags: ['inspections'],
@@ -178,7 +178,7 @@ export const patchDocReviewItemRoute = createRoute(withMcpMetadata({
     description: 'Patches requested/received/reviewed/na/notes on a single Document Review checklist item.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const upsertPsqRoute = createRoute(withMcpMetadata({
+const upsertPsqRoute = createRoute(withMcpMetadata({
     method: 'put',
     path: '/{id}/compliance/psq',
     tags: ['inspections'],
@@ -196,7 +196,7 @@ export const upsertPsqRoute = createRoute(withMcpMetadata({
     description: 'Stores the Pre-Survey Questionnaire responses (ASTM §8.5) and transitions status to received. Requires report_tier=full_pca.',
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const setPsqStatusRoute = createRoute(withMcpMetadata({
+const setPsqStatusRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/compliance/psq/status',
     tags: ['inspections'],

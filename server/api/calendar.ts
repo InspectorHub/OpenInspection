@@ -541,6 +541,6 @@ const calendarRoutes = createApiRouter()
 
 export type CalendarApi = typeof calendarRoutes;
 
-export { createCalendarEvent, syncEventsToGcal };
+export { createCalendarEvent };
 
 export default calendarRoutes;

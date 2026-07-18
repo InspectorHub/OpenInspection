@@ -9,8 +9,6 @@ export const UpdateMediaAnnotationsSchema = z.object({
     caption:     z.string().max(200, 'caption must be <= 200 chars').describe('TODO describe caption field for the OpenInspection MCP integration'),
 }).openapi('UpdateMediaAnnotations');
 
-export type UpdateMediaAnnotationsInput = z.infer<typeof UpdateMediaAnnotationsSchema>;
-
 // ── Plan 7 — video walk-through (Cloudflare Stream direct creator upload) ────
 // The server never receives a client-supplied tenantId for any of these — it
 // comes from the JWT in the route handler. Bodies carry only placement intent
@@ -34,7 +32,7 @@ export const CreateVideoUploadSchema = z.object({
  * The real r2Key from the r2-upload response MUST be used, not the
  * placeholder key from create-upload (which uses a .mp4 extension stub).
  */
-export const VideoRefSchema = z.discriminatedUnion('provider', [
+const VideoRefSchema = z.discriminatedUnion('provider', [
     z.object({
         provider: z.literal('stream'),
         streamUid: z.string().min(1, 'streamUid is required')
@@ -70,15 +68,3 @@ export const SetPosterSchema = z.object({
     posterPct: z.number().min(0).max(1)
         .describe('Poster timestamp as a fraction of duration (0..1)'),
 }).openapi('SetPoster');
-
-/** Delete a video from Stream + drop its pool row / detach the entry. */
-export const DeleteVideoSchema = z.object({
-    streamUid: z.string().min(1, 'streamUid is required')
-        .describe('Cloudflare Stream UID'),
-}).openapi('DeleteVideo');
-
-export type CreateVideoUploadInput = z.infer<typeof CreateVideoUploadSchema>;
-export type VideoRefInput = z.infer<typeof VideoRefSchema>;
-export type FinalizeVideoInput = z.infer<typeof FinalizeVideoSchema>;
-export type SetPosterInput = z.infer<typeof SetPosterSchema>;
-export type DeleteVideoInput = z.infer<typeof DeleteVideoSchema>;

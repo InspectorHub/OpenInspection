@@ -12,9 +12,6 @@ import type {
     ItemType,
     ItemTabs,
     ItemOptions,
-    ItemAttribute,
-    ItemSource,
-    SectionApplicability,
     CannedInfoComment,
     CannedDefect,
 } from '../.././../server/types/template-schema';
@@ -27,7 +24,7 @@ export type { ItemType };
 // ---------------------------------------------------------------------------
 
 export type Snapshot = { schemaVersion: 2; sections: Section[]; ratingSystem?: unknown; [k: string]: unknown };
-export type Section  = { id: string; title: string; items: Item[]; [k: string]: unknown };
+type Section  = { id: string; title: string; items: Item[]; [k: string]: unknown };
 export type Item     = { id: string; label: string; type: ItemType; [k: string]: unknown };
 
 // ---------------------------------------------------------------------------
@@ -337,15 +334,3 @@ export function renameItem(
     });
     return stripRuntimeKeys({ ...snapshot, sections });
 }
-
-// ---------------------------------------------------------------------------
-// Re-export schema types consumers may need (avoids separate import)
-// ---------------------------------------------------------------------------
-
-export type {
-    ItemTabs,
-    ItemOptions,
-    ItemAttribute,
-    ItemSource,
-    SectionApplicability,
-};

@@ -18,21 +18,6 @@ export function getLegalLinks(env: { TERMS_URL?: string; PRIVACY_URL?: string })
     return { termsUrl, privacyUrl };
 }
 
-/**
- * Returns the canonical per-tenant legal-page URL that managed compliance
- * registrations (TFV/A2P) and booking opt-in links should point at.
- * Both the orchestrator and the booking loader call this helper so the URL
- * shape lives in exactly one place.
- */
-export function tenantLegalUrl(
-    appBaseUrl: string,
-    slug: string,
-    doc: 'privacy' | 'terms',
-): string {
-    // Strip trailing slash from the base URL to avoid double-slash paths.
-    return `${appBaseUrl.replace(/\/$/, '')}/legal/${slug}/${doc}`;
-}
-
 export function buildTermsAcceptedBlob(
     links: LegalLinks,
     req: { ip?: string | undefined; country?: string | undefined },

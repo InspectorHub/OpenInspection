@@ -305,5 +305,4 @@ const adminDataImportRoutes = createApiRouter()
         }, 200);
     });
 
-export type AdminDataImportApi = typeof adminDataImportRoutes;
 export default adminDataImportRoutes;

@@ -247,8 +247,6 @@ export const inspectorMessageRoutes = createApiRouter()
         return streamAttachment(obj, att);
     });
 
-export type InspectorMessagesApi = typeof inspectorMessageRoutes;
-
 // ── Cross-cutting summary router (mounted at /api/messages) ───────────────────
 
 const messageRoutes = createApiRouter()
@@ -338,7 +336,5 @@ clientMessageRoutes.get('/inspections/:id/messages/attachments/:attachmentId', a
     if (!obj) return c.json({ error: 'Not found' }, 404);
     return streamAttachment(obj, att);
 });
-
-export type ClientMessagesApi = typeof clientMessageRoutes;
 
 export default messageRoutes;

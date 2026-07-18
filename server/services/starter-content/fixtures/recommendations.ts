@@ -8,4 +8,3 @@
  */
 
 export { RECOMMENDATION_SEEDS as RECOMMENDATIONS } from '../../../data/recommendation-seeds';
-export type { SeedRecommendation } from '../../../data/recommendation-seeds';

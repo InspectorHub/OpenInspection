@@ -59,7 +59,7 @@ export async function resolvePortalAccess(
  * claimed link, never the URL) only when the link grants access to exactly the
  * requested inspection; otherwise null (→ caller 404s).
  */
-export type ObserverClaim =
+type ObserverClaim =
     | { kind: 'ok'; inspectionId: string; tenantId: string }
     | { kind: 'expired' | 'revoked' | 'not_found' };
 
@@ -126,7 +126,7 @@ export async function resolveOwnerPreviewToken(
  * Used by the builder source endpoint so it can populate `creator.ref` with
  * the inspector/admin's userId (needed for `RepairRequestService.listMine`).
  */
-export async function resolveOwnerPreviewTokenFull(
+async function resolveOwnerPreviewTokenFull(
     token: string | undefined,
     keyring: JwtKeyring | undefined,
     kvGet?: (key: string) => Promise<string | null>,
@@ -163,7 +163,7 @@ export async function resolveOwnerPreviewTokenFull(
  * agents are global users). Tenant association for a specific inspection is
  * asserted by the CALLER (AgentService.accessToInspection), never here.
  */
-export async function resolveAgentSessionToken(
+async function resolveAgentSessionToken(
     token: string | undefined,
     keyring: JwtKeyring | undefined,
     kvGet?: (key: string) => Promise<string | null>,

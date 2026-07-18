@@ -12,7 +12,7 @@
  *   • agreementSigned      — inspections.agreement_signed_at is non-null
  */
 
-export const REQUIRED_FACT_KEYS = [
+const REQUIRED_FACT_KEYS = [
     'year_built',
     'sqft',
     'foundation',

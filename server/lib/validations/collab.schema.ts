@@ -18,8 +18,6 @@ export const CollabRestoreRequestSchema = z.object({
     seq: z.number().int().nonnegative(),
 }).openapi('CollabRestoreRequest');
 
-export type CollabRestoreRequest = z.infer<typeof CollabRestoreRequestSchema>;
-
 /**
  * Path param of `GET /:id/collab/snapshots/:seq` — the snapshot `seq` to fetch.
  *

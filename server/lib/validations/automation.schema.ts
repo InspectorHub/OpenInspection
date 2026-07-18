@@ -15,7 +15,7 @@ const AUTOMATION_RECIPIENTS = ['client', 'buying_agent', 'selling_agent', 'inspe
 const AUTOMATION_CHANNELS = ['email', 'sms'] as const;
 
 // Track J (D2) — send-time gates. All optional; absent = no gate.
-export const ConditionsSchema = z.object({
+const ConditionsSchema = z.object({
     requirePaid:   z.boolean().optional().describe('Only send if the inspection payment_status is paid.'),
     requireSigned: z.boolean().optional().describe('Only send if the inspection has a signed agreement.'),
     serviceIds:    z.array(z.string()).optional().describe('Only send if the inspection booked one of these services; empty/absent = any.'),
@@ -79,7 +79,7 @@ export const UpdateAutomationSchema = CreateAutomationBase.partial().extend({
     active: z.boolean().optional().describe('TODO describe active field for the OpenInspection MCP integration'),
 }).openapi('UpdateAutomation');
 
-export const AutomationLogSchema = z.object({
+const AutomationLogSchema = z.object({
     id:             z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
     automationId:   z.string().describe('TODO describe automationId field for the OpenInspection MCP integration'),
     inspectionId:   z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),

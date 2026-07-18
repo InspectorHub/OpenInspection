@@ -19,8 +19,6 @@ export const SEED_REFERRAL_SOURCES = [
     'Other',
 ] as const;
 
-export type SeedReferralSource = typeof SEED_REFERRAL_SOURCES[number];
-
 /**
  * Returns the effective referral-source list for a tenant: seeds first,
  * then any custom labels (de-duplicated, case-insensitive) appended in the

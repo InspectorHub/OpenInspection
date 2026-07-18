@@ -26,8 +26,6 @@ export function makeLoginSchema() {
   });
 }
 
-export type LoginInput = z.infer<ReturnType<typeof makeLoginSchema>>;
-
 /**
  * Shared strong-password rule, mirroring the API's `passwordSchema`
  * (server/lib/validations/shared.schema.ts): min 8 chars with at least one
@@ -66,8 +64,6 @@ export function makeSetupSchema() {
     setupCode: z.string().min(6, m.auth_validation_setup_code_min()),
   });
 }
-
-export type SetupInput = z.infer<ReturnType<typeof makeSetupSchema>>;
 
 /**
  * Human-readable strong-password requirement, shown next to password inputs on
@@ -118,8 +114,6 @@ export function makeJoinSchema() {
   });
 }
 
-export type JoinInput = z.infer<ReturnType<typeof makeJoinSchema>>;
-
 /**
  * Partner-agent invite accept (`/agent-invite/accept`). Token + email come from
  * the invite (email is read-only), so only name + password are validated.
@@ -134,8 +128,6 @@ export function makeAgentInviteAcceptSchema() {
     password: z.string().min(12, m.auth_validation_password_min12()),
   });
 }
-
-export type AgentInviteAcceptInput = z.infer<ReturnType<typeof makeAgentInviteAcceptSchema>>;
 
 /**
  * Partner-agent self-signup (`/agent-signup`). Mirrors the API's
@@ -158,5 +150,3 @@ export function makeAgentSignupSchema() {
       .max(120, m.auth_validation_password_too_long()),
   });
 }
-
-export type AgentSignupInput = z.infer<ReturnType<typeof makeAgentSignupSchema>>;

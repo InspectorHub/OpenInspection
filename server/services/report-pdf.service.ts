@@ -19,7 +19,7 @@ export interface ReportPdfFooterOpts {
 }
 
 export type ReportPdfType = 'summary' | 'full';
-export type ReportPdfStatus = 'queued' | 'rendering' | 'ready' | 'failed';
+type ReportPdfStatus = 'queued' | 'rendering' | 'ready' | 'failed';
 
 /**
  * Spec 5A — Report PDF Pipeline.

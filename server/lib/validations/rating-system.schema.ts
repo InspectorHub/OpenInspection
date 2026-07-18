@@ -10,11 +10,11 @@
 import { z } from '@hono/zod-openapi';
 
 /** The single severity vocabulary shared by rating levels AND comments (spec §4.F, §9 #1). */
-export const SeverityEnum = z.enum(['good', 'marginal', 'significant', 'minor']);
+const SeverityEnum = z.enum(['good', 'marginal', 'significant', 'minor']);
 export type Severity = z.infer<typeof SeverityEnum>;
 
 /** A single level inside a rating system. */
-export const RatingLevelInputSchema = z.object({
+const RatingLevelInputSchema = z.object({
     id:            z.string().min(1).max(64).optional().describe('TODO describe id field for the OpenInspection MCP integration'),     // server-assigned UUID when missing
     abbreviation:  z.string().min(1).max(8).describe('TODO describe abbreviation field for the OpenInspection MCP integration'),                 // 'Sat', 'I', 'D', 'NI'
     label:         z.string().min(1).max(40).describe('TODO describe label field for the OpenInspection MCP integration'),                // 'Satisfactory'
@@ -28,7 +28,7 @@ export const RatingLevelInputSchema = z.object({
 export type RatingLevelInput = z.infer<typeof RatingLevelInputSchema>;
 
 /** Persisted level (id + order always present). */
-export const RatingLevelSchema = RatingLevelInputSchema.extend({
+const RatingLevelSchema = RatingLevelInputSchema.extend({
     id:    z.string().min(1).max(64).describe('TODO describe id field for the OpenInspection MCP integration'),
     order: z.number().int().min(0).max(20).describe('TODO describe order field for the OpenInspection MCP integration'),
 });
@@ -52,7 +52,7 @@ export const CloneRatingSystemSchema = z.object({
 }).strict();
 
 /** Output shape returned by the API. */
-export const RatingSystemResponseSchema = z.object({
+const RatingSystemResponseSchema = z.object({
     id:          z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
     name:        z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
     slug:        z.string().describe('TODO describe slug field for the OpenInspection MCP integration'),

@@ -13,4 +13,3 @@ export const SyncQuotaSchema = z.object({
     maxUsers: z.number().int().min(1).max(10_000).describe('TODO describe maxUsers field for the OpenInspection MCP integration'),
 }).openapi('SyncQuota');
 
-export type SyncQuotaInput = z.infer<typeof SyncQuotaSchema>;

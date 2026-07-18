@@ -26,7 +26,6 @@ export type InspectionPrefs = z.infer<typeof InspectionPrefsSchema>;
 
 /** All fields optional — used by PATCH to support partial updates. */
 export const InspectionPrefsPatchSchema = InspectionPrefsSchema.partial().openapi('InspectionPrefsPatch');
-export type InspectionPrefsPatch = z.infer<typeof InspectionPrefsPatchSchema>;
 
 export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     cloneDefault:       'rating_notes',

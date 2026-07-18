@@ -630,5 +630,4 @@ const adminSettingsRoutes = createApiRouter()
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
     });
 
-export type AdminSettingsApi = typeof adminSettingsRoutes;
 export default adminSettingsRoutes;

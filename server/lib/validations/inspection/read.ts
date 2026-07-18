@@ -68,7 +68,7 @@ export const PropertyFactsAutofillResponseSchema = z.object({
 }).openapi('PropertyFactsAutofillResponse');
 
 // Round-2 F1 — recipient list returned by GET /api/inspections/:id/recipients.
-export const InspectionRecipientSchema = z.object({
+const InspectionRecipientSchema = z.object({
   contactId: z.string().nullable().describe('TODO describe contactId field for the OpenInspection MCP integration'),
   name:      z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
   role:      z.enum(['client', 'agent_buyer', 'agent_listing']).describe('TODO describe role field for the OpenInspection MCP integration'),
@@ -89,7 +89,7 @@ const PeopleAgentSchema = z.object({
   agency: z.string().nullable().describe('TODO describe agency field for the OpenInspection MCP integration'),
 });
 
-export const InspectionPeopleSchema = z.object({
+const InspectionPeopleSchema = z.object({
   inspector: z.object({
     id:    z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
     name:  z.string().nullable().describe('TODO describe name field for the OpenInspection MCP integration'),
@@ -110,7 +110,7 @@ export const InspectionPeopleResponseSchema = createApiResponseSchema(Inspection
 // Issue #111 — single aggregate payload for the `/inspections/:id` hub page.
 // One round trip drives six blocks (People / Schedule / Services / Agreement /
 // Invoice / Report status). Every field is explicit (no z.any()).
-export const InspectionHubSchema = z.object({
+const InspectionHubSchema = z.object({
   inspection: z.object({
     id:                z.string().describe('Inspection identifier'),
     propertyAddress:   z.string().describe('Subject property address'),
@@ -187,7 +187,7 @@ export const AgreementRequestCreatedSchema = createApiResponseSchema(
   }),
 ).openapi('AgreementRequestCreatedResponse');
 
-export const ReportItemSchema = z.object({
+const ReportItemSchema = z.object({
   id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
   label: z.string().describe('TODO describe label field for the OpenInspection MCP integration'),
   rating: z.string().nullable().describe('TODO describe rating field for the OpenInspection MCP integration'),
@@ -207,7 +207,7 @@ export const ReportItemSchema = z.object({
   })).optional().describe('Attached repair items snapshotted on this finding (dollars, not cents).'),
 }).openapi('ReportItem');
 
-export const ReportSectionSchema = z.object({
+const ReportSectionSchema = z.object({
   id: z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
   title: z.string().describe('TODO describe title field for the OpenInspection MCP integration'),
   icon: z.string().nullable().optional().describe('TODO describe icon field for the OpenInspection MCP integration'),
@@ -241,7 +241,7 @@ export const ReportDataResponseSchema = z.object({
   })).describe('TODO describe ratingLevels field for the OpenInspection MCP integration'),
 }).openapi('ReportData');
 
-export const InspectionListItemSchema = z.object({
+const InspectionListItemSchema = z.object({
     id:           z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
     date:         z.string().nullable().describe('TODO describe date field for the OpenInspection MCP integration'),
     address:      z.string().nullable().optional().describe('TODO describe address field for the OpenInspection MCP integration'),

@@ -16,7 +16,7 @@ export interface StatusOverview {
   date: string;
 }
 
-export type CardTone = "ok" | "warn" | "bad" | "neutral";
+type CardTone = "ok" | "warn" | "bad" | "neutral";
 
 export interface StatusCardModel {
   key: string;

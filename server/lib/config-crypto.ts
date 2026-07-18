@@ -47,7 +47,7 @@ export async function encryptSecrets(data: Record<string, string>, jwtSecret: st
 }
 
 /** Decrypt a string produced by encryptSecrets. Returns the original object. */
-export async function decryptSecrets(encrypted: string, jwtSecret: string): Promise<Record<string, string>> {
+async function decryptSecrets(encrypted: string, jwtSecret: string): Promise<Record<string, string>> {
     const colonIdx = encrypted.indexOf(':');
     if (colonIdx === -1) throw new Error('Invalid encrypted secrets format');
     const iv = fromB64(encrypted.slice(0, colonIdx));

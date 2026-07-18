@@ -9,8 +9,6 @@ export interface RendererConfig {
   overrides?: Map<string, TemplateOverride>;
 }
 
-/** @deprecated Use RendererConfig */
-export type RendererBrands = RendererConfig;
 
 /**
  * Email-template renderer — renders a trigger to { subject, html, enabled }

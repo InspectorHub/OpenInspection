@@ -5,7 +5,7 @@
 import { z } from '@hono/zod-openapi';
 
 /** Providers supported by the generic validate-credentials endpoint. */
-export const EmailProviderEnum = z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']);
+const EmailProviderEnum = z.enum(['resend', 'sendgrid', 'postmark', 'mailgun']);
 
 /** Request body for POST /email/validate. */
 export const EmailValidateBodySchema = z

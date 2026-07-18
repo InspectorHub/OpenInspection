@@ -5,7 +5,7 @@ import { MessageTemplateService } from '../message-template.service';
  * message_templates row to the port shape `{ channel, subject?, body, variables }`.
  * Tenant-scoped (fail-closed): a wrong tenant or unknown id resolves to null.
  */
-export interface ResolvedTemplate {
+interface ResolvedTemplate {
     channel: 'email' | 'sms';
     subject?: string;
     body: string;

@@ -29,7 +29,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
  * to the inspection's clientEmail. 422 when no template exists, no email is
  * resolvable, or the supplied agreementId does not belong to the tenant.
  */
-export const sendAgreementRequestRoute = createRoute(withMcpMetadata({
+const sendAgreementRequestRoute = createRoute(withMcpMetadata({
     method:  'post',
     path:    '/{id}/agreement-requests',
     tags: ['inspections'],

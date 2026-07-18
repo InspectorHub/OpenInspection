@@ -11,14 +11,14 @@ import type { MessagingProvider } from './provider';
 import { TwilioClient } from './twilio';
 import { TelnyxProvider } from './telnyx';
 
-export interface TwilioResolvedCreds {
+interface TwilioResolvedCreds {
     sid: string;
     token: string;
     from: string;
     /** API Key SID for managed-pool sends (omit for own/platform). */
     authSid?: string;
 }
-export interface TelnyxResolvedCreds { apiKey: string; from: string; }
+interface TelnyxResolvedCreds { apiKey: string; from: string; }
 export type ProviderCreds = TwilioResolvedCreds | TelnyxResolvedCreds;
 
 /**

@@ -4,7 +4,7 @@ import { pillToneFor, pillLabelFor, type RequestRow as RequestRowData } from "~/
 import { m } from "~/paraglide/messages";
 
 /** Per-envelope progress chip, e.g. "1/2 signed". Hidden for 0-signer rows. */
-export function ProgressBadge({ row }: { row: RequestRowData }) {
+function ProgressBadge({ row }: { row: RequestRowData }) {
   const total = row.signersTotal ?? 0;
   if (total <= 0) return null;
   const signed = row.signersSigned ?? 0;

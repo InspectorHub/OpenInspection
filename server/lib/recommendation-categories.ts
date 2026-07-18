@@ -164,16 +164,3 @@ export function getRecommendationCategory(id: string | null | undefined): Recomm
 export function getRecommendationPhrase(id: string | null | undefined): string {
     return getRecommendationCategory(id)?.defaultPhrase ?? '';
 }
-
-/** Group categories for the inspection-edit dropdown's <optgroup> rendering. */
-export function getCategoriesByGroup(): Array<{ group: string; items: RecommendationCategory[] }> {
-    const out: Array<{ group: string; items: RecommendationCategory[] }> = [];
-    const map = new Map<string, RecommendationCategory[]>();
-    for (const c of RECOMMENDATION_CATEGORIES) {
-        const arr = map.get(c.group) ?? [];
-        arr.push(c);
-        map.set(c.group, arr);
-    }
-    for (const [group, items] of map) out.push({ group, items });
-    return out;
-}

@@ -25,5 +25,3 @@ export const LibraryReplaceBodySchema = z.object({
      */
     confirmLossOfEdits: z.boolean().default(false).describe('TODO describe confirmLossOfEdits field for the OpenInspection MCP integration'),
 }).optional();
-
-export type LibraryReplaceBody = z.infer<typeof LibraryReplaceBodySchema>;

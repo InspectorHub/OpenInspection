@@ -1,6 +1,5 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
-import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { agreementSignPath } from '../lib/public-urls';
@@ -149,6 +148,3 @@ const conciergeRoutes = createApiRouter()
 export type ConciergeApi = typeof conciergeRoutes;
 
 export default conciergeRoutes;
-
-// Re-export Errors so callers don't need a separate import.
-export { Errors };

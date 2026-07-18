@@ -1,15 +1,5 @@
 import { z } from '@hono/zod-openapi';
 
-export const NotificationTypeSchema = z.enum([
-    'inspection.created',
-    'inspection.confirmed',
-    'booking.received',
-    'report.published',
-    'agreement.signed',
-    'payment.received',
-    'message.received',
-]);
-
 export const ListNotificationsQuerySchema = z.object({
     unread:           z.enum(['0', '1']).optional().describe('TODO describe unread field for the OpenInspection MCP integration'),
     includeArchived:  z.enum(['0', '1']).optional().describe('TODO describe includeArchived field for the OpenInspection MCP integration'),
@@ -21,7 +11,7 @@ export const MarkReadSchema = z.object({
     ids: z.array(z.string().min(1)).min(1).max(100).describe('TODO describe ids field for the OpenInspection MCP integration'),
 });
 
-export const NotificationDtoSchema = z.object({
+const NotificationDtoSchema = z.object({
     id:         z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
     type:       z.string().describe('TODO describe type field for the OpenInspection MCP integration'),
     title:      z.string().describe('TODO describe title field for the OpenInspection MCP integration'),

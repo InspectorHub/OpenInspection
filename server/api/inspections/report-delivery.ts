@@ -29,7 +29,7 @@ import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { resolveReportTier } from '../../lib/report-tier';
 
-export const sendReportPdfRoute = createRoute(withMcpMetadata({
+const sendReportPdfRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/send-report-pdf',
     tags: ["inspections"],
@@ -65,7 +65,7 @@ export const sendReportPdfRoute = createRoute(withMcpMetadata({
 /**
  * GET /api/inspections/:id/report-data
  */
-export const getReportDataRoute = createRoute(withMcpMetadata({
+const getReportDataRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/report-data',
     tags: ["inspections"],
@@ -95,7 +95,7 @@ export const getReportDataRoute = createRoute(withMcpMetadata({
  * realtor. Authenticated route; the public viewer page hits the same
  * service via a server-side render at /inspections/:id/repair-list.
  */
-export const RepairListEntrySchema = z.object({
+const RepairListEntrySchema = z.object({
     sectionId:           z.string().describe('TODO describe sectionId field for the OpenInspection MCP integration'),
     sectionTitle:        z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
     itemId:              z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
@@ -110,7 +110,7 @@ export const RepairListEntrySchema = z.object({
     photos:              z.array(z.object({ key: z.string().describe('TODO describe key field for the OpenInspection MCP integration'), url: z.string().describe('TODO describe url field for the OpenInspection MCP integration') })).describe('TODO describe photos field for the OpenInspection MCP integration'),
     source:              z.enum(['canned', 'custom']).describe('TODO describe source field for the OpenInspection MCP integration'),
 });
-export const RepairListResponseSchema = z.object({
+const RepairListResponseSchema = z.object({
     inspection: z.object({
         id:              z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
         propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
@@ -129,7 +129,7 @@ export const RepairListResponseSchema = z.object({
     showEstimates: z.boolean().describe('TODO describe showEstimates field for the OpenInspection MCP integration'),
 });
 
-export const getRepairListRoute = createRoute(withMcpMetadata({
+const getRepairListRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/repair-list',
     tags: ["inspections"],
@@ -151,7 +151,7 @@ export const getRepairListRoute = createRoute(withMcpMetadata({
  * Returns the multi-party list (client + buyer agent + listing agent) that
  * the Publish modal renders per-recipient Email/Text checkboxes against.
  */
-export const recipientsRoute = createRoute(withMcpMetadata({
+const recipientsRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/{id}/recipients',
     tags: ["inspections"],
@@ -172,7 +172,7 @@ export const recipientsRoute = createRoute(withMcpMetadata({
  * Round-2 F3 — GET /api/inspections/:id/people
  * People-card payload (inspector + client + buyer/listing agents).
  */
-export const peopleRoute = createRoute(withMcpMetadata({
+const peopleRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/{id}/people',
     tags: ["inspections"],
@@ -197,7 +197,7 @@ export const peopleRoute = createRoute(withMcpMetadata({
  * Agreement / Invoice / Report status). 404 when the inspection does not exist
  * or belongs to another tenant.
  */
-export const hubRoute = createRoute(withMcpMetadata({
+const hubRoute = createRoute(withMcpMetadata({
     method:  'get',
     path:    '/{id}/hub',
     tags: ['inspections'],
@@ -220,7 +220,7 @@ export const hubRoute = createRoute(withMcpMetadata({
 // streams (on-demand renders if needed) the requested PDF. These sit on the
 // delivery side of the report lifecycle; the publish/state-machine routes live
 // in ./publish.ts.
-export const refreshPdfRoute = createRoute(withMcpMetadata({
+const refreshPdfRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/pdf/refresh',
     tags: ["inspections"],
     summary: 'Refresh PDF renders (Summary + Full)',
@@ -244,7 +244,7 @@ export const refreshPdfRoute = createRoute(withMcpMetadata({
 // POST /{id}/export/word (Task 5) enqueues the build job; these two GETs are
 // the polling status endpoint and the streaming R2 download the UI's
 // "Export to Word" button (Task 6) uses once status flips to 'ready'.
-export const getExportStatusRoute = createRoute(withMcpMetadata({
+const getExportStatusRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/export/{exportId}',
     tags: ["inspections"],
     summary: 'Get Word export status',
@@ -274,7 +274,7 @@ export const getExportStatusRoute = createRoute(withMcpMetadata({
 // (no synchronous fast path — see the plan's Global Constraints): this route
 // only writes a `queued` status row and sends the job envelope; the queue
 // consumer (server/services/report-export-consumer.ts) does all the work.
-export const enqueueWordExportRoute = createRoute(withMcpMetadata({
+const enqueueWordExportRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/export/word',
     tags: ["inspections"],
     summary: 'Enqueue a .docx export of the commercial PCA report',
@@ -294,7 +294,7 @@ export const enqueueWordExportRoute = createRoute(withMcpMetadata({
     description: "Enqueue an async .docx export build (Commercial PCA Phase W). Async-only — every export goes through the queue regardless of size.",
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const downloadExportRoute = createRoute(withMcpMetadata({
+const downloadExportRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/export/{exportId}/download',
     tags: ["inspections"],
     summary: 'Download the built .docx export',
@@ -316,7 +316,7 @@ export const downloadExportRoute = createRoute(withMcpMetadata({
     description: "Stream the .docx bytes for a ready export from R2 (Commercial PCA Phase W).",
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const downloadPdfRoute = createRoute(withMcpMetadata({
+const downloadPdfRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}/pdf',
     tags: ["inspections"],
     summary: 'Download report PDF (Summary or Full)',

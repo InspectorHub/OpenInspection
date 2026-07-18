@@ -5,7 +5,7 @@ import { ErrorCode } from './errors';
 /**
  * Standard API response structure.
  */
-export interface ApiResponse<T = unknown> {
+interface ApiResponse<T = unknown> {
     success: boolean;
     data?: T | undefined;
     error?: {

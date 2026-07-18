@@ -8,7 +8,7 @@
 import { canvasToJpegBlob } from './cropImage';
 
 export const UPLOAD_MAX_LONG_EDGE = 2560;
-export const UPLOAD_JPEG_QUALITY = 0.82;
+const UPLOAD_JPEG_QUALITY = 0.82;
 
 export interface TargetDimensions { width: number; height: number }
 

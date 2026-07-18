@@ -5,8 +5,6 @@ import { withCustomerSync } from './qbo/customer-sync';
 import { withWebhook } from './qbo/webhook';
 import { withCdc } from './qbo/cdc';
 
-export type { QBOConnectionStatus } from './qbo/api-base';
-
 // QBOService composes the QBO integration domains over the shared api-base
 // (OAuth token auto-refresh + encrypted-token handling + apiCall/retry/log).
 // withWebhook and withCdc each layer the shared invoice-sync surface

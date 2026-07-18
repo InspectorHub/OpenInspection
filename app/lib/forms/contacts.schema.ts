@@ -32,5 +32,3 @@ export function makeAddContactSchema() {
     agency: z.string().optional(),
   });
 }
-
-export type AddContactInput = z.infer<ReturnType<typeof makeAddContactSchema>>;

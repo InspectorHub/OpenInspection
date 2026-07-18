@@ -9,7 +9,7 @@
  * could otherwise evict every genuine row within CAP requests. Unverified
  * failures are sub-capped (SIG_FAILED_CAP) so verified entries always survive.
  */
-export type StripeWebhookResult = 'processed' | 'received' | 'signature_failed' | 'tenant_mismatch';
+type StripeWebhookResult = 'processed' | 'received' | 'signature_failed' | 'tenant_mismatch';
 
 export interface StripeWebhookLogEntry {
     ts: string; // ISO 8601

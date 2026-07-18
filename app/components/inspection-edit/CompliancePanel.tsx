@@ -34,9 +34,9 @@ import { m } from "~/paraglide/messages";
 // ── Wire-shape mirrors (hand-mirrored from server/lib/validations/compliance.schema.ts;
 //    kept local/minimal — the panel only needs the fields it renders) ──────────
 
-export type SignoffRole = "field_observer" | "pcr_reviewer";
+type SignoffRole = "field_observer" | "pcr_reviewer";
 
-export interface ReportSignoffView {
+interface ReportSignoffView {
   role: SignoffRole;
   personId: string;
   name: string;
@@ -46,12 +46,12 @@ export interface ReportSignoffView {
   dualRole?: boolean;
 }
 
-export interface PsqView {
+interface PsqView {
   status: "sent" | "received" | "declined";
   responses: Record<string, unknown> | null;
 }
 
-export interface DocumentReviewItemView {
+interface DocumentReviewItemView {
   documentKey: string;
   label: string;
   requested: boolean;
@@ -61,7 +61,7 @@ export interface DocumentReviewItemView {
   notes: string | null;
 }
 
-export interface RelianceTextView {
+interface RelianceTextView {
   userReliance: string;
   pointInTime: string;
   siteSpecific: string;

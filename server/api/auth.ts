@@ -26,19 +26,6 @@ import { safeReturnTo } from '../lib/mcp/safe-return-to';
 import totpRoutes from './auth/totp';
 import profileRoutes from './auth/profile';
 
-/**
- * Interface for the decoded JWT payload. Intentionally does not carry email or any other
- * PII — JWTs are signed, not encrypted.
- */
-export interface AuthPayload {
-    sub: string;
-    'custom:tenantId': string;
-    'custom:userRole': string;
-    role: string;
-    exp: number;
-    iat?: number;
-}
-
 // --- Routes ---
 
 const loginRoute = createRoute(withMcpMetadata({

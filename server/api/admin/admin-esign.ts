@@ -376,5 +376,4 @@ const adminEsignRoutes = createApiRouter()
         return c.json({ success: true as const, data: { remindedAt: now } }, 200);
     });
 
-export type AdminEsignApi = typeof adminEsignRoutes;
 export default adminEsignRoutes;

@@ -11,7 +11,7 @@ import { z } from '@hono/zod-openapi';
  *     a confirmation modal.
  *   - 'force' — drops removed-item data without ceremony. Caller-confirmed.
  */
-export const MigrationStrategySchema = z.enum([
+const MigrationStrategySchema = z.enum([
     'preserve_unknown',
     'refuse_incompatible',
     'force',
@@ -33,4 +33,3 @@ export const MigrationBodySchema = z.object({
 });
 
 export type MigrationStrategy = z.infer<typeof MigrationStrategySchema>;
-export type MigrationBody = z.infer<typeof MigrationBodySchema>;

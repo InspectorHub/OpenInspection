@@ -6,7 +6,6 @@ export type ComplianceChannel = 'sp10dlc' | 'tollfree';
 export const COMPLIANCE_STATUSES = [
   'not_started', 'profile_pending', 'brand_pending', 'campaign_pending', 'tfv_pending', 'approved', 'rejected',
 ] as const;
-export type ComplianceStatus = (typeof COMPLIANCE_STATUSES)[number];
 
 export function isComplianceChannel(v: string): v is ComplianceChannel {
   return v === 'sp10dlc' || v === 'tollfree';

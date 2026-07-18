@@ -7,7 +7,6 @@ import { EnvelopeLegacyMixin } from './agreement/envelope-legacy';
 import { TemplateMixin } from './agreement/template';
 
 export { computeEnvelopeStatus } from './agreement/base';
-export type { SignerInput, ResolvedSigner } from './agreement/base';
 
 /**
  * Service to manage tenant-specific agreement templates (signatures, terms).

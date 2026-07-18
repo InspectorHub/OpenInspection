@@ -5,7 +5,7 @@ import { z } from '@hono/zod-openapi';
 // rating-system.schema.ts's SeverityEnum; kept as a separate declaration
 // here (recommendations is its own domain schema) rather than importing
 // across domains.
-export const SeverityEnum = z.enum(['good', 'marginal', 'significant', 'minor']);
+const SeverityEnum = z.enum(['good', 'marginal', 'significant', 'minor']);
 
 export const CreateRecommendationSchema = z.object({
     category:             z.string().nullable().optional().describe('TODO describe category field for the OpenInspection MCP integration'),
@@ -19,7 +19,7 @@ export const CreateRecommendationSchema = z.object({
 
 export const UpdateRecommendationSchema = CreateRecommendationSchema.partial().openapi('UpdateRecommendation');
 
-export const RecommendationSchema = z.object({
+const RecommendationSchema = z.object({
     id:                   z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
     tenantId:             z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     category:             z.string().nullable().describe('TODO describe category field for the OpenInspection MCP integration'),
@@ -70,5 +70,3 @@ export const AggregatedRecommendationsResponseSchema = z.object({
     }),
 }).openapi('AggregatedRecommendationsResponse');
 
-export type CreateRecommendationInput = z.infer<typeof CreateRecommendationSchema>;
-export type UpdateRecommendationInput = z.infer<typeof UpdateRecommendationSchema>;

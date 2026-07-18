@@ -35,7 +35,7 @@ export type ScalarField =
     | 'followupNotes';
 
 /** Fixed list of scalar fields (stable diff order). */
-export const SCALAR_FIELDS: readonly ScalarField[] = [
+const SCALAR_FIELDS: readonly ScalarField[] = [
     'rating',
     'notes',
     'value',
@@ -50,7 +50,7 @@ export const SCALAR_FIELDS: readonly ScalarField[] = [
 const NESTED_FIELDS = ['attributes', 'photos', 'tabs', 'customComments', 'recommendations'] as const;
 
 /** A single scalar field that differs between the two projections. */
-export interface FieldChange {
+interface FieldChange {
     field: ScalarField;
     /** The OLD value (from the `from` projection) — what "Recover" writes back. */
     from: unknown;

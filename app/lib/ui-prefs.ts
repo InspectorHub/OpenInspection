@@ -19,8 +19,8 @@ export interface UiPrefs {
   sidebarCollapsed: boolean;
 }
 
-export const COLOR_SCHEME_COOKIE = "oi-color-scheme";
-export const SIDEBAR_COOKIE = "oi-sidebar-collapsed";
+const COLOR_SCHEME_COOKIE = "oi-color-scheme";
+const SIDEBAR_COOKIE = "oi-sidebar-collapsed";
 
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
 

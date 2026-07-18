@@ -16,17 +16,13 @@ import {
     resolveRequireDefectFields,
     computePublishReadinessFromState,
     rankCannedCommentsForItem,
-    type PublishBlockingDefect,
-    type RequireDefectFields,
     type PublishReadiness,
     type Inspection,
     type InspectionListParams,
     type CreateInspectionData,
     type PropertyFacts,
     type PropertyFactFoundation,
-    type CannedSeverity,
     type CannedCommentLike,
-    type RankCommentsOpts,
 } from './inspection/shared';
 import { InspectionSharingService } from './inspection/inspection-sharing.service';
 import { InspectionAnalyticsService } from './inspection/inspection-analytics.service';
@@ -46,13 +42,9 @@ export {
     rankCannedCommentsForItem,
 };
 export type {
-    PublishBlockingDefect,
-    RequireDefectFields,
     PublishReadiness,
     PropertyFacts,
-    CannedSeverity,
     CannedCommentLike,
-    RankCommentsOpts,
 };
 
 /**

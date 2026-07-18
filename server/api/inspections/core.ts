@@ -80,7 +80,7 @@ function fireQuotaThresholdNotice(c: Context<HonoConfig>, tenantId: string): voi
 /**
  * GET /api/inspections/:id
  */
-export const getInspectionRoute = createRoute(withMcpMetadata({
+const getInspectionRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}',
     tags: ["inspections"],
@@ -113,7 +113,7 @@ export const getInspectionRoute = createRoute(withMcpMetadata({
 /**
  * DELETE /api/inspections/:id
  */
-export const deleteInspectionRoute = createRoute(withMcpMetadata({
+const deleteInspectionRoute = createRoute(withMcpMetadata({
     method: 'delete',
     path: '/{id}',
     tags: ["inspections"],
@@ -141,7 +141,7 @@ export const deleteInspectionRoute = createRoute(withMcpMetadata({
 /**
  * PATCH /api/inspections/:id
  */
-export const updateInspectionRoute = createRoute(withMcpMetadata({
+const updateInspectionRoute = createRoute(withMcpMetadata({
     method: 'patch',
     path: '/{id}',
     tags: ["inspections"],
@@ -177,7 +177,7 @@ export const updateInspectionRoute = createRoute(withMcpMetadata({
 /**
  * POST /api/inspections
  */
-export const createInspectionRoute = createRoute(withMcpMetadata({
+const createInspectionRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/',
     tags: ["inspections"],
@@ -211,7 +211,7 @@ export const createInspectionRoute = createRoute(withMcpMetadata({
 /**
  * POST /api/inspections/:id/clone
  */
-export const cloneInspectionRoute = createRoute(withMcpMetadata({
+const cloneInspectionRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/clone',
     tags: ["inspections"],
@@ -241,7 +241,7 @@ export const cloneInspectionRoute = createRoute(withMcpMetadata({
 // 4-step wizard payload validated by CreateInspectionFromWizardSchema.
 // Returns the new inspection id so the wizard factory redirects to
 // /inspections/:id/edit on success.
-export const createFromWizardRoute = createRoute(withMcpMetadata({
+const createFromWizardRoute = createRoute(withMcpMetadata({
     method:     'post',
     path:       '/wizard',
     tags: ["inspections"],

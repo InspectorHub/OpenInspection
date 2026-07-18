@@ -1,4 +1,4 @@
-import { AutomationBase, SMS_DISCLOSURE_V1 } from './automation/shared';
+import { AutomationBase } from './automation/shared';
 import { AutomationCore } from './automation/core';
 import { AutomationTrigger } from './automation/trigger';
 import { AutomationConditions } from './automation/conditions';
@@ -6,11 +6,6 @@ import { AutomationSms } from './automation/sms';
 import { AutomationDelivery } from './automation/delivery';
 import { AutomationReminders } from './automation/reminders';
 import { AutomationLogs } from './automation/logs';
-
-// Track L (D7) — default TCPA SMS opt-in disclosure (version 1). Re-exported here
-// so the public surface of this module is unchanged (callers/tests that imported
-// SMS_DISCLOSURE_V1 from 'automation.service' keep working).
-export { SMS_DISCLOSURE_V1 };
 
 /**
  * Automation engine — formerly a single ~744-LOC class. Split into focused mixins

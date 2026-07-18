@@ -4,7 +4,7 @@
 // portal only when the portal service binding is present (SaaS). Core services
 // depend on this interface so they never import a concrete portal symbol.
 
-export type UserSyncEventType =
+type UserSyncEventType =
     | 'user.invited'
     | 'user.password_changed'
     | 'user.deleted'

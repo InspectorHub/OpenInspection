@@ -21,7 +21,7 @@ import { and, eq } from 'drizzle-orm';
 // validation in UnitService (depth ≤ 3, sibling-name uniqueness, cycle
 // detection on move). Routes guard with the standard inspector role.
 
-export const createUnitRoute = createRoute(withMcpMetadata({
+const createUnitRoute = createRoute(withMcpMetadata({
     method:     'post',
     path:       '/{id}/units',
     tags: ["inspections"],
@@ -42,7 +42,7 @@ export const createUnitRoute = createRoute(withMcpMetadata({
 // Commercial PCA Phase U — bulk-create N units (floors×stacks / CSV paste) and
 // duplicate a unit's attributes into a new empty sibling. Same mount, same
 // requireRole guard, same c.var.services.unit as the single-create route.
-export const bulkCreateUnitsRoute = createRoute(withMcpMetadata({
+const bulkCreateUnitsRoute = createRoute(withMcpMetadata({
     method:     'post',
     path:       '/{id}/units/bulk',
     tags: ["inspections"],
@@ -60,7 +60,7 @@ export const bulkCreateUnitsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for bulkCreateInspectionUnits (POST /{id}/units/bulk, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const duplicateUnitRoute = createRoute(withMcpMetadata({
+const duplicateUnitRoute = createRoute(withMcpMetadata({
     method:     'post',
     path:       '/{id}/units/{unitId}/duplicate',
     tags: ["inspections"],
@@ -81,7 +81,7 @@ export const duplicateUnitRoute = createRoute(withMcpMetadata({
 // per_unit mode. Delegates to c.var.services.unitSwitch (Batch B); the
 // per_unit → tagged direction is LOSSY (drops the unit rows + matrix). Same
 // requireRole guard as the other write routes on this mount.
-export const unitModeSwitchRoute = createRoute(withMcpMetadata({
+const unitModeSwitchRoute = createRoute(withMcpMetadata({
     method:     'post',
     path:       '/{id}/unit-mode',
     tags: ["inspections"],
@@ -103,7 +103,7 @@ export const unitModeSwitchRoute = createRoute(withMcpMetadata({
 // Computes rated/total per unit + the common scope SERVER-SIDE from one results
 // row + the template snapshot, so the scope switcher never has to pull the full
 // results map. Same roles as listUnits (read, includes agent).
-export const unitProgressRoute = createRoute(withMcpMetadata({
+const unitProgressRoute = createRoute(withMcpMetadata({
     method:     'get',
     path:       '/{id}/unit-progress',
     tags: ["inspections"],
@@ -115,7 +115,7 @@ export const unitProgressRoute = createRoute(withMcpMetadata({
     description: "Returns { units: [{ unitId, rated, total }], commonRated, total } for an inspection. `total` is the template item count; `rated` counts each scope's findings that carry a truthy rating. Computed server-side from one results row to avoid shipping the full results map to the client."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const listUnitsRoute = createRoute(withMcpMetadata({
+const listUnitsRoute = createRoute(withMcpMetadata({
     method:     'get',
     path:       '/{id}/units',
     tags: ["inspections"],
@@ -129,7 +129,7 @@ export const listUnitsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listInspectionUnits (GET /{id}/units, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const updateUnitRoute = createRoute(withMcpMetadata({
+const updateUnitRoute = createRoute(withMcpMetadata({
     method:     'patch',
     path:       '/{id}/units/{unitId}',
     tags: ["inspections"],
@@ -144,7 +144,7 @@ export const updateUnitRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for patchInspectionUnit (PATCH /{id}/units/{unitId}, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const deleteUnitRoute = createRoute(withMcpMetadata({
+const deleteUnitRoute = createRoute(withMcpMetadata({
     method:     'delete',
     path:       '/{id}/units/{unitId}',
     tags: ["inspections"],
@@ -156,7 +156,7 @@ export const deleteUnitRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteInspectionUnit (DELETE /{id}/units/{unitId}, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const moveUnitRoute = createRoute(withMcpMetadata({
+const moveUnitRoute = createRoute(withMcpMetadata({
     method:     'post',
     path:       '/{id}/units/{unitId}/move',
     tags: ["inspections"],
@@ -181,7 +181,7 @@ export const moveUnitRoute = createRoute(withMcpMetadata({
 // anonymous /observe/:token claim handler is mounted at the top level
 // in server/index.ts because it does not sit under /api/inspections/:id.
 
-export const mintObserverLinkRoute = createRoute(withMcpMetadata({
+const mintObserverLinkRoute = createRoute(withMcpMetadata({
     method:     'post',
     path:       '/{id}/observer-links',
     tags: ["inspections"],
@@ -198,7 +198,7 @@ export const mintObserverLinkRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for createInspectionObserverLinks (POST /{id}/observer-links, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const listObserverLinksRoute = createRoute(withMcpMetadata({
+const listObserverLinksRoute = createRoute(withMcpMetadata({
     method:     'get',
     path:       '/{id}/observer-links',
     tags: ["inspections"],
@@ -210,7 +210,7 @@ export const listObserverLinksRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listInspectionObserverLinks (GET /{id}/observer-links, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const revokeObserverLinkRoute = createRoute(withMcpMetadata({
+const revokeObserverLinkRoute = createRoute(withMcpMetadata({
     method:     'delete',
     path:       '/{id}/observer-links/{linkId}',
     tags: ["inspections"],
@@ -229,7 +229,7 @@ export const revokeObserverLinkRoute = createRoute(withMcpMetadata({
 // existing publish flow as part of subsystem D P9 (Republish UX, separate
 // commit) — only the read APIs land here.
 
-export const listVersionsRoute = createRoute(withMcpMetadata({
+const listVersionsRoute = createRoute(withMcpMetadata({
     method:     'get',
     path:       '/{id}/versions',
     tags: ["inspections"],
@@ -241,7 +241,7 @@ export const listVersionsRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listInspectionVersions (GET /{id}/versions, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const getVersionRoute = createRoute(withMcpMetadata({
+const getVersionRoute = createRoute(withMcpMetadata({
     method:     'get',
     path:       '/{id}/versions/{n}',
     tags: ["inspections"],
@@ -253,7 +253,7 @@ export const getVersionRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for getInspectionVersion (GET /{id}/versions/{n}, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const diffVersionRoute = createRoute(withMcpMetadata({
+const diffVersionRoute = createRoute(withMcpMetadata({
     method:     'get',
     path:       '/{id}/versions/{n}/diff',
     tags: ["inspections"],

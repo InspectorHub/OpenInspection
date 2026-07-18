@@ -13,7 +13,7 @@ export const ALLOWED_EXTENSIONS = new Set([
   'doc', 'docx', 'xls', 'xlsx', 'csv', 'dwg', 'dxf',
 ]);
 export const CAD_EXTENSIONS = new Set(['dwg', 'dxf']);
-export const ALLOWED_CONTENT_TYPES = new Set([
+const ALLOWED_CONTENT_TYPES = new Set([
   'application/pdf',
   'image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/webp',
   'application/msword',

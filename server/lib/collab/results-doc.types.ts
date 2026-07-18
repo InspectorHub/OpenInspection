@@ -17,7 +17,7 @@
 // ─── Leaf types ──────────────────────────────────────────────────────────────
 
 /** Re-editable crop transform (source-pixel coords) baked into a cropped photo. */
-export interface PhotoCropTransform {
+interface PhotoCropTransform {
     aspect:      string;
     orientation: 'landscape' | 'portrait';
     x:           number;

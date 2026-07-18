@@ -24,7 +24,7 @@ import { eq, inArray, and } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
 // --- GET /api/inspections/dashboard — Spec 3A ---
-export const dashboardRoute = createRoute(withMcpMetadata({
+const dashboardRoute = createRoute(withMcpMetadata({
     method: 'get',
     path:   '/dashboard',
     tags: ["inspections"],
@@ -44,7 +44,7 @@ export const dashboardRoute = createRoute(withMcpMetadata({
  * GET /api/inspections
  * List inspections with pagination and stats.
  */
-export const listInspectionsRoute = createRoute(withMcpMetadata({
+const listInspectionsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/',
     tags: ["inspections"],
@@ -70,7 +70,7 @@ export const listInspectionsRoute = createRoute(withMcpMetadata({
 /**
  * GET /api/inspections/inspectors
  */
-export const listInspectorsRoute = createRoute(withMcpMetadata({
+const listInspectorsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/inspectors',
     tags: ["inspections"],
@@ -102,7 +102,7 @@ export const listInspectorsRoute = createRoute(withMcpMetadata({
 /**
  * PATCH /api/inspections/bulk
  */
-export const bulkUpdateRoute = createRoute(withMcpMetadata({
+const bulkUpdateRoute = createRoute(withMcpMetadata({
     method: 'patch',
     path: '/bulk',
     tags: ["inspections"],
@@ -140,7 +140,7 @@ export const bulkUpdateRoute = createRoute(withMcpMetadata({
 /**
  * GET /api/inspections/counts
  */
-export const getCountsRoute = createRoute(withMcpMetadata({
+const getCountsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/counts',
     tags: ["inspections"],
@@ -158,7 +158,7 @@ export const getCountsRoute = createRoute(withMcpMetadata({
 
 // IA-6 — GET /api/inspections/schedule-conflicts
 // MUST be registered before /{id} to avoid 'schedule-conflicts' matching as an id param.
-export const scheduleConflictsRoute = createRoute(withMcpMetadata({
+const scheduleConflictsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/schedule-conflicts',
     tags: ['inspections'],

@@ -12,7 +12,7 @@ import { m } from "~/paraglide/messages";
  * via data-color-scheme (no hardcoded colors).
  */
 
-export type SignerStatus = "pending" | "sent" | "viewed" | "signed" | "declined" | "expired";
+type SignerStatus = "pending" | "sent" | "viewed" | "signed" | "declined" | "expired";
 
 export interface SignerRow {
     id: string;

@@ -26,5 +26,3 @@ export const DOCUMENT_REVIEW_CATALOG = [
   { documentKey: 'zoning_compliance',        label: 'Zoning compliance ("legally conforming")', sortOrder: 160 },
   { documentKey: 'previous_reports',         label: 'Previous reports reviewed', sortOrder: 170 },
 ] as const;
-
-export type DocumentCatalogEntry = (typeof DOCUMENT_REVIEW_CATALOG)[number];

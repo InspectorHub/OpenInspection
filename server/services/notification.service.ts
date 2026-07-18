@@ -4,7 +4,7 @@ import { notifications, users } from '../lib/db/schema';
 import { ROLE } from '../lib/auth/roles';
 import { nanoid } from 'nanoid';
 
-export type NotificationType =
+type NotificationType =
     | 'inspection.created'
     | 'inspection.confirmed'
     | 'booking.received'

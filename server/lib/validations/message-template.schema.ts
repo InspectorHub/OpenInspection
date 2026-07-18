@@ -1,6 +1,6 @@
 import { z } from '@hono/zod-openapi';
 
-export const ChannelSchema = z.enum(['email', 'sms']);
+const ChannelSchema = z.enum(['email', 'sms']);
 
 // tenantId is NEVER accepted from input (multi-tenant rule); .strip() drops extras.
 export const CreateMessageTemplateSchema = z.object({

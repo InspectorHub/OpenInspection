@@ -31,7 +31,7 @@ import { withMcpMetadata } from '../../lib/route-metadata-standards';
  * the response echoes the target so the client can attach the key to the
  * right custom row.
  */
-export const uploadPhotoRoute = createRoute(withMcpMetadata({
+const uploadPhotoRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/upload',
     tags: ["inspections"],
@@ -80,7 +80,7 @@ export const uploadPhotoRoute = createRoute(withMcpMetadata({
  * contains '/' — travels as a query param to avoid path-segment splitting.
  * The public report viewer has its own token-scoped twin in public-report.ts.
  */
-export const servePhotoRoute = createRoute(withMcpMetadata({
+const servePhotoRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/photo',
     tags: ["inspections"],
@@ -110,7 +110,7 @@ export const servePhotoRoute = createRoute(withMcpMetadata({
  *   POST /api/inspections/:id/media/attach   — attach pool photo to an item
  *   DELETE /api/inspections/:id/media/pool/:poolId — discard pool photo
  */
-export const mediaCenterRoute = createRoute(withMcpMetadata({
+const mediaCenterRoute = createRoute(withMcpMetadata({
     method: 'get',
     path:   '/{id}/media',
     tags: ["inspections"],
@@ -127,7 +127,7 @@ export const mediaCenterRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for listInspectionMedia (GET /{id}/media, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const mediaUploadRoute = createRoute(withMcpMetadata({
+const mediaUploadRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/media/upload',
     tags: ["inspections"],
@@ -160,7 +160,7 @@ export const mediaUploadRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for uploadInspection (POST /{id}/media/upload, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const mediaAttachRoute = createRoute(withMcpMetadata({
+const mediaAttachRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/media/attach',
     tags: ["inspections"],
@@ -180,7 +180,7 @@ export const mediaAttachRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for attachInspection (POST /{id}/media/attach, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
-export const mediaPoolDeleteRoute = createRoute(withMcpMetadata({
+const mediaPoolDeleteRoute = createRoute(withMcpMetadata({
     method: 'delete',
     path:   '/{id}/media/pool/{poolId}',
     tags: ["inspections"],
@@ -201,7 +201,7 @@ export const mediaPoolDeleteRoute = createRoute(withMcpMetadata({
 
 // Media Studio (Plan 3, P4) — reorder an item's photos[] (array order ==
 // report photo order). Pure permutation; the submitted key set must match.
-export const itemPhotosReorderRoute = createRoute(withMcpMetadata({
+const itemPhotosReorderRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/items/{itemId}/photos/reorder',
     tags: ["inspections"],
@@ -226,7 +226,7 @@ export const itemPhotosReorderRoute = createRoute(withMcpMetadata({
 
 // Media Studio (Plan 3, P4) — detach a photo from an item (drop the array
 // entry; the R2 object is preserved).
-export const itemPhotoDetachRoute = createRoute(withMcpMetadata({
+const itemPhotoDetachRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/items/{itemId}/photos/{photoIndex}/detach',
     tags: ["inspections"],
@@ -252,7 +252,7 @@ export const itemPhotoDetachRoute = createRoute(withMcpMetadata({
 
 // Media Studio (Plan 3) — revert a photo's edits to the original (drop the
 // annotated derivative; keep the source key). Non-destructive undo.
-export const itemPhotoRevertRoute = createRoute(withMcpMetadata({
+const itemPhotoRevertRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/items/{itemId}/photos/{photoIndex}/revert',
     tags: ["inspections"],
@@ -278,7 +278,7 @@ export const itemPhotoRevertRoute = createRoute(withMcpMetadata({
 
 // Media Studio (Plan 3, Task 9b) — move a photo from one item to another
 // (detach from source + append to target, derivatives ride along).
-export const itemPhotoMoveRoute = createRoute(withMcpMetadata({
+const itemPhotoMoveRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/items/{itemId}/photos/{photoIndex}/move',
     tags: ["inspections"],
@@ -308,7 +308,7 @@ export const itemPhotoMoveRoute = createRoute(withMcpMetadata({
 // Inspector flips an awaiting_inspector concierge booking to awaiting_client.
 // Service mints the magic-link + sends the client confirm email. Tenant scope
 // is enforced via JWT-derived tenantId — never trust the URL for tenant.
-export const approveConciergeRoute = createRoute(withMcpMetadata({
+const approveConciergeRoute = createRoute(withMcpMetadata({
     method: 'post',
     path:   '/{id}/concierge/approve',
     tags: ["inspections"],

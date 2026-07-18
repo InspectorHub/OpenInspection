@@ -22,12 +22,12 @@ import { logger } from '../logger';
 const SLUG_CACHE_TTL_S = 300;
 
 /** Cache key for a user's booking slug — writers delete it on slug change. */
-export function userSlugCacheKey(userId: string): string {
+function userSlugCacheKey(userId: string): string {
     return `uslug:${userId}`;
 }
 
 /** Cache key for a tenant's slug (saas JWT-path fallback lookup). */
-export function tenantSlugCacheKey(tenantId: string): string {
+function tenantSlugCacheKey(tenantId: string): string {
     return `tslug:${tenantId}`;
 }
 

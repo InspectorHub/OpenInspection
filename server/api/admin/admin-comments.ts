@@ -365,5 +365,4 @@ const adminCommentsRoutes = createApiRouter()
         return c.json({ success: true as const, data: { commentId: id, useCount: 1 } }, 200);
     });
 
-export type AdminCommentsApi = typeof adminCommentsRoutes;
 export default adminCommentsRoutes;

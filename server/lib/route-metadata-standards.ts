@@ -19,8 +19,6 @@ export const VALID_TAGS = [
     'sms',
 ] as const;
 
-export type ValidTag = typeof VALID_TAGS[number];
-
 export const VALID_SECONDARY_TAGS = ['public', 'm2m', 'beta', 'webhook'] as const;
 
 export const VALID_SCOPES = ['read', 'write', 'admin', 'agent'] as const;

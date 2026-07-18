@@ -1,4 +1,4 @@
-export const INVITE_TOKEN_BYTES = 24; // 24 bytes -> 48 hex chars
+const INVITE_TOKEN_BYTES = 24; // 24 bytes -> 48 hex chars
 export const INVITE_TTL_DAYS = 7;
 
 export function mintToken(): string {

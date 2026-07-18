@@ -74,9 +74,6 @@ export interface HasResolveAddress {
         insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
     ): Promise<string | null>;
 }
-export interface HasTitleFor {
-    titleFor(event: string, insp: typeof inspections.$inferSelect): string;
-}
 export interface HasEvaluateConditions {
     evaluateConditions(
         db: DrizzleD1Database,

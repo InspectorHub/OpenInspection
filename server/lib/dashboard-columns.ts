@@ -15,7 +15,7 @@
  * safe because unknown ids are dropped on read.
  */
 
-export interface DashboardColumn {
+interface DashboardColumn {
     /** Stable identifier — never rename. Used in localStorage and DB JSON. */
     id: string;
     /** Human-readable label shown in the modal and any column-header surface. */
@@ -43,7 +43,7 @@ export interface DashboardColumn {
  * the inspection row is fixed in dashboard.tsx (the registry only governs
  * presence, not ordering — re-ordering is out of scope for round 2).
  */
-export const DASHBOARD_COLUMNS: ReadonlyArray<DashboardColumn> = [
+const DASHBOARD_COLUMNS: ReadonlyArray<DashboardColumn> = [
     {
         id: 'propertyAddress',
         label: 'Property Address',
@@ -119,7 +119,7 @@ export const DASHBOARD_COLUMNS: ReadonlyArray<DashboardColumn> = [
 ] as const;
 
 /** Set of all known column ids — used to filter persisted prefs. */
-export const DASHBOARD_COLUMN_IDS: ReadonlySet<string> = new Set(
+const DASHBOARD_COLUMN_IDS: ReadonlySet<string> = new Set(
     DASHBOARD_COLUMNS.map(c => c.id),
 );
 
@@ -129,7 +129,7 @@ export const DEFAULT_DASHBOARD_COLUMNS: ReadonlyArray<string> = DASHBOARD_COLUMN
     .map(c => c.id);
 
 /** Always-on subset — these can never be removed by user / tenant prefs. */
-export const ALWAYS_ON_DASHBOARD_COLUMNS: ReadonlyArray<string> = DASHBOARD_COLUMNS
+const ALWAYS_ON_DASHBOARD_COLUMNS: ReadonlyArray<string> = DASHBOARD_COLUMNS
     .filter(c => c.alwaysOn)
     .map(c => c.id);
 

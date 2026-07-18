@@ -326,5 +326,4 @@ const adminAgreementsRoutes = createApiRouter()
         return c.json({ success: true as const }, 200);
     });
 
-export type AdminAgreementsApi = typeof adminAgreementsRoutes;
 export default adminAgreementsRoutes;

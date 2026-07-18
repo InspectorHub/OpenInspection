@@ -17,7 +17,7 @@
 
 import type { AppEnv } from '../types/hono';
 
-export type DeploymentMode = 'standalone' | 'saas';
+type DeploymentMode = 'standalone' | 'saas';
 
 export interface DeploymentProfile {
     mode: DeploymentMode;

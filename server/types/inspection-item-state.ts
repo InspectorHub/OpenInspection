@@ -51,25 +51,6 @@ export interface MediaEntry {
 }
 
 /**
- * Legacy alias — photo-only call sites + the Plan 4 report cascade still refer
- * to `PhotoEntry`. It is structurally identical to `MediaEntry` (superset), so
- * the two are interchangeable; new code should prefer `MediaEntry`.
- */
-export type PhotoEntry = MediaEntry;
-
-/**
- * State for a non-defect canned comment (Information / Limitations).
- * `cannedId` references the corresponding entry in the template's
- * `tabs.information` / `tabs.limitations` array.
- */
-export interface CannedCommentState {
-    cannedId: string;
-    included: boolean;
-    /** When non-null, overrides the template's comment text. */
-    comment?: string | null;
-}
-
-/**
  * State for a defect canned comment. Adds category override (defaults to
  * the template's category) + location + structured trade/deadline/timeframe
  * + per-defect photos.
@@ -86,26 +67,3 @@ export interface DefectCommentState {
     photos?: MediaEntry[];
 }
 
-/**
- * Per-item state recorded on an inspection.
- */
-export interface InspectionItemState {
-    /** Currently-selected rating option (e.g. 'Inspected', 'Repair'). */
-    rating?: string | null;
-    /** Free-text notes (legacy field — still supported alongside tabs). */
-    notes?: string;
-    /** Item-level photos (legacy bucket — still supported). */
-    photos?: MediaEntry[];
-    /** New v2 tab state. Optional so legacy item-results render cleanly. */
-    tabs?: {
-        information?: CannedCommentState[];
-        limitations?: CannedCommentState[];
-        defects?: DefectCommentState[];
-    };
-    /** Inspector-added custom comments not present in the template. */
-    customComments?: {
-        information?: Array<CannedCommentState & { title: string }>;
-        limitations?: Array<CannedCommentState & { title: string }>;
-        defects?: Array<DefectCommentState & { title: string }>;
-    };
-}

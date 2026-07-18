@@ -5,26 +5,26 @@ export const MetricsQuerySchema = z.object({
     period: z.enum(['3m', '6m', '12m']).default('12m').describe('TODO describe period field for the OpenInspection MCP integration'),
 });
 
-export const MonthlyDataSchema = z.object({
+const MonthlyDataSchema = z.object({
     month:   z.string().describe('TODO describe month field for the OpenInspection MCP integration'),
     revenue: z.number().describe('TODO describe revenue field for the OpenInspection MCP integration'),
     count:   z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
 });
 
-export const TopAgentSchema = z.object({
+const TopAgentSchema = z.object({
     agentId:   z.string().nullable().describe('TODO describe agentId field for the OpenInspection MCP integration'),
     agentName: z.string().describe('TODO describe agentName field for the OpenInspection MCP integration'),
     count:     z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
     revenue:   z.number().describe('TODO describe revenue field for the OpenInspection MCP integration'),
 });
 
-export const ServiceDistributionSchema = z.object({
+const ServiceDistributionSchema = z.object({
     serviceName: z.string().describe('TODO describe serviceName field for the OpenInspection MCP integration'),
     count:       z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
     revenue:     z.number().describe('TODO describe revenue field for the OpenInspection MCP integration'),
 });
 
-export const MetricsResponseSchema = z.object({
+const MetricsResponseSchema = z.object({
     period:           z.string().describe('TODO describe period field for the OpenInspection MCP integration'),
     totalRevenue:     z.number().describe('TODO describe totalRevenue field for the OpenInspection MCP integration'),
     totalInspections: z.number().describe('TODO describe totalInspections field for the OpenInspection MCP integration'),

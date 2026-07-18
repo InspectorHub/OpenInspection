@@ -7,7 +7,7 @@ import { z } from '@hono/zod-openapi';
  * The `clientName` is sourced from the grant's metadata.clientName that was
  * stamped at authorization time by app/routes/oauth/authorize.tsx.
  */
-export const McpGrantSchema = z.object({
+const McpGrantSchema = z.object({
     id: z.string().describe('Unique grant identifier assigned by the OAuth provider'),
     clientId: z.string().describe('OAuth client identifier for the MCP client application'),
     clientName: z.string().nullable().describe('Human-readable display name of the MCP client, null when unset'),
@@ -27,5 +27,3 @@ export type McpGrant = z.infer<typeof McpGrantSchema>;
 export const McpGrantListResponseSchema = z.object({
     data: z.array(McpGrantSchema).describe('List of OAuth grants matching the request scope'),
 });
-
-export type McpGrantListResponse = z.infer<typeof McpGrantListResponseSchema>;

@@ -17,9 +17,9 @@
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 
-export type FoundationType = 'basement' | 'slab' | 'crawlspace' | 'other';
+type FoundationType = 'basement' | 'slab' | 'crawlspace' | 'other';
 
-export interface PropertyFacts {
+interface PropertyFacts {
     yearBuilt?:      number;
     sqft?:           number;
     foundationType?: FoundationType;
@@ -28,7 +28,7 @@ export interface PropertyFacts {
     bathrooms?:      number;
 }
 
-export type LookupReason = 'NO_API_KEY' | 'NOT_FOUND' | 'PROVIDER_ERROR';
+type LookupReason = 'NO_API_KEY' | 'NOT_FOUND' | 'PROVIDER_ERROR';
 
 export interface LookupResult {
     data:   PropertyFacts | null;

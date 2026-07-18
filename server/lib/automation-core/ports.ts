@@ -1,19 +1,5 @@
 // automation-core/ports.ts — the entire public port surface.
 
-/** A domain event emitted by a side (OI = inspection events; portal = account events). */
-export interface AutomationEvent {
-  triggerKey: string;
-  recipientKey: string;
-  vars: Record<string, unknown>;
-  tenantId: string;
-}
-
-/** The side emits AutomationEvents into the core. (Marker port; OI's trigger.ts is the source.) */
-export interface EventSource {
-  /** Pull/iterate pending events; OI implements this as the inspection trigger/reminder fan-out. */
-  emit?(event: AutomationEvent): Promise<void>;
-}
-
 /** Resolves a rule's template by id. OI returns the rule's own subject/body; portal returns its library row. */
 export interface ResolvedTemplate {
   channel: 'email' | 'sms';
@@ -26,15 +12,15 @@ export interface TemplateStore {
 }
 
 /** The vendored transport: send one message on a channel. Mirrors EmailProvider/MessagingProvider result shape. */
-export type TransportResult = { ok: true; id?: string } | { ok: false; error: string };
+type TransportResult = { ok: true; id?: string } | { ok: false; error: string };
 export interface Transport {
   sendEmail(args: { tenantId: string; to: string; subject: string; html: string }): Promise<TransportResult>;
   sendSms(args: { tenantId: string; to: string; body: string }): Promise<TransportResult>;
 }
 
 /** Each side owns its own log table; the core only records an outcome. */
-export type LogStatus = 'sent' | 'failed' | 'skipped';
-export interface AutomationLogRow {
+type LogStatus = 'sent' | 'failed' | 'skipped';
+interface AutomationLogRow {
   logId: string;
   status: LogStatus;
   error?: string;
@@ -53,14 +39,6 @@ export interface Clock {
 export interface CoreAction {
   channel: 'email' | 'sms';
   templateId: string;
-}
-export interface CoreRule {
-  id: string;
-  triggerKey: string;
-  recipientKey: string;
-  delayMinutes: number;
-  conditions: CoreCondition | null;
-  actions: CoreAction[];
 }
 export interface CoreCondition {
   requirePaid?: boolean;

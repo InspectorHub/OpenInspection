@@ -19,7 +19,7 @@ import { logger } from '../lib/logger';
 import type { CreateTagInput, UpdateTagInput, TagRecord } from '../lib/validations/tag.schema';
 
 /** Five canonical tags planted on first-run via `seedDefaults`. */
-export const SEED_TAGS: ReadonlyArray<{ name: string; color: string }> = Object.freeze([
+const SEED_TAGS: ReadonlyArray<{ name: string; color: string }> = Object.freeze([
     { name: 'Needs follow-up',    color: 'amber'   },
     { name: 'Waiting for client', color: 'slate'   },
     { name: 'Critical',           color: 'rose'    },

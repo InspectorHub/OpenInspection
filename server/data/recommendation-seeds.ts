@@ -13,7 +13,7 @@
 //   Mold (8): 2 sat / 3 mon / 3 def
 // Total = 80
 
-export type SeedSeverity = 'good' | 'marginal' | 'significant';
+type SeedSeverity = 'good' | 'marginal' | 'significant';
 
 export interface SeedRecommendation {
     category:             string;

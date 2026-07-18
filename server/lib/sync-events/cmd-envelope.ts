@@ -10,7 +10,7 @@ import { z } from 'zod';
  * stale-command guard (`tenants.applied_cmd_seq`).
  */
 
-export const KNOWN_CMD_TYPES: Record<string, readonly string[]> = {
+const KNOWN_CMD_TYPES: Record<string, readonly string[]> = {
     'io.inspectorhub.cmd.tenant.update': ['cmd-tenant-update/v1'],
     'io.inspectorhub.cmd.tenant.sync_quota': ['cmd-tenant-sync-quota/v1'],
     'io.inspectorhub.cmd.tenant.seed_starter_content': ['cmd-tenant-seed-starter-content/v1'],
@@ -19,7 +19,7 @@ export const KNOWN_CMD_TYPES: Record<string, readonly string[]> = {
     'io.inspectorhub.cmd.tenant.purge': ['cmd-tenant-purge/v1'],
 };
 
-export const cmdEnvelopeSchema = z.object({
+const cmdEnvelopeSchema = z.object({
     specversion: z.literal('1.0'),
     id: z.string().min(1),
     type: z.string().min(1),

@@ -40,5 +40,3 @@ export const SlugAvailabilityResponseSchema = z
         suggestions: z.array(z.string()).optional().describe('TODO describe suggestions field for the OpenInspection MCP integration'),
     })
     .openapi('SlugAvailability');
-
-export type SlugAvailability = z.infer<typeof SlugAvailabilityResponseSchema>;

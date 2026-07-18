@@ -373,7 +373,7 @@ function buildFindingsSections(sections: Array<{
  * `InspectionService`'s inferred return type, so this module stays decoupled
  * from the service's internal shape beyond the fields it actually consumes.
  */
-export function adaptReportDocxInput(
+function adaptReportDocxInput(
     reportData: {
         inspection: { propertyAddress: string | null };
         reportTier: 'light_commercial' | 'full_pca';

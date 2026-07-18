@@ -7,7 +7,7 @@
  * `severityBucket` (severity axis) and resolved defects' `effectiveCategory`
  * (the safety/recommendation/maintenance category axis). Server-only.
  */
-export type SeverityRank = 'good' | 'marginal' | 'significant' | 'minor';
+type SeverityRank = 'good' | 'marginal' | 'significant' | 'minor';
 
 export interface SystemsSummaryRow {
   systemId: string;

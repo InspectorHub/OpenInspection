@@ -39,14 +39,14 @@ export interface SchemaItem {
   source?: string;
 }
 
-export interface CannedComment {
+interface CannedComment {
   id: string;
   title: string;
   comment: string;
   default: boolean;
 }
 
-export interface CannedDefect {
+interface CannedDefect {
   id: string;
   title: string;
   comment: string;
@@ -91,15 +91,13 @@ export type SaveStatus = "idle" | "saving" | "saved" | "error";
 
 export type ActiveView = "items" | "property";
 
-export type ViewMode = "split" | "focus" | "preview";
-
 export type ItemFilter = "all" | "unrated" | "issues" | "flagged";
 
 /* ------------------------------------------------------------------ */
 /*  Composite finding key                                              */
 /* ------------------------------------------------------------------ */
 
-export function fKey(sectionId: string, itemId: string): string {
+function fKey(sectionId: string, itemId: string): string {
   return `_default:${sectionId}:${itemId}`;
 }
 

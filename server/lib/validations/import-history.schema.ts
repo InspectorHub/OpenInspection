@@ -13,19 +13,18 @@ export const ImportHistoryQuerySchema = z.object({
     pageSize:   z.coerce.number().int().min(1).max(100).optional().describe('TODO describe pageSize field for the OpenInspection MCP integration'),
 });
 
-export const ImportHistoryActionSchema = z.enum(['install', 'update', 'replace', 'migrate']);
-
-export const ImportHistoryItemSchema = z.object({
-    id:            z.string().describe('TODO describe id field for the OpenInspection MCP integration'),
-    templateId:    z.string().nullable().describe('TODO describe templateId field for the OpenInspection MCP integration'),
-    libraryId:     z.string().nullable().describe('TODO describe libraryId field for the OpenInspection MCP integration'),
-    action:        ImportHistoryActionSchema.describe('TODO describe action field for the OpenInspection MCP integration'),
-    sourceVersion: z.string().nullable().describe('TODO describe sourceVersion field for the OpenInspection MCP integration'),
-    targetVersion: z.string().nullable().describe('TODO describe targetVersion field for the OpenInspection MCP integration'),
-    rowsAffected:  z.number().int().describe('TODO describe rowsAffected field for the OpenInspection MCP integration'),
-    metadata:      z.record(z.string(), z.unknown()).nullable().describe('TODO describe metadata field for the OpenInspection MCP integration'),
-    createdAt:     z.number().int().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-    createdBy:     z.string().describe('TODO describe createdBy field for the OpenInspection MCP integration'),
-});
-
-export type ImportHistoryItem = z.infer<typeof ImportHistoryItemSchema>;
+// Shape of a single import-history event row returned by the service. Declared
+// as a plain interface — the row is assembled in code, not parsed from untrusted
+// input, so no runtime Zod schema is needed here.
+export interface ImportHistoryItem {
+    id: string;
+    templateId: string | null;
+    libraryId: string | null;
+    action: 'install' | 'update' | 'replace' | 'migrate';
+    sourceVersion: string | null;
+    targetVersion: string | null;
+    rowsAffected: number;
+    metadata: Record<string, unknown> | null;
+    createdAt: number;
+    createdBy: string;
+}

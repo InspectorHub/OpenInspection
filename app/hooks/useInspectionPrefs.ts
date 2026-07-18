@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFetcher } from 'react-router';
 import type { AutoAdvanceMode } from '~/lib/rating-levels';
 
-export type RequireDefectFields = 'none' | 'location' | 'trade' | 'both';
+type RequireDefectFields = 'none' | 'location' | 'trade' | 'both';
 
 export interface InspectionPrefs {
     cloneDefault:       'rating' | 'rating_notes' | 'all';

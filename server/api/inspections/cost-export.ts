@@ -16,7 +16,7 @@ import { costTablesToXlsxBuffer } from '../../lib/pca-costs-xlsx';
 import { tenantConfigs, inspections } from '../../lib/db/schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
-export const costExportCsvRoute = createRoute(withMcpMetadata({
+const costExportCsvRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/cost-export.csv',
     tags: ['inspections'],
@@ -35,7 +35,7 @@ export const costExportCsvRoute = createRoute(withMcpMetadata({
     description: 'Flat CSV export of every commercial PCA cost item recorded for the inspection, including the derived total_cents column, for spreadsheet import or offline review.',
 }, { scopes: ['read'], tier: 'extended' }));
 
-export const costExportXlsxRoute = createRoute(withMcpMetadata({
+const costExportXlsxRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/{id}/cost-export.xlsx',
     tags: ['inspections'],

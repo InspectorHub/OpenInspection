@@ -70,7 +70,7 @@ export const INTEGRATION_SECRET_KEYS = [
     'APP_BASE_URL',
 ] as const;
 
-export type IntegrationSecretKey = (typeof INTEGRATION_SECRET_KEYS)[number];
+type IntegrationSecretKey = (typeof INTEGRATION_SECRET_KEYS)[number];
 
 /**
  * Key format rules — the slot a value lands in is inferred from its prefix so
