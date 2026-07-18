@@ -12,6 +12,14 @@ export interface BusyBlock {
     transparency?: 'opaque' | 'transparent';
 }
 
+/** A-polish 10b — one calendar from the provider's calendar list. */
+export interface CalendarListEntry {
+    id: string;
+    summary: string;
+    accessRole: string; // owner | writer | reader | freeBusyReader
+    primary: boolean;
+}
+
 interface CalendarPushEventInput {
     summary: string;
     location?: string;
@@ -61,6 +69,13 @@ export interface CalendarProvider {
         range: { from: Date; to: Date };
         capability: CalendarCapability;
     }): Promise<BusyBlock[]>;
+    // A-polish 10b — the user's calendars, for choosing the multi-read set and
+    // the single write target.
+    listCalendars(params: {
+        clientId: string;
+        clientSecret: string;
+        refreshToken: string;
+    }): Promise<CalendarListEntry[]>;
     pushEvent(params: {
         clientId: string;
         clientSecret: string;
