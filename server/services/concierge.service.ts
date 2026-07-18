@@ -8,11 +8,13 @@ import {
     contacts,
     users,
     tenants,
+    contactRoleProfiles,
 } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
+import { PeopleService } from './people.service';
 import type { EmailService } from './email.service';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
@@ -200,6 +202,28 @@ export class ConciergeService {
         });
         // DB-8: mirror assignment into inspection_inspectors link table.
         await syncInspectionAssignments(db, params.tenantId, inspectionId, { inspectorId: inspector.id });
+
+        // Task 7b (people-role-profiles) — mirror the referring agent into
+        // inspection_people (buyer_agent), alongside the legacy
+        // referredByAgentId column above (kept until Task 13 retires it).
+        // No client contact id is resolved anywhere in this flow (clientName /
+        // clientEmail stay inline strings — there is no contact-upsert here),
+        // so only the agent role is written. Non-fatal: a people-write
+        // failure must never roll back an already-committed inspection row.
+        try {
+            const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
+                .from(contactRoleProfiles)
+                .where(and(eq(contactRoleProfiles.tenantId, params.tenantId), eq(contactRoleProfiles.active, true)));
+            const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
+            const buyerAgentRoleId = roleIdByKey.get('buyer_agent');
+            if (link.inspectorContactId && buyerAgentRoleId) {
+                const people = new PeopleService({ DB: this.db });
+                await people.addPerson(params.tenantId, inspectionId, link.inspectorContactId, buyerAgentRoleId);
+            }
+        } catch (err) {
+            logger.error('inspection-people write from concierge create failed', { inspectionId }, err instanceof Error ? err : undefined);
+        }
+
         logger.info('concierge.createBooking', {
             tenantId: params.tenantId,
             inspectionId,
