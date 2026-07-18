@@ -297,18 +297,23 @@ const publishRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
         await db.update(inspectionTable).set({ status: 'completed' }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
-        if (inspection.clientEmail) {
+        // Task 9a (people-role-profiles) — resolve the recipient via the
+        // inspection_people join (PeopleService) instead of the legacy
+        // inspection.clientEmail/.clientName column, which is being dropped.
+        const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, id);
+
+        if (primaryClient?.email) {
             const tenantSlug = await resolveTenantSlug(c, tenantId);
             // linkUrl: per-recipient TOKENIZED report link so the no-login client
             // can open it (a plain URL 404s "Report not found"). Idempotent per
             // (inspection, recipient) — re-sends keep the same stable link.
-            const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: inspection.clientEmail, role: 'client' });
+            const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: primaryClient.email, role: 'client' });
             // linkUrl now lands the no-login client on the unified portal hub
             // (overview) carrying the persistent portalAccess token.
             const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
             // renderUrl: token-bearing URL for the headless browser PDF render.
             const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
-            const clientEmail = inspection.clientEmail;
+            const clientEmail = primaryClient.email;
             const address = inspection.propertyAddress as string;
 
             // Sprint B-4a — resolve the inspector record so the report email
@@ -348,7 +353,7 @@ const publishRoutes = createApiRouter()
                 title: `Report ready — ${inspection.propertyAddress ?? 'inspection'}`,
                 entityType: 'inspection',
                 entityId: inspection.id,
-                metadata: { clientEmail: inspection.clientEmail ?? null },
+                metadata: { clientEmail: primaryClient?.email ?? null },
             })
         );
 
