@@ -703,32 +703,32 @@ export class BookingService {
             }
         }
 
-        // Task 7b (people-role-profiles) — mirror the client + buyer's agent
-        // into inspection_people for the legacy single-service direct-insert
-        // path, alongside the legacy clientContactId / referredByAgentId
-        // columns above (kept until Task 13 retires them). Scoped to
-        // directInsertInspectionId only — the multi-service branch's
-        // inspections were created by InspectionRequestService.create, which
-        // owns its own people-write for those rows. Runs after
-        // bookingClientContactId resolves above since both roles are written
-        // together. Non-fatal: a people-write failure must never roll back an
-        // already-committed inspection row.
-        if (directInsertInspectionId) {
+        // Task 7b (people-role-profiles), FIXED — mirror client + buyer_agent
+        // into inspection_people alongside the legacy clientContactId /
+        // referredByAgentId columns above. Client covers EVERY allInspectionIds
+        // entry (clientContactId is linked to all of them above, incl.
+        // multi-service sub-inspections, which only get buyer_agent from
+        // InspectionRequestService.create — the original bug wrongly scoped
+        // the client write to directInsertInspectionId alone). Non-fatal.
+        if (bookingClientContactId || (directInsertInspectionId && resolvedAgentContactId)) {
             try {
                 const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
                     .from(contactRoleProfiles)
                     .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
                 const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
                 const people = new PeopleService({ DB: this.db });
-                const links: Array<[string | null, string | undefined]> = [
-                    [bookingClientContactId, roleIdByKey.get('client')],
-                    [resolvedAgentContactId, roleIdByKey.get('buyer_agent')],
-                ];
-                for (const [contactId, roleProfileId] of links) {
-                    if (contactId && roleProfileId) await people.addPerson(tenantId, directInsertInspectionId, contactId, roleProfileId);
+                const clientRoleId = roleIdByKey.get('client');
+                if (bookingClientContactId && clientRoleId) {
+                    for (const inspId of allInspectionIds) {
+                        await people.addPerson(tenantId, inspId, bookingClientContactId, clientRoleId);
+                    }
+                }
+                const buyerAgentRoleId = roleIdByKey.get('buyer_agent');
+                if (directInsertInspectionId && resolvedAgentContactId && buyerAgentRoleId) {
+                    await people.addPerson(tenantId, directInsertInspectionId, resolvedAgentContactId, buyerAgentRoleId);
                 }
             } catch (err) {
-                logger.error('inspection-people write from booking create failed', { inspectionId: directInsertInspectionId }, err instanceof Error ? err : undefined);
+                logger.error('inspection-people write from booking create failed', { inspectionIds: allInspectionIds }, err instanceof Error ? err : undefined);
             }
         }
 

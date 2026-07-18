@@ -245,3 +245,80 @@ describe('POST /book — writes inspection_people (Task 7b)', () => {
         expect(errorSpy).toHaveBeenCalled();
     });
 });
+
+describe('POST /book — writes inspection_people for ALL booking inspections (multi-service fix)', () => {
+    let db: BetterSQLite3Database<typeof schema>;
+    let sqlite: any;
+    let booking: BookingService;
+    let contact: ContactService;
+    let people: PeopleService;
+
+    const SVC_1 = 'a1a1a1a1-0000-4000-8000-000000000001';
+    const SVC_2 = 'a1a1a1a1-0000-4000-8000-000000000002';
+    const TPL_1 = '11111111-0000-4000-8000-000000000001';
+    const TPL_2 = '11111111-0000-4000-8000-000000000002';
+    const MULTI_INSP_A = 'ffffffff-0000-4000-8000-000000000001';
+    const MULTI_INSP_B = 'ffffffff-0000-4000-8000-000000000002';
+
+    beforeEach(async () => {
+        const setup = createTestDb();
+        db = setup.db as BetterSQLite3Database<typeof schema>;
+        sqlite = setup.sqlite;
+        await setupSchema(sqlite);
+        (mockDrizzle as ReturnType<typeof vi.fn>).mockReturnValue(db);
+
+        booking = new BookingService({} as D1Database);
+        contact = new ContactService({} as D1Database);
+        people = new PeopleService({ DB: {} as D1Database });
+        await seedBaseTenant(db);
+
+        // Real service (+ backing template) rows so the pre-flight lookup in
+        // fulfillBooking (which validates serviceIds against `services` before
+        // delegating to InspectionRequestService.create) succeeds.
+        // InspectionRequestService itself is stubbed (see makeServiceStubs) so
+        // these templates are never actually used to build inspection rows.
+        await db.insert(schema.templates).values([
+            { id: TPL_1, tenantId: T1, name: 'Residential', version: 1, schema: { sections: [] } as any, createdAt: new Date() },
+            { id: TPL_2, tenantId: T1, name: 'Radon',       version: 1, schema: { sections: [] } as any, createdAt: new Date() },
+        ]);
+        await db.insert(schema.services).values([
+            {
+                id: SVC_1, tenantId: T1, name: 'Full Inspection', price: 40000,
+                durationMinutes: 120, templateId: TPL_1,
+                active: true, sortOrder: 0, createdAt: new Date(),
+            },
+            {
+                id: SVC_2, tenantId: T1, name: 'Radon Test', price: 15000,
+                durationMinutes: 60, templateId: TPL_2,
+                active: true, sortOrder: 1, createdAt: new Date(),
+            },
+        ] as any);
+    });
+
+    afterEach(() => {
+        sqlite.close();
+        vi.restoreAllMocks();
+    });
+
+    it('writes the client role for EVERY inspection created by a multi-service booking, not just the first', async () => {
+        const { app, stubs } = buildApp(db, booking, contact);
+        (stubs.inspectionRequest.create as ReturnType<typeof vi.fn>).mockResolvedValue({
+            id: 'req-multi',
+            inspections: [{ id: MULTI_INSP_A }, { id: MULTI_INSP_B }],
+        });
+
+        const res = await app.request('/book', morningBody({
+            services: [{ serviceId: SVC_1 }, { serviceId: SVC_2 }],
+        }), FAKE_ENV, FAKE_EXEC_CTX);
+        expect(res.status).toBe(200);
+        const body = await res.json() as any;
+        expect(body.success).toBe(true);
+        expect([...body.data.inspectionIds].sort()).toEqual([MULTI_INSP_A, MULTI_INSP_B].sort());
+
+        for (const id of [MULTI_INSP_A, MULTI_INSP_B]) {
+            const rows = await people.listPeople(T1, id);
+            expect(rows.map(r => r.roleKey)).toEqual(['client']);
+            expect(rows[0]?.email).toBe('client@test.com');
+        }
+    });
+});
