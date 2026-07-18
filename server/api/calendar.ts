@@ -1,8 +1,10 @@
 import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
-import { availabilityOverrides } from '../lib/db/schema/inspection';
+import { eq } from 'drizzle-orm';
+import { tenantConfigs } from '../lib/db/schema';
+import { resolveTenantTimeZone } from '../lib/tz';
+import { syncGoogleBusyOverrides } from '../lib/calendar/sync-busy';
 import {
     CalendarSyncResponseSchema,
     CalendarCallbackQuerySchema,
@@ -160,38 +162,33 @@ export const calendarRoutes = createApiRouter()
 
         const db = drizzle(c.env.DB);
         const inspectorId = jwtUser.sub;
-        let created = 0;
 
-        for (const block of busyBlocks) {
-            const date = block.start.slice(0, 10);
-            const existing = await db.select({ id: availabilityOverrides.id })
-                .from(availabilityOverrides)
-                .where(and(
-                    eq(availabilityOverrides.tenantId, tenantId),
-                    eq(availabilityOverrides.inspectorId, inspectorId),
-                    eq(availabilityOverrides.date, date),
-                ))
-                .limit(1);
-            if (existing.length) continue;
-
-            await db.insert(availabilityOverrides).values({
-                id: crypto.randomUUID(),
+        // A-polish 10 — store busy time as TIMED overrides in the tenant tz
+        // (delete-in-range + keyed upsert), so only the busy hours block slots
+        // and transparent events are carried but ignored. Replaces the old
+        // all-day blocking-date insert.
+        const tzRow = await db.select({ defaultTimezone: tenantConfigs.defaultTimezone })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        const tenantTz = resolveTenantTimeZone(tzRow?.defaultTimezone);
+        const { upserted } = await syncGoogleBusyOverrides(
+            db,
+            {
                 tenantId,
                 inspectorId,
-                date,
-                isAvailable: false,
-                startTime: null,
-                endTime: null,
-                createdAt: new Date(),
-            });
-            created++;
-        }
+                tenantTz,
+                rangeFromMs: timeMin.getTime(),
+                rangeToMs: timeMax.getTime(),
+            },
+            busyBlocks,
+        );
 
         await markCalendarSynced(c.env.DB, tenantId, inspectorId, 'google');
 
         return c.json({
             success: true,
-            data: { blockedDatesCreated: created, totalEvents: busyBlocks.length },
+            data: { blockedDatesCreated: upserted, totalEvents: busyBlocks.length },
         }, 200);
     })
     .get('/status', async (c) => {

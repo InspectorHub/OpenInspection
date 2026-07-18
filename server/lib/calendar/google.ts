@@ -115,7 +115,14 @@ export const googleCalendarProvider: CalendarProvider = {
         for (const event of eventsData.items ?? []) {
             const start = event.start?.dateTime ?? (event.start?.date ? `${event.start.date}T00:00:00.000Z` : null);
             const end = event.end?.dateTime ?? (event.end?.date ? `${event.end.date}T23:59:59.000Z` : null);
-            if (start && end) blocks.push({ start, end });
+            if (start && end) {
+                blocks.push({
+                    start,
+                    end,
+                    externalId: event.id,
+                    transparency: event.transparency === 'transparent' ? 'transparent' : 'opaque',
+                });
+            }
         }
         return blocks;
     },

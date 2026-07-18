@@ -5,6 +5,11 @@ export type CalendarCapability = 'availability_read' | 'events_read_write';
 export interface BusyBlock {
     start: string;
     end: string;
+    // A-polish 10 — provider event id (for keyed upsert) and free/busy status.
+    // freeBusy ranges carry neither; the sync helper synthesizes an id and
+    // defaults transparency to 'opaque'.
+    externalId?: string;
+    transparency?: 'opaque' | 'transparent';
 }
 
 interface CalendarPushEventInput {

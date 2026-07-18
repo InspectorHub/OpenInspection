@@ -35,3 +35,24 @@ describe('transparent overrides do not block slots', () => {
         expect(freeSlots([blocking(null)])).toEqual([]);
     });
 });
+
+describe('google timed busy removes only overlapping slots', () => {
+    const googleBusy = (startTime: string, endTime: string): SlotOverrideRow => ({
+        inspectorId: INSP, isAvailable: false, startTime, endTime,
+        transparency: 'opaque', source: 'google',
+    });
+
+    it('subtracts only the overlapping slot, not the whole day', () => {
+        // Busy 08:30–09:00 removes the 08:30 slot ([08:30,09:00) overlaps); the
+        // 08:00, 09:00 and 09:30 slots survive — proving it is not a day block.
+        expect(freeSlots([googleBusy('08:30', '09:00')])).toEqual(['08:00', '09:00', '09:30']);
+    });
+
+    it('a transparent google event removes nothing', () => {
+        const free: SlotOverrideRow = {
+            inspectorId: INSP, isAvailable: false, startTime: '08:30', endTime: '09:00',
+            transparency: 'transparent', source: 'google',
+        };
+        expect(freeSlots([free])).toEqual(['08:00', '08:30', '09:00', '09:30']);
+    });
+});
