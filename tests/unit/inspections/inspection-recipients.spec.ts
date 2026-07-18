@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -9,9 +11,16 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
+// getRecipientList (Task 8) now sources people from inspection_people (via
+// PeopleService.listPeople), not the legacy inline/agent-id columns — tests
+// below seed inspection_people rows alongside the legacy columns so the
+// legacy columns stay realistic without being what's actually read.
+const roleProfileId = (tenantId: string, key: string) => `crp_${tenantId}_${key}`;
+
 describe('Round-2 F1 — InspectionService.getRecipientList', () => {
     let svc: InspectionService;
     let testDb: BetterSQLite3Database<typeof schema>;
+    let people: PeopleService;
 
     beforeEach(async () => {
         const fixture = createTestDb();
@@ -20,10 +29,12 @@ describe('Round-2 F1 — InspectionService.getRecipientList', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
         svc = new InspectionService({} as D1Database);
+        people = new PeopleService({ DB: {} as D1Database });
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
+        await seedRoleProfiles(testDb, TENANT, new Date(1));
     });
 
     it('returns empty list when inspection has no contacts', async () => {
@@ -48,6 +59,10 @@ describe('Round-2 F1 — InspectionService.getRecipientList', () => {
     });
 
     it('returns just the client when no agents linked', async () => {
+        await testDb.insert(schema.contacts).values({
+            id: 'client-only-contact', tenantId: TENANT, type: 'client',
+            name: 'Jane Buyer', email: 'jane@example.com', phone: '+15551234567', createdAt: new Date(),
+        });
         await testDb.insert(schema.inspections).values({
             id:              'insp-client-only',
             tenantId:        TENANT,
@@ -63,6 +78,7 @@ describe('Round-2 F1 — InspectionService.getRecipientList', () => {
             agreementRequired: false,
             createdAt:       new Date(),
         });
+        await people.addPerson(TENANT, 'insp-client-only', 'client-only-contact', roleProfileId(TENANT, 'client'));
 
         const list = await svc.getRecipientList('insp-client-only', TENANT);
         expect(list).toHaveLength(1);
@@ -75,8 +91,17 @@ describe('Round-2 F1 — InspectionService.getRecipientList', () => {
     });
 
     it('returns client + buyer agent + listing agent when all linked', async () => {
-        // Buyer's Agent (referredByAgentId)
+        // Client + Buyer's Agent (referredByAgentId) + Listing Agent (sellingAgentId)
         await testDb.insert(schema.contacts).values([
+            {
+                id:        'client-3people-1',
+                tenantId:  TENANT,
+                type:      'client',
+                name:      'Jane Buyer',
+                email:     'jane@example.com',
+                phone:     '+15551234567',
+                createdAt: new Date(),
+            },
             {
                 id:        'agent-buyer-1',
                 tenantId:  TENANT,
@@ -114,6 +139,9 @@ describe('Round-2 F1 — InspectionService.getRecipientList', () => {
             agreementRequired: false,
             createdAt:         new Date(),
         });
+        await people.addPerson(TENANT, 'insp-3-people', 'client-3people-1', roleProfileId(TENANT, 'client'));
+        await people.addPerson(TENANT, 'insp-3-people', 'agent-buyer-1',    roleProfileId(TENANT, 'buyer_agent'));
+        await people.addPerson(TENANT, 'insp-3-people', 'agent-listing-1',  roleProfileId(TENANT, 'listing_agent'));
 
         const list = await svc.getRecipientList('insp-3-people', TENANT);
         expect(list).toHaveLength(3);
@@ -143,15 +171,26 @@ describe('Round-2 F1 — InspectionService.getRecipientList', () => {
     });
 
     it('drops contacts that have neither email nor phone', async () => {
-        await testDb.insert(schema.contacts).values({
-            id:        'agent-noinfo',
-            tenantId:  TENANT,
-            type:      'agent',
-            name:      'No Contact Info',
-            email:     null,
-            phone:     null,
-            createdAt: new Date(),
-        });
+        await testDb.insert(schema.contacts).values([
+            {
+                id:        'client-noinfo',
+                tenantId:  TENANT,
+                type:      'client',
+                name:      'Has Email',
+                email:     'real@example.com',
+                phone:     null,
+                createdAt: new Date(),
+            },
+            {
+                id:        'agent-noinfo',
+                tenantId:  TENANT,
+                type:      'agent',
+                name:      'No Contact Info',
+                email:     null,
+                phone:     null,
+                createdAt: new Date(),
+            },
+        ]);
         await testDb.insert(schema.inspections).values({
             id:                'insp-noinfo',
             tenantId:          TENANT,
@@ -168,6 +207,8 @@ describe('Round-2 F1 — InspectionService.getRecipientList', () => {
             agreementRequired: false,
             createdAt:         new Date(),
         });
+        await people.addPerson(TENANT, 'insp-noinfo', 'client-noinfo', roleProfileId(TENANT, 'client'));
+        await people.addPerson(TENANT, 'insp-noinfo', 'agent-noinfo',  roleProfileId(TENANT, 'buyer_agent'));
 
         const list = await svc.getRecipientList('insp-noinfo', TENANT);
         // Client kept (has email), agent dropped (no email and no phone).

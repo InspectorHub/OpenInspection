@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -9,9 +11,16 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
+// getPeopleCard (Task 8) now sources people from inspection_people (via
+// PeopleService.listPeople), not the legacy inline/agent-id columns — tests
+// below seed inspection_people rows alongside the legacy columns so the
+// legacy columns stay realistic without being what's actually read.
+const roleProfileId = (tenantId: string, key: string) => `crp_${tenantId}_${key}`;
+
 describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
     let svc: InspectionService;
     let testDb: BetterSQLite3Database<typeof schema>;
+    let people: PeopleService;
 
     beforeEach(async () => {
         const fixture = createTestDb();
@@ -20,10 +29,12 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
         svc = new InspectionService({} as D1Database);
+        people = new PeopleService({ DB: {} as D1Database });
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
+        await seedRoleProfiles(testDb, TENANT, new Date(1));
     });
 
     it('returns inspector + client + agents grouped by role', async () => {
@@ -38,6 +49,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
             createdAt:    new Date(),
         });
         await testDb.insert(schema.contacts).values([
+            { id: 'client-people-1', tenantId: TENANT, type: 'client', name: 'Jane Buyer',        email: 'jane@example.com', phone: '+15551234567', createdAt: new Date() },
             { id: 'agent-buyer-1',   tenantId: TENANT, type: 'agent', name: 'Bob Buyer-Agent',    email: 'bob@bba.com',  phone: '+15550001111', createdAt: new Date() },
             { id: 'agent-listing-1', tenantId: TENANT, type: 'agent', name: 'Lisa Listing-Agent', email: 'lisa@lla.com', phone: null,            createdAt: new Date() },
         ]);
@@ -59,6 +71,9 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
             agreementRequired: false,
             createdAt:         new Date(),
         });
+        await people.addPerson(TENANT, 'insp-people-1', 'client-people-1', roleProfileId(TENANT, 'client'));
+        await people.addPerson(TENANT, 'insp-people-1', 'agent-buyer-1',   roleProfileId(TENANT, 'buyer_agent'));
+        await people.addPerson(TENANT, 'insp-people-1', 'agent-listing-1', roleProfileId(TENANT, 'listing_agent'));
 
         const card = await svc.getPeopleCard('insp-people-1', TENANT);
 
@@ -115,6 +130,7 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
 
     it('returns counts per role group for templating', async () => {
         await testDb.insert(schema.contacts).values([
+            { id: 'client-counts',  tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@example.com', phone: null, createdAt: new Date() },
             { id: 'agent-buyer-1', tenantId: TENANT, type: 'agent', name: 'Bob', email: 'b@b.com', phone: null, createdAt: new Date() },
         ]);
         await testDb.insert(schema.inspections).values({
@@ -133,6 +149,8 @@ describe('Round-2 F3 — InspectionService.getPeopleCard', () => {
             agreementRequired: false,
             createdAt:         new Date(),
         });
+        await people.addPerson(TENANT, 'insp-counts', 'client-counts', roleProfileId(TENANT, 'client'));
+        await people.addPerson(TENANT, 'insp-counts', 'agent-buyer-1', roleProfileId(TENANT, 'buyer_agent'));
 
         const card = await svc.getPeopleCard('insp-counts', TENANT);
         expect(card.buyerAgents).toHaveLength(1);
