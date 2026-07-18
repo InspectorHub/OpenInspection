@@ -7,7 +7,8 @@ import { TenantUpdateParams } from '../lib/integration';
 import { TenantStatusBodySchema, SeedStarterContentBodySchema } from '../lib/validations/admin.schema';
 import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
 import { logger } from '../lib/logger';
-import { tenantConfigs, inspectionAccessTokens, tenants } from '../lib/db/schema';
+import { tenantConfigs, inspectionAccessTokens, tenants, contactRoleProfiles } from '../lib/db/schema';
+import { capabilitiesForKind, type RoleKind } from '../lib/people/capabilities';
 import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
 import { secretsCacheKey } from '../lib/secrets-cache';
 import { OutboxService } from './outbox.service';
@@ -384,8 +385,10 @@ api.get('/usage', requireServiceBinding, async (c) => {
 /**
  * GET /api/integration/tenants/by-email?email=<email>
  * Cross-tenant client grant lookup: returns the slugs of tenants where the
- * email holds a LIVE (not revoked, not expired) client/co_client access grant.
- * Platform-level read (raw drizzle, no tenant scope) — guarded by
+ * email holds a LIVE (not revoked, not expired) grant whose role-profile KIND
+ * grants selfRetrieveReport (client/co_client by default — see
+ * server/lib/people/capabilities.ts; tenant-configurable, not a hard-coded
+ * role list). Platform-level read (raw drizzle, no tenant scope) — guarded by
  * requireServiceBinding. Enables a portal-side "find my report" fan-out that
  * triggers each tenant's own magic-link without a cross-tenant session layer.
  */
@@ -398,17 +401,31 @@ api.get('/tenants/by-email', requireServiceBinding, async (c) => {
         const d = drizzle(c.env.DB);
         const now = new Date();
 
+        // This scan is cross-tenant (no single tenantId in scope), so the
+        // role→kind resolution is a per-row join against each grant's OWN
+        // tenant rather than a single-tenant PeopleService.roleKeysWithCapability
+        // lookup (that helper takes one tenantId). A grant whose role key has
+        // no active profile row for its tenant (deleted/renamed) is dropped by
+        // the inner join — fails closed, never matches.
         const grants = await d
-            .select({ tenantId: inspectionAccessTokens.tenantId })
+            .select({ tenantId: inspectionAccessTokens.tenantId, kind: contactRoleProfiles.kind })
             .from(inspectionAccessTokens)
+            .innerJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspectionAccessTokens.tenantId),
+                eq(contactRoleProfiles.key, inspectionAccessTokens.role),
+                eq(contactRoleProfiles.active, true),
+            ))
             .where(and(
                 eq(inspectionAccessTokens.recipientEmail, email),
-                inArray(inspectionAccessTokens.role, ['client', 'co_client']),
                 isNull(inspectionAccessTokens.revokedAt),
                 or(isNull(inspectionAccessTokens.expiresAt), gt(inspectionAccessTokens.expiresAt, now)),
             ));
 
-        const tenantIds = [...new Set(grants.map((g) => g.tenantId as string))];
+        const tenantIds = [...new Set(
+            grants
+                .filter((g) => capabilitiesForKind(g.kind as RoleKind).selfRetrieveReport)
+                .map((g) => g.tenantId as string),
+        )];
         if (tenantIds.length === 0) return c.json({ success: true, data: { slugs: [] } });
 
         const rows = await d

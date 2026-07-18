@@ -20,6 +20,8 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { signPortalSession, signMagicLink } from '../../../server/lib/portal-session';
 // eslint-disable-next-line import/order
 import portalRoutes from '../../../server/api/portal';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
 const SECRET = 'test-jwt-secret';
 
@@ -114,6 +116,10 @@ describe('portal API', () => {
                 portal: portalSvc,
                 email: { sendEmail },
                 portalAccess: makePortalAccessStub(),
+                // Hub exchange (server/api/portal.ts) now resolves the
+                // self-retrieve role-key set via PeopleService instead of a
+                // hard-coded ['client', 'co_client'] literal check.
+                people: new PeopleService({ DB: {} as D1Database }),
             } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
@@ -154,6 +160,10 @@ describe('portal API', () => {
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
+        // Both listRecipientInspections and the /exchange capability gate now
+        // derive their role filter from active role profiles' selfRetrieveReport
+        // capability (client/co_client by default) instead of a hard-coded list.
+        await seedRoleProfiles(testDb, TENANT, new Date(1));
     });
 
     it('POST /request-link returns 200 for a known recipient and sends an email', async () => {

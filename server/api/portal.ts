@@ -397,9 +397,14 @@ const portalRoutes = portalRouter
         if (!grant) return c.json({ error: 'Invalid or expired token' }, 401);
 
         // SECURITY: the token row is authoritative — it must point at THIS tenant
-        // and carry a client/co_client role. Reject agents (and any mismatch) so
-        // an agent's per-inspection token can never mint a client portal session.
-        if (grant.tenantId !== tenantId || (grant.role !== 'client' && grant.role !== 'co_client')) {
+        // and its role KEY must currently grant selfRetrieveReport (see
+        // server/lib/people/capabilities.ts; client/co_client by default).
+        // Reject agents (and any mismatch) so an agent's per-inspection token
+        // can never mint a client portal session. A role key with no active
+        // profile match (deleted/renamed) resolves to an empty set — rejected,
+        // never fails open.
+        const selfRetrieveKeys = await c.var.services.people.roleKeysWithCapability(tenantId, 'selfRetrieveReport');
+        if (grant.tenantId !== tenantId || !selfRetrieveKeys.includes(grant.role)) {
             return c.json({ error: 'Forbidden' }, 403);
         }
 
