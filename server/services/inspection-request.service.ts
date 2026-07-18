@@ -13,7 +13,10 @@ import {
     inspections,
     templates,
     contactRoleProfiles,
+    inspectionPeople,
+    contacts,
 } from '../lib/db/schema';
+import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
@@ -119,17 +122,37 @@ export class InspectionRequestService {
             .all();
 
         const reqIds = reqs.map(r => r.id);
+        // Task 9c — clientName is sourced via the client-role inspection_people
+        // LEFT JOIN (role filter joined FIRST to avoid fanning out over every
+        // role on the sub-inspection — same pattern as api/metrics.ts /
+        // InspectionCoreService.listInspections), NOT the legacy
+        // inspections.client_name column, which survives GDPR erasure as a
+        // stale denormalized cache and would leak the erased subject's name.
         const subRows: SubInspectionRow[] = reqIds.length === 0 ? [] : await db.select({
             id:              inspections.id,
             templateId:      inspections.templateId,
             propertyAddress: inspections.propertyAddress,
-            clientName:      inspections.clientName,
+            clientName:      contacts.name,
             status:          inspections.status,
             date:            inspections.date,
             price:           inspections.price,
             inspectorId:     inspections.inspectorId,
             requestId:       inspections.requestId,
         }).from(inspections)
+            .leftJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .leftJoin(inspectionPeople, and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ))
+            .leftJoin(contacts, and(
+                eq(contacts.id, inspectionPeople.contactId),
+                eq(contacts.tenantId, inspections.tenantId),
+            ))
             .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.requestId, reqIds)))
             .all();
 
@@ -149,17 +172,32 @@ export class InspectionRequestService {
             .get();
         if (!req) return null;
 
+        // Task 9c — same client-role inspection_people join as list() above.
         const subs: SubInspectionRow[] = await db.select({
             id:              inspections.id,
             templateId:      inspections.templateId,
             propertyAddress: inspections.propertyAddress,
-            clientName:      inspections.clientName,
+            clientName:      contacts.name,
             status:          inspections.status,
             date:            inspections.date,
             price:           inspections.price,
             inspectorId:     inspections.inspectorId,
             requestId:       inspections.requestId,
         }).from(inspections)
+            .leftJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .leftJoin(inspectionPeople, and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ))
+            .leftJoin(contacts, and(
+                eq(contacts.id, inspectionPeople.contactId),
+                eq(contacts.tenantId, inspections.tenantId),
+            ))
             .where(and(eq(inspections.tenantId, tenantId), eq(inspections.requestId, id)))
             .all();
 
