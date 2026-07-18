@@ -141,7 +141,7 @@ export function FormField({
  </div>
  );
  case "rich":
- return null; // Handled by RichItemRenderer
+ return null; // Rich items (rating + canned-comment tabs) are rendered by ItemEditor; FormField handles only non-rich data points.
  default:
  return (
  <input

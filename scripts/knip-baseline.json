@@ -1,6 +1,4 @@
 [
-  "dependencies:node-diff3",
-  "devDependencies:globals",
   "duplicates:app/components/portal/sections/PaymentSection.tsx:PaymentSection|default",
   "duplicates:app/components/portal/sections/ProgressView.tsx:ProgressView|default",
   "duplicates:app/components/portal/sections/ReportView.tsx:ReportView|default",
@@ -406,7 +404,6 @@
   "exports:server/services/video/r2-backend.ts:parseInspectionVideoKey",
   "exports:server/services/video/stream-backend.ts:MAX_DURATION_SEC",
   "exports:server/types/template-schema.ts:isTemplateSchemaV2",
-  "files:app/components/form/RichItemRenderer.tsx",
   "types:app/components/Breadcrumb.tsx:BreadcrumbItem",
   "types:app/components/ErrorState.tsx:ErrorStateAction",
   "types:app/components/SettingsCrumb.tsx:CrumbItem",
