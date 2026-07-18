@@ -1,5 +1,5 @@
 import { eq, and, sql, inArray, isNull } from 'drizzle-orm';
-import { inspections, inspectionResults, tenantConfigs, invoices, agreementRequests, users } from '../../lib/db/schema';
+import { inspections, inspectionResults, tenantConfigs, invoices, agreementRequests, users, inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
 import { contacts } from '../../lib/db/schema/contact';
 import { parseFindingKey } from '../../lib/finding-key';
 import { RECOMMENDATION_CATEGORIES } from '../../lib/recommendation-categories';
@@ -495,19 +495,44 @@ export class InspectionAnalyticsService extends InspectionSubService {
 
         // Sub-spec B Task 7 (B-6) — list row metadata: agent name lookup +
         // status flags + invoice paid lookup. We surface:
-        //   agentName  → from contacts (sellingAgentId or referredByAgentId)
+        //   agentName  → from inspection_people (listing_agent, else buyer_agent)
         //   statusFlags = { reportPublished, agreementSigned, paid, flagged, canceled }
-        const agentIdSet = new Set<string>();
-        for (const i of all) {
-            if (i.sellingAgentId)    agentIdSet.add(i.sellingAgentId as string);
-            if (i.referredByAgentId) agentIdSet.add(i.referredByAgentId as string);
-        }
-        const agentNameMap = new Map<string, string>();
-        if (agentIdSet.size > 0) {
-            const agentRows = await db.select({ id: contacts.id, name: contacts.name })
-                .from(contacts)
-                .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, Array.from(agentIdSet))));
-            for (const r of agentRows) agentNameMap.set(r.id as string, r.name as string);
+        //
+        // Task 9c-X3 — replaces the legacy inspections.sellingAgentId /
+        // .referredByAgentId column reads (frozen cache, dropped Task 13).
+        // A single batch query (role-scoped, tenant-scoped) resolves both
+        // roles for every inspection in `all` — listing_agent = the selling
+        // agent, buyer_agent = the referred/buyer's agent — mirroring the
+        // priority the legacy code gave sellingAgentId over referredByAgentId.
+        const allIds = all.map(i => i.id as string);
+        const listingAgentNameByInspection = new Map<string, string>();
+        const buyerAgentNameByInspection   = new Map<string, string>();
+        if (allIds.length > 0) {
+            const agentRoleRows = await db.select({
+                inspectionId: inspectionPeople.inspectionId,
+                roleKey:      contactRoleProfiles.key,
+                contactName:  contacts.name,
+            })
+                .from(inspectionPeople)
+                .innerJoin(contactRoleProfiles, and(
+                    eq(contactRoleProfiles.id, inspectionPeople.roleProfileId),
+                    eq(contactRoleProfiles.tenantId, tenantId),
+                    eq(contactRoleProfiles.active, true),
+                    inArray(contactRoleProfiles.key, ['listing_agent', 'buyer_agent']),
+                ))
+                .leftJoin(contacts, and(
+                    eq(contacts.id, inspectionPeople.contactId),
+                    eq(contacts.tenantId, tenantId),
+                ))
+                .where(and(
+                    eq(inspectionPeople.tenantId, tenantId),
+                    inArray(inspectionPeople.inspectionId, allIds),
+                ));
+            for (const r of agentRoleRows) {
+                if (!r.contactName) continue;
+                const map = r.roleKey === 'listing_agent' ? listingAgentNameByInspection : buyerAgentNameByInspection;
+                map.set(r.inspectionId as string, r.contactName as string);
+            }
         }
         // Paid invoice lookup — any inspection with at least one paid invoice
         // counts as paid in the row indicator.
@@ -549,7 +574,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
             if (rid) requestSiblingCounts.set(rid, (requestSiblingCounts.get(rid) ?? 0) + 1);
         }
 
-        const decorate = <T extends { id: unknown; status?: unknown; sellingAgentId?: unknown; referredByAgentId?: unknown; inspectorId?: unknown; price?: unknown; requestId?: unknown }>(rows: T[]): Array<T & {
+        const decorate = <T extends { id: unknown; status?: unknown; inspectorId?: unknown; price?: unknown; requestId?: unknown }>(rows: T[]): Array<T & {
             defectStats:    DefectCounts;
             agentName?:     string;
             inspectorName?: string;
@@ -559,9 +584,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
         }> =>
             rows.map(r => {
                 const id = r.id as string;
-                const sellingId    = r.sellingAgentId as string | null;
-                const referredById = r.referredByAgentId as string | null;
-                const agentName = (sellingId && agentNameMap.get(sellingId)) || (referredById && agentNameMap.get(referredById)) || undefined;
+                const agentName = listingAgentNameByInspection.get(id) || buyerAgentNameByInspection.get(id) || undefined;
                 const reqId = (r as { requestId?: unknown }).requestId as string | null | undefined;
                 const siblingCount = reqId ? (requestSiblingCounts.get(reqId) ?? 1) : 1;
                 const inspectorId = r.inspectorId as string | null;
