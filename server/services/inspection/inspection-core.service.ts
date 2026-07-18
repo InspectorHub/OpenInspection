@@ -1,7 +1,8 @@
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions, contactRoleProfiles } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions, contactRoleProfiles, inspectionPeople } from '../../lib/db/schema';
 import { contacts } from '../../lib/db/schema/contact';
 import { PeopleService } from '../people.service';
+import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { Errors } from '../../lib/errors';
 import { getRatingBucket, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
@@ -151,26 +152,52 @@ export class InspectionCoreService extends InspectionSubService {
             } catch { throw Errors.BadRequest('Invalid cursor'); }
         }
 
-        const rows = await db.select().from(inspections)
+        // Task 9c (people-role-profiles) — clientName/clientEmail are sourced
+        // from the inspection_people primary-client join, not the legacy
+        // inspections.client_name/_email columns (frozen cache, dropped Task
+        // 13). A single LEFT JOIN keeps this list N+1-free; contact_role_profiles
+        // is joined BEFORE inspection_people (filtered to the 'client' role)
+        // so the join stays scoped to the primary client, mirroring the join
+        // order already used for top-agents in api/metrics.ts.
+        const rows = await db.select({
+            inspection: inspections,
+            primaryClientName: contacts.name,
+            primaryClientEmail: contacts.email,
+        })
+            .from(inspections)
+            .leftJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .leftJoin(inspectionPeople, and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ))
+            .leftJoin(contacts, and(
+                eq(contacts.id, inspectionPeople.contactId),
+                eq(contacts.tenantId, inspections.tenantId),
+            ))
             .where(and(...conditions))
             .orderBy(sql`${inspections.createdAt} desc, ${inspections.id} desc`)
             .limit(params.limit + 1);
 
         const hasMore = rows.length > params.limit;
         const page = hasMore ? rows.slice(0, params.limit) : rows;
-        
+
         let nextCursor: string | null = null;
         if (hasMore) {
-            const last = page[page.length - 1];
+            const last = page[page.length - 1].inspection;
             nextCursor = btoa(JSON.stringify({ createdAt: safeTimestamp(last.createdAt), id: last.id }));
         }
 
-        const inspectionsFormatted: Inspection[] = page.map(row => ({
+        const inspectionsFormatted: Inspection[] = page.map(({ inspection: row, primaryClientName, primaryClientEmail }) => ({
             ...row,
             id: row.id as string,
             propertyAddress: row.propertyAddress as string,
-            clientName: row.clientName as string | null,
-            clientEmail: row.clientEmail as string | null,
+            clientName: primaryClientName ?? null,
+            clientEmail: primaryClientEmail ?? null,
             status: row.status,
             date: row.date as string,
             inspectorId: row.inspectorId as string | null,
@@ -257,13 +284,22 @@ export class InspectionCoreService extends InspectionSubService {
             ))
             .get();
 
+        // Task 9c (people-role-profiles) — clientName/clientEmail/clientPhone
+        // are sourced from the inspection_people primary-client join
+        // (PeopleService), not the legacy inspections.client_name/_email/_phone
+        // columns (frozen cache, dropped Task 13). Hard cutover, no
+        // legacy-column fallback — mirrors invoices.ts requestPaymentRoute /
+        // agreements.ts / publish.ts elsewhere on this branch.
+        const primaryClient = await new PeopleService({ DB: this.db }).getPrimaryClient(tenantId, id);
+
         return {
             inspection: {
                 ...result,
                 id: result.id as string,
                 propertyAddress: result.propertyAddress as string,
-                clientName: result.clientName as string | null,
-                clientEmail: result.clientEmail as string | null,
+                clientName: primaryClient?.name ?? null,
+                clientEmail: primaryClient?.email ?? null,
+                clientPhone: primaryClient?.phone ?? null,
                 status: result.status as 'draft' | 'completed' | 'delivered',
                 date: result.date as string,
                 inspectorId: result.inspectorId as string | null,
