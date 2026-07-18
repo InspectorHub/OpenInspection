@@ -166,6 +166,15 @@ export const inspections = sqliteTable('inspections', {
     // from the report tier (full_pca -> appendix, else inline); set = force a mode.
     // See server/lib/report-photos.ts derivePhotoMode.
     reportPhotoMode:     text('report_photo_mode', { enum: ['appendix', 'inline'] }),
+    // A-polish 9b — precise scheduled instant (UTC epoch-ms), derived from the
+    // booked slot + tenant tz at fulfillment via wallClockToEpochMs. inspections.date
+    // remains the civil YYYY-MM-DD derived from this. NULL for legacy /
+    // manually-created rows. Drives interval-overlap conflict detection, Google
+    // push (Task 10), and the schedule.ics feed.
+    scheduledStartMs:    integer('scheduled_start_ms', { mode: 'timestamp_ms' }),
+    scheduledEndMs:      integer('scheduled_end_ms', { mode: 'timestamp_ms' }),
+    // Booked duration in minutes (from the service / event type). NULL = legacy.
+    durationMin:         integer('duration_min'),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),
