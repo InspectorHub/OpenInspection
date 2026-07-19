@@ -86,16 +86,20 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             for (const rule of filteredRules) {
                 const channels = this.parseChannels(rule.channels);
                 for (const channel of channels) {
-                    const addr = await this.resolveAddress(rule.recipientKind, rule.recipientRoleProfileId, channel, insp, db);
-                    if (!addr) {
-                        logger.info('AutomationService.trigger: no address resolved for channel (skipping log)',
+                    const recipients = await this.resolveRecipients(rule, insp, channel);
+                    if (recipients.length === 0) {
+                        logger.info('AutomationService.trigger: no recipients resolved for channel (skipping)',
                             { ruleId: rule.id, recipientKind: rule.recipientKind, recipientRoleProfileId: rule.recipientRoleProfileId, channel });
                         continue;
                     }
                     const sendAt = new Date(now.getTime() + rule.delayMinutes * 60_000);
-                    logs.push({ id: nanoid(), tenantId: ctx.tenantId, automationId: rule.id,
-                                inspectionId: ctx.inspectionId, recipient: addr, channel,
-                                sendAt, deliveredAt: null, status: 'pending' as const, error: null });
+                    for (const r of recipients) {
+                        const addr = channel === 'email' ? r.email : r.phone;
+                        if (!addr) continue; // resolveRecipients already logged/skipped addr-less people; belt-and-braces
+                        logs.push({ id: nanoid(), tenantId: ctx.tenantId, automationId: rule.id,
+                                    inspectionId: ctx.inspectionId, recipient: addr, recipientRoleKey: r.roleKey, channel,
+                                    sendAt, deliveredAt: null, status: 'pending' as const, error: null });
+                    }
                 }
             }
 
@@ -270,7 +274,12 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 } catch {
                     u = null;
                 }
-                const addr = channel === 'email' ? u?.email : u?.phone;
+                // sms addresses must be normalized to E.164 here — this is the ONLY
+                // path that produces automation_logs.recipient for sms (unlike
+                // resolveAddress, which normalizes internally); sms.ts sends
+                // log.recipient as-is with no send-time re-normalization.
+                const { normalizeE164 } = await import('../../lib/sms/phone');
+                const addr = channel === 'email' ? (u?.email ?? null) : normalizeE164(u?.phone ?? null);
                 if (!addr) return [];
                 return [{
                     contactId: inspectorId ?? '',
@@ -284,9 +293,10 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 ? people.filter(p => p.roleProfileId === rule.recipientRoleProfileId)
                 : people.filter(p => capabilitiesForKind(p.kind).receivesReport);
 
+            const { normalizeE164 } = await import('../../lib/sms/phone');
             const out: Array<{ contactId: string; roleKey: string; email?: string; phone?: string }> = [];
             for (const p of targets) {
-                const addr = channel === 'email' ? p.email : p.phone;
+                const addr = channel === 'email' ? p.email : normalizeE164(p.phone);
                 if (!addr) {
                     logger.info('resolveRecipients: skipping addr-less person', {
                         inspectionId: inspection.id, contactId: p.contactId, roleKey: p.roleKey, channel,

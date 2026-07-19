@@ -64,6 +64,10 @@ export const automationLogs = sqliteTable('automation_logs', {
     inspectionId: text('inspection_id').notNull(),
     // Track L — holds the email address for email logs, the E.164 phone for sms logs.
     recipient: text('recipient').notNull(),   // RENAMED from recipient_email (0025)
+    // Spec 2 — the recipient's role-profile key (e.g. 'buyer_agent'), captured at
+    // enqueue so the flush/send path can mint a role-keyed portal token per
+    // recipient. Null for logs with no role context (legacy/reminder/inspector).
+    recipientRoleKey: text('recipient_role_key'),
     // Track L — the log's own delivery channel (a multi-channel rule emits one log each).
     channel: text('channel', { enum: ['email', 'sms'] }).notNull().default('email'),
     sendAt: integer('send_at', { mode: 'timestamp_ms' }).notNull(),
