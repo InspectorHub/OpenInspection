@@ -212,5 +212,10 @@ export default defineConfig({
         // inspection's global status via /complete + /publish). Depends on
         // `api` for the shared admin + the 8 seeded default role profiles.
         { name: 'role-aware-sending', testMatch: 'role-aware-sending.spec.ts', dependencies: ['api'] },
+        // Spec 3 Task 8 — agent unified link (final task of the agent-unified-
+        // link plan). Seeds its own two dedicated inspections (registered vs
+        // unregistered agent recipient) and a global agent account — depends
+        // on `api` for the shared admin + the 8 seeded default role profiles.
+        { name: 'agent-unified-link', testMatch: 'agent-unified-link.spec.ts', dependencies: ['api'] },
     ],
 });

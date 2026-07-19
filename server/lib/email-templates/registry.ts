@@ -63,6 +63,32 @@ export const REGISTRY: EmailTemplateDescriptor[] = [
     cta: { labelBlockKey: 'ctaLabel', urlVar: 'acceptUrl' },
   },
 
+  {
+    // Spec 3 Task 5 — agent-login-link is minted by requestMagicLoginByEmail
+    // (server/services/agent/magic-login.service.ts) and sent by
+    // EmailService.sendAgentLoginLink (server/services/email/agent.ts) for
+    // the core /agent-login page's magic-link fallback. Bare account-level
+    // sign-in with no tenant context (agents are global users), so brand:
+    // 'platform' — mirrors 'password-reset' above, not the tenant-branded
+    // 'agent-invite'/'agent-share-link' entries below.
+    trigger: 'agent-login-link',
+    name: 'Agent sign-in link',
+    category: 'agent',
+    editable: true,
+    required: false,
+    brand: 'platform',
+    defaultSubject: 'Sign in to your agent account',
+    blocks: [
+      { key: 'heading',  label: 'Heading', default: 'Sign in to your agent account',                                                    multiline: false },
+      { key: 'body',     label: 'Body',    default: 'Click the button below to sign in. This link expires in 15 minutes and can only be used once.', multiline: true  },
+      { key: 'ctaLabel', label: 'Button',  default: 'Sign in',                                                                           multiline: false },
+    ],
+    variables: [
+      { name: 'loginUrl', desc: 'One-time agent sign-in link' },
+    ],
+    cta: { labelBlockKey: 'ctaLabel', urlVar: 'loginUrl' },
+  },
+
   // ─── client ───────────────────────────────────────────────────────────────
   {
     trigger: 'agent-share-link',

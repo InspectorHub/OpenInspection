@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 import { REGISTRY, getDescriptor } from '../../../server/lib/email-templates/registry';
 
 describe('email template registry', () => {
-  it('has exactly 19 descriptors', () => {
-    expect(REGISTRY.length).toBe(19);
+  it('has exactly 20 descriptors', () => {
+    expect(REGISTRY.length).toBe(20);
   });
   it('every trigger is unique', () => {
     const t = REGISTRY.map(d => d.trigger);
-    expect(new Set(t).size).toBe(19);
+    expect(new Set(t).size).toBe(20);
   });
   it('marks exactly one non-editable (platform) trigger: password-reset', () => {
     const platform = REGISTRY.filter(d => !d.editable).map(d => d.trigger);
