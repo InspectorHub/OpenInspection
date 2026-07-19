@@ -35,7 +35,7 @@ const listRoute = createRoute(withMcpMetadata({
     path: '/',
     tags: ['role-profiles'],
     summary: 'List role profiles for the current tenant',
-    middleware: [requireRole('owner', 'manager')],
+    middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {},
     responses: {
         200: { content: { 'application/json': { schema: RoleProfileListResponseSchema } }, description: 'Active and inactive role profiles, sorted for display' },

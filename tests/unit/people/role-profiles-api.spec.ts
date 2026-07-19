@@ -168,7 +168,17 @@ describe('/api/role-profiles', () => {
         expect(putRes.status).toBe(409);
     });
 
-    it('rejects writes from a non-admin role (inspector) with 403', async () => {
+    it('allows inspector role to GET (list) role profiles', async () => {
+        const app = buildApp('inspector');
+        const res = await app.request('/api/role-profiles', {}, { DB: {} });
+        expect(res.status).toBe(200);
+        const body = await res.json() as { success: boolean; data: Array<{ key: string; isSystem: boolean }> };
+        expect(body.success).toBe(true);
+        expect(body.data.length).toBeGreaterThan(0);
+        expect(body.data.every(p => p.isSystem)).toBe(true);
+    });
+
+    it('rejects POST (create) from inspector role with 403', async () => {
         const app = buildApp('inspector');
         const res = await app.request('/api/role-profiles', {
             method: 'POST',
@@ -176,5 +186,43 @@ describe('/api/role-profiles', () => {
             body: JSON.stringify({ label: 'Blocked', kind: 'other' }),
         }, { DB: {} });
         expect(res.status).toBe(403);
+    });
+
+    it('rejects PUT (update) from inspector role with 403', async () => {
+        // First, create a profile as owner to get an ID
+        const ownerApp = buildApp('owner');
+        const createRes = await ownerApp.request('/api/role-profiles', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ label: 'Test Profile', kind: 'other' }),
+        }, { DB: {} });
+        const { data: created } = await createRes.json() as { data: { id: string } };
+
+        // Now try to update as inspector
+        const inspectorApp = buildApp('inspector');
+        const putRes = await inspectorApp.request(`/api/role-profiles/${created.id}`, {
+            method: 'PUT',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ label: 'Updated' }),
+        }, { DB: {} });
+        expect(putRes.status).toBe(403);
+    });
+
+    it('rejects DELETE (deactivate) from inspector role with 403', async () => {
+        // First, create a profile as owner to get an ID
+        const ownerApp = buildApp('owner');
+        const createRes = await ownerApp.request('/api/role-profiles', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ label: 'Test Profile', kind: 'other' }),
+        }, { DB: {} });
+        const { data: created } = await createRes.json() as { data: { id: string } };
+
+        // Now try to delete as inspector
+        const inspectorApp = buildApp('inspector');
+        const delRes = await inspectorApp.request(`/api/role-profiles/${created.id}`, {
+            method: 'DELETE',
+        }, { DB: {} });
+        expect(delRes.status).toBe(403);
     });
 });
