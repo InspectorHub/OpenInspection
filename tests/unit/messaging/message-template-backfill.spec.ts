@@ -14,7 +14,7 @@ const T = 'tenant-1';
 async function seedAuto(testDb: BetterSQLite3Database<typeof schema>, over: Partial<typeof schema.automations.$inferInsert> = {}) {
     await testDb.insert(schema.automations).values({
         id: over.id ?? 'a1', tenantId: T, name: over.name ?? 'Report Ready',
-        trigger: 'report.published', recipient: 'client', delayMinutes: 0,
+        trigger: 'report.published', recipientKind: 'inspector', recipientRoleProfileId: null, delayMinutes: 0,
         subjectTemplate: over.subjectTemplate ?? 'Your report is ready — {{property_address}}',
         bodyTemplate: over.bodyTemplate ?? '<p>Hi {{client_name}}</p><p><a href="{{report_url}}">View</a></p>',
         channels: over.channels ?? '["email","sms"]',

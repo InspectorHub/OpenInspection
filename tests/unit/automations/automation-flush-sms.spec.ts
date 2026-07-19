@@ -68,7 +68,7 @@ async function seedSmsLog(over: { contactId?: string | null; smsBody?: string } 
     const ruleId = crypto.randomUUID();
     const smsBody = over.smsBody ?? 'Hi {{client_name}} — {{company_name}}';
     await db.insert(schema.automations).values({
-        id: ruleId, tenantId: TENANT, name: 'R', trigger: 'report.published', recipient: 'client',
+        id: ruleId, tenantId: TENANT, name: 'R', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
         delayMinutes: 0, subjectTemplate: 'S', bodyTemplate: 'B', smsBody,
         channels: '["sms"]', channel: 'sms', active: true, isDefault: false, createdAt: new Date(),
     } as never);
@@ -444,7 +444,7 @@ describe('flush() — derived reminder due-time (Track L Step 3b)', () => {
         } as never);
         const ruleId = crypto.randomUUID();
         await db.insert(schema.automations).values({
-            id: ruleId, tenantId: TENANT, name: 'Reminder', trigger: 'inspection.reminder', recipient: 'client',
+            id: ruleId, tenantId: TENANT, name: 'Reminder', trigger: 'inspection.reminder', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 1440, subjectTemplate: 'Reminder', bodyTemplate: 'See you tomorrow',
             channels: '["email"]', channel: 'email', active: true, isDefault: false, createdAt: new Date(),
         } as never);

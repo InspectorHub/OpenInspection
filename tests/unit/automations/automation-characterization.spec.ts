@@ -76,7 +76,7 @@ async function seedRuleAndLog(opts: {
   const ruleId = crypto.randomUUID();
   await db.insert(schema.automations).values({
     id: ruleId, tenantId: TENANT, name: 'R', trigger: opts.trigger ?? 'report.published',
-    recipient: 'client', delayMinutes: 0, subjectTemplate: opts.subject ?? 'Subj',
+    recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0, subjectTemplate: opts.subject ?? 'Subj',
     bodyTemplate: opts.body ?? 'Body', smsBody: opts.smsBody ?? null,
     channels: JSON.stringify([opts.channel ?? 'email']), channel: opts.channel ?? 'email',
     active: true, isDefault: false, createdAt: new Date(),

@@ -32,6 +32,7 @@ const getServices = vi.fn();
 const getTenantConfig = vi.fn();
 const patchTenantConfig = vi.fn();
 const getMessageTemplates = vi.fn();
+const getRoleProfiles = vi.fn();
 
 vi.mock('~/lib/session.server', () => ({
     requireToken: vi.fn(async () => 'tok-123'),
@@ -57,6 +58,9 @@ vi.mock('~/lib/api-client.server', () => ({
         },
         messageTemplates: {
             index: { $get: getMessageTemplates },
+        },
+        roleProfiles: {
+            index: { $get: getRoleProfiles },
         },
     })),
 }));
@@ -95,7 +99,10 @@ function actionArgs(form: Record<string, string | string[]>): ActionArgs {
 }
 
 const RULE = {
-    id: 'r1', name: 'Report Ready', trigger: 'report.published', recipient: 'client',
+    id: 'r1', name: 'Report Ready', trigger: 'report.published',
+    // Spec 2 Task 0: recipientKind + recipientRoleProfileId replace the old
+    // `recipient` enum.
+    recipientKind: 'role', recipientRoleProfileId: 'crp-client-1',
     delayMinutes: 0, conditions: null,
     // SP2 Task 10/12: emailTemplateId/smsTemplateId replace embedded body fields.
     channels: ['email'], emailTemplateId: 'tpl-email-1', smsTemplateId: null,
@@ -107,6 +114,10 @@ const LOG = {
 };
 const EMAIL_TEMPLATES = [{ id: 'tpl-email-1', name: 'Report Ready Email', channel: 'email' }];
 const SMS_TEMPLATES   = [{ id: 'tpl-sms-1',   name: 'Report Ready SMS',   channel: 'sms'   }];
+const ROLE_PROFILES = [
+    { id: 'crp-client-1', key: 'client', label: 'Client', kind: 'client', active: true },
+    { id: 'crp-buyer-agent-1', key: 'buyer_agent', label: "Buyer's Agent", kind: 'agent', active: true },
+];
 
 beforeEach(() => {
     getAutomations.mockReset().mockResolvedValue(jsonRes({ success: true, data: [RULE] }));
@@ -123,6 +134,9 @@ beforeEach(() => {
     getMessageTemplates.mockReset()
         .mockResolvedValueOnce(jsonRes({ success: true, data: EMAIL_TEMPLATES }))
         .mockResolvedValueOnce(jsonRes({ success: true, data: SMS_TEMPLATES }));
+    // Spec 2 Task 0: loader fetches role profiles (BFF, no client fetch) to power
+    // the recipientRoleProfileId picker.
+    getRoleProfiles.mockReset().mockResolvedValue(jsonRes({ success: true, data: ROLE_PROFILES }));
 });
 
 describe('settings-automations trigger labels (#121)', () => {
@@ -146,19 +160,21 @@ describe('settings-automations buildConditions (Only if)', () => {
 });
 
 describe('settings-automations loader (BFF fan-out)', () => {
-    it('surfaces rules, services, recentLogs, reviewUrl, emailTemplates, smsTemplates', async () => {
+    it('surfaces rules, services, recentLogs, reviewUrl, emailTemplates, smsTemplates, roleProfiles', async () => {
         const data = await loader(loaderArgs());
         expect(getAutomations).toHaveBeenCalled();
         expect(getServices).toHaveBeenCalled();
         expect(getRecentLogs).toHaveBeenCalled();
         expect(getTenantConfig).toHaveBeenCalled();
         expect(getMessageTemplates).toHaveBeenCalledTimes(2);
+        expect(getRoleProfiles).toHaveBeenCalled();
         expect(data.rules[0].name).toBe('Report Ready');
         expect(data.services[0].name).toBe('Standard Home Inspection');
         expect(data.recentLogs[0].error).toMatch(/review_url not configured/i);
         expect(data.reviewUrl).toBe('https://g.page/r/x');
         expect(data.emailTemplates[0].id).toBe('tpl-email-1');
         expect(data.smsTemplates[0].id).toBe('tpl-sms-1');
+        expect(data.roleProfiles[0].key).toBe('client');
     });
 
     it('degrades to empty/blank when the calls fail', async () => {
@@ -167,6 +183,7 @@ describe('settings-automations loader (BFF fan-out)', () => {
         getRecentLogs.mockResolvedValue(jsonRes(null, false));
         getTenantConfig.mockResolvedValue(jsonRes(null, false));
         getMessageTemplates.mockReset().mockResolvedValue(jsonRes(null, false));
+        getRoleProfiles.mockResolvedValue(jsonRes(null, false));
         const data = await loader(loaderArgs());
         expect(data.rules).toEqual([]);
         expect(data.services).toEqual([]);
@@ -174,13 +191,14 @@ describe('settings-automations loader (BFF fan-out)', () => {
         expect(data.reviewUrl).toBe('');
         expect(data.emailTemplates).toEqual([]);
         expect(data.smsTemplates).toEqual([]);
+        expect(data.roleProfiles).toEqual([]);
     });
 });
 
 describe('settings-automations action', () => {
     it('intent=save creates a new automation with assembled conditions + channel email', async () => {
         const res = await action(actionArgs({
-            intent: 'save', name: 'New', trigger: 'report.published', recipient: 'client',
+            intent: 'save', name: 'New', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: 'crp-client-1',
             delayMinutes: '0', emailTemplateId: 'tpl-email-1',
             requirePaid: 'on', serviceIds: ['svc-1', 'svc-2'],
         }));
@@ -191,16 +209,33 @@ describe('settings-automations action', () => {
         expect(arg.json.conditions).toEqual({ requirePaid: true, serviceIds: ['svc-1', 'svc-2'] });
         // SP2 Task 12: template ids in payload, no embedded body fields.
         expect(arg.json.emailTemplateId).toBe('tpl-email-1');
+        // Spec 2 Task 0: recipientKind + recipientRoleProfileId replace the old
+        // `recipient` enum in the save payload.
+        expect(arg.json.recipientKind).toBe('role');
+        expect(arg.json.recipientRoleProfileId).toBe('crp-client-1');
+        expect(arg.json).not.toHaveProperty('recipient');
         expect(arg.json).not.toHaveProperty('subjectTemplate');
         expect(arg.json).not.toHaveProperty('bodyTemplate');
         expect(arg.json).not.toHaveProperty('smsBody');
         expect(res).toEqual({ ok: true, error: undefined });
     });
 
+    it("intent=save nulls recipientRoleProfileId when recipientKind is not 'role'", async () => {
+        await action(actionArgs({
+            intent: 'save', name: 'Inspector notice', trigger: 'report.published',
+            recipientKind: 'inspector', recipientRoleProfileId: 'crp-client-1', delayMinutes: '0',
+        }));
+        const arg = postAutomation.mock.calls[0][0];
+        expect(arg.json.recipientKind).toBe('inspector');
+        // The action nulls recipientRoleProfileId whenever the submitted kind
+        // isn't 'role', even if a stray value arrived on the form.
+        expect(arg.json.recipientRoleProfileId).toBeNull();
+    });
+
     it('intent=save returns { ok: false } when the API call fails (modal stays open)', async () => {
         postAutomation.mockResolvedValue(jsonRes({ success: false }, false));
         const res = await action(actionArgs({
-            intent: 'save', name: 'New', trigger: 'report.published', recipient: 'client',
+            intent: 'save', name: 'New', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: 'crp-client-1',
             delayMinutes: '0',
         }));
         expect(postAutomation).toHaveBeenCalledTimes(1);
@@ -210,7 +245,7 @@ describe('settings-automations action', () => {
     it('intent=save with an id PATCHes the existing automation', async () => {
         await action(actionArgs({
             intent: 'save', id: 'r1', name: 'Edited', trigger: 'report.published',
-            recipient: 'client', delayMinutes: '0',
+            recipientKind: 'role', recipientRoleProfileId: 'crp-client-1', delayMinutes: '0',
         }));
         expect(patchAutomation).toHaveBeenCalledTimes(1);
         expect(patchAutomation.mock.calls[0][0].param).toEqual({ id: 'r1' });
@@ -235,7 +270,7 @@ describe('settings-automations action', () => {
     // ── SP2 Task 12 — template-id save serialization ─────────────────────────
     it('intent=save with channels=[email,sms] serializes both channels + template ids', async () => {
         const res = await action(actionArgs({
-            intent: 'save', name: 'Multi', trigger: 'report.published', recipient: 'client',
+            intent: 'save', name: 'Multi', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: 'crp-client-1',
             delayMinutes: '0',
             channels: ['email', 'sms'],
             emailTemplateId: 'tpl-email-1',
@@ -251,7 +286,7 @@ describe('settings-automations action', () => {
 
     it('intent=save nulls smsTemplateId when sms is NOT an enabled channel', async () => {
         await action(actionArgs({
-            intent: 'save', name: 'EmailOnly', trigger: 'report.published', recipient: 'client',
+            intent: 'save', name: 'EmailOnly', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: 'crp-client-1',
             delayMinutes: '0',
             channels: ['email'],
             emailTemplateId: 'tpl-email-1',
@@ -266,7 +301,7 @@ describe('settings-automations action', () => {
 
     it('intent=save with channels=[sms] sends sms-only + smsTemplateId, emailTemplateId null', async () => {
         await action(actionArgs({
-            intent: 'save', name: 'SmsOnly', trigger: 'report.published', recipient: 'client',
+            intent: 'save', name: 'SmsOnly', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: 'crp-client-1',
             delayMinutes: '0',
             channels: ['sms'],
             smsTemplateId: 'tpl-sms-1',

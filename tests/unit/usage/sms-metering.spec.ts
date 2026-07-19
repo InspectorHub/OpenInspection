@@ -35,8 +35,19 @@ function makeDbStub() {
 
 const TENANT_ID = 't1';
 
-// Minimal ctx shapes matching automation.service.ts deliverSms signature
-function makeCtx(recipientOverride = 'selling_agent') {
+// Minimal ctx shapes matching automation.service.ts deliverSms signature.
+// Spec 2 Task 0: recipientKind/recipientRoleProfileId replace the old `recipient`
+// enum. The default here (role='crp-listing-agent-1', a non-client role profile)
+// bypasses the consent gate exactly as the old 'selling_agent' literal did — the
+// stub `db` below resolves EVERY `.get()` (including the role-profile lookup) to
+// null, so sms.ts's `roleRow?.key === PRIMARY_CLIENT_KEY` check is always false
+// regardless of which profile id is passed. That means this generic stub cannot
+// exercise the "client role requires granted consent" branch itself (only that
+// the non-client bypass still reaches deliverSms/metering unchanged) — the
+// consent-required-for-client behavior is covered with a real DB in
+// tests/unit/automations/automation-people-sourcing.spec.ts and
+// automation-flush-sms.spec.ts.
+function makeCtx(recipientKind: 'role' | 'inspector' | 'all' = 'role', recipientRoleProfileId: string | null = 'crp-listing-agent-1') {
     return {
         log: {
             id: 'log-1',
@@ -56,7 +67,7 @@ function makeCtx(recipientOverride = 'selling_agent') {
             tenantId: TENANT_ID,
             name: 'Test',
             trigger: 'report.published',
-            recipient: recipientOverride,   // non-client bypasses consent gate
+            recipientKind, recipientRoleProfileId,
             delayMinutes: 0,
             subjectTemplate: 'S',
             bodyTemplate: 'B',
@@ -130,7 +141,7 @@ describe('SMS metering in deliverSms', () => {
         fakeProviderSendMessage.mockResolvedValue({ ok: true });
 
         const db = makeDbStub();
-        const ctx = makeCtx('selling_agent');
+        const ctx = makeCtx();
 
         await (svc as any).deliverSms(db, ctx, smsMock, 'Acme', 'acme.example.com');
 
@@ -142,7 +153,7 @@ describe('SMS metering in deliverSms', () => {
         fakeProviderSendMessage.mockResolvedValue({ ok: false, error: 'provider 400: bad' });
 
         const db = makeDbStub();
-        const ctx = makeCtx('selling_agent');
+        const ctx = makeCtx();
 
         await (svc as any).deliverSms(db, ctx, smsMock, 'Acme', 'acme.example.com');
 

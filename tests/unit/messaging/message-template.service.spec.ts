@@ -63,7 +63,7 @@ describe('MessageTemplateService', () => {
         // row (this test is scoped to delete-guard logic, not FK integrity).
         sqlite.pragma('foreign_keys = OFF');
         await testDb.insert(schema.automations).values({
-            id: 'auto-1', tenantId: T1, name: 'Rule', trigger: 'report.published', recipient: 'client',
+            id: 'auto-1', tenantId: T1, name: 'Rule', trigger: 'report.published', recipientKind: 'inspector', recipientRoleProfileId: null,
             delayMinutes: 0,
             // subjectTemplate / bodyTemplate are NOT NULL DEAD columns — empty strings satisfy the constraint.
             subjectTemplate: '', bodyTemplate: '',

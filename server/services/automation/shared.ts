@@ -81,7 +81,7 @@ export interface HasEnsureSeeds {
 }
 export interface HasResolveAddress {
     resolveAddress(
-        recipient: string, channel: 'email' | 'sms',
+        recipientKind: 'role' | 'inspector' | 'all', recipientRoleProfileId: string | null, channel: 'email' | 'sms',
         insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
     ): Promise<string | null>;
 }

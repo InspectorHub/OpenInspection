@@ -70,7 +70,7 @@ describe('AutomationService.trigger — agreement filter', () => {
         await seedTemplate('tpl-agr-1', 'Click {{agreement_sign_url}}', 'Sign here');
         await testDb.insert(schema.automations).values({
             id: 'rule-1', tenantId: TENANT, name: 'Send agreement', trigger: 'inspection.created',
-            recipient: 'client', delayMinutes: 0,
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
             subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-agr-1',
             active: true, isDefault: false, createdAt: new Date(),
         });
@@ -84,7 +84,7 @@ describe('AutomationService.trigger — agreement filter', () => {
         await seedTemplate('tpl-agr-2', 'Click {{agreement_sign_url}}', 'Sign here');
         await testDb.insert(schema.automations).values({
             id: 'rule-2', tenantId: TENANT, name: 'Send agreement', trigger: 'inspection.created',
-            recipient: 'client', delayMinutes: 0,
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
             subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-agr-2',
             active: true, isDefault: false, createdAt: new Date(),
         });
@@ -98,7 +98,7 @@ describe('AutomationService.trigger — agreement filter', () => {
         await seedTemplate('tpl-ord-3', 'Confirmed for {{property_address}}', 'Hi');
         await testDb.insert(schema.automations).values({
             id: 'rule-3', tenantId: TENANT, name: 'Booking confirmation', trigger: 'inspection.created',
-            recipient: 'client', delayMinutes: 0,
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
             subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-ord-3',
             active: true, isDefault: false, createdAt: new Date(),
         });

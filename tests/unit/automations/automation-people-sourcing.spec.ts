@@ -78,7 +78,7 @@ describe('AutomationService.resolveAddress — sources people from inspection_pe
         await people().addPerson(TENANT, insp, 'c-client-1', roleProfileId('client'));
         const dbi = svc['getDrizzle']();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const addr = await (svc as any).resolveAddress('client', 'email', await inspRowOf(insp), dbi);
+        const addr = await (svc as any).resolveAddress('role', roleProfileId('client'), 'email', await inspRowOf(insp), dbi);
         expect(addr).toBe('jane@example.com');
     });
 
@@ -87,7 +87,7 @@ describe('AutomationService.resolveAddress — sources people from inspection_pe
         await seedInspection(insp);
         const dbi = svc['getDrizzle']();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const addr = await (svc as any).resolveAddress('client', 'email', await inspRowOf(insp), dbi);
+        const addr = await (svc as any).resolveAddress('role', roleProfileId('client'), 'email', await inspRowOf(insp), dbi);
         expect(addr).toBeNull();
     });
 
@@ -98,29 +98,29 @@ describe('AutomationService.resolveAddress — sources people from inspection_pe
         await people().addPerson(TENANT, insp, 'c-client-2', roleProfileId('client'));
         const dbi = svc['getDrizzle']();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const addr = await (svc as any).resolveAddress('client', 'sms', await inspRowOf(insp), dbi);
+        const addr = await (svc as any).resolveAddress('role', roleProfileId('client'), 'sms', await inspRowOf(insp), dbi);
         expect(addr).toBe('+15552223333');
     });
 
-    it('sms/selling_agent resolves the listing_agent role contact phone', async () => {
+    it('sms/selling_agent (role key listing_agent) resolves the listing_agent role contact phone', async () => {
         const insp = 'insp-sms-selling';
         await seedInspection(insp);
         await addContact('c-listing-1', { name: 'Listing Agent', phone: '(555) 444-5555', type: 'agent' });
         await people().addPerson(TENANT, insp, 'c-listing-1', roleProfileId('listing_agent'));
         const dbi = svc['getDrizzle']();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const addr = await (svc as any).resolveAddress('selling_agent', 'sms', await inspRowOf(insp), dbi);
+        const addr = await (svc as any).resolveAddress('role', roleProfileId('listing_agent'), 'sms', await inspRowOf(insp), dbi);
         expect(addr).toBe('+15554445555');
     });
 
-    it('sms/buying_agent resolves the buyer_agent role contact phone', async () => {
+    it('sms/buying_agent (role key buyer_agent) resolves the buyer_agent role contact phone', async () => {
         const insp = 'insp-sms-buying';
         await seedInspection(insp);
         await addContact('c-buyer-1', { name: "Buyer's Agent", phone: '(555) 666-7777', type: 'agent' });
         await people().addPerson(TENANT, insp, 'c-buyer-1', roleProfileId('buyer_agent'));
         const dbi = svc['getDrizzle']();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const addr = await (svc as any).resolveAddress('buying_agent', 'sms', await inspRowOf(insp), dbi);
+        const addr = await (svc as any).resolveAddress('role', roleProfileId('buyer_agent'), 'sms', await inspRowOf(insp), dbi);
         expect(addr).toBe('+15556667777');
     });
 
@@ -129,8 +129,35 @@ describe('AutomationService.resolveAddress — sources people from inspection_pe
         await seedInspection(insp);
         const dbi = svc['getDrizzle']();
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const addr = await (svc as any).resolveAddress('selling_agent', 'sms', await inspRowOf(insp), dbi);
+        const addr = await (svc as any).resolveAddress('role', roleProfileId('listing_agent'), 'sms', await inspRowOf(insp), dbi);
         expect(addr).toBeNull();
+    });
+
+    // Spec 2 Task 0 — new discriminator kinds not covered by the pre-existing
+    // enum suite: 'all' never resolves an address (email or sms), and an
+    // unknown/missing recipientRoleProfileId resolves to null rather than throwing.
+    it("recipientKind:'all' resolves null for both channels", async () => {
+        const insp = 'insp-all-kind';
+        await seedInspection(insp);
+        await addContact('c-client-all', { name: 'Jane Client', email: 'jane@example.com', phone: '+15551110000' });
+        await people().addPerson(TENANT, insp, 'c-client-all', roleProfileId('client'));
+        const dbi = svc['getDrizzle']();
+        const row = await inspRowOf(insp);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect(await (svc as any).resolveAddress('all', null, 'email', row, dbi)).toBeNull();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect(await (svc as any).resolveAddress('all', null, 'sms', row, dbi)).toBeNull();
+    });
+
+    it("recipientKind:'role' with an unknown recipientRoleProfileId resolves null (never throws)", async () => {
+        const insp = 'insp-unknown-profile';
+        await seedInspection(insp);
+        const dbi = svc['getDrizzle']();
+        const row = await inspRowOf(insp);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect(await (svc as any).resolveAddress('role', 'crp-does-not-exist', 'email', row, dbi)).toBeNull();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        expect(await (svc as any).resolveAddress('role', 'crp-does-not-exist', 'sms', row, dbi)).toBeNull();
     });
 
     // NOTE: the 'inspector' sms recipient branch is explicitly OUT OF SCOPE for
@@ -146,11 +173,11 @@ describe('AutomationService.flush — SMS consent + client_name resolve via insp
         await new SmsConsentService({} as D1Database).publishDisclosure('disclosure');
     });
 
-    async function seedRule(opts: { recipient: string; channel: 'email' | 'sms'; body: string; smsBody?: string }) {
+    async function seedRule(opts: { recipientRoleKey: string; channel: 'email' | 'sms'; body: string; smsBody?: string }) {
         const ruleId = crypto.randomUUID();
         await db.insert(schema.automations).values({
             id: ruleId, tenantId: TENANT, name: 'R', trigger: 'report.published',
-            recipient: opts.recipient, delayMinutes: 0,
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId(opts.recipientRoleKey), delayMinutes: 0,
             subjectTemplate: 'Subj', bodyTemplate: opts.body, smsBody: opts.smsBody ?? null,
             channels: JSON.stringify([opts.channel]), active: true, isDefault: false, createdAt: new Date(),
         } as never);
@@ -171,7 +198,7 @@ describe('AutomationService.flush — SMS consent + client_name resolve via insp
         await seedInspection(insp);
         await addContact('c-consent-1', { name: 'Consent Client', phone: '+15550001111' });
         await people().addPerson(TENANT, insp, 'c-consent-1', roleProfileId('client'));
-        const ruleId = await seedRule({ recipient: 'client', channel: 'sms', body: 'unused', smsBody: 'Hi {{client_name}}' });
+        const ruleId = await seedRule({ recipientRoleKey: 'client', channel: 'sms', body: 'unused', smsBody: 'Hi {{client_name}}' });
         await new SmsConsentService({} as D1Database).record(TENANT, 'c-consent-1', 'granted', 'admin', {});
         await db.insert(schema.automationLogs).values({
             id: crypto.randomUUID(), tenantId: TENANT, automationId: ruleId, inspectionId: insp,
@@ -194,7 +221,7 @@ describe('AutomationService.flush — SMS consent + client_name resolve via insp
         await seedInspection(insp);
         await addContact('c-name-1', { name: 'Resolved Name', email: 'resolved@example.com' });
         await people().addPerson(TENANT, insp, 'c-name-1', roleProfileId('client'));
-        const ruleId = await seedRule({ recipient: 'client', channel: 'email', body: 'Hi {{client_name}}' });
+        const ruleId = await seedRule({ recipientRoleKey: 'client', channel: 'email', body: 'Hi {{client_name}}' });
         await db.insert(schema.automationLogs).values({
             id: crypto.randomUUID(), tenantId: TENANT, automationId: ruleId, inspectionId: insp,
             recipient: 'resolved@example.com', channel: 'email', sendAt: new Date(Date.now() - 1000), status: 'pending',

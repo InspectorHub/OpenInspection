@@ -42,7 +42,7 @@ beforeEach(async () => {
 describe('AutomationService — channels + sms_body (Track L)', () => {
     it('create persists channels and smsTemplateId (SP2: embedded body fields replaced by template ids)', async () => {
         const row = await svc.create(TENANT, {
-            name: 'Multi', trigger: 'report.published', recipient: 'client',
+            name: 'Multi', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 0,
             channels: ['email', 'sms'], smsTemplateId: 'tpl-sms-1',
         });
@@ -54,7 +54,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
 
     it('create defaults to email-only channels when omitted', async () => {
         const row = await svc.create(TENANT, {
-            name: 'Default', trigger: 'report.published', recipient: 'client',
+            name: 'Default', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 0,
         });
         expect(row.channels).toEqual(['email']);
@@ -64,7 +64,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
 
     it('update can change channels and smsTemplateId (SP2)', async () => {
         const created = await svc.create(TENANT, {
-            name: 'U', trigger: 'report.published', recipient: 'client',
+            name: 'U', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 0,
         });
         const updated = await svc.update(TENANT, created.id, {
@@ -83,7 +83,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         } as never);
         await seedPrimaryClient(inspId, 'c-jane', { name: 'Jane', email: 'jane@example.com', phone: '(555) 123-4567' });
         const created = await svc.create(TENANT, {
-            name: 'R', trigger: 'report.published', recipient: 'client',
+            name: 'R', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 0,
             channels: ['email', 'sms'], smsTemplateId: 'tpl-sms',
         });
@@ -107,7 +107,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         } as never);
         await seedPrimaryClient(inspId, 'c-joe', { name: 'Joe', email: 'joe@example.com', phone: null });
         const created = await svc.create(TENANT, {
-            name: 'R2', trigger: 'report.published', recipient: 'client',
+            name: 'R2', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 0,
             channels: ['email', 'sms'], smsTemplateId: 'tpl-sms',
         });
@@ -121,7 +121,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
 
     it('list() parses the JSON channels column to a string[] on output (Part A)', async () => {
         await svc.create(TENANT, {
-            name: 'L1', trigger: 'report.published', recipient: 'client',
+            name: 'L1', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 0,
             channels: ['email', 'sms'],
         });
@@ -141,7 +141,7 @@ describe('AutomationService — channels + sms_body (Track L)', () => {
         } as never);
         await seedPrimaryClient(inspId, 'c-ann', { name: 'Ann', email: 'ann@example.com', phone: '555-123-4567' });
         const created = await svc.create(TENANT, {
-            name: 'Reminder', trigger: 'inspection.reminder', recipient: 'client',
+            name: 'Reminder', trigger: 'inspection.reminder', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 1440,
             channels: ['email', 'sms'], smsTemplateId: 'tpl-reminder',
         });

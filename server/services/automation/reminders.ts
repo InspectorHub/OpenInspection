@@ -65,7 +65,7 @@ export function AutomationReminders<TBase extends Constructor<AutomationBase & H
                     // address resolution replaces the old single clientEmail guard.
                     const channels = this.parseChannels(rule.channels);
                     for (const channel of channels) {
-                        const addr = await this.resolveAddress(rule.recipient as string, channel, insp, db);
+                        const addr = await this.resolveAddress(rule.recipientKind, rule.recipientRoleProfileId, channel, insp, db);
                         if (!addr) continue;
                         // Dedup key is per-channel so email + sms reminders for the same
                         // (rule, inspection) coexist and each de-dupes independently.

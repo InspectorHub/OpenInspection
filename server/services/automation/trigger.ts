@@ -84,10 +84,10 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             for (const rule of filteredRules) {
                 const channels = this.parseChannels(rule.channels);
                 for (const channel of channels) {
-                    const addr = await this.resolveAddress(rule.recipient as string, channel, insp, db);
+                    const addr = await this.resolveAddress(rule.recipientKind, rule.recipientRoleProfileId, channel, insp, db);
                     if (!addr) {
                         logger.info('AutomationService.trigger: no address resolved for channel (skipping log)',
-                            { ruleId: rule.id, recipient: rule.recipient, channel });
+                            { ruleId: rule.id, recipientKind: rule.recipientKind, recipientRoleProfileId: rule.recipientRoleProfileId, channel });
                         continue;
                     }
                     const sendAt = new Date(now.getTime() + rule.delayMinutes * 60_000);
@@ -124,24 +124,29 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
         }
 
         /**
-         * Track L — resolve the delivery address for a (recipient, channel) pair.
-         * email → existing behavior (client only; agents/inspector deferred). sms →
-         * E.164 phone for client / selling_agent / buying_agent / inspector. Returns
+         * Resolve the delivery address for a (recipientKind, recipientRoleProfileId,
+         * channel) triple. email → 'role' targeting the PRIMARY_CLIENT_KEY profile
+         * only (agents/inspector/all deferred — behavior-preserving with the former
+         * enum's "email → client only" rule); other role/'inspector'/'all' → null.
+         * sms → E.164 phone for ANY role profile key, plus 'inspector'; 'all' → null.
+         * An unknown/missing recipientRoleProfileId resolves to null. Returns
          * null → the caller skips creating that log (never throws).
          *
-         * Task 11a — client/selling_agent/buying_agent addresses are resolved from
-         * `inspection_people` (via `contact_role_profiles`), NOT the legacy
-         * inspections.client_email/_phone/_contact_id/selling_agent_id/
-         * referred_by_agent_id columns (frozen cache, dropped Task 13).
-         * selling_agent → role key 'listing_agent' (the seller's-side agent);
-         * buying_agent → role key 'buyer_agent' — matches the automations.recipient
-         * enum naming against the newer contact_role_profiles key naming.
-         * inspector stays on the users table — unrelated to inspection_people.
+         * Task 11a — role addresses are resolved from `inspection_people` (via
+         * `contact_role_profiles`), NOT the legacy inspections.client_email/_phone/
+         * _contact_id/selling_agent_id/referred_by_agent_id columns (frozen cache,
+         * dropped Task 13). inspector stays on the users table — unrelated to
+         * inspection_people.
+         *
+         * Spec 2 Task 0 — this is a pure discriminator swap (recipientKind/
+         * recipientRoleProfileId replace the fixed `recipient` enum); the resolved
+         * address per role is unchanged (widening to all `receivesReport` roles is
+         * a later task).
          */
         // Public (was `private` on the monolith) so the reminders mixin can call it
         // through a typed cross-mixin contract; no runtime behavior change.
         async resolveAddress(
-            recipient: string, channel: 'email' | 'sms',
+            recipientKind: 'role' | 'inspector' | 'all', recipientRoleProfileId: string | null, channel: 'email' | 'sms',
             insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
         ): Promise<string | null> {
             const { contacts, users, inspectionPeople, contactRoleProfiles } = await import('../../lib/db/schema');
@@ -177,20 +182,33 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 }
             };
 
+            // Resolve the recipient's role-profile id to its stable `key` (the
+            // machine id contactForRole joins on — `label` is tenant-editable and
+            // not a safe join key). A transient read failure or an unknown/inactive
+            // id resolves to null (no throw), same posture as contactForRole.
+            const roleKeyFor = async (profileId: string): Promise<string | null> => {
+                try {
+                    const row = await db.select({ key: contactRoleProfiles.key }).from(contactRoleProfiles)
+                        .where(and(eq(contactRoleProfiles.tenantId, insp.tenantId), eq(contactRoleProfiles.id, profileId))).get();
+                    return row?.key ?? null;
+                } catch {
+                    return null;
+                }
+            };
+
             if (channel === 'email') {
-                if (recipient !== 'client') return null;
+                if (recipientKind !== 'role' || !recipientRoleProfileId) return null;
+                const roleKey = await roleKeyFor(recipientRoleProfileId);
+                if (roleKey !== PRIMARY_CLIENT_KEY) return null;
                 const c = await contactForRole(PRIMARY_CLIENT_KEY);
                 return c?.email ?? null;
             }
             // channel === 'sms'
             let raw: string | null = null;
-            if (recipient === 'client') {
-                raw = (await contactForRole(PRIMARY_CLIENT_KEY))?.phone ?? null;
-            } else if (recipient === 'selling_agent') {
-                raw = (await contactForRole('listing_agent'))?.phone ?? null;
-            } else if (recipient === 'buying_agent') {
-                raw = (await contactForRole('buyer_agent'))?.phone ?? null;
-            } else if (recipient === 'inspector') {
+            if (recipientKind === 'role' && recipientRoleProfileId) {
+                const roleKey = await roleKeyFor(recipientRoleProfileId);
+                if (roleKey) raw = (await contactForRole(roleKey))?.phone ?? null;
+            } else if (recipientKind === 'inspector') {
                 // Verified against server/lib/db/schema/inspection.ts: the assigned
                 // inspector is `inspections.inspector_id` (text FK → users.id, line 46).
                 // `lead_inspector_id` (team mode) is the primary when set and falls back
@@ -205,6 +223,8 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                     raw = u?.phone ?? null;
                 }
             }
+            // recipientKind === 'all' falls through with raw = null (matches the
+            // former enum's behavior: 'all' hit no branch and yielded null).
             const { normalizeE164 } = await import('../../lib/sms/phone');
             return normalizeE164(raw);
         }

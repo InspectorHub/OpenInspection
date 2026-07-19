@@ -3,8 +3,9 @@ import { CreateAutomationSchema, UpdateAutomationSchema, AutomationSchema } from
 
 describe('CreateAutomationSchema (Track J)', () => {
     // SP2: subjectTemplate/bodyTemplate removed; emailTemplateId/smsTemplateId replace them.
+    // Spec 2 Task 0: recipientKind + recipientRoleProfileId replace the old `recipient` enum.
     const base = {
-        name: 'R', trigger: 'report.published', recipient: 'client',
+        name: 'R', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: 'crp-client-1',
     };
 
     it('accepts the new inspection.reminder trigger', () => {
@@ -69,8 +70,8 @@ describe('UpdateAutomationSchema (Track L — partial-update channel-drop regres
 
 it('SP2: CreateAutomationSchema accepts template ids and no longer requires bodyTemplate', () => {
     const r = CreateAutomationSchema.safeParse({
-        name: 'R', trigger: 'report.published', recipient: 'client', delayMinutes: 0,
-        channels: ['email'], emailTemplateId: 'tpl-1',
+        name: 'R', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: 'crp-client-1',
+        delayMinutes: 0, channels: ['email'], emailTemplateId: 'tpl-1',
     });
     expect(r.success).toBe(true);
 });
@@ -79,4 +80,33 @@ it('SP2: AutomationSchema exposes emailTemplateId + smsTemplateId', () => {
     const shape = AutomationSchema.shape as Record<string, unknown>;
     expect(shape.emailTemplateId).toBeDefined();
     expect(shape.smsTemplateId).toBeDefined();
+});
+
+describe('CreateAutomationSchema recipient discriminator (Spec 2 Task 0)', () => {
+    const withRecipient = (overrides: Record<string, unknown>) => CreateAutomationSchema.safeParse({
+        name: 'R', trigger: 'report.published', ...overrides,
+    });
+
+    it("rejects recipientKind:'role' with no recipientRoleProfileId", () => {
+        expect(withRecipient({ recipientKind: 'role' }).success).toBe(false);
+        expect(withRecipient({ recipientKind: 'role', recipientRoleProfileId: null }).success).toBe(false);
+    });
+
+    it("accepts recipientKind:'role' with a recipientRoleProfileId", () => {
+        expect(withRecipient({ recipientKind: 'role', recipientRoleProfileId: 'crp-1' }).success).toBe(true);
+    });
+
+    it("rejects recipientKind:'inspector'/'all' carrying a stray recipientRoleProfileId", () => {
+        expect(withRecipient({ recipientKind: 'inspector', recipientRoleProfileId: 'crp-1' }).success).toBe(false);
+        expect(withRecipient({ recipientKind: 'all', recipientRoleProfileId: 'crp-1' }).success).toBe(false);
+    });
+
+    it("accepts recipientKind:'inspector'/'all' with no recipientRoleProfileId", () => {
+        expect(withRecipient({ recipientKind: 'inspector' }).success).toBe(true);
+        expect(withRecipient({ recipientKind: 'all' }).success).toBe(true);
+    });
+
+    it('UpdateAutomationSchema has no refine — a partial PATCH may omit both fields', () => {
+        expect(UpdateAutomationSchema.safeParse({ active: false }).success).toBe(true);
+    });
 });

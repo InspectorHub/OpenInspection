@@ -105,6 +105,25 @@ export class PeopleService {
         return row?.contactId ?? null;
     }
 
+    /**
+     * Resolves a role profile `key` (e.g. 'client', 'buyer_agent', 'listing_agent')
+     * to its per-tenant `contact_role_profiles.id`, or null when the tenant has no
+     * active profile for that key. Shared helper for callers that persist a
+     * recipient discriminator (recipientKind='role' + recipientRoleProfileId) —
+     * e.g. automation seed writers mapping their stable role-key shorthand to a
+     * real profile id. The `uq_crp_tenant_key` unique index is partial on
+     * `is_active = 1`, so the active filter is required to hit that index.
+     */
+    async profileIdForKey(tenantId: string, key: string): Promise<string | null> {
+        const row = await this.db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
+            .where(and(
+                eq(contactRoleProfiles.tenantId, tenantId),
+                eq(contactRoleProfiles.key, key),
+                eq(contactRoleProfiles.active, true),
+            )).get();
+        return row?.id ?? null;
+    }
+
     /** Lists all role profiles (active + inactive) for the tenant, in display order. */
     async listProfiles(tenantId: string) {
         return this.db.select().from(contactRoleProfiles)

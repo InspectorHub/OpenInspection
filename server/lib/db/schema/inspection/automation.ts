@@ -20,9 +20,13 @@ export const automations = sqliteTable('automations', {
             'inspection.reminder',
         ],
     }).notNull(),
-    recipient: text('recipient', {
-        enum: ['client', 'buying_agent', 'selling_agent', 'inspector', 'all'],
-    }).notNull(),
+    // Recipient discriminator (replaces the fixed `recipient` enum). `role` means
+    // "the role profile named by recipientRoleProfileId"; `inspector` and `all`
+    // are role-independent and always carry a null profile id. Invariant:
+    // recipient_role_profile_id is set iff kind='role'; when set it holds a
+    // contact_role_profiles.id (app-layer link, no FK per Schema Rules).
+    recipientKind: text('recipient_kind', { enum: ['role', 'inspector', 'all'] }).notNull(),
+    recipientRoleProfileId: text('recipient_role_profile_id'),
     delayMinutes: integer('delay_minutes').notNull().default(0),
     // -- DEAD (2026-06-26, SP2): embedded email subject/body retired. Automations
     // now reference a message_templates row via email_template_id. Frozen: no
