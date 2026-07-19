@@ -14,6 +14,7 @@ import type { AutomationBase, HasEvaluateConditions, HasDeliverSms } from './sha
 import type { SmsRuntime } from './sms';
 import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
+import { deliverReportEmail, type ReportDeliveryDeps } from './report-email';
 
 /**
  * The flush query's SELECT projection. `inspection` is narrowed to the
@@ -47,6 +48,10 @@ export const FLUSH_SELECTION = {
  * Re-checks conditions (conditions mixin), branches SMS to deliverSms (sms mixin),
  * and renders + sends email through the per-tenant EmailService. Body is
  * byte-identical to the former monolith.
+ *
+ * Spec 2 Task 2b — `report.published` EMAIL logs additionally branch to
+ * report-email.ts:deliverReportEmail (tokenized portal link + PDF) when the
+ * optional `reportDelivery` param is supplied; see that param's own doc.
  */
 export function AutomationDelivery<TBase extends Constructor<AutomationBase & HasEvaluateConditions & HasDeliverSms>>(Base: TBase) {
     return class extends Base {
@@ -59,6 +64,12 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             /** Free-tier pre-flight (2026-07) — undefined on deployments with no
              *  usage-quota capability (standalone); see scheduled.ts wiring. */
             quotaGuard?: PlanQuotaGuard,
+            /** Spec 2 Task 2b — opt-in seam: when present, `report.published` EMAIL
+             *  logs are delivered as a per-recipient tokenized portal link + PDF
+             *  (report-email.ts) instead of the generic template path below. Absent
+             *  on every existing caller/test (backward-compatible) and on deploys
+             *  missing JWT_SECRET (see scheduled.ts wiring). */
+            reportDelivery?: ReportDeliveryDeps,
         ): Promise<void> {
             const db = this.getDrizzle();
             const now = new Date();
@@ -156,6 +167,12 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                 };
             })();
 
+            // Spec 2 Task 2b — render the report PDF ONCE per inspection, reused
+            // across every recipient log in this flush() batch (an `all`-recipient
+            // report.published rule fans out to N logs for the same inspection).
+            // Declared once per flush() call; see report-email.ts:deliverReportEmail.
+            const pdfMemo = new Map<string, Promise<ArrayBuffer | null>>();
+
             for (const { log, automation, inspection, tenant } of pending) {
                 try {
                     const verdict = await this.evaluateConditions(db, automation, inspection);
@@ -170,6 +187,18 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // per-tenant EmailService (metering + per-tenant key resolution by construction).
                     if (log.channel === 'sms') {
                         await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost, env, quotaGuard);
+                        continue;
+                    }
+
+                    // Spec 2 Task 2b — report.published EMAIL logs get the tokenized
+                    // portal link + PDF attachment when reportDelivery deps are wired
+                    // (cron path only — see scheduled.ts). Absent reportDelivery (every
+                    // existing test, or a deploy missing JWT_SECRET) falls through
+                    // unchanged to the generic template path below. SMS report links
+                    // stay generic — out of scope (deliverSms above is untouched).
+                    if (log.channel === 'email' && automation.trigger === 'report.published' && reportDelivery) {
+                        const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
+                        await deliverReportEmail(db, { log, inspection, tenant }, emailSvc, appBaseUrl, reportDelivery, pdfMemo);
                         continue;
                     }
 
