@@ -19,7 +19,7 @@ import {
     type AcceptInviteResult,
 } from './agent/invite';
 import { signup, autoLinkSameEmail } from './agent/signup';
-import { updateProfile, type AgentProfilePatch } from './agent/profile';
+import { updateProfile, getProfile, type AgentProfilePatch } from './agent/profile';
 import { findGlobalAgentByEmail } from './agent/account';
 
 export type { AgentReferralRow, AgentInspectorRow } from './agent/referral';
@@ -214,6 +214,14 @@ export class AgentService {
      */
     async updateProfile(userId: string, patch: AgentProfilePatch): Promise<void> {
         return updateProfile(this.db, userId, patch);
+    }
+
+    /**
+     * Spec 3 Task 4b — Read the signed-in agent's profile (slug + notification
+     * prefs) for GET /api/agent/profile.
+     */
+    async getProfile(userId: string): ReturnType<typeof getProfile> {
+        return getProfile(this.db, userId);
     }
 
     /**

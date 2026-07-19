@@ -54,3 +54,22 @@ export async function updateProfile(
     await db.update(users).set(set).where(eq(users.id, userId));
     logger.info('agent.profile.updated', { userId, fields: Object.keys(set) });
 }
+
+/**
+ * Spec 3 Task 4b — Read the signed-in agent's profile (slug + notification
+ * prefs) for GET /api/agent/profile. Agents are global users (tenant_id IS
+ * NULL, id globally unique), so a plain by-id lookup is correct here — no
+ * tenant scoping applies.
+ */
+export async function getProfile(rawDb: D1Database, userId: string) {
+    const db = drizzle(rawDb);
+    const row = await db.select({
+        name: users.name, email: users.email, slug: users.slug,
+        notifyOnReferral: users.notifyOnReferral, notifyOnReport: users.notifyOnReport, notifyOnPaid: users.notifyOnPaid,
+    }).from(users).where(eq(users.id, userId)).get();
+    if (!row) throw Errors.NotFound('Agent profile not found');
+    return {
+        name: row.name ?? null, email: row.email ?? '', slug: row.slug ?? null,
+        notifyOnReferral: !!row.notifyOnReferral, notifyOnReport: !!row.notifyOnReport, notifyOnPaid: !!row.notifyOnPaid,
+    };
+}

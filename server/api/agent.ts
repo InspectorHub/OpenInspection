@@ -15,8 +15,12 @@ import {
     LeaderboardResponseSchema,
     AgentProfilePatchSchema,
     AgentProfilePatchResponseSchema,
+    AgentProfileResponseSchema,
     ConciergeBookSchema,
     ConciergeBookResponseSchema,
+    AgentMyRecommendationsResponseSchema,
+    AgentReferralRowSchema,
+    AgentInspectorRowSchema,
 } from '../lib/validations/agent.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
@@ -54,23 +58,9 @@ const getReportsRoute = createRoute(withMcpMetadata({
  * UC-A-5 — agent's flattened recommendations grouped by safety / recommendation /
  * maintenance. Pulls from referred-and-delivered inspections only; access is
  * scoped via the same agent_tenant_links predicate as listReferrals.
+ * (RecommendationRowSchema lives in lib/validations/agent.schema.ts alongside
+ * this module's other route-response schemas — file-size ratchet.)
  */
-const RecommendationRowSchema = z.object({
-    inspectionId:    z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
-    propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
-    inspectionDate:  z.string().describe('TODO describe inspectionDate field for the OpenInspection MCP integration'),
-    sectionTitle:    z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
-    itemLabel:       z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
-    defectTitle:     z.string().describe('TODO describe defectTitle field for the OpenInspection MCP integration'),
-    // Widened (Authoring unification Plan-4 module K): a defect_categories.id
-    // or legacy seed name. This feed still only groups into the 3 fixed
-    // legacy buckets below (agent-recommendations.ts), so in practice the
-    // value here is always one of those three.
-    category:        z.string().describe('Defect category — a defect_categories.id or legacy seed name (safety/recommendation/maintenance).'),
-    comment:         z.string().describe('TODO describe comment field for the OpenInspection MCP integration'),
-    location:        z.string().nullable().describe('TODO describe location field for the OpenInspection MCP integration'),
-    photos:          z.array(z.string()).describe('TODO describe photos field for the OpenInspection MCP integration'),
-});
 const myRecommendationsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/my-recommendations',
@@ -78,14 +68,7 @@ const myRecommendationsRoute = createRoute(withMcpMetadata({
     summary: 'Defects from referred inspections grouped by category',
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({
-                success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
-                data: z.object({
-                    safety:         z.array(RecommendationRowSchema).describe('TODO describe safety field for the OpenInspection MCP integration'),
-                    recommendation: z.array(RecommendationRowSchema).describe('TODO describe recommendation field for the OpenInspection MCP integration'),
-                    maintenance:    z.array(RecommendationRowSchema).describe('TODO describe maintenance field for the OpenInspection MCP integration'),
-                }).describe('TODO describe data field for the OpenInspection MCP integration'),
-            }) } },
+            content: { 'application/json': { schema: AgentMyRecommendationsResponseSchema } },
             description: 'Success',
         },
         401: { description: 'Unauthorized' },
@@ -152,6 +135,32 @@ const updateProfileRoute = createRoute(withMcpMetadata({
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
+ * Spec 3 Task 4b — GET /api/agent/profile
+ * Reads the signed-in agent's current slug + notification prefs, seeding the
+ * /agent-settings/profile page's loader. Same identity resolution as
+ * POST /profile (`c.get('user').sub`) — agents are global users so the route
+ * does NOT require a tenantId.
+ */
+const getProfileRoute = createRoute(withMcpMetadata({
+    method: 'get',
+    path: '/profile',
+    tags: ["agents"],
+    summary: 'Get agent profile (slug + notification prefs)',
+    responses: {
+        200: {
+            content: { 'application/json': { schema: AgentProfileResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
+            description: 'Success',
+        },
+        401: { description: 'Unauthorized' },
+        403: { description: 'Forbidden — agent role required' },
+        404: { description: 'Agent profile not found' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: "getAgentProfile",
+    description: "Auto-generated placeholder for getAgentProfile (GET /profile, agents domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['agent'], tier: 'extended' }));
+
+/**
  * Agent Accounts A3 — POST /api/agent/concierge-book
  * Agent submits a booking on behalf of a client. The route never trusts the
  * agent_user_id from the body — it uses `c.get('agentUserId')` set by the
@@ -187,17 +196,6 @@ const conciergeBookRoute = createRoute(withMcpMetadata({
  * linked to). Thin wrapper over AgentService.listReferrals; agent_tenant_links
  * scoping happens in the service.
  */
-const AgentReferralRowSchema = z.object({
-    id:              z.string().describe('Inspection id.'),
-    tenantName:      z.string().describe('Inspecting company name.'),
-    tenantSlug:      z.string().describe('Tenant slug for building repair-builder links.'),
-    propertyAddress: z.string().nullable().describe('Property address of the referred inspection.'),
-    clientName:      z.string().nullable().describe('Client (buyer) name on the referral.'),
-    date:            z.string().nullable().describe('Scheduled inspection date.'),
-    status:          z.string().describe('Inspection lifecycle status.'),
-    reportStatus:    z.string().nullable().describe('Report lifecycle status (published = repair builder available).'),
-    inspectorName:   z.string().nullable().describe('Assigned inspector name.'),
-});
 const referralsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/referrals',
@@ -218,13 +216,6 @@ const referralsRoute = createRoute(withMcpMetadata({
  * Every inspecting team the agent partners with (for the booking-link cards).
  * Thin wrapper over AgentService.listInspectors.
  */
-const AgentInspectorRowSchema = z.object({
-    inspectorName:     z.string().nullable().describe('Inspector display name.'),
-    inspectorSlug:     z.string().nullable().describe('Inspector public profile slug.'),
-    inspectorPhotoUrl: z.string().nullable().describe('Inspector avatar URL.'),
-    tenantName:        z.string().describe('Inspecting company name.'),
-    tenantSlug:   z.string().describe('Tenant slug for the booking link.'),
-});
 const inspectorsRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/inspectors',
@@ -355,6 +346,14 @@ const agentRoutes = createApiRouter()
 
         await c.var.services.agent.updateProfile(user.sub, patch);
         return c.json({ success: true as const, data: { ok: true as const } }, 200);
+    })
+    .openapi(getProfileRoute, async (c) => {
+        await requireRole('agent')(c, async () => {});
+        const user = c.get('user');
+        if (!user?.sub) throw Errors.Unauthorized();
+
+        const data = await c.var.services.agent.getProfile(user.sub);
+        return c.json({ success: true as const, data }, 200);
     })
     .openapi(conciergeBookRoute, async (c) => {
         await requireRole('agent')(c, async () => {});

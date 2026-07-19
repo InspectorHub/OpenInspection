@@ -6483,6 +6483,22 @@
     "description": "Public, no-login resolution of an agent-invite token into the inspector + tenant + email metadata the accept page renders. Returns 404 for unknown/expired/used tokens so the page can show its recovery state."
   },
   {
+    "operationId": "getAgentProfile",
+    "method": "GET",
+    "pathTemplate": "/api/agent/profile",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Get agent profile (slug + notification prefs)",
+    "description": "Auto-generated placeholder for getAgentProfile (GET /profile, agents domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
     "operationId": "getAgentReportContext",
     "method": "POST",
     "pathTemplate": "/api/agent/report-context",

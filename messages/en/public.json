@@ -127,6 +127,8 @@
   "agent_portal_settings_notify_report_subtitle": "When the inspector publishes the report for one of your referrals.",
   "agent_portal_settings_notify_paid_title": "An invoice is paid",
   "agent_portal_settings_notify_paid_subtitle": "When your client pays the inspection invoice.",
+  "agent_portal_settings_slug_error_generic": "Couldn't save your slug. Please try again.",
+  "agent_portal_settings_notify_error_generic": "Couldn't save your notification preferences. Please try again.",
   "agent_portal_nav_dashboard": "Dashboard",
   "agent_portal_nav_inspectors": "Inspectors",
   "agent_portal_layout_badge": "Agent Portal",
