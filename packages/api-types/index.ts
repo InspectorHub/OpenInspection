@@ -50,6 +50,7 @@ export type { PublicSlugApi }         from '../../server/api/public-slug';
 export type { RatingSystemsApi }      from '../../server/api/rating-systems';
 export type { RecommendationsApi }    from '../../server/api/recommendations';
 export type { RepairBuilderApi }      from '../../server/api/repair-builder';
+export type { RoleProfilesApi }       from '../../server/api/role-profiles';
 export type { EmailTemplatesApi }     from '../../server/api/email-templates';
 export type { ScheduleApi }           from '../../server/api/schedule-week-summary';
 export type { SecretsApi }            from '../../server/api/secrets';
