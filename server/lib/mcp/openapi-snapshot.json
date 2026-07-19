@@ -199,7 +199,7 @@
         "$ref": "#/components/schemas/AgentLoginBody"
       }
     },
-    "summary": "Agent password login",
+    "summary": "Authenticate an agent by email and password",
     "description": "Public, unauthenticated endpoint. Authenticates ONLY a global agent account (tenant_id IS NULL, role='agent') by email + password and mints an agent session cookie. A tenant user's email, a missing account, and a wrong password all answer the SAME generic 401 (anti-oracle) — the token is delivered via Set-Cookie only, never in this response body."
   },
   {

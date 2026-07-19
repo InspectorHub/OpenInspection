@@ -1,8 +1,9 @@
 import { z } from '@hono/zod-openapi';
 
 /**
- * POST /api/integration/sso-handoff body (server/portal/integration.routes.ts).
- * Portal->core M2M handoff (guarded by requireServiceBinding).
+ * POST /api/integration/sso-handoff body (consumed by the integration
+ * module's handoff route). Portal->core M2M handoff (guarded by
+ * requireServiceBinding).
  *
  * `tenantId` is OPTIONAL:
  *  - PRESENT -> the long-standing tenant path: resolves a (tenantId, email)

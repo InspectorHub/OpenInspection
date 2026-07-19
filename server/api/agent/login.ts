@@ -55,7 +55,7 @@ const loginRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/login',
     tags: ['agents', 'public'],
-    summary: 'Agent password login',
+    summary: 'Authenticate an agent by email and password',
     description:
         'Public, unauthenticated endpoint. Authenticates ONLY a global agent account ' +
         "(tenant_id IS NULL, role='agent') by email + password and mints an agent " +
