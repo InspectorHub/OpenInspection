@@ -16,8 +16,8 @@ export const UpdateRoleProfileSchema = z.object({
 }).strip();
 
 export const AddPersonSchema = z.object({
-    contactId: z.string().min(1),
-    roleProfileId: z.string().min(1),
+    contactId: z.string().min(1).describe('Id of the tenant-owned contact to assign to the inspection.'),
+    roleProfileId: z.string().min(1).describe('Id of the tenant-owned role profile this contact will occupy on the inspection.'),
 }).strict();
 
 // Response shape for GET/POST /api/role-profiles rows. `tenantId` is included
