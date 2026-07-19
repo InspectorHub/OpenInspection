@@ -15,7 +15,7 @@
   "app/routes/settings-communication-templates.tsx": 724,
   "app/routes/template-edit.tsx": 698,
   "app/components/media-studio/PhotoAnnotator.tsx": 692,
-  "server/api/inspections/report-delivery.ts": 664,
+  "server/api/inspections/report-delivery.ts": 667,
   "app/hooks/usePhotoOps.ts": 661,
   "server/lib/messaging/providers/telnyx-compliance.ts": 657,
   "server/services/inspection/inspection-analytics.service.ts": 651,
