@@ -13939,7 +13939,7 @@
       "body": null
     },
     "summary": "Upgrade a per-inspection access token into a portal session",
-    "description": "Exchanges a persistent per-(recipient, inspection) access token (the same family used by the public report links) for a __Host-portal_session cookie, so a client arriving from an email CTA lands in the portal already authenticated. Asserts the resolved grant tenant matches the path tenant AND the role is client/co_client (agent → 403)."
+    "description": "Exchanges a persistent per-(recipient, inspection) access token (the same family used by the public report links) for a __Host-portal_session cookie, so a client arriving from an email CTA lands in the portal already authenticated. Asserts the resolved grant tenant matches the path tenant AND the role currently grants selfRetrieveReport (client/co_client by default, and agent — see server/lib/people/capabilities.ts). SECURITY: an agent-kind role NEVER receives the session cookie — it gets a 200 with `agent: true` and no Set-Cookie, so its report token can never unlock the client hub (agreement signing, payment, messages)."
   },
   {
     "operationId": "portalInspectionObserve",

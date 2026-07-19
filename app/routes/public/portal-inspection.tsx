@@ -52,6 +52,7 @@ import {
   type AgreementLoaderResult,
 } from "~/lib/section-loaders";
 import { loadAgentReportContext, type AgentReportContext } from "~/lib/agent-report-context";
+import { resolvePortalSession } from "~/lib/portal-exchange";
 import { HubSectionSlot } from "~/components/portal/hub/HubSectionSlot";
 import type { TenantBrand } from "~/lib/brand";
 import { m } from "~/paraglide/messages";
@@ -70,7 +71,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
   const to = url.searchParams.get("to");
-  const section = parseSection(url.searchParams.get("section"));
+  let section = parseSection(url.searchParams.get("section"));
 
   const api = createApi(context);
   const browserCookie = request.headers.get("cookie") ?? "";
@@ -84,70 +85,21 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     brand = EMPTY_BRAND;
   }
 
-  // Cookie to forward to the browser (only set if exchange minted a fresh one).
-  let cookieToForward: string | null = null;
-  // Cookie value to present to the overview call: prefer the freshly-issued one.
-  let cookieForApi = browserCookie;
-
-  // Step 1 — if a per-inspection token is present, try to upgrade it into a
-  // portal session. Failure is non-fatal: an existing session may still work.
-  if (token) {
-    try {
-      const ex = await api.portal[":tenant"].exchange.$get({
-        param: { tenant },
-        query: { token, inspectionId },
-      });
-      if (ex.status === 200) {
-        const minted = ex.headers.get("set-cookie");
-        if (minted) {
-          // Forward the FULL Set-Cookie value to the browser (it carries
-          // ; Path=/; HttpOnly; Secure; SameSite=Lax attributes).
-          cookieToForward = minted;
-          // A Cookie request header must be `name=value` only — slice off the
-          // attributes before reusing the minted cookie on the same-request
-          // overview call. Fall back to the incoming browser cookie.
-          const mintedCookiePair = minted.split(";")[0];
-          cookieForApi = mintedCookiePair || browserCookie;
-        }
-      }
-    } catch {
-      // ignore — fall through to step 2
-    }
-  }
-
-  // Step 2 — fetch the overview, forwarding the (possibly freshly-issued) cookie.
-  let overview: StatusOverview;
-  try {
-    const res = await api.portal[":tenant"].inspections[":inspectionId"].overview.$get(
-      { param: { tenant, inspectionId } },
-      { headers: { Cookie: cookieForApi } },
-    );
-    if (res.status === 401) {
-      throw redirect(`/portal/${tenant}`);
-    }
-    if (res.status === 403 || res.status === 404) {
-      throw new Response("Not found", { status: 404 });
-    }
-    if (!res.ok) {
-      throw new Response("Not found", { status: 404 });
-    }
-    const body = (await res.json()) as {
-      data?: StatusOverview & { token?: string; signerToken?: string | null };
-    };
-    if (!body.data) throw new Response("Not found", { status: 404 });
-    overview = body.data;
-  } catch (err) {
-    if (err instanceof Response) throw err;
-    throw new Response("Not found", { status: 404 });
-  }
+  // Steps 1+2 (token exchange + overview) live in ~/lib/portal-exchange —
+  // extracted purely to keep this route file under the file-size ratchet.
+  // Task 6: `isAgentToken` short-circuits the session-gated overview call
+  // entirely (an agent token never mints `__Host-portal_session`) and forces
+  // the report section below, since agents have no client hub.
+  const { overview: resolvedOverview, overviewToken, signerToken, isAgentToken, cookieToForward, cookieForApi } =
+    await resolvePortalSession(context, api, tenant, inspectionId, token, browserCookie);
+  let overview = resolvedOverview;
+  if (isAgentToken) section = "report";
 
   // Prefer the server-issued persistent per-inspection token (always present for
   // an accessible inspection, including magic-link sessions that carry no
-  // ?token); fall back to the URL ?token (email-CTA arrival) then "".
-  const overviewToken = (overview as StatusOverview & { token?: string }).token;
+  // ?token); fall back to the URL ?token (email-CTA arrival, and the ONLY
+  // source for an agent token — overviewToken is never set on that path) then "".
   const ctxToken = overviewToken || token || "";
-  const signerToken =
-    (overview as StatusOverview & { signerToken?: string | null }).signerToken ?? null;
   const ctx = { tenant, inspectionId, token: ctxToken, signerToken };
 
   // Step 3 — if ?to names a real Hub section, jump straight to the Hub with that
@@ -199,6 +151,19 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   } else if (section === "agreement") {
     // Uses the recipient's OWN email-matched signer token (from the overview).
     agreement = await loadAgreementSection(context, signerToken);
+  }
+
+  // Backfill the minimal agent overview stand-in's .address/.date (the only
+  // fields InspectionHub reads off `overview` on a non-overview section) from
+  // the just-fetched, token-scoped report — never from the session-gated
+  // overview endpoint, which agent tokens never call (see Step 2 above).
+  if (isAgentToken && report) {
+    overview = {
+      ...overview,
+      address: report.address || overview.address,
+      date: report.date || overview.date,
+      reportPublished: report.isPublished ?? overview.reportPublished,
+    };
   }
 
   // Step 4b — agent report-landing context (Spec 3 Task 3): resolves whether
