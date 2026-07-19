@@ -6,6 +6,13 @@
  * seeds an inspection with the LEGACY client columns NULL and only
  * inspection_people populated, so it fails against the old implementation
  * (which reads only inspection.clientEmail and skips the send entirely).
+ *
+ * Spec 2 Task 4 — /complete no longer sends the report inline. It fires the
+ * `report.published` automation trigger (the same engine path the live
+ * /publish route already uses), so this spec now spies on
+ * `c.var.services.automation.trigger` instead of asserting inline send-method
+ * call counts. The in-app admin notification (createForAllAdmins) is
+ * unchanged — still fired directly from the route, not by the engine.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
@@ -29,14 +36,15 @@ const SLUG = 'acme';
 const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 
 let db: BetterSQLite3Database<typeof schema>;
+let automationTrigger: ReturnType<typeof vi.fn>;
+let issueToken: ReturnType<typeof vi.fn>;
 let sendReportReady: ReturnType<typeof vi.fn>;
 let sendInspectionReportPdf: ReturnType<typeof vi.fn>;
-let issueToken: ReturnType<typeof vi.fn>;
 let createForAllAdmins: ReturnType<typeof vi.fn>;
 let getInspection: ReturnType<typeof vi.fn>;
 
 /** Tracks every promise scheduled via waitUntil so the test can await the
- * fire-and-forget delivery + notification effects after the response returns. */
+ * fire-and-forget notification effect after the response returns. */
 function makeExecCtx() {
     const pending: Promise<unknown>[] = [];
     const ctx = {
@@ -48,9 +56,10 @@ function makeExecCtx() {
 
 function buildApp(inspectionStub: { status: string; clientEmail: string | null; clientName: string | null; propertyAddress: string; inspectorId: string | null; id: string }) {
     const app = new OpenAPIHono<HonoConfig>();
+    automationTrigger = vi.fn().mockResolvedValue(undefined);
+    issueToken = vi.fn().mockResolvedValue('token-abc');
     sendReportReady = vi.fn().mockResolvedValue(undefined);
     sendInspectionReportPdf = vi.fn().mockResolvedValue(undefined);
-    issueToken = vi.fn().mockResolvedValue('token-abc');
     createForAllAdmins = vi.fn().mockResolvedValue(undefined);
     getInspection = vi.fn().mockResolvedValue({ inspection: inspectionStub });
 
@@ -66,11 +75,11 @@ function buildApp(inspectionStub: { status: string; clientEmail: string | null; 
             },
             people: new PeopleService({ DB: {} as D1Database }),
             portalAccess: { issueToken },
-            // reportPdf intentionally absent — deliver()'s try/catch falls back
-            // to the text-only sendReportReady email, mirroring production's
-            // "BROWSER binding missing" degrade path.
+            // No inline send in the route anymore — these stay here only to
+            // assert they are NOT invoked directly by /complete.
             email: { sendReportReady, sendInspectionReportPdf },
             notification: { createForAllAdmins },
+            automation: { trigger: automationTrigger },
         } as never);
         await next();
     });
@@ -86,7 +95,7 @@ function buildApp(inspectionStub: { status: string; clientEmail: string | null; 
 
 const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET: 'test-secret' } as never;
 
-describe('POST /api/inspections/:id/complete — primary-client resolution (Task 9a)', () => {
+describe('POST /api/inspections/:id/complete — primary-client resolution (Task 9a) + engine-routed delivery (Spec 2 Task 4)', () => {
     beforeEach(async () => {
         const fixture = createTestDb();
         db = fixture.db;
@@ -121,7 +130,7 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         return req;
     }
 
-    it('sends the report-ready email to the primary client resolved via PeopleService, not inspection.clientEmail', async () => {
+    it('fires report.published through the automation engine, not the inline send methods, for a primary client resolved via PeopleService', async () => {
         const { ctx, settle } = makeExecCtx();
         const app = buildApp({
             status: 'in_progress', clientEmail: null, clientName: null,
@@ -131,23 +140,31 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         expect(res.status).toBe(200);
         await settle();
 
-        // issueToken must resolve the recipient email from the primary-client
-        // join, not the (null) legacy column.
-        expect(issueToken).toHaveBeenCalledTimes(1);
-        expect(issueToken.mock.calls[0][0]).toMatchObject({ recipientEmail: 'jane@example.com', role: 'client' });
+        // The engine trigger is fired (awaited inline, not via waitUntil) with
+        // the right tenant/inspection/event.
+        expect(automationTrigger).toHaveBeenCalledTimes(1);
+        expect(automationTrigger.mock.calls[0][0]).toMatchObject({
+            tenantId: TENANT,
+            inspectionId: INSP_ID,
+            triggerEvent: 'report.published',
+        });
 
-        // PDF render is unavailable in this harness (no reportPdf service) so
-        // delivery falls back to the text-only email — still addressed to the
-        // resolved primary client.
-        expect(sendReportReady).toHaveBeenCalledTimes(1);
-        expect(sendReportReady.mock.calls[0][0]).toBe('jane@example.com');
+        // The route itself no longer performs an inline send — delivery is the
+        // engine's job now (per-recipient PDF + role-keyed link, cron-flushed).
+        expect(issueToken).not.toHaveBeenCalled();
+        expect(sendInspectionReportPdf).not.toHaveBeenCalled();
+        expect(sendReportReady).not.toHaveBeenCalled();
 
-        // The in-app admin notification's metadata also carries the resolved email.
+        // The in-app admin notification's metadata still carries the resolved
+        // primary-client email (unrelated to the automation engine).
         expect(createForAllAdmins).toHaveBeenCalledTimes(1);
-        expect(createForAllAdmins.mock.calls[0][1]).toMatchObject({ metadata: { clientEmail: 'jane@example.com' } });
+        expect(createForAllAdmins.mock.calls[0][1]).toMatchObject({
+            type: 'report.published',
+            metadata: { clientEmail: 'jane@example.com' },
+        });
     });
 
-    it('no primary client at all — skips the auto-send (same as the legacy no-clientEmail behavior)', async () => {
+    it('no primary client at all — still fires the trigger (engine resolves zero recipients) and the notification carries clientEmail:null', async () => {
         // Remove the seeded inspection_people row so getPrimaryClient resolves null.
         const { eq } = await import('drizzle-orm');
         await db.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.inspectionId, INSP_ID));
@@ -161,12 +178,54 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         expect(res.status).toBe(200);
         await settle();
 
+        // report.published still fires unconditionally — the engine (not this
+        // route) is responsible for resolving recipients and no-op'ing when
+        // there are none.
+        expect(automationTrigger).toHaveBeenCalledTimes(1);
+        expect(automationTrigger.mock.calls[0][0]).toMatchObject({
+            tenantId: TENANT,
+            inspectionId: INSP_ID,
+            triggerEvent: 'report.published',
+        });
+
         expect(issueToken).not.toHaveBeenCalled();
         expect(sendReportReady).not.toHaveBeenCalled();
         expect(sendInspectionReportPdf).not.toHaveBeenCalled();
+
         // The in-app notification still fires (unconditional in production), but its
         // clientEmail metadata is null now that there is no primary client.
         expect(createForAllAdmins).toHaveBeenCalledTimes(1);
         expect(createForAllAdmins.mock.calls[0][1]).toMatchObject({ metadata: { clientEmail: null } });
+    });
+
+    it('a failed automation trigger does not 500 the completion (log + continue)', async () => {
+        const { ctx, settle } = makeExecCtx();
+        const app = buildApp({
+            status: 'in_progress', clientEmail: null, clientName: null,
+            propertyAddress: '1 Main St', inspectorId: null, id: INSP_ID,
+        });
+        automationTrigger.mockRejectedValueOnce(new Error('enqueue failed'));
+
+        const res = await app.fetch(post(), ENV, ctx);
+        expect(res.status).toBe(200);
+        await settle();
+
+        expect(automationTrigger).toHaveBeenCalledTimes(1);
+        // Completion + admin notification still happen even though the trigger failed.
+        expect(createForAllAdmins).toHaveBeenCalledTimes(1);
+    });
+
+    it('already-completed inspection short-circuits — no trigger, no notification', async () => {
+        const { ctx, settle } = makeExecCtx();
+        const app = buildApp({
+            status: 'completed', clientEmail: null, clientName: null,
+            propertyAddress: '1 Main St', inspectorId: null, id: INSP_ID,
+        });
+        const res = await app.fetch(post(), ENV, ctx);
+        expect(res.status).toBe(200);
+        await settle();
+
+        expect(automationTrigger).not.toHaveBeenCalled();
+        expect(createForAllAdmins).not.toHaveBeenCalled();
     });
 });
