@@ -231,8 +231,11 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // Spec 4D — populate event vars when log was created by EventService.
                     // Spec 4D event-vars apply only to logs linked to a real inspection
                     // event. Track J reminders reuse event_id as a "reminder:<rule>:<insp>"
-                    // dedup key that never matches an inspectionEvents row, so skip the lookup.
-                    if (log.eventId && !log.eventId.startsWith('reminder:')) {
+                    // dedup key that never matches an inspectionEvents row, so skip the
+                    // lookup. Spec 2 Task 3 — report.published logs reuse event_id the same
+                    // way with an "auto:report.published:<insp>" dedup key (see trigger.ts);
+                    // also never a real inspectionEvents row, so skip it too.
+                    if (log.eventId && !log.eventId.startsWith('reminder:') && !log.eventId.startsWith('auto:')) {
                         try {
                             const { eventTypes, inspectionEvents } = await import('../../lib/db/schema');
                             const ev = await db.select().from(inspectionEvents).where(eq(inspectionEvents.id, log.eventId)).get();

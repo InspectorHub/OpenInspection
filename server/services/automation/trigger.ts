@@ -80,6 +80,15 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             if (filteredRules.length === 0) return;
 
             const now = new Date();
+            // Spec 2 Task 3 — report.published is a terminal state → dedup per (rule,
+            // inspection, channel, recipient) via a deterministic synthetic eventId, so
+            // a retry/double-publish never double-sends (see uq_automation_logs_event).
+            // Other events keep eventId NULL: some (e.g. agreement.viewed) legitimately
+            // recur and must not be collapsed to once-per-inspection. Computed once per
+            // rule/inspection — it doesn't depend on channel/recipient.
+            const dedupEventId = ctx.triggerEvent === 'report.published'
+                ? `auto:report.published:${ctx.inspectionId}`
+                : null;
             // Track L — fan out one pending log per enabled channel, each stamped with
             // the channel-appropriate recipient (email address or normalized E.164 phone).
             const logs: (typeof automationLogs.$inferInsert)[] = [];
@@ -98,7 +107,7 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                         if (!addr) continue; // resolveRecipients already logged/skipped addr-less people; belt-and-braces
                         logs.push({ id: nanoid(), tenantId: ctx.tenantId, automationId: rule.id,
                                     inspectionId: ctx.inspectionId, recipient: addr, recipientRoleKey: r.roleKey, channel,
-                                    sendAt, deliveredAt: null, status: 'pending' as const, error: null });
+                                    sendAt, deliveredAt: null, status: 'pending' as const, error: null, eventId: dedupEventId });
                     }
                 }
             }
@@ -107,7 +116,13 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 { event: ctx.triggerEvent, count: logs.length });
             if (logs.length > 0) {
                 try {
-                    await db.insert(automationLogs).values(logs);
+                    // .onConflictDoNothing() covers the uq_automation_logs_event partial
+                    // unique index: a report.published retry produces the SAME
+                    // (automationId, inspectionId, eventId, channel, recipient) tuple and
+                    // is silently skipped (no duplicate log, no double-send). NULL-eventId
+                    // logs (all other triggers) never conflict, so this is a harmless
+                    // no-op for them — behavior there is unchanged.
+                    await db.insert(automationLogs).values(logs).onConflictDoNothing();
                     logger.info('AutomationService.trigger: logs inserted',
                         { event: ctx.triggerEvent, count: logs.length });
                 } catch (err) {
