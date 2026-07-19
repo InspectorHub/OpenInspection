@@ -104,4 +104,53 @@ export class PeopleService {
             )).get();
         return row?.contactId ?? null;
     }
+
+    /** Lists all role profiles (active + inactive) for the tenant, in display order. */
+    async listProfiles(tenantId: string) {
+        return this.db.select().from(contactRoleProfiles)
+            .where(eq(contactRoleProfiles.tenantId, tenantId))
+            .orderBy(contactRoleProfiles.sortOrder);
+    }
+
+    /** Creates a tenant-defined (non-system) role profile with a unique, slugified key. */
+    async createProfile(tenantId: string, input: { label: string; kind: RoleKind; emailTemplateId?: string; smsTemplateId?: string }) {
+        const key = await this.uniqueKey(tenantId, input.label);
+        const now = new Date();
+        const row = { id: crypto.randomUUID(), tenantId, key, label: input.label, kind: input.kind,
+            emailTemplateId: input.emailTemplateId ?? null, smsTemplateId: input.smsTemplateId ?? null,
+            isSystem: false, sortOrder: 1000, active: true, createdAt: now, updatedAt: now };
+        await this.db.insert(contactRoleProfiles).values(row);
+        return row;
+    }
+
+    /** Updates label/templates/active. System profiles cannot be deactivated (409). */
+    async updateProfile(tenantId: string, id: string, patch: { label?: string; emailTemplateId?: string | null; smsTemplateId?: string | null; active?: boolean }) {
+        const cur = await this.db.select().from(contactRoleProfiles)
+            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id))).get();
+        if (!cur) throw Errors.NotFound('Role profile not found');
+        if (cur.isSystem && patch.active === false) throw Errors.Conflict('System role profiles cannot be deactivated');
+        await this.db.update(contactRoleProfiles).set({ ...patch, updatedAt: new Date() })
+            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id)));
+    }
+
+    /** Soft-deletes (deactivates) a role profile. System profiles cannot be deleted (409). */
+    async deactivateProfile(tenantId: string, id: string) {
+        const cur = await this.db.select().from(contactRoleProfiles)
+            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id))).get();
+        if (!cur) throw Errors.NotFound('Role profile not found');
+        if (cur.isSystem) throw Errors.Conflict('System role profiles cannot be deleted');
+        await this.db.update(contactRoleProfiles).set({ active: false, updatedAt: new Date() })
+            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id)));
+    }
+
+    /** Slugifies `label` into a stable machine key, disambiguating collisions with a numeric suffix. */
+    private async uniqueKey(tenantId: string, label: string): Promise<string> {
+        const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || 'role';
+        let key = base, n = 1;
+        while (await this.db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
+            .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.key, key))).get()) {
+            key = `${base}_${++n}`;
+        }
+        return key;
+    }
 }

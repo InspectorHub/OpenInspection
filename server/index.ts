@@ -81,6 +81,7 @@ import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
 import contractorTypesRoutes from './api/contractor-types';
+import roleProfilesRoutes from './api/role-profiles';
 import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 import inspectionTypesRoutes from './api/inspection-types';
@@ -534,6 +535,7 @@ const routes = app
   .route('/api/contacts', contactsImportRoutes)
   .route('/api/recommendations', recommendationsRoutes)
   .route('/api/contractor-types', contractorTypesRoutes)
+  .route('/api/role-profiles', roleProfilesRoutes)
   .route('/api/rating-systems', ratingSystemsRoutes)
   .route('/api', eventsRoutes)
   .route('/api/invoices', invoiceRoutes)
