@@ -7,6 +7,8 @@ import { createOiTemplateStore } from './template-store';
 import { type Constructor, type TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
+import { PeopleService } from '../people.service';
+import { capabilitiesForKind } from '../../lib/people/capabilities';
 
 /**
  * Trigger mixin: fan out pending automation_log rows when a domain event fires,
@@ -227,6 +229,76 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
             // former enum's behavior: 'all' hit no branch and yielded null).
             const { normalizeE164 } = await import('../../lib/sms/phone');
             return normalizeE164(raw);
+        }
+
+        /**
+         * Spec 2 Task 1 — role-driven recipient resolution: returns EVERY matching
+         * recipient (not just the single client address `resolveAddress` targets),
+         * so a later task can send one message per recipient. Pure resolver: never
+         * throws, never writes `automation_logs` (that stays the flush loop's job
+         * — see `trigger()` above, untouched by this method). An addr-less person
+         * is logged and skipped, not treated as an error.
+         *
+         * 'all' = every `receivesReport` person on the inspection's people list —
+         * currently client/agent/other all set `receivesReport: true`
+         * (`lib/people/capabilities.ts`), so 'all' is effectively "everyone".
+         *
+         * 'inspector' has no `inspection_people` row — the inspector is a `users`
+         * row, not a contact — so it's resolved the same way `resolveAddress`'s
+         * inspector branch does (lead falls back to assigned), not via
+         * PeopleService. `contactId` on the returned recipient is therefore
+         * best-effort: the inspector's user id, not a real `contacts` row id.
+         */
+        async resolveRecipients(
+            rule: { recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId: string | null },
+            inspection: typeof inspections.$inferSelect,
+            channel: 'email' | 'sms',
+        ): Promise<Array<{ contactId: string; roleKey: string; email?: string; phone?: string }>> {
+            if (rule.recipientKind === 'inspector') {
+                const inspectorId = inspection.leadInspectorId ?? inspection.inspectorId ?? null;
+                if (!inspectorId) return [];
+                const { users } = await import('../../lib/db/schema');
+                const db = this.getDrizzle();
+                // Try/catch (not `.get().catch()`) — the latter only behaves as a
+                // Promise against the real async D1 driver, not the synchronous
+                // better-sqlite3 test driver (same posture as resolveAddress's
+                // contactForRole above).
+                let u: { email: string | null; phone: string | null } | null;
+                try {
+                    u = (await db.select({ email: users.email, phone: users.phone }).from(users)
+                        .where(eq(users.id, inspectorId)).get()) ?? null;
+                } catch {
+                    u = null;
+                }
+                const addr = channel === 'email' ? u?.email : u?.phone;
+                if (!addr) return [];
+                return [{
+                    contactId: inspectorId ?? '',
+                    roleKey: 'inspector',
+                    ...(channel === 'email' ? { email: addr } : { phone: addr }),
+                }];
+            }
+
+            const people = await new PeopleService({ DB: this.db }).listPeople(inspection.tenantId, inspection.id);
+            const targets = rule.recipientKind === 'role'
+                ? people.filter(p => p.roleProfileId === rule.recipientRoleProfileId)
+                : people.filter(p => capabilitiesForKind(p.kind).receivesReport);
+
+            const out: Array<{ contactId: string; roleKey: string; email?: string; phone?: string }> = [];
+            for (const p of targets) {
+                const addr = channel === 'email' ? p.email : p.phone;
+                if (!addr) {
+                    logger.info('resolveRecipients: skipping addr-less person', {
+                        inspectionId: inspection.id, contactId: p.contactId, roleKey: p.roleKey, channel,
+                    });
+                    continue;
+                }
+                out.push({
+                    contactId: p.contactId, roleKey: p.roleKey,
+                    ...(channel === 'email' ? { email: addr } : { phone: addr }),
+                });
+            }
+            return out;
         }
 
         protected titleFor(event: string, insp: typeof inspections.$inferSelect): string {
