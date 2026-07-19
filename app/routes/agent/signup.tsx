@@ -31,6 +31,22 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 /* ------------------------------------------------------------------ */
+/*  Report-link conversion helper                                      */
+/* ------------------------------------------------------------------ */
+
+// Matches the tokenized report path a converting agent's returnTo carries
+// (`/portal/:tenant/i/:inspectionId?token=...`) and extracts the inspection
+// id. A converting agent already has that inspection auto-linked into their
+// referrals server-side (Task 3), so we can land them on the dashboard with
+// it highlighted instead of bouncing them back to the tokenized report.
+const REPORT_PATH_RE = /^\/portal\/[^/]+\/i\/([^/?#]+)/;
+
+function welcomeRedirectFor(returnTo: string): string | null {
+  const match = returnTo.match(REPORT_PATH_RE);
+  return match ? `/agent-dashboard?welcome=${encodeURIComponent(match[1])}` : null;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Action                                                             */
 /* ------------------------------------------------------------------ */
 
@@ -71,9 +87,11 @@ export async function action({ request, context }: Route.ActionArgs) {
   const data = json.data as Record<string, string> | undefined;
   // Success: keep the client-side redirect path (sentinel object, not a
   // Conform SubmissionResult — the component guards on `redirect`). An
-  // explicit API-provided redirect wins; otherwise fall back to the
-  // report-link's returnTo, then /agent-dashboard.
-  return { redirect: data?.redirect || returnTo || "/agent-dashboard" };
+  // explicit API-provided redirect wins; otherwise a report-path returnTo
+  // sends the agent to their dashboard with that inspection highlighted
+  // (rather than back to the tokenized report); otherwise fall back to a
+  // non-report-path returnTo, then /agent-dashboard.
+  return { redirect: data?.redirect || welcomeRedirectFor(returnTo) || returnTo || "/agent-dashboard" };
 }
 
 /* ------------------------------------------------------------------ */

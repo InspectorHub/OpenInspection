@@ -13,6 +13,10 @@
  *   - On successful signup, the action's redirect target honors a sanitized
  *     returnTo, falls back to /agent-dashboard when absent, and still lets an
  *     explicit API-provided redirect win over returnTo.
+ *   - Task 4c: a report-path returnTo (`/portal/:tenant/i/:inspectionId`)
+ *     redirects to `/agent-dashboard?welcome=<inspectionId>` instead of back
+ *     to the tokenized report, since that inspection is already auto-linked
+ *     into the agent's referrals.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -108,6 +112,13 @@ describe("agent signup action redirect target", () => {
       actionArgs({ ...VALID_SIGNUP, returnTo: "/agent-dashboard/foo" }),
     );
     expect(res).toMatchObject({ redirect: "/agent-dashboard/foo" });
+  });
+
+  it("redirects a report-path returnTo to the dashboard welcome highlight instead of back to the report", async () => {
+    const res = await action(
+      actionArgs({ ...VALID_SIGNUP, returnTo: "/portal/acme/i/i1?token=t" }),
+    );
+    expect(res).toMatchObject({ redirect: "/agent-dashboard?welcome=i1" });
   });
 
   it("falls back to /agent-dashboard when returnTo is absent", async () => {
