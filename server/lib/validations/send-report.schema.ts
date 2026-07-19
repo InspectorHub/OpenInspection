@@ -18,11 +18,8 @@ export const SendReportSchema = z.object({
     channels:   z.array(z.enum(['email'])).min(1).default(['email']).describe('Delivery channels (email only for now).'),
 }).openapi('SendReport');
 
-export type SendReportRecipient = z.infer<typeof SendReportRecipientSchema>;
-export type SendReportBody = z.infer<typeof SendReportSchema>;
-
 /** A recipient the handler could not send to, and why. */
-export const SendReportSkippedSchema = z.object({
+const SendReportSkippedSchema = z.object({
     recipient: z.string().describe('The contactId or email that identified the recipient in the request.'),
     reason:    z.string().describe('Why this recipient was skipped (no resolvable email, unknown roleKey, send failure, ...).'),
 });

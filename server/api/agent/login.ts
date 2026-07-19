@@ -194,5 +194,3 @@ export const agentLoginRoutes = createApiRouter()
     });
 
 export type AgentLoginApi = typeof agentLoginRoutes;
-
-export default agentLoginRoutes;

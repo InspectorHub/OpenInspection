@@ -28,7 +28,7 @@ import { loadAgentReportContext } from "~/lib/agent-report-context";
  * `.date` for the page header, which the loader backfills from the
  * (already token-scoped) report payload once loadReportSection returns.
  */
-export const EMPTY_STATUS_OVERVIEW: StatusOverview = {
+const EMPTY_STATUS_OVERVIEW: StatusOverview = {
   inspectionStatus: "",
   agreementSigned: false,
   paymentStatus: "",

@@ -77,5 +77,3 @@ export const agentReportContextRoutes = createApiRouter()
             return c.json({ success: true as const, data: { kind: null } }, 200);
         }
     });
-
-export type AgentReportContextApi = typeof agentReportContextRoutes;

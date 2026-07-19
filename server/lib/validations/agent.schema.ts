@@ -97,7 +97,7 @@ export const ConciergeBookResponseSchema = createApiResponseSchema(
 // recommendations grouped by safety/recommendation/maintenance). Relocated
 // from server/api/agent.ts (file-size ratchet) alongside this module's other
 // route-response schemas.
-export const RecommendationRowSchema = z.object({
+const RecommendationRowSchema = z.object({
     inspectionId:    z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
     propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
     inspectionDate:  z.string().describe('TODO describe inspectionDate field for the OpenInspection MCP integration'),
