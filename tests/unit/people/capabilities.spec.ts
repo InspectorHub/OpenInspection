@@ -7,9 +7,9 @@ describe('capabilitiesForKind', () => {
       receivesReport: true, selfRetrieveReport: true, canSign: true, canPay: true, canHaveAccount: false,
     });
   });
-  it('agent can sign/pay + account, but not self-retrieve (Spec 1 latent)', () => {
+  it('agent can self-retrieve, sign, pay, and have an account (Spec 3 flip)', () => {
     expect(capabilitiesForKind('agent')).toEqual({
-      receivesReport: true, selfRetrieveReport: false, canSign: true, canPay: true, canHaveAccount: true,
+      receivesReport: true, selfRetrieveReport: true, canSign: true, canPay: true, canHaveAccount: true,
     });
   });
   it('other only receives report', () => {

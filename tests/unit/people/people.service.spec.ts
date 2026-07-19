@@ -38,9 +38,9 @@ describe('PeopleService', () => {
     expect(people.map(p => p.roleKey).sort()).toEqual(['client', 'co_client']);
   });
 
-  it('roleKeysWithCapability(selfRetrieveReport) = client + co_client only', async () => {
+  it('roleKeysWithCapability(selfRetrieveReport) = client + co_client + agent-kind keys (Spec 3 flip)', async () => {
     const keys = await svc.roleKeysWithCapability('t1', 'selfRetrieveReport');
-    expect(keys.sort()).toEqual(['client', 'co_client']);
+    expect(keys.sort()).toEqual(['buyer_agent', 'client', 'co_client', 'listing_agent']);
   });
 
   it('contactIdForRole resolves the contact id for a given inspection + role key', async () => {

@@ -15,7 +15,7 @@ export interface RoleCapabilities {
 export function capabilitiesForKind(kind: RoleKind): RoleCapabilities {
     switch (kind) {
         case 'client': return { receivesReport: true, selfRetrieveReport: true,  canSign: true,  canPay: true,  canHaveAccount: false };
-        case 'agent':  return { receivesReport: true, selfRetrieveReport: false, canSign: true,  canPay: true,  canHaveAccount: true  };
+        case 'agent':  return { receivesReport: true, selfRetrieveReport: true,  canSign: true,  canPay: true,  canHaveAccount: true  };
         case 'other':  return { receivesReport: true, selfRetrieveReport: false, canSign: false, canPay: false, canHaveAccount: false };
     }
 }

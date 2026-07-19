@@ -78,10 +78,10 @@ describe('find-my-report discovery — capability-driven role filter', () => {
         expect(body.data.slugs).toEqual(['acme-cap']);
     });
 
-    it('does NOT find the tenant for an agent-kind grant (buyer_agent)', async () => {
+    it('finds the tenant for an agent-kind grant (buyer_agent) — Spec 3 flip opened selfRetrieveReport for agents', async () => {
         const res = await app().request('/api/integration/tenants/by-email?email=agent@x.com', { headers: { [M2M_HEADER]: await header() } }, ENV);
         const body = await res.json() as { data: { slugs: string[] } };
-        expect(body.data.slugs).toEqual([]);
+        expect(body.data.slugs).toEqual(['acme-cap']);
     });
 
     it('does NOT find the tenant for a custom other-kind grant', async () => {
@@ -137,10 +137,10 @@ describe('PortalService.listRecipientInspections — capability-driven role filt
         expect(rows.map((r) => r.inspectionId)).toEqual(['insp1']);
     });
 
-    it('excludes an agent-kind grant (buyer_agent)', async () => {
+    it('includes an agent-kind grant (buyer_agent) — Spec 3 flip opened selfRetrieveReport for agents', async () => {
         await seedInsp('insp1'); await seedTok('insp1', 'a@x.com', 'buyer_agent');
         const rows = await svc.listRecipientInspections(TENANT, 'a@x.com');
-        expect(rows).toEqual([]);
+        expect(rows.map((r) => r.inspectionId)).toEqual(['insp1']);
     });
 
     it('excludes a custom other-kind grant', async () => {
@@ -236,12 +236,12 @@ describe('GET /api/portal/:tenant/exchange — capability-driven role gate', () 
         expect(res.status).toBe(200);
     });
 
-    it('an agent-kind grant (buyer_agent) is rejected → 403', async () => {
+    it('an agent-kind grant (buyer_agent) now passes the gate → 200 (Spec 3 flip; a KNOWN interaction — a later task routes agent tokens to magic-login instead of a client session)', async () => {
         await seedInsp('insp1');
         const token = await seedTokReturning('insp1', 'agent@x.com', 'buyer_agent');
         const res = await buildApp().request(
             `/api/portal/acme-cap3/exchange?token=${encodeURIComponent(token)}&inspectionId=insp1`, {}, reqEnv());
-        expect(res.status).toBe(403);
+        expect(res.status).toBe(200);
     });
 
     it('a CUSTOM non-literal client-kind role key passes → 200 (capability-derived, not a hard-coded list)', async () => {
