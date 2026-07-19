@@ -62,6 +62,29 @@ export const AUTOMATION_SEEDS = [
         isDefault: true,
     },
     {
+        name:            "Report Ready (Buyer's Agent)",
+        trigger:         'report.published' as const,
+        recipientKind:   'role' as const,
+        recipientRoleKey: 'buyer_agent' as const,
+        delayMinutes:    0,
+        subjectTemplate: 'Inspection report ready — {{property_address}}',
+        bodyTemplate:    '<p>Hello,</p><p>The inspection report for <strong>{{property_address}}</strong> is ready to view.</p><p><a href="{{report_url}}">View Report</a></p><p>— {{company_name}}</p>',
+        smsBody:         '{{company_name}}: the inspection report for {{property_address}} is ready: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}',
+        isDefault: true,
+    },
+    {
+        name:            'Report Ready (Listing Agent)',
+        trigger:         'report.published' as const,
+        recipientKind:   'role' as const,
+        recipientRoleKey: 'listing_agent' as const,
+        delayMinutes:    0,
+        subjectTemplate: 'Inspection report ready — {{property_address}}',
+        bodyTemplate:    '<p>Hello,</p><p>The inspection report for <strong>{{property_address}}</strong> is ready to view.</p><p><a href="{{report_url}}">View Report</a></p><p>— {{company_name}}</p>',
+        smsBody:         '{{company_name}}: the inspection report for {{property_address}} is ready: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}',
+        isDefault: true,
+        defaultActive: false,
+    },
+    {
         name:            'Invoice / Payment Request',
         trigger:         'invoice.created' as const,
         recipientKind:   'role' as const,
@@ -130,12 +153,11 @@ export const AUTOMATION_SEEDS = [
         subjectTemplate: 'Agreement viewed — {{property_address}}',
         bodyTemplate:    '<p>{{client_name}} just viewed the inspection agreement for <strong>{{property_address}}</strong>. They have not yet signed.</p>',
         isDefault: true,
-        // NOTE: AUTOMATION_SEEDS doesn't currently track an `active` flag at seed
-        // time (active defaults to true in ensureSeeds). Inspector can disable in
-        // Settings → Automations. If we want this rule disabled by default, we
-        // need to extend ensureSeeds() to honor a `defaultActive: false` field.
-        // For Spec 2A: leave active=true; reconsider in Spec 3 if email noise
-        // becomes a complaint.
+        // NOTE: ensureSeeds() honors an optional `defaultActive: false` field
+        // (maps to `active`) — see the Report Ready (Listing Agent) seed above
+        // and the Review request seed below for examples. This rule
+        // intentionally leaves `defaultActive` unset (active=true); reconsider
+        // in Spec 3 if email noise becomes a complaint.
     },
     // Spec 4D — Inspection Events automations.
     // EventService pre-INSERTs automation_logs with computed sendAt
