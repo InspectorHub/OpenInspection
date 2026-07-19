@@ -249,6 +249,11 @@ export default function PortalInspection() {
   const revalidator = useRevalidator();
   const [searchParams] = useSearchParams();
   const { tenant, inspectionId, token } = ctx;
+  // Spec 3: an agent report link is token-only (no client session) and the
+  // server forces section='report'. Drive the hub's agent-mode chrome (hide the
+  // client-only tab bar, Sign out, and in-report client actions) off the same
+  // flag HubSectionSlot uses for the AgentReportActions CTA.
+  const isAgent = agentReport?.kind === "agent";
 
   // After Stripe's confirmPayment redirect the Hub reloads with
   // ?redirect_status=succeeded. The webhook settles the invoice asynchronously,
@@ -347,7 +352,8 @@ export default function PortalInspection() {
       brand={brand}
       activeSection={section}
       sectionSlot={sectionSlot}
-      onSignOut={() => void signOut(tenant)}
+      agentMode={isAgent}
+      onSignOut={isAgent ? undefined : () => void signOut(tenant)}
     />
   );
 }

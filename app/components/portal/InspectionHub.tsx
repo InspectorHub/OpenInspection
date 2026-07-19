@@ -69,6 +69,7 @@ export default function InspectionHub({
   activeSection = "overview",
   sectionSlot,
   onSignOut,
+  agentMode = false,
 }: {
   overview: StatusOverview;
   ctx: HubLinkCtx;
@@ -86,6 +87,11 @@ export default function InspectionHub({
    *  the route so this component stays presentational/SSR-safe. When omitted, no
    *  Sign out control is rendered. */
   onSignOut?: () => void;
+  /** Agent-mode (Spec 3): the viewer opened an agent report link (token-only,
+   *  no client session). The server already forces section='report', so this
+   *  hides the client-only tab bar — an agent has no overview/agreement/payment/
+   *  messages/repair/documents hub, only the report + the AgentReportActions CTA. */
+  agentMode?: boolean;
 }) {
   return (
     <div style={brandTokens(brand?.primaryColor)} className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
@@ -124,7 +130,9 @@ export default function InspectionHub({
         )}
       </div>
 
-      {/* Top nav — client-side <Link>s switching the ?section= query. */}
+      {/* Top nav — client-side <Link>s switching the ?section= query. Hidden in
+          agent mode: an agent report link has only the report section. */}
+      {!agentMode && (
       <nav className="mb-6 flex flex-wrap gap-2 border-b border-ih-border pb-3">
         {navItems().map((n) => {
           const active = n.section === activeSection;
@@ -146,6 +154,7 @@ export default function InspectionHub({
           );
         })}
       </nav>
+      )}
 
       {/* Body — overview shows the status cards; any other section renders the
           route-supplied slot. */}

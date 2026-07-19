@@ -103,6 +103,7 @@ export function HubSectionSlot({
             inspectionId,
             token: token || undefined,
           })}
+          hideClientActions={agentReport?.kind === "agent"}
         />
         {/* Spec 3 Task 3 — agent report-landing CTA, mounted below the report
             body. Only rendered for an agent-kind token recipient. */}
