@@ -1623,19 +1623,11 @@
         }
       ],
       "body": {
-        "type": "object",
-        "properties": {
-          "toEmail": {
-            "type": "string",
-            "format": "email",
-            "description": "TODO describe toEmail field for the OpenInspection MCP integration"
-          }
-        },
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
+        "$ref": "#/components/schemas/SendReport"
       }
     },
-    "summary": "Re-send the inspection report as a PDF email attachment",
-    "description": "Auto-generated placeholder for createInspectionSendReportPdf (POST /{id}/send-report-pdf, inspections domain). TODO: replace with a real description sourced from the handler."
+    "summary": "Send the inspection report to one or more role-keyed recipients",
+    "description": "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request."
   },
   {
     "operationId": "createInspectionShareAgent",

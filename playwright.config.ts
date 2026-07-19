@@ -206,5 +206,11 @@ export default defineConfig({
         // the shared admin + a real inspection id (the `api` project it in
         // turn depends on already seeds the 8 default role profiles).
         { name: 'people-role-profiles', testMatch: 'people-role-profiles.spec.ts', dependencies: ['editor-seed'] },
+        // Spec 2 Task 8 — role-aware report sending (final task of the
+        // role-aware-sending plan). Seeds its own template + inspection (does
+        // NOT reuse the shared editor-seed fixture — it flips that
+        // inspection's global status via /complete + /publish). Depends on
+        // `api` for the shared admin + the 8 seeded default role profiles.
+        { name: 'role-aware-sending', testMatch: 'role-aware-sending.spec.ts', dependencies: ['api'] },
     ],
 });
