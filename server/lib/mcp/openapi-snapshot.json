@@ -6483,6 +6483,22 @@
     "description": "Public, no-login resolution of an agent-invite token into the inspector + tenant + email metadata the accept page renders. Returns 404 for unknown/expired/used tokens so the page can show its recovery state."
   },
   {
+    "operationId": "getAgentReportContext",
+    "method": "POST",
+    "pathTemplate": "/api/agent/report-context",
+    "scopes": [],
+    "tag": "agents",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AgentMagicLoginRequest"
+      }
+    },
+    "summary": "Resolve a report token's role kind + agent-account status",
+    "description": "Public, unauthenticated read-only probe for the portal report-landing BFF loader. Resolves the report token to a role kind and, for agent-kind tokens only, whether a global agent account exists for the recipient email. A bad/expired/mismatched token replies 200 with kind: null rather than 401 — this is a context probe, not an auth check."
+  },
+  {
     "operationId": "getAutomationLog",
     "method": "GET",
     "pathTemplate": "/api/automations/logs/{inspectionId}",
@@ -14278,6 +14294,32 @@
     "description": "Save integration secrets. Masked values (containing bullet characters) are skipped — they indicate unchanged fields."
   },
   {
+    "operationId": "redeemAgentMagicLogin",
+    "method": "GET",
+    "pathTemplate": "/agent/magic-login",
+    "scopes": [],
+    "tag": "agents",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "code",
+          "in": "query",
+          "required": true,
+          "description": "Single-use magic-login code minted by POST /api/agent/magic-login/request. Expires after 900 seconds and is deleted from KV on the first redeem attempt, success or failure.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Single-use magic-login code minted by POST /api/agent/magic-login/request. Expires after 900 seconds and is deleted from KV on the first redeem attempt, success or failure."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Redeem a single-use agent magic-login code",
+    "description": "Public, unauthenticated endpoint for the agent unified link. Redeems the single-use code minted by POST /api/agent/magic-login/request into an agent session cookie, then redirects into the agent dashboard. A missing, expired, or already-used code redirects to a friendly recovery page instead of surfacing a raw error."
+  },
+  {
     "operationId": "refreshInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/pdf/refresh",
@@ -14893,6 +14935,22 @@
     },
     "summary": "Replace tag for current tenant",
     "description": "Auto-generated placeholder for replaceTag (PUT /{id}, tags domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "requestAgentMagicLogin",
+    "method": "POST",
+    "pathTemplate": "/api/agent/magic-login/request",
+    "scopes": [],
+    "tag": "agents",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AgentMagicLoginRequest"
+      }
+    },
+    "summary": "Exchange an agent report token for a login code",
+    "description": "Public, unauthenticated endpoint for the agent unified link. Exchanges a live, agent-kind report-link token for a single-use magic-login code (900 second TTL) that mints an agent session cookie on redeem. Returns loginUrl: null with 200 (not an error) when the token is valid but no global agent account exists yet for the recipient email, so probing tokens cannot be used to enumerate accounts."
   },
   {
     "operationId": "requestInvoicePayment",

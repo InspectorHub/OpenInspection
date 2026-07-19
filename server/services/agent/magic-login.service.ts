@@ -12,8 +12,9 @@ import { Errors } from '../../lib/errors';
  * grants ONLY report viewing — it never mints a session by itself. This code
  * (KV `agent_ml:<code>`, single-use, 900s TTL) is the only thing that does.
  *
- * Mirrors the `sso:<code>` KV single-use pattern (server/portal/integration.routes.ts
- * + server/api/auth.ts): put on issue, get-then-delete-before-use on redeem.
+ * Mirrors the `sso:<code>` KV single-use pattern used by the SSO handoff flow
+ * (see the `/sso` consumer in server/api/auth.ts): put on issue,
+ * get-then-delete-before-use on redeem.
  */
 
 const MAGIC_LOGIN_KV_PREFIX = 'agent_ml:';
