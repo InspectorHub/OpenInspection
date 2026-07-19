@@ -6,6 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { makeAgentSignupSchema } from "~/lib/forms/auth.schema";
 import { readLegalLinks } from "~/lib/legal-links.server";
 import { LegalCheckbox } from "~/components/LegalCheckbox";
+import { safeReturnTo } from "../../../server/lib/mcp/safe-return-to";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -16,9 +17,17 @@ export function meta() {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const legal = readLegalLinks(context);
-  return { legal };
+  const url = new URL(request.url);
+  // Report-link conversion (Task 3's CTA): prefill the email of the
+  // recipient the report was shared with, and preserve a same-origin
+  // returnTo so a successful signup lands back on that report. safeReturnTo
+  // gates it to same-origin relative paths — an attacker-supplied
+  // ?returnTo=https://evil.com or //evil.com is discarded here.
+  const email = url.searchParams.get("email") ?? "";
+  const returnTo = safeReturnTo(url.searchParams.get("returnTo"), "");
+  return { legal, email, returnTo };
 }
 
 /* ------------------------------------------------------------------ */
@@ -54,10 +63,17 @@ export async function action({ request, context }: Route.ActionArgs) {
     return submission.reply({ formErrors: [err?.message || m.auth_agent_signup_error_failed()] });
   }
 
+  // Re-sanitize returnTo server-side — never trust the hidden field blindly,
+  // even though the loader already sanitized it once (defense in depth).
+  const returnToRaw = fd.get("returnTo");
+  const returnTo = safeReturnTo(typeof returnToRaw === "string" ? returnToRaw : null, "");
+
   const data = json.data as Record<string, string> | undefined;
   // Success: keep the client-side redirect path (sentinel object, not a
-  // Conform SubmissionResult — the component guards on `redirect`).
-  return { redirect: data?.redirect || "/agent-dashboard" };
+  // Conform SubmissionResult — the component guards on `redirect`). An
+  // explicit API-provided redirect wins; otherwise fall back to the
+  // report-link's returnTo, then /agent-dashboard.
+  return { redirect: data?.redirect || returnTo || "/agent-dashboard" };
 }
 
 /* ------------------------------------------------------------------ */
@@ -91,7 +107,7 @@ function makeValueProps() {
 /* ------------------------------------------------------------------ */
 
 export default function AgentSignupPage() {
-  const { legal } = useLoaderData<typeof loader>();
+  const { legal, email, returnTo } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
@@ -168,6 +184,7 @@ export default function AgentSignupPage() {
           </p>
 
           <Form method="post" autoComplete="off" id={form.id} onSubmit={form.onSubmit} noValidate>
+            {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
             <div className="space-y-5">
               <div>
                 <label
@@ -199,6 +216,7 @@ export default function AgentSignupPage() {
                   type="email"
                   id={fields.email.id}
                   name={fields.email.name}
+                  defaultValue={email}
                   placeholder={m.auth_agent_signup_email_placeholder()}
                   aria-invalid={fields.email.errors ? true : undefined}
                   className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"
