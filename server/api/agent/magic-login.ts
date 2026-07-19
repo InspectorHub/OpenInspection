@@ -72,7 +72,6 @@ export const agentMagicLoginRequestRoutes = createApiRouter()
             db: c.env.DB,
             inspectionId: body.inspectionId,
             reportToken: body.token,
-            tenantId: body.tenant,
             coreBaseUrl: getBaseUrl(c),
         });
         return c.json({ success: true as const, data: { loginUrl } }, 200);

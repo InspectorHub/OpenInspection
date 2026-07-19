@@ -31,11 +31,6 @@ export interface RequestMagicLoginParams {
     db: D1Database;
     inspectionId: string;
     reportToken: string;
-    // Caller-declared tenant (slug/id) — consistency/telemetry only, NEVER the
-    // authorization boundary. Reserved for callers that want it recorded
-    // alongside the audit entry; the grant's OWN tenantId (below) is what
-    // gates every security decision.
-    tenantId: string;
     // Absolute origin (protocol + host) the loginUrl is built against — the
     // caller resolves this via getBaseUrl(c) so this module stays Context-free
     // and unit-testable with a plain string.
