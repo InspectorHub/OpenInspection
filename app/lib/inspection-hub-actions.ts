@@ -77,8 +77,8 @@ export async function handlePersonAdd(
       const err = (await createRes.json().catch(() => null)) as { error?: { message?: string } } | null;
       return { ok: false, intent: "person-add", error: err?.error?.message ?? m.inspections_hub_error_person_add() };
     }
-    const createdBody = (await createRes.json()) as { data?: { id?: string } };
-    contactId = createdBody.data?.id ?? "";
+    const createdBody = (await createRes.json()) as { data?: { contact?: { id?: string } } };
+    contactId = createdBody.data?.contact?.id ?? "";
     if (!contactId) {
       return { ok: false, intent: "person-add", error: m.inspections_hub_error_person_add() };
     }

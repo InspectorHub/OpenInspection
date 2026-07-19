@@ -89,7 +89,7 @@ async function seedDefaultAutomations(db: D1Database, tenantId: string): Promise
         ['report.published', 'client', 'Review request', 'How did we do? — {{property_address}}', '<p>Hi {{client_name}},</p><p>Thanks for choosing us for your inspection at <strong>{{property_address}}</strong>. A short review helps other homebuyers find us:</p><p><a href="{{review_url}}">Leave a review</a></p><p>— {{company_name}}</p>', 0, null], // active=0: inactive until review_url configured
     ];
     const stmt = `
-        INSERT INTO automations (id, tenant_id, trigger, recipient, name, delay_minutes, subject_template, body_template, active, channels, sms_body, is_default, created_at)
+        INSERT INTO automations (id, tenant_id, trigger, recipient, name, delay_minutes, subject_template, body_template, is_active, channels, sms_body, is_default, created_at)
         SELECT ${SQL_UUID_V4}, ?, ?, ?, ?, 0, ?, ?, ?, '["email"]', ?, 1, unixepoch('now')
         WHERE NOT EXISTS (
             SELECT 1 FROM automations WHERE tenant_id = ? AND trigger = ? AND recipient = ? AND name = ?
