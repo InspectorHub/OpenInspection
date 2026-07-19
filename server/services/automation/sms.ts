@@ -92,7 +92,16 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
                             eq(contactRoleProfiles.tenantId, inspection.tenantId),
                             eq(contactRoleProfiles.id, automation.recipientRoleProfileId),
                         )).get() ?? null;
-                } catch { /* unresolvable role profile → no consent gate applies */ }
+                } catch (err) {
+                    // DB error on consent-gate role lookup: fail closed (do not send).
+                    // When we cannot prove the recipient is NOT a consent-requiring client, we must not send.
+                    logger.error('sms consent-gate role lookup failed; failing closed (skipping send)', {
+                        automationId: automation.id,
+                        inspectionId: inspection.id,
+                        tenantId: inspection.tenantId,
+                    }, err instanceof Error ? err : undefined);
+                    return void (await skip('consent-gate role lookup failed'));
+                }
                 if (roleRow?.key === PRIMARY_CLIENT_KEY) {
                     const { SmsConsentService } = await import('../sms-consent.service');
                     const consentSvc = new SmsConsentService(this.db);
