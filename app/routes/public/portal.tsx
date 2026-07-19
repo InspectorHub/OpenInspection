@@ -156,6 +156,9 @@ export default function PortalLanding() {
           <p className="text-[13px] text-ih-fg-3 mt-1">
             {m.portal_landing_sent_body()}
           </p>
+          <p className="text-[13px] text-ih-fg-3 mt-3">
+            {m.portal_landing_sent_recovery()}
+          </p>
         </div>
       ) : (
         <Form method="post" className="space-y-3">

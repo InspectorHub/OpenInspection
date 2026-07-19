@@ -63,6 +63,7 @@
   "portal_landing_signin_subtitle": "Enter your email and we'll send you a secure sign-in link.",
   "portal_landing_sent_title": "Check your email for a sign-in link.",
   "portal_landing_sent_body": "If an account matches that address, a link is on its way. It expires in 15 minutes.",
+  "portal_landing_sent_recovery": "Didn't get an email within a few minutes? Check your spam folder and make sure you used the same email your inspector has on file. Still stuck? Contact your inspection company.",
   "portal_landing_email_label": "Email address",
   "portal_landing_email_placeholder": "you@example.com",
   "portal_landing_submit_pending": "Sending…",
