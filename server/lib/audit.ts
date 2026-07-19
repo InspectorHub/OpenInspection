@@ -94,7 +94,9 @@ export type AuditAction =
     | 'inspection.compliance.doc_review_seeded'
     | 'inspection.compliance.doc_review_updated'
     | 'inspection.compliance.psq_updated'
-    | 'inspection.compliance.psq_status_changed';
+    | 'inspection.compliance.psq_status_changed'
+    // Agent unified link (Spec 3, Task 2) — single-use magic-login code issue.
+    | 'agent.magic_login.issued';
 
 interface AuditParams {
     db: D1Database;

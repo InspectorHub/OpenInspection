@@ -57,6 +57,7 @@ import emailTemplateRoutes from './api/email-templates';
 import agentRoutes from './api/agent';
 import agentsRoutes from './api/agents';
 import agentSignupRoutes from './api/agent-signup';
+import { agentMagicLoginRequestRoutes, agentMagicLoginRedeemRoutes } from './api/agent/magic-login';
 import placesRoutes from './api/places';
 import { availabilityRoutes } from './api/availability';
 import calendarRoutes from './api/calendar';
@@ -253,7 +254,9 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
     // Agent Accounts A1 — both /agent-invite/* (HTML) and /api/agents/accept +
     // /agent-signup + /api/agent-signup are unauthenticated entry points.
-    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup';
+    // Agent unified link (Spec 3 Task 2) — the caller holds a report token or
+    // a one-time KV code, never a session, for both new entry points below.
+    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request';
     // Agent Accounts A3 — concierge magic-link entry points (client-facing,
     // no JWT). The token in the URL is the secret.
     const isConciergePublic =
@@ -437,6 +440,10 @@ const routes = app
   // Mount auth routes at canonical API path AND at root so that /setup, /login (POST), /join (POST) work without redirects
   .route('/api/auth', coreAuthRoutes)
   .route('/', coreAuthRoutes)
+  // Agent unified link (Spec 3 Task 2) — GET /agent/magic-login redeem. Root
+  // mount (not /api) mirrors the /sso pattern above; workers/app.ts forwards
+  // this exact path to the API app since it isn't under /api/*.
+  .route('/', agentMagicLoginRedeemRoutes)
   // Test-only hooks, fail-closed behind E2E_EMAIL_SINK (404 in prod). See test-hooks.ts.
   .route('/api/__test__', testHooksRoutes)
   .route('/api/billing', billingRoutes)
@@ -515,6 +522,10 @@ const routes = app
   // Authoring unification Plan-4 module K — GET/POST/PUT/DELETE /api/admin/defect-categories
   .route('/api/admin', adminDefectCategoriesRoutes)
   .route('/api/agent', agentRoutes)
+  // Agent unified link (Spec 3 Task 2) — POST /api/agent/magic-login/request.
+  // The GET /agent/magic-login redeem endpoint is mounted at root, below
+  // (not under /api — see workers/app.ts's explicit forward for that path).
+  .route('/api/agent', agentMagicLoginRequestRoutes)
   // Agent Accounts A1 — invite + accept endpoints
   .route('/api/agents', agentsRoutes)
   // Agent Accounts A1 — self-serve signup

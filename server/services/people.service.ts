@@ -124,6 +124,23 @@ export class PeopleService {
         return row?.id ?? null;
     }
 
+    /**
+     * Resolves a role profile `key`'s `kind` (client/agent/other) for the
+     * tenant, or null when no ACTIVE profile matches. Used by the agent
+     * magic-login primitive (server/services/agent/magic-login.service.ts) to
+     * confirm a portal-access grant's role KEY is agent-kind before minting a
+     * session — the grant itself only carries the key, never the kind.
+     */
+    async kindForKey(tenantId: string, key: string): Promise<RoleKind | null> {
+        const row = await this.db.select({ kind: contactRoleProfiles.kind }).from(contactRoleProfiles)
+            .where(and(
+                eq(contactRoleProfiles.tenantId, tenantId),
+                eq(contactRoleProfiles.key, key),
+                eq(contactRoleProfiles.active, true),
+            )).get();
+        return (row?.kind as RoleKind | undefined) ?? null;
+    }
+
     /** Lists all role profiles (active + inactive) for the tenant, in display order. */
     async listProfiles(tenantId: string) {
         return this.db.select().from(contactRoleProfiles)
