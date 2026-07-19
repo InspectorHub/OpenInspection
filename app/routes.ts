@@ -81,6 +81,8 @@ export default [
   route("agent-invite/:token", "routes/agent/invite-accept.tsx"),
   route("agent-invite-expired", "routes/agent/invite-expired.tsx"),
   route("agent-signup", "routes/agent/signup.tsx"),
+  // Spec 3 Task 5 — core dual-mode agent front door (password + magic-link).
+  route("agent-login", "routes/agent/login.tsx"),
   // Error / utility pages (bare, outside auth)
   route("not-found", "routes/not-found.tsx"),
   route("feature-disabled", "routes/feature-disabled.tsx"),

@@ -11,6 +11,7 @@ export type { AgentApi }              from '../../server/api/agent';
 export type { AgentsApi }             from '../../server/api/agents';
 export type { AgentSignupApi }        from '../../server/api/agent-signup';
 export type { AgentMagicLoginRequestApi, AgentMagicLoginRedeemApi } from '../../server/api/agent/magic-login';
+export type { AgentLoginApi }          from '../../server/api/agent/login';
 export type { AiApi }                 from '../../server/api/ai';
 export type { AnalyticsApi }          from '../../server/api/analytics';
 export type { AutomationsApi }        from '../../server/api/automations';

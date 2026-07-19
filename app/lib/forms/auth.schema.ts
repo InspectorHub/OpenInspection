@@ -150,3 +150,32 @@ export function makeAgentSignupSchema() {
       .max(120, m.auth_validation_password_too_long()),
   });
 }
+
+/**
+ * Task 5 — core agent password login (`/agent-login`, primary form). Mirrors
+ * the API's `AgentLoginSchema` (server/lib/validations/agent-login.schema.ts):
+ * email + password min(1) — this authenticates an EXISTING account, so no
+ * strength rule applies here (unlike signup's makeAgentSignupSchema).
+ */
+export function makeAgentLoginSchema() {
+  return z.object({
+    email: z
+      .string()
+      .min(1, m.auth_validation_email_required())
+      .email(m.auth_validation_email_invalid()),
+    password: z.string().min(1, m.auth_validation_password_required()),
+  });
+}
+
+/**
+ * Task 5 — core agent login's magic-link fallback form (`/agent-login`,
+ * secondary form). Mirrors the API's `AgentLoginLinkSchema`: email only.
+ */
+export function makeAgentLoginLinkSchema() {
+  return z.object({
+    email: z
+      .string()
+      .min(1, m.auth_validation_email_required())
+      .email(m.auth_validation_email_invalid()),
+  });
+}

@@ -187,6 +187,38 @@
     "description": "Adds a defect item to the caller's repair request. Creator-auth enforced."
   },
   {
+    "operationId": "agentLogin",
+    "method": "POST",
+    "pathTemplate": "/api/agent/login",
+    "scopes": [],
+    "tag": "agents",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AgentLoginBody"
+      }
+    },
+    "summary": "Agent password login",
+    "description": "Public, unauthenticated endpoint. Authenticates ONLY a global agent account (tenant_id IS NULL, role='agent') by email + password and mints an agent session cookie. A tenant user's email, a missing account, and a wrong password all answer the SAME generic 401 (anti-oracle) — the token is delivered via Set-Cookie only, never in this response body."
+  },
+  {
+    "operationId": "agentLoginLink",
+    "method": "POST",
+    "pathTemplate": "/api/agent/login-link",
+    "scopes": [],
+    "tag": "agents",
+    "tier": "excluded",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "$ref": "#/components/schemas/AgentLoginLinkBody"
+      }
+    },
+    "summary": "Request an agent magic sign-in link by email",
+    "description": "Public, unauthenticated endpoint. ALWAYS returns 200 { sent: true } regardless of whether the email has a global agent account, to prevent account enumeration. When it does, an email with a one-time sign-in link (900 second TTL) is sent — the send itself is deferred so the response is timing-identical either way."
+  },
+  {
     "operationId": "approveInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/concierge/approve",

@@ -59,6 +59,7 @@ import agentsRoutes from './api/agents';
 import agentSignupRoutes from './api/agent-signup';
 import { agentMagicLoginRequestRoutes, agentMagicLoginRedeemRoutes } from './api/agent/magic-login';
 import { agentReportContextRoutes } from './api/agent/report-context'; // Spec 3 Task 3
+import { agentLoginRoutes } from './api/agent/login'; // Spec 3 Task 5
 import placesRoutes from './api/places';
 import { availabilityRoutes } from './api/availability';
 import calendarRoutes from './api/calendar';
@@ -254,7 +255,10 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
     // Agent Accounts A1 + the agent unified link (Spec 3 — report token or one-time KV code, never a session).
-    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request' || path === '/api/agent/report-context';
+    // Spec 3 Task 5 — core /agent-login dual-mode front door (password +
+    // magic-link request); both are unauthenticated by design (the caller
+    // holds neither a session nor a report token yet).
+    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request' || path === '/api/agent/report-context' || path === '/api/agent/login' || path === '/api/agent/login-link';
     // Agent Accounts A3 — concierge magic-link entry points (client-facing,
     // no JWT). The token in the URL is the secret.
     const isConciergePublic =
@@ -525,6 +529,9 @@ const routes = app
   // (not under /api — see workers/app.ts's explicit forward for that path).
   .route('/api/agent', agentMagicLoginRequestRoutes)
   .route('/api/agent', agentReportContextRoutes) // Spec 3 Task 3 — POST /api/agent/report-context
+  // Spec 3 Task 5 — POST /api/agent/login + POST /api/agent/login-link (core
+  // dual-mode front door: password primary, magic-link fallback).
+  .route('/api/agent', agentLoginRoutes)
   // Agent Accounts A1 — invite + accept endpoints
   .route('/api/agents', agentsRoutes)
   // Agent Accounts A1 — self-serve signup

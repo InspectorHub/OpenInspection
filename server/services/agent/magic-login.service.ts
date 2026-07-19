@@ -91,8 +91,49 @@ export async function requestMagicLogin(params: RequestMagicLoginParams): Promis
 
     if (!account) return null;
 
+    return mintLoginCode(kv, account.id, coreBaseUrl);
+}
+
+export interface RequestMagicLoginByEmailParams {
+    kv: KVNamespace;
+    db: D1Database;
+    email: string;
+    // Absolute origin the loginUrl is built against — same contract as
+    // RequestMagicLoginParams.coreBaseUrl above (Context-free, unit-testable).
+    coreBaseUrl: string;
+}
+
+/**
+ * Spec 3 Task 5 — email-only sibling of requestMagicLogin, for the core
+ * `/agent-login` page's magic-link fallback (no report token involved, unlike
+ * the unified-link flow above). Gated purely on whether the email has a
+ * global agent account (findGlobalAgentByEmail — the single shared predicate
+ * query in server/services/agent/account.ts, never duplicated here).
+ *
+ * Returns `null` (NOT an error) when no account exists — the anti-oracle
+ * case: the route ALWAYS answers `{ sent: true }` regardless, so a caller
+ * can't probe this endpoint to learn which emails have agent accounts.
+ */
+export async function requestMagicLoginByEmail(params: RequestMagicLoginByEmailParams): Promise<string | null> {
+    const { kv, db, email, coreBaseUrl } = params;
+
+    const account = await findGlobalAgentByEmail(db, email);
+    if (!account) return null;
+
+    return mintLoginCode(kv, account.id, coreBaseUrl);
+}
+
+/**
+ * Shared step behind both requestMagicLogin (report-token path) and
+ * requestMagicLoginByEmail (email path, Task 5): mint a single-use code in KV
+ * for an ALREADY-authorized userId and build the redeemable URL. Does no
+ * authorization itself — every caller must establish the account exists
+ * (and, for the report-token path, that the token is live and agent-kind)
+ * before calling this.
+ */
+async function mintLoginCode(kv: KVNamespace, userId: string, coreBaseUrl: string): Promise<string> {
     const code = crypto.randomUUID();
-    const payload: MagicLoginKvPayload = { userId: account.id, issuedAt: Date.now() };
+    const payload: MagicLoginKvPayload = { userId, issuedAt: Date.now() };
     await kv.put(`${MAGIC_LOGIN_KV_PREFIX}${code}`, JSON.stringify(payload), {
         expirationTtl: MAGIC_LOGIN_TTL_SECONDS,
     });
