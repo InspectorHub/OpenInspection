@@ -117,5 +117,19 @@
   "inspections_hub_eb_not_found": "This inspection could not be found. It may have been deleted.",
   "inspections_hub_eb_forbidden": "You do not have permission to view this inspection.",
   "inspections_hub_eb_generic": "Something went wrong while opening the inspection.",
-  "inspections_hub_eb_back": "Back to Dashboard"
+  "inspections_hub_eb_back": "Back to Dashboard",
+  "inspections_hub_error_send_report": "Could not send the report. Please try again.",
+  "inspections_hub_report_send": "Send report",
+  "inspections_hub_send_report_title": "Send report",
+  "inspections_hub_send_report_people_label": "People on this inspection",
+  "inspections_hub_send_report_no_email_hint": "No email on file",
+  "inspections_hub_send_report_oneoff_title": "One-off recipient",
+  "inspections_hub_send_report_oneoff_email_label": "Email",
+  "inspections_hub_send_report_oneoff_email_ph": "name@example.com",
+  "inspections_hub_send_report_oneoff_role_label": "Role",
+  "inspections_hub_send_report_oneoff_role_placeholder": "Select a role…",
+  "inspections_hub_send_report_channel_label": "Channel",
+  "inspections_hub_send_report_channel_email": "Email",
+  "inspections_hub_send_report_submit": "Send",
+  "inspections_hub_send_report_sending": "Sending…"
 }

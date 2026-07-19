@@ -20,6 +20,7 @@ import { RequestPaymentModal } from "~/components/inspection-hub/RequestPaymentM
 import { PublishReportModal } from "~/components/inspection-hub/PublishReportModal";
 import { CreateReinspectionModal } from "~/components/inspection-hub/CreateReinspectionModal";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
+import { SendReportModal } from "~/components/inspection/SendReportModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import {
   toActionResult,
@@ -310,6 +311,19 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   if (intent === "person-remove") return handlePersonRemove(api, id, formData);
   if (intent === "search-contacts") return handleSearchContacts(api, formData);
 
+  // Spec 2 Task 7 — "Send report" modal. Recipients/channels arrive as JSON
+  // strings (SendReportModal's hidden fields) mirroring the endpoint's own
+  // body shape (server/lib/validations/send-report.schema.ts).
+  if (intent === "send-report") {
+    const recipients = JSON.parse(String(formData.get("recipients") ?? "[]"));
+    const channels = JSON.parse(String(formData.get("channels") ?? '["email"]'));
+    const res = await api.inspections[":id"]["send-report-pdf"].$post({
+      param: { id },
+      json: { recipients, channels },
+    });
+    return toActionResult(res, "send-report", m.inspections_hub_error_send_report());
+  }
+
   return { ok: false, intent: undefined, error: m.inspections_hub_error_unknown_action() };
 }
 
@@ -433,6 +447,12 @@ export default function InspectionHubPage() {
   // published baselines can re-inspect. Unlike the other modals it does NOT
   // auto-close on success: the effect below navigates to the new inspection's
   // editor instead (mirrors the app's create-then-navigate flow).
+  // "Send report" modal (Spec 2 Task 7) — its own dedicated fetcher (B-17:
+  // never share fetchers between mutations) and a local open flag; the modal
+  // component itself derives submitting/error/auto-close from the fetcher.
+  const [sendReportOpen, setSendReportOpen] = useState(false);
+  const sendReportFetcher = useFetcher<typeof action>();
+
   const reinspectModal = useModalFetcher("create-reinspection", { closeOnSuccess: false });
   const createReinspection = reinspectModal.fetcher;
   useEffect(() => {
@@ -666,6 +686,15 @@ export default function InspectionHubPage() {
                 >
                   {m.inspections_hub_report_create_reinspection()}
                 </Button>
+                {canPublishCap && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSendReportOpen(true)}
+                  >
+                    {m.inspections_hub_report_send()}
+                  </Button>
+                )}
                 {reportActionList.includes('unpublish') && (
                   <unpublishReport.Form method="post">
                     <input type="hidden" name="intent" value="unpublish" />
@@ -796,6 +825,18 @@ export default function InspectionHubPage() {
         error={publishModal.error}
         onClose={() => publishModal.setOpen(false)}
       />
+
+      {/* Send-report modal — shared Modal primitive (no window.confirm). Only
+          mounted while open (SendReportModal always renders its Modal as
+          open — see its own doc comment). */}
+      {sendReportOpen && (
+        <SendReportModal
+          people={people}
+          roleProfiles={roleProfiles}
+          fetcher={sendReportFetcher}
+          onClose={() => setSendReportOpen(false)}
+        />
+      )}
 
       {/* Create-re-inspection modal — shared Modal primitive (no window.confirm) */}
       <CreateReinspectionModal
