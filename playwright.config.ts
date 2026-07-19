@@ -201,5 +201,10 @@ export default defineConfig({
         // pdf-lib). Exercises the actual worker report render + BROWSER binding;
         // see tests/e2e/report-toc-numbers.spec.ts for its harness requirements.
         { name: 'report-toc-numbers', testMatch: 'report-toc-numbers.spec.ts', dependencies: ['editor-seed'] },
+        // Plan 1B Task 8 — people/role-profile flow (Roles tab CRUD + People
+        // section add + primary-client conflict). Depends on `editor-seed` for
+        // the shared admin + a real inspection id (the `api` project it in
+        // turn depends on already seeds the 8 default role profiles).
+        { name: 'people-role-profiles', testMatch: 'people-role-profiles.spec.ts', dependencies: ['editor-seed'] },
     ],
 });

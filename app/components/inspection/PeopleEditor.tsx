@@ -107,7 +107,10 @@ export function PeopleEditor({
         <div className="space-y-4">
           {groups.map((group) => (
             <div key={group.kind}>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
+              <p
+                data-testid={`people-group-${group.kind}`}
+                className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1"
+              >
                 {groupLabel(group.kind)}
               </p>
               <div className="space-y-2">

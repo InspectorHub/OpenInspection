@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useFetcher } from "react-router";
 import { useForm, type SubmissionResult } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
@@ -49,6 +50,17 @@ export function RoleProfileModal({
 
   const fetcherOk = (fetcher.data as { ok?: boolean } | undefined)?.ok;
 
+  // Auto-close on a successful save. The `onSubmit` handler runs BEFORE the
+  // fetcher's own submission resolves, so checking `fetcherOk` there only
+  // ever reflects the PREVIOUS submission's result (always undefined on a
+  // fresh open) — the modal would never close after the actual save. Close
+  // from an effect once the fetcher settles back to idle with ok:true instead
+  // (mirrors AddPersonModal's addSucceeded effect / the hub's useModalFetcher).
+  const succeeded = fetcher.state === "idle" && fetcherOk === true;
+  useEffect(() => {
+    if (open && succeeded) onClose();
+  }, [open, succeeded, onClose]);
+
   const emailOptions = [
     { value: "", label: m.contacts_roles_modal_template_none() },
     ...templates.filter((t) => t.channel === "email").map((t) => ({ value: t.id, label: t.name })),
@@ -74,10 +86,7 @@ export function RoleProfileModal({
       <fetcher.Form
         method="post"
         id={form.id}
-        onSubmit={(e) => {
-          form.onSubmit(e);
-          if (fetcherOk) setTimeout(onClose, 200);
-        }}
+        onSubmit={form.onSubmit}
         noValidate
         className="space-y-4"
       >

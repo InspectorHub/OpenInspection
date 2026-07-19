@@ -17,7 +17,6 @@ import { logger } from '../../lib/logger';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import {
     InspectionRecipientsResponseSchema,
-    InspectionPeopleResponseSchema,
     InspectionHubResponseSchema,
     ReportDataResponseSchema,
 } from '../../lib/validations/inspection.schema';
@@ -166,27 +165,6 @@ const recipientsRoute = createRoute(withMcpMetadata({
     },
     operationId: "listInspectionRecipients",
     description: "Auto-generated placeholder for listInspectionRecipients (GET /{id}/recipients, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['read'], tier: 'extended' }));
-
-/**
- * Round-2 F3 — GET /api/inspections/:id/people
- * People-card payload (inspector + client + buyer/listing agents).
- */
-const peopleRoute = createRoute(withMcpMetadata({
-    method:  'get',
-    path:    '/{id}/people',
-    tags: ["inspections"],
-    summary: 'People card payload (inspector, client, agents)',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: InspectionPeopleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
-            description: 'People card',
-        },
-    },
-    operationId: "listInspectionPeople",
-    description: "Auto-generated placeholder for listInspectionPeople (GET /{id}/people, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -409,12 +387,6 @@ const reportDeliveryRoutes = createApiRouter()
         const { id }   = c.req.valid('param');
         const list     = await c.var.services.inspection.getRecipientList(id, tenantId);
         return c.json({ success: true, data: list }, 200);
-    })
-    .openapi(peopleRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { id }   = c.req.valid('param');
-        const card     = await c.var.services.inspection.getPeopleCard(id, tenantId);
-        return c.json({ success: true, data: card }, 200);
     })
     .openapi(hubRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
