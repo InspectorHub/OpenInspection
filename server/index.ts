@@ -58,6 +58,7 @@ import agentRoutes from './api/agent';
 import agentsRoutes from './api/agents';
 import agentSignupRoutes from './api/agent-signup';
 import { agentMagicLoginRequestRoutes, agentMagicLoginRedeemRoutes } from './api/agent/magic-login';
+import { agentReportContextRoutes } from './api/agent/report-context'; // Spec 3 Task 3
 import placesRoutes from './api/places';
 import { availabilityRoutes } from './api/availability';
 import calendarRoutes from './api/calendar';
@@ -252,11 +253,8 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
-    // Agent Accounts A1 — both /agent-invite/* (HTML) and /api/agents/accept +
-    // /agent-signup + /api/agent-signup are unauthenticated entry points.
-    // Agent unified link (Spec 3 Task 2) — the caller holds a report token or
-    // a one-time KV code, never a session, for both new entry points below.
-    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request';
+    // Agent Accounts A1 + the agent unified link (Spec 3 — report token or one-time KV code, never a session).
+    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request' || path === '/api/agent/report-context';
     // Agent Accounts A3 — concierge magic-link entry points (client-facing,
     // no JWT). The token in the URL is the secret.
     const isConciergePublic =
@@ -526,6 +524,7 @@ const routes = app
   // The GET /agent/magic-login redeem endpoint is mounted at root, below
   // (not under /api — see workers/app.ts's explicit forward for that path).
   .route('/api/agent', agentMagicLoginRequestRoutes)
+  .route('/api/agent', agentReportContextRoutes) // Spec 3 Task 3 — POST /api/agent/report-context
   // Agent Accounts A1 — invite + accept endpoints
   .route('/api/agents', agentsRoutes)
   // Agent Accounts A1 — self-serve signup

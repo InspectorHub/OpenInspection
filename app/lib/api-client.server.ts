@@ -6,6 +6,7 @@ import type {
     AgentApi,
     AgentsApi,
     AgentSignupApi,
+    AgentMagicLoginRequestApi,
     AiApi,
     AnalyticsApi,
     AutomationsApi,
@@ -116,6 +117,13 @@ export interface Api {
     agent:              ReturnType<typeof hc<AgentApi>>;
     agents:             ReturnType<typeof hc<AgentsApi>>;
     agentSignup:        ReturnType<typeof hc<AgentSignupApi>>;
+    // Spec 3 Task 3 — separate per-module client for the agent unified-link
+    // magic-login primitive: it lives in its OWN router file (server/api/agent/
+    // magic-login.ts), mounted at the same /api/agent path as `agent` above but
+    // typed independently (AgentApi vs AgentMagicLoginRequestApi are different
+    // `typeof <router>` types) — merging them into one hc<T> would hit the same
+    // structural-check depth limit this per-module split exists to avoid (C-10).
+    agentMagicLogin:    ReturnType<typeof hc<AgentMagicLoginRequestApi>>;
     ai:                 ReturnType<typeof hc<AiApi>>;
     analytics:          ReturnType<typeof hc<AnalyticsApi>>;
     auth:               ReturnType<typeof hc<CoreAuthApi>>;
@@ -186,6 +194,7 @@ const MOUNT: Record<keyof Api, string> = {
     agent:              "/api/agent",
     agents:             "/api/agents",
     agentSignup:        "/api/agent-signup",
+    agentMagicLogin:    "/api/agent",
     ai:                 "/api/ai",
     analytics:          "/api/analytics",
     auth:               "/api/auth",
@@ -274,6 +283,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         agent:              mk<AgentApi>(MOUNT.agent),
         agents:             mk<AgentsApi>(MOUNT.agents),
         agentSignup:        mk<AgentSignupApi>(MOUNT.agentSignup),
+        agentMagicLogin:    mk<AgentMagicLoginRequestApi>(MOUNT.agentMagicLogin),
         ai:                 mk<AiApi>(MOUNT.ai),
         analytics:          mk<AnalyticsApi>(MOUNT.analytics),
         auth:               mk<CoreAuthApi>(MOUNT.auth),

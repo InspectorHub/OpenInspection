@@ -51,6 +51,7 @@ import {
   type InvoiceLoaderResult,
   type AgreementLoaderResult,
 } from "~/lib/section-loaders";
+import { loadAgentReportContext, type AgentReportContext } from "~/lib/agent-report-context";
 import { HubSectionSlot } from "~/components/portal/hub/HubSectionSlot";
 import type { TenantBrand } from "~/lib/brand";
 import { m } from "~/paraglide/messages";
@@ -200,9 +201,15 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     agreement = await loadAgreementSection(context, signerToken);
   }
 
+  // Step 4b — agent report-landing context (Spec 3 Task 3): resolves whether
+  // ctx.token's recipient is an agent and, if so, whether they already have a
+  // global agent account — the Report section CTA (magic-login vs signup)
+  // branches on this. See loadAgentReportContext for the best-effort fetch.
+  const agentReport = await loadAgentReportContext(context, tenant, inspectionId, ctx.token);
+
   // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement }),
+    JSON.stringify({ overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -213,11 +220,55 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Action — Spec 3 Task 3 "Go to my workspace" BFF relay.               */
+/* BFF ONLY (feedback_core_bff_no_client_fetch): <AgentReportActions>   */
+/* posts the "agent-magic-login" intent via useFetcher, which hits THIS */
+/* action rather than a client `fetch('/api/...')`. Mirrors the         */
+/* Commercial PCA Phase W Task 6 WordExportButton/report-card-stack.tsx */
+/* action pattern (intent-dispatch, createApi(context) relay).          */
+/* ------------------------------------------------------------------ */
+
+type AgentMagicLoginActionResult =
+  | { ok: true; intent: "agent-magic-login"; loginUrl: string | null }
+  | { ok: false; intent: "agent-magic-login"; error?: string }
+  | { ok: false; intent: string };
+
+export async function action({ request, params, context }: Route.ActionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+  const tenant = params.tenant ?? "";
+  const inspectionId = params.inspectionId ?? "";
+
+  if (intent === "agent-magic-login") {
+    const token = String(formData.get("token") ?? "");
+    const api = createApi(context);
+    try {
+      const res = (await api.agentMagicLogin["magic-login"].request.$post({
+        json: { tenant, inspectionId, token },
+      })) as unknown as Response;
+      if (!res.ok) {
+        return { ok: false, intent: "agent-magic-login" } satisfies AgentMagicLoginActionResult;
+      }
+      const body = (await res.json()) as { data?: { loginUrl: string | null } };
+      return {
+        ok: true,
+        intent: "agent-magic-login",
+        loginUrl: body.data?.loginUrl ?? null,
+      } satisfies AgentMagicLoginActionResult;
+    } catch {
+      return { ok: false, intent: "agent-magic-login" } satisfies AgentMagicLoginActionResult;
+    }
+  }
+
+  return { ok: false, intent: String(intent ?? "") } satisfies AgentMagicLoginActionResult;
+}
+
+/* ------------------------------------------------------------------ */
 /* Component */
 /* ------------------------------------------------------------------ */
 
 export default function PortalInspection() {
-  const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string; signerToken: string | null };
     section: HubSection;
@@ -228,6 +279,7 @@ export default function PortalInspection() {
     repair: RepairLoaderResult | null;
     invoice: InvoiceLoaderResult | null;
     agreement: AgreementLoaderResult | null;
+    agentReport: AgentReportContext | null;
   };
   const revalidator = useRevalidator();
   const [searchParams] = useSearchParams();
@@ -315,6 +367,7 @@ export default function PortalInspection() {
       repair={repair}
       invoice={invoice}
       agreement={agreement}
+      agentReport={agentReport}
       docUploading={docUploading}
       docError={docError}
       onUpload={onUpload}
