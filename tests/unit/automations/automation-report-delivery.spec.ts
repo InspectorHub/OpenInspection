@@ -98,9 +98,9 @@ function makeReportDelivery(opts: { pdfBytes?: ArrayBuffer | null } = {}) {
     return { reportDelivery, issueToken, getOrRender, streamPdf, getContentHash };
 }
 
-function makeEmailSvc() {
-    const sendInspectionReportPdf = vi.fn(async () => {});
-    const sendReportReady = vi.fn(async () => {});
+function makeEmailSvc(opts: { pdfDelivered?: boolean; readyDelivered?: boolean } = {}) {
+    const sendInspectionReportPdf = vi.fn(async () => opts.pdfDelivered ?? true);
+    const sendReportReady = vi.fn(async () => opts.readyDelivered ?? true);
     const sendEmail = vi.fn(async () => ({ delivered: true }));
     const emailFor = async (_tid: string) =>
         ({ sendInspectionReportPdf, sendReportReady, sendEmail } as unknown as EmailService);
@@ -201,5 +201,42 @@ describe('AutomationService.flush — report.published PDF-email delivery (Spec 
         const row = await db.select().from(schema.automationLogs).where(eq(schema.automationLogs.id, logId)).get();
         expect(row?.status).toBe('sent');
         expect(row?.deliveredAt).not.toBeNull();
+    });
+
+    it('log status: when the report-ready template is disabled (or email not configured), sendInspectionReportPdf returns false and the row is marked skipped, not sent', async () => {
+        const insp = 'insp-log-skipped';
+        await seedInspection(insp);
+        const ruleId = await seedRule({ recipientKind: 'role', recipientRoleProfileId: roleProfileId('client') });
+        const logId = await seedLog({ ruleId, inspectionId: insp, recipient: 'client@example.com', recipientRoleKey: 'client' });
+
+        const { reportDelivery } = makeReportDelivery();
+        const { emailFor } = makeEmailSvc({ pdfDelivered: false });
+
+        await expect(
+            svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery),
+        ).resolves.not.toThrow();
+
+        const row = await db.select().from(schema.automationLogs).where(eq(schema.automationLogs.id, logId)).get();
+        expect(row?.status).toBe('skipped');
+        expect(row?.deliveredAt).toBeNull();
+        expect(row?.error).toMatch(/not sent/);
+    });
+
+    it("log status: text-only fallback path (streamPdf returns null) also honors sendReportReady's false return as skipped", async () => {
+        const insp = 'insp-log-skipped-textonly';
+        await seedInspection(insp);
+        const ruleId = await seedRule({ recipientKind: 'role', recipientRoleProfileId: roleProfileId('client') });
+        const logId = await seedLog({ ruleId, inspectionId: insp, recipient: 'client@example.com', recipientRoleKey: 'client' });
+
+        const { reportDelivery } = makeReportDelivery({ pdfBytes: null });
+        const { emailFor } = makeEmailSvc({ readyDelivered: false });
+
+        await expect(
+            svc.flush(emailFor, 'Acme', 'https://acme.example.com', undefined, 50, undefined, undefined, reportDelivery),
+        ).resolves.not.toThrow();
+
+        const row = await db.select().from(schema.automationLogs).where(eq(schema.automationLogs.id, logId)).get();
+        expect(row?.status).toBe('skipped');
+        expect(row?.deliveredAt).toBeNull();
     });
 });

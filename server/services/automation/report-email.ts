@@ -44,8 +44,11 @@ export interface ReportDeliveryDeps {
  *
  * Never throws — always marks the log row itself (mirrors the existing
  * post-deliverAction bookkeeping in flush(): `status:'sent'` + `deliveredAt`
- * on success, `status:'failed'` + `error` on any failure), so the caller can
- * simply `continue` after awaiting this.
+ * when the underlying send actually dispatched, `status:'skipped'` + `error`
+ * when nothing was sent without an exception (report-ready template disabled
+ * for the tenant, or email not configured — sendReportReady/sendInspectionReportPdf
+ * return `false` in that case), `status:'failed'` + `error` on any thrown
+ * exception), so the caller can simply `continue` after awaiting this.
  *
  * Simplification vs publish.ts: the cron path doesn't resolve a signature
  * inspector (that lookup lives in the request-scoped publish flow and isn't
@@ -106,21 +109,32 @@ export async function deliverReportEmail(
         }
         const pdf = await pdfPromise;
 
+        let delivered: boolean;
         try {
-            if (pdf) {
-                await emailSvc.sendInspectionReportPdf(log.recipient, address, linkUrl, pdf, undefined, reportDelivery.renderHost);
-            } else {
-                await emailSvc.sendReportReady(log.recipient, address, linkUrl, undefined, reportDelivery.renderHost);
-            }
+            delivered = pdf
+                ? await emailSvc.sendInspectionReportPdf(log.recipient, address, linkUrl, pdf, undefined, reportDelivery.renderHost)
+                : await emailSvc.sendReportReady(log.recipient, address, linkUrl, undefined, reportDelivery.renderHost);
         } catch (err) {
             logger.error('AutomationService.flush: report PDF email send failed; falling back to text-only email',
                 { inspectionId: inspection.id, logId: log.id }, err instanceof Error ? err : undefined);
-            await emailSvc.sendReportReady(log.recipient, address, linkUrl, undefined, reportDelivery.renderHost);
+            delivered = await emailSvc.sendReportReady(log.recipient, address, linkUrl, undefined, reportDelivery.renderHost);
         }
 
-        await db.update(automationLogs)
-            .set({ status: 'sent', deliveredAt: new Date() })
-            .where(eq(automationLogs.id, log.id));
+        // `delivered === false` means nothing was sent without an exception —
+        // the tenant disabled the report-ready template, or email isn't
+        // configured (sendEmail's own soft-skip). That's not a failure to
+        // retry (the log would never leave `pending` and clutter the due-query
+        // forever); mirror the generic template path's "skipped" terminal
+        // status (see delivery.ts's `__email_not_configured__` translation).
+        if (delivered) {
+            await db.update(automationLogs)
+                .set({ status: 'sent', deliveredAt: new Date() })
+                .where(eq(automationLogs.id, log.id));
+        } else {
+            await db.update(automationLogs)
+                .set({ status: 'skipped', error: 'report email not sent (template disabled or email not configured)' })
+                .where(eq(automationLogs.id, log.id));
+        }
     } catch (err) {
         await db.update(automationLogs)
             .set({ status: 'failed', error: err instanceof Error ? err.message.slice(0, 500) : 'Unknown error' })

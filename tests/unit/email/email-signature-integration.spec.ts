@@ -29,6 +29,7 @@ function makeService(): { svc: EmailService; sent: SentCall[] } {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (svc as any).sendEmail = vi.fn(async (to: string[], subject: string, html: string) => {
         sent.push({ to, subject, html });
+        return { delivered: true };
     });
     return { svc, sent };
 }
