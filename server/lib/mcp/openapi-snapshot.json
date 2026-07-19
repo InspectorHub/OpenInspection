@@ -13939,7 +13939,7 @@
       "body": null
     },
     "summary": "Upgrade a per-inspection access token into a portal session",
-    "description": "Exchanges a persistent per-(recipient, inspection) access token (the same family used by the public report links) for a __Host-portal_session cookie, so a client arriving from an email CTA lands in the portal already authenticated. Asserts the resolved grant tenant matches the path tenant AND the role currently grants selfRetrieveReport (client/co_client by default, and agent — see server/lib/people/capabilities.ts). SECURITY: an agent-kind role NEVER receives the session cookie — it gets a 200 with `agent: true` and no Set-Cookie, so its report token can never unlock the client hub (agreement signing, payment, messages)."
+    "description": "Exchanges a persistent per-(recipient, inspection) access token (the same family used by the public report links) for a __Host-portal_session cookie, so a client arriving from an email CTA lands in the portal already authenticated. Asserts the resolved grant tenant matches the path tenant AND the role currently grants selfRetrieveReport (client/co_client by default, and agent). SECURITY: an agent-kind role NEVER receives the session cookie — it gets `agent: true` and no Set-Cookie, so its report token can never unlock the client hub."
   },
   {
     "operationId": "portalInspectionObserve",
@@ -14094,7 +14094,7 @@
       "body": null
     },
     "summary": "Validate a portal magic-link token",
-    "description": "Validates a portal magic-link token (typ=ml). On success it sets the __Host-portal_session cookie (httpOnly/secure/SameSite=Lax) carrying the verified email and returns that email so the frontend can render. Bad/expired token → 401."
+    "description": "Validates a portal magic-link token (typ=ml). When the verified email resolves to a global agent account (findGlobalAgentByEmail), mints an agent session (__Host-inspector_token, no tenantId) instead and returns { email, agent: true } — the client __Host-portal_session cookie is NEVER set for an agent. Otherwise (client/co_client) it sets the __Host-portal_session cookie (httpOnly/secure/SameSite=Lax) carrying the verified email and returns that email so the frontend can render. Bad/expired token → 401."
   },
   {
     "operationId": "portalRequestLink",

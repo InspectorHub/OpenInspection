@@ -2,8 +2,14 @@
  * Unified client portal — magic-link redemption.
  *
  * Route: /portal/:tenant/auth?link=<magic-link token>
- *   - Valid link → API sets __Host-portal_session; we forward that Set-Cookie to
- *     the browser and redirect to /portal/:tenant (now authenticated).
+ *   - Valid link, client/co_client email → API sets __Host-portal_session; we
+ *     forward that Set-Cookie to the browser and redirect to /portal/:tenant
+ *     (now authenticated).
+ *   - Valid link, GLOBAL AGENT email (find-my-report analogue of the agent
+ *     exchange branch — server/api/portal.ts redeemRoute) → API instead sets
+ *     __Host-inspector_token and returns `{ email, agent: true }`, NO
+ *     __Host-portal_session. We forward that Set-Cookie and redirect to
+ *     /agent-dashboard, never the client hub.
  *   - Missing link → redirect to /portal/:tenant.
  *   - Expired/invalid link → "expired" state with a path back to request a new one.
  */
@@ -31,10 +37,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       query: { link },
     });
     if (res.status === 200) {
-      // Forward the session cookie minted by the API to the browser, then land
-      // the user on their My Inspections page (now authenticated).
       const cookie = res.headers.get("set-cookie");
-      return redirect(`/portal/${tenant}`, {
+      const body = (await res.json()) as { data?: { email: string; agent?: boolean } };
+      // SECURITY: an agent-resolved redeem set __Host-inspector_token (NOT
+      // __Host-portal_session) — route to the agent dashboard, never the
+      // client hub. See server/api/portal.ts redeemRoute.
+      const destination = body.data?.agent === true ? "/agent-dashboard" : `/portal/${tenant}`;
+      return redirect(destination, {
         headers: cookie ? { "Set-Cookie": cookie } : undefined,
       });
     }

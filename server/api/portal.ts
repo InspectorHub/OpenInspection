@@ -27,6 +27,8 @@ import { signMagicLink, verifyMagicLink, verifyPortalSession, signPortalSession 
 import { resolvePortalAccess } from '../lib/public-access';
 import { getBaseUrl } from '../lib/url';
 import { logger } from '../lib/logger';
+import { signJwt } from '../lib/jwt-keyring';
+import { findGlobalAgentByEmail } from '../services/agent/account';
 import type { HonoConfig } from '../types/hono';
 
 const PORTAL_SESSION_COOKIE = '__Host-portal_session';
@@ -151,16 +153,23 @@ const redeemRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ data: z.object({ email: z.string().describe('Verified email carried by the magic-link.') }) }) } },
+            content: { 'application/json': { schema: z.object({ data: z.object({
+                email: z.string().describe('Verified email carried by the magic-link.'),
+                agent: z.boolean().optional().describe('True when the email resolves to a global agent account — the caller MUST NOT treat this as a client-portal session; NO __Host-portal_session cookie was set.'),
+            }) }) } },
             description: 'Magic-link is valid; returns the verified email.',
         },
         401: { description: 'Magic-link missing, expired, or invalid' },
     },
     operationId: 'portalRedeemLink',
     description:
-        'Validates a portal magic-link token (typ=ml). On success it sets the ' +
-        '__Host-portal_session cookie (httpOnly/secure/SameSite=Lax) carrying the verified ' +
-        'email and returns that email so the frontend can render. Bad/expired token → 401.',
+        'Validates a portal magic-link token (typ=ml). When the verified email resolves to a ' +
+        'global agent account (findGlobalAgentByEmail), mints an agent session ' +
+        '(__Host-inspector_token, no tenantId) instead and returns { email, agent: true } — the ' +
+        'client __Host-portal_session cookie is NEVER set for an agent. Otherwise (client/' +
+        'co_client) it sets the __Host-portal_session cookie (httpOnly/secure/SameSite=Lax) ' +
+        'carrying the verified email and returns that email so the frontend can render. ' +
+        'Bad/expired token → 401.',
 }, { scopes: [], tier: 'extended' }));
 
 const exchangeRoute = createRoute(withMcpMetadata({
@@ -380,6 +389,45 @@ const portalRoutes = portalRouter
         if (!verified) {
             return c.json({ error: 'Invalid or expired link' }, 401);
         }
+
+        // SECURITY: a find-my-report magic link redeemed by an agent must mint
+        // an AGENT JWT (mirrors server/api/agent/login.ts's password mint
+        // EXACTLY — no tenantId) and NEVER the client __Host-portal_session
+        // cookie. Global agent accounts (findGlobalAgentByEmail — the single
+        // source of the "live global agent" predicate) are a SEPARATE identity
+        // plane from tenant-scoped client/co_client contacts; there is no
+        // token/grant object on this magic-link path (unlike exchangeRoute),
+        // only a verified email, so the global-agent-account lookup is the
+        // correct signal to branch on here.
+        const agent = await findGlobalAgentByEmail(c.env.DB, verified.email);
+        if (agent) {
+            const keyring = await c.var.keyringPromise!;
+            const now = Math.floor(Date.now() / 1000);
+            const token = await signJwt({
+                sub: agent.id,
+                role: 'agent',
+                'custom:userRole': 'agent',
+                email: agent.email,
+                iat: now,
+                exp: now + 60 * 60 * 24,
+            }, keyring);
+
+            setCookie(c, '__Host-inspector_token', token, {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'Strict',
+                path: '/',
+                maxAge: 60 * 60 * 24,
+            });
+
+            // Tenant-less global agent identity — same reasoning as the agent
+            // login/magic-login redeem handlers: no tenant-scoped audit_logs
+            // row (auditLogs.tenantId is a NOT NULL FK), structured logging only.
+            logger.info('agent.find_my_report.redeemed', { userId: agent.id });
+
+            return c.json({ data: { email: agent.email, agent: true as const } }, 200);
+        }
+
         const sess = await signPortalSession(c.env.JWT_SECRET, verified.email);
         setCookie(c, PORTAL_SESSION_COOKIE, sess, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
         return c.json({ data: { email: verified.email } }, 200);
