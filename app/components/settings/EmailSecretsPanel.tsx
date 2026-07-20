@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Form } from "react-router";
+import { RadioCardGroup } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SecretField } from "~/components/SecretField";
 import { TestConnectionButton } from "~/components/settings/TestConnectionButton";
@@ -119,22 +120,15 @@ export function EmailSecretsPanel({
         {/* Provider choice */}
         <div className="space-y-1.5">
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_emailsecrets_provider_label()}</p>
-          <div className="flex gap-2">
-            {(["resend", "sendgrid", "postmark", "mailgun"] as const).map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => setProvider(p)}
-                className={`flex-1 h-9 rounded-md border text-[13px] font-bold transition-colors ${
-                  provider === p
-                    ? "border-ih-primary bg-ih-primary/5 text-ih-primary"
-                    : "border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-primary/40"
-                }`}
-              >
-                {PROVIDER_LABELS[p]}
-              </button>
-            ))}
-          </div>
+          <RadioCardGroup
+            name="_emailProviderRadio"
+            value={provider}
+            onChange={(v) => setProvider(v as EmailByoProvider)}
+            options={(["resend", "sendgrid", "postmark", "mailgun"] as const).map((p) => ({
+              value: p,
+              title: PROVIDER_LABELS[p],
+            }))}
+          />
         </div>
 
         {/* Resend credential fields */}

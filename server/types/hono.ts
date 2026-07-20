@@ -202,6 +202,14 @@ export interface AppEnv {
     // back to a free-text address input (no autocomplete dropdown).
     GOOGLE_PLACES_API_KEY?: string;
 
+    // Spec 5D (B4) — Google Maps JavaScript API key for the browser-side
+    // interactive marker map. Unlike GOOGLE_PLACES_API_KEY this one IS exposed
+    // to the client (surfaced via the root loader → `useRouteLoaderData("root")`)
+    // because the Maps JS SDK runs in the browser. It MUST be an HTTP-referrer-
+    // restricted platform key. Optional/fail-closed: when absent, GoogleMap
+    // renders nothing and address entry still works (autocomplete + free text).
+    GOOGLE_MAPS_JS_API_KEY?: string;
+
     // Sprint 3 S3-1 — Estated.io public-records API. Server-side proxy holds
     // the key so it never leaks to the client. Optional: when absent the
     // /api/inspections/:id/property-facts/autofill endpoint returns

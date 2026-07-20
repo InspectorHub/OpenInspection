@@ -206,6 +206,8 @@ export default defineConfig({
         // the shared admin + a real inspection id (the `api` project it in
         // turn depends on already seeds the 8 default role profiles).
         { name: 'people-role-profiles', testMatch: 'people-role-profiles.spec.ts', dependencies: ['editor-seed'] },
+        // Issue #250 — settings-communication sticky section-nav (scroll-spy).
+        { name: 'settings-communication-nav', testMatch: 'settings-communication-nav.spec.ts', dependencies: ['editor-seed'] },
         // Spec 2 Task 8 — role-aware report sending (final task of the
         // role-aware-sending plan). Seeds its own template + inspection (does
         // NOT reuse the shared editor-seed fixture — it flips that
@@ -217,5 +219,9 @@ export default defineConfig({
         // unregistered agent recipient) and a global agent account — depends
         // on `api` for the shared admin + the 8 seeded default role profiles.
         { name: 'agent-unified-link', testMatch: 'agent-unified-link.spec.ts', dependencies: ['api'] },
+        // #198/#200 — Google Places address autocomplete + property auto-fill.
+        // Verifies real-browser wiring + graceful degradation (no external keys
+        // locally). Uses the shared editor-seed admin + inspection.
+        { name: 'address-autofill', testMatch: 'address-autofill.spec.ts', dependencies: ['editor-seed'] },
     ],
 });

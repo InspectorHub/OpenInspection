@@ -1,4 +1,5 @@
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useEffect, useState } from "react";
+import { useFetcher } from "react-router";
 import { isDedicatedFactKey } from "~/lib/property-facts-keys";
 import { m } from "~/paraglide/messages";
 
@@ -124,6 +125,72 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
     onCommit?.(Object.keys(metadata).length ? { ...dedicated, metadata } : dedicated);
   }
 
+  // #200 — "Fetch property details": pull public-records facts for the address
+  // and fill ONLY the fields the inspector hasn't already entered, so a lookup
+  // never clobbers manual work. Rides the editor BFF action (autofill-property-
+  // facts intent) via its own fetcher, then commits the merged snapshot through
+  // the same save-property-facts path as manual edits.
+  const autofillFetcher = useFetcher<{
+    intent?: string;
+    facts?: Record<string, unknown> | null;
+    reason?: string | null;
+  }>();
+  const [autofillMsg, setAutofillMsg] = useState<string | null>(null);
+  const addressString = (propertyAddress || (inspection.propertyAddress as string) || "").trim();
+  const autofilling = autofillFetcher.state !== "idle";
+
+  useEffect(() => {
+    if (autofillFetcher.state !== "idle" || !autofillFetcher.data) return;
+    const data = autofillFetcher.data;
+    if (data.intent !== "autofill-property-facts") return;
+
+    const facts = data.facts;
+    if (!facts) {
+      setAutofillMsg(
+        data.reason === "NO_API_KEY"
+          ? m.editor_property_autofill_unconfigured()
+          : data.reason === "NOT_FOUND"
+            ? m.editor_property_autofill_not_found()
+            : m.editor_property_autofill_failed(),
+      );
+      return;
+    }
+
+    const dedicated: Record<string, unknown> = {};
+    const metadata: Record<string, unknown> = {};
+    const filledLabels: string[] = [];
+    for (const f of metaFields) {
+      const current = inspection[f.id];
+      const isEmpty = current === "" || current === null || current === undefined;
+      const factVal = facts[f.id];
+      let raw = current;
+      if (isEmpty && factVal != null && factVal !== "") {
+        raw = factVal;
+        filledLabels.push(f.label);
+        onSave?.(f.id, factVal); // optimistic — keep the controlled input in sync
+      }
+      const value = coerce(f, raw);
+      if (isDedicatedFactKey(f.id)) dedicated[f.id] = value;
+      else metadata[f.id] = value;
+    }
+
+    if (filledLabels.length) {
+      onCommit?.(Object.keys(metadata).length ? { ...dedicated, metadata } : dedicated);
+      setAutofillMsg(
+        m.editor_property_autofill_filled({ count: filledLabels.length, fields: filledLabels.join(", ") }),
+      );
+    } else {
+      setAutofillMsg(m.editor_property_autofill_none());
+    }
+    // Fires once per settled autofill response; metaFields/inspection/callbacks
+    // are intentionally read fresh at fire time (RR fetcher-effect convention).
+  }, [autofillFetcher.state, autofillFetcher.data]);
+
+  function runAutofill() {
+    setAutofillMsg(null);
+    autofillFetcher.submit({ intent: "autofill-property-facts", addressString }, { method: "post" });
+  }
+
   return (
     <div className="px-6 py-6 max-w-5xl" data-testid="property-info-form">
       <header className="mb-6">
@@ -137,9 +204,20 @@ export function PropertyInfoForm({ inspection, templateFields, propertyAddress, 
             </span>
           )}
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-ih-fg-1">
-          {(propertyAddress || inspection.propertyAddress as string) || m.editor_property_fallback()}
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-2xl font-bold tracking-tight text-ih-fg-1">
+            {(propertyAddress || inspection.propertyAddress as string) || m.editor_property_fallback()}
+          </h2>
+          <button
+            type="button"
+            onClick={runAutofill}
+            disabled={addressString.length < 5 || autofilling}
+            className="h-8 px-3 rounded-md border border-ih-border text-[12px] font-bold text-ih-primary hover:bg-ih-primary-tint disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {autofilling ? m.editor_property_autofill_loading() : m.editor_property_autofill_button()}
+          </button>
+        </div>
+        {autofillMsg && <p className="mt-2 text-[12px] text-ih-fg-3">{autofillMsg}</p>}
       </header>
 
       {groups.map((g) => (

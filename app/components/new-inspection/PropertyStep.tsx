@@ -1,4 +1,7 @@
 import type { WizardTemplate } from "../NewInspectionWizard";
+import { AddressAutocomplete } from "../address/AddressAutocomplete";
+import { GoogleMap } from "../address/GoogleMap";
+import type { AddressSelection } from "~/routes/resources/places";
 import { m } from "~/paraglide/messages";
 
 // `label` is a thunk so each type name resolves at render inside the paraglide
@@ -14,6 +17,9 @@ export function PropertyStep({
   setPropertyType,
   address,
   setAddress,
+  onAddressSelect,
+  addressLat,
+  addressLng,
   templates,
   templateId,
   setTemplateId,
@@ -26,6 +32,10 @@ export function PropertyStep({
   setPropertyType: (v: string) => void;
   address: string;
   setAddress: (v: string) => void;
+  /** Fires when a suggestion resolves to a structured, geocoded address. */
+  onAddressSelect: (sel: AddressSelection) => void;
+  addressLat?: number | null;
+  addressLng?: number | null;
   templates: WizardTemplate[];
   templateId: string;
   setTemplateId: (v: string) => void;
@@ -47,8 +57,18 @@ export function PropertyStep({
         </div>
       </div>
       <div>
-        <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_property_address_label()}</label>
-        <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={m.newinsp_property_address_ph()} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
+        <label htmlFor="property-address" className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_property_address_label()}</label>
+        <AddressAutocomplete
+          value={address}
+          onValueChange={setAddress}
+          onSelect={onAddressSelect}
+          placeholder={m.newinsp_property_address_ph()}
+        />
+        {typeof addressLat === "number" && typeof addressLng === "number" && (
+          <div className="mt-2">
+            <GoogleMap lat={addressLat} lng={addressLng} className="w-full h-40 rounded-md border border-ih-border bg-ih-bg-muted overflow-hidden" />
+          </div>
+        )}
       </div>
       <div>
         <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_property_template_label()}</label>

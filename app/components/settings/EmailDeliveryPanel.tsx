@@ -1,4 +1,5 @@
 import { Link, Form } from "react-router";
+import { SegmentedControl, RadioCardGroup } from "@core/shared-ui";
 import type { useForm } from "@conform-to/react";
 import { m } from "~/paraglide/messages";
 
@@ -113,19 +114,18 @@ export function EmailDeliveryPanel({
               mode is forced to `own` (hidden input below) and the toggle hides. */}
           {isSaas ? (
             <>
-              <div className="inline-flex rounded-md border border-ih-border overflow-hidden">
-                {(["platform", "own"] as const).map((optMode) => (
-                  <label key={optMode} className={`px-3 h-8 flex items-center text-[12px] font-bold cursor-pointer ${mode === optMode ? "bg-ih-primary text-white" : "bg-ih-bg-card text-ih-fg-2"}`}>
-                    <input
-                      type="radio" name={emailFields.emailMode.name} value={optMode}
-                      defaultChecked={config.emailMode === optMode}
-                      onChange={() => setMode(optMode)}
-                      className="sr-only"
-                    />
-                    {optMode === "platform" ? m.settings_emaildelivery_mode_platform() : m.settings_emaildelivery_mode_own()}
-                  </label>
-                ))}
-              </div>
+              <SegmentedControl
+                ariaLabel={m.settings_emaildelivery_heading()}
+                value={mode}
+                onChange={(v) => setMode(v as "platform" | "own")}
+                options={[
+                  { value: "platform", label: m.settings_emaildelivery_mode_platform() },
+                  { value: "own", label: m.settings_emaildelivery_mode_own() },
+                ]}
+              />
+              {/* SegmentedControl renders buttons, not a form field — carry the
+                  value into the native form POST via a hidden input. */}
+              <input type="hidden" name={emailFields.emailMode.name} value={mode} />
               <p className="text-[11px] text-ih-fg-4">
                 {mode === "platform"
                   ? m.settings_emaildelivery_mode_platform_desc()
@@ -223,17 +223,15 @@ export function EmailDeliveryPanel({
 
           <div className="space-y-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3">{m.settings_emaildelivery_poc_label()}</p>
-            {(["company", "inspector"] as const).map((p) => (
-              <label key={p} className="flex items-center gap-2 text-[13px] text-ih-fg-2 cursor-pointer">
-                <input
-                  type="radio" name={emailFields.pointOfContact.name} value={p}
-                  defaultChecked={config.pointOfContact === p}
-                  onChange={() => setPoc(p)}
-                  className="h-4 w-4 border-ih-border"
-                />
-                {p === "company" ? m.settings_emaildelivery_poc_company() : m.settings_emaildelivery_poc_inspector()}
-              </label>
-            ))}
+            <RadioCardGroup
+              name={emailFields.pointOfContact.name}
+              value={poc}
+              onChange={(v) => setPoc(v as "company" | "inspector")}
+              options={[
+                { value: "company", title: m.settings_emaildelivery_poc_company() },
+                { value: "inspector", title: m.settings_emaildelivery_poc_inspector() },
+              ]}
+            />
             <p className="text-[11px] text-ih-fg-4 pt-1">
               {m.settings_emaildelivery_send_as()}{" "}
               <strong>

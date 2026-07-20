@@ -91,6 +91,31 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  return { ok: res.ok, intent: "save-property-facts" };
  }
 
+ // #200 — "Fetch property details": look up public-records property facts for
+ // the inspection's address via the Estated proxy. Rides the BFF relay (no raw
+ // client fetch — feedback_core_bff_no_client_fetch). Read-only: it does NOT
+ // persist; the client fills empty fields and commits via save-property-facts.
+ if (intent === "autofill-property-facts") {
+ const addressString = String(formData.get("addressString") ?? "").trim();
+ if (addressString.length < 5) {
+ return { ok: false as const, intent: "autofill-property-facts", facts: null, reason: "BAD_ADDRESS" as const };
+ }
+ const res = await api.inspections[":id"]["property-facts"].autofill.$post({
+ param: { id: params.id },
+ json: { addressString },
+ });
+ if (!res.ok) {
+ return { ok: false as const, intent: "autofill-property-facts", facts: null, reason: "REQUEST_FAILED" as const };
+ }
+ const body = (await res.json()) as { data?: { facts?: Record<string, unknown> | null; reason?: string } };
+ return {
+ ok: true as const,
+ intent: "autofill-property-facts",
+ facts: body.data?.facts ?? null,
+ reason: body.data?.reason ?? null,
+ };
+ }
+
  // Commercial PCA Phase U (Batch C2b) — per-unit editor mutations + lazy scope
  // read. All ride the BFF relay (no bare client fetch to /api/...): the action
  // holds the authed tenant context that the unit routes' requireRole guard

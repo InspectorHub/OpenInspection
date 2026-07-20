@@ -9,6 +9,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
+import { SectionNav } from "~/components/settings/SectionNav";
 import { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
@@ -199,10 +200,22 @@ export default function SettingsWorkspacePage() {
 
   if ("forbidden" in data) return <AccessDenied />;
 
+  const navSections = [
+    { id: "branding", label: m.settings_workspace_branding_heading() },
+    { id: "timezone", label: m.settings_workspace_timezone_heading() },
+    { id: "locale-currency", label: m.settings_workspace_locale_currency_heading() },
+    { id: "report-theme", label: m.settings_workspace_report_theme_heading() },
+    { id: "referral", label: m.settings_workspace_referral_heading() },
+    { id: "report-features", label: m.settings_workspace_report_features_heading() },
+    { id: "report-pdf", label: m.settings_workspace_report_pdf_heading() },
+  ];
+
   return (
     <div className="space-y-ih-list">
       <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_workspace_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">{m.settings_workspace_subtitle()}</p>
+
+      <SectionNav sections={navSections} />
 
       {/* Flash */}
       {actionData && "success" in actionData && actionData.success && (
@@ -219,7 +232,7 @@ export default function SettingsWorkspacePage() {
         className="space-y-5"
       >
         {/* Branding */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-6">
+        <section id="branding" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-6 scroll-mt-12">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_branding_heading()}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
@@ -263,7 +276,7 @@ export default function SettingsWorkspacePage() {
         </section>
 
         {/* Timezone */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+        <section id="timezone" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_timezone_heading()}</h3>
           <p className="text-[12px] text-ih-fg-3">
             {m.settings_workspace_timezone_subtitle()}
@@ -290,7 +303,7 @@ export default function SettingsWorkspacePage() {
         </section>
 
         {/* Locale & Currency */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+        <section id="locale-currency" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_locale_currency_heading()}</h3>
           <p className="text-[12px] text-ih-fg-3">
             {m.settings_workspace_locale_currency_subtitle()}
@@ -312,7 +325,7 @@ export default function SettingsWorkspacePage() {
         </section>
 
         {/* Report theme */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <section id="report-theme" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_theme_heading()}</h3>
           <p className="text-[12px] text-ih-fg-3">{m.settings_workspace_report_theme_subtitle()}</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -330,7 +343,7 @@ export default function SettingsWorkspacePage() {
         </section>
 
         {/* Referral sources */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <section id="referral" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_referral_heading()}</h3>
           <div className="space-y-3">
             <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-ih-fg-2">{m.settings_workspace_referral_builtin_label()}</div>
@@ -351,7 +364,7 @@ export default function SettingsWorkspacePage() {
         </section>
 
         {/* Report features */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <section id="report-features" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_features_heading()}</h3>
 
           <label className="flex items-start gap-3 cursor-pointer select-none">
@@ -388,7 +401,7 @@ export default function SettingsWorkspacePage() {
         </section>
 
         {/* Report PDF */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <section id="report-pdf" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_pdf_heading()}</h3>
           <p className="text-[12px] text-ih-fg-3">{m.settings_workspace_report_pdf_subtitle()}</p>
 

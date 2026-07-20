@@ -29,11 +29,16 @@ export const securityHeaders: MiddlewareHandler<HonoConfig> = async (c, next) =>
         'Content-Security-Policy',
         [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+            // maps.googleapis.com: the Google Maps JavaScript SDK (address
+            // autocomplete map, Spec 5D B4) — a deliberate CDN exception to the
+            // "no CDN except GA + Turnstile" rule; the SDK cannot be self-hosted.
+            "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com https://maps.googleapis.com",
             "style-src 'self' 'unsafe-inline'",
             "font-src 'self' data:",
-            "img-src 'self' data: blob:",
-            "connect-src 'self' https://challenges.cloudflare.com",
+            // maps.gstatic.com / maps.googleapis.com: map tiles + marker sprites.
+            "img-src 'self' data: blob: https://maps.gstatic.com https://maps.googleapis.com",
+            // maps.googleapis.com: the Maps SDK's own XHR/fetch for tile metadata.
+            "connect-src 'self' https://challenges.cloudflare.com https://maps.googleapis.com",
             // 'self' required so the Settings → Embed Widget page can iframe
             // its own /book?embed=1 preview. Without it the live preview is blank.
             "frame-src 'self' https://challenges.cloudflare.com",

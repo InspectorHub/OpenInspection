@@ -32,11 +32,27 @@ import { ToastPortal } from "~/components/Toast";
 // returns from the ALS store with no side effect.
 import { getLocale } from "~/paraglide/runtime";
 
-export function loader({ request }: Route.LoaderArgs): UiPrefs & { locale: string } {
+export function loader({
+  request,
+  context,
+}: Route.LoaderArgs): UiPrefs & { locale: string; mapsApiKey: string | null } {
   // getLocale() here runs on the server inside the paraglide ALS scope
   // (workers/app.ts wraps the whole RR render), so it resolves the request's
   // locale and returns without the client-side setLocale() self-init side effect.
-  return { ...parseUiPrefs(request.headers.get("Cookie")), locale: getLocale() };
+  //
+  // mapsApiKey (Spec 5D B4): the Google Maps JS key is browser-side by design
+  // (the SDK runs in the browser), so it is surfaced here for GoogleMap to read
+  // via useRouteLoaderData("root"). It is an HTTP-referrer-restricted platform
+  // key; null when unset → the map fails closed and renders nothing.
+  // GOOGLE_MAPS_JS_API_KEY is an optional runtime var not present in the
+  // wrangler-generated `Env` type, so read it through a narrow cast (the same
+  // approach oauth/authorize.tsx uses for its env subset).
+  const env = context.cloudflare.env as unknown as { GOOGLE_MAPS_JS_API_KEY?: string };
+  return {
+    ...parseUiPrefs(request.headers.get("Cookie")),
+    locale: getLocale(),
+    mapsApiKey: env.GOOGLE_MAPS_JS_API_KEY ?? null,
+  };
 }
 
 export function meta(_args: Route.MetaArgs) {

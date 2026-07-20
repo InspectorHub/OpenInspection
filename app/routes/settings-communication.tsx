@@ -19,6 +19,7 @@ import { EmailSecretsPanel } from "~/components/settings/EmailSecretsPanel";
 import { SmsDeliveryPanel, type SmsModeValue } from "~/components/settings/SmsDeliveryPanel";
 import { GoogleCalendarPanel } from "~/components/settings/GoogleCalendarPanel";
 import { ManagedComplianceWizard, type ManagedComplianceData } from "~/components/settings/ManagedComplianceWizard";
+import { SectionNav } from "~/components/settings/SectionNav";
 import { parseTestResults } from "~/lib/connection-test";
 import { m } from "~/paraglide/messages";
 
@@ -605,6 +606,19 @@ export default function SettingsCommunication() {
 
   if (denied) return <AccessDenied />;
 
+  const navSections = [
+    { id: "email-delivery", label: m.settings_emaildelivery_heading() },
+    { id: "email-secrets", label: m.settings_emailsecrets_heading(), visible: !isSaas || mode === "own" },
+    { id: "sms-delivery", label: m.settings_smsdelivery_heading() },
+    {
+      id: "managed-compliance",
+      label: m.settings_comms_nav_managed(),
+      visible: isSaas && (smsMode === "managed_dedicated" || smsMode === "managed_shared"),
+    },
+    { id: "email-templates", label: m.settings_comms_email_templates_heading() },
+    { id: "google-calendar", label: m.settings_comms_nav_calendar() },
+  ];
+
   return (
     <div className="space-y-ih-list">
       <SettingsCrumb items={[{ label: m.settings_crumb_root(), href: "/settings" }, { label: m.settings_comms_crumb() }]} />
@@ -619,41 +633,49 @@ export default function SettingsCommunication() {
         </div>
       )}
 
+      {/* In-page section navigation (sticky; scroll-spy). Shows only when ≥3 sections visible. */}
+      <SectionNav sections={navSections} />
+
       {/* Email delivery config */}
-      <EmailDeliveryPanel
-        config={config}
-        isSaas={isSaas}
-        emailByoProvider={emailByoProvider}
-        ownProviderConfigured={ownProviderConfigured}
-        mode={mode}
-        setMode={setMode}
-        overrideName={overrideName}
-        setOverrideName={setOverrideName}
-        poc={poc}
-        setPoc={setPoc}
-        emailForm={emailForm}
-        emailFields={emailFields}
-        secretFormError={secretFormError}
-      />
+      <div id="email-delivery" className="scroll-mt-12">
+        <EmailDeliveryPanel
+          config={config}
+          isSaas={isSaas}
+          emailByoProvider={emailByoProvider}
+          ownProviderConfigured={ownProviderConfigured}
+          mode={mode}
+          setMode={setMode}
+          overrideName={overrideName}
+          setOverrideName={setOverrideName}
+          poc={poc}
+          setPoc={setPoc}
+          emailForm={emailForm}
+          emailFields={emailFields}
+          secretFormError={secretFormError}
+        />
+      </div>
 
       {/* Email API keys — BYO only (hidden when SaaS platform email is selected) */}
       {(!isSaas || mode === "own") && (
-        <EmailSecretsPanel
-          secrets={secrets}
-          secretFieldError={secretFieldError}
-          secretFormError={secretFormError}
-          savingEmailSecrets={savingEmailSecrets}
-          resendTestFetcher={resendTestFetcher}
-          resendTest={resendTest}
-          emailValidateFetcher={emailValidateFetcher}
-          initialProvider={emailByoProvider}
-          webhookBaseUrl={typeof window !== "undefined" ? window.location.origin : ""}
-          tenantSlug={tenantSlug}
-          testResults={testResults}
-        />
+        <div id="email-secrets" className="scroll-mt-12">
+          <EmailSecretsPanel
+            secrets={secrets}
+            secretFieldError={secretFieldError}
+            secretFormError={secretFormError}
+            savingEmailSecrets={savingEmailSecrets}
+            resendTestFetcher={resendTestFetcher}
+            resendTest={resendTest}
+            emailValidateFetcher={emailValidateFetcher}
+            initialProvider={emailByoProvider}
+            webhookBaseUrl={typeof window !== "undefined" ? window.location.origin : ""}
+            tenantSlug={tenantSlug}
+            testResults={testResults}
+          />
+        </div>
       )}
 
       {/* SMS delivery (Track L) */}
+      <div id="sms-delivery" className="scroll-mt-12">
       <SmsDeliveryPanel
         isSaas={isSaas}
         smsMode={smsMode}
@@ -672,47 +694,53 @@ export default function SettingsCommunication() {
         byoProvider={byoProvider}
         testResults={testResults}
       />
+      </div>
 
-      {/* Managed dedicated — onboarding wizard + status timeline (SaaS only) */}
-      {isSaas && smsMode === "managed_dedicated" && (
-        <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_comms_dedicated_heading()}</h3>
-          <p className="text-[13px] text-ih-fg-3">
-            {m.settings_comms_dedicated_desc()}
-          </p>
-          <ManagedComplianceWizard
-            compliance={compliance}
-            managedProvider={managedProvider}
-            savingManagedProvider={savingManagedProvider}
-            actionError={
-              actionData &&
-              "intent" in actionData &&
-              (actionData.intent === "sms-compliance-provision" || actionData.intent === "sms-compliance-resubmit") &&
-              "ok" in actionData &&
-              !actionData.ok
-                ? actionData.error ?? null
-                : null
-            }
-            saving={savingCompliance}
-          />
-        </section>
-      )}
-
-      {/* Managed shared — minimal status note (SaaS only, no per-tenant form) */}
-      {isSaas && smsMode === "managed_shared" && (
-        <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5">
-          <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 mb-2">{m.settings_comms_shared_pool_heading()}</h3>
-          <p className="text-[13px] text-ih-fg-3">
-            {m.settings_comms_shared_pool_desc()}
-          </p>
-          {compliance.complianceStatus === "approved" && (
-            <p className="text-[12px] text-ih-ok-fg font-medium mt-2">{m.settings_comms_shared_pool_active()}</p>
+      {/* Managed compliance (SaaS only) — dedicated wizard or shared-pool note */}
+      {isSaas && (smsMode === "managed_dedicated" || smsMode === "managed_shared") && (
+        <div id="managed-compliance" className="scroll-mt-12">
+          {/* Managed dedicated — onboarding wizard + status timeline */}
+          {smsMode === "managed_dedicated" && (
+            <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
+              <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_comms_dedicated_heading()}</h3>
+              <p className="text-[13px] text-ih-fg-3">
+                {m.settings_comms_dedicated_desc()}
+              </p>
+              <ManagedComplianceWizard
+                compliance={compliance}
+                managedProvider={managedProvider}
+                savingManagedProvider={savingManagedProvider}
+                actionError={
+                  actionData &&
+                  "intent" in actionData &&
+                  (actionData.intent === "sms-compliance-provision" || actionData.intent === "sms-compliance-resubmit") &&
+                  "ok" in actionData &&
+                  !actionData.ok
+                    ? actionData.error ?? null
+                    : null
+                }
+                saving={savingCompliance}
+              />
+            </section>
           )}
-        </section>
+
+          {/* Managed shared — minimal status note (no per-tenant form) */}
+          {smsMode === "managed_shared" && (
+            <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5">
+              <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3 mb-2">{m.settings_comms_shared_pool_heading()}</h3>
+              <p className="text-[13px] text-ih-fg-3">
+                {m.settings_comms_shared_pool_desc()}
+              </p>
+              {compliance.complianceStatus === "approved" && (
+                <p className="text-[12px] text-ih-ok-fg font-medium mt-2">{m.settings_comms_shared_pool_active()}</p>
+              )}
+            </section>
+          )}
+        </div>
       )}
 
       {/* Email templates */}
-      <section className="space-y-4">
+      <section id="email-templates" className="space-y-4 scroll-mt-12">
         <div className="flex items-baseline justify-between">
           <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_comms_email_templates_heading()}</h3>
           <div className="flex items-center gap-3">
@@ -730,16 +758,18 @@ export default function SettingsCommunication() {
       </section>
 
       {/* Company-level Google OAuth app configuration */}
-      <GoogleCalendarPanel
-        isSaas={isSaas}
-        googleOAuthConfigured={googleOAuthConfigured}
-        googleOAuthMode={googleOAuthMode}
-        secrets={secrets}
-        secretFieldError={secretFieldError}
-        secretFormError={secretFormError}
-        savingCalendarSecrets={savingCalendarSecrets}
-        savingOAuthMode={savingGoogleOAuthMode}
-      />
+      <div id="google-calendar" className="scroll-mt-12">
+        <GoogleCalendarPanel
+          isSaas={isSaas}
+          googleOAuthConfigured={googleOAuthConfigured}
+          googleOAuthMode={googleOAuthMode}
+          secrets={secrets}
+          secretFieldError={secretFieldError}
+          secretFormError={secretFormError}
+          savingCalendarSecrets={savingCalendarSecrets}
+          savingOAuthMode={savingGoogleOAuthMode}
+        />
+      </div>
     </div>
   );
 }
