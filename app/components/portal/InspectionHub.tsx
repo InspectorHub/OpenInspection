@@ -2,6 +2,7 @@ import type React from "react";
 import { Link } from "react-router";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
 import InspectionStatusCards, { type StatusOverview } from "./InspectionStatusCards";
+import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -96,7 +97,7 @@ export default function InspectionHub({
   return (
     <div style={brandTokens(brand?.primaryColor)} className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
       {/* Header — always rendered for every section. */}
-      <div className="mb-6 flex items-start justify-between gap-4">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
           {/* Brand line — tenant logo and/or company name above the address.
               Hidden entirely when the tenant has no logo/name. */}
@@ -119,15 +120,22 @@ export default function InspectionHub({
           </h1>
           {overview.date && <p className="mt-1 text-sm text-ih-fg-3">{overview.date}</p>}
         </div>
-        {onSignOut && (
-          <button
-            type="button"
-            onClick={onSignOut}
-            className="shrink-0 h-9 px-3 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
-          >
-            {m.portal_signout()}
-          </button>
-        )}
+        {/* Right cluster — shared theme control (consistent with the tenant app
+            and agent portal), plus Sign out for a client session. The client
+            portal is heavily mobile, so the control stays visible at every width
+            and the header wraps rather than colliding with the address. */}
+        <div className="flex items-center gap-2 shrink-0">
+          <ThemeSegmentControl />
+          {onSignOut && (
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="shrink-0 h-9 px-3 rounded-lg border border-ih-border bg-ih-bg-card text-[13px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"
+            >
+              {m.portal_signout()}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Top nav — client-side <Link>s switching the ?section= query. Hidden in

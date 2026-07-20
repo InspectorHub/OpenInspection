@@ -1,7 +1,7 @@
 {
-  "app/routes/inspection-edit.tsx": 2434,
+  "app/routes/inspection-edit.tsx": 2443,
   "server/services/inspection/inspection-core.service.ts": 1083,
-  "app/routes/inspection-hub.tsx": 1006,
+  "app/routes/inspection-hub.tsx": 1010,
   "server/services/booking.service.ts": 958,
   "server/durable-objects/inspection-doc.ts": 896,
   "app/routes/inspections.tsx": 892,
@@ -13,7 +13,7 @@
   "server/services/inspection.service.ts": 747,
   "app/routes/settings-communication.tsx": 746,
   "app/routes/settings-communication-templates.tsx": 724,
-  "app/routes/template-edit.tsx": 698,
+  "app/routes/template-edit.tsx": 701,
   "app/components/media-studio/PhotoAnnotator.tsx": 692,
   "server/api/inspections/report-delivery.ts": 667,
   "app/hooks/usePhotoOps.ts": 661,

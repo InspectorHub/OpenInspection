@@ -4,6 +4,7 @@ import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { Icon, Button, TabStrip } from "@core/shared-ui";
+import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { RATING_PRESETS } from "~/components/template/types";
 import type { RatingLevel, RatingSystem, TemplateItem, TemplateSchema, TemplateSection, CannedComment } from "~/components/template/types";
 import { RatingSystemEditor } from "~/components/RatingSystemEditor";
@@ -485,6 +486,8 @@ export default function TemplateEditPage() {
           <span className="text-[10px] font-mono text-ih-fg-4">v{initialVersion}</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Shared theme control (xl+; this bare route has no mobile drawer). */}
+          <ThemeSegmentControl className="hidden xl:flex" />
           {/* Bespoke: active "watch" tone would fight Button's ghost hover/selected treatment. */}
           <button
             onClick={() => setPreviewMode(!previewMode)}

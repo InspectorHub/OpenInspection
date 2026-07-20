@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { useInspectionState } from "~/hooks/useInspection";
 import { Button, IconButton, Icon } from "@core/shared-ui";
 import { usePdfExport, pdfActionLabel } from "~/hooks/usePdfExport";
-import type { ColorScheme } from "~/lib/ui-prefs";
+import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { ProgressStripText } from "~/components/editor/ProgressStripText";
 import { TemplateMenu } from "~/components/editor/TemplateMenu";
 import { m } from "~/paraglide/messages";
@@ -12,10 +12,6 @@ type EditorState = ReturnType<typeof useInspectionState>;
 export interface EditorHeaderProps {
  /** Consolidated inspection state (useInspectionState return). */
  state: EditorState;
- /** Current theme scheme from useTheme(). */
- scheme: ColorScheme;
- /** Theme setter from useTheme(). */
- setColorScheme: (scheme: ColorScheme) => void;
  /** Tenant slug (for the full-report preview link); may be null/undefined. */
  tenantSlug?: string | null;
  /** Opens the manual sign modal. */
@@ -45,8 +41,6 @@ export interface EditorHeaderProps {
 
 export function EditorHeader({
  state,
- scheme,
- setColorScheme,
  tenantSlug,
  setSignModalOpen,
  handlePublishClick,
@@ -209,23 +203,10 @@ export function EditorHeader({
 
  {/* Right zone: theme + settings + preview + preview PDF + sign now + publish */}
  <div className="flex items-center gap-2">
- {/* Theme cycle: light → dark → field → auto */}
- <IconButton
-  aria-label={`${m.editor_header_theme_label({ scheme })}${scheme === 'field' ? m.editor_header_theme_field_suffix() : ''}`}
-  onClick={() => setColorScheme(scheme === 'light' ? 'dark' : scheme === 'dark' ? 'field' : scheme === 'field' ? 'auto' : 'light')}
-  className="hidden xl:flex"
-  title={`${m.editor_header_theme_label({ scheme })}${scheme === 'field' ? m.editor_header_theme_field_suffix() : ''}`}
- >
-  {scheme === 'dark' ? (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg>
-  ) : scheme === 'light' ? (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-  ) : scheme === 'field' ? (
-  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364-.707-.707M6.343 6.343l-.707-.707m12.728 0-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0z" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>
-  ) : (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-  )}
- </IconButton>
+ {/* Theme — the shared 4-segment control (auto/light/dark/field), same as the
+     tenant sidebar. Shown from xl up where the header has room; narrower
+     widths reach it through the mobile Theme drawer. */}
+ <ThemeSegmentControl className="hidden xl:flex" />
 
  {/* Settings button */}
  <IconButton

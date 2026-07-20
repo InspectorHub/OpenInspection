@@ -2,6 +2,7 @@ import { Outlet, NavLink, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/agent-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { m } from "~/paraglide/messages";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -77,6 +78,12 @@ export default function AgentLayout() {
                 {item.label()}
               </NavLink>
             ))}
+            {/* Shared theme control — same 4-segment control as the tenant app,
+                so the auto/light/dark/field preference (a same-origin cookie) is
+                reachable and consistent here too. Hidden on the smallest widths
+                where the top bar has no room; the field variant + cookie still
+                apply. */}
+            <ThemeSegmentControl className="hidden md:flex ml-2" />
             <a
               href="/logout"
               className="px-3 py-1.5 rounded-md text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bad-bg hover:text-ih-bad-fg transition-colors ml-2"

@@ -10,6 +10,7 @@ import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, humanizeStatus, st
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,
@@ -526,6 +527,9 @@ export default function InspectionHubPage() {
         }
         actions={
           <>
+            {/* Shared theme control (xl+; keeps this read-only hub consistent
+                with the editor it links into). */}
+            <ThemeSegmentControl className="hidden xl:flex" />
             <Link
               to={`/inspections/${inspection.id}/edit`}
               className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600"
