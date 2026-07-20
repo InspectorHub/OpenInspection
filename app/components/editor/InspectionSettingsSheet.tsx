@@ -7,6 +7,7 @@ import { fullResUrl } from "~/components/media-studio/cropImage";
 import { ORIGINAL_QUALITY_KEY } from "~/routes/inspection-edit";
 import { MoneyInput } from "~/components/MoneyInput";
 import { m } from "~/paraglide/messages";
+import { CLIENT_PROFILE_LIST } from "~/lib/report-style/profiles-client";
 
 interface SettingsForm {
   date: string;
@@ -21,6 +22,9 @@ interface SettingsForm {
   /** Track H (IA-7) — per-inspection override of the tenant-wide required
    *  defect fields; '' = inherit (stored as NULL). */
   requireDefectFieldsOverride: "" | "none" | "location" | "trade" | "both";
+  /** Report Style Presets — per-inspection appearance profile; '' = inherit
+   *  (template default -> company default), stored as NULL. */
+  profileOverride: "" | "signature" | "meridian" | "terra";
 }
 
 interface Inspector {
@@ -61,6 +65,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     paymentRequired: false,
     agreementRequired: false,
     requireDefectFieldsOverride: "",
+    profileOverride: "",
   });
   // Tracks the templateId that was loaded when the sheet opened, so we can
   // detect whether the user changed it before saving.
@@ -139,6 +144,7 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
         paymentRequired: !!insp.paymentRequired,
         agreementRequired: !!insp.agreementRequired,
         requireDefectFieldsOverride: (insp.requireDefectFieldsOverride as SettingsForm["requireDefectFieldsOverride"]) || "",
+        profileOverride: (insp.profileOverride as SettingsForm["profileOverride"]) || "",
       });
     }
     setTemplates(d.templates ?? []);
@@ -223,7 +229,11 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
     templateChangedAtSubmit.current = form.templateId !== templateIdAtOpen.current;
     // '' means "inherit" and must reach the API as an explicit null (clears the
     // override column) — the BFF sanitizer drops empty strings entirely.
-    const payload = { ...form, requireDefectFieldsOverride: form.requireDefectFieldsOverride === "" ? null : form.requireDefectFieldsOverride };
+    const payload = {
+      ...form,
+      requireDefectFieldsOverride: form.requireDefectFieldsOverride === "" ? null : form.requireDefectFieldsOverride,
+      profileOverride: form.profileOverride === "" ? null : form.profileOverride,
+    };
     saveFetcher.submit(
       { intent: "save-settings", payload: JSON.stringify(payload) },
       { method: "post" },
@@ -344,6 +354,26 @@ export function InspectionSettingsSheet({ open, onClose, inspectionId, referralS
                   </select>
                   <p className="mt-1 text-[11px] text-ih-fg-4">{m.editor_settings_required_defect_help()}</p>
                 </label>
+                {/* Report Style Presets — per-inspection appearance override,
+                    collapsed by default (progressive disclosure: the default
+                    path never touches this). */}
+                <details className="mt-1">
+                  <summary className="text-[12px] text-ih-fg-3 cursor-pointer select-none">{m.editor_settings_appearance_summary()}</summary>
+                  <label className="block mt-3">
+                    <select
+                      value={form.profileOverride}
+                      onChange={(e) => updateForm("profileOverride", e.target.value as SettingsForm["profileOverride"])}
+                      className={inputClass}
+                      data-testid="inspection-profile-override"
+                    >
+                      <option value="">{m.editor_settings_appearance_inherit()}</option>
+                      {CLIENT_PROFILE_LIST.map((p) => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-ih-fg-4">{m.editor_settings_appearance_help()}</p>
+                  </label>
+                </details>
               </fieldset>
 
               {/* DB-16 — report cover photo: pick an existing inspection photo OR upload one directly */}

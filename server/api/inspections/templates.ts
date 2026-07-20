@@ -312,7 +312,7 @@ const templatesRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const body = c.req.valid('json');
         const service = c.var.services.template;
-        const template = await service.updateTemplate(id, c.get('tenantId'), body.name, body.schema);
+        const template = await service.updateTemplate(id, c.get('tenantId'), body.name, body.schema, body.defaultProfileId);
         auditFromContext(c, 'template.update', 'template', {
             entityId: id,
             metadata: { name: template.name },
