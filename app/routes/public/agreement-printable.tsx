@@ -1,8 +1,9 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-printable";
-import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { formatDateTime } from "~/lib/format";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
+import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
+import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -27,7 +28,7 @@ interface AgreementData {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params }: Route.LoaderArgs) {
   try {
     const res = await fetch(
       `/m2m/agreement-render/${encodeURIComponent(params.token)}`,
@@ -36,20 +37,16 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
     const agreement = (Object.keys(d).length > 0 ? d : null) as AgreementData | null;
-    // Humanize the signed-at ISO server-side. This m2m-rendered printable carries
-    // no tenant slug, so brand resolution degrades to the platform default (UTC)
-    // — consistent with the field's own UTC semantics. Null stays null → "--".
-    const brand = await resolveTenantBrand(context, undefined);
-    const signedAtFormatted = agreement?.signedAtUtcIso
-      ? formatDateTime(agreement.signedAtUtcIso, { locale: "en-US", timeZone: brand.defaultTimezone })
-      : null;
+    // The signed-at ISO stays raw: this m2m-rendered printable carries no tenant
+    // slug and no session, so there is no configured zone to anchor to. On screen
+    // it renders in the viewer's own browser zone; a PDF/no-JS render keeps the
+    // fixed UTC anchor, the correct fallback for a printed document.
     return {
       agreement,
-      signedAtFormatted,
       error: res.ok ? null : "Not found",
     };
   } catch {
-    return { agreement: null, signedAtFormatted: null, error: "Service unavailable" };
+    return { agreement: null, error: "Service unavailable" };
   }
 }
 
@@ -67,8 +64,12 @@ function ensureDataUri(b64: string | null): string {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function AgreementPrintablePage() {
-  const { agreement, signedAtFormatted, error } = useLoaderData<typeof loader>();
+function AgreementPrintableBody() {
+  const { agreement, error } = useLoaderData<typeof loader>();
+  const tz = useViewerTimeZone();
+  const signedAtFormatted = agreement?.signedAtUtcIso
+    ? formatDateTime(agreement.signedAtUtcIso, { locale: "en-US", timeZone: tz })
+    : null;
 
   if (error || !agreement) {
     return (
@@ -135,6 +136,16 @@ export default function AgreementPrintablePage() {
         and the Uniform Electronic Transactions Act (UETA). Independent verification: see
         Certificate of Completion.
       </div>
+
+      {agreement.signedAtUtcIso && <ViewerTimeZoneNotice className="mt-6" />}
     </div>
+  );
+}
+
+export default function AgreementPrintablePage() {
+  return (
+    <ViewerTimeZoneProvider>
+      <AgreementPrintableBody />
+    </ViewerTimeZoneProvider>
   );
 }

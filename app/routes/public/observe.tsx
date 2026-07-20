@@ -1,9 +1,10 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/observe";
 import { createApi } from "~/lib/api-client.server";
-import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { ProgressView } from "~/components/portal/sections/ProgressView";
+import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
+import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -19,11 +20,9 @@ interface ObserveData {
 }
 
 export async function loader({ params, request, context }: Route.LoaderArgs) {
-  // This standalone observer link carries no tenant slug, so brand resolution
-  // degrades to the platform default (UTC) — the honest anchor when the tenant
-  // timezone is unknowable here. Format the date server-side so <ProgressView>
-  // receives a humanized string (never a bare ISO).
-  const brand = await resolveTenantBrand(context, undefined);
+  // This standalone observer link carries no tenant slug and no session, so there
+  // is no configured zone to anchor to. Return the raw date and let the page
+  // render it in the viewer's own browser zone (see <ViewerTimeZoneProvider>).
   try {
     const api = createApi(context);
     const token = new URL(request.url).searchParams.get("token") ?? undefined;
@@ -36,9 +35,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     const inspection = (Object.keys(d).length > 0 ? d : null) as ObserveData | null;
     return {
       inspection,
-      date: inspection?.date
-        ? formatInspectionDateTime(inspection.date, undefined, brand.defaultTimezone)
-        : null,
+      date: inspection?.date ?? null,
       error: res.ok ? null : m.portal_observe_error_not_found(),
     };
   } catch {
@@ -46,20 +43,30 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   }
 }
 
-export default function ObservePage() {
+function ObserveBody() {
   const { inspection, date, error } = useLoaderData<typeof loader>();
+  const tz = useViewerTimeZone();
 
   // The wrapper supplies the standalone page container; ProgressView stays bare.
   return (
     <div className="max-w-2xl mx-auto p-6">
       <ProgressView
         address={inspection?.address ?? ""}
-        date={date}
+        date={date ? formatInspectionDateTime(date, undefined, tz) : null}
         inspectorName={inspection?.inspectorName ?? ""}
         status={inspection?.status ?? ""}
         sections={inspection?.sections ?? []}
         error={error || (!inspection ? m.portal_observe_error_not_found() : null)}
       />
+      {inspection?.date && <ViewerTimeZoneNotice className="mt-4" />}
     </div>
+  );
+}
+
+export default function ObservePage() {
+  return (
+    <ViewerTimeZoneProvider>
+      <ObserveBody />
+    </ViewerTimeZoneProvider>
   );
 }
