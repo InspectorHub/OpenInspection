@@ -282,7 +282,7 @@ export interface CostTables {
 /** App-side mirror of the server StyleProfile (Report Style Presets). The report
  *  payload carries this resolved shape; app/ cannot import server/lib. tokens is a
  *  flat CSS-var value map consumed by presetTokens(). */
-export interface StyleProfileClient {
+interface StyleProfileClient {
   id: string;
   name: string;
   schemaVersion: number;
