@@ -66,7 +66,6 @@ export class DashboardPrefsService {
         if (existing.length === 0) {
             await db.insert(tenantConfigs).values({
                 tenantId,
-                reportTheme: 'modern',
                 dashboardColumnPrefs: normalized,
                 updatedAt: new Date(),
             });

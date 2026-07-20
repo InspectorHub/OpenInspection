@@ -11,7 +11,7 @@ export const UpdateBrandingSchema = z.object({
     primaryColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color').optional().openapi({ example: '#4f46e5' }).describe('TODO describe primaryColor field for the OpenInspection MCP integration'),
     supportEmail: z.string().email('Invalid email address').optional().openapi({ example: 'support@example.com' }).describe('TODO describe supportEmail field for the OpenInspection MCP integration'),
     billingUrl: z.string().url('Invalid URL').or(z.literal('')).optional().openapi({ example: 'https://example.com/billing' }).describe('TODO describe billingUrl field for the OpenInspection MCP integration'),
-    reportTheme: z.enum(['modern', 'classic', 'minimal']).optional().openapi({ example: 'modern' }).describe('TODO describe reportTheme field for the OpenInspection MCP integration'),
+    defaultProfileId: z.string().optional().openapi({ example: 'signature' }).describe('Default report appearance profile id (built-in: signature|meridian|terra)'),
     // Sprint 2 S2-4 — gate the per-defect "Estimated cost: $X – $Y" badge.
     showEstimates: z.boolean().optional().openapi({ example: true }).describe('TODO describe showEstimates field for the OpenInspection MCP integration'),
     // Track E1 (ITB §11) — gate the "Repair List" tab on the published report.

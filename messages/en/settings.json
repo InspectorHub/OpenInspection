@@ -125,8 +125,6 @@
   "settings_workspace_locale_currency_subtitle": "Controls how dates, times, numbers, and money are formatted across reports and the dashboard. Individual users can override the language/locale in their profile; currency is company-wide.",
   "settings_workspace_locale_select_label": "Company locale",
   "settings_workspace_currency_select_label": "Currency",
-  "settings_workspace_report_theme_heading": "Report Theme",
-  "settings_workspace_report_theme_subtitle": "Default visual style for client-facing reports.",
   "settings_workspace_referral_heading": "Referral Sources",
   "settings_workspace_referral_builtin_label": "Built-in sources",
   "settings_workspace_referral_custom_label": "Custom labels",

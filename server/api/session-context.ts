@@ -173,7 +173,7 @@ const sessionContextRoutes = createApiRouter()
                     companyName: branding?.companyName || 'OpenInspection',
                     primaryColor: branding?.primaryColor || '#6366f1',
                     logoUrl: branding?.logoUrl || null,
-                    reportTheme: branding?.reportTheme || 'modern',
+                    defaultProfileId: branding?.defaultProfileId || 'signature',
                     isSaas: branding?.isSaas || false,
                     portalBaseUrl: branding?.portalBaseUrl || null,
                     tenantSlug: branding?.tenantSlug || null,

@@ -109,17 +109,6 @@ export class BrandingService {
     }
 
     /**
-     * Resolves the effective report theme for an inspection.
-     * Per-report override wins; otherwise falls back to tenant default; otherwise 'modern'.
-     */
-    resolveReportTheme(
-        inspection: { reportThemeOverride?: string | null },
-        branding?: { reportTheme?: string | undefined }
-    ): 'modern' | 'classic' | 'minimal' {
-        return (inspection.reportThemeOverride ?? branding?.reportTheme ?? 'modern') as 'modern' | 'classic' | 'minimal';
-    }
-
-    /**
      * Updates the branding configuration for a tenant.
      */
     async updateBranding(tenantId: string, data: Partial<typeof tenantConfigs.$inferInsert>) {

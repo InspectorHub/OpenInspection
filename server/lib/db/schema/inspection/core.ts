@@ -99,7 +99,9 @@ export const inspections = sqliteTable('inspections', {
     disableAutomations:  integer('is_automations_disabled', { mode: 'boolean' }).notNull().default(false),
     templateSnapshot:    text('template_snapshot', { mode: 'json' }),
     templateSnapshotVersion: integer('template_snapshot_version').default(1),
-    reportThemeOverride: text('report_theme_override', { enum: ['modern', 'classic', 'minimal'] }),
+    // Report Style Presets — per-inspection appearance profile override.
+    // NULL = inherit template default, then tenant default, then 'signature'.
+    profileOverride: text('profile_override'),
     // Track H (IA-7) — per-inspection override of the tenant's
     // require_defect_fields default; NULL = inherit.
     requireDefectFieldsOverride: text('require_defect_fields_override', { enum: ['none', 'location', 'trade', 'both'] }),
@@ -171,6 +173,12 @@ export const inspections = sqliteTable('inspections', {
     scheduledEndMs:      integer('scheduled_end_ms', { mode: 'timestamp_ms' }),
     // Booked duration in minutes (from the service / event type). NULL = legacy.
     durationMin:         integer('duration_min'),
+    // Report Style Presets — per-inspection field-level tweaks. NULL = inherit
+    // the resolved profile. Appended at table end (FK-referenced, no mid-table
+    // insert). badge_layout_override is Spec B's column, added here so the single
+    // migration covers both; resolveProfile already reads it.
+    badgeLayoutOverride: text('badge_layout_override', { enum: ['strip', 'inline'] }),
+    reportPhotoColumns:  integer('report_photo_columns'),
 }, (t) => [
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),

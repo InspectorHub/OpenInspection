@@ -26,7 +26,6 @@ interface Branding {
   companyName?: string | null;
   primaryColor?: string | null;
   logoUrl?: string | null;
-  reportTheme?: string | null;
   customReferralSources?: string[];
   enableRepairList?: boolean | null;
   enableCustomerRepairExport?: boolean | null;
@@ -38,8 +37,6 @@ interface Branding {
   defaultLocale?: string | null;
   currency?: string | null;
 }
-
-const THEMES = ["modern", "classic", "minimal"] as const;
 
 /* ------------------------------------------------------------------ */
 /*  Loader                                                             */
@@ -87,7 +84,6 @@ export async function action({ request, context }: Route.ActionArgs) {
   const body: Record<string, unknown> = {};
   if (v.companyName !== undefined) body.companyName = v.companyName;
   if (v.primaryColor !== undefined) body.primaryColor = v.primaryColor;
-  if (v.reportTheme !== undefined) body.reportTheme = v.reportTheme;
 
   // Custom referral sources: one label per line
   if (typeof v.customReferralSources === "string") {
@@ -204,7 +200,6 @@ export default function SettingsWorkspacePage() {
     { id: "branding", label: m.settings_workspace_branding_heading() },
     { id: "timezone", label: m.settings_workspace_timezone_heading() },
     { id: "locale-currency", label: m.settings_workspace_locale_currency_heading() },
-    { id: "report-theme", label: m.settings_workspace_report_theme_heading() },
     { id: "referral", label: m.settings_workspace_referral_heading() },
     { id: "report-features", label: m.settings_workspace_report_features_heading() },
     { id: "report-pdf", label: m.settings_workspace_report_pdf_heading() },
@@ -321,24 +316,6 @@ export default function SettingsWorkspacePage() {
               defaultValue={branding.currency ?? "USD"}
               options={CURRENCY_OPTIONS}
             />
-          </div>
-        </section>
-
-        {/* Report theme */}
-        <section id="report-theme" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
-          <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_theme_heading()}</h3>
-          <p className="text-[12px] text-ih-fg-3">{m.settings_workspace_report_theme_subtitle()}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {THEMES.map((t) => (
-              <label key={t} className="cursor-pointer">
-                <input type="radio" name={fields.reportTheme.name} value={t}
-                  defaultChecked={(branding.reportTheme ?? "modern") === t}
-                  className="sr-only peer" />
-                <div className="p-4 rounded-md border-2 text-[13px] font-bold uppercase tracking-[0.2em] capitalize transition-all text-center peer-checked:border-ih-primary peer-checked:bg-ih-primary-tint peer-checked:text-ih-primary border-ih-border bg-ih-bg-card text-ih-fg-2 hover:border-ih-border">
-                  {t}
-                </div>
-              </label>
-            ))}
           </div>
         </section>
 
