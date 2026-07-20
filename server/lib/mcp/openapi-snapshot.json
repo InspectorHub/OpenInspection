@@ -4035,6 +4035,39 @@
     "description": "Auto-generated placeholder for createInspectionWizard (POST /wizard, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "createInspectorCredential",
+    "method": "POST",
+    "pathTemplate": "/api/credentials",
+    "scopes": [
+      "write"
+    ],
+    "tag": "credentials",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "default": ""
+          },
+          "memberNumber": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "sortOrder": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "summary": "Add a credential for the signed-in inspector",
+    "description": "Adds a credential row for the signed-in inspector (image uploaded separately)."
+  },
+  {
     "operationId": "createInvoice",
     "method": "POST",
     "pathTemplate": "/api/invoices",
@@ -5547,6 +5580,33 @@
     },
     "summary": "Delete a walk-through video from the backend + drop the pool row",
     "description": "Delete a video from the active backend (Cloudflare Stream or R2) and remove its media-pool row. Pass the Stream UID for Stream videos or the mediaId for R2 videos."
+  },
+  {
+    "operationId": "deleteInspectorCredential",
+    "method": "DELETE",
+    "pathTemplate": "/api/credentials/{id}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "credentials",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete a credential",
+    "description": "Deletes a credential and purges its uploaded image."
   },
   {
     "operationId": "deleteInvoice",
@@ -9937,6 +9997,22 @@
     },
     "summary": "Diff version :n against ?from=<version>",
     "description": "Auto-generated placeholder for listInspectionVersionsDiff (GET /{id}/versions/{n}/diff, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "listInspectorCredentials",
+    "method": "GET",
+    "pathTemplate": "/api/credentials",
+    "scopes": [
+      "read"
+    ],
+    "tag": "credentials",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List the signed-in inspector's credentials",
+    "description": "Lists the signed-in inspector self-asserted credentials (label, member number, badge image)."
   },
   {
     "operationId": "listIntegrationStatus",
@@ -18743,6 +18819,50 @@
     "description": "Auto-generated placeholder for updateInspectionTemplate (PUT /templates/{id}, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "updateInspectorCredential",
+    "method": "PATCH",
+    "pathTemplate": "/api/credentials/{id}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "credentials",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "default": ""
+          },
+          "memberNumber": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60
+          },
+          "sortOrder": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "summary": "Update a credential",
+    "description": "Updates a credential's label / member number / sort order."
+  },
+  {
     "operationId": "updateMessageTemplate",
     "method": "PATCH",
     "pathTemplate": "/api/message-templates/{id}",
@@ -19223,6 +19343,33 @@
     },
     "summary": "Upload inspection for current tenant",
     "description": "Auto-generated placeholder for uploadInspection (POST /{id}/upload, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "uploadInspectorCredentialImage",
+    "method": "POST",
+    "pathTemplate": "/api/credentials/{id}/image",
+    "scopes": [
+      "write"
+    ],
+    "tag": "credentials",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "",
+          "schema": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Upload/replace a credential badge image",
+    "description": "Uploads (or replaces) the badge image for a credential; returns the public asset URL."
   },
   {
     "operationId": "uploadMessageInspection",
