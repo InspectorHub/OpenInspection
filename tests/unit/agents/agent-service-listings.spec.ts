@@ -33,6 +33,12 @@ describe('AgentService.listReferrals — A2', () => {
             { id: T1, name: 'Acme Inspections', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: T2, name: 'BobsInsp', slug: 'bobs', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
+        // Tenant display tz lives on tenant_configs (branding.default_timezone).
+        // T1 configures NY; T2 has NO config row -> listReferrals falls back to
+        // 'UTC' (the leftJoin yields null there).
+        await testDb.insert(schema.tenantConfigs).values([
+            { tenantId: T1, defaultTimezone: 'America/New_York', updatedAt: new Date() },
+        ]);
         await seedRoleProfiles(testDb, T1, new Date(1));
         await seedRoleProfiles(testDb, T2, new Date(1));
 
@@ -126,6 +132,11 @@ describe('AgentService.listReferrals — A2', () => {
         expect(r1?.clientName).toBe('Sarah');
         expect(r1?.status).toBe('confirmed');
         expect(r1?.paymentStatus).toBe('paid');
+        // Owning-tenant display tz (T1 configured NY); the agent dashboard
+        // renders each referral date in this zone unless the agent overrides it.
+        expect(r1?.tenantTimezone).toBe('America/New_York');
+        const r3 = refs.find((r) => r.id === 'i-3'); // T2, no configured tz
+        expect(r3?.tenantTimezone).toBe('UTC');
     });
 
     it('respects opts.limit', async () => {

@@ -65,6 +65,7 @@ const SAMPLE_AGENT = {
   notifyOnReferral: true,
   notifyOnReport: false,
   notifyOnPaid: true,
+  timezone: "America/New_York",
 };
 
 beforeEach(() => {
@@ -85,6 +86,7 @@ describe("agent settings-profile loader", () => {
     expect(data.agent).toEqual({
       name: null, email: "", slug: null,
       notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
+      timezone: null,
     });
   });
 });
@@ -115,6 +117,18 @@ describe("agent settings-profile action", () => {
       json: { notifyOnReferral: false, notifyOnReport: true, notifyOnPaid: true },
     });
     expect(res).toMatchObject({ ok: true, intent: "save-notifications" });
+  });
+
+  it("intent=save-timezone posts the chosen IANA zone", async () => {
+    const res = await action(actionArgs({ intent: "save-timezone", timezone: "America/Chicago" }));
+    expect(profilePost).toHaveBeenCalledWith({ json: { timezone: "America/Chicago" } });
+    expect(res).toMatchObject({ ok: true, intent: "save-timezone" });
+  });
+
+  it("intent=save-timezone posts an empty string to clear the override", async () => {
+    const res = await action(actionArgs({ intent: "save-timezone", timezone: "" }));
+    expect(profilePost).toHaveBeenCalledWith({ json: { timezone: "" } });
+    expect(res).toMatchObject({ ok: true, intent: "save-timezone" });
   });
 });
 

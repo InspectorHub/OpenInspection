@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
-import { agentTenantLinks, tenants, users } from '../../lib/db/schema/tenant';
+import { agentTenantLinks, tenants, tenantConfigs, users } from '../../lib/db/schema/tenant';
 import { contacts } from '../../lib/db/schema/contact';
 import { inspections, inspectionResults } from '../../lib/db/schema/inspection';
 import { inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
@@ -27,6 +27,12 @@ export interface AgentReferralRow {
     tenantId: string;
     tenantName: string;
     tenantSlug: string;
+    /** Owning tenant's display timezone (IANA; 'UTC' when the tenant has no
+     *  tenant_configs row or hasn't set default_timezone — same source as the
+     *  session-context branding.defaultTimezone). The agent dashboard renders
+     *  each referral date in this zone unless the agent set a personal timezone
+     *  override (see users.timezone). */
+    tenantTimezone: string;
     propertyAddress: string;
     clientName: string | null;
     date: string;
@@ -96,6 +102,7 @@ export async function listReferrals(
             tenantId:        inspections.tenantId,
             tenantName:      tenants.name,
             tenantSlug: tenants.slug,
+            tenantTimezone:  tenantConfigs.defaultTimezone,
             propertyAddress: inspections.propertyAddress,
             // Task 9c — sourced via the client-role inspection_people join
             // below, NOT the legacy inspections.client_name column (which
@@ -121,6 +128,10 @@ export async function listReferrals(
             ),
         )
         .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
+        // Owning tenant's display timezone (branding.default_timezone lives on
+        // tenant_configs). Left join: tenants without a config row fall back to
+        // 'UTC' in the row mapping below.
+        .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, inspections.tenantId))
         // Buyer's-agent attribution: inspections -> contact_role_profiles
         // (this tenant's buyer_agent profile) -> inspection_people -> contacts.
         // contact_role_profiles is joined FIRST (correlated on tenantId only,
@@ -206,6 +217,7 @@ export async function listReferrals(
         tenantId:        r.tenantId,
         tenantName:      r.tenantName,
         tenantSlug: r.tenantSlug,
+        tenantTimezone:  r.tenantTimezone ?? 'UTC',
         propertyAddress: r.propertyAddress,
         clientName:      r.clientName ?? null,
         date:            r.date,

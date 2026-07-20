@@ -343,6 +343,7 @@ const agentRoutes = createApiRouter()
         if (body.notifyOnReferral !== undefined) patch.notifyOnReferral = body.notifyOnReferral;
         if (body.notifyOnReport !== undefined)   patch.notifyOnReport   = body.notifyOnReport;
         if (body.notifyOnPaid !== undefined)     patch.notifyOnPaid     = body.notifyOnPaid;
+        if (body.timezone !== undefined)         patch.timezone         = body.timezone;
 
         await c.var.services.agent.updateProfile(user.sub, patch);
         return c.json({ success: true as const, data: { ok: true as const } }, 200);

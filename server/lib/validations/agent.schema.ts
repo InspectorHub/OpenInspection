@@ -46,6 +46,10 @@ export const AgentProfilePatchSchema = z.object({
     notifyOnReferral: z.boolean().optional().describe('TODO describe notifyOnReferral field for the OpenInspection MCP integration'),
     notifyOnReport:   z.boolean().optional().describe('TODO describe notifyOnReport field for the OpenInspection MCP integration'),
     notifyOnPaid:     z.boolean().optional().describe('TODO describe notifyOnPaid field for the OpenInspection MCP integration'),
+    // Personal display-timezone override (IANA id). Empty string clears it, so
+    // referral dates fall back to each inspecting company's timezone. Validated
+    // against the runtime Intl database in the service (isValidTimeZone).
+    timezone:         z.string().max(64).optional().describe('Personal display timezone (IANA id); empty string clears the override.'),
 }).openapi('AgentProfilePatch');
 
 export const AgentProfilePatchResponseSchema = createApiResponseSchema(
@@ -65,6 +69,7 @@ export const AgentProfileResponseSchema = createApiResponseSchema(
         notifyOnReferral: z.boolean().describe('TODO describe notifyOnReferral field for the OpenInspection MCP integration'),
         notifyOnReport:   z.boolean().describe('TODO describe notifyOnReport field for the OpenInspection MCP integration'),
         notifyOnPaid:     z.boolean().describe('TODO describe notifyOnPaid field for the OpenInspection MCP integration'),
+        timezone:         z.string().nullable().describe('Personal display timezone (IANA id), or null to use each company timezone.'),
     }),
 ).openapi('AgentProfileResponse');
 
@@ -129,6 +134,7 @@ export const AgentReferralRowSchema = z.object({
     id:              z.string().describe('Inspection id.'),
     tenantName:      z.string().describe('Inspecting company name.'),
     tenantSlug:      z.string().describe('Tenant slug for building repair-builder links.'),
+    tenantTimezone:  z.string().describe("Owning tenant's display timezone from tenant_configs (IANA; 'UTC' when unset)."),
     propertyAddress: z.string().nullable().describe('Property address of the referred inspection.'),
     clientName:      z.string().nullable().describe('Client (buyer) name on the referral.'),
     date:            z.string().nullable().describe('Scheduled inspection date.'),

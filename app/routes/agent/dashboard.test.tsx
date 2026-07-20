@@ -13,7 +13,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { render, fireEvent } from "@testing-library/react";
-import { createRoutesStub } from "react-router";
+import { createRoutesStub, Outlet } from "react-router";
 
 import AgentDashboardPage from "~/routes/agent/dashboard";
 
@@ -21,6 +21,7 @@ const REFERRAL_I1 = {
   id: "i1",
   tenantName: "Acme Inspections",
   tenantSlug: "acme",
+  tenantTimezone: "UTC",
   propertyAddress: "123 Main St",
   clientName: "Jane Client",
   date: "2026-07-18",
@@ -33,6 +34,7 @@ const REFERRAL_I2 = {
   id: "i2",
   tenantName: "Acme Inspections",
   tenantSlug: "acme",
+  tenantTimezone: "UTC",
   propertyAddress: "456 Oak Ave",
   clientName: "John Client",
   date: "2026-07-10",
@@ -45,16 +47,28 @@ function renderDashboard(opts: {
   referrals?: typeof REFERRAL_I1[];
   welcomeInspectionId?: string | null;
   unreadReports?: number;
+  agentTimezone?: string | null;
 }) {
+  // Nest the dashboard under a route carrying the agent-layout id so
+  // useAgentTimeZoneOverride() resolves from a real loader (the agent-portal
+  // analogue of useSessionContext). Without a match it falls back to null.
   const Stub = createRoutesStub([
     {
-      path: "/agent-dashboard",
-      Component: AgentDashboardPage,
-      loader: () => ({
-        referrals: opts.referrals ?? [],
-        unreadReports: opts.unreadReports ?? 0,
-        welcomeInspectionId: opts.welcomeInspectionId ?? null,
-      }),
+      id: "routes/agent-layout",
+      path: "/",
+      Component: () => <Outlet />,
+      loader: () => ({ agentTimezone: opts.agentTimezone ?? null }),
+      children: [
+        {
+          path: "agent-dashboard",
+          Component: AgentDashboardPage,
+          loader: () => ({
+            referrals: opts.referrals ?? [],
+            unreadReports: opts.unreadReports ?? 0,
+            welcomeInspectionId: opts.welcomeInspectionId ?? null,
+          }),
+        },
+      ],
     },
   ]);
   return render(<Stub initialEntries={["/agent-dashboard"]} />);
@@ -120,5 +134,49 @@ describe("AgentDashboardPage welcome banner + highlight", () => {
     expect(
       queryByText("Welcome! Here's the inspection you were just added to."),
     ).toBeNull();
+  });
+
+  it("humanizes the referral date through the shared formatter (never a raw ISO timestamp)", async () => {
+    const { findByTestId } = renderDashboard({
+      referrals: [{ ...REFERRAL_I1, id: "i3", tenantTimezone: "UTC", date: "2026-07-20T00:27:12.605Z" }],
+      welcomeInspectionId: null,
+    });
+
+    const row = await findByTestId("referral-row-i3");
+    // Rendered via formatInspectionDateTime: month-abbrev date, never the raw
+    // ISO string, with a short zone label so the time reads unambiguously.
+    expect(row.textContent).toContain("Jul 20");
+    expect(row.textContent).not.toContain("2026-07-20T00:27:12");
+    expect(row.textContent).toContain("UTC");
+  });
+
+  it("renders each referral date in its OWNING TENANT's timezone when the agent has no override", async () => {
+    const { findByTestId } = renderDashboard({
+      // Same instant, two different owning-tenant zones -> two different labels.
+      referrals: [
+        { ...REFERRAL_I1, id: "utc", tenantTimezone: "UTC", date: "2026-07-20T12:00:00Z" },
+        { ...REFERRAL_I1, id: "la", tenantTimezone: "America/Los_Angeles", date: "2026-07-20T12:00:00Z" },
+      ],
+      agentTimezone: null,
+    });
+
+    expect((await findByTestId("referral-row-utc")).textContent).toContain("UTC");
+    // 12:00Z is 05:00 PDT — the owning tenant's zone label, not UTC.
+    expect((await findByTestId("referral-row-la")).textContent).toContain("PDT");
+  });
+
+  it("applies the agent's personal timezone override to EVERY row, over each tenant's zone", async () => {
+    const { findByTestId } = renderDashboard({
+      referrals: [
+        { ...REFERRAL_I1, id: "utc", tenantTimezone: "UTC", date: "2026-07-20T12:00:00Z" },
+        { ...REFERRAL_I1, id: "la", tenantTimezone: "America/Los_Angeles", date: "2026-07-20T12:00:00Z" },
+      ],
+      agentTimezone: "America/New_York",
+    });
+
+    // Both rows render in the agent's chosen zone (EDT), ignoring the per-row
+    // tenant tz — 12:00Z is 08:00 EDT.
+    expect((await findByTestId("referral-row-utc")).textContent).toContain("EDT");
+    expect((await findByTestId("referral-row-la")).textContent).toContain("EDT");
   });
 });

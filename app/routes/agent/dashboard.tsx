@@ -4,6 +4,8 @@ import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Banner } from "@core/shared-ui";
+import { formatInspectionDateTime } from "~/lib/format-date";
+import { useAgentTimeZoneOverride } from "~/routes/agent-layout";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -14,6 +16,8 @@ interface Referral {
  id: string;
  tenantName: string;
  tenantSlug: string;
+ /** Owning tenant's display timezone (IANA; 'UTC' when unset). */
+ tenantTimezone: string;
  propertyAddress: string | null;
  clientName: string | null;
  date: string | null;
@@ -67,6 +71,15 @@ function statusColor(s: string): string {
 export default function AgentDashboardPage() {
  const { referrals, unreadReports, welcomeInspectionId } = useLoaderData<typeof loader>();
  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
+ // Referral-date timezone resolution (agents are global users spanning many
+ // tenants, so there is no single "the agent's tenant tz"):
+ //   1. the agent's personal override, when set — applied to every row;
+ //   2. else each row's owning-tenant tz (tenants.default_timezone);
+ //   3. else 'UTC' — which is also the tenant's own unconfigured fallback, so
+ //      an agent with no override sees exactly what that company would show.
+ // formatInspectionDateTime stamps the short zone label so the time reads
+ // unambiguously, and reuses the same shared formatter as the inspector hub.
+ const agentTz = useAgentTimeZoneOverride();
 
  // Task 4c: the referral matching a conversion-flow ?welcome=<id>, if it has
  // shown up in this agent's referrals yet (server-side auto-link can lag a
@@ -157,7 +170,7 @@ export default function AgentDashboardPage() {
  {r.propertyAddress || m.agent_portal_no_address()}
  </p>
  <p className="text-[11px] text-ih-fg-3 mt-0.5">
- {r.clientName || m.agent_portal_dashboard_no_client()}{r.date ? ` · ${r.date}` : ""}
+ {r.clientName || m.agent_portal_dashboard_no_client()}{r.date ? ` · ${formatInspectionDateTime(r.date, undefined, agentTz || r.tenantTimezone)}` : ""}
  {r.inspectorName ? m.agent_portal_dashboard_with_inspector({ name: r.inspectorName }) : ""}
  </p>
  </div>

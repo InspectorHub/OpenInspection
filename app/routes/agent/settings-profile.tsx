@@ -4,7 +4,8 @@ import type { Route } from "./+types/settings-profile";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { toActionResult } from "~/lib/inspection-hub-actions";
-import { PageHeader, Input, Button } from "@core/shared-ui";
+import { PageHeader, Input, Button, Select } from "@core/shared-ui";
+import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -18,11 +19,15 @@ interface AgentProfile {
   notifyOnReferral: boolean;
   notifyOnReport: boolean;
   notifyOnPaid: boolean;
+  /** Personal display-timezone override (IANA id), or null to follow each
+   *  inspecting company's timezone. */
+  timezone: string | null;
 }
 
 const DEFAULT_PROFILE: AgentProfile = {
   name: null, email: "", slug: null,
   notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
+  timezone: null,
 };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -40,6 +45,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         notifyOnReferral: d.notifyOnReferral ?? true,
         notifyOnReport: d.notifyOnReport ?? true,
         notifyOnPaid: d.notifyOnPaid ?? false,
+        timezone: d.timezone ?? null,
       } as AgentProfile,
     };
   } catch {
@@ -47,7 +53,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 }
 
-type ActionIntent = "save-slug" | "save-notifications";
+type ActionIntent = "save-slug" | "save-notifications" | "save-timezone";
 
 export async function action({ request, context }: Route.ActionArgs) {
   const token = await requireToken(context, request);
@@ -71,6 +77,13 @@ export async function action({ request, context }: Route.ActionArgs) {
     return toActionResult(res, "save-notifications" as const, m.agent_portal_settings_notify_error_generic());
   }
 
+  if (intent === "save-timezone") {
+    // Empty string clears the override (server persists NULL → per-company tz).
+    const timezone = String(fd.get("timezone") ?? "");
+    const res = await api.agent.profile.$post({ json: { timezone } });
+    return toActionResult(res, "save-timezone" as const, m.agent_portal_settings_timezone_error_generic());
+  }
+
   return { ok: false as const, intent: "save-slug" as const, error: m.agent_portal_settings_slug_error_generic() };
 }
 
@@ -90,6 +103,15 @@ export default function AgentSettingsProfilePage() {
   const notifyFetcher = useFetcher<typeof action>();
   const notifyResult = notifyFetcher.data?.intent === "save-notifications" ? notifyFetcher.data : null;
   const notifyError = notifyResult && !notifyResult.ok ? notifyResult.error : null;
+
+  const tzFetcher = useFetcher<typeof action>();
+  const tzResult = tzFetcher.data?.intent === "save-timezone" ? tzFetcher.data : null;
+  const tzError = tzResult && !tzResult.ok ? tzResult.error : null;
+  const tzSaved = tzResult?.ok === true;
+
+  function saveTimezone(next: string) {
+    tzFetcher.submit({ intent: "save-timezone", timezone: next }, { method: "post" });
+  }
 
   const previewLink = slug
     ? `https://*.inspectorhub.io/book/<slug>?ref=${slug}`
@@ -182,6 +204,28 @@ export default function AgentSettingsProfilePage() {
             onChange={(v) => saveNotifications({ ...notify, notifyOnPaid: v })}
           />
         </div>
+      </section>
+
+      {/* Timezone */}
+      <section className="bg-ih-bg-card border border-ih-border rounded-xl p-6">
+        <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{m.agent_portal_settings_timezone_eyebrow()}</p>
+        <h2 className="text-sm font-bold text-ih-fg-1 mb-1">{m.agent_portal_settings_timezone_heading()}</h2>
+        <p className="text-[13px] text-ih-fg-3 mb-4">
+          {m.agent_portal_settings_timezone_desc()}
+        </p>
+        <Select
+          label={m.agent_portal_settings_timezone_label()}
+          defaultValue={agent.timezone ?? ""}
+          onChange={(e) => saveTimezone(e.target.value)}
+          disabled={tzFetcher.state !== "idle"}
+          options={[
+            { value: "", label: m.agent_portal_settings_timezone_company_option() },
+            ...TIMEZONE_SELECT_OPTIONS,
+          ]}
+        />
+        <p className={`text-[12px] mt-2 ${tzError ? "text-ih-bad-fg" : "text-ih-fg-4"}`}>
+          {tzError ?? (tzSaved ? m.agent_portal_settings_timezone_saved() : m.agent_portal_settings_timezone_hint())}
+        </p>
       </section>
     </div>
   );
