@@ -219,5 +219,9 @@ export default defineConfig({
         // unregistered agent recipient) and a global agent account — depends
         // on `api` for the shared admin + the 8 seeded default role profiles.
         { name: 'agent-unified-link', testMatch: 'agent-unified-link.spec.ts', dependencies: ['api'] },
+        // #198/#200 — Google Places address autocomplete + property auto-fill.
+        // Verifies real-browser wiring + graceful degradation (no external keys
+        // locally). Uses the shared editor-seed admin + inspection.
+        { name: 'address-autofill', testMatch: 'address-autofill.spec.ts', dependencies: ['editor-seed'] },
     ],
 });
