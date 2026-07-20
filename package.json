@@ -87,6 +87,7 @@
     "@cloudflare/workers-oauth-provider": "^0.8.1",
     "@conform-to/react": "^1.19.4",
     "@conform-to/zod": "^1.19.4",
+    "@googlemaps/js-api-loader": "^1.16.10",
     "@inlang/paraglide-js": "2.22.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@stripe/react-stripe-js": "^6.5.0",
