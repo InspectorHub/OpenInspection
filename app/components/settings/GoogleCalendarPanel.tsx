@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Form, Link } from "react-router";
+import { SegmentedControl } from "@core/shared-ui";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
 
@@ -45,26 +46,18 @@ export function GoogleCalendarPanel({
 
       {isSaas ? (
         <div className="space-y-2">
-          <div className="inline-flex rounded-md border border-ih-border overflow-hidden">
-            {(["platform", "own"] as const).map((mode) => (
-              <label
-                key={mode}
-                className={`px-3 h-8 flex items-center text-[12px] font-bold cursor-pointer ${
-                  oauthMode === mode ? "bg-ih-primary text-white" : "bg-ih-bg-card text-ih-fg-2"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="_googleOAuthModeRadio"
-                  value={mode}
-                  checked={oauthMode === mode}
-                  onChange={() => setOauthMode(mode)}
-                  className="sr-only"
-                />
-                {mode === "platform" ? m.settings_gcal_mode_platform() : m.settings_gcal_mode_own()}
-              </label>
-            ))}
-          </div>
+          <SegmentedControl
+            ariaLabel={m.settings_gcal_heading()}
+            value={oauthMode}
+            onChange={(v) => setOauthMode(v as GoogleOAuthMode)}
+            options={[
+              { value: "platform", label: m.settings_gcal_mode_platform() },
+              { value: "own", label: m.settings_gcal_mode_own() },
+            ]}
+          />
+          {/* No hidden input here: the toggle radios were never inside the
+              form. The save Form below carries the value via its own
+              hidden `googleOAuthMode` input. */}
           <p className="text-[11px] text-ih-fg-4">
             {oauthMode === "platform"
               ? m.settings_gcal_mode_platform_desc()

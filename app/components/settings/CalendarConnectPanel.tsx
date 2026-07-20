@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useFetcher, useRevalidator, useSearchParams } from "react-router";
+import { RadioCardGroup } from "@core/shared-ui";
 import { GoogleSignInButton } from "~/components/GoogleSignInButton";
 import { CalendarGlyph } from "~/components/settings/CalendarGlyph";
 import { calendarOAuthErrorToast } from "~/lib/calendar-oauth-errors";
@@ -194,28 +195,21 @@ export function CalendarConnectPanel({
       ) : (
         <div className="space-y-3">
           <p className="text-[12px] text-ih-fg-3">{m.settings_calconnect_choose_access()}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {(["availability_read", "events_read_write"] as const).map((option) => (
-              <label
-                key={option}
-                className={`flex items-center gap-2 p-3 rounded-md border cursor-pointer text-[12px] ${
-                  capability === option
-                    ? "border-ih-primary bg-ih-primary-tint text-ih-fg-1"
-                    : "border-ih-border text-ih-fg-2"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="calendarCapability"
-                  value={option}
-                  checked={capability === option}
-                  onChange={() => setCapability(option)}
-                  className="h-3.5 w-3.5"
-                />
-                {CAPABILITY_LABELS[option]}
-              </label>
-            ))}
-          </div>
+          <RadioCardGroup
+            name="calendarCapability"
+            value={capability}
+            onChange={(v) => setCapability(v as CalendarCapability)}
+            options={[
+              {
+                value: "availability_read",
+                title: CAPABILITY_LABELS.availability_read,
+              },
+              {
+                value: "events_read_write",
+                title: CAPABILITY_LABELS.events_read_write,
+              },
+            ]}
+          />
           <GoogleSignInButton
             onClick={handleConnect}
             label={connecting ? m.settings_calconnect_connecting() : m.settings_calconnect_continue_google()}

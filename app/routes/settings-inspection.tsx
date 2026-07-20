@@ -1,5 +1,5 @@
 import { useLoaderData } from 'react-router';
-import { Icon } from "@core/shared-ui";
+import { Icon, RadioGroup } from "@core/shared-ui";
 import { SettingsCrumb } from '~/components/SettingsCrumb';
 import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
@@ -40,40 +40,30 @@ export default function SettingsInspectionPage() {
 
             <section>
                 <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_clone_heading()}</h2>
-                {(['rating', 'rating_notes', 'all'] as const).map(scope => (
-                    <label key={scope} className="flex items-center gap-2 py-1.5 cursor-pointer">
-                        <input
-                            type="radio"
-                            checked={prefs.cloneDefault === scope}
-                            onChange={() => patch({ cloneDefault: scope })}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-[13px]">{({
-                            rating:       m.settings_inspection_clone_rating(),
-                            rating_notes: m.settings_inspection_clone_rating_notes(),
-                            all:          m.settings_inspection_clone_all(),
-                        } as Record<typeof scope, string>)[scope]}</span>
-                    </label>
-                ))}
+                <RadioGroup
+                    name="cloneDefault"
+                    value={prefs.cloneDefault}
+                    onChange={v => patch({ cloneDefault: v as 'rating' | 'rating_notes' | 'all' })}
+                    options={[
+                        { value: 'rating', label: m.settings_inspection_clone_rating() },
+                        { value: 'rating_notes', label: m.settings_inspection_clone_rating_notes() },
+                        { value: 'all', label: m.settings_inspection_clone_all() },
+                    ]}
+                />
             </section>
 
             <section>
                 <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_autoadvance_heading()}</h2>
-                {(['keyboard', 'always', 'off'] as const).map(mode => (
-                    <label key={mode} className="flex items-center gap-2 py-1 cursor-pointer">
-                        <input
-                            type="radio"
-                            checked={prefs.autoAdvance === mode}
-                            onChange={() => patch({ autoAdvance: mode })}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-[13px]">{({
-                            keyboard: m.settings_inspection_autoadvance_keyboard(),
-                            always:   m.settings_inspection_autoadvance_always(),
-                            off:      m.settings_inspection_autoadvance_off(),
-                        } as Record<typeof mode, string>)[mode]}</span>
-                    </label>
-                ))}
+                <RadioGroup
+                    name="autoAdvance"
+                    value={prefs.autoAdvance}
+                    onChange={v => patch({ autoAdvance: v as 'keyboard' | 'always' | 'off' })}
+                    options={[
+                        { value: 'keyboard', label: m.settings_inspection_autoadvance_keyboard() },
+                        { value: 'always', label: m.settings_inspection_autoadvance_always() },
+                        { value: 'off', label: m.settings_inspection_autoadvance_off() },
+                    ]}
+                />
                 <p className="text-[12px] text-ih-fg-3 mt-1">{m.settings_inspection_autoadvance_note()}</p>
                 <div className="flex items-center gap-3 mt-3">
                     <input
@@ -93,22 +83,17 @@ export default function SettingsInspectionPage() {
             <section>
                 <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_required_heading()}</h2>
                 <p className="text-[12px] text-ih-fg-3 mb-2">{m.settings_inspection_required_help()}</p>
-                {(['none', 'location', 'trade', 'both'] as const).map(req => (
-                    <label key={req} className="flex items-center gap-2 py-1 cursor-pointer">
-                        <input
-                            type="radio"
-                            checked={prefs.requireDefectFields === req}
-                            onChange={() => patch({ requireDefectFields: req })}
-                            className="w-4 h-4"
-                        />
-                        <span className="text-[13px]">{({
-                            none:     m.settings_inspection_required_none(),
-                            location: m.settings_inspection_required_location(),
-                            trade:    m.settings_inspection_required_trade(),
-                            both:     m.settings_inspection_required_both(),
-                        } as Record<typeof req, string>)[req]}</span>
-                    </label>
-                ))}
+                <RadioGroup
+                    name="requireDefectFields"
+                    value={prefs.requireDefectFields}
+                    onChange={v => patch({ requireDefectFields: v as 'none' | 'location' | 'trade' | 'both' })}
+                    options={[
+                        { value: 'none', label: m.settings_inspection_required_none() },
+                        { value: 'location', label: m.settings_inspection_required_location() },
+                        { value: 'trade', label: m.settings_inspection_required_trade() },
+                        { value: 'both', label: m.settings_inspection_required_both() },
+                    ]}
+                />
             </section>
 
             <section>
