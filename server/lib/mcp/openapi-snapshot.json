@@ -1708,6 +1708,11 @@
             "maxLength": 100,
             "description": "TODO describe name field for the OpenInspection MCP integration"
           },
+          "defaultProfileId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default report appearance profile id for inspections from this template; null inherits the tenant default"
+          },
           "schema": {
             "anyOf": [
               {
@@ -16614,6 +16619,11 @@
             "minLength": 1,
             "maxLength": 100,
             "description": "TODO describe name field for the OpenInspection MCP integration"
+          },
+          "defaultProfileId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default report appearance profile id for inspections from this template; null inherits the tenant default"
           },
           "schema": {
             "anyOf": [
