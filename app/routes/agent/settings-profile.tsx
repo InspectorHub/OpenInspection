@@ -5,6 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { toActionResult } from "~/lib/inspection-hub-actions";
 import { PageHeader, Input, Button, Select } from "@core/shared-ui";
+import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { m } from "~/paraglide/messages";
 
@@ -108,8 +109,10 @@ export default function AgentSettingsProfilePage() {
   const tzResult = tzFetcher.data?.intent === "save-timezone" ? tzFetcher.data : null;
   const tzError = tzResult && !tzResult.ok ? tzResult.error : null;
   const tzSaved = tzResult?.ok === true;
+  const [tz, setTz] = useState(agent.timezone ?? "");
 
   function saveTimezone(next: string) {
+    setTz(next);
     tzFetcher.submit({ intent: "save-timezone", timezone: next }, { method: "post" });
   }
 
@@ -215,7 +218,7 @@ export default function AgentSettingsProfilePage() {
         </p>
         <Select
           label={m.agent_portal_settings_timezone_label()}
-          defaultValue={agent.timezone ?? ""}
+          value={tz}
           onChange={(e) => saveTimezone(e.target.value)}
           disabled={tzFetcher.state !== "idle"}
           options={[
@@ -226,6 +229,7 @@ export default function AgentSettingsProfilePage() {
         <p className={`text-[12px] mt-2 ${tzError ? "text-ih-bad-fg" : "text-ih-fg-4"}`}>
           {tzError ?? (tzSaved ? m.agent_portal_settings_timezone_saved() : m.agent_portal_settings_timezone_hint())}
         </p>
+        <BrowserTimezoneHint effectiveValue={tz} onUse={saveTimezone} />
       </section>
     </div>
   );

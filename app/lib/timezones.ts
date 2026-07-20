@@ -41,6 +41,20 @@ export function timeZoneLabel(tz: string): string {
   return `(${formatOffset(timeZoneOffsetMinutes(tz))}) ${tz.replace(/_/g, ' ')}`;
 }
 
+/** The viewer's own IANA timezone as reported by the runtime, or null if it
+ *  can't be resolved. CLIENT-ONLY in intent: on the server this returns the
+ *  worker's zone (UTC), so callers must read it after mount (never during SSR)
+ *  to avoid hydration mismatches. Used to offer "use my browser timezone" in
+ *  the settings pickers — mirrors how mainstream field-service tools pre-detect
+ *  the zone rather than defaulting silently to UTC. */
+export function getBrowserTimeZone(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+
 /** `{ value, label }` options for the settings `<Select>`, sorted west→east by
  *  current UTC offset (then name) so the list reads like mainstream tz pickers.
  *  `value` is the IANA id (persisted); `label` shows the offset. */
