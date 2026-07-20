@@ -22,19 +22,16 @@
  *      submit.
  *   5. Assert the E2E email sink recorded an email addressed to the listing
  *      agent (not the client) whose body contains a tokenized portal link,
- *      then follow that link with NO staff auth. It does NOT land on the
- *      report — and that is the CORRECT, by-design outcome, not a bug:
- *      `capabilitiesForKind('agent')` (server/lib/people/capabilities.ts)
- *      sets `selfRetrieveReport: false` (only `client`/`co_client` get
- *      `true`), and the portal's `/exchange` route enforces exactly that
- *      capability before minting a session (server/api/portal.ts, "Reject
- *      agents ... so an agent's per-inspection token can never mint a client
- *      portal session"). So the assertion here is the mirror image: the
- *      agent's own role-keyed link authenticates them for NOTHING beyond
- *      identifying them as this email's owner — it bounces to the generic
- *      sign-in prompt, never the property/report content. That IS the
- *      role-aware guarantee for a non-self-retrieve role — receivesReport
- *      (the email + PDF) without selfRetrieveReport (browsing the hub).
+ *      then follow that link with NO staff auth. Per Spec 3 (agent unified
+ *      link) `capabilitiesForKind('agent')` now sets `selfRetrieveReport:
+ *      true`, so the link lands on the report with the agent action banner
+ *      (`agent-report-actions`) rather than the client "Sign in to your
+ *      portal" gate. The role-aware SECURITY guarantee is preserved a layer
+ *      down: the portal's `/exchange` route still refuses to mint a client
+ *      `__Host-portal_session` cookie for an agent kind — it returns
+ *      `agent: true` with no Set-Cookie (server/api/portal.ts) — so an
+ *      agent's per-inspection token can view THIS report but can never unlock
+ *      the client hub. Mirrors agent-unified-link.spec's fresh-open checks.
  *   6. A second case: a one-off email + role profile picked directly in the
  *      modal (no pre-existing `inspection_people` row), showing the
  *      recipient list generalizes beyond people already on the inspection.
@@ -308,17 +305,18 @@ test.describe.serial('Role-aware report sending (Spec 2 Task 8)', () => {
     expect(portalUrl, 'listing agent email must contain a tokenized portal link').toBeTruthy();
 
     // Follow the link with NO staff auth — a brand new context carries no
-    // cookies at all. Per capabilitiesForKind('agent') (selfRetrieveReport:
-    // false) + the portal /exchange route's capability check, this correctly
-    // bounces to the generic sign-in prompt rather than the report itself —
-    // see the file header for why that is the CORRECT outcome here, not a
-    // failure of the link.
+    // cookies at all. Per Spec 3 the agent unified link no longer bounces to the
+    // client "Sign in to your portal" gate: an agent (selfRetrieveReport: true)
+    // lands on the report with the agent action banner, while the portal
+    // /exchange route still refuses to mint a client __Host-portal_session cookie
+    // for an agent kind (it returns `agent: true`, no Set-Cookie) — so the client
+    // hub stays locked. Mirrors agent-unified-link.spec's fresh-open assertions.
     const freshContext = await page.context().browser()!.newContext();
     try {
       const freshPage = await freshContext.newPage();
       await freshPage.goto(toLocalNavUrl(portalUrl!), { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
-      await expect(freshPage.getByRole('heading', { name: 'Sign in to your portal' })).toBeVisible({ timeout: 10000 });
-      await expect(freshPage.getByRole('heading', { name: propertyAddress })).toHaveCount(0);
+      await expect(freshPage.getByRole('heading', { name: 'Sign in to your portal' })).toHaveCount(0);
+      await expect(freshPage.getByTestId('agent-report-actions')).toBeVisible({ timeout: 10000 });
     } finally {
       await freshContext.close();
     }
