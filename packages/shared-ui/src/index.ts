@@ -11,6 +11,7 @@ export { Select, type SelectOption } from "./Select";
 export { Textarea } from "./Textarea";
 export { Checkbox } from "./Checkbox";
 export { Radio, RadioGroup, type RadioOption } from "./Radio";
+export { RadioCardGroup, type RadioCardOption } from "./RadioCardGroup";
 export { EmptyState } from "./EmptyState";
 export { Skeleton } from "./Skeleton";
 export { Card } from "./Card";
