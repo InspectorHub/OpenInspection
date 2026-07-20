@@ -21,6 +21,7 @@ import { useState } from "react";
 import { m } from "~/paraglide/messages";
 import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
 import { brandTokens } from "~/lib/brand";
+import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, isDefect } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
@@ -433,7 +434,8 @@ export function ReportView(props: ReportViewProps) {
           </h1>
         )}
         <p className="text-sm text-ih-fg-3">
-          {data.date} &middot; {m.report_view_inspector({ name: data.inspectorName || m.report_view_na() })}
+          {data.date ? `${formatInspectionDateTime(data.date, undefined, data.reportTimeZone)} · ` : ""}
+          {m.report_view_inspector({ name: data.inspectorName || m.report_view_na() })}
         </p>
       </div>
 

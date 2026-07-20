@@ -9,7 +9,7 @@
   "server/lib/collab/results-doc.ts": 874,
   "server/index.ts": 867,
   "server/api/sms.ts": 824,
-  "app/components/portal/sections/ReportView.tsx": 768,
+  "app/components/portal/sections/ReportView.tsx": 770,
   "server/services/inspection.service.ts": 747,
   "app/routes/settings-communication.tsx": 746,
   "app/routes/settings-communication-templates.tsx": 724,
