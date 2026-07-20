@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, gte, lte, sql, inArray, isNull, ne } from 'drizzle-orm';
-import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, tenantConfigs, users, services as servicesTable, agentTenantLinks, contactRoleProfiles } from '../lib/db/schema';
+import { eq, and, gte, lte, sql, inArray, isNull, ne, asc } from 'drizzle-orm';
+import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, tenantConfigs, users, services as servicesTable, agentTenantLinks, contactRoleProfiles, inspectorCredentials } from '../lib/db/schema';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../lib/tz';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
@@ -799,6 +799,14 @@ export class BookingService {
             const inspectorName = inspector?.name || c.env.APP_NAME || 'Your inspector';
             const inspectorEmail = inspector?.email || c.env.SENDER_EMAIL || `noreply@${c.env.APP_NAME?.toLowerCase().replace(/\s/g, '') || 'inspector'}.com`;
 
+            // Spec B — the assigned inspector's active credentials, for the footer.
+            const bookingCreds = inspector
+                ? (await db.select().from(inspectorCredentials)
+                    .where(and(eq(inspectorCredentials.tenantId, tenantId), eq(inspectorCredentials.userId, inspectorId!), eq(inspectorCredentials.active, true)))
+                    .orderBy(asc(inspectorCredentials.sortOrder)).all())
+                    .filter((cr) => cr.imageR2Key || (cr.label ?? '').trim())
+                    .map((cr) => ({ label: cr.label, memberNumber: cr.memberNumber, imageUrl: cr.imageR2Key ? `/api/public/brand-asset?key=${encodeURIComponent(cr.imageR2Key)}` : null }))
+                : [];
             // Sprint B-4a — append inspector signature so customers can rebook
             // with the same inspector via the per-inspector booking link.
             const sigInspector = inspector ? {
@@ -807,6 +815,7 @@ export class BookingService {
                 phone:         inspector.phone ?? null,
                 licenseNumber: inspector.licenseNumber ?? null,
                 slug:          inspector.slug ?? null,
+                credentials:   bookingCreds,
             } : undefined;
             // Track L (D6, path B) — double-opt-in link injected at the RENDERER
             // level (not gated on any automation rule) so disabling a rule never

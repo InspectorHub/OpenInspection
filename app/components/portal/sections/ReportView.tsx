@@ -746,7 +746,7 @@ export function ReportView(props: ReportViewProps) {
       )}
 
       {/* ── Signature block ──────────────────────────────────────────── */}
-      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} timeZone={data.reportTimeZone} />
+      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} timeZone={data.reportTimeZone} credentialBadgeUrl={data.inspectorCredentials?.find((c) => c.imageUrl)?.imageUrl ?? null} />
 
       {/* ── Verification block ───────────────────────────────────────── */}
       <ReportVerificationBlock verification={data.verification} baseUrl={data.baseUrl} timeZone={data.reportTimeZone} />

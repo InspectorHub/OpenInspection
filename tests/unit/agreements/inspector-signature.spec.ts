@@ -35,6 +35,29 @@ describe('inspectorSignature — Sprint B-4 / DB-12', () => {
         expect(sig.html).toContain('&lt;script&gt;');
     });
 
+    it('renders credential badges: image (absolute URL) in HTML + all credentials as text in both variants', () => {
+        const sig = inspectorSignature({
+            ...FULL_USER,
+            credentials: [
+                { label: 'InterNACHI CPI', memberNumber: '12345', imageUrl: '/api/public/brand-asset?key=t%2Fcredentials%2Fc1%2Flogo-a.png' },
+                { label: 'TX License', memberNumber: '22841', imageUrl: null },
+            ],
+        }, HOST);
+        // image credential -> absolutized <img> in HTML
+        expect(sig.html).toContain('<img src="https://app.inspectorhub.io/api/public/brand-asset');
+        // every credential (image + text) also as text in BOTH variants (blocked image never loses it)
+        expect(sig.html).toContain('InterNACHI CPI #12345');
+        expect(sig.html).toContain('TX License #22841');
+        expect(sig.text).toContain('InterNACHI CPI #12345');
+        expect(sig.text).toContain('TX License #22841');
+        expect(sig.text).not.toContain('<img');
+    });
+
+    it('omits the credential block entirely when there are no credentials', () => {
+        const sig = inspectorSignature(FULL_USER, HOST);
+        expect(sig.html).not.toContain('brand-asset');
+    });
+
     it('renders the book link when tenantSlug is set (slug presence does not matter)', () => {
         // DB-12 — link depends only on tenantSlug, not slug
         const withSlug = inspectorSignature({ ...FULL_USER, slug: 'mike' }, HOST);
