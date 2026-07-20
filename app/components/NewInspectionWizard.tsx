@@ -7,6 +7,7 @@ import { ServicesStep } from "./new-inspection/ServicesStep";
 import { ScheduleStep } from "./new-inspection/ScheduleStep";
 import { TeamStep } from "./new-inspection/TeamStep";
 import { QuotaExceededPanel } from "./new-inspection/QuotaExceededPanel";
+import type { AddressSelection } from "~/routes/resources/places";
 import { m } from "~/paraglide/messages";
 
 function stepLabel(id: WizardStepId): string {
@@ -94,6 +95,10 @@ export function NewInspectionWizard({
   const [stepIdx, setStepIdx] = useState(0);
   const [propertyType, setPropertyType] = useState("single_family");
   const [address, setAddress] = useState("");
+  // #198 — structured, geocoded address captured when the inspector picks a
+  // Places suggestion. Cleared when they edit the text back to free-form, so we
+  // never persist stale coordinates against a hand-typed address.
+  const [addressSel, setAddressSel] = useState<AddressSelection | null>(null);
   const [templateId, setTemplateId] = useState("");
   // Stores selected service IDs (matched against the tenant's services table).
   const [services, setServices] = useState<Set<string>>(new Set());
@@ -172,6 +177,7 @@ export function NewInspectionWizard({
       setStepIdx(0);
       setPropertyType("single_family");
       setAddress("");
+      setAddressSel(null);
       setTemplateId("");
       setTemplateQuery("");
       setServices(new Set());
@@ -292,6 +298,17 @@ export function NewInspectionWizard({
     setAgentDropdownOpen(false);
   }
 
+  // #198 — editing the address text by hand invalidates any previously picked
+  // Places suggestion (its coordinates no longer describe what's typed).
+  function handleAddressChange(v: string) {
+    setAddress(v);
+    if (addressSel) setAddressSel(null);
+  }
+  function handleAddressSelect(sel: AddressSelection) {
+    setAddressSel(sel);
+    setAddress(sel.formatted);
+  }
+
   if (!open) return null;
 
   const toggleService = (id: string) => {
@@ -368,6 +385,17 @@ export function NewInspectionWizard({
         intent: "create",
         propertyType,
         address,
+        // #198 — structured geocoded address (empty strings when the inspector
+        // typed a free-form address the API couldn't match; the server stamps
+        // addressGeocodedAt itself).
+        addressPlaceId: addressSel?.placeId ?? "",
+        addressStreet: addressSel?.street ?? "",
+        addressCity: addressSel?.city ?? "",
+        addressState: addressSel?.state ?? "",
+        addressZip: addressSel?.zip ?? "",
+        addressCounty: addressSel?.county ?? "",
+        addressLat: addressSel?.lat != null ? String(addressSel.lat) : "",
+        addressLng: addressSel?.lng != null ? String(addressSel.lng) : "",
         templateId,
         serviceIds: [...services].join(","),
         serviceSelectionsJson,
@@ -420,7 +448,10 @@ export function NewInspectionWizard({
               propertyType={propertyType}
               setPropertyType={setPropertyType}
               address={address}
-              setAddress={setAddress}
+              setAddress={handleAddressChange}
+              onAddressSelect={handleAddressSelect}
+              addressLat={addressSel?.lat}
+              addressLng={addressSel?.lng}
               templates={templates}
               templateId={templateId}
               setTemplateId={setTemplateId}

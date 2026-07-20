@@ -149,6 +149,46 @@ describe("buildCreateInspectionJson", () => {
         expect("serviceIds" in json).toBe(false);
         expect("serviceSelections" in json).toBe(false);
     });
+
+    // #198 structured-address forwarding
+    it("forwards structured address fields (with numeric lat/lng) when a Places suggestion was picked", () => {
+        const json = buildCreateInspectionJson(fd({
+            address: "123 Main St, Austin, TX 78701",
+            templateId: "t",
+            addressPlaceId: "ChIJabc",
+            addressStreet: "123 Main St",
+            addressCity: "Austin",
+            addressState: "TX",
+            addressZip: "78701",
+            addressCounty: "Travis",
+            addressLat: "30.2672",
+            addressLng: "-97.7431",
+        }));
+        expect(json.addressPlaceId).toBe("ChIJabc");
+        expect(json.addressStreet).toBe("123 Main St");
+        expect(json.addressCity).toBe("Austin");
+        expect(json.addressState).toBe("TX");
+        expect(json.addressZip).toBe("78701");
+        expect(json.addressCounty).toBe("Travis");
+        expect(json.addressLat).toBeCloseTo(30.2672);
+        expect(json.addressLng).toBeCloseTo(-97.7431);
+    });
+
+    it("omits all structured address fields for a hand-typed free-form address", () => {
+        const json = buildCreateInspectionJson(fd({ address: "Grandma's cabin by the lake", templateId: "t" }));
+        expect("addressPlaceId" in json).toBe(false);
+        expect("addressLat" in json).toBe(false);
+        expect("addressLng" in json).toBe(false);
+    });
+
+    it("drops non-finite lat/lng rather than forwarding NaN", () => {
+        const json = buildCreateInspectionJson(fd({
+            address: "1 A St", templateId: "t",
+            addressLat: "not-a-number", addressLng: "",
+        }));
+        expect("addressLat" in json).toBe(false);
+        expect("addressLng" in json).toBe(false);
+    });
 });
 
 describe("dollarsToCents", () => {

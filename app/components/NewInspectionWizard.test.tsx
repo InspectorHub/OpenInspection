@@ -167,8 +167,12 @@ describe('NewInspectionWizard — guard test for client + buyer-agent payload', 
         const addressInput = getByPlaceholderText(/123 Main|St.*City/i) as HTMLInputElement;
         fireEvent.change(addressInput, { target: { value: '123 Main Street' } });
 
-        const selects = getAllByRole('combobox') as HTMLSelectElement[];
-        fireEvent.change(selects[0], { target: { value: 'tpl-1' } });
+        // Two comboboxes now exist on the property step: the address
+        // autocomplete <input role="combobox"> (#198) and the template <select>.
+        // Target the native <select> specifically.
+        const combos = getAllByRole('combobox') as HTMLElement[];
+        const templateSelect = combos.find((el) => el.tagName === 'SELECT') as HTMLSelectElement;
+        fireEvent.change(templateSelect, { target: { value: 'tpl-1' } });
 
         let buttons = getAllByRole('button') as HTMLButtonElement[];
         let nextBtn = buttons.find((btn) => btn.textContent?.includes('Next'));

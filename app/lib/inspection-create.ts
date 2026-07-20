@@ -42,6 +42,17 @@ interface ServiceSelection {
 export interface CreateInspectionJson {
   propertyAddress: string;
   templateId: string;
+  // #198 — structured, geocoded address from Places autocomplete. All optional;
+  // omitted for hand-typed free-form addresses. The server stamps
+  // addressGeocodedAt when addressPlaceId is present.
+  addressPlaceId?: string;
+  addressStreet?: string;
+  addressCity?: string;
+  addressState?: string;
+  addressZip?: string;
+  addressCounty?: string;
+  addressLat?: number;
+  addressLng?: number;
   date?: string;
   inspectorId?: string;
   /** Legacy flat list — kept for backward compat. */
@@ -69,6 +80,20 @@ export function dollarsToCents(value: string | number | null | undefined): numbe
 export function buildCreateInspectionJson(formData: FormData): CreateInspectionJson {
   const address = String(formData.get("address") || "");
   const templateId = String(formData.get("templateId") || "");
+
+  // #198 — structured address fields (present only when a Places suggestion was
+  // picked). Empty strings collapse to omitted; lat/lng parse to finite numbers.
+  const addressPlaceId = String(formData.get("addressPlaceId") || "").trim();
+  const addressStreet = String(formData.get("addressStreet") || "").trim();
+  const addressCity = String(formData.get("addressCity") || "").trim();
+  const addressState = String(formData.get("addressState") || "").trim();
+  const addressZip = String(formData.get("addressZip") || "").trim();
+  const addressCounty = String(formData.get("addressCounty") || "").trim();
+  const latRaw = String(formData.get("addressLat") || "").trim();
+  const lngRaw = String(formData.get("addressLng") || "").trim();
+  const addressLat = latRaw ? Number(latRaw) : undefined;
+  const addressLng = lngRaw ? Number(lngRaw) : undefined;
+
   const dateStr = String(formData.get("date") || "");
   const time = String(formData.get("time") || "") || "09:00";
   const inspectorId = String(formData.get("inspectorId") || "");
@@ -131,6 +156,14 @@ export function buildCreateInspectionJson(formData: FormData): CreateInspectionJ
   return {
     propertyAddress: address,
     templateId,
+    ...(addressPlaceId ? { addressPlaceId } : {}),
+    ...(addressStreet ? { addressStreet } : {}),
+    ...(addressCity ? { addressCity } : {}),
+    ...(addressState ? { addressState } : {}),
+    ...(addressZip ? { addressZip } : {}),
+    ...(addressCounty ? { addressCounty } : {}),
+    ...(addressLat != null && Number.isFinite(addressLat) ? { addressLat } : {}),
+    ...(addressLng != null && Number.isFinite(addressLng) ? { addressLng } : {}),
     ...(dateStr ? { date: `${dateStr}T${time}:00Z` } : {}),
     ...(inspectorId && UUID_RE.test(inspectorId) ? { inspectorId } : {}),
     ...(serviceIds ? { serviceIds } : {}),
