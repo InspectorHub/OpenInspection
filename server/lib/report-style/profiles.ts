@@ -1,7 +1,8 @@
 // Appearance-profile engine constants. Phase 1 = built-in only; a Phase-2
 // style_profiles table will resolve after these (see resolve.ts).
 
-export const PROFILE_SCHEMA_VERSION = 1;
+// Internal — bump when the token schema changes shape (stamped onto each profile).
+const PROFILE_SCHEMA_VERSION = 1;
 export const DEFAULT_PROFILE_ID = 'signature';
 
 /** All optional — a profile carries a sparse overlay; missing keys fall back to BASE_TOKENS. */
