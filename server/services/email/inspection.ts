@@ -15,7 +15,7 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
          * Sprint B-4a — appends the inspector's signature when caller passes
          * `inspector` + `host`.
          */
-        async sendReportReady(to: string, address: string, reportUrl: string, inspector?: SignatureUser, host?: string) {
+        async sendReportReady(to: string, address: string, reportUrl: string, inspector?: SignatureUser, host?: string): Promise<boolean> {
             const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                <h1 style="color: #4f46e5;">Report Ready</h1>
                <p>The inspection for <strong>${address}</strong> has been completed and the report is now available.</p>
@@ -32,14 +32,15 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
                 inspector,
                 host,
             );
-            if (!rendered.enabled) return;
-            await this.sendEmail(
+            if (!rendered.enabled) return false;
+            const { delivered } = await this.sendEmail(
                 [to],
                 rendered.subject,
                 rendered.html,
                 undefined,
                 { inspector },
             );
+            return delivered;
         }
 
         /**
@@ -57,7 +58,7 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
             pdfBytes: ArrayBuffer,
             inspector?: SignatureUser,
             host?: string,
-        ) {
+        ): Promise<boolean> {
             const safeAddress = address.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
             const fallbackBody = `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                 <h1 style="color: #4f46e5;">Your Inspection Report</h1>
@@ -76,14 +77,15 @@ export function InspectionEmailMixin<TBase extends Constructor>(Base: TBase) {
                 inspector,
                 host,
             );
-            if (!rendered.enabled) return;
-            await this.sendEmail(
+            if (!rendered.enabled) return false;
+            const { delivered } = await this.sendEmail(
                 [to],
                 rendered.subject,
                 rendered.html,
                 [{ filename: `${safeAddress}-report.pdf`, content: pdfBytes }],
                 { inspector },
             );
+            return delivered;
         }
 
         /**

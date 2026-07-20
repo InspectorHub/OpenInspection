@@ -1,6 +1,8 @@
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions, contactRoleProfiles, inspectionPeople } from '../../lib/db/schema';
 import { contacts } from '../../lib/db/schema/contact';
+import { PeopleService } from '../people.service';
+import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { Errors } from '../../lib/errors';
 import { getRatingBucket, type RatingLevel } from '../../lib/report-utils';
 import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
@@ -29,6 +31,15 @@ interface InspectionRecipient {
     email:     string | null;
     phone:     string | null;
 }
+
+/** `contact_role_profiles.key` → `InspectionRecipient.role`, for the three
+ *  roles `getRecipientList` covers. Other role keys (co_client, attorney,
+ *  ...) are intentionally absent — Spec 2 widens the recipient set. */
+const RECIPIENT_ROLE_MAP: Record<string, 'client' | 'agent_buyer' | 'agent_listing'> = {
+    client:        'client',
+    buyer_agent:   'agent_buyer',
+    listing_agent: 'agent_listing',
+};
 
 /** Parse a report_versions.snapshotJson payload (snapshotOnPublish serialises
  *  `{ inspection, data, units }`); both re-inspection paths read only `.data`,
@@ -67,25 +78,6 @@ export class InspectionCoreService extends InspectionSubService {
     }
 
     /**
-     * Fetch the contact rows for an inspection's buyer/listing agents, keyed by
-     * id. Tenant-scoped. Shared by getRecipientList + getPeopleCard, which both
-     * resolve `referredByAgentId` / `sellingAgentId` against `contacts`.
-     */
-    private async fetchAgentsById(
-        db: ReturnType<InspectionCoreService['getDrizzle']>,
-        tenantId: string,
-        agentIds: Array<string | null | undefined>,
-    ): Promise<Map<string, typeof contacts.$inferSelect>> {
-        const ids = agentIds.filter((x): x is string => typeof x === 'string' && x.length > 0);
-        const byId = new Map<string, typeof contacts.$inferSelect>();
-        if (ids.length === 0) return byId;
-        const rows = await db.select().from(contacts)
-            .where(and(eq(contacts.tenantId, tenantId), inArray(contacts.id, ids)));
-        for (const row of rows) byId.set(row.id as string, row);
-        return byId;
-    }
-
-    /**
      * Guard: every non-null id in `ids` must be a `contacts` row that belongs
      * to `tenantId`. Throws BadRequest for the first id that fails — preventing
      * cross-tenant contact/agent references from being persisted (D1 does not
@@ -118,7 +110,7 @@ export class InspectionCoreService extends InspectionSubService {
             const term = `%${escapeLikePattern(params.search)}%`;
             conditions.push(or(
                 sql`lower(${inspections.propertyAddress}) like lower(${term})`,
-                sql`lower(${inspections.clientName}) like lower(${term})`
+                sql`lower(${contacts.name}) like lower(${term})` // primary-client join below, not the frozen legacy inspections.client_name
             )!);
         }
 
@@ -160,26 +152,52 @@ export class InspectionCoreService extends InspectionSubService {
             } catch { throw Errors.BadRequest('Invalid cursor'); }
         }
 
-        const rows = await db.select().from(inspections)
+        // Task 9c (people-role-profiles) — clientName/clientEmail are sourced
+        // from the inspection_people primary-client join, not the legacy
+        // inspections.client_name/_email columns (frozen cache, dropped Task
+        // 13). A single LEFT JOIN keeps this list N+1-free; contact_role_profiles
+        // is joined BEFORE inspection_people (filtered to the 'client' role)
+        // so the join stays scoped to the primary client, mirroring the join
+        // order already used for top-agents in api/metrics.ts.
+        const rows = await db.select({
+            inspection: inspections,
+            primaryClientName: contacts.name,
+            primaryClientEmail: contacts.email,
+        })
+            .from(inspections)
+            .leftJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .leftJoin(inspectionPeople, and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ))
+            .leftJoin(contacts, and(
+                eq(contacts.id, inspectionPeople.contactId),
+                eq(contacts.tenantId, inspections.tenantId),
+            ))
             .where(and(...conditions))
             .orderBy(sql`${inspections.createdAt} desc, ${inspections.id} desc`)
             .limit(params.limit + 1);
 
         const hasMore = rows.length > params.limit;
         const page = hasMore ? rows.slice(0, params.limit) : rows;
-        
+
         let nextCursor: string | null = null;
         if (hasMore) {
-            const last = page[page.length - 1];
+            const last = page[page.length - 1].inspection;
             nextCursor = btoa(JSON.stringify({ createdAt: safeTimestamp(last.createdAt), id: last.id }));
         }
 
-        const inspectionsFormatted: Inspection[] = page.map(row => ({
+        const inspectionsFormatted: Inspection[] = page.map(({ inspection: row, primaryClientName, primaryClientEmail }) => ({
             ...row,
             id: row.id as string,
             propertyAddress: row.propertyAddress as string,
-            clientName: row.clientName as string | null,
-            clientEmail: row.clientEmail as string | null,
+            clientName: primaryClientName ?? null,
+            clientEmail: primaryClientEmail ?? null,
             status: row.status,
             date: row.date as string,
             inspectorId: row.inspectorId as string | null,
@@ -266,13 +284,22 @@ export class InspectionCoreService extends InspectionSubService {
             ))
             .get();
 
+        // Task 9c (people-role-profiles) — clientName/clientEmail/clientPhone
+        // are sourced from the inspection_people primary-client join
+        // (PeopleService), not the legacy inspections.client_name/_email/_phone
+        // columns (frozen cache, dropped Task 13). Hard cutover, no
+        // legacy-column fallback — mirrors invoices.ts requestPaymentRoute /
+        // agreements.ts / publish.ts elsewhere on this branch.
+        const primaryClient = await new PeopleService({ DB: this.db }).getPrimaryClient(tenantId, id);
+
         return {
             inspection: {
                 ...result,
                 id: result.id as string,
                 propertyAddress: result.propertyAddress as string,
-                clientName: result.clientName as string | null,
-                clientEmail: result.clientEmail as string | null,
+                clientName: primaryClient?.name ?? null,
+                clientEmail: primaryClient?.email ?? null,
+                clientPhone: primaryClient?.phone ?? null,
                 status: result.status as 'draft' | 'completed' | 'delivered',
                 date: result.date as string,
                 inspectorId: result.inspectorId as string | null,
@@ -349,23 +376,30 @@ export class InspectionCoreService extends InspectionSubService {
             // the inspection is still created without it.
         }
 
+        // Task 13 (people-role-profiles) — the client/agent identity is NOT
+        // stored on the inspections row anymore (clientContactId/clientName/
+        // clientEmail/clientPhone/referredByAgentId/sellingAgentId columns
+        // dropped, superseded by inspection_people). These locals stay
+        // derived from the INPUT DTO and feed the contact soft-upsert +
+        // inspection_people writes below; only the row insert itself lost
+        // the fields.
+        const clientContactIdInput = (data as { clientContactId?: string }).clientContactId ?? null;
+        const clientNameInput = data.clientName || 'Private Client';
+        const clientEmailInput = (data.clientEmail as string | null) || null;
+        const clientPhoneInput = data.clientPhone ?? null;
+        const referredByAgentIdInput = (data.referredByAgentId as string | null) || null;
+        const sellingAgentIdInput = (data.sellingAgentId as string | null) || null;
+
         const newInspection = {
             id,
             tenantId,
             inspectorId: data.inspectorId || null,
             propertyAddress: data.propertyAddress,
-            clientName: data.clientName || 'Private Client',
-            clientEmail: (data.clientEmail as string | null) || null,
-            clientPhone: data.clientPhone ?? null,
-            // IA-1: FK to contacts.id for the client (app-layer integrity).
-            clientContactId: (data as { clientContactId?: string }).clientContactId ?? null,
             templateId: data.templateId,
             templateSnapshot,
             templateSnapshotVersion,
             status,
             date,
-            referredByAgentId: (data.referredByAgentId as string | null) || null,
-            sellingAgentId: (data.sellingAgentId as string | null) || null,
             // Spec 5D — geocoded fields, all optional (legacy free-text addresses ok)
             addressPlaceId:    (data.addressPlaceId as string | null) || null,
             addressStreet:     (data.addressStreet as string | null) || null,
@@ -388,7 +422,7 @@ export class InspectionCoreService extends InspectionSubService {
             createdAt
         };
 
-        await this.assertContactsBelongToTenant(tenantId, [data.referredByAgentId, data.sellingAgentId, data.clientContactId]);
+        await this.assertContactsBelongToTenant(tenantId, [referredByAgentIdInput, sellingAgentIdInput, clientContactIdInput]);
         // Quota is consumed only after every precondition check above has
         // passed and immediately before the row that actually creates the
         // inspection — a failed validation (e.g. a bad contact reference)
@@ -407,29 +441,59 @@ export class InspectionCoreService extends InspectionSubService {
         // Soft-upsert the client into Contacts so it shows up in the Contacts list
         // for future re-use (search, agent linking). Idempotent on tenantId+email
         // (or tenantId+name if no email). Failures are non-fatal — inspection
-        // creation must not break because of a contact-side issue.
-        if (newInspection.clientName && newInspection.clientName !== 'Private Client') {
+        // creation must not break because of a contact-side issue. Captures the
+        // resolved/created contact id for the inspection_people write below.
+        let resolvedClientContactId: string | null = clientContactIdInput;
+        if (clientNameInput !== 'Private Client') {
             try {
                 const matchConds = [eq(contacts.tenantId, tenantId), eq(contacts.type, 'client')];
-                if (newInspection.clientEmail) matchConds.push(eq(contacts.email, newInspection.clientEmail));
-                else matchConds.push(eq(contacts.name, newInspection.clientName));
+                if (clientEmailInput) matchConds.push(eq(contacts.email, clientEmailInput));
+                else matchConds.push(eq(contacts.name, clientNameInput));
                 const existing = await db.select().from(contacts).where(and(...matchConds)).get();
-                if (!existing) {
+                if (existing) {
+                    resolvedClientContactId = resolvedClientContactId ?? existing.id;
+                } else {
+                    const newContactId = crypto.randomUUID();
                     await db.insert(contacts).values({
-                        id: crypto.randomUUID(),
+                        id: newContactId,
                         tenantId,
                         type: 'client',
-                        name: newInspection.clientName,
-                        email: newInspection.clientEmail,
-                        phone: newInspection.clientPhone,
+                        name: clientNameInput,
+                        email: clientEmailInput,
+                        phone: clientPhoneInput,
                         agency: null,
                         notes: null,
                         createdAt: createdAt,
                     });
+                    resolvedClientContactId = resolvedClientContactId ?? newContactId;
                 }
             } catch (err) {
                 logger.error('contact upsert from inspection failed', { inspectionId: id }, err instanceof Error ? err : undefined);
             }
+        }
+
+        // Task 7 (people-role-profiles) — mirror the primary client, buyer's
+        // agent, and listing agent into the inspection_people join table.
+        // Task 13 dropped the legacy clientContactId / referredByAgentId /
+        // sellingAgentId columns from the inspections row — this is now the
+        // ONLY place WHO is persisted. Best-effort: a people-write failure
+        // must never roll back an already-committed inspection row.
+        try {
+            const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
+                .from(contactRoleProfiles)
+                .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
+            const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
+            const people = new PeopleService({ DB: this.db });
+            const links: Array<[string | null, string | undefined]> = [
+                [resolvedClientContactId,   roleIdByKey.get('client')],
+                [referredByAgentIdInput,    roleIdByKey.get('buyer_agent')],
+                [sellingAgentIdInput,       roleIdByKey.get('listing_agent')],
+            ];
+            for (const [contactId, roleProfileId] of links) {
+                if (contactId && roleProfileId) await people.addPerson(tenantId, id, contactId, roleProfileId);
+            }
+        } catch (err) {
+            logger.error('inspection-people write from inspection create failed', { inspectionId: id }, err instanceof Error ? err : undefined);
         }
 
         // Link selected services.
@@ -462,7 +526,8 @@ export class InspectionCoreService extends InspectionSubService {
 
         return {
             ...newInspection,
-            clientEmail: newInspection.clientEmail as string | null,
+            clientName: clientNameInput,
+            clientEmail: clientEmailInput,
             inspectorId: newInspection.inspectorId as string | null,
             createdAt: safeISODate(newInspection.createdAt)
         } as Inspection;
@@ -548,10 +613,6 @@ export class InspectionCoreService extends InspectionSubService {
             addressCounty:           baseline.addressCounty,
             addressLat:              baseline.addressLat,
             addressLng:              baseline.addressLng,
-            clientContactId:         baseline.clientContactId,
-            clientName:              baseline.clientName,
-            clientEmail:             baseline.clientEmail,
-            clientPhone:             baseline.clientPhone,
             templateId:              baseline.templateId,
             templateSnapshot:        baseline.templateSnapshot,
             templateSnapshotVersion: baseline.templateSnapshotVersion,
@@ -575,6 +636,25 @@ export class InspectionCoreService extends InspectionSubService {
             data:         seeded as unknown as object,
             lastSyncedAt: createdAt,
         });
+
+        // Task 7c (people-role-profiles fix) — copy the baseline's
+        // inspection_people rows (client / buyer_agent / listing_agent / ...)
+        // onto the new re-inspection. Task 13 dropped the legacy
+        // clientContactId/clientName/clientEmail/clientPhone columns from the
+        // inspections row, so this copy is now the ONLY carry-forward of WHO.
+        // Without this, getInspection/listInspections (Task 9c-reads) resolve the client
+        // via inspection_people ONLY and would show a null client on every
+        // re-inspection. Non-fatal: a people-write failure must never roll
+        // back the already-committed re-inspection row.
+        try {
+            const people = new PeopleService({ DB: this.db });
+            const baselinePeople = await people.listPeople(tenantId, baselineId);
+            for (const p of baselinePeople) {
+                await people.addPerson(tenantId, id, p.contactId, p.roleProfileId);
+            }
+        } catch (err) {
+            logger.error('inspection-people copy from reinspection create failed', { inspectionId: id }, err instanceof Error ? err : undefined);
+        }
 
         const created = await db.select().from(inspections).where(eq(inspections.id, id)).get();
         return created as unknown as Inspection;
@@ -824,8 +904,35 @@ export class InspectionCoreService extends InspectionSubService {
         };
         delete (clone as { signedByClient?: boolean }).signedByClient; // Remove ephemeral field
 
+        // Task 13 — clientName/clientEmail/clientPhone on `source` are
+        // resolved via PeopleService inside getInspection (not raw DB
+        // columns; clientContactId/referredByAgentId/sellingAgentId are gone
+        // entirely now that the columns are dropped). Strip them from the
+        // insert payload — they'd otherwise be dead keys on an object the
+        // schema no longer recognizes. The inspection_people copy below is
+        // the only carry-forward of WHO.
+        const { clientName: _clientName, clientEmail: _clientEmail, clientPhone: _clientPhone, ...cloneDbValues } =
+            clone as typeof clone & { clientName?: unknown; clientEmail?: unknown; clientPhone?: unknown };
+        void _clientName; void _clientEmail; void _clientPhone;
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await this.getDrizzle().insert(inspections).values(clone as any);
+        await this.getDrizzle().insert(inspections).values(cloneDbValues as any);
+
+        // Task 7c (people-role-profiles fix) — copy the source inspection's
+        // inspection_people rows (client + any agents) onto the clone.
+        // Without this, getInspection/listInspections (Task 9c-reads)
+        // resolve the client via inspection_people ONLY and would show a
+        // null client on every clone. Non-fatal: a people-write failure must
+        // never roll back the already-committed clone row.
+        try {
+            const people = new PeopleService({ DB: this.db });
+            const sourcePeople = await people.listPeople(tenantId, id);
+            for (const p of sourcePeople) {
+                await people.addPerson(tenantId, clone.id, p.contactId, p.roleProfileId);
+            }
+        } catch (err) {
+            logger.error('inspection-people copy from clone create failed', { inspectionId: clone.id }, err instanceof Error ? err : undefined);
+        }
         // DB-8: mirror the cloned inspection's assignment into inspection_inspectors.
         // Non-fatal — the link table is a denormalized mirror; a sync failure must
         // not abort a clone whose canonical inspection row already committed.
@@ -849,16 +956,23 @@ export class InspectionCoreService extends InspectionSubService {
      * Round-2 F1 — list every party associated with an inspection so the
      * Publish modal can render per-recipient Email + Text checkboxes.
      *
+     * Sourced from `PeopleService.listPeople` (the `inspection_people` join),
+     * restricted to the three roles this Publish-modal contract covers
+     * (`client` / `buyer_agent` / `listing_agent` — see `RECIPIENT_ROLE_MAP`);
+     * other role kinds (co_client, attorney, ...) are ignored here (Spec 2
+     * widens the recipient set).
+     *
      * Returned shape (`InspectionRecipient[]`):
      *   - role: 'client' | 'agent_buyer' | 'agent_listing'
-     *   - contactId: contact row id (null for the inline client — clients are
-     *     stored as columns on `inspections`, not in `contacts`)
+     *   - contactId: the person's contact row id (now populated for every
+     *     role, including the client — the legacy inline-client column had
+     *     no contact row, so this used to be null for `role: 'client'`)
      *   - name, email, phone
      *
      * Recipients without any contact info (no email AND no phone) are dropped
      * because there is no way to deliver to them. Tenant-scoped via the
      * compound `where(eq(id), eq(tenantId))` guard on the inspection lookup
-     * AND the contact lookup.
+     * AND `PeopleService.listPeople`'s own tenant filter.
      */
     async getRecipientList(inspectionId: string, tenantId: string): Promise<InspectionRecipient[]> {
         const db = this.getDrizzle();
@@ -868,39 +982,19 @@ export class InspectionCoreService extends InspectionSubService {
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
 
+        const people = await new PeopleService({ DB: this.db }).listPeople(tenantId, inspectionId);
+
         const recipients: InspectionRecipient[] = [];
-
-        // Client — stored inline on inspections (not contacts table). Only
-        // include when there is at least a name AND at least one channel.
-        if ((inspection.clientName ?? '').trim() && (inspection.clientEmail || inspection.clientPhone)) {
+        for (const p of people) {
+            const role = RECIPIENT_ROLE_MAP[p.roleKey];
+            if (!role) continue; // ignore co_client/attorney/etc — Spec 2 widens the recipient set
+            if (!p.email && !p.phone) continue; // no delivery channel
             recipients.push({
-                contactId: null,
-                name:      inspection.clientName as string,
-                role:      'client',
-                email:     (inspection.clientEmail as string | null) ?? null,
-                phone:     (inspection.clientPhone as string | null) ?? null,
-            });
-        }
-
-        // Agents — buyer's agent (referredByAgentId) + listing agent (sellingAgentId).
-        const byId = await this.fetchAgentsById(db, tenantId, [inspection.referredByAgentId, inspection.sellingAgentId]);
-        const agentRoles: Array<[string | null, 'agent_buyer' | 'agent_listing']> = [
-            [inspection.referredByAgentId as string | null, 'agent_buyer'],
-            [inspection.sellingAgentId   as string | null, 'agent_listing'],
-        ];
-        for (const [id, role] of agentRoles) {
-            if (!id) continue;
-            const row = byId.get(id);
-            if (!row) continue;
-            const email = (row.email as string | null) ?? null;
-            const phone = (row.phone as string | null) ?? null;
-            if (!email && !phone) continue; // no delivery channel
-            recipients.push({
-                contactId: row.id as string,
-                name:      row.name as string,
+                contactId: p.contactId,
+                name:      p.name,
                 role,
-                email,
-                phone,
+                email:     p.email ?? null,
+                phone:     p.phone ?? null,
             });
         }
 
@@ -914,9 +1008,13 @@ export class InspectionCoreService extends InspectionSubService {
      * Settings page can render a contact card with role chips:
      *
      *   - Inspector  → users row referenced by inspectorId
-     *   - Client     → inline columns on inspections (clientName/email/phone)
-     *   - Buyer's Agent  → contacts row pointed at by referredByAgentId
-     *   - Listing Agent  → contacts row pointed at by sellingAgentId
+     *   - Client, Buyer's Agent, Listing Agent → `inspection_people` rows
+     *     (via `PeopleService.listPeople`), matched on `roleKey`. Other role
+     *     kinds (co_client, attorney, ...) are ignored here (Spec 2 widens
+     *     the people card).
+     *
+     * Each agent's `.id` is the CONTACT id (`p.contactId`), matching the old
+     * contract — NOT the `inspection_people` join-row id (`p.id`).
      *
      * Schema currently allows ONE buyer agent + ONE listing agent per
      * inspection. The result returns arrays for forward-compat (so the UI
@@ -952,39 +1050,33 @@ export class InspectionCoreService extends InspectionSubService {
             }
         }
 
-        // Client — inline on inspections. Only return when there's at least
-        // a name (otherwise nothing meaningful to render in the card).
-        const clientName = (inspection.clientName as string | null) ?? null;
-        const client = clientName && clientName.trim().length > 0
+        // Client + agents — from inspection_people (via PeopleService).
+        const people = await new PeopleService({ DB: this.db }).listPeople(tenantId, inspectionId);
+
+        const clientP = people.find(p => p.roleKey === 'client') ?? null;
+        const client = clientP
             ? {
-                name:  clientName,
-                email: (inspection.clientEmail as string | null) ?? null,
-                phone: (inspection.clientPhone as string | null) ?? null,
+                name:  clientP.name,
+                email: clientP.email ?? null,
+                phone: clientP.phone ?? null,
             }
             : null;
 
-        // Agents — fetch both in one query.
-        const agentRowsById = await this.fetchAgentsById(db, tenantId, [inspection.referredByAgentId, inspection.sellingAgentId]);
-        const toAgent = (id: string | null) => {
-            if (!id) return null;
-            const row = agentRowsById.get(id);
-            if (!row) return null;
-            return {
-                id:     row.id as string,
-                name:   row.name as string,
-                email:  (row.email  as string | null) ?? null,
-                phone:  (row.phone  as string | null) ?? null,
-                agency: (row.agency as string | null) ?? null,
-            };
-        };
-        const buyerAgent   = toAgent(inspection.referredByAgentId as string | null);
-        const listingAgent = toAgent(inspection.sellingAgentId   as string | null);
+        const toAgent = (p: (typeof people)[number]) => ({
+            id:     p.contactId, // CONTACT id — matches the old contract, not the join-row id
+            name:   p.name,
+            email:  p.email  ?? null,
+            phone:  p.phone  ?? null,
+            agency: p.agency ?? null,
+        });
+        const buyerAgents   = people.filter(p => p.roleKey === 'buyer_agent').map(toAgent);
+        const listingAgents = people.filter(p => p.roleKey === 'listing_agent').map(toAgent);
 
         return {
             inspector,
             client,
-            buyerAgents:   buyerAgent   ? [buyerAgent]   : [],
-            listingAgents: listingAgent ? [listingAgent] : [],
+            buyerAgents,
+            listingAgents,
         };
     }
 }

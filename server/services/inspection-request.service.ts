@@ -12,12 +12,18 @@ import {
     inspectionRequests,
     inspections,
     templates,
+    contactRoleProfiles,
+    inspectionPeople,
+    contacts,
 } from '../lib/db/schema';
+import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../lib/status/inspection-status';
+import { PeopleService } from './people.service';
+import { ContactService } from './contact.service';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
 export interface CreateRequestInput {
@@ -116,17 +122,37 @@ export class InspectionRequestService {
             .all();
 
         const reqIds = reqs.map(r => r.id);
+        // Task 9c — clientName is sourced via the client-role inspection_people
+        // LEFT JOIN (role filter joined FIRST to avoid fanning out over every
+        // role on the sub-inspection — same pattern as api/metrics.ts /
+        // InspectionCoreService.listInspections), NOT the legacy
+        // inspections.client_name column, which survives GDPR erasure as a
+        // stale denormalized cache and would leak the erased subject's name.
         const subRows: SubInspectionRow[] = reqIds.length === 0 ? [] : await db.select({
             id:              inspections.id,
             templateId:      inspections.templateId,
             propertyAddress: inspections.propertyAddress,
-            clientName:      inspections.clientName,
+            clientName:      contacts.name,
             status:          inspections.status,
             date:            inspections.date,
             price:           inspections.price,
             inspectorId:     inspections.inspectorId,
             requestId:       inspections.requestId,
         }).from(inspections)
+            .leftJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .leftJoin(inspectionPeople, and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ))
+            .leftJoin(contacts, and(
+                eq(contacts.id, inspectionPeople.contactId),
+                eq(contacts.tenantId, inspections.tenantId),
+            ))
             .where(and(eq(inspections.tenantId, tenantId), inArray(inspections.requestId, reqIds)))
             .all();
 
@@ -146,17 +172,32 @@ export class InspectionRequestService {
             .get();
         if (!req) return null;
 
+        // Task 9c — same client-role inspection_people join as list() above.
         const subs: SubInspectionRow[] = await db.select({
             id:              inspections.id,
             templateId:      inspections.templateId,
             propertyAddress: inspections.propertyAddress,
-            clientName:      inspections.clientName,
+            clientName:      contacts.name,
             status:          inspections.status,
             date:            inspections.date,
             price:           inspections.price,
             inspectorId:     inspections.inspectorId,
             requestId:       inspections.requestId,
         }).from(inspections)
+            .leftJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .leftJoin(inspectionPeople, and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ))
+            .leftJoin(contacts, and(
+                eq(contacts.id, inspectionPeople.contactId),
+                eq(contacts.tenantId, inspections.tenantId),
+            ))
             .where(and(eq(inspections.tenantId, tenantId), eq(inspections.requestId, id)))
             .all();
 
@@ -248,9 +289,6 @@ export class InspectionRequestService {
                 tenantId,
                 inspectorId:              input.inspectorId ?? null,
                 propertyAddress:          input.propertyAddress,
-                clientName:               input.clientName,
-                clientEmail:              input.clientEmail ?? null,
-                clientPhone:              input.clientPhone ?? null,
                 templateId:               s.templateId,
                 templateSnapshot:         tpl ? tpl.schema : null,
                 templateSnapshotVersion:  tpl ? tpl.version : 1,
@@ -259,7 +297,6 @@ export class InspectionRequestService {
                 paymentStatus:            'unpaid' as const,
                 price:                    s.price ?? 0,
                 requestId,
-                referredByAgentId:        input.referredByAgentId ?? null,
                 createdAt:                now,
             };
         });
@@ -269,6 +306,48 @@ export class InspectionRequestService {
         for (const row of subRows) {
             await syncInspectionAssignments(db, tenantId, row.id, { inspectorId: row.inspectorId });
         }
+
+        // Task 7b/7c (people-role-profiles) — mirror the client AND the agent
+        // referral into inspection_people for EVERY sub-inspection this
+        // request created. Task 13 dropped the legacy clientName/clientEmail/
+        // referredByAgentId columns from inspections, so this is now the ONLY
+        // persistence of WHO. The client contact is resolved via the same idempotent upsert
+        // booking.service/core.ts use (matches by tenant + normalized email),
+        // so getInspection/listInspections (Task 9c-reads), which resolve the
+        // client ONLY via inspection_people, always find one for a
+        // request-created inspection. Non-fatal: a people-write failure must
+        // never roll back an already-committed inspection row.
+        try {
+            const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
+                .from(contactRoleProfiles)
+                .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
+            const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
+            const people = new PeopleService({ DB: this.db });
+
+            // input.clientName is a required field on CreateRequestInput, so
+            // this upsert always runs — mirrors ConciergeService.createBooking.
+            const { id: clientContactId } = await new ContactService(this.db).upsertClientContact(tenantId, {
+                name: input.clientName,
+                ...(input.clientEmail ? { email: input.clientEmail } : {}),
+                ...(input.clientPhone ? { phone: input.clientPhone } : {}),
+                type: 'client',
+            });
+
+            const links: Array<[string | null, string | undefined]> = [
+                [clientContactId, roleIdByKey.get('client')],
+                [input.referredByAgentId ?? null, roleIdByKey.get('buyer_agent')],
+            ];
+            for (const row of subRows) {
+                for (const [contactId, roleProfileId] of links) {
+                    if (contactId && roleProfileId) {
+                        await people.addPerson(tenantId, row.id, contactId, roleProfileId);
+                    }
+                }
+            }
+        } catch (err) {
+            logger.error('inspection-people write from inspection-request create failed', { requestId }, err instanceof Error ? err : undefined);
+        }
+
         logger.info('inspection-request.created', { requestId, tenantId, subCount: subs.length });
 
         const detail = await this.get(tenantId, requestId);
@@ -303,9 +382,6 @@ export class InspectionRequestService {
             id,
             tenantId,
             propertyAddress:          req.propertyAddress,
-            clientName:               req.clientName,
-            clientEmail:              req.clientEmail ?? null,
-            clientPhone:              req.clientPhone ?? null,
             templateId:               sub.templateId,
             templateSnapshot:         tpl.schema,
             templateSnapshotVersion:  tpl.version,
@@ -321,6 +397,33 @@ export class InspectionRequestService {
         await db.update(inspectionRequests)
             .set({ totalAmount: newTotal, updatedAt: now })
             .where(and(eq(inspectionRequests.id, requestId), eq(inspectionRequests.tenantId, tenantId)));
+
+        // Task 7c (people-role-profiles fix) — mirror the client (inherited
+        // from the parent request — this call site carries no separate
+        // client input) into inspection_people for the new sub-inspection.
+        // Task 13 dropped the legacy clientName/clientEmail columns from
+        // inspections, so this is now the ONLY persistence of the client. No
+        // agent referral is captured on CreateSubInspectionInput, so only
+        // the client role is written.
+        // Non-fatal: a people-write failure must never roll back an
+        // already-committed inspection row.
+        try {
+            const { id: clientContactId } = await new ContactService(this.db).upsertClientContact(tenantId, {
+                name: req.clientName,
+                ...(req.clientEmail ? { email: req.clientEmail } : {}),
+                ...(req.clientPhone ? { phone: req.clientPhone } : {}),
+                type: 'client',
+            });
+            const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
+                .from(contactRoleProfiles)
+                .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.active, true)));
+            const clientRoleId = roleRows.find(r => r.key === 'client')?.id;
+            if (clientRoleId) {
+                await new PeopleService({ DB: this.db }).addPerson(tenantId, id, clientContactId, clientRoleId);
+            }
+        } catch (err) {
+            logger.error('inspection-people write from addSubInspection failed', { requestId, inspectionId: id }, err instanceof Error ? err : undefined);
+        }
 
         const detail = await this.get(tenantId, requestId);
         if (!detail) throw Errors.Internal('Failed to load updated request');

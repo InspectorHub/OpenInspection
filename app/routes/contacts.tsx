@@ -6,11 +6,14 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 import { PageHeader, TabStrip, Button, Select } from "@core/shared-ui";
-import { inferMappingFromCsv, type Contact, type Agent } from "~/components/contacts/contacts-helpers";
+import { inferMappingFromCsv, type Contact, type Agent, type RoleProfile, type MessageTemplateOption } from "~/components/contacts/contacts-helpers";
 import { ContactModal } from "~/components/contacts/ContactModal";
 import { CsvImportModal } from "~/components/contacts/CsvImportModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
 import { AgentsTable } from "~/components/contacts/AgentsTable";
+import { RolesTable } from "~/components/contacts/RolesTable";
+import { RoleProfileModal } from "~/components/contacts/RoleProfileModal";
+import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -21,21 +24,48 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const url = new URL(request.url);
   const filterType = url.searchParams.get("type") || "";
+  const api = createApi(context, { token });
+
+  // Resolve the session role to gate the admin-only Roles tab — mirrors the
+  // loader-side pattern in settings-connected-apps.tsx (fail-closed on error:
+  // an unresolved role never shows the admin surface).
+  let role: string | null | undefined;
   try {
-    const api = createApi(context, { token });
-    const [contactsRes, agentsRes] = await Promise.all([
+    const ctxRes = await api.sessionContext.context.$get();
+    if (ctxRes.ok) {
+      const body = (await ctxRes.json()) as { data?: { user?: { role?: string } } };
+      role = body.data?.user?.role;
+    }
+  } catch {
+    role = undefined;
+  }
+  const isAdmin = isAdminRole(role);
+
+  try {
+    const [contactsRes, agentsRes, rolesRes, emailTemplatesRes, smsTemplatesRes] = await Promise.all([
       api.contacts.index.$get({ query: filterType === "agent" || filterType === "client" ? { type: filterType } : {} }),
       api.agents.links.$get(),
+      api.roleProfiles.index.$get(),
+      api.messageTemplates.index.$get({ query: { channel: "email" } }).catch(() => null),
+      api.messageTemplates.index.$get({ query: { channel: "sms" } }).catch(() => null),
     ]);
     const contactsBody = contactsRes.ok ? ((await contactsRes.json()) as Record<string, unknown>) : { data: [] };
     const agentsBody = agentsRes.ok ? ((await agentsRes.json()) as Record<string, unknown>) : { data: [] };
+    const rolesBody = rolesRes.ok ? ((await rolesRes.json()) as Record<string, unknown>) : { data: [] };
+    const emailTemplatesBody =
+      emailTemplatesRes && emailTemplatesRes.ok ? ((await emailTemplatesRes.json()) as { data?: MessageTemplateOption[] }) : { data: [] };
+    const smsTemplatesBody =
+      smsTemplatesRes && smsTemplatesRes.ok ? ((await smsTemplatesRes.json()) as { data?: MessageTemplateOption[] }) : { data: [] };
     return {
       contacts: (contactsBody.data ?? []) as Contact[],
       agents: (agentsBody.data ?? []) as Agent[],
+      roleProfiles: (rolesBody.data ?? []) as RoleProfile[],
+      messageTemplates: [...(emailTemplatesBody.data ?? []), ...(smsTemplatesBody.data ?? [])] as MessageTemplateOption[],
       filterType,
+      isAdmin,
     };
   } catch {
-    return { contacts: [], agents: [], filterType: "" };
+    return { contacts: [], agents: [], roleProfiles: [], messageTemplates: [], filterType: "", isAdmin };
   }
 }
 
@@ -101,21 +131,61 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res.ok, preview: (data as { data?: unknown } | null)?.data ?? {} };
   }
 
+  if (intent === "role-create") {
+    const label = String(form.get("label") ?? "").trim();
+    const kind = String(form.get("kind") ?? "") as "client" | "agent" | "other";
+    if (!label || !kind) return { ok: false };
+    const emailTemplateId = String(form.get("emailTemplateId") ?? "").trim();
+    const smsTemplateId = String(form.get("smsTemplateId") ?? "").trim();
+    const body: { label: string; kind: "client" | "agent" | "other"; emailTemplateId?: string; smsTemplateId?: string } = { label, kind };
+    if (emailTemplateId) body.emailTemplateId = emailTemplateId;
+    if (smsTemplateId) body.smsTemplateId = smsTemplateId;
+    const res = await api.roleProfiles.index.$post({ json: body });
+    return { ok: res.ok };
+  }
+
+  if (intent === "role-update") {
+    const id = form.get("id") as string;
+    const label = String(form.get("label") ?? "").trim();
+    const emailTemplateId = String(form.get("emailTemplateId") ?? "").trim();
+    const smsTemplateId = String(form.get("smsTemplateId") ?? "").trim();
+    const res = await api.roleProfiles[":id"].$put({
+      param: { id },
+      json: {
+        label,
+        emailTemplateId: emailTemplateId || null,
+        smsTemplateId: smsTemplateId || null,
+      },
+    });
+    return { ok: res.ok };
+  }
+
+  if (intent === "role-delete") {
+    const id = form.get("id") as string;
+    const res = await api.roleProfiles[":id"].$delete({ param: { id } });
+    return { ok: res.ok };
+  }
+
   return { ok: false };
 }
 
 export default function ContactsPage() {
-  const { contacts, agents, filterType } = useLoaderData<typeof loader>();
+  const { contacts, agents, roleProfiles, messageTemplates, filterType, isAdmin } = useLoaderData<typeof loader>();
   const TABS = [
     { id: "contacts", label: m.contacts_label_contacts() },
     { id: "agents", label: m.contacts_label_agents() },
+    ...(isAdmin ? [{ id: "roles", label: m.contacts_label_roles() }] : []),
   ];
   const contactList = contacts as Contact[];
   const agentList = agents as Agent[];
+  const roleProfileList = roleProfiles as RoleProfile[];
+  const templateList = messageTemplates as MessageTemplateOption[];
   const [activeTab, setActiveTab] = useState("contacts");
   const [modalOpen, setModalOpen] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
+  const [roleModalOpen, setRoleModalOpen] = useState(false);
+  const [editRole, setEditRole] = useState<RoleProfile | null>(null);
   const [typeFilter, setTypeFilter] = useState(filterType || "");
   const deleteFetcher = useFetcher();
 
@@ -129,27 +199,29 @@ export default function ContactsPage() {
         title={`${filtered.length} ${filtered.length === 1 ? m.contacts_list_count_one() : m.contacts_label_contacts()}`}
         meta={m.contacts_list_meta_count({ count: filtered.length })}
         actions={
-          <>
-            <div className="w-[130px]">
-              <Select
-                bare
-                aria-label={m.contacts_filter_type_aria()}
-                value={typeFilter}
-                onChange={(e) => setTypeFilter(e.target.value)}
-                options={[
-                  { value: "", label: m.contacts_filter_all_types() },
-                  { value: "agent", label: m.contacts_label_agents() },
-                  { value: "client", label: m.contacts_label_clients() },
-                ]}
-              />
-            </div>
-            <Button variant="secondary" size="sm" onClick={() => setCsvModalOpen(true)}>
-              {m.contacts_action_import_csv()}
-            </Button>
-            <Button variant="primary" onClick={() => { setEditContact(null); setModalOpen(true); }} icon={<PlusIcon />}>
-              {m.contacts_action_add()}
-            </Button>
-          </>
+          activeTab === "roles" ? undefined : (
+            <>
+              <div className="w-[130px]">
+                <Select
+                  bare
+                  aria-label={m.contacts_filter_type_aria()}
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  options={[
+                    { value: "", label: m.contacts_filter_all_types() },
+                    { value: "agent", label: m.contacts_label_agents() },
+                    { value: "client", label: m.contacts_label_clients() },
+                  ]}
+                />
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => setCsvModalOpen(true)}>
+                {m.contacts_action_import_csv()}
+              </Button>
+              <Button variant="primary" onClick={() => { setEditContact(null); setModalOpen(true); }} icon={<PlusIcon />}>
+                {m.contacts_action_add()}
+              </Button>
+            </>
+          )
         }
       />
 
@@ -163,8 +235,24 @@ export default function ContactsPage() {
         <AgentsTable agentList={agentList} />
       )}
 
+      {activeTab === "roles" && isAdmin && (
+        <RolesTable
+          roleProfiles={roleProfileList}
+          onEdit={(p) => { setEditRole(p); setRoleModalOpen(true); }}
+          onCreate={() => { setEditRole(null); setRoleModalOpen(true); }}
+        />
+      )}
+
       <ContactModal open={modalOpen} onClose={() => setModalOpen(false)} contact={editContact} />
       <CsvImportModal open={csvModalOpen} onClose={() => setCsvModalOpen(false)} />
+      {isAdmin && (
+        <RoleProfileModal
+          open={roleModalOpen}
+          onClose={() => setRoleModalOpen(false)}
+          profile={editRole}
+          templates={templateList}
+        />
+      )}
     </div>
   );
 }

@@ -14,6 +14,7 @@ import type { AppLoadContext } from "react-router";
 import { createApi } from "~/lib/api-client.server";
 import { m } from "~/paraglide/messages";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { formatDate } from "~/lib/format";
 import { EMPTY_BRAND } from "~/lib/brand";
 import type { HubSection } from "~/components/portal/InspectionHub";
 import {
@@ -313,8 +314,11 @@ export async function loadInvoiceSection(
     const invoice: InvoiceData | null = d
       ? {
           number: `INV-${d.id.slice(0, 8).toUpperCase()}`,
-          date: d.createdAt?.slice(0, 10) ?? "",
-          dueDate: d.dueDate ?? null,
+          // Issued/Due are calendar dates (YYYY-MM-DD) — format for display via
+          // the shared formatter (locale only; date-only anchors to UTC). Keep
+          // empty/null so the "—" / "Due on receipt" fallbacks still apply.
+          date: d.createdAt ? formatDate(d.createdAt.slice(0, 10), { locale: "en-US", timeZone: "UTC" }) : "",
+          dueDate: d.dueDate ? formatDate(d.dueDate, { locale: "en-US", timeZone: "UTC" }) : null,
           status: (d.status as InvoiceData["status"]) ?? "draft",
           clientName: d.clientName ?? "",
           inspectorName: "",

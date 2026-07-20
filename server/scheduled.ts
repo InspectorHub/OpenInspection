@@ -7,12 +7,18 @@ import { buildTenantEmailService } from './lib/email/build-email-service';
 import type { EmailServiceEnv } from './lib/email/build-email-service';
 import { PlanQuotaGuard, readTenantTier } from './features/plan-quota/guard';
 import { getDeploymentProfile } from './lib/deployment-profile';
-import type { AppEnv } from './types/hono';
+import type { AppEnv, BrowserRun } from './types/hono';
 import { QBOService } from './services/qbo.service';
 import { InvoiceService } from './services/invoice.service';
 import { qboConnections } from './lib/db/schema/qbo';
 import { logger } from './lib/logger';
 import type { SyncEnvelope } from './lib/sync-events/envelope';
+// Spec 2 Task 2b — cron-path deps for report.published PDF-email delivery
+// (see services/automation/report-email.ts:ReportDeliveryDeps).
+import { PortalAccessService } from './services/portal-access.service';
+import { ReportPdfService } from './services/report-pdf.service';
+import { InspectionService } from './services/inspection.service';
+import type { ReportDeliveryDeps } from './services/automation/report-email';
 
 export interface ScheduledEnv {
     DB: D1Database;
@@ -47,6 +53,11 @@ export interface ScheduledEnv {
     // sync queue; the outbox sweeper republishes pending rows through it.
     // Optional — sweeper is a no-op when missing (standalone).
     SYNC_QUEUE?: Queue<SyncEnvelope>;
+    // Spec 2 Task 2b — report.published PDF-email delivery deps (ReportPdfService
+    // + InspectionService.getReportContentHash). Absent → the cron flush() falls
+    // back to the generic template path (see reportDelivery construction below).
+    BROWSER?: BrowserRun;
+    KEY_ENCRYPTION_SECRET?: string;
 }
 
 async function runQBOCDC(env: ScheduledEnv): Promise<void> {
@@ -185,17 +196,41 @@ export async function scheduled(
         const quotaGuard = profile.hasUsageQuota
             ? new PlanQuotaGuard(env.DB, { enforced: true, billingPortalUrl: profile.billingPortalUrl })
             : undefined;
+        const appBaseUrl = env.APP_BASE_URL || '';
+        // Spec 2 Task 2b — report.published PDF-email delivery deps. Guarded on
+        // JWT_SECRET (required in prod; absent only in an unconfigured/standalone
+        // dev deploy) — when absent, reportDelivery is undefined and flush() falls
+        // back to the generic template path for report.published emails (no crash).
+        const appHostForRender = (() => {
+            try { return new URL(appBaseUrl).host; } catch { return appBaseUrl.replace(/^https?:\/\//, '').replace(/\/$/, ''); }
+        })();
+        const reportDelivery: ReportDeliveryDeps | undefined = env.JWT_SECRET ? {
+            portalAccess: new PortalAccessService(env.DB, {
+                jwtSecret: env.JWT_SECRET,
+                ...(env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: env.JWT_SECRET_PREVIOUS } : {}),
+            }),
+            reportPdf: new ReportPdfService(env.DB, env.BROWSER, env.PHOTOS),
+            getContentHash: (inspectionId: string, tenantId: string) =>
+                new InspectionService(
+                    env.DB, env.PHOTOS,
+                    /* sdb */ undefined, env.TENANT_CACHE, /* IMAGES */ undefined, /* quota */ undefined,
+                    env.KEY_ENCRYPTION_SECRET || env.JWT_SECRET,
+                ).getReportContentHash(inspectionId, tenantId),
+            renderHost: appHostForRender,
+            renderSecret: env.JWT_SECRET,
+        } : undefined;
         await svc.flush(
             async (tid) => {
                 const tier = quotaGuard ? await readTenantTier(env.DB, tid) : undefined;
                 return buildTenantEmailService(env as EmailServiceEnv, tid, quotaGuard, tier);
             },
             env.APP_NAME || 'OpenInspection',
-            env.APP_BASE_URL || '',
+            appBaseUrl,
             sms,
             50,
             gateEnv,
             quotaGuard,
+            reportDelivery,
         );
     } catch (e) {
         logger.error('[cron] automation flush failed', {}, e instanceof Error ? e : undefined);

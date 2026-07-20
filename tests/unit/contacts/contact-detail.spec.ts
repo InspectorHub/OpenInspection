@@ -1,5 +1,16 @@
+/**
+ * Task 9c-X2 (people-role-profiles) — ContactService.getContactDetail's
+ * inspection history must be sourced from an inspection_people join (any role
+ * on the contact), not the legacy dual-path linkage predicate
+ * (referredByAgentId/sellingAgentId for agents, clientContactId/clientEmail
+ * for clients — frozen cache, dropped Task 13). Seeds ONLY inspection_people
+ * rows (legacy columns left unset), so this fails against the old
+ * linkage-predicate implementation.
+ */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ContactService } from '../../../server/services/contact.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -10,8 +21,11 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER = '00000000-0000-0000-0000-0000000000ff';
 
+const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
+
 describe('IA-18 — ContactService.getContactDetail', () => {
     let svc: ContactService;
+    let people: PeopleService;
     let testDb: BetterSQLite3Database<typeof schema>;
 
     beforeEach(async () => {
@@ -21,66 +35,73 @@ describe('IA-18 — ContactService.getContactDetail', () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (mockDrizzle as any).mockReturnValue(testDb);
         svc = new ContactService({} as D1Database);
+        people = new PeopleService({ DB: {} as D1Database });
 
         await testDb.insert(schema.tenants).values([
             { id: TENANT, name: 'Acme', slug: 'acme', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
             { id: OTHER, name: 'Other', slug: 'other', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
         ]);
+        await seedRoleProfiles(testDb, TENANT, new Date(1));
     });
 
-    it('client: history via clientContactId AND legacy email-only row, deduped, date desc', async () => {
+    it('client: history via inspection_people (client role), deduped, date desc', async () => {
         await testDb.insert(schema.contacts).values({
             id: 'client-1', tenantId: TENANT, type: 'client', name: 'Jane Buyer',
             email: 'jane@example.com', phone: '+15551234567', createdAt: new Date(),
         });
-        // 1) Linked via clientContactId (no email match needed). Newest date.
-        // 2) Legacy row: NO clientContactId, matched only by clientEmail. Older date.
-        // 3) A row matched by BOTH clientContactId and email — must appear ONCE (dedup).
+        // 1) client role. Newest date.
+        // 2) client role (equivalent of the old "legacy email-only" case — the
+        //    contact holds a role, no email needed for linkage anymore). Older date.
+        // 3) A row where the contact holds BOTH client AND co_client roles —
+        //    must appear ONCE (dedup by inspection id).
         await testDb.insert(schema.inspections).values([
-            { id: 'insp-linked', tenantId: TENANT, propertyAddress: '1 Linked St', clientContactId: 'client-1',
-              clientName: 'Jane Buyer', clientEmail: null, clientPhone: null,
+            { id: 'insp-linked', tenantId: TENANT, propertyAddress: '1 Linked St',
               date: '2026-06-03', status: 'completed', paymentStatus: 'paid', price: 30000,
               paymentRequired: false, agreementRequired: false, createdAt: new Date() },
-            { id: 'insp-legacy', tenantId: TENANT, propertyAddress: '2 Legacy Ave', clientContactId: null,
-              clientName: 'Jane Buyer', clientEmail: 'jane@example.com', clientPhone: null,
+            { id: 'insp-legacy', tenantId: TENANT, propertyAddress: '2 Legacy Ave',
               date: '2026-06-01', status: 'completed', paymentStatus: 'unpaid', price: 25000,
               paymentRequired: false, agreementRequired: false, createdAt: new Date() },
-            { id: 'insp-both', tenantId: TENANT, propertyAddress: '3 Both Rd', clientContactId: 'client-1',
-              clientName: 'Jane Buyer', clientEmail: 'jane@example.com', clientPhone: null,
+            { id: 'insp-both', tenantId: TENANT, propertyAddress: '3 Both Rd',
               date: '2026-06-02', status: 'completed', paymentStatus: 'unpaid', price: 20000,
               paymentRequired: false, agreementRequired: false, createdAt: new Date() },
         ]);
+        await people.addPerson(TENANT, 'insp-linked', 'client-1', roleProfileId('client'));
+        await people.addPerson(TENANT, 'insp-legacy', 'client-1', roleProfileId('client'));
+        await people.addPerson(TENANT, 'insp-both', 'client-1', roleProfileId('client'));
+        await people.addPerson(TENANT, 'insp-both', 'client-1', roleProfileId('co_client'));
 
         const detail = await svc.getContactDetail('client-1', TENANT);
         expect(detail).not.toBeNull();
         if (!detail) throw new Error('unreachable');
 
         expect(detail.contact).toMatchObject({ id: 'client-1', type: 'client', name: 'Jane Buyer' });
-        // Three distinct inspections, deduped (insp-both not double-counted).
+        // Three distinct inspections, deduped (insp-both not double-counted
+        // despite holding two roles for this contact).
         expect(detail.inspections.map(i => i.id)).toEqual(['insp-linked', 'insp-both', 'insp-legacy']);
         expect(detail.stats.inspectionCount).toBe(3);
     });
 
-    it('agent: history via referredByAgentId + legacy sellingAgentId row, deduped', async () => {
+    it('agent: history via inspection_people (buyer_agent + listing_agent roles), deduped', async () => {
         await testDb.insert(schema.contacts).values({
             id: 'agent-1', tenantId: TENANT, type: 'agent', name: 'Bob Agent',
             email: 'bob@bba.com', phone: null, agency: 'BBA Realty', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values([
-            { id: 'insp-referred', tenantId: TENANT, propertyAddress: '1 Referred St', referredByAgentId: 'agent-1',
-              clientName: null, clientEmail: null, clientPhone: null,
+            { id: 'insp-referred', tenantId: TENANT, propertyAddress: '1 Referred St',
               date: '2026-06-05', status: 'completed', paymentStatus: 'paid', price: 30000,
               paymentRequired: false, agreementRequired: false, createdAt: new Date() },
-            { id: 'insp-selling', tenantId: TENANT, propertyAddress: '2 Selling Ave', sellingAgentId: 'agent-1',
-              clientName: null, clientEmail: null, clientPhone: null,
+            { id: 'insp-selling', tenantId: TENANT, propertyAddress: '2 Selling Ave',
               date: '2026-06-04', status: 'completed', paymentStatus: 'unpaid', price: 25000,
               paymentRequired: false, agreementRequired: false, createdAt: new Date() },
-            // Both fields point at the agent — appears once.
-            { id: 'insp-agent-both', tenantId: TENANT, propertyAddress: '3 Both Rd', referredByAgentId: 'agent-1', sellingAgentId: 'agent-1',
-              clientName: null, clientEmail: null, clientPhone: null,
+            // Both roles point at the agent — appears once.
+            { id: 'insp-agent-both', tenantId: TENANT, propertyAddress: '3 Both Rd',
               date: '2026-06-06', status: 'completed', paymentStatus: 'unpaid', price: 20000,
               paymentRequired: false, agreementRequired: false, createdAt: new Date() },
         ]);
+        await people.addPerson(TENANT, 'insp-referred', 'agent-1', roleProfileId('buyer_agent'));
+        await people.addPerson(TENANT, 'insp-selling', 'agent-1', roleProfileId('listing_agent'));
+        await people.addPerson(TENANT, 'insp-agent-both', 'agent-1', roleProfileId('buyer_agent'));
+        await people.addPerson(TENANT, 'insp-agent-both', 'agent-1', roleProfileId('listing_agent'));
 
         const detail = await svc.getContactDetail('agent-1', TENANT);
         expect(detail).not.toBeNull();
@@ -97,15 +118,15 @@ describe('IA-18 — ContactService.getContactDetail', () => {
             email: 'pay@example.com', createdAt: new Date(),
         });
         await testDb.insert(schema.inspections).values([
-            { id: 'insp-paid', tenantId: TENANT, propertyAddress: '1 Paid St', clientContactId: 'client-rev',
-              clientName: 'Pay Client', clientEmail: null, clientPhone: null,
+            { id: 'insp-paid', tenantId: TENANT, propertyAddress: '1 Paid St',
               date: '2026-06-02', status: 'completed', paymentStatus: 'paid', price: 30000,
               paymentRequired: false, agreementRequired: false, createdAt: new Date() },
-            { id: 'insp-unpaid', tenantId: TENANT, propertyAddress: '2 Unpaid Ave', clientContactId: 'client-rev',
-              clientName: 'Pay Client', clientEmail: null, clientPhone: null,
+            { id: 'insp-unpaid', tenantId: TENANT, propertyAddress: '2 Unpaid Ave',
               date: '2026-06-01', status: 'completed', paymentStatus: 'unpaid', price: 25000,
               paymentRequired: false, agreementRequired: false, createdAt: new Date() },
         ]);
+        await people.addPerson(TENANT, 'insp-paid', 'client-rev', roleProfileId('client'));
+        await people.addPerson(TENANT, 'insp-unpaid', 'client-rev', roleProfileId('client'));
         await testDb.insert(schema.invoices).values([
             { id: 'inv-paid', tenantId: TENANT, inspectionId: 'insp-paid', amountCents: 30000,
               lineItems: [], paidAt: new Date(5000), createdAt: new Date(1000) },
@@ -127,11 +148,11 @@ describe('IA-18 — ContactService.getContactDetail', () => {
             email: 'arch@example.com', createdAt: new Date(), archivedAt: new Date(),
         });
         await testDb.insert(schema.inspections).values({
-            id: 'insp-arch', tenantId: TENANT, propertyAddress: '1 Arch St', clientContactId: 'client-arch',
-            clientName: 'Archived Client', clientEmail: null, clientPhone: null,
+            id: 'insp-arch', tenantId: TENANT, propertyAddress: '1 Arch St',
             date: '2026-06-01', status: 'completed', paymentStatus: 'unpaid', price: 10000,
             paymentRequired: false, agreementRequired: false, createdAt: new Date(),
         });
+        await people.addPerson(TENANT, 'insp-arch', 'client-arch', roleProfileId('client'));
 
         const detail = await svc.getContactDetail('client-arch', TENANT);
         expect(detail).not.toBeNull();

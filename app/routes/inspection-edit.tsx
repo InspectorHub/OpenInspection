@@ -14,7 +14,7 @@ import { useKeyboard } from "~/hooks/useKeyboard";
 import { useCannedComments } from "~/hooks/useCannedComments";
 import { useUnsavedChanges } from "~/hooks/useUnsavedChanges";
 import { usePresence } from "~/hooks/usePresence";
-import { useTheme } from "~/hooks/useTheme";
+import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { useResultsDoc } from "~/lib/collab/use-results-doc";
 import { useMediaDrain } from "~/hooks/useMediaDrain";
 import { bindResultMap, appendPendingPhoto } from "~/lib/collab/results-binding";
@@ -212,7 +212,6 @@ export default function InspectionEditPage() {
  // affordance). Both feed the same handlePhotoUpload batch handler.
  const cameraInputRef = useRef<HTMLInputElement>(null);
  const libraryInputRef = useRef<HTMLInputElement>(null);
- const { scheme, setColorScheme } = useTheme();
 
  /* Plan 7 — add-media chooser (photo OR video) + video capture overlay. The
   * add tile opens the chooser; Task 16 split "Photo" into "Take photo"
@@ -1770,6 +1769,18 @@ export default function InspectionEditPage() {
  >
  {sideRailEl}
  </MobileBottomDrawer>
+ {/* Theme — narrow-screen home for the theme control the xl+ header shows
+     inline, so the auto/light/dark/field preference is reachable on tablet
+     and phone too. */}
+ <MobileBottomDrawer
+ open={mobileDrawer === 'theme'}
+ onClose={() => setMobileDrawer(null)}
+ title={m.nav_theme_label()}
+ >
+ <div className="p-4">
+  <ThemeSegmentControl />
+ </div>
+ </MobileBottomDrawer>
  </div>
  );
  }
@@ -2115,8 +2126,6 @@ export default function InspectionEditPage() {
  {/* ------------------------------------------------------------ */}
  <EditorHeader
  state={state}
- scheme={scheme}
- setColorScheme={setColorScheme}
  tenantSlug={loaderData.tenantSlug}
  setSignModalOpen={setSignModalOpen}
  handlePublishClick={handlePublishClick}

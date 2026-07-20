@@ -95,6 +95,7 @@ app.all("/.well-known/*", toApi);
 app.all("/doc", toApi); // OpenAPI JSON (the RR /ui Swagger page fetches it); /ui itself is now an RR route
 app.all("/sso", toApi); // saas SSO handoff (coreAuthRoutes is also mounted at '/')
 app.all("/sign/*", toApi); // public signing pages — no React Router /sign route
+app.all("/agent/magic-login", toApi); // agent unified link redeem — no React Router page for this path
 app.get("/inspector/:tenant/:slug/calendar.ics", toApi); // ICS feed (API-only)
 app.get("/observe/:token", toApi); // 1-seg observe — RR owns /observe/inspections/:id
 

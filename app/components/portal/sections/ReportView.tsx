@@ -21,6 +21,7 @@ import { useState } from "react";
 import { m } from "~/paraglide/messages";
 import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
 import { brandTokens } from "~/lib/brand";
+import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, isDefect } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
@@ -97,6 +98,10 @@ export interface ReportViewProps extends ReportLoaderResult {
    * Mirrors `PaymentSection`'s `showStandaloneChrome` convention.
    */
   showStandaloneChrome?: boolean;
+  /** Spec 3: hide client-transaction affordances (repair-list / build-repair
+   *  links + the in-report Repair Request toggle) when an AGENT is viewing the
+   *  report via their link. Report-viewing actions (Print, Download PDF) stay. */
+  hideClientActions?: boolean;
 }
 
 /**
@@ -385,7 +390,7 @@ export function ReportView(props: ReportViewProps) {
             </span>
           </div>
           <div className="flex items-center gap-2 print:hidden">
-            {data.enableRepairList && (
+            {!data.hideClientActions && data.enableRepairList && (
               <a
                 href={`/inspections/${data.inspectionId}/repair-list`}
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
@@ -393,7 +398,7 @@ export function ReportView(props: ReportViewProps) {
                 {m.report_view_repair_list_link()}
               </a>
             )}
-            {data.enableCustomerRepairExport && (
+            {!data.hideClientActions && data.enableCustomerRepairExport && (
               <a
                 href={`/repair-builder/${tenant}/${id}${urlToken ? `?token=${encodeURIComponent(urlToken)}` : ""}`}
                 className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
@@ -408,13 +413,15 @@ export function ReportView(props: ReportViewProps) {
             >
               {m.report_view_print()}
             </button>
-            <button
-              type="button"
-              onClick={() => setRepairPanel(!repairPanel)}
-              className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg flex items-center gap-2"
-            >
-              {m.portal_hub_nav_repair()}
-            </button>
+            {!data.hideClientActions && (
+              <button
+                type="button"
+                onClick={() => setRepairPanel(!repairPanel)}
+                className="px-4 py-2 text-sm font-semibold rounded-lg bg-ih-primary text-ih-primary-fg flex items-center gap-2"
+              >
+                {m.portal_hub_nav_repair()}
+              </button>
+            )}
           </div>
         </div>
         {/* Big property-ADDRESS title — standalone only. Inline in the Hub the
@@ -427,7 +434,8 @@ export function ReportView(props: ReportViewProps) {
           </h1>
         )}
         <p className="text-sm text-ih-fg-3">
-          {data.date} &middot; {m.report_view_inspector({ name: data.inspectorName || m.report_view_na() })}
+          {data.date ? `${formatInspectionDateTime(data.date, undefined, data.reportTimeZone)} · ` : ""}
+          {m.report_view_inspector({ name: data.inspectorName || m.report_view_na() })}
         </p>
       </div>
 

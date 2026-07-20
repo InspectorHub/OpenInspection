@@ -1,3 +1,5 @@
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 export type HolidayPublicPolicy = "open" | "block" | "advisory";
@@ -25,6 +27,7 @@ export function CompanyClosedStrip({
   holidayPublicPolicy: HolidayPublicPolicy;
   upcomingClosed: ClosedDate[];
 }) {
+  const locale = useDisplayLocale();
   return (
     <section
       className="bg-ih-bg-muted border border-ih-border rounded-lg px-4 py-3 space-y-2"
@@ -42,7 +45,7 @@ export function CompanyClosedStrip({
         <ul className="flex flex-wrap gap-x-4 gap-y-1">
           {upcomingClosed.map((day) => (
             <li key={day.date} className="text-[12px] text-ih-fg-2">
-              <span className="font-bold">{day.date}</span>
+              <span className="font-bold">{formatDate(day.date, { locale, timeZone: "UTC" })}</span>
               <span className="text-ih-fg-3"> — {day.name}</span>
             </li>
           ))}

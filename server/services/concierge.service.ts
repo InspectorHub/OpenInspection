@@ -8,11 +8,14 @@ import {
     contacts,
     users,
     tenants,
+    contactRoleProfiles,
 } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
+import { PeopleService } from './people.service';
+import { ContactService } from './contact.service';
 import type { EmailService } from './email.service';
 import type { PlanQuotaGuard } from '../features/plan-quota/guard';
 
@@ -184,11 +187,7 @@ export class ConciergeService {
             id: inspectionId,
             tenantId: params.tenantId,
             inspectorId: inspector.id,
-            referredByAgentId: link.inspectorContactId ?? null,
             propertyAddress: params.propertyAddress,
-            clientName: params.clientName,
-            clientEmail: params.clientEmail,
-            clientPhone: params.clientPhone ?? null,
             date: params.date,
             status: 'scheduled',
             paymentStatus: 'unpaid',
@@ -200,6 +199,49 @@ export class ConciergeService {
         });
         // DB-8: mirror assignment into inspection_inspectors link table.
         await syncInspectionAssignments(db, params.tenantId, inspectionId, { inspectorId: inspector.id });
+
+        // Task 7b (people-role-profiles), FIXED (Task 9b regression) — mirror
+        // both the client and the referring agent into inspection_people
+        // (client / buyer_agent). Task 13 dropped the legacy clientName/
+        // clientEmail/clientPhone/referredByAgentId columns from inspections,
+        // so this is now the ONLY persistence of WHO. The client contact is
+        // resolved via the same idempotent upsert booking.service/core.ts use
+        // (matches by tenant + normalized email), so approveByInspector's
+        // PeopleService.getPrimaryClient join (Task 9b) always resolves a
+        // client for a concierge booking.
+        // Non-fatal: a people-write failure must never roll back an
+        // already-committed inspection row.
+        try {
+            const roleRows = await db.select({ id: contactRoleProfiles.id, key: contactRoleProfiles.key })
+                .from(contactRoleProfiles)
+                .where(and(eq(contactRoleProfiles.tenantId, params.tenantId), eq(contactRoleProfiles.active, true)));
+            const roleIdByKey = new Map(roleRows.map(r => [r.key, r.id]));
+            const people = new PeopleService({ DB: this.db });
+
+            let clientContactId: string | null = null;
+            if (params.clientEmail || params.clientName) {
+                const { id } = await new ContactService(this.db).upsertClientContact(params.tenantId, {
+                    name: params.clientName,
+                    email: params.clientEmail,
+                    type: 'client',
+                    ...(params.clientPhone ? { phone: params.clientPhone } : {}),
+                });
+                clientContactId = id;
+            }
+
+            const links: Array<[string | null, string | undefined]> = [
+                [clientContactId, roleIdByKey.get('client')],
+                [link.inspectorContactId, roleIdByKey.get('buyer_agent')],
+            ];
+            for (const [contactId, roleProfileId] of links) {
+                if (contactId && roleProfileId) {
+                    await people.addPerson(params.tenantId, inspectionId, contactId, roleProfileId);
+                }
+            }
+        } catch (err) {
+            logger.error('inspection-people write from concierge create failed', { inspectionId }, err instanceof Error ? err : undefined);
+        }
+
         logger.info('concierge.createBooking', {
             tenantId: params.tenantId,
             inspectionId,
@@ -254,7 +296,10 @@ export class ConciergeService {
         if (insp.conciergeStatus !== 'awaiting_inspector') {
             throw Errors.Conflict('Inspection is not awaiting inspector approval');
         }
-        if (!insp.clientEmail) {
+        // Resolve the client via the inspection_people primary-client join
+        // (insp.clientEmail is a frozen legacy cache, dropped Task 13).
+        const client = await new PeopleService({ DB: this.db }).getPrimaryClient(tenantId, inspectionId);
+        if (!client?.email) {
             throw Errors.BadRequest('Inspection has no client email on file');
         }
 
@@ -274,7 +319,7 @@ export class ConciergeService {
             .set({ conciergeStatus: 'awaiting_client' })
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)));
 
-        await this.mintTokenAndEmailClient(inspectionId, tenantId, insp.clientEmail, {
+        await this.mintTokenAndEmailClient(inspectionId, tenantId, client.email, {
             propertyAddress: insp.propertyAddress,
             date: insp.date,
             inspectorName,
@@ -322,26 +367,28 @@ export class ConciergeService {
                 ),
             );
 
-        // Notify the originating agent. The referredByAgentId on the
-        // inspection points at the agent's contact row in this tenant; the
-        // contact carries the agent's email.
+        // Notify the originating agent. The buyer's-agent contact is resolved
+        // via the inspection_people (buyer_agent) join (Task 9c-X2) — not the
+        // legacy inspections.referredByAgentId column (frozen cache, dropped
+        // Task 13) — then looked up in contacts as before.
         try {
             const insp = await db
                 .select({
-                    referredByAgentId: inspections.referredByAgentId,
                     propertyAddress: inspections.propertyAddress,
                     date: inspections.date,
                 })
                 .from(inspections)
                 .where(eq(inspections.id, row.inspectionId))
                 .get();
-            if (insp?.referredByAgentId) {
+            const buyerAgentContactId = await new PeopleService({ DB: this.db })
+                .contactIdForRole(row.tenantId, row.inspectionId, 'buyer_agent');
+            if (insp && buyerAgentContactId) {
                 const agentContact = await db
                     .select({ email: contacts.email, name: contacts.name })
                     .from(contacts)
                     .where(
                         and(
-                            eq(contacts.id, insp.referredByAgentId),
+                            eq(contacts.id, buyerAgentContactId),
                             eq(contacts.tenantId, row.tenantId),
                         ),
                     )
@@ -433,6 +480,13 @@ export class ConciergeService {
             }
         }
 
+        // Task 9c (people-role-profiles) — clientName/clientEmail are sourced
+        // from the inspection_people primary-client join (PeopleService), not
+        // the legacy inspections.client_name/_email columns (frozen cache,
+        // dropped Task 13). Hard cutover, no legacy-column fallback, mirroring
+        // approveByInspector's PeopleService.getPrimaryClient use above.
+        const primaryClient = await new PeopleService({ DB: this.db }).getPrimaryClient(insp.tenantId, insp.id);
+
         const expMs = toMs(row.expiresAt);
         return {
             inspection: {
@@ -441,8 +495,8 @@ export class ConciergeService {
                 tenantSlug,
                 propertyAddress: insp.propertyAddress,
                 date: insp.date,
-                clientName: insp.clientName ?? null,
-                clientEmail: insp.clientEmail ?? null,
+                clientName: primaryClient?.name ?? null,
+                clientEmail: primaryClient?.email ?? null,
                 agreementRequired: !!insp.agreementRequired,
                 inspectorId: insp.inspectorId ?? null,
             },

@@ -1,11 +1,21 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq } from 'drizzle-orm';
-import { agentTenantLinks, tenants, users } from '../../lib/db/schema/tenant';
+import { alias } from 'drizzle-orm/sqlite-core';
+import { agentTenantLinks, tenants, tenantConfigs, users } from '../../lib/db/schema/tenant';
 import { contacts } from '../../lib/db/schema/contact';
 import { inspections, inspectionResults } from '../../lib/db/schema/inspection';
+import { inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
+import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { REPORT_STATUS } from '../../lib/status/report-status';
+
+// Task 9c — the CLIENT role join, aliased so it can coexist in the same query
+// as the buyer_agent join (contactRoleProfiles/inspectionPeople/contacts,
+// unaliased above) without column/table-name collisions.
+const clientRoleProfiles = alias(contactRoleProfiles, 'client_role_profiles');
+const clientPeople = alias(inspectionPeople, 'client_people');
+const clientContacts = alias(contacts, 'client_contacts');
 import {
     flattenInspectionToRecommendations,
     groupRecommendations,
@@ -17,6 +27,12 @@ export interface AgentReferralRow {
     tenantId: string;
     tenantName: string;
     tenantSlug: string;
+    /** Owning tenant's display timezone (IANA; 'UTC' when the tenant has no
+     *  tenant_configs row or hasn't set default_timezone — same source as the
+     *  session-context branding.defaultTimezone). The agent dashboard renders
+     *  each referral date in this zone unless the agent set a personal timezone
+     *  override (see users.timezone). */
+    tenantTimezone: string;
     propertyAddress: string;
     clientName: string | null;
     date: string;
@@ -40,8 +56,8 @@ export interface AgentInspectorRow {
  * The agent↔inspection association predicate, shared verbatim by listReferrals,
  * accessToInspection, and listRecommendationsForAgent. An agent is associated
  * with a referral row when either:
- *   1. the inspection's `referredByAgentId` equals the active link's
- *      `inspectorContactId` (canonical link), OR
+ *   1. the inspection's buyer_agent `inspection_people` contactId equals the
+ *      active link's `inspectorContactId` (canonical link), OR
  *   2. the referred contact's email matches the agent's email (legacy
  *      contacts pre-A1 promotion).
  *
@@ -64,10 +80,11 @@ function getAgentReferralFilter(
  * `agent_tenant_links` (active only) so the agent only sees inspections in
  * tenants they currently have access to. Restricts to inspections that
  * either:
- *   1. Carry a `referredByAgentId` matching this agent's contact id in
- *      that tenant (canonical link, populated by inspection create), OR
- *   2. Carry a `referredByAgentId` whose contact email matches the agent
- *      user's email (legacy contacts pre-A1 promotion).
+ *   1. Carry a buyer_agent `inspection_people` contactId matching this
+ *      agent's contact id in that tenant (canonical link, populated by
+ *      inspection create), OR
+ *   2. Carry a buyer_agent contact whose email matches the agent user's
+ *      email (legacy contacts pre-A1 promotion).
  *
  * The compound predicate keeps the query single-roundtrip while remaining
  * resilient to tenants that haven't backfilled `inspectorContactId` on
@@ -85,13 +102,18 @@ export async function listReferrals(
             tenantId:        inspections.tenantId,
             tenantName:      tenants.name,
             tenantSlug: tenants.slug,
+            tenantTimezone:  tenantConfigs.defaultTimezone,
             propertyAddress: inspections.propertyAddress,
-            clientName:      inspections.clientName,
+            // Task 9c — sourced via the client-role inspection_people join
+            // below, NOT the legacy inspections.client_name column (which
+            // survives GDPR erasure as a stale denormalized cache and would
+            // leak the erased subject's name).
+            clientName:      clientContacts.name,
             date:            inspections.date,
             status:          inspections.status,
             reportStatus:    inspections.reportStatus,
             paymentStatus:   inspections.paymentStatus,
-            referredById:    inspections.referredByAgentId,
+            referredById:    inspectionPeople.contactId,
             contactEmail:    contacts.email,
             inspectorName:   users.name,
             linkContactId:   agentTenantLinks.inspectorContactId,
@@ -106,11 +128,69 @@ export async function listReferrals(
             ),
         )
         .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
+        // Owning tenant's display timezone (branding.default_timezone lives on
+        // tenant_configs). Left join: tenants without a config row fall back to
+        // 'UTC' in the row mapping below.
+        .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, inspections.tenantId))
+        // Buyer's-agent attribution: inspections -> contact_role_profiles
+        // (this tenant's buyer_agent profile) -> inspection_people -> contacts.
+        // contact_role_profiles is joined FIRST (correlated on tenantId only,
+        // so it narrows to at most one row per tenant) so the inspection_people
+        // join below only ever matches buyer_agent rows — joining
+        // inspection_people first would fan out over every role (client,
+        // co_client, listing_agent, ...) on the inspection. Replaces the
+        // legacy inspections.referredByAgentId column read (see PeopleService).
+        .leftJoin(
+            contactRoleProfiles,
+            and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            inspectionPeople,
+            and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ),
+        )
         .leftJoin(
             contacts,
             and(
-                eq(contacts.id, inspections.referredByAgentId),
+                eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
+            ),
+        )
+        // Client attribution: inspections -> contact_role_profiles (this
+        // tenant's client profile) -> inspection_people -> contacts, aliased
+        // to coexist with the buyer_agent join above. Role filter joined
+        // FIRST for the same fan-out-avoidance reason as buyer_agent.
+        // Replaces the legacy inspections.clientName column read (see
+        // PeopleService.getPrimaryClient) — at most one client row per
+        // inspection (PeopleService.addPerson enforces this), so no fan-out.
+        .leftJoin(
+            clientRoleProfiles,
+            and(
+                eq(clientRoleProfiles.tenantId, inspections.tenantId),
+                eq(clientRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                eq(clientRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            clientPeople,
+            and(
+                eq(clientPeople.roleProfileId, clientRoleProfiles.id),
+                eq(clientPeople.inspectionId, inspections.id),
+                eq(clientPeople.tenantId, inspections.tenantId),
+            ),
+        )
+        .leftJoin(
+            clientContacts,
+            and(
+                eq(clientContacts.id, clientPeople.contactId),
+                eq(clientContacts.tenantId, inspections.tenantId),
             ),
         )
         .leftJoin(users, eq(users.id, inspections.inspectorId))
@@ -126,8 +206,8 @@ export async function listReferrals(
     const agentEmail = agent?.email ?? null;
 
     // Filter rows in JS — SQLite's join planner doesn't compose the OR
-    // predicate (link.contactId == inspection.referredByAgentId OR
-    // contact.email == agentEmail) cleanly when contacts is a left-join.
+    // predicate (link.contactId == inspection_people's buyer_agent contactId
+    // OR contact.email == agentEmail) cleanly when contacts is a left-join.
     // Doing the filter post-fetch is fine: the inner join on links already
     // narrows to ≤ N tenants × inspections, and N is small in practice.
     const filtered = refRows.filter(getAgentReferralFilter(agentEmail));
@@ -137,6 +217,7 @@ export async function listReferrals(
         tenantId:        r.tenantId,
         tenantName:      r.tenantName,
         tenantSlug: r.tenantSlug,
+        tenantTimezone:  r.tenantTimezone ?? 'UTC',
         propertyAddress: r.propertyAddress,
         clientName:      r.clientName ?? null,
         date:            r.date,
@@ -156,8 +237,9 @@ export async function listReferrals(
  *
  * Uses the same association predicate as listReferrals:
  *   - active agent_tenant_links row for (agentUserId, inspection.tenantId), AND
- *   - inspection.referredByAgentId matches either the link's inspectorContactId
- *     OR a contacts row (type='agent') whose email equals the agent's email.
+ *   - the inspection's buyer_agent inspection_people contactId matches either
+ *     the link's inspectorContactId OR a contacts row (type='agent') whose
+ *     email equals the agent's email.
  *
  * Single inspection id → at most one tenant; the inner join + filter keeps
  * this O(1) in practice.
@@ -171,7 +253,7 @@ export async function accessToInspection(
     const rows = await db
         .select({
             tenantId:      inspections.tenantId,
-            referredById:  inspections.referredByAgentId,
+            referredById:  inspectionPeople.contactId,
             contactEmail:  contacts.email,
             linkContactId: agentTenantLinks.inspectorContactId,
         })
@@ -184,10 +266,29 @@ export async function accessToInspection(
                 eq(agentTenantLinks.status, 'active'),
             ),
         )
+        // Buyer's-agent attribution via inspection_people — see listReferrals
+        // above for why contact_role_profiles is joined before
+        // inspection_people (avoids fanning out over every role).
+        .leftJoin(
+            contactRoleProfiles,
+            and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            inspectionPeople,
+            and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ),
+        )
         .leftJoin(
             contacts,
             and(
-                eq(contacts.id, inspections.referredByAgentId),
+                eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
             ),
         )
@@ -226,7 +327,7 @@ export async function listRecommendationsForAgent(
             propertyAddress:   inspections.propertyAddress,
             date:              inspections.date,
             templateSnapshot:  inspections.templateSnapshot,
-            referredById:      inspections.referredByAgentId,
+            referredById:      inspectionPeople.contactId,
             contactEmail:      contacts.email,
             linkContactId:     agentTenantLinks.inspectorContactId,
             resultsData:       inspectionResults.data,
@@ -240,10 +341,29 @@ export async function listRecommendationsForAgent(
                 eq(agentTenantLinks.status, 'active'),
             ),
         )
+        // Buyer's-agent attribution via inspection_people — see listReferrals
+        // above for why contact_role_profiles is joined before
+        // inspection_people (avoids fanning out over every role).
+        .leftJoin(
+            contactRoleProfiles,
+            and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            inspectionPeople,
+            and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
+            ),
+        )
         .leftJoin(
             contacts,
             and(
-                eq(contacts.id, inspections.referredByAgentId),
+                eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
             ),
         )
@@ -338,7 +458,7 @@ export async function referralsByDay(
     const rows = await db
         .select({
             createdAt:    inspections.createdAt,
-            referredById: inspections.referredByAgentId,
+            referredById: inspectionPeople.contactId,
             linkContactId: agentTenantLinks.inspectorContactId,
         })
         .from(inspections)
@@ -348,6 +468,30 @@ export async function referralsByDay(
                 eq(agentTenantLinks.tenantId, inspections.tenantId),
                 eq(agentTenantLinks.agentUserId, agentUserId),
                 eq(agentTenantLinks.status, 'active'),
+            ),
+        )
+        // Buyer's-agent attribution via inspection_people — see listReferrals
+        // above for why contact_role_profiles is joined before
+        // inspection_people (avoids fanning out over every role). NOTE: if an
+        // inspection ever carries more than one buyer_agent inspection_people
+        // row for this same agent contact, it would be double-counted here
+        // (no downstream dedup, unlike listReferrals' predicate filter) — not
+        // possible via the current create paths (single buyer_agent per
+        // inspection), flagged for awareness.
+        .leftJoin(
+            contactRoleProfiles,
+            and(
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.key, 'buyer_agent'),
+                eq(contactRoleProfiles.active, true),
+            ),
+        )
+        .leftJoin(
+            inspectionPeople,
+            and(
+                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                eq(inspectionPeople.inspectionId, inspections.id),
+                eq(inspectionPeople.tenantId, inspections.tenantId),
             ),
         )
         .all();

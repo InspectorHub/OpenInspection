@@ -201,5 +201,21 @@ export default defineConfig({
         // pdf-lib). Exercises the actual worker report render + BROWSER binding;
         // see tests/e2e/report-toc-numbers.spec.ts for its harness requirements.
         { name: 'report-toc-numbers', testMatch: 'report-toc-numbers.spec.ts', dependencies: ['editor-seed'] },
+        // Plan 1B Task 8 — people/role-profile flow (Roles tab CRUD + People
+        // section add + primary-client conflict). Depends on `editor-seed` for
+        // the shared admin + a real inspection id (the `api` project it in
+        // turn depends on already seeds the 8 default role profiles).
+        { name: 'people-role-profiles', testMatch: 'people-role-profiles.spec.ts', dependencies: ['editor-seed'] },
+        // Spec 2 Task 8 — role-aware report sending (final task of the
+        // role-aware-sending plan). Seeds its own template + inspection (does
+        // NOT reuse the shared editor-seed fixture — it flips that
+        // inspection's global status via /complete + /publish). Depends on
+        // `api` for the shared admin + the 8 seeded default role profiles.
+        { name: 'role-aware-sending', testMatch: 'role-aware-sending.spec.ts', dependencies: ['api'] },
+        // Spec 3 Task 8 — agent unified link (final task of the agent-unified-
+        // link plan). Seeds its own two dedicated inspections (registered vs
+        // unregistered agent recipient) and a global agent account — depends
+        // on `api` for the shared admin + the 8 seeded default role profiles.
+        { name: 'agent-unified-link', testMatch: 'agent-unified-link.spec.ts', dependencies: ['api'] },
     ],
 });

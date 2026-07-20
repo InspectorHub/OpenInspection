@@ -1,9 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { runErasure } from '../../../server/lib/compliance/erasure-orchestrator';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { PeopleService } from '../../../server/services/people.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+
+// PeopleService.getPrimaryClient resolves `drizzle(env.DB)` internally
+// (drizzle-orm/d1); mock it to return this test's better-sqlite3 instance so
+// the compliance-proof assertion below exercises the SAME live read path
+// production code uses (getInspection/listInspections/agreements all call
+// through PeopleService too).
+vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
+import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 
 const TENANT_A = '00000000-0000-0000-0000-000000000001';
 const TENANT_B = '00000000-0000-0000-0000-000000000002';
@@ -22,15 +32,18 @@ async function seedTenants(db: BetterSQLite3Database<typeof schema>) {
 
 /**
  * Seed a SIGNED multi-signer envelope for the subject (terminal state) plus a
- * second signer (co-client) with different PII, an inspection carrying the
- * subject's client columns, a contact row, and a tamper-evident audit chain.
+ * second signer (co-client) with different PII, an inspection linked to the
+ * subject via `inspection_people` (the LIVE client-identity path — the
+ * `inspections.client_*` columns are a frozen, unread cache and are
+ * intentionally left NULL here to prove the orchestrator does not depend on
+ * them), a contact row, and a tamper-evident audit chain.
  */
 async function seedSignedEnvelope(db: BetterSQLite3Database<typeof schema>, signedAtMs: number) {
     const inspId = 'insp-signed';
     const reqId = 'req-signed';
+    await seedRoleProfiles(db, TENANT_A, new Date(1));
     await db.insert(schema.inspections).values({
         id: inspId, tenantId: TENANT_A, propertyAddress: '1 Main St',
-        clientName: 'Jane Subject', clientEmail: SUBJECT_EMAIL, clientPhone: '555-1111',
         date: '2026-06-01', status: 'completed', paymentStatus: 'unpaid', price: 50000, createdAt: new Date(),
     });
     await db.insert(schema.agreementRequests).values({
@@ -61,6 +74,11 @@ async function seedSignedEnvelope(db: BetterSQLite3Database<typeof schema>, sign
         id: 'contact-subject', tenantId: TENANT_A, type: 'client',
         name: 'Jane Subject', email: SUBJECT_EMAIL, phone: '555-1111', createdAt: new Date(),
     });
+    // The live client-identity link (inspection <-> contact <-> 'client' role).
+    await db.insert(schema.inspectionPeople).values({
+        id: 'ip-subject', tenantId: TENANT_A, inspectionId: inspId,
+        contactId: 'contact-subject', roleProfileId: `crp_${TENANT_A}_client`, createdAt: new Date(),
+    });
     // Tamper-evident audit chain — must remain UNTOUCHED.
     await db.insert(schema.esignAuditLogs).values([
         {
@@ -82,6 +100,8 @@ describe('runErasure', () => {
         sqlite = fixture.sqlite;
         await setupSchema(fixture.sqlite);
         await seedTenants(db);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (mockDrizzle as any).mockReturnValue(db);
     });
 
     it('signed agreement -> anonymized PII, signature + chain KEPT, log row w/ retentionExpiry + legalBasis', async () => {
@@ -260,36 +280,70 @@ describe('runErasure', () => {
         expect(decisions.some(d => d.table === 'agreement_requests' && d.action === 'delete')).toBe(false);
     });
 
-    it('non-agreement client PII (inspections + contacts) -> nulled', async () => {
-        await seedSignedEnvelope(db, Date.UTC(2024, 0, 1));
-        await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
+    it('non-agreement client PII (contacts + inspection_people) -> actually erased from every live read path', async () => {
+        const { inspId } = await seedSignedEnvelope(db, Date.UTC(2024, 0, 1));
+        const summary = await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
 
-        const insp = await db.select().from(schema.inspections)
-            .where(eq(schema.inspections.id, 'insp-signed')).get();
-        expect(insp!.clientName).toBeNull();
-        expect(insp!.clientEmail).toBeNull();
-        expect(insp!.clientPhone).toBeNull();
-
-        // contacts.name is NOT NULL -> the CRM contact row is deleted outright.
+        // contacts.name is NOT NULL -> the CRM contact row (the LIVE source of
+        // client PII) is deleted outright.
         const contact = await db.select().from(schema.contacts)
             .where(eq(schema.contacts.id, 'contact-subject')).get();
         expect(contact).toBeUndefined();
+
+        // The inspection_people row that linked the inspection to that contact
+        // is gone too — orphan cleanup, ordered BEFORE the contacts delete so
+        // it can still resolve the contact id via contacts.email.
+        const ip = await db.select().from(schema.inspectionPeople)
+            .where(eq(schema.inspectionPeople.contactId, 'contact-subject')).all();
+        expect(ip.length).toBe(0);
+
+        // Compliance proof: the SAME primary-client join production code reads
+        // through (getInspection/listInspections/agreements all call
+        // PeopleService.getPrimaryClient) now resolves to null for this subject
+        // — the client is provably gone, not just relocated.
+        const people = new PeopleService({ DB: {} as D1Database });
+        const primary = await people.getPrimaryClient(TENANT_A, inspId);
+        expect(primary).toBeNull();
+
+        // Decision log recorded both steps.
+        const decisions = summary.decisions;
+        expect(decisions.some(d => d.table === 'contacts' && d.action === 'delete' && d.count > 0)).toBe(true);
+        expect(decisions.some(d => d.table === 'inspection_people' && d.action === 'delete' && d.count > 0)).toBe(true);
+
+        // Task 13 — inspections.client_name/client_email/client_phone (the
+        // legacy cache this orchestrator never wrote) are dropped columns now,
+        // not just an unread cache. Nothing left to assert on that row.
+        const insp = await db.select().from(schema.inspections)
+            .where(eq(schema.inspections.id, inspId)).get();
+        expect(insp).toBeTruthy();
     });
 
-    it('tenant-scoped: other tenant rows with same email untouched', async () => {
+    it('tenant-scoped: other tenant contact + inspection_people rows with same email untouched', async () => {
         await seedSignedEnvelope(db, Date.UTC(2024, 0, 1));
+        await seedRoleProfiles(db, TENANT_B, new Date(1));
         await db.insert(schema.inspections).values({
             id: 'insp-other-tenant', tenantId: TENANT_B, propertyAddress: '3 Main',
-            clientName: 'Cross', clientEmail: SUBJECT_EMAIL, date: '2026-06-03',
-            status: 'requested', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
+            date: '2026-06-03', status: 'requested', paymentStatus: 'unpaid', price: 1, createdAt: new Date(),
+        });
+        await db.insert(schema.contacts).values({
+            id: 'contact-other-tenant', tenantId: TENANT_B, type: 'client',
+            name: 'Cross', email: SUBJECT_EMAIL, createdAt: new Date(),
+        });
+        await db.insert(schema.inspectionPeople).values({
+            id: 'ip-other-tenant', tenantId: TENANT_B, inspectionId: 'insp-other-tenant',
+            contactId: 'contact-other-tenant', roleProfileId: `crp_${TENANT_B}_client`, createdAt: new Date(),
         });
 
         await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
 
-        const other = await db.select().from(schema.inspections)
-            .where(eq(schema.inspections.id, 'insp-other-tenant')).get();
-        expect(other!.clientName).toBe('Cross');
-        expect(other!.clientEmail).toBe(SUBJECT_EMAIL);
+        const otherContact = await db.select().from(schema.contacts)
+            .where(eq(schema.contacts.id, 'contact-other-tenant')).get();
+        expect(otherContact).toBeTruthy();
+        expect(otherContact!.email).toBe(SUBJECT_EMAIL);
+
+        const otherIp = await db.select().from(schema.inspectionPeople)
+            .where(eq(schema.inspectionPeople.id, 'ip-other-tenant')).get();
+        expect(otherIp).toBeTruthy();
     });
 
     it('idempotent re-run -> 0 new anonymizations, still writes a log row', async () => {
@@ -309,16 +363,17 @@ describe('runErasure', () => {
     it('partial failure -> status partially_completed, landed decisions still recorded', async () => {
         await seedSignedEnvelope(db, Date.UTC(2024, 0, 1));
 
-        // Force the inspections UPDATE step to throw by monkeypatching db.update
-        // so that ONLY the inspections table call rejects; everything else lands.
-        const realUpdate = db.update.bind(db);
-        const spy = vi.spyOn(db, 'update').mockImplementation(((table: unknown) => {
-            if (table === schema.inspections) {
+        // Force the inspection_people orphan-cleanup DELETE to throw by
+        // monkeypatching db.delete so that ONLY that step rejects; everything
+        // else (signer anonymize, the later contacts delete) still lands.
+        const realDelete = db.delete.bind(db);
+        const spy = vi.spyOn(db, 'delete').mockImplementation(((table: unknown) => {
+            if (table === schema.inspectionPeople) {
                 return {
-                    set: () => ({ where: () => ({ run: () => { throw new Error('forced inspections failure'); } }) }),
+                    where: () => ({ run: () => { throw new Error('forced inspection_people failure'); } }),
                 } as never;
             }
-            return realUpdate(table as never);
+            return realDelete(table as never);
         }) as never);
 
         const summary = await runErasure(db, { tenantId: TENANT_A, subjectEmail: SUBJECT_EMAIL, retentionYears: 6 });
@@ -330,6 +385,13 @@ describe('runErasure', () => {
         const subjectSigner = await db.select().from(schema.agreementSigners)
             .where(eq(schema.agreementSigners.id, 'signer-subject')).get();
         expect(subjectSigner!.email).toBe('[erased]');
+
+        // The contacts delete (a later, independent step) still landed too —
+        // the subject's client PII is still actually erased even though the
+        // orphan-cleanup step failed.
+        const contact = await db.select().from(schema.contacts)
+            .where(eq(schema.contacts.id, 'contact-subject')).get();
+        expect(contact).toBeUndefined();
 
         // A log row was written reflecting the partial status, with the error noted.
         const logs = await db.select().from(schema.erasureLog).all();

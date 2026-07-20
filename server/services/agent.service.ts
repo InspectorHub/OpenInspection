@@ -19,7 +19,8 @@ import {
     type AcceptInviteResult,
 } from './agent/invite';
 import { signup, autoLinkSameEmail } from './agent/signup';
-import { updateProfile, type AgentProfilePatch } from './agent/profile';
+import { updateProfile, getProfile, type AgentProfilePatch } from './agent/profile';
+import { findGlobalAgentByEmail } from './agent/account';
 
 export type { AgentReferralRow, AgentInspectorRow } from './agent/referral';
 export type { ResolvedInvite, AcceptInviteInput, AcceptInviteResult } from './agent/invite';
@@ -213,5 +214,24 @@ export class AgentService {
      */
     async updateProfile(userId: string, patch: AgentProfilePatch): Promise<void> {
         return updateProfile(this.db, userId, patch);
+    }
+
+    /**
+     * Spec 3 Task 4b — Read the signed-in agent's profile (slug + notification
+     * prefs) for GET /api/agent/profile.
+     */
+    async getProfile(userId: string): ReturnType<typeof getProfile> {
+        return getProfile(this.db, userId);
+    }
+
+    /**
+     * Spec 3 Task 2 — global-agent existence check (tenant_id IS NULL,
+     * role='agent', not soft-deleted). Consumed by the agent magic-login
+     * primitive to decide `loginUrl: null` (anti-oracle, no account) vs a
+     * minted code, and by later tasks (3/5/7) wiring the agent unified link.
+     * Delegates to the single shared query in agent/account.ts.
+     */
+    async accountExistsForEmail(email: string): Promise<boolean> {
+        return (await findGlobalAgentByEmail(this.db, email)) !== null;
     }
 }

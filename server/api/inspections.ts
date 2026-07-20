@@ -34,6 +34,7 @@ import collabRoutes from './inspections/collab';
 import costExportRoutes from './inspections/cost-export';
 import costItemRoutes from './inspections/cost-items';
 import complianceRoutes from './inspections/compliance';
+import peopleRoutes from './inspections/people';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
@@ -54,6 +55,8 @@ export const inspectionsRoutes = createApiRouter()
     .route('/', complianceRoutes)
     // Yjs collab WS upgrade route (#181) — GET /:id/collab/ws.
     // Auth + forward to INSPECTION_DOC DO; mirrors the presence WS pattern.
-    .route('/', collabRoutes);
+    .route('/', collabRoutes)
+    // Plan 1B Task 3 (people-role-profiles) — GET/POST/DELETE /:id/people.
+    .route('/', peopleRoutes);
 
 export type InspectionsApi = typeof inspectionsRoutes;

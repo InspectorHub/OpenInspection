@@ -6,7 +6,10 @@
  * fixture replays every migration so the new 0041 migration is exercised.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { InspectionRequestService } from '../../../server/services/inspection-request.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -42,6 +45,10 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             { id: TPL2, tenantId: TENANT,  name: 'Radon',       version: 1, schema: { sections: [] } as any, createdAt: new Date() },
         ]);
+        // Task 9c — role profiles so create() writes the client into
+        // inspection_people (list()/get() now read clientName from there).
+        await seedRoleProfiles(testDb, TENANT, new Date(1));
+        await seedRoleProfiles(testDb, TENANT2, new Date(1));
     });
 
     it('creates a request with multiple sub-inspections', async () => {
@@ -162,5 +169,53 @@ describe('InspectionRequestService (Sprint 2 S2-2)', () => {
         expect(detail).not.toBeNull();
         const names = detail!.inspections.map(i => i.templateName).sort();
         expect(names).toEqual(['Radon', 'Residential']);
+    });
+
+    it('list()/get() source a sub-inspection\'s clientName from the inspection_people client join, ' +
+        'not the legacy inspections.client_name column', async () => {
+        const created = await svc.create(TENANT, {
+            clientName: 'Jane Smith', clientEmail: 'jane@example.com',
+            propertyAddress: '123 Main St', scheduledAt: '2026-06-15T09:00:00Z',
+        }, [{ templateId: TPL1 }]);
+        const subId = created.inspections[0].id;
+
+        const listed = await svc.list(TENANT, {});
+        const subFromList = listed.find(r => r.id === created.id)?.inspections.find(s => s.id === subId);
+        expect(subFromList?.clientName).toBe('Jane Smith');
+
+        const got = await svc.get(TENANT, created.id);
+        const subFromGet = got?.inspections.find(s => s.id === subId);
+        expect(subFromGet?.clientName).toBe('Jane Smith');
+    });
+
+    it('ANTI-LEAK (Task 9c) — after GDPR erasure deletes the client\'s inspection_people + contacts ' +
+        'rows, list()/get() must not leak the stale legacy inspections.client_name column', async () => {
+        const created = await svc.create(TENANT, {
+            clientName: 'Leak Victim', clientEmail: 'victim@example.com',
+            propertyAddress: '9 Erasure Ln', scheduledAt: '2026-06-20T09:00:00Z',
+        }, [{ templateId: TPL1 }]);
+        const subId = created.inspections[0].id;
+
+        const people = new PeopleService({ DB: {} as D1Database });
+        const rows = await people.listPeople(TENANT, subId);
+        const clientRow = rows.find(r => r.roleKey === 'client');
+        expect(clientRow).toBeTruthy();
+
+        // Mirrors erasure-orchestrator.ts: DELETE (not anonymize) the
+        // inspection_people row, then the contacts row. The legacy
+        // inspections.client_name column populated by create() above is
+        // intentionally left untouched — it is the leak vector this closes.
+        await testDb.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.id, clientRow!.id));
+        await testDb.delete(schema.contacts).where(eq(schema.contacts.id, clientRow!.contactId));
+
+        const listed = await svc.list(TENANT, {});
+        const subFromList = listed.find(r => r.id === created.id)?.inspections.find(s => s.id === subId);
+        expect(subFromList?.clientName).toBeNull();
+        expect(subFromList?.clientName).not.toBe('Leak Victim');
+
+        const got = await svc.get(TENANT, created.id);
+        const subFromGet = got?.inspections.find(s => s.id === subId);
+        expect(subFromGet?.clientName).toBeNull();
+        expect(subFromGet?.clientName).not.toBe('Leak Victim');
     });
 });

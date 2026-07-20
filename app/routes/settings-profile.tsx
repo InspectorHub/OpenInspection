@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Form, useLoaderData, useActionData, useFetcher } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
+import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
+import { useSessionContext } from "~/hooks/useSessionContext";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-profile";
@@ -151,6 +153,26 @@ export default function SettingsProfilePage() {
     }
   }, [photoFetcher.state, photoFetcher.data]);
 
+  // Timezone field — the tenant's own display tz. The <select> stays
+  // uncontrolled (Conform reparses its DOM value on submit); we mirror the
+  // current value into state only so the browser-timezone hint knows whether to
+  // show. Adopting the browser zone writes the DOM value (that is what gets
+  // submitted) + fires a native change so Conform revalidates and the hint
+  // re-evaluates. The submitted value comes from `el.value`, not from any dirty
+  // flag — the save bar is always shown, not dirty-gated.
+  const companyTz = useSessionContext()?.branding.defaultTimezone ?? null;
+  const tzSelectRef = useRef<HTMLSelectElement>(null);
+  const [selectedTz, setSelectedTz] = useState(profile.timezone ?? "");
+  function adoptBrowserTz(zone: string) {
+    const el = tzSelectRef.current;
+    if (el) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setter?.call(el, zone);
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    setSelectedTz(zone);
+  }
+
   // Signature pad state
   const sigFetcher = useFetcher<typeof action>();
   const [showSigPad, setShowSigPad] = useState(false);
@@ -226,14 +248,25 @@ export default function SettingsProfilePage() {
 
           <div className="max-w-md">
             <Select
+              ref={tzSelectRef}
               label={m.settings_profile_timezone_label()}
               name="timezone"
               defaultValue={profile.timezone ?? ""}
+              onChange={(e) => setSelectedTz(e.target.value)}
               hint={m.settings_profile_timezone_hint()}
               options={[
-                { value: "", label: m.settings_profile_timezone_inherit_option() },
+                {
+                  value: "",
+                  label: companyTz
+                    ? m.settings_profile_timezone_company_named({ zone: companyTz.replace(/_/g, " ") })
+                    : m.settings_profile_timezone_inherit_option(),
+                },
                 ...TIMEZONE_SELECT_OPTIONS,
               ]}
+            />
+            <BrowserTimezoneHint
+              effectiveValue={selectedTz || companyTz || ""}
+              onUse={adoptBrowserTz}
             />
           </div>
 

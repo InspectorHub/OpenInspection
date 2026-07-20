@@ -1,4 +1,6 @@
 import { Link } from "react-router";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 export interface TimeOffBlock {
@@ -21,6 +23,7 @@ export function TimeOffListPanel({
 }: {
   blocks: TimeOffBlock[];
 }) {
+  const locale = useDisplayLocale();
   return (
     <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-4">
       <h3 className="text-[13px] font-bold uppercase tracking-[0.15em] text-ih-fg-3">{m.settings_timeoff_heading()}</h3>
@@ -38,7 +41,7 @@ export function TimeOffListPanel({
               <div className="min-w-0">
                 <p className="text-[13px] font-bold text-ih-fg-1 truncate">{block.title}</p>
                 <p className="text-[12px] text-ih-fg-3">
-                  {block.date} · {formatBlockWindow(block)}
+                  {formatDate(block.date, { locale, timeZone: "UTC" })} · {formatBlockWindow(block)}
                 </p>
               </div>
               <Link

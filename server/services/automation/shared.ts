@@ -57,10 +57,21 @@ import type { automations, inspections } from '../../lib/db/schema';
 // exactly these columns; because flush() feeds that row into consumers typed as
 // FlushInspection, type-check enforces the projection stays a superset of this
 // type, and the `flush-column-budget` spec guards the total under the cap.
+//
+// Task 11a — clientContactId/clientName are NO LONGER `inspections` columns
+// here. They're resolved via the inspection_people primary-client join
+// (FLUSH_SELECTION in delivery.ts LEFT JOINs contact_role_profiles →
+// inspection_people → contacts, projecting contacts.id/contacts.name under
+// these same field names), replacing the legacy inspections.client_contact_id
+// / client_name reads (frozen cache, dropped Task 13). sms.ts's consent-gate
+// read and template-vars.ts's client_name interpolation are both unchanged —
+// they just consume whichever value this type carries.
 export type FlushInspection = Pick<typeof inspections.$inferSelect,
-    | 'id' | 'tenantId' | 'clientContactId' | 'clientName'
-    | 'propertyAddress' | 'date' | 'status' | 'reportStatus' | 'paymentStatus'
->;
+    | 'id' | 'tenantId' | 'propertyAddress' | 'date' | 'status' | 'reportStatus' | 'paymentStatus'
+> & {
+    clientContactId: string | null;
+    clientName: string | null;
+};
 
 export interface HasParseChannels {
     parseChannels(raw: string | null): ('email' | 'sms')[];
@@ -70,7 +81,7 @@ export interface HasEnsureSeeds {
 }
 export interface HasResolveAddress {
     resolveAddress(
-        recipient: string, channel: 'email' | 'sms',
+        recipientKind: 'role' | 'inspector' | 'all', recipientRoleProfileId: string | null, channel: 'email' | 'sms',
         insp: typeof inspections.$inferSelect, db: DrizzleD1Database,
     ): Promise<string | null>;
 }

@@ -8,6 +8,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InspectionCoreService } from '../../../server/services/inspection/inspection-core.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -32,6 +34,10 @@ async function seedFixtures(db: BetterSQLite3Database<typeof schema>) {
         { id: CONTACT_T1, tenantId: T1, type: 'agent', name: 'Agent One', email: 'agent1@t1.com', createdAt: new Date() },
         { id: CONTACT_T2, tenantId: T2, type: 'agent', name: 'Agent Two', email: 'agent2@t2.com', createdAt: new Date() },
     ]);
+    // Task 13 — client/agent identity is persisted ONLY via inspection_people
+    // now; createInspection's Task 7 people-write resolves role profile ids
+    // by key, so the role profiles must exist for the write to land.
+    await seedRoleProfiles(db, T1, new Date());
 }
 
 const BASE_DATA = {
@@ -108,14 +114,17 @@ describe('InspectionCoreService.createInspection — cross-tenant contact valida
     it('allows referredByAgentId belonging to the same tenant (inspection created)', async () => {
         const svc = makeSvc(T1);
 
-        await expect(
-            svc.createInspection(T1, { ...BASE_DATA, referredByAgentId: CONTACT_T1 })
-        ).resolves.toBeDefined();
+        const created = await svc.createInspection(T1, { ...BASE_DATA, referredByAgentId: CONTACT_T1 });
 
         const rows = await db.select().from(schema.inspections)
             .where(eq(schema.inspections.tenantId, T1)).all();
         expect(rows).toHaveLength(1);
-        expect(rows[0].referredByAgentId).toBe(CONTACT_T1);
+
+        // Task 13 dropped inspections.referredByAgentId — the buyer_agent
+        // link now lives ONLY in inspection_people.
+        const buyerAgentContactId = await new PeopleService({ DB: {} as D1Database })
+            .contactIdForRole(T1, created.id, 'buyer_agent');
+        expect(buyerAgentContactId).toBe(CONTACT_T1);
     });
 
     // -------------------------------------------------------------------------

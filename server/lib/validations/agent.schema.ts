@@ -46,6 +46,10 @@ export const AgentProfilePatchSchema = z.object({
     notifyOnReferral: z.boolean().optional().describe('TODO describe notifyOnReferral field for the OpenInspection MCP integration'),
     notifyOnReport:   z.boolean().optional().describe('TODO describe notifyOnReport field for the OpenInspection MCP integration'),
     notifyOnPaid:     z.boolean().optional().describe('TODO describe notifyOnPaid field for the OpenInspection MCP integration'),
+    // Personal display-timezone override (IANA id). Empty string clears it, so
+    // referral dates fall back to each inspecting company's timezone. Validated
+    // against the runtime Intl database in the service (isValidTimeZone).
+    timezone:         z.string().max(64).optional().describe('Personal display timezone (IANA id); empty string clears the override.'),
 }).openapi('AgentProfilePatch');
 
 export const AgentProfilePatchResponseSchema = createApiResponseSchema(
@@ -53,6 +57,21 @@ export const AgentProfilePatchResponseSchema = createApiResponseSchema(
         ok: z.literal(true).describe('TODO describe ok field for the OpenInspection MCP integration'),
     }),
 ).openapi('AgentProfilePatchResponse');
+
+// Spec 3 Task 4b — GET /api/agent/profile response. Mirrors the shape
+// getProfile() returns: current slug + notification prefs for the signed-in
+// agent, seeding the settings-profile page's loader.
+export const AgentProfileResponseSchema = createApiResponseSchema(
+    z.object({
+        name:             z.string().nullable().describe('TODO describe name field for the OpenInspection MCP integration'),
+        email:            z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
+        slug:             z.string().nullable().describe('TODO describe slug field for the OpenInspection MCP integration'),
+        notifyOnReferral: z.boolean().describe('TODO describe notifyOnReferral field for the OpenInspection MCP integration'),
+        notifyOnReport:   z.boolean().describe('TODO describe notifyOnReport field for the OpenInspection MCP integration'),
+        notifyOnPaid:     z.boolean().describe('TODO describe notifyOnPaid field for the OpenInspection MCP integration'),
+        timezone:         z.string().nullable().describe('Personal display timezone (IANA id), or null to use each company timezone.'),
+    }),
+).openapi('AgentProfileResponse');
 
 // Agent Accounts A3 — POST /api/agent/concierge-book body. Agent submits a
 // booking on behalf of a client. Server resolves the agent ↔ tenant link,
@@ -78,3 +97,57 @@ export const ConciergeBookResponseSchema = createApiResponseSchema(
         status:       z.enum(['awaiting_inspector', 'awaiting_client']).describe('TODO describe status field for the OpenInspection MCP integration'),
     }),
 ).openapi('ConciergeBookResponse');
+
+// UC-A-5 — row shape for GET /api/agent/my-recommendations (agent's flattened
+// recommendations grouped by safety/recommendation/maintenance). Relocated
+// from server/api/agent.ts (file-size ratchet) alongside this module's other
+// route-response schemas.
+const RecommendationRowSchema = z.object({
+    inspectionId:    z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
+    inspectionDate:  z.string().describe('TODO describe inspectionDate field for the OpenInspection MCP integration'),
+    sectionTitle:    z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
+    itemLabel:       z.string().describe('TODO describe itemLabel field for the OpenInspection MCP integration'),
+    defectTitle:     z.string().describe('TODO describe defectTitle field for the OpenInspection MCP integration'),
+    // Widened (Authoring unification Plan-4 module K): a defect_categories.id
+    // or legacy seed name. This feed still only groups into the 3 fixed
+    // legacy buckets below (agent-recommendations.ts), so in practice the
+    // value here is always one of those three.
+    category:        z.string().describe('Defect category — a defect_categories.id or legacy seed name (safety/recommendation/maintenance).'),
+    comment:         z.string().describe('TODO describe comment field for the OpenInspection MCP integration'),
+    location:        z.string().nullable().describe('TODO describe location field for the OpenInspection MCP integration'),
+    photos:          z.array(z.string()).describe('TODO describe photos field for the OpenInspection MCP integration'),
+});
+
+// UC-A-5 — GET /api/agent/my-recommendations response envelope.
+export const AgentMyRecommendationsResponseSchema = z.object({
+    success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration'),
+    data: z.object({
+        safety:         z.array(RecommendationRowSchema).describe('TODO describe safety field for the OpenInspection MCP integration'),
+        recommendation: z.array(RecommendationRowSchema).describe('TODO describe recommendation field for the OpenInspection MCP integration'),
+        maintenance:    z.array(RecommendationRowSchema).describe('TODO describe maintenance field for the OpenInspection MCP integration'),
+    }).describe('TODO describe data field for the OpenInspection MCP integration'),
+});
+
+// C-10 ③-C — row shape for GET /api/agent/referrals.
+export const AgentReferralRowSchema = z.object({
+    id:              z.string().describe('Inspection id.'),
+    tenantName:      z.string().describe('Inspecting company name.'),
+    tenantSlug:      z.string().describe('Tenant slug for building repair-builder links.'),
+    tenantTimezone:  z.string().describe("Owning tenant's display timezone from tenant_configs (IANA; 'UTC' when unset)."),
+    propertyAddress: z.string().nullable().describe('Property address of the referred inspection.'),
+    clientName:      z.string().nullable().describe('Client (buyer) name on the referral.'),
+    date:            z.string().nullable().describe('Scheduled inspection date.'),
+    status:          z.string().describe('Inspection lifecycle status.'),
+    reportStatus:    z.string().nullable().describe('Report lifecycle status (published = repair builder available).'),
+    inspectorName:   z.string().nullable().describe('Assigned inspector name.'),
+});
+
+// C-10 ③-C — row shape for GET /api/agent/inspectors.
+export const AgentInspectorRowSchema = z.object({
+    inspectorName:     z.string().nullable().describe('Inspector display name.'),
+    inspectorSlug:     z.string().nullable().describe('Inspector public profile slug.'),
+    inspectorPhotoUrl: z.string().nullable().describe('Inspector avatar URL.'),
+    tenantName:        z.string().describe('Inspecting company name.'),
+    tenantSlug:   z.string().describe('Tenant slug for the booking link.'),
+});

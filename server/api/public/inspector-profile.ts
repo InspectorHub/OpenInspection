@@ -13,6 +13,9 @@ export const PublicBrandSchema = z.object({
     companyName: z.string().nullable(),
     primaryColor: z.string().nullable(),
     logoUrl: z.string().nullable(),
+    // Tenant display timezone (IANA; 'UTC' when unset). Public/report surfaces
+    // anchor displayed inspection dates to this zone.
+    defaultTimezone: z.string().default('UTC'),
 });
 
 const brandRoute = createRoute(withMcpMetadata({

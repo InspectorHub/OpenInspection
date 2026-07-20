@@ -150,15 +150,23 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             const { drizzle } = await import('drizzle-orm/d1');
             const { inspections, users } = await import('../../lib/db/schema');
             const { eq, and } = await import('drizzle-orm');
+            const { PeopleService } = await import('../people.service');
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const db = drizzle(deps.db as any);
             const [insp] = await db.select().from(inspections).where(eq(inspections.id, inspectionId)).limit(1);
             if (!insp) return;
 
+            // Task 9c — the primary client is resolved via inspection_people
+            // (PeopleService.getPrimaryClient), NOT the legacy inspections.
+            // client_email/client_name columns, which survive GDPR erasure as
+            // a stale denormalized cache and were leaking the erased subject's
+            // email (recipient) and name (the "from <name>" fallback below).
+            const client = await new PeopleService({ DB: deps.db }).getPrimaryClient(insp.tenantId, insp.id);
+
             let to: string | null = null;
             let viewUrl = '';
             if (recipient === 'client') {
-                to = insp.clientEmail ?? null;
+                to = client?.email ?? null;
                 // The client now reads messages in the unified portal Hub. The caller
                 // (inspector send route) mints a per-recipient portal token and builds
                 // the section deep-link, mirroring the report-ready email. If it is
@@ -177,7 +185,7 @@ export function TransactionalEmailMixin<TBase extends Constructor>(Base: TBase) 
             if (!to) return;
 
             const escape = escapeHtml;
-            const fromName = (message.fromName ?? (recipient === 'client' ? 'your inspector' : (insp.clientName ?? 'your client'))).toString();
+            const fromName = (message.fromName ?? (recipient === 'client' ? 'your inspector' : (client?.name ?? 'your client'))).toString();
             const snippet = message.body.length > 200 ? message.body.slice(0, 197) + '...' : message.body;
             const fallbackBody = `
             <p>New message from <strong>${escape(fromName)}</strong> regarding <strong>${escape(insp.propertyAddress ?? '')}</strong>:</p>

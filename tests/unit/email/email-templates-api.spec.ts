@@ -62,13 +62,13 @@ describe('GET /api/admin/email-templates', () => {
         vi.clearAllMocks();
     });
 
-    it('returns 200 with 18 items, no password-reset, correct fields', async () => {
+    it('returns 200 with 19 items, no password-reset, correct fields', async () => {
         const app = buildApp();
         const res = await app.request('/api/admin/email-templates', {}, { DB: {} });
         expect(res.status).toBe(200);
         const body = await res.json() as { success: boolean; data: Array<{ trigger: string; name: string; required: boolean; enabled: boolean; isCustomized: boolean; subject: string; category: string }> };
         expect(body.success).toBe(true);
-        expect(body.data).toHaveLength(18);
+        expect(body.data).toHaveLength(19);
         expect(body.data.every(t => t.trigger !== 'password-reset')).toBe(true);
         for (const item of body.data) {
             expect(typeof item.trigger).toBe('string');

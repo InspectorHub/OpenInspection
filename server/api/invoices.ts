@@ -210,7 +210,11 @@ const invoiceRoutes = createApiRouter()
         if (!inspection) throw Errors.NotFound('Inspection not found');
 
         // Recipient is mandatory — we cannot request payment with nowhere to send it.
-        const clientEmail = inspection.clientEmail ?? null;
+        // Task 9a (people-role-profiles) — resolve via the inspection_people
+        // join (PeopleService) instead of the legacy inspection.clientEmail/
+        // .clientName columns, which are being dropped.
+        const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, inspectionId);
+        const clientEmail = primaryClient?.email ?? null;
         if (!clientEmail) {
             throw Errors.UnprocessableEntity('No client email on this inspection. Add a client email before requesting payment.');
         }
@@ -260,7 +264,7 @@ const invoiceRoutes = createApiRouter()
 
             const created = await c.var.services.invoice.createInvoice(tenantId, {
                 inspectionId,
-                clientName: inspection.clientName ?? clientEmail,
+                clientName: primaryClient?.name ?? clientEmail,
                 clientEmail,
                 amountCents,
                 lineItems,
@@ -293,7 +297,7 @@ const invoiceRoutes = createApiRouter()
         // truthful (Task 7's reviewer-endorsed choice). markSent already ran, so
         // a failed send means "sent, delivery failed", which the user can retry.
         await c.var.services.email.sendInvoiceRequest(
-            clientEmail, inspection.clientName ?? null, amountLabel, payUrl, sigInspector, getBookingHost(c),
+            clientEmail, primaryClient?.name ?? null, amountLabel, payUrl, sigInspector, getBookingHost(c),
         );
 
         // Re-read for the canonical post-send status + sentAt.

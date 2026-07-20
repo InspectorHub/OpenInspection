@@ -1,11 +1,41 @@
-import { Outlet, NavLink } from "react-router";
+import { Outlet, NavLink, useRouteLoaderData } from "react-router";
 import type { Route } from "./+types/agent-layout";
 import { requireToken } from "~/lib/session.server";
+import { createApi } from "~/lib/api-client.server";
+import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { m } from "~/paraglide/messages";
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  await requireToken(context, request);
-  return null;
+  const token = await requireToken(context, request);
+  // Agent-portal "session context" (agents are global users, so they have no
+  // tenant auth-layout context). We surface just the agent's personal display
+  // timezone here so every agent page can resolve dates the same way. null =
+  // no personal override (dates then follow each inspecting company's tz).
+  let timezone: string | null = null;
+  try {
+    const api = createApi(context, { token });
+    const res = await api.agent.profile.$get();
+    if (res.ok) {
+      const body = (await res.json()) as { data?: { timezone?: string | null } };
+      timezone = body.data?.timezone ?? null;
+    }
+  } catch {
+    /* non-fatal: fall back to per-company / UTC resolution */
+  }
+  return { agentTimezone: timezone };
+}
+
+/**
+ * The signed-in agent's personal display-timezone override, or null when unset.
+ * Reads the agent-layout loader (the agent-portal analogue of
+ * useSessionContext). Consumers (e.g. the dashboard) use this as the top of the
+ * resolution chain: agent override → each row's tenant tz → 'UTC'.
+ */
+export function useAgentTimeZoneOverride(): string | null {
+  const data = useRouteLoaderData("routes/agent-layout") as
+    | { agentTimezone: string | null }
+    | undefined;
+  return data?.agentTimezone ?? null;
 }
 
 // `label` is a thunk so the message resolves at render (inside paraglide's ALS
@@ -48,6 +78,12 @@ export default function AgentLayout() {
                 {item.label()}
               </NavLink>
             ))}
+            {/* Shared theme control — same 4-segment control as the tenant app,
+                so the auto/light/dark/field preference (a same-origin cookie) is
+                reachable and consistent here too. Hidden on the smallest widths
+                where the top bar has no room; the field variant + cookie still
+                apply. */}
+            <ThemeSegmentControl className="hidden md:flex ml-2" />
             <a
               href="/logout"
               className="px-3 py-1.5 rounded-md text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bad-bg hover:text-ih-bad-fg transition-colors ml-2"

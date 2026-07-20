@@ -66,6 +66,7 @@ export { reportVersions } from './report-versions';
 export { userIdentityLinks } from './identity-links';
 
 export { inspectionAccessTokens } from './portal-access';
+export { contactRoleProfiles, inspectionPeople } from './inspection/role-profiles';
 
 // Track I-a GDPR (spec §4) — append-only DSAR erasure decision log.
 // Track L (D7) — SMS consent ledger + disclosure versions.

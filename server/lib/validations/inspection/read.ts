@@ -105,8 +105,6 @@ const InspectionPeopleSchema = z.object({
   listingAgents: z.array(PeopleAgentSchema).describe('TODO describe listingAgents field for the OpenInspection MCP integration'),
 }).openapi('InspectionPeople');
 
-export const InspectionPeopleResponseSchema = createApiResponseSchema(InspectionPeopleSchema).openapi('InspectionPeopleResponse');
-
 // Issue #111 — single aggregate payload for the `/inspections/:id` hub page.
 // One round trip drives six blocks (People / Schedule / Services / Agreement /
 // Invoice / Report status). Every field is explicit (no z.any()).

@@ -8,6 +8,8 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../../server/services/automation.service';
 import { SmsConsentService } from '../../../server/services/sms-consent.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { EmailService } from '../../../server/services/email.service';
 import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
 
@@ -15,6 +17,7 @@ import { PlanQuotaGuard } from '../../../server/features/plan-quota/guard';
 const stubEmailFor = async (_tid: string) => ({ sendEmail: async () => ({ delivered: true }) } as unknown as EmailService);
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
+const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 let db: BetterSQLite3Database<typeof schema>;
 let svc: AutomationService;
 
@@ -35,24 +38,37 @@ beforeEach(async () => {
         id: TENANT, name: 'Acme', slug: 'acme', status: 'active', phone: '+15550001111',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     } as never);
+    await seedRoleProfiles(db, TENANT, new Date(1));
     svc = new AutomationService({} as D1Database);
     await new SmsConsentService({} as D1Database).publishDisclosure('disclosure');
     smsRuntime.resolveProvider.mockResolvedValue({ provider: fakeProvider, from: '+1999' });
     fakeSendMessage.mockResolvedValue({ ok: true });
 });
 
+// Task 11a — the SMS consent gate (sms.ts) and client_name interpolation now
+// resolve the primary client from inspection_people, not the legacy
+// inspections.client_contact_id/client_name/client_email/client_phone columns.
+// `over.contactId` (when set) seeds a contact + inspection_people 'client' row
+// under that SAME id, so tests that grant consent for `over.contactId` keep
+// working unchanged.
 async function seedSmsLog(over: { contactId?: string | null; smsBody?: string } = {}) {
     const inspId = crypto.randomUUID();
     await db.insert(schema.inspections).values({
-        id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
-        clientEmail: 'jane@example.com', clientPhone: '+15551234567',
-        clientContactId: over.contactId ?? null, date: '2026-07-01', status: 'completed',
+        id: inspId, tenantId: TENANT, propertyAddress: '1 Main',
+        date: '2026-07-01', status: 'completed',
         reportStatus: 'published', paymentStatus: 'paid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
     } as never);
+    if (over.contactId) {
+        await db.insert(schema.contacts).values({
+            id: over.contactId, tenantId: TENANT, type: 'client', name: 'Jane',
+            email: 'jane@example.com', phone: '+15551234567', createdAt: new Date(),
+        } as never);
+        await new PeopleService({ DB: {} as D1Database }).addPerson(TENANT, inspId, over.contactId, roleProfileId('client'));
+    }
     const ruleId = crypto.randomUUID();
     const smsBody = over.smsBody ?? 'Hi {{client_name}} — {{company_name}}';
     await db.insert(schema.automations).values({
-        id: ruleId, tenantId: TENANT, name: 'R', trigger: 'report.published', recipient: 'client',
+        id: ruleId, tenantId: TENANT, name: 'R', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
         delayMinutes: 0, subjectTemplate: 'S', bodyTemplate: 'B', smsBody,
         channels: '["sms"]', channel: 'sms', active: true, isDefault: false, createdAt: new Date(),
     } as never);
@@ -71,6 +87,18 @@ async function seedSmsLog(over: { contactId?: string | null; smsBody?: string } 
 
 const statusOf = async (id: string) =>
     (await db.select().from(schema.automationLogs).where(eq(schema.automationLogs.id, id)).get());
+
+// Task 11a — a handful of specs below call deliverSms() DIRECTLY (bypassing
+// flush()'s FLUSH_SELECTION join) to reach args flush() doesn't expose
+// (env/quotaGuard overrides). They need the same FlushInspection shape flush()
+// now builds: clientContactId/clientName resolved from inspection_people, not
+// the raw (never-written-to-anymore) inspections columns.
+async function loadFlushInspection(inspectionId: string) {
+    const row = await db.select().from(schema.inspections).where(eq(schema.inspections.id, inspectionId)).get();
+    if (!row) throw new Error('inspection missing');
+    const primary = await new PeopleService({ DB: {} as D1Database }).getPrimaryClient(TENANT, inspectionId);
+    return { ...row, clientContactId: primary?.contactId ?? null, clientName: primary?.name ?? null };
+}
 
 describe('flush() — SMS branch (Track L)', () => {
     beforeEach(() => {
@@ -276,7 +304,7 @@ describe('flush() — managed-send compliance gate (Task 8)', () => {
         // Re-use the logs already created. Instead of going through flush, call deliverSms directly.
         const logs = await db2.select().from(schema.automationLogs).all();
         const automationRow = await db2.select().from(schema.automations).get();
-        const inspRow = await db2.select().from(schema.inspections).get();
+        const inspRow = logs[0] ? await loadFlushInspection(logs[0].inspectionId) : undefined;
         const tenantRow = await db2.select().from(schema.tenants).get();
         if (!logs[0] || !automationRow || !inspRow || !tenantRow) throw new Error('Seed missing');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -297,7 +325,7 @@ describe('flush() — managed-send compliance gate (Task 8)', () => {
         const db2 = svc['getDrizzle']() as import('drizzle-orm/better-sqlite3').BetterSQLite3Database<typeof schema>;
         const logs = await db2.select().from(schema.automationLogs).all();
         const automationRow = await db2.select().from(schema.automations).get();
-        const inspRow = await db2.select().from(schema.inspections).get();
+        const inspRow = logs[0] ? await loadFlushInspection(logs[0].inspectionId) : undefined;
         const tenantRow = await db2.select().from(schema.tenants).get();
         if (!logs[0] || !automationRow || !inspRow || !tenantRow) throw new Error('Seed missing');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -416,7 +444,7 @@ describe('flush() — derived reminder due-time (Track L Step 3b)', () => {
         } as never);
         const ruleId = crypto.randomUUID();
         await db.insert(schema.automations).values({
-            id: ruleId, tenantId: TENANT, name: 'Reminder', trigger: 'inspection.reminder', recipient: 'client',
+            id: ruleId, tenantId: TENANT, name: 'Reminder', trigger: 'inspection.reminder', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 1440, subjectTemplate: 'Reminder', bodyTemplate: 'See you tomorrow',
             channels: '["email"]', channel: 'email', active: true, isDefault: false, createdAt: new Date(),
         } as never);
@@ -524,7 +552,7 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
         const db2 = svc['getDrizzle']() as typeof db;
         const logs = await db2.select().from(schema.automationLogs).all();
         const automationRow = await db2.select().from(schema.automations).get();
-        const inspRow = await db2.select().from(schema.inspections).get();
+        const inspRow = logs[0] ? await loadFlushInspection(logs[0].inspectionId) : undefined;
         const tenantRow = await db2.select().from(schema.tenants).get();
         if (!logs[0] || !automationRow || !inspRow || !tenantRow) throw new Error('Seed missing');
         // Pass MANAGED_SMS_MONTHLY_ALLOWANCE=2 in the env so the gate uses cap=2.
@@ -561,7 +589,7 @@ describe('managedSendAllowed — SMS quota gate (Task 10)', () => {
         const db2 = svc['getDrizzle']() as typeof db;
         const logs = await db2.select().from(schema.automationLogs).all();
         const automationRow = await db2.select().from(schema.automations).get();
-        const inspRow = await db2.select().from(schema.inspections).get();
+        const inspRow = logs[0] ? await loadFlushInspection(logs[0].inspectionId) : undefined;
         const tenantRow = await db2.select().from(schema.tenants).get();
         if (!logs[0] || !automationRow || !inspRow || !tenantRow) throw new Error('Seed missing');
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

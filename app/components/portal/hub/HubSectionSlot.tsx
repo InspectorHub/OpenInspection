@@ -20,11 +20,13 @@ import { RepairBuilderSection } from "~/components/portal/sections/RepairBuilder
 import { MessagesSection } from "~/components/portal/sections/MessagesSection";
 import { AgreementSection } from "~/components/portal/sections/AgreementSection";
 import { PaymentSection } from "~/components/portal/sections/PaymentSection";
+import { AgentReportActions } from "~/components/portal/AgentReportActions";
 import type {
   ProgressLoaderResult,
   InvoiceLoaderResult,
   AgreementLoaderResult,
 } from "~/lib/section-loaders";
+import type { AgentReportContext } from "~/lib/agent-report-context";
 import type { ReportLoaderResult } from "~/components/portal/sections/ReportView";
 import type { LoaderResult as RepairLoaderResult } from "~/components/portal/sections/RepairBuilderSection";
 
@@ -42,6 +44,8 @@ interface HubSectionSlotProps {
   repair: RepairLoaderResult | null;
   invoice: InvoiceLoaderResult | null;
   agreement: AgreementLoaderResult | null;
+  /** Spec 3 Task 3 — non-null only for an agent-kind report-token recipient. */
+  agentReport: AgentReportContext | null;
   docUploading: boolean;
   docError: string | null;
   onUpload: (
@@ -65,6 +69,7 @@ export function HubSectionSlot({
   repair,
   invoice,
   agreement,
+  agentReport,
   docUploading,
   docError,
   onUpload,
@@ -90,14 +95,29 @@ export function HubSectionSlot({
     );
   } else if (section === "report" && report) {
     sectionSlot = (
-      <ReportView
-        {...reportViewProps({
-          ...report,
-          tenant,
-          inspectionId,
-          token: token || undefined,
-        })}
-      />
+      <>
+        <ReportView
+          {...reportViewProps({
+            ...report,
+            tenant,
+            inspectionId,
+            token: token || undefined,
+          })}
+          hideClientActions={agentReport?.kind === "agent"}
+        />
+        {/* Spec 3 Task 3 — agent report-landing CTA, mounted below the report
+            body. Only rendered for an agent-kind token recipient. */}
+        {agentReport?.kind === "agent" && (
+          <AgentReportActions
+            tenant={tenant}
+            inspectionId={inspectionId}
+            token={token}
+            recipientEmail={agentReport.recipientEmail}
+            hasAccount={agentReport.hasAccount}
+            reportPath={`/portal/${tenant}/i/${inspectionId}?token=${encodeURIComponent(token)}&to=report`}
+          />
+        )}
+      </>
     );
   } else if (section === "progress" && progress) {
     sectionSlot = (

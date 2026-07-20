@@ -17,10 +17,10 @@ import { logger } from '../../lib/logger';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
 import {
     InspectionRecipientsResponseSchema,
-    InspectionPeopleResponseSchema,
     InspectionHubResponseSchema,
     ReportDataResponseSchema,
 } from '../../lib/validations/inspection.schema';
+import { SendReportSchema, SendReportResponseDataSchema } from '../../lib/validations/send-report.schema';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable, contacts, tenants } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -33,33 +33,27 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/{id}/send-report-pdf',
     tags: ["inspections"],
-    summary: 'Re-send the inspection report as a PDF email attachment',
+    summary: 'Send the inspection report to one or more role-keyed recipients',
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
         params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
-                'application/json': {
-                    schema: z.object({
-                        // Optional override; defaults to inspection.clientEmail
-                        toEmail: z.string().email().optional().describe('TODO describe toEmail field for the OpenInspection MCP integration'),
-                    }).optional().describe('TODO describe schema field for the OpenInspection MCP integration'),
-                },
+                'application/json': { schema: SendReportSchema },
             },
         },
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ sentTo: z.string().describe('TODO describe sentTo field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } },
-            description: 'PDF email queued',
+            content: { 'application/json': { schema: createApiResponseSchema(SendReportResponseDataSchema) } },
+            description: 'Report email(s) sent (see data.sentTo / data.skipped for per-recipient outcome)',
         },
-        400: { description: 'Recipient missing' },
+        400: { description: 'Malformed request body (no recipients, or a recipient with neither contactId nor email)' },
         404: { description: 'Inspection not found' },
-        503: { description: 'PDF rendering unavailable; text-only email sent instead' },
     },
     security: [{ bearerAuth: [] }],
     operationId: "createInspectionSendReportPdf",
-    description: "Auto-generated placeholder for createInspectionSendReportPdf (POST /{id}/send-report-pdf, inspections domain). TODO: replace with a real description sourced from the handler."
+    description: "Renders the report PDF once and sends it (or a text-only fallback if rendering fails) to every recipient in the request body, each with their own role-keyed portal link. Per-recipient failures (no resolvable email, unknown roleKey, send failure) are collected in the response and do not fail the whole request."
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -166,27 +160,6 @@ const recipientsRoute = createRoute(withMcpMetadata({
     },
     operationId: "listInspectionRecipients",
     description: "Auto-generated placeholder for listInspectionRecipients (GET /{id}/recipients, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['read'], tier: 'extended' }));
-
-/**
- * Round-2 F3 — GET /api/inspections/:id/people
- * People-card payload (inspector + client + buyer/listing agents).
- */
-const peopleRoute = createRoute(withMcpMetadata({
-    method:  'get',
-    path:    '/{id}/people',
-    tags: ["inspections"],
-    summary: 'People card payload (inspector, client, agents)',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-    responses: {
-        200: {
-            content: { 'application/json': { schema: InspectionPeopleResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } },
-            description: 'People card',
-        },
-    },
-    operationId: "listInspectionPeople",
-    description: "Auto-generated placeholder for listInspectionPeople (GET /{id}/people, inspections domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['read'], tier: 'extended' }));
 
 /**
@@ -340,24 +313,12 @@ const reportDeliveryRoutes = createApiRouter()
     .openapi(sendReportPdfRoute, async (c) => {
         const { id } = c.req.valid('param');
         const tenantId = getTenantId(c);
-        const body = c.req.valid('json') ?? {};
+        const { recipients } = c.req.valid('json');
+        const db = getDrizzle(c);
         const service = c.var.services.inspection;
         const { inspection } = await service.getInspection(id, tenantId);
 
-        const recipient = body.toEmail || inspection.clientEmail;
-        if (!recipient) {
-            throw Errors.BadRequest('No recipient email — set inspection.clientEmail or pass toEmail.');
-        }
-
         const tenantSlug = await resolveTenantSlug(c, tenantId);
-        // linkUrl: per-recipient TOKENIZED report link. The report viewer is
-        // gated (token / session / owner-preview); a plain URL 404s "Report not
-        // found" for a no-login recipient. issueToken is idempotent per
-        // (inspection, recipient), so re-sends reuse the same stable link.
-        const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: recipient, role: 'client' });
-        // linkUrl now lands the no-login client on the unified portal hub
-        // (overview) carrying the persistent portalAccess token.
-        const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
         // renderUrl: token-bearing URL for the headless browser PDF render.
         const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
         const address = inspection.propertyAddress as string;
@@ -366,6 +327,12 @@ const reportDeliveryRoutes = createApiRouter()
         const sigInspector = await resolveSignatureInspector(c, inspection.inspectorId, tenantId);
         const sigHost = getBookingHost(c);
 
+        // Spec 2 Task 6 — render the PDF ONCE, before the recipient loop, and
+        // reuse the same ArrayBuffer for every recipient. If rendering fails,
+        // `pdf` stays null and every recipient falls back to the text-only
+        // email (mirrors the previous per-request try/catch posture, but the
+        // render itself only ever runs once regardless of recipient count).
+        let pdf: ArrayBuffer | null = null;
         try {
             // Route through the PDF cache — reuses an existing render when content
             // is unchanged, avoiding a redundant Browser Rendering call.
@@ -375,17 +342,63 @@ const reportDeliveryRoutes = createApiRouter()
             const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber: null });
             const obj = await c.var.services.reportPdf.streamPdf(record);
             if (!obj) throw new Error('PDF unavailable');
-            const pdf = await obj.arrayBuffer();
-            await c.var.services.email.sendInspectionReportPdf(recipient, address, linkUrl, pdf, sigInspector, sigHost);
-            auditFromContext(c, 'inspection.send_pdf', 'inspection', { entityId: id, metadata: { recipient } });
-            return c.json({ success: true as const, data: { sentTo: recipient } }, 200);
+            pdf = await obj.arrayBuffer();
         } catch (err) {
-            logger.error('[send-report-pdf] PDF failed, sending text-only', { inspectionId: id }, err instanceof Error ? err : undefined);
-            await c.var.services.email.sendReportReady(recipient, address, linkUrl, sigInspector, sigHost);
-            auditFromContext(c, 'inspection.send_text_fallback', 'inspection', { entityId: id, metadata: { recipient } });
-            // 200 because the user got AN email, just not a PDF — log + audit captures the degradation
-            return c.json({ success: true as const, data: { sentTo: recipient } }, 200);
+            logger.error('[send-report-pdf] PDF render failed, recipients get text-only', { inspectionId: id }, err instanceof Error ? err : undefined);
         }
+
+        const sentTo: string[] = [];
+        const skipped: Array<{ recipient: string; reason: string }> = [];
+
+        for (const recipient of recipients) {
+            const recipientLabel = recipient.contactId ?? recipient.email ?? 'unknown';
+            try {
+                // Resolve the recipient's email: an explicit one-off email wins;
+                // otherwise look up the contact (tenant-scoped).
+                let recipientEmail = recipient.email ?? null;
+                if (!recipientEmail && recipient.contactId) {
+                    const contactRow = await db.select({ email: contacts.email }).from(contacts)
+                        .where(and(eq(contacts.id, recipient.contactId), eq(contacts.tenantId, tenantId)))
+                        .get();
+                    recipientEmail = contactRow?.email ?? null;
+                }
+                if (!recipientEmail) {
+                    skipped.push({ recipient: recipientLabel, reason: 'No email on file for this recipient' });
+                    continue;
+                }
+
+                // linkUrl: per-recipient TOKENIZED report link, keyed by their
+                // role profile. The report viewer is gated (token / session /
+                // owner-preview); a plain URL 404s "Report not found" for a
+                // no-login recipient. issueToken is idempotent per (inspection,
+                // recipient), so re-sends reuse the same stable link.
+                // issueToken validates roleKey against the tenant's active
+                // contact_role_profiles and throws BadRequest for an unknown
+                // key — caught below so one bad role doesn't sink the batch.
+                const reportToken = await c.var.services.portalAccess.issueToken({
+                    tenantId, inspectionId: id, recipientEmail, role: recipient.roleKey,
+                });
+                // linkUrl now lands the no-login recipient on the unified
+                // portal hub (overview) carrying the persistent portalAccess token.
+                const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
+
+                if (pdf) {
+                    await c.var.services.email.sendInspectionReportPdf(recipientEmail, address, linkUrl, pdf, sigInspector, sigHost);
+                } else {
+                    await c.var.services.email.sendReportReady(recipientEmail, address, linkUrl, sigInspector, sigHost);
+                }
+                auditFromContext(c, 'inspection.send_pdf', 'inspection', {
+                    entityId: id,
+                    metadata: { recipient: recipientEmail, roleKey: recipient.roleKey },
+                });
+                sentTo.push(recipientEmail);
+            } catch (err) {
+                logger.error('[send-report-pdf] recipient send failed', { inspectionId: id, recipient: recipientLabel }, err instanceof Error ? err : undefined);
+                skipped.push({ recipient: recipientLabel, reason: err instanceof Error ? err.message : 'Send failed' });
+            }
+        }
+
+        return c.json({ success: true as const, data: { sentTo, ...(skipped.length ? { skipped } : {}) } }, 200);
     })
     .openapi(getReportDataRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
@@ -405,12 +418,6 @@ const reportDeliveryRoutes = createApiRouter()
         const { id }   = c.req.valid('param');
         const list     = await c.var.services.inspection.getRecipientList(id, tenantId);
         return c.json({ success: true, data: list }, 200);
-    })
-    .openapi(peopleRoute, async (c) => {
-        const tenantId = c.get('tenantId') as string;
-        const { id }   = c.req.valid('param');
-        const card     = await c.var.services.inspection.getPeopleCard(id, tenantId);
-        return c.json({ success: true, data: card }, 200);
     })
     .openapi(hubRoute, async (c) => {
         const tenantId = c.get('tenantId') as string;
@@ -477,19 +484,23 @@ const reportDeliveryRoutes = createApiRouter()
         const inspectionRow = await db.select({
             id: inspectionTable.id,
             propertyAddress: inspectionTable.propertyAddress,
-            referredByAgentId: inspectionTable.referredByAgentId,
             inspectorId: inspectionTable.inspectorId,
         }).from(inspectionTable)
             .where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)))
             .get();
         if (!inspectionRow) throw Errors.NotFound('Inspection not found');
-        if (!inspectionRow.referredByAgentId) {
+
+        // Buyer's-agent attribution now lives on inspection_people (role
+        // buyer_agent) rather than the legacy inspections.referredByAgentId
+        // column — see PeopleService.contactIdForRole.
+        const buyerAgentContactId = await c.var.services.people.contactIdForRole(tenantId, id, 'buyer_agent');
+        if (!buyerAgentContactId) {
             throw Errors.BadRequest('No agent linked to this inspection');
         }
 
         const agentRow = await db.select({ email: contacts.email })
             .from(contacts)
-            .where(and(eq(contacts.id, inspectionRow.referredByAgentId), eq(contacts.tenantId, tenantId)))
+            .where(and(eq(contacts.id, buyerAgentContactId), eq(contacts.tenantId, tenantId)))
             .get();
         if (!agentRow || !agentRow.email) {
             throw Errors.BadRequest('Agent has no email on file');

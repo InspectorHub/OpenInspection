@@ -13,6 +13,7 @@ import { Hono } from 'hono';
 import type { HonoConfig } from '../../../server/types/hono';
 import { ClientDocumentService } from '../../../server/services/client-document.service';
 import { PortalAccessService } from '../../../server/services/portal-access.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { signPortalSession } from '../../../server/lib/portal-session';
 import clientDocumentsRoutes, { inspectorDocumentsRoutes } from '../../../server/api/client-documents';
 
@@ -132,6 +133,10 @@ describe('client document routes (token-gated)', () => {
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
+        // issueToken validates `role` against the tenant's active role
+        // profiles — seed the defaults so the 'client' role used by
+        // seedInspectionWithClientToken resolves.
+        await seedRoleProfiles(testDb, TENANT);
     });
 
     it('PUT streams a valid file; bad extension → 400; no token → 401/403', async () => {

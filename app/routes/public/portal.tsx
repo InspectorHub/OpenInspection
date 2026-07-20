@@ -13,6 +13,7 @@ import { Form, useLoaderData, useActionData, useNavigation } from "react-router"
 import type { Route } from "./+types/portal";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { formatInspectionDateTime } from "~/lib/format-date";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
 import InspectionList, { type InspectionRow } from "~/components/portal/InspectionList";
 import { signOut } from "~/components/portal/sign-out";
@@ -56,7 +57,16 @@ export async function loader({
       };
       const data = body.data;
       if (data) {
-        return { authed: true, tenant, email: data.email, inspections: data.inspections, brand };
+        // Humanize each row's raw inspections.date in the tenant timezone,
+        // server-side, so <InspectionList> renders a formatted string (never a
+        // bare ISO). Preserve empty dates so the row's `r.date &&` guard holds.
+        const inspections = data.inspections.map((row) => ({
+          ...row,
+          date: row.date
+            ? formatInspectionDateTime(row.date, undefined, brand.defaultTimezone)
+            : row.date,
+        }));
+        return { authed: true, tenant, email: data.email, inspections, brand };
       }
     }
   } catch {
@@ -155,6 +165,9 @@ export default function PortalLanding() {
           </p>
           <p className="text-[13px] text-ih-fg-3 mt-1">
             {m.portal_landing_sent_body()}
+          </p>
+          <p className="text-[13px] text-ih-fg-3 mt-3">
+            {m.portal_landing_sent_recovery()}
           </p>
         </div>
       ) : (

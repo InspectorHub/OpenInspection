@@ -3,8 +3,10 @@
  *
  * Two responsibilities, both pure reads over EXISTING tables (no portal table):
  *   1. `listRecipientInspections` — every inspection a recipient email can see
- *      via a live `inspectionAccessTokens` grant (client / co_client only;
- *      agent grants are out of scope for the client hub).
+ *      via a live `inspectionAccessTokens` grant whose role-profile KIND
+ *      grants selfRetrieveReport (client / co_client by default — see
+ *      server/lib/people/capabilities.ts; agent grants are out of scope for
+ *      the client hub).
  *   2. `hubOverview` — a 6-dimension status snapshot for one inspection used by
  *      the portal landing card (status / agreement / payment / report / progress
  *      / unread messages).
@@ -15,6 +17,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, inArray, isNull, or, gt } from 'drizzle-orm';
 import { inspectionAccessTokens, inspections, agreementRequests, inspectionMessages } from '../lib/db/schema';
 import { isReportPublished } from '../lib/status/report-status';
+import { PeopleService } from './people.service';
 
 interface ObserveProgressLike {
     getObserveProgress: (
@@ -70,11 +73,20 @@ export class PortalService {
 
     /**
      * Inspections this recipient can access via a live (non-revoked,
-     * non-expired) client / co_client token. Deduplicated by inspection id.
+     * non-expired) token whose role KEY currently grants selfRetrieveReport.
+     * Deduplicated by inspection id.
      */
     async listRecipientInspections(tenantId: string, email: string): Promise<RecipientInspection[]> {
         const db = this.d();
         const now = new Date();
+
+        // Capability-driven, not a hard-coded ['client', 'co_client'] list —
+        // derives the eligible role keys from each active role profile's KIND
+        // (server/lib/people/capabilities.ts). A tenant with no matching
+        // active profile yields an empty set; short-circuit rather than let
+        // an empty inArray reach the query.
+        const selfRetrieveKeys = await new PeopleService({ DB: this.db }).roleKeysWithCapability(tenantId, 'selfRetrieveReport');
+        if (selfRetrieveKeys.length === 0) return [];
 
         const grants = await db
             .select({ inspectionId: inspectionAccessTokens.inspectionId })
@@ -83,7 +95,7 @@ export class PortalService {
                 and(
                     eq(inspectionAccessTokens.tenantId, tenantId),
                     eq(inspectionAccessTokens.recipientEmail, email),
-                    inArray(inspectionAccessTokens.role, ['client', 'co_client']),
+                    inArray(inspectionAccessTokens.role, selfRetrieveKeys),
                     isNull(inspectionAccessTokens.revokedAt),
                     // A grant is live only when not yet expired (NULL = never expires).
                     // Mirrors resolvePortalAccess (server/lib/public-access.ts).

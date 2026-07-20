@@ -10,7 +10,10 @@ const AUTOMATION_TRIGGERS = [
     'inspection.reminder',
 ] as const;
 
-const AUTOMATION_RECIPIENTS = ['client', 'buying_agent', 'selling_agent', 'inspector', 'all'] as const;
+// Recipient discriminator (replaces the old fixed `recipient` enum). 'role'
+// targets the contact_role_profiles row named by recipientRoleProfileId;
+// 'inspector' and 'all' are role-independent.
+const RECIPIENT_KINDS = ['role', 'inspector', 'all'] as const;
 
 const AUTOMATION_CHANNELS = ['email', 'sms'] as const;
 
@@ -26,7 +29,8 @@ export const AutomationSchema = z.object({
     tenantId:        z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     name:            z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
     trigger:         z.enum(AUTOMATION_TRIGGERS).describe('TODO describe trigger field for the OpenInspection MCP integration'),
-    recipient:       z.enum(AUTOMATION_RECIPIENTS).describe('TODO describe recipient field for the OpenInspection MCP integration'),
+    recipientKind:   z.enum(RECIPIENT_KINDS).describe("Who this rule sends to: 'role' (see recipientRoleProfileId), 'inspector', or 'all'."),
+    recipientRoleProfileId: z.string().nullable().describe("The contact_role_profiles.id targeted when recipientKind is 'role'; null otherwise."),
     delayMinutes:    z.number().int().describe('TODO describe delayMinutes field for the OpenInspection MCP integration'),
     conditions:      z.string().nullable().describe('JSON-encoded send-time gates, or null. Editor parses it.'),
     // Track L (D2) — enabled delivery channels. Replaces the dead `channel` shadow column.
@@ -42,7 +46,8 @@ export const AutomationSchema = z.object({
 const CreateAutomationBase = z.object({
     name:            z.string().min(1).max(200).describe('TODO describe name field for the OpenInspection MCP integration'),
     trigger:         z.enum(AUTOMATION_TRIGGERS).describe('TODO describe trigger field for the OpenInspection MCP integration'),
-    recipient:       z.enum(AUTOMATION_RECIPIENTS).describe('TODO describe recipient field for the OpenInspection MCP integration'),
+    recipientKind:   z.enum(RECIPIENT_KINDS).describe("Who this rule sends to: 'role' (see recipientRoleProfileId), 'inspector', or 'all'."),
+    recipientRoleProfileId: z.string().nullish().describe("The contact_role_profiles.id targeted when recipientKind is 'role'; omit/null otherwise."),
     // No `.default(0)` on the base — same `.partial()` injection hazard as `channels`: it would
     // reset a tenant's configured delay to 0 on every partial PATCH that omits it (the service
     // spreads `...rest` into the patch). Create re-adds the default below.
@@ -68,6 +73,27 @@ export const CreateAutomationSchema = CreateAutomationBase
             .describe('TODO describe delayMinutes field for the OpenInspection MCP integration'),
         channels: z.array(z.enum(AUTOMATION_CHANNELS)).min(1).default(['email'])
             .describe('At least one delivery channel.'),
+    })
+    // recipientRoleProfileId is required (non-empty) exactly when recipientKind is
+    // 'role', and must be absent/null otherwise — enforced here so a malformed
+    // 'role' rule with no target, or an 'inspector'/'all' rule carrying a stray
+    // profile id, is rejected at the API boundary rather than silently resolving
+    // to nothing at send time.
+    .superRefine((data, ctx) => {
+        if (data.recipientKind === 'role' && !data.recipientRoleProfileId) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['recipientRoleProfileId'],
+                message: "recipientRoleProfileId is required when recipientKind is 'role'.",
+            });
+        }
+        if (data.recipientKind !== 'role' && data.recipientRoleProfileId) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ['recipientRoleProfileId'],
+                message: "recipientRoleProfileId must be omitted unless recipientKind is 'role'.",
+            });
+        }
     })
     .openapi('CreateAutomation');
 

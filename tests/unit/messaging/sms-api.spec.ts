@@ -7,6 +7,7 @@ import { AppError } from '../../../server/lib/errors';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 import { SAAS_PROFILE, STANDALONE_PROFILE } from '../../../server/lib/deployment-profile';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
 /**
  * Track L Task 8 — SMS consent API (in-process Hono harness, mirrors
@@ -99,6 +100,7 @@ function form(fields: Record<string, string>): RequestInit {
 
 describe('SMS consent API (Track L Task 8)', () => {
     it('inspector attestation records granted for an already-linked client contact', async () => {
+        await seedRoleProfiles(db, TENANT, new Date(1));
         const contactId = crypto.randomUUID();
         await db.insert(schema.contacts).values({
             id: contactId, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', createdAt: new Date(),
@@ -108,6 +110,14 @@ describe('SMS consent API (Track L Task 8)', () => {
             id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
             clientEmail: 'jane@x.com', clientContactId: contactId, date: '2026-07-01',
             status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as never);
+        // Task 9c — ensureClientContact/consentStatusRoute resolve the client
+        // via the inspection_people primary-client join (PeopleService), not
+        // the legacy clientContactId column above (kept only as a backfilled
+        // cache for other, not-yet-converted readers).
+        await db.insert(schema.inspectionPeople).values({
+            id: `ip_${inspId}_client`, tenantId: TENANT, inspectionId: inspId,
+            contactId, roleProfileId: `crp_${TENANT}_client`, createdAt: new Date(),
         } as never);
 
         const app = buildApp(db);
@@ -120,12 +130,27 @@ describe('SMS consent API (Track L Task 8)', () => {
         expect(ev?.capturedVia).toBe('admin');
     });
 
-    it('attestation auto-creates + links a contact for a free-typed client (D6b)', async () => {
+    it('attestation resolves the primary client from the inspection_people join (Task 9b; Task 13 dropped clientContactId)', async () => {
+        // Pre-Task-9b this exercised ensureClientContact's free-typed-string
+        // dedupe/create path (no linked contact, just inline clientName/
+        // clientEmail). That path was retired: a primary client is now always
+        // an EXISTING contacts row referenced via inspection_people, so this
+        // seeds that join instead of relying on the (dropped) denormalized
+        // columns.
         const inspId = crypto.randomUUID();
         await db.insert(schema.inspections).values({
-            id: inspId, tenantId: TENANT, propertyAddress: '2 Oak', clientName: 'Bob',
-            clientEmail: 'bob@x.com', clientContactId: null, date: '2026-07-02',
+            id: inspId, tenantId: TENANT, propertyAddress: '2 Oak',
+            date: '2026-07-02',
             status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as never);
+        await seedRoleProfiles(db, TENANT, new Date(1));
+        const bobContactId = crypto.randomUUID();
+        await db.insert(schema.contacts).values({
+            id: bobContactId, tenantId: TENANT, type: 'client', name: 'Bob', email: 'bob@x.com', createdAt: new Date(),
+        } as never);
+        await db.insert(schema.inspectionPeople).values({
+            id: `ip_${inspId}_client`, tenantId: TENANT, inspectionId: inspId,
+            contactId: bobContactId, roleProfileId: `crp_${TENANT}_client`, createdAt: new Date(),
         } as never);
 
         const app = buildApp(db);
@@ -134,12 +159,11 @@ describe('SMS consent API (Track L Task 8)', () => {
             FAKE_ENV, makeExecCtx());
         expect(res.status).toBe(200);
 
-        const insp = await db.select().from(schema.inspections).where(eq(schema.inspections.id, inspId)).get();
-        expect(insp?.clientContactId).toBeTruthy();
-        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, insp!.clientContactId!)).toBe('granted');
+        expect(await new SmsConsentService({} as D1Database).getLatest(TENANT, bobContactId)).toBe('granted');
     });
 
     it('GET /sms/consent reports the latest action', async () => {
+        await seedRoleProfiles(db, TENANT, new Date(1));
         const contactId = crypto.randomUUID();
         await db.insert(schema.contacts).values({
             id: contactId, tenantId: TENANT, type: 'client', name: 'Jane', email: 'jane@x.com', createdAt: new Date(),
@@ -149,6 +173,13 @@ describe('SMS consent API (Track L Task 8)', () => {
             id: inspId, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
             clientContactId: contactId, date: '2026-07-01', status: 'requested', paymentStatus: 'unpaid', price: 0,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        } as never);
+        // Task 9c — consentStatusRoute resolves the client contact via the
+        // inspection_people primary-client join (PeopleService), not the
+        // legacy clientContactId column above.
+        await db.insert(schema.inspectionPeople).values({
+            id: `ip_${inspId}_client`, tenantId: TENANT, inspectionId: inspId,
+            contactId, roleProfileId: `crp_${TENANT}_client`, createdAt: new Date(),
         } as never);
         await new SmsConsentService({} as D1Database).record(TENANT, contactId, 'granted', 'booking_form', {});
 

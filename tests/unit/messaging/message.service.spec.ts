@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MessageService } from '../../../server/services/message.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
-import { inspectionMessages, inspections, tenants } from '../../../server/lib/db/schema';
+import { inspectionMessages, inspections, tenants, contacts } from '../../../server/lib/db/schema';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -59,5 +61,48 @@ describe('MessageService', () => {
         const list = await svc.listForInspection('i1', 't1');
         expect(list.find(m => m.fromRole === 'client')?.readAt).not.toBeNull();
         expect(list.find(m => m.fromRole === 'inspector')?.readAt).toBeNull();
+    });
+
+    /**
+     * Task 9a (people-role-profiles) — clientEmailForInspection /
+     * clientNameForInspection resolve via PeopleService.getPrimaryClient
+     * (inspection_people join) instead of the legacy
+     * inspections.clientEmail/.clientName columns, which are being dropped
+     * (Task 13). i1 above intentionally carries no legacy client columns
+     * (they default NULL) — only the inspection_people row below supplies
+     * the primary client, so these specs fail against the old
+     * implementation (which reads only the legacy columns and returns null).
+     */
+    describe('clientEmailForInspection / clientNameForInspection — primary-client join', () => {
+        const roleProfileId = (key: string) => `crp_t1_${key}`;
+
+        beforeEach(async () => {
+            await seedRoleProfiles(testDb, 't1', new Date(1));
+            await testDb.insert(contacts).values({
+                id: 'contact-client-1', tenantId: 't1', type: 'client', name: 'Jane Client',
+                email: 'jane@example.com', phone: null, createdAt: new Date(),
+            });
+        });
+
+        it('resolves the client email from the primary-client join', async () => {
+            const people = new PeopleService({ DB: {} as D1Database });
+            await people.addPerson('t1', 'i1', 'contact-client-1', roleProfileId('client'));
+
+            const email = await svc.clientEmailForInspection('i1', 't1');
+            expect(email).toBe('jane@example.com');
+        });
+
+        it('resolves the client name from the primary-client join', async () => {
+            const people = new PeopleService({ DB: {} as D1Database });
+            await people.addPerson('t1', 'i1', 'contact-client-1', roleProfileId('client'));
+
+            const name = await svc.clientNameForInspection('i1', 't1');
+            expect(name).toBe('Jane Client');
+        });
+
+        it('no primary client — both resolve null', async () => {
+            expect(await svc.clientEmailForInspection('i1', 't1')).toBeNull();
+            expect(await svc.clientNameForInspection('i1', 't1')).toBeNull();
+        });
     });
 });

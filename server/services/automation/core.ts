@@ -1,5 +1,5 @@
-import { eq, and, max } from 'drizzle-orm';
-import { automations, smsDisclosureVersions } from '../../lib/db/schema';
+import { eq, and, inArray, max } from 'drizzle-orm';
+import { automations, contactRoleProfiles, smsDisclosureVersions } from '../../lib/db/schema';
 import { AUTOMATION_SEEDS } from '../../data/automation-seeds';
 import { nanoid } from 'nanoid';
 import { Errors } from '../../lib/errors';
@@ -29,29 +29,64 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
                     seed => !existing.some(e => e.name === seed.name && e.trigger === seed.trigger)
                 );
                 if (toInsert.length > 0) {
+                    // Resolve every recipientRoleKey this batch needs to its per-tenant
+                    // contact_role_profiles.id in one query. Role profiles are seeded
+                    // ahead of automations on both the /setup and starter-content paths,
+                    // so this map is normally fully populated; a seed whose key is still
+                    // missing is skipped below (not inserted with a null profile id) and
+                    // picked up on the next ensureSeeds call once the profile exists.
+                    const neededKeys = [...new Set(
+                        toInsert.map(s => s.recipientRoleKey).filter((k): k is NonNullable<typeof k> => !!k)
+                    )];
+                    const profileRows = neededKeys.length
+                        ? await db.select({ key: contactRoleProfiles.key, id: contactRoleProfiles.id })
+                            .from(contactRoleProfiles)
+                            .where(and(
+                                eq(contactRoleProfiles.tenantId, tenantId),
+                                eq(contactRoleProfiles.active, true),
+                                inArray(contactRoleProfiles.key, neededKeys),
+                            ))
+                        : [];
+                    const profileIdByKey = new Map(profileRows.map(r => [r.key, r.id]));
+
                     // D1 caps prepared-statement bind parameters at 100. Each row now binds
                     // 13 columns (Track L added channels + sms_body), so chunk to 7 rows /
                     // 91 binds per insert (under the 100 cap).
                     const CHUNK_SIZE = 7;
-                    const rows = toInsert.map(seed => ({
-                        id:              nanoid(),
-                        tenantId,
-                        name:            seed.name,
-                        trigger:         seed.trigger,
-                        recipient:       seed.recipient,
-                        delayMinutes:    seed.delayMinutes,
-                        subjectTemplate: seed.subjectTemplate,
-                        bodyTemplate:    seed.bodyTemplate,
-                        channels:        JSON.stringify((seed as { channels?: string[] }).channels ?? ['email']),
-                        smsBody:         (seed as { smsBody?: string }).smsBody ?? null,
-                        active:          (seed as { defaultActive?: boolean }).defaultActive ?? true,
-                        isDefault:       true,
-                        createdAt:       new Date(),
-                    }));
+                    const rows: (typeof automations.$inferInsert)[] = [];
+                    for (const seed of toInsert) {
+                        let recipientRoleProfileId: string | null = null;
+                        if (seed.recipientRoleKey) {
+                            recipientRoleProfileId = profileIdByKey.get(seed.recipientRoleKey) ?? null;
+                            if (!recipientRoleProfileId) {
+                                logger.warn('AutomationService.ensureSeeds: role profile not yet seeded, skipping rule (will retry)',
+                                    { tenantId, name: seed.name, recipientRoleKey: seed.recipientRoleKey });
+                                continue;
+                            }
+                        }
+                        rows.push({
+                            id:              nanoid(),
+                            tenantId,
+                            name:            seed.name,
+                            trigger:         seed.trigger,
+                            recipientKind:   seed.recipientKind,
+                            recipientRoleProfileId,
+                            delayMinutes:    seed.delayMinutes,
+                            subjectTemplate: seed.subjectTemplate,
+                            bodyTemplate:    seed.bodyTemplate,
+                            channels:        JSON.stringify((seed as { channels?: string[] }).channels ?? ['email']),
+                            smsBody:         (seed as { smsBody?: string }).smsBody ?? null,
+                            active:          (seed as { defaultActive?: boolean }).defaultActive ?? true,
+                            isDefault:       true,
+                            createdAt:       new Date(),
+                        });
+                    }
                     for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
                         await db.insert(automations).values(rows.slice(i, i + CHUNK_SIZE));
                     }
-                    logger.info('AutomationService: seeded default rules', { tenantId, count: toInsert.length });
+                    if (rows.length > 0) {
+                        logger.info('AutomationService: seeded default rules', { tenantId, count: rows.length });
+                    }
                 }
             }
 
@@ -95,7 +130,8 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
         }
 
         async create(tenantId: string, data: {
-            name: string; trigger: string; recipient: string;
+            name: string; trigger: string;
+            recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId?: string | null;
             delayMinutes: number;
             conditions?: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
             channels?: ('email' | 'sms')[];
@@ -103,15 +139,14 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
         }) {
             const db = this.getDrizzle();
             const id = nanoid();
-            const { conditions, channels, emailTemplateId, smsTemplateId, ...rest } = data;
+            const { conditions, channels, emailTemplateId, smsTemplateId, recipientRoleProfileId, ...rest } = data;
             await db.insert(automations).values({
                 id, tenantId, ...rest,
-                // Casts narrow the public string param to the schema's enum literal
+                // Cast narrows the public string param to the schema's enum literal
                 // union; runtime values are validated by the API zod schema.
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 trigger:   rest.trigger as any,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                recipient: rest.recipient as any,
+                recipientRoleProfileId: recipientRoleProfileId ?? null,
                 conditions: conditions ? JSON.stringify(conditions) : null,
                 // Track L — channels is the live field; the dead `channel` column is left
                 // to its DB default ('email') so its NOT NULL constraint stays satisfied.
@@ -127,7 +162,8 @@ export function AutomationCore<TBase extends Constructor<AutomationBase>>(Base: 
         }
 
         async update(tenantId: string, id: string, data: Partial<{
-            name: string; trigger: string; recipient: string;
+            name: string; trigger: string;
+            recipientKind: 'role' | 'inspector' | 'all'; recipientRoleProfileId: string | null;
             delayMinutes: number; active: boolean;
             conditions: { requirePaid?: boolean; requireSigned?: boolean; serviceIds?: string[] } | null;
             channels: ('email' | 'sms')[];

@@ -6,8 +6,13 @@ import { hashPassword, verifyPassword } from '../lib/password';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
 
-/** Dummy PBKDF2 hash used to equalize verify() timing when the email lookup misses. */
-const DUMMY_HASH = 'pbkdf2:00000000000000000000000000000000:0000000000000000000000000000000000000000000000000000000000000000';
+/**
+ * Dummy PBKDF2 hash used to equalize verify() timing when the email lookup
+ * misses. Exported so other login entry points that must mirror the SAME
+ * anti-oracle pattern (e.g. the agent password login, server/api/agent/login.ts
+ * — Spec 3 Task 5) reuse this exact constant rather than a second one.
+ */
+export const DUMMY_HASH = 'pbkdf2:00000000000000000000000000000000:0000000000000000000000000000000000000000000000000000000000000000';
 
 /**
  * Service to handle all authentication-related business logic.

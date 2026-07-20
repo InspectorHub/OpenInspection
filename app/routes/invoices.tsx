@@ -5,7 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, StatCard, Button, EmptyState, Modal, Table, Pill, type PillTone } from "@core/shared-ui";
 import { MoneyInput } from "~/components/MoneyInput";
-import { formatCurrency } from "~/lib/format";
+import { formatCurrency, formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
@@ -139,6 +139,7 @@ function NewInvoiceModal({
   inspections: InspectionOption[];
 }) {
   const fetcher = useFetcher<typeof action>();
+  const locale = useDisplayLocale();
   const busy = fetcher.state !== "idle";
   const [clientName, setClientName] = useState("");
   // Money stays in integer cents; the hidden `amount` field carries dollars to
@@ -177,7 +178,7 @@ function NewInvoiceModal({
             <option value="">{m.invoices_new_no_inspection()}</option>
             {inspections.map((i) => (
               <option key={i.id} value={i.id}>
-                {(i.propertyAddress || i.id.slice(0, 8)) + (i.date ? ` · ${i.date.slice(0, 10)}` : "")}
+                {(i.propertyAddress || i.id.slice(0, 8)) + (i.date ? ` · ${formatDate(i.date, { locale, timeZone: "UTC" })}` : "")}
               </option>
             ))}
           </select>
@@ -277,7 +278,7 @@ export default function InvoicesPage() {
           columns={[
             { label: m.invoices_col_client(), cell: (invoice) => <span className="font-medium text-ih-fg-1">{invoice.clientName || "—"}</span> },
             { label: m.invoices_col_amount(), cell: (invoice) => <span className="font-mono text-ih-fg-1">{formatCurrency(invoice.amountCents, { locale, currency: invoice.currency || currency })}</span> },
-            { label: m.invoices_col_due(), cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate || "—"}</span> },
+            { label: m.invoices_col_due(), cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate ? formatDate(invoice.dueDate, { locale, timeZone: "UTC" }) : "—"}</span> },
             {
               label: m.invoices_col_status(),
               cell: (invoice) => {

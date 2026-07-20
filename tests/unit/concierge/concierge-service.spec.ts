@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { ConciergeService } from '../../../server/services/concierge.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import { hashToken } from '../../../server/lib/token-hash';
@@ -55,6 +56,10 @@ async function seedFixture(testDb: BetterSQLite3Database<typeof schema>, opts: S
         invitedByUserId: INSPECTOR,
         createdAt: new Date(),
     });
+    // Task 9c-X2 — confirmByClient's agent-notify now resolves the buyer_agent
+    // contact via inspection_people, which createBooking only populates when
+    // role profiles exist for the tenant (see its try/catch mirror-write).
+    await seedRoleProfiles(testDb, T1, new Date(1));
 }
 
 const baseParams = () => ({
@@ -147,12 +152,13 @@ describe('ConciergeService — A3', () => {
             await expect(svc.createBooking(baseParams())).rejects.toThrow(/not linked|forbidden/i);
         });
 
-        it('auto-binds referredByAgentId from agentTenantLinks.inspectorContactId reverse lookup', async () => {
+        it('auto-binds the buyer_agent from agentTenantLinks.inspectorContactId reverse lookup (inspection_people — Task 13 dropped referredByAgentId)', async () => {
             await seedFixture(testDb, { reviewRequired: false });
             const result = await svc.createBooking(baseParams());
-            const insp = await testDb.select().from(schema.inspections)
-                .where(eq(schema.inspections.id, result.inspectionId)).get();
-            expect(insp?.referredByAgentId).toBe(CONTACT_AGENT);
+            const { PeopleService } = await import('../../../server/services/people.service');
+            const buyerAgentContactId = await new PeopleService({ DB: {} as D1Database })
+                .contactIdForRole(T1, result.inspectionId, 'buyer_agent');
+            expect(buyerAgentContactId).toBe(CONTACT_AGENT);
         });
 
         it('rejects when inspector contact is not found in tenant', async () => {
@@ -165,8 +171,15 @@ describe('ConciergeService — A3', () => {
     describe('approveByInspector', () => {
         it('transitions awaiting_inspector → awaiting_client + mints token + emails client', async () => {
             await seedFixture(testDb, { reviewRequired: true });
+            await seedRoleProfiles(testDb, T1, new Date(1));
             const created = await svc.createBooking(baseParams());
 
+            // Task 9b (people-role-profiles) — approveByInspector resolves the
+            // client-confirm recipient via PeopleService.getPrimaryClient
+            // (inspection_people join) instead of the legacy
+            // inspection.clientEmail column. createBooking itself now mirrors
+            // the booking client into inspection_people (client role) — see
+            // concierge-people.spec.ts — so no manual seeding is needed here.
             await svc.approveByInspector(created.inspectionId, T1);
 
             const insp = await testDb.select().from(schema.inspections)

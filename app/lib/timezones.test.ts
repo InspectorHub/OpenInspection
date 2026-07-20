@@ -4,6 +4,7 @@ import {
   TIMEZONE_SELECT_OPTIONS,
   timeZoneLabel,
   timeZoneOffsetMinutes,
+  onboardingTzPrefill,
 } from './timezones';
 
 describe('TIMEZONE_OPTIONS', () => {
@@ -58,5 +59,31 @@ describe('TIMEZONE_SELECT_OPTIONS', () => {
     for (let i = 1; i < offsets.length; i++) {
       expect(offsets[i]).toBeGreaterThanOrEqual(offsets[i - 1]);
     }
+  });
+});
+
+describe('onboardingTzPrefill', () => {
+  const CHI = 'America/Chicago'; // canonical, in TIMEZONE_OPTIONS
+
+  it('suggests the browser zone on the onboarding step when the tenant is still on UTC', () => {
+    expect(onboardingTzPrefill({ isTimezoneSetup: true, storedTz: 'UTC', browserTz: CHI })).toBe(CHI);
+    expect(onboardingTzPrefill({ isTimezoneSetup: true, storedTz: null, browserTz: CHI })).toBe(CHI);
+  });
+
+  it('does nothing off the onboarding step (no ?setup=timezone marker)', () => {
+    expect(onboardingTzPrefill({ isTimezoneSetup: false, storedTz: 'UTC', browserTz: CHI })).toBeNull();
+  });
+
+  it('never overrides a tenant that already chose a real zone', () => {
+    expect(onboardingTzPrefill({ isTimezoneSetup: true, storedTz: 'America/Denver', browserTz: CHI })).toBeNull();
+  });
+
+  it('does nothing when the browser is UTC or unknown', () => {
+    expect(onboardingTzPrefill({ isTimezoneSetup: true, storedTz: 'UTC', browserTz: 'UTC' })).toBeNull();
+    expect(onboardingTzPrefill({ isTimezoneSetup: true, storedTz: 'UTC', browserTz: null })).toBeNull();
+  });
+
+  it('skips a non-canonical/alias zone the picker cannot represent', () => {
+    expect(onboardingTzPrefill({ isTimezoneSetup: true, storedTz: 'UTC', browserTz: 'Not/AZone' })).toBeNull();
   });
 });

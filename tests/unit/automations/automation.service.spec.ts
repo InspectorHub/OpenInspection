@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AutomationService } from '../../../server/services/automation.service';
 import { AgreementService } from '../../../server/services/agreement.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
@@ -11,10 +13,21 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 const TENANT = '00000000-0000-0000-0000-000000000001';
 const INSP   = '00000000-0000-0000-0000-000000000010';
 const AGR    = '00000000-0000-0000-0000-000000000020';
+const CLIENT = 'contact-client-agreement-filter';
 
+const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
+
+// Task 11a — the trigger's email resolveAddress now sources the primary
+// client's email from inspection_people (not the legacy inspections.client_*
+// columns), so the fixture seeds a role profile + contact + inspection_people
+// row alongside the (now-unread) legacy columns.
 async function seedFor(testDb: BetterSQLite3Database<typeof schema>, agreementRequired: boolean) {
     await testDb.insert(schema.tenants).values([
         { id: TENANT, name: 'T', slug: 't', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() },
+    ]);
+    await seedRoleProfiles(testDb, TENANT, new Date(1));
+    await testDb.insert(schema.contacts).values([
+        { id: CLIENT, tenantId: TENANT, type: 'client', name: 'J', email: 'j@t.com', createdAt: new Date() },
     ]);
     await testDb.insert(schema.inspections).values([
         { id: INSP, tenantId: TENANT, propertyAddress: '1 St', clientName: 'J', clientEmail: 'j@t.com', date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 0, agreementRequired, paymentRequired: false, createdAt: new Date() },
@@ -22,6 +35,7 @@ async function seedFor(testDb: BetterSQLite3Database<typeof schema>, agreementRe
     await testDb.insert(schema.agreements).values([
         { id: AGR, tenantId: TENANT, name: 'Std', content: 'text', version: 1, createdAt: new Date() },
     ]);
+    await new PeopleService({ DB: {} as D1Database }).addPerson(TENANT, INSP, CLIENT, roleProfileId('client'));
 }
 
 describe('AutomationService.trigger — agreement filter', () => {
@@ -56,7 +70,7 @@ describe('AutomationService.trigger — agreement filter', () => {
         await seedTemplate('tpl-agr-1', 'Click {{agreement_sign_url}}', 'Sign here');
         await testDb.insert(schema.automations).values({
             id: 'rule-1', tenantId: TENANT, name: 'Send agreement', trigger: 'inspection.created',
-            recipient: 'client', delayMinutes: 0,
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
             subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-agr-1',
             active: true, isDefault: false, createdAt: new Date(),
         });
@@ -70,7 +84,7 @@ describe('AutomationService.trigger — agreement filter', () => {
         await seedTemplate('tpl-agr-2', 'Click {{agreement_sign_url}}', 'Sign here');
         await testDb.insert(schema.automations).values({
             id: 'rule-2', tenantId: TENANT, name: 'Send agreement', trigger: 'inspection.created',
-            recipient: 'client', delayMinutes: 0,
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
             subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-agr-2',
             active: true, isDefault: false, createdAt: new Date(),
         });
@@ -84,7 +98,7 @@ describe('AutomationService.trigger — agreement filter', () => {
         await seedTemplate('tpl-ord-3', 'Confirmed for {{property_address}}', 'Hi');
         await testDb.insert(schema.automations).values({
             id: 'rule-3', tenantId: TENANT, name: 'Booking confirmation', trigger: 'inspection.created',
-            recipient: 'client', delayMinutes: 0,
+            recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0,
             subjectTemplate: '', bodyTemplate: '', channels: '["email"]', emailTemplateId: 'tpl-ord-3',
             active: true, isDefault: false, createdAt: new Date(),
         });

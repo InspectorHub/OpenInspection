@@ -7,9 +7,11 @@
  * drizzle-orm/d1). Other services the handler touches (widget, email,
  * notification, automation, inspectionRequest) are stubbed to no-ops.
  *
- * Verifies: a public booking find-or-creates ONE client contact and stamps
- * inspections.clientContactId, the upsert is idempotent per email, and a
- * contact-upsert failure NEVER fails the booking (non-fatal guarantee).
+ * Verifies: a public booking find-or-creates ONE client contact and links it
+ * as the inspection's primary client via inspection_people (Task 13 dropped
+ * the legacy inspections.clientContactId column — see booking.service.ts),
+ * the upsert is idempotent per email, and a contact-upsert failure NEVER
+ * fails the booking (non-fatal guarantee).
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -27,6 +29,7 @@ import type { HonoConfig } from '../../../server/types/hono';
 import { AppError } from '../../../server/lib/errors';
 import { BookingService } from '../../../server/services/booking.service';
 import { ContactService } from '../../../server/services/contact.service';
+import { PeopleService } from '../../../server/services/people.service';
 import { logger } from '../../../server/lib/logger';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 
@@ -127,6 +130,11 @@ async function seedBaseTenant(db: BetterSQLite3Database<typeof schema>) {
         { id: 'a1', tenantId: T1, inspectorId: U1, dayOfWeek: 1, startTime: '08:00', endTime: '12:00', createdAt: new Date() },
         { id: 'a2', tenantId: T1, inspectorId: U2, dayOfWeek: 1, startTime: '08:00', endTime: '12:00', createdAt: new Date() },
     ] as any);
+    // Task 13 — client identity is persisted ONLY via inspection_people now;
+    // booking.service.ts's people-write resolves role profile ids by key, so
+    // the role profiles must exist for the write to land.
+    const { seedRoleProfiles } = await import('../../../server/services/seed/seed-role-profiles');
+    await seedRoleProfiles(db, T1, new Date());
 }
 
 function morningBody(overrides: Record<string, unknown> = {}) {
@@ -168,9 +176,9 @@ describe('POST /book — client contact upsert (#111 / IA-18)', () => {
         vi.restoreAllMocks();
     });
 
-    // 1. Successful booking → a client contact row exists AND the inspection
-    //    row's clientContactId points at it.
-    it('creates a client contact and stamps inspection.clientContactId', async () => {
+    // 1. Successful booking → a client contact row exists AND is linked as
+    //    the inspection's primary client via inspection_people.
+    it('creates a client contact and links it as the inspection primary client (inspection_people)', async () => {
         const { app } = buildApp(db, booking, contact);
         const res = await app.request('/book', morningBody(), FAKE_ENV, FAKE_EXEC_CTX);
         expect(res.status).toBe(200);
@@ -186,11 +194,13 @@ describe('POST /book — client contact upsert (#111 / IA-18)', () => {
 
         const insp = await db.select().from(inspections)
             .where(eq(inspections.id, body.data.inspectionId)).get();
-        expect(insp?.clientContactId).toBe(contactRows[0].id);
+        expect(insp).toBeTruthy();
+        const primary = await new PeopleService({ DB: {} as D1Database }).getPrimaryClient(T1, insp!.id);
+        expect(primary?.contactId).toBe(contactRows[0].id);
     });
 
     // 2. Same email books twice → ONE contact row (idempotent upsert); both
-    //    inspections point at the same contact.
+    //    inspections link to the same contact via inspection_people.
     it('reuses the same contact when the same email books twice', async () => {
         const { app } = buildApp(db, booking, contact);
 
@@ -209,16 +219,16 @@ describe('POST /book — client contact upsert (#111 / IA-18)', () => {
         expect(contactRows.length).toBe(1);
         const contactId = contactRows[0].id;
 
-        const insp1 = await db.select().from(inspections)
-            .where(eq(inspections.id, body1.data.inspectionId)).get();
-        const insp2 = await db.select().from(inspections)
-            .where(eq(inspections.id, body2.data.inspectionId)).get();
-        expect(insp1?.clientContactId).toBe(contactId);
-        expect(insp2?.clientContactId).toBe(contactId);
+        const people = new PeopleService({ DB: {} as D1Database });
+        const primary1 = await people.getPrimaryClient(T1, body1.data.inspectionId);
+        const primary2 = await people.getPrimaryClient(T1, body2.data.inspectionId);
+        expect(primary1?.contactId).toBe(contactId);
+        expect(primary2?.contactId).toBe(contactId);
     });
 
     // 3. Contact-upsert failure → booking still succeeds (200), inspection row
-    //    exists with clientContactId null, and a warn was logged.
+    //    exists with NO primary client linked (inspection_people write never
+    //    ran since there is no contact id to link), and a warn was logged.
     it('does not fail the booking when contact upsert throws (non-fatal)', async () => {
         const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
         const upsertSpy = vi.spyOn(contact, 'upsertClientContact')
@@ -236,7 +246,8 @@ describe('POST /book — client contact upsert (#111 / IA-18)', () => {
         const insp = await db.select().from(inspections)
             .where(eq(inspections.id, body.data.inspectionId)).get();
         expect(insp).toBeTruthy();
-        expect(insp?.clientContactId).toBeNull();
+        const primary = await new PeopleService({ DB: {} as D1Database }).getPrimaryClient(T1, insp!.id);
+        expect(primary).toBeNull();
 
         // A warn was logged, and it must NOT contain the client's email.
         expect(warnSpy).toHaveBeenCalled();

@@ -3,6 +3,8 @@ import type { Route } from "./+types/notifications";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Card, EmptyState } from "@core/shared-ui";
+import { formatRelativeTime } from "~/lib/format";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -26,6 +28,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 export default function NotificationsPage() {
   const { notifications } = useLoaderData<typeof loader>();
   const notificationList = notifications as unknown[];
+  const locale = useDisplayLocale();
 
   return (
     <div className="space-y-ih-list">
@@ -52,7 +55,7 @@ export default function NotificationsPage() {
                   {notification.message}
                 </p>
                 <p className="text-[11px] text-ih-fg-4 mt-1">
-                  {notification.createdAt}
+                  {formatRelativeTime(notification.createdAt, { locale })}
                 </p>
               </Card>
             );

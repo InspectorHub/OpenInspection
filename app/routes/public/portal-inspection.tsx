@@ -26,6 +26,7 @@ import type { Route } from "./+types/portal-inspection";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { EMPTY_BRAND } from "~/lib/brand";
+import { formatInspectionDateTime } from "~/lib/format-date";
 import InspectionHub, {
   hubSectionNavHref,
   type HubSection,
@@ -51,6 +52,8 @@ import {
   type InvoiceLoaderResult,
   type AgreementLoaderResult,
 } from "~/lib/section-loaders";
+import { loadAgentReportContext, type AgentReportContext } from "~/lib/agent-report-context";
+import { resolvePortalSession } from "~/lib/portal-exchange";
 import { HubSectionSlot } from "~/components/portal/hub/HubSectionSlot";
 import type { TenantBrand } from "~/lib/brand";
 import { m } from "~/paraglide/messages";
@@ -69,7 +72,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token");
   const to = url.searchParams.get("to");
-  const section = parseSection(url.searchParams.get("section"));
+  let section = parseSection(url.searchParams.get("section"));
 
   const api = createApi(context);
   const browserCookie = request.headers.get("cookie") ?? "";
@@ -83,70 +86,21 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     brand = EMPTY_BRAND;
   }
 
-  // Cookie to forward to the browser (only set if exchange minted a fresh one).
-  let cookieToForward: string | null = null;
-  // Cookie value to present to the overview call: prefer the freshly-issued one.
-  let cookieForApi = browserCookie;
-
-  // Step 1 — if a per-inspection token is present, try to upgrade it into a
-  // portal session. Failure is non-fatal: an existing session may still work.
-  if (token) {
-    try {
-      const ex = await api.portal[":tenant"].exchange.$get({
-        param: { tenant },
-        query: { token, inspectionId },
-      });
-      if (ex.status === 200) {
-        const minted = ex.headers.get("set-cookie");
-        if (minted) {
-          // Forward the FULL Set-Cookie value to the browser (it carries
-          // ; Path=/; HttpOnly; Secure; SameSite=Lax attributes).
-          cookieToForward = minted;
-          // A Cookie request header must be `name=value` only — slice off the
-          // attributes before reusing the minted cookie on the same-request
-          // overview call. Fall back to the incoming browser cookie.
-          const mintedCookiePair = minted.split(";")[0];
-          cookieForApi = mintedCookiePair || browserCookie;
-        }
-      }
-    } catch {
-      // ignore — fall through to step 2
-    }
-  }
-
-  // Step 2 — fetch the overview, forwarding the (possibly freshly-issued) cookie.
-  let overview: StatusOverview;
-  try {
-    const res = await api.portal[":tenant"].inspections[":inspectionId"].overview.$get(
-      { param: { tenant, inspectionId } },
-      { headers: { Cookie: cookieForApi } },
-    );
-    if (res.status === 401) {
-      throw redirect(`/portal/${tenant}`);
-    }
-    if (res.status === 403 || res.status === 404) {
-      throw new Response("Not found", { status: 404 });
-    }
-    if (!res.ok) {
-      throw new Response("Not found", { status: 404 });
-    }
-    const body = (await res.json()) as {
-      data?: StatusOverview & { token?: string; signerToken?: string | null };
-    };
-    if (!body.data) throw new Response("Not found", { status: 404 });
-    overview = body.data;
-  } catch (err) {
-    if (err instanceof Response) throw err;
-    throw new Response("Not found", { status: 404 });
-  }
+  // Steps 1+2 (token exchange + overview) live in ~/lib/portal-exchange —
+  // extracted purely to keep this route file under the file-size ratchet.
+  // Task 6: `isAgentToken` short-circuits the session-gated overview call
+  // entirely (an agent token never mints `__Host-portal_session`) and forces
+  // the report section below, since agents have no client hub.
+  const { overview: resolvedOverview, overviewToken, signerToken, isAgentToken, cookieToForward, cookieForApi } =
+    await resolvePortalSession(context, api, tenant, inspectionId, token, browserCookie);
+  let overview = resolvedOverview;
+  if (isAgentToken) section = "report";
 
   // Prefer the server-issued persistent per-inspection token (always present for
   // an accessible inspection, including magic-link sessions that carry no
-  // ?token); fall back to the URL ?token (email-CTA arrival) then "".
-  const overviewToken = (overview as StatusOverview & { token?: string }).token;
+  // ?token); fall back to the URL ?token (email-CTA arrival, and the ONLY
+  // source for an agent token — overviewToken is never set on that path) then "".
   const ctxToken = overviewToken || token || "";
-  const signerToken =
-    (overview as StatusOverview & { signerToken?: string | null }).signerToken ?? null;
   const ctx = { tenant, inspectionId, token: ctxToken, signerToken };
 
   // Step 3 — if ?to names a real Hub section, jump straight to the Hub with that
@@ -200,9 +154,45 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     agreement = await loadAgreementSection(context, signerToken);
   }
 
+  // Backfill the minimal agent overview stand-in's .address/.date (the only
+  // fields InspectionHub reads off `overview` on a non-overview section) from
+  // the just-fetched, token-scoped report — never from the session-gated
+  // overview endpoint, which agent tokens never call (see Step 2 above).
+  if (isAgentToken && report) {
+    overview = {
+      ...overview,
+      address: report.address || overview.address,
+      date: report.date || overview.date,
+      reportPublished: report.isPublished ?? overview.reportPublished,
+    };
+  }
+
+  // Humanize the raw inspection date once, server-side. Both the normal overview
+  // and the agent stand-in carry inspections.date as a raw ISO/date string; the
+  // Hub header + status cards would otherwise show a bare timestamp
+  // (2026-07-20T00:27:12.605Z). Format in the TENANT timezone — the anchor for
+  // portal/report surfaces — and do it in the loader so the formatted string is
+  // serialized loader data (no client re-format, so no hydration mismatch).
+  if (overview.date) {
+    overview = { ...overview, date: formatInspectionDateTime(overview.date, undefined, brand.defaultTimezone) };
+  }
+
+  // Same treatment for the Progress section header date — loadProgressSection
+  // returns the raw inspections.date; format it in the tenant timezone here so
+  // <ProgressView> receives an already-humanized string (never a bare ISO).
+  if (progress?.date) {
+    progress = { ...progress, date: formatInspectionDateTime(progress.date, undefined, brand.defaultTimezone) };
+  }
+
+  // Step 4b — agent report-landing context (Spec 3 Task 3): resolves whether
+  // ctx.token's recipient is an agent and, if so, whether they already have a
+  // global agent account — the Report section CTA (magic-login vs signup)
+  // branches on this. See loadAgentReportContext for the best-effort fetch.
+  const agentReport = await loadAgentReportContext(context, tenant, inspectionId, ctx.token);
+
   // Step 5 — render the hub.
   return new Response(
-    JSON.stringify({ overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement }),
+    JSON.stringify({ overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport }),
     {
       headers: {
         "Content-Type": "application/json",
@@ -213,11 +203,55 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Action — Spec 3 Task 3 "Go to my workspace" BFF relay.               */
+/* BFF ONLY (feedback_core_bff_no_client_fetch): <AgentReportActions>   */
+/* posts the "agent-magic-login" intent via useFetcher, which hits THIS */
+/* action rather than a client `fetch('/api/...')`. Mirrors the         */
+/* Commercial PCA Phase W Task 6 WordExportButton/report-card-stack.tsx */
+/* action pattern (intent-dispatch, createApi(context) relay).          */
+/* ------------------------------------------------------------------ */
+
+type AgentMagicLoginActionResult =
+  | { ok: true; intent: "agent-magic-login"; loginUrl: string | null }
+  | { ok: false; intent: "agent-magic-login"; error?: string }
+  | { ok: false; intent: string };
+
+export async function action({ request, params, context }: Route.ActionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get("intent");
+  const tenant = params.tenant ?? "";
+  const inspectionId = params.inspectionId ?? "";
+
+  if (intent === "agent-magic-login") {
+    const token = String(formData.get("token") ?? "");
+    const api = createApi(context);
+    try {
+      const res = (await api.agentMagicLogin["magic-login"].request.$post({
+        json: { tenant, inspectionId, token },
+      })) as unknown as Response;
+      if (!res.ok) {
+        return { ok: false, intent: "agent-magic-login" } satisfies AgentMagicLoginActionResult;
+      }
+      const body = (await res.json()) as { data?: { loginUrl: string | null } };
+      return {
+        ok: true,
+        intent: "agent-magic-login",
+        loginUrl: body.data?.loginUrl ?? null,
+      } satisfies AgentMagicLoginActionResult;
+    } catch {
+      return { ok: false, intent: "agent-magic-login" } satisfies AgentMagicLoginActionResult;
+    }
+  }
+
+  return { ok: false, intent: String(intent ?? "") } satisfies AgentMagicLoginActionResult;
+}
+
+/* ------------------------------------------------------------------ */
 /* Component */
 /* ------------------------------------------------------------------ */
 
 export default function PortalInspection() {
-  const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement } = useLoaderData<typeof loader>() as {
+  const { overview, ctx, section, brand, documents, report, progress, repair, invoice, agreement, agentReport } = useLoaderData<typeof loader>() as {
     overview: StatusOverview;
     ctx: { tenant: string; inspectionId: string; token: string; signerToken: string | null };
     section: HubSection;
@@ -228,10 +262,16 @@ export default function PortalInspection() {
     repair: RepairLoaderResult | null;
     invoice: InvoiceLoaderResult | null;
     agreement: AgreementLoaderResult | null;
+    agentReport: AgentReportContext | null;
   };
   const revalidator = useRevalidator();
   const [searchParams] = useSearchParams();
   const { tenant, inspectionId, token } = ctx;
+  // Spec 3: an agent report link is token-only (no client session) and the
+  // server forces section='report'. Drive the hub's agent-mode chrome (hide the
+  // client-only tab bar, Sign out, and in-report client actions) off the same
+  // flag HubSectionSlot uses for the AgentReportActions CTA.
+  const isAgent = agentReport?.kind === "agent";
 
   // After Stripe's confirmPayment redirect the Hub reloads with
   // ?redirect_status=succeeded. The webhook settles the invoice asynchronously,
@@ -315,6 +355,7 @@ export default function PortalInspection() {
       repair={repair}
       invoice={invoice}
       agreement={agreement}
+      agentReport={agentReport}
       docUploading={docUploading}
       docError={docError}
       onUpload={onUpload}
@@ -329,7 +370,8 @@ export default function PortalInspection() {
       brand={brand}
       activeSection={section}
       sectionSlot={sectionSlot}
-      onSignOut={() => void signOut(tenant)}
+      agentMode={isAgent}
+      onSignOut={isAgent ? undefined : () => void signOut(tenant)}
     />
   );
 }

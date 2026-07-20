@@ -37,3 +37,23 @@ export interface Agent {
   status: string;
   linkedAt: string;
 }
+
+/** Mirrors `RoleProfileSchema` (server/lib/validations/role-profile.schema.ts). */
+export interface RoleProfile {
+  id: string;
+  key: string;
+  label: string;
+  kind: "client" | "agent" | "other";
+  emailTemplateId: string | null;
+  smsTemplateId: string | null;
+  isSystem: boolean;
+  sortOrder: number;
+  active: boolean;
+}
+
+/** Trimmed view of a message template — just enough for the Select options in RoleProfileModal. */
+export interface MessageTemplateOption {
+  id: string;
+  name: string;
+  channel: "email" | "sms";
+}

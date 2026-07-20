@@ -79,6 +79,7 @@ import { TAGS } from './starter-content/fixtures/tags';
 import { RECOMMENDATIONS } from './starter-content/fixtures/recommendations';
 import { RATING_SYSTEMS } from './starter-content/fixtures/rating-systems';
 import { MARKETPLACE_LIBRARIES } from './starter-content/fixtures/marketplace';
+import { seedRoleProfiles } from './seed/seed-role-profiles';
 
 // Comments-repair fold (2026-06-12) — the standard contractor-type taxonomy.
 // MUST stay in sync with the contractor-type backfill in `0000_baseline.sql`
@@ -154,6 +155,9 @@ export async function seedStarterContent(
 ): Promise<StarterContentResult> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const d = drizzle(db as any);
+
+    // Spec 1 — tenant-configurable people role profiles (idempotent).
+    await seedRoleProfiles(d, tenantId);
 
     // ── inspection templates ────────────────────────────────────────────
     let inspectionTemplatesSeeded = 0;

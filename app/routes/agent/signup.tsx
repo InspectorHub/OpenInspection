@@ -3,9 +3,11 @@ import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/signup";
 import { createApi } from "~/lib/api-client.server";
+import { createSessionWithToken } from "~/lib/session.server";
 import { makeAgentSignupSchema } from "~/lib/forms/auth.schema";
 import { readLegalLinks } from "~/lib/legal-links.server";
 import { LegalCheckbox } from "~/components/LegalCheckbox";
+import { safeReturnTo } from "../../../server/lib/mcp/safe-return-to";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -16,9 +18,33 @@ export function meta() {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const legal = readLegalLinks(context);
-  return { legal };
+  const url = new URL(request.url);
+  // Report-link conversion (Task 3's CTA): prefill the email of the
+  // recipient the report was shared with, and preserve a same-origin
+  // returnTo so a successful signup lands back on that report. safeReturnTo
+  // gates it to same-origin relative paths — an attacker-supplied
+  // ?returnTo=https://evil.com or //evil.com is discarded here.
+  const email = url.searchParams.get("email") ?? "";
+  const returnTo = safeReturnTo(url.searchParams.get("returnTo"), "");
+  return { legal, email, returnTo };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Report-link conversion helper                                      */
+/* ------------------------------------------------------------------ */
+
+// Matches the tokenized report path a converting agent's returnTo carries
+// (`/portal/:tenant/i/:inspectionId?token=...`) and extracts the inspection
+// id. A converting agent already has that inspection auto-linked into their
+// referrals server-side (Task 3), so we can land them on the dashboard with
+// it highlighted instead of bouncing them back to the tokenized report.
+const REPORT_PATH_RE = /^\/portal\/[^/]+\/i\/([^/?#]+)/;
+
+function welcomeRedirectFor(returnTo: string): string | null {
+  const match = returnTo.match(REPORT_PATH_RE);
+  return match ? `/agent-dashboard?welcome=${encodeURIComponent(match[1])}` : null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -54,10 +80,44 @@ export async function action({ request, context }: Route.ActionArgs) {
     return submission.reply({ formErrors: [err?.message || m.auth_agent_signup_error_failed()] });
   }
 
+  // Re-sanitize returnTo server-side — never trust the hidden field blindly,
+  // even though the loader already sanitized it once (defense in depth).
+  const returnToRaw = fd.get("returnTo");
+  const returnTo = safeReturnTo(typeof returnToRaw === "string" ? returnToRaw : null, "");
+
   const data = json.data as Record<string, string> | undefined;
-  // Success: keep the client-side redirect path (sentinel object, not a
-  // Conform SubmissionResult — the component guards on `redirect`).
-  return { redirect: data?.redirect || "/agent-dashboard" };
+  // A report-path returnTo (Task 3/4's report-link conversion) sends the
+  // agent to their dashboard with that inspection highlighted, rather than
+  // back to the tokenized report or the API's own generic redirect — checked
+  // FIRST because POST /api/agent-signup (server/api/agent-signup.ts) always
+  // answers a static `redirect: '/agent-dashboard'` with no welcome-highlight
+  // awareness of its own, so an API-redirect-first precedence would make this
+  // branch permanently unreachable for real traffic. Otherwise an explicit,
+  // more-specific API-provided redirect wins; otherwise a non-report-path
+  // returnTo; otherwise /agent-dashboard.
+  const target = welcomeRedirectFor(returnTo) || data?.redirect || returnTo || "/agent-dashboard";
+
+  // POST /api/agent-signup mints the agent session cookie itself via
+  // Set-Cookie on ITS OWN response (server/api/agent-signup.ts) — but that
+  // response is an in-process self-binding call (createApi's buildFetch),
+  // so nothing forwards it to the browser unless this action does so
+  // explicitly. Mirrors agent/login.tsx's action exactly: extract the JWT
+  // from the raw Set-Cookie header and re-establish it as the RR `__session`
+  // cookie via createSessionWithToken, which also performs the redirect —
+  // so a converting agent actually lands on /agent-dashboard AUTHENTICATED
+  // rather than bouncing through requireToken() back to /login.
+  const setCookieHeader = res.headers?.get?.("set-cookie") || "";
+  const tokenMatch = setCookieHeader.match(/(?:inspector_token|__Host-inspector_token)=([^;]+)/);
+  const jwt = tokenMatch?.[1];
+  if (jwt) {
+    return createSessionWithToken(context, jwt, target);
+  }
+
+  // Fall back to the client-side redirect sentinel (the component guards on
+  // `redirect`) if the API response somehow carried no Set-Cookie — should
+  // not happen in practice, but degrades to the previous behavior rather
+  // than stranding the user on a blank page.
+  return { redirect: target };
 }
 
 /* ------------------------------------------------------------------ */
@@ -91,7 +151,7 @@ function makeValueProps() {
 /* ------------------------------------------------------------------ */
 
 export default function AgentSignupPage() {
-  const { legal } = useLoaderData<typeof loader>();
+  const { legal, email, returnTo } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state === "submitting";
@@ -168,6 +228,7 @@ export default function AgentSignupPage() {
           </p>
 
           <Form method="post" autoComplete="off" id={form.id} onSubmit={form.onSubmit} noValidate>
+            {returnTo ? <input type="hidden" name="returnTo" value={returnTo} /> : null}
             <div className="space-y-5">
               <div>
                 <label
@@ -199,6 +260,7 @@ export default function AgentSignupPage() {
                   type="email"
                   id={fields.email.id}
                   name={fields.email.name}
+                  defaultValue={email}
                   placeholder={m.auth_agent_signup_email_placeholder()}
                   aria-invalid={fields.email.errors ? true : undefined}
                   className="w-full px-4 py-3 text-[15px] bg-ih-bg-card border border-ih-border rounded-xl outline-none focus:border-ih-primary focus:shadow-ih-focus transition-all text-ih-fg-1"

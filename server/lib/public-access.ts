@@ -15,7 +15,10 @@ import { verifyJwt, type JwtKeyring } from './jwt-keyring';
 import { classifyJwtPayload } from './auth/jwt-claims';
 import type { HonoConfig } from '../types/hono';
 
-export type PortalRole = 'client' | 'co_client' | 'agent';
+// A role-profile KEY (tenant.contact_role_profiles.key) — free-form, not a
+// fixed set. `client` remains the seeded default; validation against the
+// tenant's active role profiles happens in PortalAccessService.issueToken.
+export type PortalRole = string;
 
 export interface PortalAccessRow {
     inspectionId: string;

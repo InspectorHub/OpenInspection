@@ -10,6 +10,7 @@ import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, humanizeStatus, st
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,
@@ -19,8 +20,17 @@ import { SendAgreementModal } from "~/components/inspection-hub/SendAgreementMod
 import { RequestPaymentModal } from "~/components/inspection-hub/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspection-hub/PublishReportModal";
 import { CreateReinspectionModal } from "~/components/inspection-hub/CreateReinspectionModal";
-import { toActionResult } from "~/lib/inspection-hub-actions";
+import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
+import { SendReportModal } from "~/components/inspection/SendReportModal";
+import type { RoleProfile } from "~/components/contacts/contacts-helpers";
+import {
+  toActionResult,
+  handlePersonAdd,
+  handlePersonRemove,
+  handleSearchContacts,
+} from "~/lib/inspection-hub-actions";
 import type { ReinspectCandidate } from "~/lib/inspection-hub-helpers";
+import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -41,18 +51,12 @@ interface HubData extends HubPayload {
   inspection: HubPayload["inspection"] & {
     id: string;
     propertyAddress: string;
-    clientName: string | null;
-    clientEmail: string | null;
-    clientPhone: string | null;
-    clientContactId: string | null;
     date: string | null;
     inspectorId: string | null;
     templateId: string | null;
     price: number;
     paymentStatus: string;
     coverPhoto: string | null;
-    referredByAgentId: string | null;
-    sellingAgentId: string | null;
     createdAt: string | null;
     // reportStatus is inherited from HubPayload["inspection"] but listed here for clarity
   };
@@ -122,13 +126,40 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // Best-effort: falls back to false (inspector will see submit-only flow).
   // The cast mirrors dashboard.tsx — hono/client collapses the typed union.
   let canPublishCap = false;
+  // Plan 1B Task 5 — same role read also drives the People editor's admin-only
+  // messaging (role-profile management lives behind requireRole('owner','manager')).
+  let isAdmin = false;
   const meGet = api.auth?.me?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
   const meRes = meGet ? await meGet().catch(() => null) : null;
   if (meRes && meRes.ok) {
     const meBody = (await meRes.json().catch(() => ({}))) as { data?: { user?: { role?: string } } };
     const role = meBody.data?.user?.role ?? 'inspector';
     canPublishCap = new Set(['owner', 'manager', 'inspector']).has(role);
+    isAdmin = isAdminRole(role);
   }
+
+  // Plan 1B Task 5 — editable People section: every contact/role pairing on
+  // the inspection via inspection_people (Task 3), plus the tenant's role
+  // profiles for the "add person" role picker (Task 2). Both best-effort:
+  // `people` degrades to [] on failure (the card still renders, just empty);
+  // `roleProfiles` is admin-gated server-side (owner/manager) — a non-admin
+  // viewer (inspector) degrades to an empty list, same graceful pattern as
+  // contacts.tsx's Roles tab. Optional-chained (mirrors the `meGet` lookup
+  // above) so a narrower mocked api-client in unit tests degrades cleanly
+  // instead of throwing on a missing property.
+  const peopleGet = api.inspections?.[":id"]?.people?.$get as unknown as
+    | ((args: { param: { id: string } }) => Promise<Response>)
+    | undefined;
+  const peopleRes = peopleGet ? await peopleGet({ param: { id } }).catch(() => null) : null;
+  const people: PersonRow[] =
+    peopleRes && peopleRes.ok ? (((await peopleRes.json()) as { data?: PersonRow[] }).data ?? []) : [];
+
+  const roleProfilesGet = api.roleProfiles?.index?.$get as unknown as (() => Promise<Response>) | undefined;
+  const roleProfilesRes = roleProfilesGet ? await roleProfilesGet().catch(() => null) : null;
+  const roleProfiles: RoleProfile[] =
+    roleProfilesRes && roleProfilesRes.ok
+      ? (((await roleProfilesRes.json()) as { data?: RoleProfile[] }).data ?? [])
+      : [];
 
   // Inspector documents (unified portal section ⑦). The inspector document
   // routes are not in the typed client, so fetch the list directly via the
@@ -149,7 +180,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     // Best-effort: fail open to empty list
   }
 
-  return { hub, smsConsent, reinspectCandidates, canPublishCap, documents };
+  return { hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin };
 }
 
 /* ------------------------------------------------------------------ */
@@ -165,7 +196,8 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
   if (intent === "send-agreement") {
     // Empty strings → omit, so the endpoint falls back to its defaults
-    // (tenant's first agreement template / inspection clientEmail).
+    // (tenant's first agreement template / the inspection's primary client
+    // email, resolved via inspection_people — see PeopleService.getPrimaryClient).
     const agreementId = String(formData.get("agreementId") || "").trim();
     const email = String(formData.get("email") || "").trim();
     const res = await api.inspections[":id"]["agreement-requests"].$post({
@@ -272,6 +304,27 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     };
   }
 
+  // Plan 1B Task 5 — People editor intents. Handlers live in
+  // inspection-hub-actions.ts (same extraction convention as toActionResult
+  // above) — person-add's inline-create-then-link path and search-contacts'
+  // response mapping are long enough to keep this dispatcher scannable.
+  if (intent === "person-add") return handlePersonAdd(api, id, formData);
+  if (intent === "person-remove") return handlePersonRemove(api, id, formData);
+  if (intent === "search-contacts") return handleSearchContacts(api, formData);
+
+  // Spec 2 Task 7 — "Send report" modal. Recipients/channels arrive as JSON
+  // strings (SendReportModal's hidden fields) mirroring the endpoint's own
+  // body shape (server/lib/validations/send-report.schema.ts).
+  if (intent === "send-report") {
+    const recipients = JSON.parse(String(formData.get("recipients") ?? "[]"));
+    const channels = JSON.parse(String(formData.get("channels") ?? '["email"]'));
+    const res = await api.inspections[":id"]["send-report-pdf"].$post({
+      param: { id },
+      json: { recipients, channels },
+    });
+    return toActionResult(res, "send-report", m.inspections_hub_error_send_report());
+  }
+
   return { ok: false, intent: undefined, error: m.inspections_hub_error_unknown_action() };
 }
 
@@ -301,8 +354,13 @@ export function reportActions(
 /* ------------------------------------------------------------------ */
 
 export default function InspectionHubPage() {
-  const { hub, smsConsent, reinspectCandidates, canPublishCap, documents } = useLoaderData<typeof loader>();
-  const { inspection, people, services, tenantSlug } = hub;
+  const { hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin } =
+    useLoaderData<typeof loader>();
+  // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
+  // inspector — still used for the header meta line + modal default emails);
+  // `people` (destructured above) is the Task 3 editable inspection_people
+  // list PeopleEditor renders. Two different shapes, hence the rename here.
+  const { inspection, people: peopleCard, services, tenantSlug } = hub;
   const displayTz = useDisplayTimeZone();
   const blocks = deriveBlockStates(hub);
   const navigate = useNavigate();
@@ -390,6 +448,12 @@ export default function InspectionHubPage() {
   // published baselines can re-inspect. Unlike the other modals it does NOT
   // auto-close on success: the effect below navigates to the new inspection's
   // editor instead (mirrors the app's create-then-navigate flow).
+  // "Send report" modal (Spec 2 Task 7) — its own dedicated fetcher (B-17:
+  // never share fetchers between mutations) and a local open flag; the modal
+  // component itself derives submitting/error/auto-close from the fetcher.
+  const [sendReportOpen, setSendReportOpen] = useState(false);
+  const sendReportFetcher = useFetcher<typeof action>();
+
   const reinspectModal = useModalFetcher("create-reinspection", { closeOnSuccess: false });
   const createReinspection = reinspectModal.fetcher;
   useEffect(() => {
@@ -421,7 +485,6 @@ export default function InspectionHubPage() {
   );
 
   const servicesTotalCents = services.reduce((sum, s) => sum + s.priceCents, 0);
-  const allAgents = [...people.buyerAgents, ...people.listingAgents];
 
   // Invoice amount the SERVER will request — same money authority chain as the
   // endpoint (invoice > Σ services > inspections.price). Drives the modal amount
@@ -457,13 +520,16 @@ export default function InspectionHubPage() {
             <span className="text-ih-fg-3">
               {formatInspectionDateTime(inspection.date)}
             </span>
-            {people.inspector?.name && (
-              <span className="text-ih-fg-3">&middot; {people.inspector.name}</span>
+            {peopleCard.inspector?.name && (
+              <span className="text-ih-fg-3">&middot; {peopleCard.inspector.name}</span>
             )}
           </span>
         }
         actions={
           <>
+            {/* Shared theme control (xl+; keeps this read-only hub consistent
+                with the editor it links into). */}
+            <ThemeSegmentControl className="hidden xl:flex" />
             <Link
               to={`/inspections/${inspection.id}/edit`}
               className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600"
@@ -484,106 +550,29 @@ export default function InspectionHubPage() {
 
       {/* Six blocks — responsive 2-col grid (1-col on mobile) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 1. People ------------------------------------------------- */}
-        <Card className="p-5">
-          <BlockHeading title={m.inspections_hub_block_people()} />
-          <div className="space-y-3">
-            {/* Client */}
-            <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                {m.inspections_hub_people_client()}
-              </p>
-              {people.client ? (
-                <div className="text-[13px] text-ih-fg-1">
-                  <p className="font-medium">
-                    {/* Link to the contact record only when the inspection
-                        carries a clientContactId — the inline client name
-                        (denormalized columns) has no contact row to open. */}
-                    {inspection.clientContactId ? (
-                      <Link
-                        to={`/contacts/${inspection.clientContactId}`}
-                        className="hover:text-ih-primary hover:underline"
-                      >
-                        {people.client.name}
-                      </Link>
-                    ) : (
-                      people.client.name
-                    )}
-                  </p>
-                  {people.client.email && (
-                    <a href={`mailto:${people.client.email}`} className="text-ih-primary hover:underline block">
-                      {people.client.email}
-                    </a>
-                  )}
-                  {people.client.phone && (
-                    <a href={`tel:${people.client.phone}`} className="text-ih-primary hover:underline block">
-                      {people.client.phone}
-                    </a>
-                  )}
-                  {/* Track L (E) — SMS consent status + inspector attestation */}
-                  <ClientSmsConsent
-                    consent={smsConsent}
-                    fetcher={attestSms}
-                    attesting={attesting}
-                  />
-                </div>
-              ) : inspection.clientName ? (
-                // Bare-text fallback when only the denormalized name is present.
-                <p className="text-[13px] text-ih-fg-1">{inspection.clientName}</p>
-              ) : (
-                <p className="text-[13px] text-ih-fg-4">{m.inspections_hub_people_no_client()}</p>
-              )}
-            </div>
-
-            {/* Agents (buyer + listing) */}
-            {allAgents.length > 0 && (
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                  {m.inspections_hub_people_agents()}
-                </p>
-                <div className="space-y-2">
-                  {allAgents.map((agent) => (
-                    <div key={agent.id} className="text-[13px] text-ih-fg-1">
-                      <p className="font-medium">
-                        {/* agent.id is the contacts row id (getPeopleCard reads
-                            referredByAgentId/sellingAgentId from contacts), so the
-                            name always links to the contact detail page. */}
-                        <Link
-                          to={`/contacts/${agent.id}`}
-                          className="hover:text-ih-primary hover:underline"
-                        >
-                          {agent.name}
-                        </Link>
-                        {agent.agency && (
-                          <span className="text-ih-fg-3 font-normal"> &middot; {agent.agency}</span>
-                        )}
-                      </p>
-                      {agent.email && (
-                        <a href={`mailto:${agent.email}`} className="text-ih-primary hover:underline block">
-                          {agent.email}
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Inspector */}
-            <div>
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-4 mb-1">
-                {m.inspections_hub_people_inspector()}
-              </p>
-              {people.inspector ? (
-                <p className="text-[13px] text-ih-fg-1 font-medium">
-                  {people.inspector.name || people.inspector.email}
-                </p>
-              ) : (
-                <p className="text-[13px] text-ih-fg-4">{m.inspections_hub_people_unassigned()}</p>
-              )}
-            </div>
-          </div>
-        </Card>
+        {/* 1. People — editable (Plan 1B Task 5): PeopleEditor sources rows
+            from inspection_people (the `people` loader array) grouped by role
+            kind, replacing the old read-only client/agents/inspector text
+            block. Client SMS consent (Track L (E)) stays a small addendum
+            underneath, keyed off the same primary-client projection
+            (getPeopleCard) the rest of the page already uses. */}
+        <div className="space-y-4">
+          <PeopleEditor
+            inspectionId={inspection.id}
+            people={people}
+            roleProfiles={roleProfiles}
+            isAdmin={isAdmin}
+          />
+          {peopleCard.client && (
+            <Card className="p-4">
+              <ClientSmsConsent
+                consent={smsConsent}
+                fetcher={attestSms}
+                attesting={attesting}
+              />
+            </Card>
+          )}
+        </div>
 
         {/* 2. Schedule ---------------------------------------------- */}
         <Card className="p-5">
@@ -701,6 +690,15 @@ export default function InspectionHubPage() {
                 >
                   {m.inspections_hub_report_create_reinspection()}
                 </Button>
+                {canPublishCap && (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setSendReportOpen(true)}
+                  >
+                    {m.inspections_hub_report_send()}
+                  </Button>
+                )}
                 {reportActionList.includes('unpublish') && (
                   <unpublishReport.Form method="post">
                     <input type="hidden" name="intent" value="unpublish" />
@@ -802,7 +800,7 @@ export default function InspectionHubPage() {
       <SendAgreementModal
         open={agreementModal.open}
         agreements={hub.agreements}
-        defaultEmail={inspection.clientEmail ?? ""}
+        defaultEmail={peopleCard.client?.email ?? ""}
         fetcher={agreementModal.fetcher}
         submitting={agreementModal.busy}
         error={agreementModal.error}
@@ -812,7 +810,7 @@ export default function InspectionHubPage() {
       {/* Request-payment modal — shared Modal primitive (no window.confirm) */}
       <RequestPaymentModal
         open={paymentModal.open}
-        recipientEmail={inspection.clientEmail ?? ""}
+        recipientEmail={peopleCard.client?.email ?? ""}
         amountLabel={formatCents(invoiceAmountCents)}
         resend={invoiceSent}
         fetcher={paymentModal.fetcher}
@@ -831,6 +829,18 @@ export default function InspectionHubPage() {
         error={publishModal.error}
         onClose={() => publishModal.setOpen(false)}
       />
+
+      {/* Send-report modal — shared Modal primitive (no window.confirm). Only
+          mounted while open (SendReportModal always renders its Modal as
+          open — see its own doc comment). */}
+      {sendReportOpen && (
+        <SendReportModal
+          people={people}
+          roleProfiles={roleProfiles}
+          fetcher={sendReportFetcher}
+          onClose={() => setSendReportOpen(false)}
+        />
+      )}
 
       {/* Create-re-inspection modal — shared Modal primitive (no window.confirm) */}
       <CreateReinspectionModal
@@ -864,10 +874,19 @@ function useModalFetcher<I extends string>(
   const [open, setOpen] = useState(false);
   const fetcher = useFetcher<typeof action>();
   const busy = fetcher.state !== "idle";
+  // "ok" in fetcher.data narrows away the People-editor intents (person-add /
+  // person-remove use their own dedicated fetchers, never this hook) and
+  // search-contacts, whose result shape carries no ok/error — those would
+  // otherwise widen the union `fetcher.data.ok` is read from.
   const succeeded =
-    fetcher.state === "idle" && fetcher.data?.intent === intent && fetcher.data.ok;
+    fetcher.state === "idle" &&
+    fetcher.data?.intent === intent &&
+    "ok" in fetcher.data &&
+    fetcher.data.ok;
   const error =
-    fetcher.data?.intent === intent && !fetcher.data.ok ? fetcher.data.error : undefined;
+    fetcher.data?.intent === intent && "ok" in fetcher.data && !fetcher.data.ok
+      ? fetcher.data.error
+      : undefined;
 
   useEffect(() => {
     if (closeOnSuccess && open && succeeded) setOpen(false);

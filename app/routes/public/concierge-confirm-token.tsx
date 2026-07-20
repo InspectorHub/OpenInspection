@@ -1,7 +1,10 @@
 import { Form, useLoaderData, useNavigation, redirect } from "react-router";
 import type { Route } from "./+types/concierge-confirm-token";
 import { createApi } from "~/lib/api-client.server";
+import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
+import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
+import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -26,19 +29,23 @@ interface ConfirmView {
 
 export async function loader({ params, context }: Route.LoaderArgs) {
   const token = params.token ?? "";
-  if (!token) return { view: null as ConfirmView | null, status: "not-found" as const };
+  if (!token) return { view: null as ConfirmView | null, status: "not-found" as const, date: null };
   try {
     const api = createApi(context);
     const res = await api.concierge["confirm-view"].$get({ query: { token } });
-    if (!res.ok) return { view: null, status: "not-found" as const };
+    if (!res.ok) return { view: null, status: "not-found" as const, date: null };
     const body = (await res.json()) as { success: boolean; data?: ConfirmView };
-    if (!body.success || !body.data) return { view: null, status: "not-found" as const };
+    if (!body.success || !body.data) return { view: null, status: "not-found" as const, date: null };
     const view = body.data;
-    if (view.expired) return { view, status: "expired" as const };
-    if (view.alreadyConfirmed) return { view, status: "already" as const };
-    return { view, status: "ok" as const };
+    // This magic-link surface carries no tenant slug and no session, so there is
+    // no configured zone to anchor to. Return the raw date; the confirm card
+    // renders it in the viewer's own browser zone (see <ViewerTimeZoneProvider>).
+    const date = view.inspection.date;
+    if (view.expired) return { view, status: "expired" as const, date };
+    if (view.alreadyConfirmed) return { view, status: "already" as const, date };
+    return { view, status: "ok" as const, date };
   } catch {
-    return { view: null, status: "error" as const };
+    return { view: null, status: "error" as const, date: null };
   }
 }
 
@@ -61,8 +68,10 @@ export async function action({ params, context }: Route.ActionArgs) {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function ConciergeConfirmTokenPage() {
-  const { view, status } = useLoaderData<typeof loader>();
+function ConciergeConfirmBody() {
+  const { view, status, date } = useLoaderData<typeof loader>();
+  const tz = useViewerTimeZone();
+  const displayDate = date ? formatInspectionDateTime(date, undefined, tz) : date;
   const nav = useNavigation();
   const submitting = nav.state === "submitting";
 
@@ -115,7 +124,7 @@ export default function ConciergeConfirmTokenPage() {
           </div>
           <div className="flex justify-between gap-4 px-4 py-3">
             <dt className="text-ih-fg-4">{m.concierge_confirm_label_date()}</dt>
-            <dd className="text-ih-fg-1 font-medium text-right">{view.inspection.date}</dd>
+            <dd className="text-ih-fg-1 font-medium text-right">{displayDate}</dd>
           </div>
           {view.inspector?.name && (
             <div className="flex justify-between gap-4 px-4 py-3">
@@ -140,7 +149,17 @@ export default function ConciergeConfirmTokenPage() {
             {submitting ? m.concierge_confirm_submit_pending() : m.concierge_confirm_submit()}
           </button>
         </Form>
+
+        {view.inspection.date && <ViewerTimeZoneNotice className="mt-5" />}
       </main>
     </div>
+  );
+}
+
+export default function ConciergeConfirmTokenPage() {
+  return (
+    <ViewerTimeZoneProvider>
+      <ConciergeConfirmBody />
+    </ViewerTimeZoneProvider>
   );
 }

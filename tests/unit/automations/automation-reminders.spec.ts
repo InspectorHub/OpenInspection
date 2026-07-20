@@ -7,6 +7,8 @@ import { eq } from 'drizzle-orm';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../../server/services/automation.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { EmailService } from '../../../server/services/email.service';
 
 // Stub emailFor factory: delivers successfully so reminder flush tests can verify
@@ -14,6 +16,7 @@ import type { EmailService } from '../../../server/services/email.service';
 const stubEmailFor = async (_tid: string) => ({ sendEmail: async () => ({ delivered: true }) } as unknown as EmailService);
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
+const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 let db: BetterSQLite3Database<typeof schema>;
 let svc: AutomationService;
 const NOW = Date.parse('2026-05-30T08:00:00Z'); // fixed clock for the test
@@ -27,6 +30,7 @@ beforeEach(async () => {
         id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
+    await seedRoleProfiles(db, TENANT, new Date(1));
     svc = new AutomationService({} as D1Database);
 });
 
@@ -34,18 +38,33 @@ async function reminderRule(delayMinutes = 1440) {
     const id = crypto.randomUUID();
     await db.insert(schema.automations).values({
         id, tenantId: TENANT, name: 'Appt reminder', trigger: 'inspection.reminder',
-        recipient: 'client', delayMinutes, subjectTemplate: 'Reminder', bodyTemplate: 'See you {{scheduled_date}}',
+        recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes, subjectTemplate: 'Reminder', bodyTemplate: 'See you {{scheduled_date}}',
         active: true, isDefault: false, createdAt: new Date(),
     } as never);
     return id;
 }
+// Task 11a — resolveAddress (used by both trigger() and enqueueReminders())
+// now sources the client's email via inspection_people, not the legacy
+// inspections.client_email/_name columns. `over.clientEmail === null` (the
+// original fixture's "no client" signal, e.g. the "ignores ... inspections
+// with no client email" case below) skips seeding the person so resolveAddress
+// still resolves null for that case.
 async function insp(date: string, over: Partial<typeof schema.inspections.$inferInsert> = {}) {
     const id = crypto.randomUUID();
+    const { clientEmail, clientName, ...inspOver } = over;
     await db.insert(schema.inspections).values({
-        id, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
-        clientEmail: 'jane@example.com', date, status: 'scheduled', paymentStatus: 'unpaid',
-        price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(), ...over,
+        id, tenantId: TENANT, propertyAddress: '1 Main',
+        date, status: 'scheduled', paymentStatus: 'unpaid',
+        price: 0, agreementRequired: false, paymentRequired: false, createdAt: new Date(), ...inspOver,
     } as never);
+    if (clientEmail !== null) {
+        const contactId = `contact-${id}`;
+        await db.insert(schema.contacts).values({
+            id: contactId, tenantId: TENANT, type: 'client',
+            name: clientName ?? 'Jane', email: clientEmail ?? 'jane@example.com', createdAt: new Date(),
+        } as never);
+        await new PeopleService({ DB: {} as D1Database }).addPerson(TENANT, id, contactId, roleProfileId('client'));
+    }
     return id;
 }
 async function logsFor(inspectionId: string) {

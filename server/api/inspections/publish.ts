@@ -11,16 +11,14 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { requireCapability } from '../../lib/middleware/require-capability';
 import { auditFromContext } from '../../lib/audit';
-import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../../lib/url';
+import { getBookingHost, resolveTenantSlug } from '../../lib/url';
 import { buildRenderReportUrl } from '../../lib/public-urls';
-import { buildPortalUrl } from '../../lib/portal-urls';
 import { logger } from '../../lib/logger';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { PublishInspectionSchema, CreateReinspectionSchema, CancelInspectionSchema } from '../../lib/validations/inspection.schema';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable } from '../../lib/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { getTenantId } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 
@@ -297,48 +295,31 @@ const publishRoutes = createApiRouter()
         const db = drizzle(c.env.DB);
         await db.update(inspectionTable).set({ status: 'completed' }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
-        if (inspection.clientEmail) {
-            const tenantSlug = await resolveTenantSlug(c, tenantId);
-            // linkUrl: per-recipient TOKENIZED report link so the no-login client
-            // can open it (a plain URL 404s "Report not found"). Idempotent per
-            // (inspection, recipient) — re-sends keep the same stable link.
-            const reportToken = await c.var.services.portalAccess.issueToken({ tenantId, inspectionId: id, recipientEmail: inspection.clientEmail, role: 'client' });
-            // linkUrl now lands the no-login client on the unified portal hub
-            // (overview) carrying the persistent portalAccess token.
-            const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
-            // renderUrl: token-bearing URL for the headless browser PDF render.
-            const renderUrl = await buildRenderReportUrl(getBookingHost(c), tenantSlug, id, c.env.JWT_SECRET);
-            const clientEmail = inspection.clientEmail;
-            const address = inspection.propertyAddress as string;
+        // Task 9a (people-role-profiles) — resolve the recipient via the
+        // inspection_people join (PeopleService) instead of the legacy
+        // inspection.clientEmail/.clientName column, which is being dropped.
+        // Resolved here only for the admin notification's metadata below — the
+        // actual report delivery is the automation trigger fired next.
+        const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, id);
 
-            // Sprint B-4a — resolve the inspector record so the report email
-            // body carries the rebooking signature footer.
-            const sigInspector = await resolveSignatureInspector(c, inspection.inspectorId, tenantId);
-            const sigHost = getBookingHost(c);
-
-            // Best-effort PDF: if BROWSER binding is missing or rendering fails,
-            // fall back to the existing text-only "Report Ready" email so we
-            // never block inspection completion on an optional dependency.
-            // Route through the PDF cache — if the publish flow already rendered
-            // this content, getOrRender returns the cached record at zero Browser
-            // Rendering cost.
-            const deliver = async () => {
-                try {
-                    const contentHash = await c.var.services.inspection.getReportContentHash(id, tenantId);
-                    // Everyday email attachment always renders current content.
-                    // Frozen per-version PDFs live only on the verify page.
-                    const record = await c.var.services.reportPdf.getOrRender(id, tenantId, 'full', { reportUrl: renderUrl, contentHash, versionNumber: null });
-                    const obj = await c.var.services.reportPdf.streamPdf(record);
-                    if (!obj) throw new Error('PDF unavailable');
-                    const pdf = await obj.arrayBuffer();
-                    await c.var.services.email.sendInspectionReportPdf(clientEmail, address, linkUrl, pdf, sigInspector, sigHost);
-                } catch (err) {
-                    logger.error('[complete] PDF generation failed, falling back to text-only email',
-                        { inspectionId: id }, err instanceof Error ? err : undefined);
-                    await c.var.services.email.sendReportReady(clientEmail, address, linkUrl, sigInspector, sigHost);
-                }
-            };
-            c.executionCtx.waitUntil(deliver());
+        // Route report delivery through the single automation engine (report.published)
+        // instead of an inline per-route send. The seeded report.published rules
+        // (client active, buyer_agent active, listing_agent inactive) fan out one
+        // per-recipient automation_log; the cron flush renders the PDF once and sends
+        // each recipient their role-keyed tokenized link. Idempotent per inspection
+        // (see the auto:report.published:<id> dedup key), so a later /publish that
+        // fires the same event does not double-send.
+        try {
+            await c.var.services.automation.trigger({
+                tenantId,
+                inspectionId: id,
+                triggerEvent: 'report.published',
+                companyName: '',
+                reportBaseUrl: '',
+            });
+        } catch (err) {
+            logger.error('[complete] report.published automation trigger failed',
+                { inspectionId: id }, err instanceof Error ? err : undefined);
         }
 
         // B3: in-app notification for report ready
@@ -348,7 +329,7 @@ const publishRoutes = createApiRouter()
                 title: `Report ready — ${inspection.propertyAddress ?? 'inspection'}`,
                 entityType: 'inspection',
                 entityId: inspection.id,
-                metadata: { clientEmail: inspection.clientEmail ?? null },
+                metadata: { clientEmail: primaryClient?.email ?? null },
             })
         );
 

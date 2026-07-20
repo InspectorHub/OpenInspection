@@ -24,5 +24,6 @@
   "validation_service_name_required": "Service name is required",
   "validation_service_name_too_long": "Service name is too long",
   "validation_service_description_too_long": "Description is too long",
-  "validation_service_price_invalid": "Enter a price of 0 or more"
+  "validation_service_price_invalid": "Enter a price of 0 or more",
+  "validation_role_label_required": "Label is required"
 }

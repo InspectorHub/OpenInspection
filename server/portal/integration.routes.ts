@@ -6,12 +6,15 @@ import { HonoConfig } from '../types/hono';
 import { TenantUpdateParams } from '../lib/integration';
 import { TenantStatusBodySchema, SeedStarterContentBodySchema } from '../lib/validations/admin.schema';
 import { SyncQuotaSchema } from '../lib/validations/sync-quota.schema';
+import { SsoHandoffSchema } from '../lib/validations/sso-handoff.schema';
 import { logger } from '../lib/logger';
-import { tenantConfigs, inspectionAccessTokens, tenants } from '../lib/db/schema';
+import { tenantConfigs, inspectionAccessTokens, tenants, contactRoleProfiles } from '../lib/db/schema';
+import { capabilitiesForKind, type RoleKind } from '../lib/people/capabilities';
 import { reencryptAllTenantSecrets } from '../lib/secrets-reencrypt';
 import { secretsCacheKey } from '../lib/secrets-cache';
 import { OutboxService } from './outbox.service';
 import { requireServiceBinding } from './service-binding-guard';
+import { findGlobalAgentByEmail } from '../services/agent/account';
 import { aggregateUsage } from '../lib/usage/aggregate';
 import { usageCounters } from '../lib/db/schema/usage';
 import { FREE_TIER_CAPS } from '../features/plan-quota/policy';
@@ -124,7 +127,7 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
  *
  * Issues a one-time SSO code that the portal hands to the browser
  * so the user lands at `GET /sso?code=...` and gets a workspace-
- * scoped session cookie. Body: { tenantId, email, ttlSeconds? }.
+ * scoped session cookie. Body: { tenantId?, email, ttlSeconds? }.
  * Returns: { code } — caller redirects the browser to
  * `https://app.{domain}/sso?code=<code>`.
  *
@@ -132,18 +135,44 @@ api.post('/tenants/:slug/purge', requireServiceBinding, async (c) => {
  * seconds; consume-side deletes the key on success (single-use).
  * No JWT material in the body — only the lookup tuple — so an
  * exposed code can't be replayed indefinitely.
+ *
+ * `tenantId` is OPTIONAL (Spec 3 Task 5b): when present, this is the
+ * long-standing tenant-scoped handoff below (unchanged). When ABSENT, this
+ * is an agent handoff — portal's Google-OIDC agent-mode callback hands off
+ * just the email; findGlobalAgentByEmail (the single shared "live global
+ * agent" predicate — server/services/agent/account.ts) resolves the
+ * account and the KV payload carries `{ userId }` only, no tenantId. The
+ * `/sso` consumer (server/api/auth.ts) detects the tenant-null payload and
+ * mints an agent JWT instead of a tenant JWT.
  */
 api.post('/sso-handoff', requireServiceBinding, async (c) => {
-    const body = await c.req.json().catch(() => ({})) as {
-        tenantId?: string;
-        email?: string;
-        ttlSeconds?: number;
-    };
-    if (!body.tenantId || !body.email) {
-        return c.json({ success: false, error: { message: 'tenantId and email required' } }, 400);
+    const parsed = SsoHandoffSchema.safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) {
+        return c.json({ success: false, error: { message: 'Invalid input' } }, 400);
     }
+    const body = parsed.data;
     const ttl = Math.min(Math.max(body.ttlSeconds ?? 60, 5), 300);
 
+    if (!body.tenantId) {
+        // Agent handoff (Spec 3 Task 5b) — no tenant-scoped lookup; the caller
+        // is not asserting a workspace at all, only an email.
+        const agent = await findGlobalAgentByEmail(c.env.DB, body.email);
+        if (!agent) return c.json({ success: false, error: { message: 'No global agent for that email' } }, 404);
+
+        if (!c.env.TENANT_CACHE) {
+            return c.json({ success: false, error: { message: 'KV unavailable' } }, 503);
+        }
+        const code = crypto.randomUUID();
+        await c.env.TENANT_CACHE.put(
+            `sso:${code}`,
+            JSON.stringify({ userId: agent.id }),
+            { expirationTtl: ttl },
+        );
+        logger.info('sso_handoff.agent_code_issued', { userId: agent.id });
+        return c.json({ success: true, data: { code, expiresIn: ttl } });
+    }
+
+    // EXISTING tenant path — unchanged.
     const { drizzle } = await import('drizzle-orm/d1');
     const { eq, and } = await import('drizzle-orm');
     const { users } = await import('../lib/db/schema');
@@ -384,8 +413,10 @@ api.get('/usage', requireServiceBinding, async (c) => {
 /**
  * GET /api/integration/tenants/by-email?email=<email>
  * Cross-tenant client grant lookup: returns the slugs of tenants where the
- * email holds a LIVE (not revoked, not expired) client/co_client access grant.
- * Platform-level read (raw drizzle, no tenant scope) — guarded by
+ * email holds a LIVE (not revoked, not expired) grant whose role-profile KIND
+ * grants selfRetrieveReport (client/co_client by default — see
+ * server/lib/people/capabilities.ts; tenant-configurable, not a hard-coded
+ * role list). Platform-level read (raw drizzle, no tenant scope) — guarded by
  * requireServiceBinding. Enables a portal-side "find my report" fan-out that
  * triggers each tenant's own magic-link without a cross-tenant session layer.
  */
@@ -398,17 +429,31 @@ api.get('/tenants/by-email', requireServiceBinding, async (c) => {
         const d = drizzle(c.env.DB);
         const now = new Date();
 
+        // This scan is cross-tenant (no single tenantId in scope), so the
+        // role→kind resolution is a per-row join against each grant's OWN
+        // tenant rather than a single-tenant PeopleService.roleKeysWithCapability
+        // lookup (that helper takes one tenantId). A grant whose role key has
+        // no active profile row for its tenant (deleted/renamed) is dropped by
+        // the inner join — fails closed, never matches.
         const grants = await d
-            .select({ tenantId: inspectionAccessTokens.tenantId })
+            .select({ tenantId: inspectionAccessTokens.tenantId, kind: contactRoleProfiles.kind })
             .from(inspectionAccessTokens)
+            .innerJoin(contactRoleProfiles, and(
+                eq(contactRoleProfiles.tenantId, inspectionAccessTokens.tenantId),
+                eq(contactRoleProfiles.key, inspectionAccessTokens.role),
+                eq(contactRoleProfiles.active, true),
+            ))
             .where(and(
                 eq(inspectionAccessTokens.recipientEmail, email),
-                inArray(inspectionAccessTokens.role, ['client', 'co_client']),
                 isNull(inspectionAccessTokens.revokedAt),
                 or(isNull(inspectionAccessTokens.expiresAt), gt(inspectionAccessTokens.expiresAt, now)),
             ));
 
-        const tenantIds = [...new Set(grants.map((g) => g.tenantId as string))];
+        const tenantIds = [...new Set(
+            grants
+                .filter((g) => capabilitiesForKind(g.kind as RoleKind).selfRetrieveReport)
+                .map((g) => g.tenantId as string),
+        )];
         if (tenantIds.length === 0) return c.json({ success: true, data: { slugs: [] } });
 
         const rows = await d

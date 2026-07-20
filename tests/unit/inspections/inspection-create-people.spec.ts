@@ -9,6 +9,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { InspectionService } from '../../../server/services/inspection.service';
 import { ContactService } from '../../../server/services/contact.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { ScopedDB } from '../../../server/lib/db/scoped';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
@@ -24,6 +26,7 @@ let testDb: BetterSQLite3Database<typeof schema>;
 let sdb: ScopedDB;
 let inspectionSvc: InspectionService;
 let contactSvc: ContactService;
+let peopleSvc: PeopleService;
 
 // Service catalog id seeded in beforeEach
 const SVC_ID = '00000000-0000-0000-0000-000000000901';
@@ -49,15 +52,23 @@ beforeEach(async () => {
         price: 45000, active: true, sortOrder: 0, createdAt: new Date(),
     } as never);
 
+    // Task 13 — client/agent identity is persisted ONLY via inspection_people
+    // now (clientContactId/clientName/clientEmail/clientPhone/
+    // referredByAgentId/sellingAgentId dropped from inspections). createInspection's
+    // Task 7 people-write resolves role profile ids by key, so the role
+    // profiles must exist for the write to land.
+    await seedRoleProfiles(testDb, TENANT, new Date());
+
     inspectionSvc = new InspectionService({} as D1Database, undefined, sdb);
     contactSvc = new ContactService({} as D1Database);
+    peopleSvc = new PeopleService({ DB: {} as D1Database });
 });
 
 // ---------------------------------------------------------------------------
 // 1. create with client lands FK + denormalized trio
 // ---------------------------------------------------------------------------
 describe('client capture via upsertClientContact then createInspection', () => {
-    it('writes clientContactId + clientName/clientEmail/clientPhone on the inspection row', async () => {
+    it('links the client contact into inspection_people (Task 13 — dropped clientContactId/clientName/clientEmail/clientPhone columns)', async () => {
         // Simulate what the handler does: upsert the client first, then create.
         const { id: clientContactId } = await contactSvc.upsertClientContact(TENANT, {
             name: 'Jane Buyer', email: 'jane@buyer.com', phone: '555-0100', type: 'client',
@@ -73,10 +84,11 @@ describe('client capture via upsertClientContact then createInspection', () => {
         } as any);
 
         const row = await testDb.select().from(schema.inspections).get();
-        expect(row?.clientContactId).toBe(clientContactId);
-        expect(row?.clientName).toBe('Jane Buyer');
-        expect(row?.clientEmail).toBe('jane@buyer.com');
-        expect(row?.clientPhone).toBe('555-0100');
+        const primary = await peopleSvc.getPrimaryClient(TENANT, row!.id);
+        expect(primary?.contactId).toBe(clientContactId);
+        expect(primary?.name).toBe('Jane Buyer');
+        expect(primary?.email).toBe('jane@buyer.com');
+        expect(primary?.phone).toBe('555-0100');
 
         // Verify the contact row was created correctly.
         const contact = await testDb.select().from(schema.contacts)
@@ -125,12 +137,14 @@ describe('returning customer reuses contact id', () => {
             .where(and(eq(schema.contacts.tenantId, TENANT), eq(schema.contacts.email, email)));
         expect(contactRows).toHaveLength(1);
 
-        // Both inspections reference the same contact.
+        // Both inspections reference the same contact, via inspection_people
+        // (Task 13 — inspections.clientContactId dropped).
         const inspRows = await testDb.select().from(schema.inspections)
             .where(eq(schema.inspections.tenantId, TENANT));
         expect(inspRows).toHaveLength(2);
         for (const insp of inspRows) {
-            expect(insp.clientContactId).toBe(firstContactId);
+            const primary = await peopleSvc.getPrimaryClient(TENANT, insp.id);
+            expect(primary?.contactId).toBe(firstContactId);
         }
     });
 });
@@ -139,7 +153,7 @@ describe('returning customer reuses contact id', () => {
 // 3. newAgent creates a type='agent' contact and links referredByAgentId
 // ---------------------------------------------------------------------------
 describe('new agent linking', () => {
-    it('upserts an agent contact and the inspection referredByAgentId matches', async () => {
+    it('upserts an agent contact and links it into inspection_people as buyer_agent (Task 13 — dropped referredByAgentId column)', async () => {
         const { id: agentId } = await contactSvc.upsertClientContact(TENANT, {
             name: 'Tony Agent', email: 'tony@realty.com', type: 'agent',
         });
@@ -152,7 +166,8 @@ describe('new agent linking', () => {
         } as any);
 
         const insp = await testDb.select().from(schema.inspections).get();
-        expect(insp?.referredByAgentId).toBe(agentId);
+        const buyerAgentContactId = await peopleSvc.contactIdForRole(TENANT, insp!.id, 'buyer_agent');
+        expect(buyerAgentContactId).toBe(agentId);
 
         // Verify the contact has type='agent'.
         const contact = await testDb.select().from(schema.contacts)

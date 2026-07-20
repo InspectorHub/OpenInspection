@@ -4,7 +4,12 @@ import { isValidTimeZone, resolveTenantTimeZone, epochMsToRfc3339, wallClockToEp
 describe('tz helper', () => {
   it('validates IANA names', () => {
     expect(isValidTimeZone('America/New_York')).toBe(true);
-    expect(isValidTimeZone('EST')).toBe(true); // Intl accepts a few abbreviations; that's fine
+    expect(isValidTimeZone('UTC')).toBe(true);
+    // Abbreviations / legacy fixed-offset zones are rejected — we store IANA
+    // region ids only so the runtime always handles DST.
+    expect(isValidTimeZone('EST')).toBe(false);
+    expect(isValidTimeZone('GMT')).toBe(false);
+    expect(isValidTimeZone('PST8PDT')).toBe(false);
     expect(isValidTimeZone('Not/AZone')).toBe(false);
     expect(isValidTimeZone('')).toBe(false);
   });

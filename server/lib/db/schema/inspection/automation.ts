@@ -20,9 +20,13 @@ export const automations = sqliteTable('automations', {
             'inspection.reminder',
         ],
     }).notNull(),
-    recipient: text('recipient', {
-        enum: ['client', 'buying_agent', 'selling_agent', 'inspector', 'all'],
-    }).notNull(),
+    // Recipient discriminator (replaces the fixed `recipient` enum). `role` means
+    // "the role profile named by recipientRoleProfileId"; `inspector` and `all`
+    // are role-independent and always carry a null profile id. Invariant:
+    // recipient_role_profile_id is set iff kind='role'; when set it holds a
+    // contact_role_profiles.id (app-layer link, no FK per Schema Rules).
+    recipientKind: text('recipient_kind', { enum: ['role', 'inspector', 'all'] }).notNull(),
+    recipientRoleProfileId: text('recipient_role_profile_id'),
     delayMinutes: integer('delay_minutes').notNull().default(0),
     // -- DEAD (2026-06-26, SP2): embedded email subject/body retired. Automations
     // now reference a message_templates row via email_template_id. Frozen: no
@@ -60,6 +64,10 @@ export const automationLogs = sqliteTable('automation_logs', {
     inspectionId: text('inspection_id').notNull(),
     // Track L — holds the email address for email logs, the E.164 phone for sms logs.
     recipient: text('recipient').notNull(),   // RENAMED from recipient_email (0025)
+    // Spec 2 — the recipient's role-profile key (e.g. 'buyer_agent'), captured at
+    // enqueue so the flush/send path can mint a role-keyed portal token per
+    // recipient. Null for logs with no role context (legacy/reminder/inspector).
+    recipientRoleKey: text('recipient_role_key'),
     // Track L — the log's own delivery channel (a multi-channel rule emits one log each).
     channel: text('channel', { enum: ['email', 'sms'] }).notNull().default('email'),
     sendAt: integer('send_at', { mode: 'timestamp_ms' }).notNull(),
@@ -70,11 +78,13 @@ export const automationLogs = sqliteTable('automation_logs', {
 }, (t) => [
     index('idx_automation_logs_pending').on(t.tenantId, t.status, t.sendAt),
     index('idx_automation_logs_insp').on(t.inspectionId),
-    // DB-9 — idempotency: one log row per (automation, inspection, event). Guards
-    // against retry double-sends. Partial (event_id present) so legacy rows that
+    // DB-9 — idempotency: one log row per (automation, inspection, event, channel,
+    // recipient) when event_id is set. Guards against retry double-sends — including
+    // for multi-recipient/multi-channel rules, where each recipient/channel still
+    // gets its own distinct row. Partial (event_id present) so legacy rows that
     // predate event-id stamping aren't forced unique on a NULL key.
     uniqueIndex('uq_automation_logs_event')
-        .on(t.automationId, t.inspectionId, t.eventId)
+        .on(t.automationId, t.inspectionId, t.eventId, t.channel, t.recipient)
         .where(sql`event_id IS NOT NULL`),
 ]);
 

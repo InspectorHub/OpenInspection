@@ -23,6 +23,7 @@ import { AvailabilityService } from '../../services/booking.service';
 import { ContactService } from '../../services/contact.service';
 import { InvoiceService } from '../../services/invoice.service';
 import { PortalAccessService } from '../../services/portal-access.service';
+import { PeopleService } from '../../services/people.service';
 import { ServiceService } from '../../services/service.service';
 import { AutomationService } from '../../services/automation.service';
 import { MarketplaceService } from '../../services/marketplace.service';
@@ -247,6 +248,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                         jwtSecret: c.env.JWT_SECRET,
                         ...(c.env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: c.env.JWT_SECRET_PREVIOUS } : {}),
                     });
+                    break;
+                case 'people':
+                    target.people = new PeopleService(c.env);
                     break;
                 case 'service':
                     target.service = new ServiceService(c.env.DB);

@@ -1,6 +1,7 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { automationLogs, automations, tenants, tenantConfigs } from '../../lib/db/schema';
+import { automationLogs, automations, tenants, tenantConfigs, contactRoleProfiles } from '../../lib/db/schema';
+import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { logger } from '../../lib/logger';
 import { currentPeriodKey } from '../../lib/usage/period';
 import { interpolate, type Constructor, type FlushInspection } from './shared';
@@ -77,13 +78,37 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
                 : null;
             if (!tpl || tpl.channel !== 'sms' || !tpl.body.trim()) return void (await skip('no sms template'));
 
-            // Consent gate — client only (agents/inspector implied; D5).
-            if (automation.recipient === 'client') {
-                const { SmsConsentService } = await import('../sms-consent.service');
-                const consentSvc = new SmsConsentService(this.db);
-                const contactId = inspection.clientContactId;
-                const latest = contactId ? await consentSvc.getLatest(inspection.tenantId, contactId) : null;
-                if (latest !== 'granted') return void (await skip('no sms consent'));
+            // Consent gate — client only (agents/inspector implied; D5). Gate
+            // fires when the rule's recipient discriminator resolves to the
+            // PRIMARY_CLIENT_KEY role profile (replaces the old `recipient ===
+            // 'client'` enum check; same consent-required-only-for-client behavior).
+            if (automation.recipientKind === 'role' && automation.recipientRoleProfileId) {
+                // try/catch (not `.get().catch()`) so this works under both the async
+                // D1 driver and the synchronous better-sqlite3 test driver.
+                let roleRow: { key: string } | null = null;
+                try {
+                    roleRow = await db.select({ key: contactRoleProfiles.key }).from(contactRoleProfiles)
+                        .where(and(
+                            eq(contactRoleProfiles.tenantId, inspection.tenantId),
+                            eq(contactRoleProfiles.id, automation.recipientRoleProfileId),
+                        )).get() ?? null;
+                } catch (err) {
+                    // DB error on consent-gate role lookup: fail closed (do not send).
+                    // When we cannot prove the recipient is NOT a consent-requiring client, we must not send.
+                    logger.error('sms consent-gate role lookup failed; failing closed (skipping send)', {
+                        automationId: automation.id,
+                        inspectionId: inspection.id,
+                        tenantId: inspection.tenantId,
+                    }, err instanceof Error ? err : undefined);
+                    return void (await skip('consent-gate role lookup failed'));
+                }
+                if (roleRow?.key === PRIMARY_CLIENT_KEY) {
+                    const { SmsConsentService } = await import('../sms-consent.service');
+                    const consentSvc = new SmsConsentService(this.db);
+                    const contactId = inspection.clientContactId;
+                    const latest = contactId ? await consentSvc.getLatest(inspection.tenantId, contactId) : null;
+                    if (latest !== 'granted') return void (await skip('no sms consent'));
+                }
             }
 
             const resolved = await sms.resolveProvider(inspection.tenantId);

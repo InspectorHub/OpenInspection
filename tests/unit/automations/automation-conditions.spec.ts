@@ -6,8 +6,10 @@ import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../../server/services/automation.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
+const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 let db: BetterSQLite3Database<typeof schema>;
 let svc: AutomationService;
 
@@ -20,13 +22,14 @@ beforeEach(async () => {
         id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
+    await seedRoleProfiles(db, TENANT, new Date(1));
     svc = new AutomationService({} as D1Database);
 });
 
 describe('AutomationService create/update — conditions + channels (Track J/L)', () => {
     it('serializes conditions to JSON and defaults channels to email-only', async () => {
         const row = await svc.create(TENANT, {
-            name: 'Follow-up', trigger: 'report.published', recipient: 'client',
+            name: 'Follow-up', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 1440, subjectTemplate: 's', bodyTemplate: 'b',
             conditions: { requirePaid: true, serviceIds: ['svc-1'] },
         });
@@ -37,7 +40,7 @@ describe('AutomationService create/update — conditions + channels (Track J/L)'
 
     it('update can clear conditions and change channels', async () => {
         const created = await svc.create(TENANT, {
-            name: 'R', trigger: 'report.published', recipient: 'client',
+            name: 'R', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
             delayMinutes: 0, subjectTemplate: 's', bodyTemplate: 'b',
             conditions: { requireSigned: true },
         });

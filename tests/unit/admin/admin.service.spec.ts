@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { AdminService } from '../../../server/services/admin.service';
 import { MockKV } from '../mocks';
 import { createTestDb, setupSchema } from '../db';
-import { users, tenantInvites, inspections, tenants, templates, agreements, agreementRequests, agreementSigners } from '../../../server/lib/db/schema';
+import { users, tenantInvites, inspections, tenants, templates, agreements, agreementRequests, agreementSigners, contacts, inspectionPeople } from '../../../server/lib/db/schema';
 import { eq } from 'drizzle-orm';
 import { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import * as schema from '../../../server/lib/db/schema';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { PeopleService } from '../../../server/services/people.service';
 
 // Mock the drizzle-orm/d1 module to return our in-memory SQLite DB
 vi.mock('drizzle-orm/d1', () => ({
@@ -132,7 +134,7 @@ describe('AdminService', () => {
     it('should perform GDPR erasure of client data', async () => {
         const tenantId = 't1';
         const clientEmail = 'client@privacy.com';
-        
+
         // Seed inspector
         await testDb.insert(users).values({
             id: 'u-insp',
@@ -153,22 +155,33 @@ describe('AdminService', () => {
             createdAt: new Date(),
         });
 
-        // Seed inspection
+        // Seed inspection — legacy client_* columns intentionally left NULL: the
+        // LIVE client-identity path is inspection_people -> contacts (the
+        // inspections.client_* columns are a frozen, unread cache dropped in a
+        // later migration).
         await testDb.insert(inspections).values({
             id: 'insp-1',
             tenantId,
             propertyAddress: '123 Privacy St',
-            clientName: 'Original Name',
-            clientEmail,
             inspectorId: 'u-insp',
             templateId: 'temp-1',
             status: 'completed',
             date: new Date().toISOString().split('T')[0], // Text column needs string
             createdAt: new Date(),
         });
+        await seedRoleProfiles(testDb, tenantId, new Date(1));
+        await testDb.insert(contacts).values({
+            id: 'contact-privacy', tenantId, type: 'client',
+            name: 'Original Name', email: clientEmail, createdAt: new Date(),
+        });
+        await testDb.insert(inspectionPeople).values({
+            id: 'ip-privacy', tenantId, inspectionId: 'insp-1',
+            contactId: 'contact-privacy', roleProfileId: `crp_${tenantId}_client`, createdAt: new Date(),
+        });
 
         const result = await adminService.eraseClientData(tenantId, clientEmail);
-        // Legacy additive contract.
+        // Legacy additive contract — still counts the ONE inspection the
+        // subject is on, now resolved via inspection_people -> contacts.
         expect(result.matched).toBe(1);
         expect(result.deletedAgreements).toBe(1);
         // Richer orchestrator summary (Track I-a).
@@ -179,10 +192,16 @@ describe('AdminService', () => {
         expect(typeof result.deletedCount).toBe('number');
         expect(typeof result.retainedCount).toBe('number');
 
-        const insp = await testDb.select().from(inspections).where(eq(inspections.id as any, 'insp-1')).get();
-        expect(insp).toBeDefined();
-        expect(insp!.clientName).toBeNull();
-        expect(insp!.clientEmail).toBeNull();
+        // Compliance proof: the contact (the live PII source) is deleted, the
+        // inspection_people link is gone, and the primary-client join every
+        // read path uses now resolves to null for this subject.
+        const contact = await testDb.select().from(contacts).where(eq(contacts.id, 'contact-privacy')).get();
+        expect(contact).toBeUndefined();
+        const ip = await testDb.select().from(inspectionPeople).where(eq(inspectionPeople.id, 'ip-privacy')).get();
+        expect(ip).toBeUndefined();
+        const people = new PeopleService({ DB: {} as D1Database });
+        const primary = await people.getPrimaryClient(tenantId, 'insp-1');
+        expect(primary).toBeNull();
 
         // An append-only erasure_log decision row was written (Art. 5(2)/30).
         const logs = await testDb.select().from(schema.erasureLog).all();

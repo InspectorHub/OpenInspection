@@ -16,10 +16,25 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { ImportResponseSchema } from '../../lib/validations/admin.schema';
-import { templates, agreements as agreementTable, inspections, inspectionResults } from '../../lib/db/schema';
+import { templates, agreements as agreementTable, inspections, inspectionResults, contactRoleProfiles } from '../../lib/db/schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
 import { syncInspectionAssignmentsBatch } from '../../lib/db/assignment-links';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
+import type { DrizzleD1Database } from 'drizzle-orm/d1';
+
+/**
+ * Task 7c (people-role-profiles fix) — resolves an active role profile's id
+ * by key (e.g. 'client', 'buyer_agent', 'listing_agent') for the imported-
+ * inspection people-mirroring below. Returns undefined when the tenant has
+ * no active profile for that key (role seeding failed/incomplete) —
+ * callers treat that as "skip this role" rather than throw.
+ */
+async function resolveRoleId(db: DrizzleD1Database, tenantId: string, key: string): Promise<string | undefined> {
+    const row = await db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
+        .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.key, key), eq(contactRoleProfiles.active, true)))
+        .get();
+    return row?.id;
+}
 
 
 /**
@@ -118,7 +133,12 @@ const adminDataImportRoutes = createApiRouter()
             id: string; propertyAddress: string; inspectorId?: string; clientName?: string;
             clientEmail?: string; templateId?: string; date?: string;
             status?: 'requested' | 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
-            paymentStatus?: 'unpaid' | 'partial' | 'paid'; price?: number; createdAt?: string
+            paymentStatus?: 'unpaid' | 'partial' | 'paid'; price?: number; createdAt?: string;
+            // Task 7c (people-role-profiles fix) — optional legacy agent-referral
+            // ids, mirrored into inspection_people (buyer_agent / listing_agent)
+            // below when present. Both must already be contacts.id rows in this
+            // tenant (same contract as the legacy inspections columns they name).
+            referredByAgentId?: string; sellingAgentId?: string;
         }
         interface ResultImport { id: string; inspectionId: string; data: unknown; lastSyncedAt?: string }
 
@@ -147,8 +167,8 @@ const adminDataImportRoutes = createApiRouter()
             // Imported historical inspections deliberately do not consume plan quota.
             await db.insert(inspections).values({
                 id: ins.id, tenantId, propertyAddress: ins.propertyAddress,
-                inspectorId: ins.inspectorId || null, clientName: ins.clientName || null,
-                clientEmail: ins.clientEmail || null, templateId: ins.templateId || null,
+                inspectorId: ins.inspectorId || null,
+                templateId: ins.templateId || null,
                 date: ins.date || new Date().toISOString(), status: ins.status || INSPECTION_STATUS.REQUESTED,
                 paymentStatus: ins.paymentStatus || 'unpaid', price: ins.price || 0,
                 createdAt: ins.createdAt ? new Date(ins.createdAt) : new Date(),
@@ -160,6 +180,47 @@ const adminDataImportRoutes = createApiRouter()
             // is the only conflict source and payloads are identical.
             importAssignments.push({ inspectionId: ins.id, inspectorId: ins.inspectorId || null });
             counts.inspections++;
+
+            // Task 7c (people-role-profiles fix) — getInspection/listInspections
+            // (Task 9c-reads) resolve the client ONLY via inspection_people; the
+            // legacy inline clientName/clientEmail/referredByAgentId/
+            // sellingAgentId columns were dropped from inspections (Task 13),
+            // so every imported inspection needs matching inspection_people
+            // rows. Client is upserted as a contact (same idempotent match
+            // booking.service/core.ts use); agent ids are assumed to already be
+            // contacts.id rows in this tenant (same contract as the legacy
+            // columns) and are linked directly. Per-row non-fatal: one bad row
+            // must not abort the rest of the import (the inspection row already
+            // committed above regardless).
+            if (ins.clientName || ins.clientEmail || ins.referredByAgentId || ins.sellingAgentId) {
+                try {
+                    if (ins.clientName || ins.clientEmail) {
+                        const { id: clientContactId } = await c.var.services.contact.upsertClientContact(tenantId, {
+                            name: ins.clientName || 'Imported Client',
+                            ...(ins.clientEmail ? { email: ins.clientEmail } : {}),
+                            type: 'client',
+                        });
+                        const clientRoleId = await resolveRoleId(db, tenantId, 'client');
+                        if (clientRoleId) {
+                            await c.var.services.people.addPerson(tenantId, ins.id, clientContactId, clientRoleId);
+                        }
+                    }
+                    if (ins.referredByAgentId) {
+                        const buyerAgentRoleId = await resolveRoleId(db, tenantId, 'buyer_agent');
+                        if (buyerAgentRoleId) {
+                            await c.var.services.people.addPerson(tenantId, ins.id, ins.referredByAgentId, buyerAgentRoleId);
+                        }
+                    }
+                    if (ins.sellingAgentId) {
+                        const listingAgentRoleId = await resolveRoleId(db, tenantId, 'listing_agent');
+                        if (listingAgentRoleId) {
+                            await c.var.services.people.addPerson(tenantId, ins.id, ins.sellingAgentId, listingAgentRoleId);
+                        }
+                    }
+                } catch (err) {
+                    logger.error('inspection-people write from admin data import failed', { inspectionId: ins.id }, err instanceof Error ? err : undefined);
+                }
+            }
         }
         // B-29: all link-table resyncs in one db.batch round trip (was 2N
         // statements inside the loop).

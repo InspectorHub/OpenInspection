@@ -1,5 +1,6 @@
 import { eq, and, lte, ne } from 'drizzle-orm';
-import { automations, automationLogs, inspections, tenants, tenantConfigs } from '../../lib/db/schema';
+import { automations, automationLogs, inspections, tenants, tenantConfigs, contacts, contactRoleProfiles, inspectionPeople } from '../../lib/db/schema';
+import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
 import { resolveLocale } from '../../lib/locale';
 import { formatDateTime } from '../../lib/format';
@@ -13,6 +14,7 @@ import type { AutomationBase, HasEvaluateConditions, HasDeliverSms } from './sha
 import type { SmsRuntime } from './sms';
 import type { ManagedSendGateEnv } from '../../lib/sms/managed-send-gate';
 import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
+import { deliverReportEmail, type ReportDeliveryDeps } from './report-email';
 
 /**
  * The flush query's SELECT projection. `inspection` is narrowed to the
@@ -20,6 +22,13 @@ import type { PlanQuotaGuard } from '../../features/plan-quota/guard';
  * stays well under D1's result-set column cap — selecting the full row pushed the
  * total past 100 columns and failed every cron tick (see shared.ts). Exported so
  * the `flush-column-budget` spec can assert the column count.
+ *
+ * Task 11a — clientContactId/clientName project from the inspection_people
+ * primary-client join (contacts.id / contacts.name via the LEFT JOINs added to
+ * baseSelect() below), NOT the legacy inspections.client_contact_id/client_name
+ * columns (frozen cache, dropped Task 13). The column COUNT is unchanged (still
+ * 2 fields under these names) — only the source table moves — so this keeps the
+ * `flush-column-budget` spec's total the same.
  */
 export const FLUSH_SELECTION = {
     log: automationLogs,
@@ -27,7 +36,7 @@ export const FLUSH_SELECTION = {
     tenant: tenants,
     inspection: {
         id: inspections.id, tenantId: inspections.tenantId,
-        clientContactId: inspections.clientContactId, clientName: inspections.clientName,
+        clientContactId: contacts.id, clientName: contacts.name,
         propertyAddress: inspections.propertyAddress, date: inspections.date,
         status: inspections.status, reportStatus: inspections.reportStatus,
         paymentStatus: inspections.paymentStatus,
@@ -39,6 +48,10 @@ export const FLUSH_SELECTION = {
  * Re-checks conditions (conditions mixin), branches SMS to deliverSms (sms mixin),
  * and renders + sends email through the per-tenant EmailService. Body is
  * byte-identical to the former monolith.
+ *
+ * Spec 2 Task 2b — `report.published` EMAIL logs additionally branch to
+ * report-email.ts:deliverReportEmail (tokenized portal link + PDF) when the
+ * optional `reportDelivery` param is supplied; see that param's own doc.
  */
 export function AutomationDelivery<TBase extends Constructor<AutomationBase & HasEvaluateConditions & HasDeliverSms>>(Base: TBase) {
     return class extends Base {
@@ -51,6 +64,12 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             /** Free-tier pre-flight (2026-07) — undefined on deployments with no
              *  usage-quota capability (standalone); see scheduled.ts wiring. */
             quotaGuard?: PlanQuotaGuard,
+            /** Spec 2 Task 2b — opt-in seam: when present, `report.published` EMAIL
+             *  logs are delivered as a per-recipient tokenized portal link + PDF
+             *  (report-email.ts) instead of the generic template path below. Absent
+             *  on every existing caller/test (backward-compatible) and on deploys
+             *  missing JWT_SECRET (see scheduled.ts wiring). */
+            reportDelivery?: ReportDeliveryDeps,
         ): Promise<void> {
             const db = this.getDrizzle();
             const now = new Date();
@@ -60,11 +79,32 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             // reminder live-due path) select the same shape. `inspection` is a
             // narrowed projection (FLUSH_SELECTION) — selecting the whole inspections
             // row overflows D1's result-set column cap; see FLUSH_SELECTION above.
+            // Task 11a — the trailing 3 LEFT JOINs resolve the primary client
+            // (contact_role_profiles filtered to 'client' FIRST, then
+            // inspection_people, then contacts — same join order as
+            // api/metrics.ts / data.service.ts) into FLUSH_SELECTION.inspection's
+            // clientContactId/clientName; they add no extra SELECTed columns
+            // (FLUSH_SELECTION only projects contacts.id/contacts.name from them),
+            // so the column-budget total is unaffected.
             const baseSelect = () => db.select(FLUSH_SELECTION)
                 .from(automationLogs)
                 .innerJoin(automations, eq(automationLogs.automationId, automations.id))
                 .innerJoin(inspections, eq(automationLogs.inspectionId, inspections.id))
-                .innerJoin(tenants, eq(tenants.id, inspections.tenantId));
+                .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
+                .leftJoin(contactRoleProfiles, and(
+                    eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                    eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
+                    eq(contactRoleProfiles.active, true),
+                ))
+                .leftJoin(inspectionPeople, and(
+                    eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+                    eq(inspectionPeople.inspectionId, inspections.id),
+                    eq(inspectionPeople.tenantId, inspections.tenantId),
+                ))
+                .leftJoin(contacts, and(
+                    eq(contacts.id, inspectionPeople.contactId),
+                    eq(contacts.tenantId, inspections.tenantId),
+                ));
 
             // Non-reminder logs: indexed, batch-limited fast path (unchanged semantics —
             // gated on the stored send_at).
@@ -127,6 +167,12 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                 };
             })();
 
+            // Spec 2 Task 2b — render the report PDF ONCE per inspection, reused
+            // across every recipient log in this flush() batch (an `all`-recipient
+            // report.published rule fans out to N logs for the same inspection).
+            // Declared once per flush() call; see report-email.ts:deliverReportEmail.
+            const pdfMemo = new Map<string, Promise<ArrayBuffer | null>>();
+
             for (const { log, automation, inspection, tenant } of pending) {
                 try {
                     const verdict = await this.evaluateConditions(db, automation, inspection);
@@ -141,6 +187,18 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // per-tenant EmailService (metering + per-tenant key resolution by construction).
                     if (log.channel === 'sms') {
                         await this.deliverSms(db, { log, automation, inspection, tenant }, sms, appName, appHost, env, quotaGuard);
+                        continue;
+                    }
+
+                    // Spec 2 Task 2b — report.published EMAIL logs get the tokenized
+                    // portal link + PDF attachment when reportDelivery deps are wired
+                    // (cron path only — see scheduled.ts). Absent reportDelivery (every
+                    // existing test, or a deploy missing JWT_SECRET) falls through
+                    // unchanged to the generic template path below. SMS report links
+                    // stay generic — out of scope (deliverSms above is untouched).
+                    if (log.channel === 'email' && automation.trigger === 'report.published' && reportDelivery) {
+                        const emailSvc = await emailSvcCache.getOrBuild(inspection.tenantId, emailFor);
+                        await deliverReportEmail(db, { log, inspection, tenant }, emailSvc, appBaseUrl, reportDelivery, pdfMemo);
                         continue;
                     }
 
@@ -173,8 +231,11 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     // Spec 4D — populate event vars when log was created by EventService.
                     // Spec 4D event-vars apply only to logs linked to a real inspection
                     // event. Track J reminders reuse event_id as a "reminder:<rule>:<insp>"
-                    // dedup key that never matches an inspectionEvents row, so skip the lookup.
-                    if (log.eventId && !log.eventId.startsWith('reminder:')) {
+                    // dedup key that never matches an inspectionEvents row, so skip the
+                    // lookup. Spec 2 Task 3 — report.published logs reuse event_id the same
+                    // way with an "auto:report.published:<insp>" dedup key (see trigger.ts);
+                    // also never a real inspectionEvents row, so skip it too.
+                    if (log.eventId && !log.eventId.startsWith('reminder:') && !log.eventId.startsWith('auto:')) {
                         try {
                             const { eventTypes, inspectionEvents } = await import('../../lib/db/schema');
                             const ev = await db.select().from(inspectionEvents).where(eq(inspectionEvents.id, log.eventId)).get();

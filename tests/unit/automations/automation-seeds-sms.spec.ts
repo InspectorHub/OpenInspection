@@ -8,6 +8,7 @@ import { backfillAutomationTemplates } from '../../../server/services/message-te
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../../server/services/automation.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 let db: BetterSQLite3Database<typeof schema>;
@@ -20,6 +21,10 @@ beforeEach(async () => {
         id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
         deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
     });
+    // Spec 2 Task 0 — ensureSeeds now resolves each seed's recipientRoleKey to a
+    // per-tenant contact_role_profiles.id and SKIPS a rule whose role isn't
+    // seeded yet, so role profiles must exist before ensureSeeds runs.
+    await seedRoleProfiles(db, TENANT, new Date(1));
 });
 
 describe('Track L seeds', () => {

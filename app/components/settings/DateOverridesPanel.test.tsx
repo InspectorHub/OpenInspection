@@ -30,7 +30,7 @@ describe("DateOverridesPanel", () => {
     const html = renderToStaticMarkup(<RouterProvider router={router} />);
 
     expect(html).toContain("Synced &amp; legacy");
-    expect(html).toContain("2026-07-20");
+    expect(html).toContain("Jul 20, 2026"); // formatDate(UTC-anchored date-only)
     expect(html).toContain('href="/calendar"');
     expect(html).toContain("Block time");
     expect(html).not.toContain("Add block");

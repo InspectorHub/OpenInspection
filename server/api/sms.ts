@@ -32,6 +32,8 @@ import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { Errors } from '../lib/errors';
 import { SmsConsentService } from '../services/sms-consent.service';
 import { MessagingComplianceService } from '../services/messaging-compliance.service';
+import { PeopleService } from '../services/people.service';
+import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { TwilioClient } from '../lib/messaging/twilio';
 import { ensureClientContact } from '../lib/sms/ensure-client-contact';
 import { resolveOptinToken } from '../lib/sms/optin-token';
@@ -454,7 +456,7 @@ export const smsAdminRoutes = createApiRouter()
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).get();
         if (!insp) throw Errors.NotFound('Inspection not found.');
 
-        const contactId = await ensureClientContact(c.env.DB, tenantId, insp);
+        const contactId = await ensureClientContact(c.env.DB, tenantId, inspectionId);
         if (!contactId) throw Errors.BadRequest('This inspection has no client to attest consent for.');
 
         await new SmsConsentService(c.env.DB).record(tenantId, contactId, 'granted', 'admin', {
@@ -544,11 +546,15 @@ export const smsAdminRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const { inspectionId } = c.req.valid('query');
         const db = drizzle(c.env.DB);
-        const insp = await db.select({ clientContactId: inspections.clientContactId }).from(inspections)
+        const insp = await db.select({ id: inspections.id }).from(inspections)
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId))).get();
         if (!insp) throw Errors.NotFound('Inspection not found.');
 
-        const contactId = insp.clientContactId;
+        // Task 9c (people-role-profiles) — the client contact is resolved via
+        // the inspection_people primary-client join (PeopleService), not the
+        // legacy inspections.client_contact_id column (frozen cache, dropped
+        // Task 13).
+        const contactId = await new PeopleService(c.env).contactIdForRole(tenantId, inspectionId, PRIMARY_CLIENT_KEY);
         const latest = contactId ? await new SmsConsentService(c.env.DB).getLatest(tenantId, contactId) : null;
         return c.json({ success: true as const, data: { consent: latest ?? 'none' } }, 200);
     })

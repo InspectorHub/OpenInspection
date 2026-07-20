@@ -1,6 +1,5 @@
 import { sqliteTable, text, integer, real, blob, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 import { tenants, users } from '../tenant';
-import { contacts } from '../contact';
 import { INSPECTION_STATUSES } from '../../../status/inspection-status';
 import { REPORT_STATUSES } from '../../../status/report-status';
 import { templates } from './template-rating';
@@ -23,13 +22,10 @@ export const inspections = sqliteTable('inspections', {
     addressLat:          real('address_lat'),
     addressLng:          real('address_lng'),
     addressGeocodedAt:   integer('address_geocoded_at', { mode: 'timestamp_ms' }),
-    // IA-1 — the order finally captures WHO. Points at contacts.id (app-layer
-    // integrity per the FK policy); the denormalized clientName/Email/Phone
-    // below remain as a read cache and are double-written on create.
-    clientContactId:     text('client_contact_id'),
-    clientName:          text('client_name'),
-    clientEmail:         text('client_email'),
-    clientPhone:         text('client_phone'),
+    // IA-1 — WHO is captured via inspection_people (client/agent rows); see
+    // schema/inspection/people.ts. The former denormalized clientContactId/
+    // clientName/clientEmail/clientPhone columns were DROPPED (superseded by
+    // inspection_people) — do not reintroduce them here.
     templateId:          text('template_id').references(() => templates.id),
     // Calendar-semantic YYYY-MM-DD (inspection date, no time component) — intentionally
     // TEXT per the Schema Rules calendar-field exception, not an epoch timestamp.
@@ -37,7 +33,7 @@ export const inspections = sqliteTable('inspections', {
     status:              text('status', { enum: [...INSPECTION_STATUSES] }).notNull().default('requested'),
     reportStatus:        text('report_status', { enum: [...REPORT_STATUSES] }).notNull().default('in_progress'),
     paymentStatus:       text('payment_status', { enum: ['unpaid','partial','paid'] }).notNull().default('unpaid'),
-    referredByAgentId:   text('referred_by_agent_id'),   // Buyer's Agent — unkeyed TEXT (backward compat)
+    // Buyer's Agent — see inspection_people (referredByAgentId column DROPPED, superseded).
     // P-4 authority chain: denormalized cache only — never reconcile back from invoice
     // or service-snapshot tiers. Use getEffectivePriceCents() (app/lib/effective-price.ts)
     // to read the authoritative price. Written by the inspection-create path as a
@@ -99,7 +95,7 @@ export const inspections = sqliteTable('inspections', {
     // ASTM E2018 deliverable. See "Commercial PCA Phase T".
     reportTier:          text('report_tier', { enum: ['light_commercial', 'full_pca'] }),
     county:              text('county'),
-    sellingAgentId:      text('selling_agent_id').references(() => contacts.id),
+    // Selling Agent — see inspection_people (sellingAgentId column DROPPED, superseded).
     disableAutomations:  integer('is_automations_disabled', { mode: 'boolean' }).notNull().default(false),
     templateSnapshot:    text('template_snapshot', { mode: 'json' }),
     templateSnapshotVersion: integer('template_snapshot_version').default(1),
@@ -179,10 +175,8 @@ export const inspections = sqliteTable('inspections', {
     index('idx_inspections_tenant').on(t.tenantId),
     index('idx_inspections_request').on(t.requestId),
     index('idx_inspections_inspector').on(t.inspectorId),
-    index('idx_inspections_agent').on(t.referredByAgentId),
     index('idx_inspections_tenant_status').on(t.tenantId, t.status),
     index('idx_inspections_tenant_date').on(t.tenantId, t.date),
-    index('idx_inspections_tenant_client_email').on(t.tenantId, t.clientEmail),
     index('idx_inspections_inspector_date').on(t.inspectorId, t.date),
     index('idx_inspections_root').on(t.rootInspectionId),
 ]);

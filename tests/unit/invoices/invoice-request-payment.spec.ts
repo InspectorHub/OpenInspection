@@ -9,6 +9,8 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import invoiceRoutes from '../../../server/api/invoices';
 import { InvoiceService } from '../../../server/services/invoice.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 
@@ -32,6 +34,8 @@ const INSP_ID = '550e8400-e29b-41d4-a716-446655440000';
 const OTHER_INSP_ID = '550e8400-e29b-41d4-a716-4466554400ff';
 const SVC_ID = '660e8400-e29b-41d4-a716-446655440000';
 const SLUG = 'acme';
+const CLIENT = 'contact-client-1';
+const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 
 let db: BetterSQLite3Database<typeof schema>;
 let sendInvoiceRequest: ReturnType<typeof vi.fn>;
@@ -46,6 +50,7 @@ function buildApp(role = 'manager') {
         c.set('requestedTenantSlug', SLUG as never);
         c.set('services', {
             invoice: new InvoiceService({} as D1Database),
+            people: new PeopleService({ DB: {} as D1Database }),
             email: { sendInvoiceRequest } as never,
             qbo: { upsertInvoice: vi.fn() } as never,
         } as never);
@@ -83,12 +88,22 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
             id: TENANT, name: 'Acme', slug: SLUG, status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
+        // Task 9a — the route resolves the client via the inspection_people
+        // join (PeopleService), not the legacy inline columns, so those are
+        // intentionally left NULL here and the primary client rides the join.
+        await seedRoleProfiles(db, TENANT, new Date(1));
+        await db.insert(schema.contacts).values({
+            id: CLIENT, tenantId: TENANT, type: 'client', name: 'Jane',
+            email: 'jane@example.com', phone: null, createdAt: new Date(),
+        });
         await db.insert(schema.inspections).values({
             id: INSP_ID, tenantId: TENANT,
-            propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@example.com',
+            propertyAddress: '1 Main St', clientName: null, clientEmail: null,
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
         });
+        const people = new PeopleService({ DB: {} as D1Database });
+        await people.addPerson(TENANT, INSP_ID, CLIENT, roleProfileId('client'));
     });
 
     async function seedService(priceSnapshot = 30000, priceOverride: number | null = null) {
@@ -189,7 +204,9 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
     });
 
     it('no client email — 422, no invoice created, no email', async () => {
-        await db.update(schema.inspections).set({ clientEmail: null }).where(eq(schema.inspections.id, INSP_ID));
+        // No legacy column to null out anymore — remove the primary-client join
+        // row so getPrimaryClient resolves null, same net effect.
+        await db.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.inspectionId, INSP_ID));
         const res = await post({ inspectionId: INSP_ID });
         expect(res.status).toBe(422);
         const rows = await db.select().from(schema.invoices).where(eq(schema.invoices.inspectionId, INSP_ID)).all();

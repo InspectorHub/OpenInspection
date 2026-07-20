@@ -2,6 +2,7 @@ import { useLoaderData, useSearchParams } from "react-router";
 import type { Route } from "./+types/invoice";
 import { createApi } from "~/lib/api-client.server";
 import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
+import { formatDate } from "~/lib/format";
 import { readLegalLinks } from "~/lib/legal-links.server";
 import { PaymentSection, type InvoiceData } from "~/components/portal/sections/PaymentSection";
 import { m } from "~/paraglide/messages";
@@ -33,8 +34,11 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     const invoice: InvoiceData | null = d
       ? {
           number: `INV-${d.id.slice(0, 8).toUpperCase()}`,
-          date: d.createdAt?.slice(0, 10) ?? "",
-          dueDate: d.dueDate ?? null,
+          // Issued/Due are calendar dates (YYYY-MM-DD) — format for display via
+          // the shared formatter (locale only; date-only anchors to UTC). Keep
+          // empty/null so the "—" / "Due on receipt" fallbacks still apply.
+          date: d.createdAt ? formatDate(d.createdAt.slice(0, 10), { locale: "en-US", timeZone: "UTC" }) : "",
+          dueDate: d.dueDate ? formatDate(d.dueDate, { locale: "en-US", timeZone: "UTC" }) : null,
           status: (d.status as InvoiceData["status"]) ?? "draft",
           clientName: d.clientName ?? "",
           inspectorName: "",

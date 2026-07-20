@@ -27,6 +27,8 @@ import { signMagicLink, verifyMagicLink, verifyPortalSession, signPortalSession 
 import { resolvePortalAccess } from '../lib/public-access';
 import { getBaseUrl } from '../lib/url';
 import { logger } from '../lib/logger';
+import { signJwt } from '../lib/jwt-keyring';
+import { findGlobalAgentByEmail } from '../services/agent/account';
 import type { HonoConfig } from '../types/hono';
 
 const PORTAL_SESSION_COOKIE = '__Host-portal_session';
@@ -151,16 +153,23 @@ const redeemRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ data: z.object({ email: z.string().describe('Verified email carried by the magic-link.') }) }) } },
+            content: { 'application/json': { schema: z.object({ data: z.object({
+                email: z.string().describe('Verified email carried by the magic-link.'),
+                agent: z.boolean().optional().describe('True when the email resolves to a global agent account — the caller MUST NOT treat this as a client-portal session; NO __Host-portal_session cookie was set.'),
+            }) }) } },
             description: 'Magic-link is valid; returns the verified email.',
         },
         401: { description: 'Magic-link missing, expired, or invalid' },
     },
     operationId: 'portalRedeemLink',
     description:
-        'Validates a portal magic-link token (typ=ml). On success it sets the ' +
-        '__Host-portal_session cookie (httpOnly/secure/SameSite=Lax) carrying the verified ' +
-        'email and returns that email so the frontend can render. Bad/expired token → 401.',
+        'Validates a portal magic-link token (typ=ml). When the verified email resolves to a ' +
+        'global agent account (findGlobalAgentByEmail), mints an agent session ' +
+        '(__Host-inspector_token, no tenantId) instead and returns { email, agent: true } — the ' +
+        'client __Host-portal_session cookie is NEVER set for an agent. Otherwise (client/' +
+        'co_client) it sets the __Host-portal_session cookie (httpOnly/secure/SameSite=Lax) ' +
+        'carrying the verified email and returns that email so the frontend can render. ' +
+        'Bad/expired token → 401.',
 }, { scopes: [], tier: 'extended' }));
 
 const exchangeRoute = createRoute(withMcpMetadata({
@@ -177,19 +186,15 @@ const exchangeRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: {
-            content: { 'application/json': { schema: z.object({ data: z.object({ email: z.string().describe('Recipient email carried by the access token; also written into the session cookie.') }) }) } },
-            description: 'Token valid for this tenant + inspection; session cookie set and email returned.',
+            content: { 'application/json': { schema: z.object({ data: z.object({ email: z.string().describe('Recipient email carried by the access token; also written into the session cookie for client/co_client tokens.'), agent: z.boolean().optional().describe('True when the token resolved to an agent-kind role — agent tokens NEVER receive a session cookie.') }) }) } },
+            description: 'Token valid for this tenant + inspection. Client/co_client: session cookie set, `agent` omitted. Agent-kind: NO cookie, `agent: true` returned so the caller routes to a report-only view.',
         },
         401: { description: 'Access token missing, invalid, expired, revoked, or not for this inspection' },
-        403: { description: 'Token resolves to a different tenant, or to a non-client (e.g. agent) role' },
+        403: { description: 'Token resolves to a different tenant, or to a role with neither self-retrieve nor agent capability' },
         404: { description: 'Tenant slug not found' },
     },
     operationId: 'portalExchangeToken',
-    description:
-        'Exchanges a persistent per-(recipient, inspection) access token (the same family used ' +
-        'by the public report links) for a __Host-portal_session cookie, so a client arriving ' +
-        'from an email CTA lands in the portal already authenticated. Asserts the resolved ' +
-        'grant tenant matches the path tenant AND the role is client/co_client (agent → 403).',
+    description: 'Exchanges a persistent per-(recipient, inspection) access token (the same family used by the public report links) for a __Host-portal_session cookie, so a client arriving from an email CTA lands in the portal already authenticated. Asserts the resolved grant tenant matches the path tenant AND the role currently grants selfRetrieveReport (client/co_client by default, and agent). SECURITY: an agent-kind role NEVER receives the session cookie — it gets `agent: true` and no Set-Cookie, so its report token can never unlock the client hub.',
 }, { scopes: [], tier: 'extended' }));
 
 const logoutRoute = createRoute(withMcpMetadata({
@@ -384,6 +389,45 @@ const portalRoutes = portalRouter
         if (!verified) {
             return c.json({ error: 'Invalid or expired link' }, 401);
         }
+
+        // SECURITY: a find-my-report magic link redeemed by an agent must mint
+        // an AGENT JWT (mirrors server/api/agent/login.ts's password mint
+        // EXACTLY — no tenantId) and NEVER the client __Host-portal_session
+        // cookie. Global agent accounts (findGlobalAgentByEmail — the single
+        // source of the "live global agent" predicate) are a SEPARATE identity
+        // plane from tenant-scoped client/co_client contacts; there is no
+        // token/grant object on this magic-link path (unlike exchangeRoute),
+        // only a verified email, so the global-agent-account lookup is the
+        // correct signal to branch on here.
+        const agent = await findGlobalAgentByEmail(c.env.DB, verified.email);
+        if (agent) {
+            const keyring = await c.var.keyringPromise!;
+            const now = Math.floor(Date.now() / 1000);
+            const token = await signJwt({
+                sub: agent.id,
+                role: 'agent',
+                'custom:userRole': 'agent',
+                email: agent.email,
+                iat: now,
+                exp: now + 60 * 60 * 24,
+            }, keyring);
+
+            setCookie(c, '__Host-inspector_token', token, {
+                httpOnly: true,
+                secure: true,
+                sameSite: 'Strict',
+                path: '/',
+                maxAge: 60 * 60 * 24,
+            });
+
+            // Tenant-less global agent identity — same reasoning as the agent
+            // login/magic-login redeem handlers: no tenant-scoped audit_logs
+            // row (auditLogs.tenantId is a NOT NULL FK), structured logging only.
+            logger.info('agent.find_my_report.redeemed', { userId: agent.id });
+
+            return c.json({ data: { email: agent.email, agent: true as const } }, 200);
+        }
+
         const sess = await signPortalSession(c.env.JWT_SECRET, verified.email);
         setCookie(c, PORTAL_SESSION_COOKIE, sess, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
         return c.json({ data: { email: verified.email } }, 200);
@@ -396,11 +440,20 @@ const portalRoutes = portalRouter
         const grant = await resolvePortalAccess(c.var.services.portalAccess, token, inspectionId);
         if (!grant) return c.json({ error: 'Invalid or expired token' }, 401);
 
-        // SECURITY: the token row is authoritative — it must point at THIS tenant
-        // and carry a client/co_client role. Reject agents (and any mismatch) so
-        // an agent's per-inspection token can never mint a client portal session.
-        if (grant.tenantId !== tenantId || (grant.role !== 'client' && grant.role !== 'co_client')) {
+        // SECURITY: the token row must point at THIS tenant and its role KEY must
+        // currently grant selfRetrieveReport (client/co_client AND agent by
+        // default). Deleted/renamed keys resolve to an empty set — never fails open.
+        const selfRetrieveKeys = await c.var.services.people.roleKeysWithCapability(tenantId, 'selfRetrieveReport');
+        if (grant.tenantId !== tenantId || !selfRetrieveKeys.includes(grant.role)) {
             return c.json({ error: 'Forbidden' }, 403);
+        }
+
+        // SECURITY: an agent's report token must NEVER mint the client session.
+        // Resolve the ISSUING tenant's role kind (grant.tenantId, not the path
+        // tenant) — agent-kind gets `agent: true` + no Set-Cookie instead.
+        const kind = await c.var.services.people.kindForKey(grant.tenantId, grant.role);
+        if (kind === 'agent') {
+            return c.json({ data: { email: grant.recipientEmail, agent: true } }, 200);
         }
 
         const sess = await signPortalSession(c.env.JWT_SECRET, grant.recipientEmail);

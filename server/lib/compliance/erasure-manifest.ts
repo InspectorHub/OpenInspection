@@ -75,13 +75,17 @@ export const ERASURE_MANIFEST: ErasureRule[] = [
     // Draft/unsigned envelope: delete the ROW (locator = client_email).
     { table: 'agreement_requests', column: 'client_email', category: 'user.contact.email', action: 'delete', condition: 'draft_only' },
 
-    // ── inspections (non-agreement client PII: null in-place, current behavior) ─
-    { table: 'inspections', column: 'client_name',  category: 'user.name',           action: 'null' },
-    { table: 'inspections', column: 'client_email', category: 'user.contact.email',  action: 'null' },
-    { table: 'inspections', column: 'client_phone', category: 'user.contact.phone',  action: 'null' },
-
     // ── contacts (CRM client/agent PII) ───────────────────────────────────────
     // `name` is NOT NULL, and a CRM contact carries no legal-evidence retention
     // basis, so the row is DELETED outright (locator = email) rather than nulled.
+    // This is the LIVE source of client PII (the `inspections.client_*` columns
+    // are a frozen, unread cache — see the `inspection_people` rule below).
     { table: 'contacts', column: 'email', category: 'user.contact.email', action: 'delete' },
+
+    // ── inspection_people (orphan cleanup) ────────────────────────────────────
+    // No PII of its own — an inspection<->contact<->role join row. Deleted
+    // (ordered BEFORE the contacts delete above) so no row dangles at the
+    // soon-to-be-deleted contact id. `column` names the join key used to find
+    // the subject's rows (via contacts.email), not a column to null.
+    { table: 'inspection_people', column: 'contact_id', category: 'user.contact.email', action: 'delete' },
 ];

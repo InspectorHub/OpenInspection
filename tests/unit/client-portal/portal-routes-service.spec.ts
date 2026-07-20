@@ -3,6 +3,7 @@ import { PortalService } from '../../../server/services/portal.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 
 // PortalService builds its drizzle handle via `drizzle(this.db)` (drizzle-orm/d1).
 // Mock that factory to hand back the in-memory better-sqlite3 test DB, mirroring
@@ -26,6 +27,10 @@ describe('PortalService', () => {
             id: TENANT, name: 'Acme', slug: 'acme', status: 'active',
             deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
+        // listRecipientInspections now derives its role filter from each active
+        // role profile's selfRetrieveReport capability (client/co_client by
+        // default) instead of a hard-coded literal list — seed the defaults.
+        await seedRoleProfiles(testDb, TENANT, new Date(1));
         svc = new PortalService({} as D1Database, inspStub);
     });
 

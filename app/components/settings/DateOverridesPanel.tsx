@@ -1,4 +1,6 @@
 import { Link } from "react-router";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 interface DateOverride {
@@ -20,6 +22,7 @@ export function DateOverridesPanel({
   /** Kept for call-site compatibility; add/remove is no longer offered here. */
   inspectorId?: string | null;
 }) {
+  const locale = useDisplayLocale();
   if (initialOverrides.length === 0) return null;
 
   return (
@@ -42,7 +45,7 @@ export function DateOverridesPanel({
             className="flex items-center justify-between bg-ih-bg-muted rounded-md px-3 py-2 border border-ih-border"
           >
             <div className="flex items-center gap-3">
-              <span className="text-[13px] font-bold text-ih-fg-1">{o.date}</span>
+              <span className="text-[13px] font-bold text-ih-fg-1">{formatDate(o.date, { locale, timeZone: "UTC" })}</span>
               <span className="text-[11px] text-ih-bad-fg font-bold uppercase">
                 {o.isAvailable ? m.settings_dateoverrides_extra_hours() : m.settings_closed_policy_blocked()}
               </span>

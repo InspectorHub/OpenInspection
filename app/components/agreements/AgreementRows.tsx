@@ -1,6 +1,8 @@
 import { Pill } from "@core/shared-ui";
 import { RequestDetail } from "~/components/agreements/RequestDetail";
 import { pillToneFor, pillLabelFor, type RequestRow as RequestRowData } from "~/components/agreements/agreements-helpers";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 /** Per-envelope progress chip, e.g. "1/2 signed". Hidden for 0-signer rows. */
@@ -16,13 +18,16 @@ function ProgressBadge({ row }: { row: RequestRowData }) {
 }
 
 export function TemplateRow({ t }: { t: { id: string; name?: string; updatedAt?: string; createdAt?: string } }) {
+  const locale = useDisplayLocale();
+  const timeZone = useDisplayTimeZone();
+  const updatedOrCreated = t.updatedAt || t.createdAt;
   return (
     <tr key={t.id} className="hover:bg-ih-bg-muted/50 transition-colors">
                       <td className="px-4 py-3 text-[13px] font-semibold text-ih-fg-1">
                         {t.name || m.agreement_row_untitled()}
                       </td>
                       <td className="px-4 py-3 text-[13px] text-ih-fg-3">
-                        {t.updatedAt || t.createdAt || "--"}
+                        {updatedOrCreated ? formatDate(updatedOrCreated, { locale, timeZone }) : "--"}
                       </td>
                       <td className="px-4 py-3">
                         <Pill tone="sat">{m.agreement_template_status_active()}</Pill>

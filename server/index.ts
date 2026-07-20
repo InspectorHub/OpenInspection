@@ -57,6 +57,9 @@ import emailTemplateRoutes from './api/email-templates';
 import agentRoutes from './api/agent';
 import agentsRoutes from './api/agents';
 import agentSignupRoutes from './api/agent-signup';
+import { agentMagicLoginRequestRoutes, agentMagicLoginRedeemRoutes } from './api/agent/magic-login';
+import { agentReportContextRoutes } from './api/agent/report-context'; // Spec 3 Task 3
+import { agentLoginRoutes } from './api/agent/login'; // Spec 3 Task 5
 import placesRoutes from './api/places';
 import { availabilityRoutes } from './api/availability';
 import calendarRoutes from './api/calendar';
@@ -81,6 +84,7 @@ import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
 import contractorTypesRoutes from './api/contractor-types';
+import roleProfilesRoutes from './api/role-profiles';
 import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
 import inspectionTypesRoutes from './api/inspection-types';
@@ -250,9 +254,11 @@ const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|tt
 export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
     const path = c.req.path;
     const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
-    // Agent Accounts A1 — both /agent-invite/* (HTML) and /api/agents/accept +
-    // /agent-signup + /api/agent-signup are unauthenticated entry points.
-    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup';
+    // Agent Accounts A1 + the agent unified link (Spec 3 — report token or one-time KV code, never a session).
+    // Spec 3 Task 5 — core /agent-login dual-mode front door (password +
+    // magic-link request); both are unauthenticated by design (the caller
+    // holds neither a session nor a report token yet).
+    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request' || path === '/api/agent/report-context' || path === '/api/agent/login' || path === '/api/agent/login-link';
     // Agent Accounts A3 — concierge magic-link entry points (client-facing,
     // no JWT). The token in the URL is the secret.
     const isConciergePublic =
@@ -436,6 +442,10 @@ const routes = app
   // Mount auth routes at canonical API path AND at root so that /setup, /login (POST), /join (POST) work without redirects
   .route('/api/auth', coreAuthRoutes)
   .route('/', coreAuthRoutes)
+  // Agent unified link (Spec 3 Task 2) — GET /agent/magic-login redeem. Root
+  // mount (not /api) mirrors the /sso pattern above; workers/app.ts forwards
+  // this exact path to the API app since it isn't under /api/*.
+  .route('/', agentMagicLoginRedeemRoutes)
   // Test-only hooks, fail-closed behind E2E_EMAIL_SINK (404 in prod). See test-hooks.ts.
   .route('/api/__test__', testHooksRoutes)
   .route('/api/billing', billingRoutes)
@@ -514,6 +524,14 @@ const routes = app
   // Authoring unification Plan-4 module K — GET/POST/PUT/DELETE /api/admin/defect-categories
   .route('/api/admin', adminDefectCategoriesRoutes)
   .route('/api/agent', agentRoutes)
+  // Agent unified link (Spec 3 Task 2) — POST /api/agent/magic-login/request.
+  // The GET /agent/magic-login redeem endpoint is mounted at root, below
+  // (not under /api — see workers/app.ts's explicit forward for that path).
+  .route('/api/agent', agentMagicLoginRequestRoutes)
+  .route('/api/agent', agentReportContextRoutes) // Spec 3 Task 3 — POST /api/agent/report-context
+  // Spec 3 Task 5 — POST /api/agent/login + POST /api/agent/login-link (core
+  // dual-mode front door: password primary, magic-link fallback).
+  .route('/api/agent', agentLoginRoutes)
   // Agent Accounts A1 — invite + accept endpoints
   .route('/api/agents', agentsRoutes)
   // Agent Accounts A1 — self-serve signup
@@ -534,6 +552,7 @@ const routes = app
   .route('/api/contacts', contactsImportRoutes)
   .route('/api/recommendations', recommendationsRoutes)
   .route('/api/contractor-types', contractorTypesRoutes)
+  .route('/api/role-profiles', roleProfilesRoutes)
   .route('/api/rating-systems', ratingSystemsRoutes)
   .route('/api', eventsRoutes)
   .route('/api/invoices', invoiceRoutes)

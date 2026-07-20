@@ -17,8 +17,11 @@
  *  - TRUE-DRAFT envelopes (NO signer has EVER signed: pending/sent/viewed/
  *    declined/expired with every signer unsigned) -> DELETE the envelope row +
  *    its signer rows.
- *  - Non-agreement client PII (inspections client columns, contacts) -> NULL
- *    in-place (the pre-existing behavior).
+ *  - Non-agreement client PII lives on `contacts` (the `inspections.client_*`
+ *    columns are a frozen, unread cache dropped in a later migration) -> the
+ *    `contacts` row is DELETED (name is NOT NULL, no legal-retention basis),
+ *    preceded by an `inspection_people` orphan-cleanup delete so no row
+ *    dangles at the about-to-be-deleted contact id.
  *
  * Hard rules: NEVER touch esign_audit_logs; NEVER clear signature_base64.
  * Fail-closed: each step is wrapped — a throw is caught, recorded in the
@@ -36,8 +39,8 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import {
-    inspections,
     contacts,
+    inspectionPeople,
     agreementRequests,
     agreementSigners,
     erasureLog,
@@ -261,16 +264,32 @@ export async function runErasure(
         });
     }
 
-    // ── 3) Non-agreement client PII: null in-place ────────────────────────────
-    await step('inspections', 'null', {}, async () => {
-        const res = await db.update(inspections)
-            .set({ clientName: null, clientEmail: null, clientPhone: null })
-            .where(and(eq(inspections.tenantId, tenantId), eq(inspections.clientEmail, subjectEmail)))
+    // ── 3) Non-agreement client PII lives on `contacts` now (the
+    // `inspections.client_*` columns are a frozen, unread cache dropped in a
+    // later migration — the erasure orchestrator no longer writes them). ────
+    //
+    // Orphan cleanup FIRST: resolve the subject's contact id(s) and delete the
+    // `inspection_people` rows that reference them, so nothing dangles once the
+    // contact row itself is deleted below. Resolving the contact id(s) before
+    // the contacts delete (rather than joining contacts.email at delete time)
+    // means this step works even if run standalone/retried after the contacts
+    // row is already gone (idempotent: 0 contacts found -> 0 rows deleted).
+    await step('inspection_people', 'delete', {}, async () => {
+        const subjectContacts = await db.select({ id: contacts.id }).from(contacts)
+            .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, subjectEmail)))
+            .all();
+        const contactIds = (subjectContacts as Array<{ id: string }>).map((c) => c.id);
+        if (contactIds.length === 0) return 0;
+        const res = await db.delete(inspectionPeople)
+            .where(and(eq(inspectionPeople.tenantId, tenantId), inArray(inspectionPeople.contactId, contactIds)))
             .run();
         return changeCount(res);
     });
     // contacts.name is NOT NULL and a CRM contact carries no legal-retention
-    // basis, so the row is deleted outright rather than nulled in-place.
+    // basis, so the row is deleted outright rather than nulled in-place. This
+    // is the LIVE source of client PII — deleting it makes every primary-client
+    // join (getPrimaryClient / getInspection / listInspections / agreements)
+    // correctly resolve to null/absent for the subject.
     await step('contacts', 'delete', {}, async () => {
         const res = await db.delete(contacts)
             .where(and(eq(contacts.tenantId, tenantId), eq(contacts.email, subjectEmail)))

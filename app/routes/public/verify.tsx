@@ -1,7 +1,10 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/verify";
 import { createApi } from "~/lib/api-client.server";
+import { formatDateTime } from "~/lib/format";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
+import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
+import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -39,8 +42,12 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     });
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
+    const result = (Object.keys(d).length > 0 ? d : null) as VerifyData | null;
+    // Signer timestamps stay raw ISO here: this public verify link carries no
+    // tenant slug and no session, so there is no configured zone to anchor to.
+    // The page renders each timestamp in the viewer's own browser zone below.
     return {
-      result: (Object.keys(d).length > 0 ? d : null) as VerifyData | null,
+      result,
       error: res.ok ? null : m.public_verify_error_failed(),
     };
   } catch {
@@ -77,8 +84,9 @@ function StatusChip({ status }: { status: string }) {
   );
 }
 
-export default function VerifyPage() {
+function VerifyBody() {
   const { result, error } = useLoaderData<typeof loader>();
+  const tz = useViewerTimeZone();
 
   if (error || !result) {
     return (
@@ -147,7 +155,11 @@ export default function VerifyPage() {
                   </span>
                 </p>
                 <p className="text-[11px] text-ih-fg-3">
-                  {s.signedAt ? m.public_verify_signed_at({ signedAt: s.signedAt }) : m.public_verify_not_signed()}
+                  {s.signedAt
+                    ? m.public_verify_signed_at({
+                        signedAt: formatDateTime(s.signedAt, { locale: "en-US", timeZone: tz }),
+                      })
+                    : m.public_verify_not_signed()}
                   {s.channel === "in_person" ? m.public_verify_channel_in_person() : ""}
                 </p>
               </div>
@@ -178,6 +190,16 @@ export default function VerifyPage() {
           <p className="text-ih-bad-fg">{result.chainReason}</p>
         )}
       </div>
+
+      {result.signers.some((s) => s.signedAt) && <ViewerTimeZoneNotice className="mt-4" />}
     </div>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <ViewerTimeZoneProvider>
+      <VerifyBody />
+    </ViewerTimeZoneProvider>
   );
 }

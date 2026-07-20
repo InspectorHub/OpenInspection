@@ -1,6 +1,9 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-printable";
+import { formatDateTime } from "~/lib/format";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
+import { ViewerTimeZoneProvider, useViewerTimeZone } from "~/lib/viewer-timezone";
+import { ViewerTimeZoneNotice } from "~/components/public/ViewerTimeZoneNotice";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -33,8 +36,13 @@ export async function loader({ params }: Route.LoaderArgs) {
     );
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
+    const agreement = (Object.keys(d).length > 0 ? d : null) as AgreementData | null;
+    // The signed-at ISO stays raw: this m2m-rendered printable carries no tenant
+    // slug and no session, so there is no configured zone to anchor to. On screen
+    // it renders in the viewer's own browser zone; a PDF/no-JS render keeps the
+    // fixed UTC anchor, the correct fallback for a printed document.
     return {
-      agreement: (Object.keys(d).length > 0 ? d : null) as AgreementData | null,
+      agreement,
       error: res.ok ? null : "Not found",
     };
   } catch {
@@ -56,8 +64,12 @@ function ensureDataUri(b64: string | null): string {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function AgreementPrintablePage() {
+function AgreementPrintableBody() {
   const { agreement, error } = useLoaderData<typeof loader>();
+  const tz = useViewerTimeZone();
+  const signedAtFormatted = agreement?.signedAtUtcIso
+    ? formatDateTime(agreement.signedAtUtcIso, { locale: "en-US", timeZone: tz })
+    : null;
 
   if (error || !agreement) {
     return (
@@ -112,7 +124,7 @@ export default function AgreementPrintablePage() {
               {m.agreement_printable_date_signed()}
             </div>
             <div className="text-[13px] font-semibold text-slate-900">
-              {agreement.signedAtUtcIso ?? "--"}
+              {signedAtFormatted ?? "--"}
             </div>
           </div>
         </div>
@@ -124,6 +136,16 @@ export default function AgreementPrintablePage() {
         and the Uniform Electronic Transactions Act (UETA). Independent verification: see
         Certificate of Completion.
       </div>
+
+      {agreement.signedAtUtcIso && <ViewerTimeZoneNotice className="mt-6" />}
     </div>
+  );
+}
+
+export default function AgreementPrintablePage() {
+  return (
+    <ViewerTimeZoneProvider>
+      <AgreementPrintableBody />
+    </ViewerTimeZoneProvider>
   );
 }

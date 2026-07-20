@@ -6,6 +6,8 @@ import type {
     AgentApi,
     AgentsApi,
     AgentSignupApi,
+    AgentLoginApi,
+    AgentMagicLoginRequestApi,
     AiApi,
     AnalyticsApi,
     AutomationsApi,
@@ -48,6 +50,7 @@ import type {
     RatingSystemsApi,
     RecommendationsApi,
     RepairBuilderApi,
+    RoleProfilesApi,
     ScheduleApi,
     SecretsApi,
     ServicesApi,
@@ -115,6 +118,18 @@ export interface Api {
     agent:              ReturnType<typeof hc<AgentApi>>;
     agents:             ReturnType<typeof hc<AgentsApi>>;
     agentSignup:        ReturnType<typeof hc<AgentSignupApi>>;
+    // Spec 3 Task 5 — core /agent-login dual-mode front door (password +
+    // magic-link request). Own router file (server/api/agent/login.ts),
+    // mounted at the same /api/agent path as `agent`/`agentMagicLogin` above
+    // but typed independently for the same TS structural-check-depth reason.
+    agentLogin:         ReturnType<typeof hc<AgentLoginApi>>;
+    // Spec 3 Task 3 — separate per-module client for the agent unified-link
+    // magic-login primitive: it lives in its OWN router file (server/api/agent/
+    // magic-login.ts), mounted at the same /api/agent path as `agent` above but
+    // typed independently (AgentApi vs AgentMagicLoginRequestApi are different
+    // `typeof <router>` types) — merging them into one hc<T> would hit the same
+    // structural-check depth limit this per-module split exists to avoid (C-10).
+    agentMagicLogin:    ReturnType<typeof hc<AgentMagicLoginRequestApi>>;
     ai:                 ReturnType<typeof hc<AiApi>>;
     analytics:          ReturnType<typeof hc<AnalyticsApi>>;
     auth:               ReturnType<typeof hc<CoreAuthApi>>;
@@ -157,6 +172,7 @@ export interface Api {
     ratingSystems:      ReturnType<typeof hc<RatingSystemsApi>>;
     recommendations:    ReturnType<typeof hc<RecommendationsApi>>;
     repairBuilder:      ReturnType<typeof hc<RepairBuilderApi>>;
+    roleProfiles:       ReturnType<typeof hc<RoleProfilesApi>>;
     schedule:           ReturnType<typeof hc<ScheduleApi>>;
     secrets:            ReturnType<typeof hc<SecretsApi>>;
     services:           ReturnType<typeof hc<ServicesApi>>;
@@ -184,6 +200,8 @@ const MOUNT: Record<keyof Api, string> = {
     agent:              "/api/agent",
     agents:             "/api/agents",
     agentSignup:        "/api/agent-signup",
+    agentLogin:         "/api/agent",
+    agentMagicLogin:    "/api/agent",
     ai:                 "/api/ai",
     analytics:          "/api/analytics",
     auth:               "/api/auth",
@@ -226,6 +244,7 @@ const MOUNT: Record<keyof Api, string> = {
     ratingSystems:      "/api/rating-systems",
     recommendations:    "/api/recommendations",
     repairBuilder:      "/api/public",
+    roleProfiles:       "/api/role-profiles",
     schedule:           "/api/schedule",
     secrets:            "/api/admin",
     services:           "/api/services",
@@ -271,6 +290,8 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         agent:              mk<AgentApi>(MOUNT.agent),
         agents:             mk<AgentsApi>(MOUNT.agents),
         agentSignup:        mk<AgentSignupApi>(MOUNT.agentSignup),
+        agentLogin:         mk<AgentLoginApi>(MOUNT.agentLogin),
+        agentMagicLogin:    mk<AgentMagicLoginRequestApi>(MOUNT.agentMagicLogin),
         ai:                 mk<AiApi>(MOUNT.ai),
         analytics:          mk<AnalyticsApi>(MOUNT.analytics),
         auth:               mk<CoreAuthApi>(MOUNT.auth),
@@ -313,6 +334,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         ratingSystems:      mk<RatingSystemsApi>(MOUNT.ratingSystems),
         recommendations:    mk<RecommendationsApi>(MOUNT.recommendations),
         repairBuilder:      mk<RepairBuilderApi>(MOUNT.repairBuilder),
+        roleProfiles:       mk<RoleProfilesApi>(MOUNT.roleProfiles),
         schedule:           mk<ScheduleApi>(MOUNT.schedule),
         secrets:            mk<SecretsApi>(MOUNT.secrets),
         services:           mk<ServicesApi>(MOUNT.services),

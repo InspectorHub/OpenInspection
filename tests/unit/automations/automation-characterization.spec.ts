@@ -9,9 +9,12 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../../server/services/automation.service';
 import { SmsConsentService } from '../../../server/services/sms-consent.service';
+import { PeopleService } from '../../../server/services/people.service';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { EmailService } from '../../../server/services/email.service';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
+const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 let db: BetterSQLite3Database<typeof schema>;
 let svc: AutomationService;
 
@@ -39,17 +42,30 @@ beforeEach(async () => {
     id: TENANT, name: 'Acme', slug: 'acme', status: 'active', phone: '+15550001111',
     deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
   } as never);
+  await seedRoleProfiles(db, TENANT, new Date(1));
   svc = new AutomationService({} as D1Database);
 });
 
-async function seedInspection(over: Partial<typeof schema.inspections.$inferInsert> = {}) {
+// Task 11a — client_name (email path) and the SMS consent-gate contactId now
+// resolve via inspection_people (not the legacy inspections.client_* columns),
+// so every seeded inspection also gets a contact + inspection_people 'client'
+// row. `clientContactId` is still accepted here (default 'c1', matching the
+// original fixture's SMS-branch literal) so seedInspection seeds the SAME
+// contact id the SMS tests already grant consent for.
+async function seedInspection(over: Partial<typeof schema.inspections.$inferInsert> & { clientContactId?: string | null } = {}) {
   const id = (over.id as string) ?? crypto.randomUUID();
+  const contactId = over.clientContactId ?? 'primary-client';
   await db.insert(schema.inspections).values({
-    id, tenantId: TENANT, propertyAddress: '1 Main', clientName: 'Jane',
-    clientEmail: 'jane@example.com', date: '2026-06-01', status: 'completed',
+    id, tenantId: TENANT, propertyAddress: '1 Main',
+    date: '2026-06-01', status: 'completed',
     reportStatus: 'published', paymentStatus: 'unpaid', price: 50000,
     agreementRequired: false, paymentRequired: false, createdAt: new Date(), ...over,
   } as never);
+  await db.insert(schema.contacts).values({
+    id: contactId, tenantId: TENANT, type: 'client', name: 'Jane',
+    email: 'jane@example.com', phone: '+15551234567', createdAt: new Date(),
+  } as never);
+  await new PeopleService({ DB: {} as D1Database }).addPerson(TENANT, id, contactId, roleProfileId('client'));
   return id;
 }
 
@@ -60,7 +76,7 @@ async function seedRuleAndLog(opts: {
   const ruleId = crypto.randomUUID();
   await db.insert(schema.automations).values({
     id: ruleId, tenantId: TENANT, name: 'R', trigger: opts.trigger ?? 'report.published',
-    recipient: 'client', delayMinutes: 0, subjectTemplate: opts.subject ?? 'Subj',
+    recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'), delayMinutes: 0, subjectTemplate: opts.subject ?? 'Subj',
     bodyTemplate: opts.body ?? 'Body', smsBody: opts.smsBody ?? null,
     channels: JSON.stringify([opts.channel ?? 'email']), channel: opts.channel ?? 'email',
     active: true, isDefault: false, createdAt: new Date(),

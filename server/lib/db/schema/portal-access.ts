@@ -19,7 +19,11 @@ export const inspectionAccessTokens = sqliteTable('inspection_access_tokens', {
     tenantId:       text('tenant_id').notNull().references(() => tenants.id),
     inspectionId:   text('inspection_id').notNull(),
     recipientEmail: text('recipient_email').notNull(),
-    role:           text('role', { enum: ['client', 'co_client', 'agent'] }).notNull().default('client'),
+    // Free-form role-profile KEY (validated against the tenant's
+    // contact_role_profiles by PortalAccessService.issueToken) — NOT a fixed
+    // drizzle enum. SQLite stores plain TEXT; this is a type-layer widening
+    // only, no DDL/migration cost. See spec 2026-07-16-oi-people-role-profiles.
+    role:           text('role').notNull().default('client'),
     token:          text('token').notNull(),
     createdAt:      integer('created_at', { mode: 'timestamp_ms' }).notNull(),
     expiresAt:      integer('expires_at', { mode: 'timestamp_ms' }),   // null = open (order active)

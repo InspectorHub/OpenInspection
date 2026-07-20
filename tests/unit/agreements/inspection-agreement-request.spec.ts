@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
 import { createTestDb, setupSchema } from '../db';
+import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { eq } from 'drizzle-orm';
 
@@ -9,6 +10,7 @@ import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { OpenAPIHono } from '@hono/zod-openapi';
 import { inspectionsRoutes } from '../../../server/api/inspections';
 import { AgreementService } from '../../../server/services/agreement.service';
+import { PeopleService } from '../../../server/services/people.service';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 
@@ -28,6 +30,8 @@ const TENANT = '00000000-0000-0000-0000-000000000001';
 const OTHER = '00000000-0000-0000-0000-0000000000ff';
 const USER_ID = '00000000-0000-0000-0000-000000000300';
 const INSP_ID = '550e8400-e29b-41d4-a716-446655440000';
+const CLIENT_CONTACT_ID = '00000000-0000-0000-0000-0000000000c1';
+const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 const AGR_ID = '11111111-1111-4111-8111-111111111111';
 const AGR_ID_2 = '22222222-2222-4222-8222-222222222222';
 const AGR_OTHER = '33333333-3333-4333-8333-333333333333';
@@ -46,6 +50,7 @@ function buildApp(role = 'manager') {
         c.set('requestedTenantSlug', SLUG as never);
         c.set('services', {
             agreement: new AgreementService({} as D1Database, { jwtSecret: 'test-secret' }),
+            people: new PeopleService({ DB: {} as D1Database }),
             email: { sendAgreementRequest } as never,
         } as never);
         await next();
@@ -93,6 +98,20 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
             propertyAddress: '1 Main St', clientName: 'Jane', clientEmail: 'jane@example.com',
             date: '2026-06-01', status: 'requested', paymentStatus: 'unpaid', price: 50000,
             agreementRequired: false, paymentRequired: false, createdAt: new Date(),
+        });
+        // Task 9b (people-role-profiles) — the route now resolves the default
+        // recipient via PeopleService.getPrimaryClient (inspection_people join)
+        // instead of the legacy clientName/clientEmail columns above. Seed a
+        // matching primary-client contact so the "happy path" default-recipient
+        // tests keep resolving to Jane / jane@example.com.
+        await seedRoleProfiles(db, TENANT, new Date(1));
+        await db.insert(schema.contacts).values({
+            id: CLIENT_CONTACT_ID, tenantId: TENANT, type: 'client', name: 'Jane',
+            email: 'jane@example.com', createdAt: new Date(),
+        });
+        await db.insert(schema.inspectionPeople).values({
+            id: `ip_${INSP_ID}_client`, tenantId: TENANT, inspectionId: INSP_ID,
+            contactId: CLIENT_CONTACT_ID, roleProfileId: roleProfileId('client'), createdAt: new Date(),
         });
     });
 
@@ -155,10 +174,11 @@ describe('POST /api/inspections/:id/agreement-requests (Task 7, #111)', () => {
         expect(sendAgreementRequest).not.toHaveBeenCalled();
     });
 
-    it('422 when no email is resolvable (inspection has none and none supplied)', async () => {
+    it('422 when no email is resolvable (no primary client and none supplied)', async () => {
         await seedAgreement();
-        await db.update(schema.inspections).set({ clientEmail: null })
-            .where(eq(schema.inspections.id, INSP_ID));
+        // Task 9b — resolution now rides inspection_people, not the legacy
+        // clientEmail column, so "no client" means no primary-client row.
+        await db.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.inspectionId, INSP_ID));
         const res = await post({});
         expect(res.status).toBe(422);
         expect(sendAgreementRequest).not.toHaveBeenCalled();

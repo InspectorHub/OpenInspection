@@ -3,7 +3,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { MetricsQuerySchema, MetricsApiResponseSchema } from '../lib/validations/metrics.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections, inspectionServices, contacts } from '../lib/db/schema';
+import { inspections, inspectionServices, contacts, inspectionPeople, contactRoleProfiles } from '../lib/db/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
@@ -42,24 +42,40 @@ const metricsRoutes = createApiRouter()
     const totalInspections = monthly.reduce((s, r) => s + Number(r.count || 0), 0);
     const avgOrderValue    = totalInspections > 0 ? Math.round(totalRevenue / totalInspections) : 0;
 
-    // Top agents — single JOIN query instead of N+1
+    // Top agents — single JOIN query instead of N+1. Buyer's-agent
+    // attribution via inspection_people (role buyer_agent) — contact_role_profiles
+    // is joined before inspection_people so the join stays scoped to
+    // buyer_agent only (joining inspection_people first would fan out over
+    // every role on the inspection). The old "referredByAgentId is not null"
+    // filter is now implicit: an inspection with no buyer_agent
+    // inspection_people row simply has no matching row to group on.
     const topAgents = await db.select({
-        agentId:   inspections.referredByAgentId,
+        agentId:   inspectionPeople.contactId,
         agentName: contacts.name,
         count:     sql<number>`count(*)`,
         revenue:   sql<number>`sum(${inspections.price})`,
     })
         .from(inspections)
+        .leftJoin(contactRoleProfiles, and(
+            eq(contactRoleProfiles.tenantId, inspections.tenantId),
+            eq(contactRoleProfiles.key, 'buyer_agent'),
+            eq(contactRoleProfiles.active, true),
+        ))
+        .leftJoin(inspectionPeople, and(
+            eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
+            eq(inspectionPeople.inspectionId, inspections.id),
+            eq(inspectionPeople.tenantId, inspections.tenantId),
+        ))
         .leftJoin(contacts, and(
-            eq(contacts.id, inspections.referredByAgentId),
+            eq(contacts.id, inspectionPeople.contactId),
             eq(contacts.tenantId, inspections.tenantId),
         ))
         .where(and(
             eq(inspections.tenantId, tenantId),
             gte(inspections.date, fromStr),
-            sql`${inspections.referredByAgentId} is not null`,
+            sql`${inspectionPeople.contactId} is not null`,
         ))
-        .groupBy(inspections.referredByAgentId)
+        .groupBy(inspectionPeople.contactId)
         .orderBy(sql`count(*) desc`)
         .limit(10)
         .then(rows => rows.map(r => ({

@@ -23,6 +23,7 @@ import { createApiResponseSchema, SuccessResponseSchema } from '../lib/validatio
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { authCookieOptions } from '../lib/auth-helpers';
 import { safeReturnTo } from '../lib/mcp/safe-return-to';
+import { findGlobalAgentById } from '../services/agent/account';
 import totpRoutes from './auth/totp';
 import profileRoutes from './auth/profile';
 
@@ -121,6 +122,12 @@ const joinTeamRoute = createRoute(withMcpMetadata({
  * calls /api/integration/sso-handoff to get a code → portal 302s the
  * browser to this URL → core sets the right cookie → user lands on
  * the right tenant's dashboard.
+ *
+ * Spec 3 Task 5b — the KV payload's `tenantId` is now OPTIONAL. When
+ * ABSENT (an agent handoff — portal's Google-OIDC agent-mode callback hands
+ * off just an email, no tenantId), this mints a tenant-less agent JWT
+ * instead of a tenant JWT and redirects to /agent-dashboard. The tenant path
+ * below (tenantId present) is unchanged.
  */
 const ssoConsumeRoute = createRoute(withMcpMetadata({
     method: 'get',
@@ -364,7 +371,41 @@ const coreAuthRoutes = createApiRouter()
 
         let parsed: { userId?: string; tenantId?: string };
         try { parsed = JSON.parse(raw); } catch { return c.redirect('/login?sso=invalid', 302); }
-        if (!parsed.userId || !parsed.tenantId) return c.redirect('/login?sso=invalid', 302);
+        if (!parsed.userId) return c.redirect('/login?sso=invalid', 302);
+
+        if (!parsed.tenantId) {
+            // Agent handoff (Spec 3 Task 5b) — tenant-null payload minted by
+            // the agent branch of POST /api/integration/sso-handoff.
+            // Re-verify the account AT REDEEM TIME (mirrors
+            // redeemMagicLogin/findGlobalAgentById — server/services/agent/
+            // magic-login.service.ts) rather than trusting the issue-time
+            // snapshot: the account may have been deleted or demoted from
+            // 'agent' during the code's TTL window.
+            const agent = await findGlobalAgentById(c.env.DB, parsed.userId);
+            if (!agent) return c.redirect('/login?sso=invalid', 302);
+
+            const keyring = await c.var.keyringPromise!;
+            const now = Math.floor(Date.now() / 1000);
+            // Agent JWT claim shape mirrors server/api/agent/login.ts and
+            // server/api/agent/magic-login.ts EXACTLY — no
+            // tenantId/custom:tenantId. Agents are global users.
+            const token = await signJwt({
+                sub: agent.id,
+                role: 'agent',
+                'custom:userRole': 'agent',
+                email: agent.email,
+                iat: now,
+                exp: now + 60 * 60 * 24,
+            }, keyring);
+
+            setCookie(c, '__Host-inspector_token', token, authCookieOptions());
+            // Global agent identity — tenant-less by design, so this does NOT
+            // go through the tenant-scoped audit_logs table (auditLogs.tenantId
+            // is a NOT NULL FK to tenants.id). Structured logging only, mirrors
+            // the magic-login redeem handler.
+            logger.info('sso_consume.agent_session_minted', { userId: agent.id });
+            return c.redirect('/agent-dashboard', 302);
+        }
 
         const d = drizzle(c.env.DB);
         // Excludes soft-deleted (removed member) rows — a portal handoff must
