@@ -12,6 +12,7 @@ import { AccessDenied } from "~/components/AccessDenied";
 import { StripeConnectPanel } from "~/components/settings/advanced/StripeConnectPanel";
 import { AiFeaturesPanel } from "~/components/settings/advanced/AiFeaturesPanel";
 import { IntegrationKeysPanel } from "~/components/settings/advanced/IntegrationKeysPanel";
+import { SectionNav } from "~/components/settings/SectionNav";
 import { parseTestResults } from "~/lib/connection-test";
 import { m } from "~/paraglide/messages";
 
@@ -223,6 +224,13 @@ export default function SettingsAdvancedPage() {
     return undefined;
   };
 
+  const navSections = [
+    { id: "stripe-connect", label: m.settings_stripeconnect_heading() },
+    { id: "ai-features", label: m.settings_ai_heading() },
+    { id: "integration-keys", label: m.settings_intkeys_heading() },
+    { id: "data", label: m.settings_advanced_data_heading() },
+  ];
+
   return (
     <div className="space-y-ih-list max-w-3xl">
       <SettingsCrumb items={[{ label: m.settings_crumb_root(), href: "/settings" }, { label: m.settings_advanced_crumb() }]} />
@@ -244,37 +252,46 @@ export default function SettingsAdvancedPage() {
         </div>
       ) : null}
 
+      {/* In-page section navigation (sticky; scroll-spy). Shows only when ≥3 sections visible. */}
+      <SectionNav sections={navSections} />
+
       {/* Stripe Connect */}
-      <StripeConnectPanel
-        stripeConnected={config.stripeConnected}
-        stripeAccountId={config.stripeAccountId}
-        stripeForm={stripeForm}
-        stripeFields={stripeFields}
-      />
+      <div id="stripe-connect" className="scroll-mt-12">
+        <StripeConnectPanel
+          stripeConnected={config.stripeConnected}
+          stripeAccountId={config.stripeAccountId}
+          stripeForm={stripeForm}
+          stripeFields={stripeFields}
+        />
+      </div>
 
       {/* AI features */}
-      <AiFeaturesPanel
-        geminiConfigured={config.geminiConfigured}
-        value={secrets.GEMINI_API_KEY}
-        fieldError={secretFieldError}
-        saving={savingAi}
-        geminiTestFetcher={geminiTestFetcher}
-        testResults={testResults}
-      />
+      <div id="ai-features" className="scroll-mt-12">
+        <AiFeaturesPanel
+          geminiConfigured={config.geminiConfigured}
+          value={secrets.GEMINI_API_KEY}
+          fieldError={secretFieldError}
+          saving={savingAi}
+          geminiTestFetcher={geminiTestFetcher}
+          testResults={testResults}
+        />
+      </div>
 
       {/* Integration API keys */}
-      <IntegrationKeysPanel
-        secrets={{
-          GOOGLE_PLACES_API_KEY: secrets.GOOGLE_PLACES_API_KEY,
-          ESTATED_API_KEY: secrets.ESTATED_API_KEY,
-          APP_BASE_URL: secrets.APP_BASE_URL,
-        }}
-        fieldError={secretFieldError}
-        saving={savingAdvanced}
-      />
+      <div id="integration-keys" className="scroll-mt-12">
+        <IntegrationKeysPanel
+          secrets={{
+            GOOGLE_PLACES_API_KEY: secrets.GOOGLE_PLACES_API_KEY,
+            ESTATED_API_KEY: secrets.ESTATED_API_KEY,
+            APP_BASE_URL: secrets.APP_BASE_URL,
+          }}
+          fieldError={secretFieldError}
+          saving={savingAdvanced}
+        />
+      </div>
 
       {/* Data import/export */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+      <section id="data" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
         <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_advanced_data_heading()}</h3>
         <p className="text-[13px] text-ih-fg-3">
           {m.settings_advanced_data_desc()}

@@ -9,6 +9,7 @@ import { BookingPoliciesPanel } from "~/components/settings/BookingPoliciesPanel
 import { EmbedWidgetPanel } from "~/components/settings/EmbedWidgetPanel";
 import { ManageTeamSchedulesBar } from "~/components/settings/ManageTeamSchedulesBar";
 import { CompanyBookingLinksPanel } from "~/components/settings/CompanyBookingLinksPanel";
+import { SectionNav } from "~/components/settings/SectionNav";
 import {
   BookingSlotRulesPanel,
   type BookingSlotIntervalMin,
@@ -243,6 +244,14 @@ export default function SettingsBookingPage() {
     (SCHEDULING_ROLES as readonly string[]).includes(m.role),
   );
 
+  const navSections = [
+    { id: "booking-links", label: m.settings_companylink_heading() },
+    { id: "booking-policies", label: m.settings_policies_heading() },
+    { id: "holidays", label: m.settings_holiday_panel_heading() },
+    { id: "slot-rules", label: m.settings_slotrules_heading() },
+    { id: "embed-widget", label: m.settings_embed_heading() },
+  ];
+
   return (
     <div className="space-y-ih-list">
       <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_booking_crumb() }]} />
@@ -250,29 +259,42 @@ export default function SettingsBookingPage() {
         {m.settings_booking_intro()}
       </p>
 
+      {/* In-page section navigation (sticky; scroll-spy). Shows only when ≥3 sections visible. */}
+      <SectionNav sections={navSections} />
+
       <ManageTeamSchedulesBar
         members={schedulingMembers.map((m) => ({ id: m.id, email: m.email }))}
       />
-      <CompanyBookingLinksPanel tenant={tenant} />
-      <BookingPoliciesPanel initialConfig={data.config} />
-      <HolidayClosedPanel
-        initialConfig={{
-          holidayRegion: data.config.holidayRegion,
-          holidayPublicPolicy: data.config.holidayPublicPolicy,
-          holidayInternalPolicy: data.config.holidayInternalPolicy,
-          conciergeReviewRequired: data.config.conciergeReviewRequired,
-        }}
-        initialCustomHolidays={data.customHolidays}
-        dataMaxYear={data.holidayDataMaxYear}
-        currentYear={data.currentYear}
-      />
-      <BookingSlotRulesPanel
-        initial={{
-          bookingSlotMode: data.config.bookingSlotMode,
-          bookingSlotIntervalMin: data.config.bookingSlotIntervalMin,
-        }}
-      />
-      <EmbedWidgetPanel tenant={tenant} />
+      <div id="booking-links" className="scroll-mt-12">
+        <CompanyBookingLinksPanel tenant={tenant} />
+      </div>
+      <div id="booking-policies" className="scroll-mt-12">
+        <BookingPoliciesPanel initialConfig={data.config} />
+      </div>
+      <div id="holidays" className="scroll-mt-12">
+        <HolidayClosedPanel
+          initialConfig={{
+            holidayRegion: data.config.holidayRegion,
+            holidayPublicPolicy: data.config.holidayPublicPolicy,
+            holidayInternalPolicy: data.config.holidayInternalPolicy,
+            conciergeReviewRequired: data.config.conciergeReviewRequired,
+          }}
+          initialCustomHolidays={data.customHolidays}
+          dataMaxYear={data.holidayDataMaxYear}
+          currentYear={data.currentYear}
+        />
+      </div>
+      <div id="slot-rules" className="scroll-mt-12">
+        <BookingSlotRulesPanel
+          initial={{
+            bookingSlotMode: data.config.bookingSlotMode,
+            bookingSlotIntervalMin: data.config.bookingSlotIntervalMin,
+          }}
+        />
+      </div>
+      <div id="embed-widget" className="scroll-mt-12">
+        <EmbedWidgetPanel tenant={tenant} />
+      </div>
     </div>
   );
 }

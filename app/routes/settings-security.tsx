@@ -12,6 +12,7 @@ import { ChangePasswordPanel } from "~/components/settings/security/ChangePasswo
 import { TwoFactorPanel } from "~/components/settings/security/TwoFactorPanel";
 import { TurnstilePanel } from "~/components/settings/security/TurnstilePanel";
 import { DataExportPanel } from "~/components/settings/security/DataExportPanel";
+import { SectionNav } from "~/components/settings/SectionNav";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -198,10 +199,23 @@ export default function SettingsSecurityPage() {
     shouldRevalidate: "onInput",
   });
 
+  const navSections = [
+    { id: "account-details", label: m.settings_security_account_details_heading() },
+    { id: "change-password", label: m.settings_pw_heading() },
+    { id: "two-factor", label: m.settings_2fa_heading() },
+    { id: "turnstile", label: m.settings_turnstile_heading() },
+    { id: "sessions", label: m.settings_security_sessions_heading() },
+    { id: "data-export", label: m.settings_dataexport_heading() },
+    { id: "danger", label: m.settings_security_danger_heading() },
+  ];
+
   return (
     <div className="space-y-ih-list max-w-3xl">
       <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_security_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">{m.settings_security_subtitle()}</p>
+
+      {/* In-page section navigation (sticky; scroll-spy). Shows only when ≥3 sections visible. */}
+      <SectionNav sections={navSections} />
 
       {/* Flash */}
       {flashVisible && actionData && "success" in actionData && actionData.success && (
@@ -220,7 +234,7 @@ export default function SettingsSecurityPage() {
       ) : null}
 
       {/* Account info */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+      <section id="account-details" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
         <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_security_account_details_heading()}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
@@ -235,28 +249,34 @@ export default function SettingsSecurityPage() {
       </section>
 
       {/* Change password */}
-      <ChangePasswordPanel
-        pwForm={pwForm}
-        pwFields={pwFields}
-        showPassword={showPassword}
-        setShowPassword={setShowPassword}
-      />
+      <div id="change-password" className="scroll-mt-12">
+        <ChangePasswordPanel
+          pwForm={pwForm}
+          pwFields={pwFields}
+          showPassword={showPassword}
+          setShowPassword={setShowPassword}
+        />
+      </div>
 
       {/* 2FA status */}
-      <TwoFactorPanel
-        totpEnabled={user.totpEnabled}
-        recoveryCodesRemaining={user.recoveryCodesRemaining}
-      />
+      <div id="two-factor" className="scroll-mt-12">
+        <TwoFactorPanel
+          totpEnabled={user.totpEnabled}
+          recoveryCodesRemaining={user.recoveryCodesRemaining}
+        />
+      </div>
 
       {/* Turnstile bot protection */}
-      <TurnstilePanel
-        value={secrets.TURNSTILE_SECRET_KEY}
-        fieldError={turnstileFieldError}
-        saving={savingTurnstile}
-      />
+      <div id="turnstile" className="scroll-mt-12">
+        <TurnstilePanel
+          value={secrets.TURNSTILE_SECRET_KEY}
+          fieldError={turnstileFieldError}
+          saving={savingTurnstile}
+        />
+      </div>
 
       {/* Active sessions placeholder */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+      <section id="sessions" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
         <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_security_sessions_heading()}</h3>
         <div className="flex items-center gap-3 p-3 rounded-md bg-ih-bg-muted border border-ih-border">
           <div className="w-8 h-8 rounded-full bg-ih-primary-tint text-ih-primary flex items-center justify-center">
@@ -273,10 +293,12 @@ export default function SettingsSecurityPage() {
       </section>
 
       {/* Data export */}
-      <DataExportPanel />
+      <div id="data-export" className="scroll-mt-12">
+        <DataExportPanel />
+      </div>
 
       {/* Danger zone */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-bad p-6 space-y-4">
+      <section id="danger" className="bg-ih-bg-card rounded-lg border border-ih-bad p-6 space-y-4 scroll-mt-12">
         <h3 className="text-[11px] font-bold text-ih-bad-fg uppercase tracking-[0.2em]">{m.settings_security_danger_heading()}</h3>
         <div className="p-4 rounded-md bg-ih-bad-bg border border-ih-bad">
           <p className="text-[13px] font-bold text-ih-bad-fg mb-1">{m.settings_security_delete_title()}</p>

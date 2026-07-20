@@ -15,6 +15,7 @@ import { makeProfileSchema } from "~/lib/forms/settings.schema";
 import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { LOCALE_OPTIONS } from "~/lib/locales";
+import { SectionNav } from "~/components/settings/SectionNav";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -183,10 +184,20 @@ export default function SettingsProfilePage() {
     && "intent" in sigFetcher.data && sigFetcher.data.intent === "save-signature"
     ? (sigFetcher.data.error as string) : null;
 
+  const navSections = [
+    { id: "profile-details", label: m.settings_profile_crumb() },
+    { id: "photo", label: m.settings_profile_photo_heading() },
+    { id: "signature", label: m.settings_profile_signature_heading() },
+    { id: "saved-signature", label: m.settings_profile_saved_signature_heading() },
+  ];
+
   return (
     <div className="space-y-ih-list">
       <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_profile_crumb() }]} />
       <p className="text-[13px] text-ih-fg-3">{m.settings_profile_subtitle()}</p>
+
+      {/* In-page section navigation (sticky; scroll-spy). Shows only when ≥3 sections visible. */}
+      <SectionNav sections={navSections} />
 
       {/* Flash */}
       {flashSuccess && (
@@ -208,7 +219,7 @@ export default function SettingsProfilePage() {
         className="space-y-5"
       >
         {/* Identity fields */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-6">
+        <section id="profile-details" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-6 scroll-mt-12">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div className="space-y-2">
               <label htmlFor={fields.name.id} className="block text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_name_label()}</label>
@@ -288,7 +299,7 @@ export default function SettingsProfilePage() {
             now lives in Settings → Booking ("Your links"). */}
 
         {/* Photo placeholder */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+        <section id="photo" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
           <header className="space-y-1">
             <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_photo_heading()}</h3>
             <p className="text-[12px] text-ih-fg-3">{m.settings_profile_photo_subtitle()}</p>
@@ -324,7 +335,7 @@ export default function SettingsProfilePage() {
         </section>
 
         {/* Email signature (business-card footer) — independent of Point of Contact */}
-        <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4">
+        <section id="signature" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-4 scroll-mt-12">
           <header className="space-y-1">
             <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_signature_heading()}</h3>
             <p className="text-[12px] text-ih-fg-3">
@@ -359,7 +370,7 @@ export default function SettingsProfilePage() {
       </Form>
 
       {/* Saved signature */}
-      <section className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5">
+      <section id="saved-signature" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
         <header className="space-y-1">
           <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_profile_saved_signature_heading()}</h3>
           <p className="text-[12px] text-ih-fg-3">

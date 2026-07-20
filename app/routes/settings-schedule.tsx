@@ -24,6 +24,7 @@ import {
 } from "~/components/settings/CalendarConnectPanel";
 import type { CalendarPickerData } from "~/components/settings/CalendarReadSetPicker";
 import { ScheduleLinksPanel } from "~/components/settings/ScheduleLinksPanel";
+import { SectionNav } from "~/components/settings/SectionNav";
 import { m } from "~/paraglide/messages";
 
 interface AvailabilitySlot {
@@ -330,6 +331,15 @@ export default function SettingsSchedulePage() {
     ? data.members.filter((m) => (SCHEDULING_ROLES as readonly string[]).includes(m.role))
     : [];
 
+  const navSections = [
+    { id: "calendar-connect", label: m.settings_calconnect_heading() },
+    { id: "weekly-schedule", label: m.settings_weekly_heading() },
+    { id: "availability-heatmap", label: m.schedule_heatmap_heading(), visible: data.weekSummary.length > 0 },
+    { id: "time-off", label: m.settings_timeoff_heading() },
+    { id: "date-overrides", label: m.settings_dateoverrides_heading() },
+    { id: "schedule-links", label: m.settings_schedlinks_heading() },
+  ];
+
   return (
     <div className="space-y-ih-list">
       <SettingsCrumb items={[{ label: m.settings_crumb_settings(), href: "/settings" }, { label: m.settings_schedule_crumb() }]} />
@@ -341,23 +351,32 @@ export default function SettingsSchedulePage() {
         <ManageOthersPicker members={pickerMembers} managedInspectorId={data.managedInspectorId} />
       )}
 
-      <CalendarConnectPanel
-        connected={data.calendar.connected}
-        capability={data.calendar.capability}
-        oauthConfigured={data.calendar.oauthConfigured}
-        disabled={data.managedInspectorId !== null}
-        picker={data.calendar.picker}
-      />
-      <WeeklySchedulePanel
-        key={data.managedInspectorId ?? "self"}
-        initialSlots={data.slots}
-        inspectorId={data.managedInspectorId}
-      />
+      {/* In-page section navigation (sticky; scroll-spy). Shows only when ≥3 sections visible. */}
+      <SectionNav sections={navSections} />
+
+      <div id="calendar-connect" className="scroll-mt-12">
+        <CalendarConnectPanel
+          connected={data.calendar.connected}
+          capability={data.calendar.capability}
+          oauthConfigured={data.calendar.oauthConfigured}
+          disabled={data.managedInspectorId !== null}
+          picker={data.calendar.picker}
+        />
+      </div>
+      <div id="weekly-schedule" className="scroll-mt-12">
+        <WeeklySchedulePanel
+          key={data.managedInspectorId ?? "self"}
+          initialSlots={data.slots}
+          inspectorId={data.managedInspectorId}
+        />
+      </div>
       {data.weekSummary.length > 0 && (
-        <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-3">
-          <h3 className="text-[13px] font-bold text-ih-fg-1">{m.schedule_heatmap_heading()}</h3>
-          <AvailabilityHeatmapWeek days={data.weekSummary} locale={locale} />
-        </section>
+        <div id="availability-heatmap" className="scroll-mt-12">
+          <section className="bg-ih-bg-card border border-ih-border rounded-lg p-5 space-y-3">
+            <h3 className="text-[13px] font-bold text-ih-fg-1">{m.schedule_heatmap_heading()}</h3>
+            <AvailabilityHeatmapWeek days={data.weekSummary} locale={locale} />
+          </section>
+        </div>
       )}
       {data.companyClosed && (
         <CompanyClosedStrip
@@ -366,16 +385,22 @@ export default function SettingsSchedulePage() {
           upcomingClosed={data.companyClosed.upcomingClosed}
         />
       )}
-      <TimeOffListPanel
-        key={`time-off-${data.managedInspectorId ?? "self"}`}
-        blocks={data.timeOffBlocks}
-      />
-      <DateOverridesPanel
-        key={`overrides-${data.managedInspectorId ?? "self"}`}
-        initialOverrides={data.overrides}
-        inspectorId={data.managedInspectorId}
-      />
-      <ScheduleLinksPanel tenant={tenant} slug={slug} />
+      <div id="time-off" className="scroll-mt-12">
+        <TimeOffListPanel
+          key={`time-off-${data.managedInspectorId ?? "self"}`}
+          blocks={data.timeOffBlocks}
+        />
+      </div>
+      <div id="date-overrides" className="scroll-mt-12">
+        <DateOverridesPanel
+          key={`overrides-${data.managedInspectorId ?? "self"}`}
+          initialOverrides={data.overrides}
+          inspectorId={data.managedInspectorId}
+        />
+      </div>
+      <div id="schedule-links" className="scroll-mt-12">
+        <ScheduleLinksPanel tenant={tenant} slug={slug} />
+      </div>
     </div>
   );
 }
