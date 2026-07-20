@@ -1,4 +1,5 @@
 import { Form } from "react-router";
+import { RadioCardGroup } from "@core/shared-ui";
 import type { useFetcher } from "react-router";
 import { SmsSecretsPanel } from "~/components/settings/SmsSecretsPanel";
 import type { action } from "~/routes/settings-communication";
@@ -113,49 +114,29 @@ export function SmsDeliveryPanel({
               is hidden. "platform" is a first-party-only value that is never
               presented as a tenant option. */}
           {isSaas && (
-            <div className="space-y-2">
-              <div className="flex flex-col gap-2">
-                {/* BYO */}
-                <label className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${smsMode === "own" ? "border-ih-primary bg-ih-primary/5" : "border-ih-border bg-ih-bg-card hover:border-ih-primary/40"}`}>
-                  <input
-                    type="radio" name="_smsModeRadio" value="own"
-                    checked={smsMode === "own"}
-                    onChange={() => setSmsMode("own")}
-                    className="mt-0.5 accent-ih-primary"
-                  />
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_smsdelivery_byo_label()}</span>
-                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">{m.settings_smsdelivery_byo_desc()}</span>
-                  </span>
-                </label>
-                {/* Managed shared */}
-                <label className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${smsMode === "managed_shared" ? "border-ih-primary bg-ih-primary/5" : "border-ih-border bg-ih-bg-card hover:border-ih-primary/40"}`}>
-                  <input
-                    type="radio" name="_smsModeRadio" value="managed_shared"
-                    checked={smsMode === "managed_shared"}
-                    onChange={() => setSmsMode("managed_shared")}
-                    className="mt-0.5 accent-ih-primary"
-                  />
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_smsdelivery_shared_label()} <span className="font-normal text-ih-ok-fg">{m.settings_smsdelivery_included()}</span></span>
-                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">{m.settings_smsdelivery_shared_desc()}</span>
-                  </span>
-                </label>
-                {/* Managed dedicated — selectable; provisioning wizard renders below */}
-                <label className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${smsMode === "managed_dedicated" ? "border-ih-primary bg-ih-primary/5" : "border-ih-border bg-ih-bg-card hover:border-ih-primary/40"}`}>
-                  <input
-                    type="radio" name="_smsModeRadio" value="managed_dedicated"
-                    checked={smsMode === "managed_dedicated"}
-                    onChange={() => setSmsMode("managed_dedicated")}
-                    className="mt-0.5 accent-ih-primary"
-                  />
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[13px] font-bold text-ih-fg-1">{m.settings_smsdelivery_dedicated_label()}</span>
-                    <span className="block text-[11px] text-ih-fg-3 mt-0.5">{m.settings_smsdelivery_dedicated_desc()}</span>
-                  </span>
-                </label>
-              </div>
-            </div>
+            <RadioCardGroup
+              name="_smsModeRadio"
+              value={smsMode}
+              onChange={(v) => setSmsMode(v as SmsModeValue)}
+              options={[
+                {
+                  value: "own",
+                  title: m.settings_smsdelivery_byo_label(),
+                  description: m.settings_smsdelivery_byo_desc(),
+                },
+                {
+                  value: "managed_shared",
+                  title: m.settings_smsdelivery_shared_label(),
+                  badge: m.settings_smsdelivery_included(),
+                  description: m.settings_smsdelivery_shared_desc(),
+                },
+                {
+                  value: "managed_dedicated",
+                  title: m.settings_smsdelivery_dedicated_label(),
+                  description: m.settings_smsdelivery_dedicated_desc(),
+                },
+              ]}
+            />
           )}
           {!isSaas && (
             <p className="text-[13px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md p-3">
