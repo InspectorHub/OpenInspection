@@ -14,6 +14,8 @@
   "settings_error_generic": "An error occurred.",
   "settings_comms_meta_title": "Communication - Settings - OpenInspection",
   "settings_comms_intro": "Configure email delivery, templates, and calendar sync.",
+  "settings_comms_nav_managed": "Managed SMS",
+  "settings_comms_nav_calendar": "Google Calendar",
   "settings_comms_email_save_error": "Failed to save email settings.",
   "settings_comms_provider_save_error": "Failed to save provider selection.",
   "settings_comms_email_secrets_save_error": "Failed to save email secrets.",

@@ -3,9 +3,11 @@ import { useEffect, useState } from "react";
 /**
  * Tracks which section id is "current" within a scroll container. A section is
  * current when its top has scrolled at or above `topOffset` px from the root's
- * top; the current section is the last such one. Uses a passive scroll
- * listener on the resolved root (falls back to window). Returns the first id
- * until a scroll settles, or null when there are no ids.
+ * top; the current section is the last such one. `getRoot` only sets the offset
+ * reference (viewport when it returns null); the scroll listener is always a
+ * capture-phase window listener so it fires regardless of which element scrolls
+ * (scroll events don't bubble). Returns the first id until a scroll settles, or
+ * null when there are no ids.
  */
 export function useScrollSpy(
   ids: string[],
@@ -21,7 +23,6 @@ export function useScrollSpy(
       return;
     }
     const root = getRoot();
-    const scroller: HTMLElement | Window = root ?? window;
     const rootTop = root ? root.getBoundingClientRect().top : 0;
 
     function compute() {
@@ -36,8 +37,9 @@ export function useScrollSpy(
     }
 
     compute();
-    scroller.addEventListener("scroll", compute, { passive: true });
-    return () => scroller.removeEventListener("scroll", compute);
+    // capture:true catches scroll from any scroller (events don't bubble).
+    window.addEventListener("scroll", compute, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", compute, { capture: true } as EventListenerOptions);
   }, [key, getRoot, topOffset]);
 
   return active;

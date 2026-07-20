@@ -34,6 +34,7 @@ describe("SectionNav", () => {
         ]}
       />,
     );
+    expect(screen.getByRole("navigation", { name: "Section navigation" })).toBeTruthy();
     expect(screen.getByText("Alpha")).toBeTruthy();
     expect(screen.getByText("Bravo")).toBeTruthy();
     expect(screen.getByText("Delta")).toBeTruthy();

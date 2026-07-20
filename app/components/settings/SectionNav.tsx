@@ -8,8 +8,14 @@ export interface NavSection {
   visible?: boolean;
 }
 
-/** Height (px) of the sticky bar; consumers set matching `scroll-mt` on sections. */
-export const SECTION_NAV_BAR_HEIGHT = 52;
+/**
+ * Scroll-spy activation line (px from viewport top). A section becomes "current"
+ * once its top scrolls above this line. Sits comfortably below the 48px anchor
+ * offset (`scroll-mt-12`, which every consumer section must set so its heading
+ * clears the sticky bar on jump) so a jumped-to section — which lands at 48px —
+ * is unambiguously current, with no sub-pixel boundary flicker.
+ */
+const SPY_ACTIVATION_OFFSET = 80;
 
 function nearestScrollParent(el: HTMLElement | null): HTMLElement | null {
   let node = el?.parentElement ?? null;
@@ -33,7 +39,7 @@ export function SectionNav({
   const ids = visible.map((s) => s.id);
 
   const getRoot = React.useCallback(() => nearestScrollParent(rootRef.current), []);
-  const activeId = useScrollSpy(ids, { getRoot, topOffset: SECTION_NAV_BAR_HEIGHT }) ?? ids[0];
+  const activeId = useScrollSpy(ids, { getRoot, topOffset: SPY_ACTIVATION_OFFSET }) ?? ids[0];
 
   // Hooks must run unconditionally; bail out on render only.
   if (visible.length < 3) return null;
@@ -50,6 +56,8 @@ export function SectionNav({
   return (
     <div
       ref={rootRef}
+      role="navigation"
+      aria-label="Section navigation"
       className={`sticky top-0 z-20 -mx-1 px-1 bg-ih-bg-app ${className}`}
     >
       <TabStrip
