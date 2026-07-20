@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useFetcher } from "react-router";
 import type { AddressSelection, PlaceSuggestion } from "~/routes/resources/places";
 import { m } from "~/paraglide/messages";
@@ -33,6 +34,10 @@ export function AddressAutocomplete({
 
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
+  // Dropdown is portaled to <body> as position:fixed so it floats above the
+  // modal's overflow-y-auto box instead of extending it (which grew a scrollbar).
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const sessionRef = useRef<string>("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Set the moment a suggestion is clicked; the details effect below consumes it
@@ -89,6 +94,28 @@ export function AddressAutocomplete({
     // this from re-firing on unrelated parent renders (RR fetcher convention).
   }, [detailsFetcher.state, detailsFetcher.data]);
 
+  // Position the portaled dropdown against the input. Re-measure on scroll
+  // (capture:true so we also catch the modal's own scroll container, not just
+  // window) and on resize. pos stays null until measured, so SSR renders no
+  // portal (never touches document).
+  const dropdownOpen = open && suggestions.length > 0;
+  useEffect(() => {
+    if (!dropdownOpen) { setPos(null); return; }
+    const measure = () => {
+      const el = inputRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left, width: r.width });
+    };
+    measure();
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [dropdownOpen]);
+
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (!open || suggestions.length === 0) return;
     if (e.key === "ArrowDown") {
@@ -111,6 +138,7 @@ export function AddressAutocomplete({
   return (
     <div className="relative">
       <input
+        ref={inputRef}
         id={id}
         role="combobox"
         aria-expanded={open && suggestions.length > 0}
@@ -125,18 +153,21 @@ export function AddressAutocomplete({
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none"
       />
-      {open && suggestions.length > 0 && (
+      {dropdownOpen && pos && createPortal(
         <ul
           id={listboxId}
           role="listbox"
-          className="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover py-1"
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
+          className="z-50 max-h-64 overflow-y-auto rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover py-1"
         >
           {suggestions.map((s, i) => (
             <li
               key={s.placeId}
               role="option"
               aria-selected={i === active}
-              // onMouseDown (not onClick) so it fires before the input's onBlur.
+              // onMouseDown (not onClick) so it fires before the input's onBlur —
+              // this still holds across the portal, so the click resolves the
+              // suggestion before the 120ms blur-close runs.
               onMouseDown={(e) => {
                 e.preventDefault();
                 choose(s);
@@ -148,7 +179,8 @@ export function AddressAutocomplete({
               {s.secondaryText && <span className="text-ih-fg-4"> {s.secondaryText}</span>}
             </li>
           ))}
-        </ul>
+        </ul>,
+        document.body,
       )}
       {detailsFetcher.state === "loading" && (
         <p className="mt-1 text-[11px] text-ih-fg-4">{m.common_loading()}</p>
