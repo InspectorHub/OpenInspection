@@ -47,7 +47,7 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview, tim
             />
           )}
           {sig.variant === "typed" && (
-            <div className="font-serif italic text-2xl text-ih-fg-1 border-b border-ih-border pb-1 min-w-[160px]">
+            <div className="italic text-2xl text-ih-fg-1 border-b border-ih-border pb-1 min-w-[160px]" style={{ fontFamily: "var(--report-heading-font)" }}>
               {sig.inspectorName}
             </div>
           )}

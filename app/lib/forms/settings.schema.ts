@@ -121,6 +121,7 @@ export function makeWorkspaceSchema() {
       .string()
       .regex(/^#[0-9A-Fa-f]{6}$/, m.validation_workspace_color_invalid())
       .optional(),
+    defaultProfileId: z.enum(["signature", "meridian", "terra"]).optional(),
     customReferralSources: z.string().optional(),
     // Report-feature flags. Rendered as conform-native checkboxes (single input,
     // value "on", NO hidden "false" sibling) so a checked box submits ONE value that

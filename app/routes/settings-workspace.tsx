@@ -10,6 +10,8 @@ import { createApi } from "~/lib/api-client.server";
 import { LogoUploader } from "~/components/media-studio/LogoUploader";
 import { SettingsSaveBar } from "~/components/settings/SettingsSaveBar";
 import { SectionNav } from "~/components/settings/SectionNav";
+import { ProfilePicker } from "~/components/settings/ProfilePicker";
+import { ReportStylePreview } from "~/components/settings/ReportStylePreview";
 import { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
@@ -25,6 +27,7 @@ import { m } from "~/paraglide/messages";
 interface Branding {
   companyName?: string | null;
   primaryColor?: string | null;
+  defaultProfileId?: string | null;
   logoUrl?: string | null;
   customReferralSources?: string[];
   enableRepairList?: boolean | null;
@@ -84,6 +87,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const body: Record<string, unknown> = {};
   if (v.companyName !== undefined) body.companyName = v.companyName;
   if (v.primaryColor !== undefined) body.primaryColor = v.primaryColor;
+  if (v.defaultProfileId !== undefined) body.defaultProfileId = v.defaultProfileId;
 
   // Custom referral sources: one label per line
   if (typeof v.customReferralSources === "string") {
@@ -137,6 +141,7 @@ export default function SettingsWorkspacePage() {
   // forbidden loader branch ({ forbidden: true }) without reading missing keys.
   const branding: Branding = "forbidden" in data ? {} : data.branding;
   const [color, setColor] = useState(branding.primaryColor ?? "#6366f1");
+  const [profile, setProfile] = useState(branding.defaultProfileId ?? "signature");
 
   const logoFetcher = useFetcher<{ success: boolean; intent?: string; logoUrl?: string | null }>();
   const [logoUrl, setLogoUrl] = useState<string | null>(branding.logoUrl ?? null);
@@ -200,6 +205,7 @@ export default function SettingsWorkspacePage() {
     { id: "branding", label: m.settings_workspace_branding_heading() },
     { id: "timezone", label: m.settings_workspace_timezone_heading() },
     { id: "locale-currency", label: m.settings_workspace_locale_currency_heading() },
+    { id: "report-style", label: m.settings_workspace_report_style_heading() },
     { id: "referral", label: m.settings_workspace_referral_heading() },
     { id: "report-features", label: m.settings_workspace_report_features_heading() },
     { id: "report-pdf", label: m.settings_workspace_report_pdf_heading() },
@@ -316,6 +322,18 @@ export default function SettingsWorkspacePage() {
               defaultValue={branding.currency ?? "USD"}
               options={CURRENCY_OPTIONS}
             />
+          </div>
+        </section>
+
+        {/* Report style */}
+        <section id="report-style" className="bg-ih-bg-card rounded-lg border border-ih-border p-6 space-y-5 scroll-mt-12">
+          <div>
+            <h3 className="text-[11px] font-bold text-ih-fg-2 uppercase tracking-[0.2em]">{m.settings_workspace_report_style_heading()}</h3>
+            <p className="mt-1 text-[12px] text-ih-fg-3">{m.settings_workspace_report_style_subtitle()}</p>
+          </div>
+          <div className="grid gap-5 lg:grid-cols-[1fr_minmax(0,300px)] lg:items-start">
+            <ProfilePicker name={fields.defaultProfileId.name} value={profile} onChange={setProfile} />
+            <ReportStylePreview profileId={profile} primaryColor={color} />
           </div>
         </section>
 

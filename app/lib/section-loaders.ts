@@ -108,7 +108,7 @@ export async function loadReportSection(
       brand,
       error: res.ok ? null : m.helper_section_report_not_found(),
       notPublished: (res.status as number) === 403,
-      reportTheme: (raw?.reportTheme as string | undefined) ?? meta?.theme,
+      styleProfile: raw?.styleProfile as ReportLoaderResult["styleProfile"],
       initialFilter,
       printMode,
       tocPages: undefined,
