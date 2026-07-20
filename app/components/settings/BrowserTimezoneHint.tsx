@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getBrowserTimeZone, timeZoneLabel } from "~/lib/timezones";
+import { getBrowserTimeZone, timeZoneLabel, TIMEZONE_OPTIONS } from "~/lib/timezones";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -31,7 +31,12 @@ export function BrowserTimezoneHint({
     setBrowserTz(getBrowserTimeZone());
   }, []);
 
-  if (!browserTz || browserTz === effectiveValue) return null;
+  // Only offer a zone the pickers can actually represent. Some runtimes report
+  // a non-canonical alias (e.g. Asia/Calcutta) that has no matching <option>;
+  // adopting it into an uncontrolled select would leave the value empty and
+  // silently persist "inherit/clear". When the detected zone isn't in the
+  // canonical list, skip the shortcut and let the user pick manually.
+  if (!browserTz || browserTz === effectiveValue || !TIMEZONE_OPTIONS.includes(browserTz)) return null;
 
   return (
     <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ih-fg-4">

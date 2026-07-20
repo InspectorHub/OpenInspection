@@ -13,7 +13,8 @@ import * as schema from '../../../server/lib/db/schema';
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 // eslint-disable-next-line import/order
-import { getProfile } from '../../../server/services/agent/profile';
+import { getProfile, updateProfile } from '../../../server/services/agent/profile';
+import { eq } from 'drizzle-orm';
 
 describe('getProfile', () => {
     let f: ReturnType<typeof createTestDb>;
@@ -39,10 +40,32 @@ describe('getProfile', () => {
         expect(p).toEqual({
             name: 'Jane', email: 'jane@x.com', slug: 'jane',
             notifyOnReferral: true, notifyOnReport: true, notifyOnPaid: false,
+            timezone: null,
         });
     });
 
     it('unknown id throws NotFound', async () => {
         await expect(getProfile(rawDb, 'ghost')).rejects.toMatchObject({ status: 404 });
+    });
+
+    // Personal display-timezone override (Spec 3 follow-up).
+    it('persists a valid IANA timezone and reflects it on read', async () => {
+        await updateProfile(rawDb, 'ag1', { timezone: 'America/Chicago' });
+        expect((await getProfile(rawDb, 'ag1')).timezone).toBe('America/Chicago');
+    });
+
+    it('an empty-string timezone clears the override (stores null)', async () => {
+        await updateProfile(rawDb, 'ag1', { timezone: 'America/Chicago' });
+        await updateProfile(rawDb, 'ag1', { timezone: '' });
+        const row = await f.db.select({ tz: schema.users.timezone })
+            .from(schema.users).where(eq(schema.users.id, 'ag1')).get();
+        expect(row?.tz).toBeNull();
+        expect((await getProfile(rawDb, 'ag1')).timezone).toBeNull();
+    });
+
+    it('rejects a non-resolvable timezone (fail-closed BadRequest, nothing persisted)', async () => {
+        await expect(updateProfile(rawDb, 'ag1', { timezone: 'Not/AZone' }))
+            .rejects.toMatchObject({ status: 400 });
+        expect((await getProfile(rawDb, 'ag1')).timezone).toBeNull();
     });
 });

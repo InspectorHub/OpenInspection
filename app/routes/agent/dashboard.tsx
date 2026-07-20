@@ -74,11 +74,15 @@ export default function AgentDashboardPage() {
  // Referral-date timezone resolution (agents are global users spanning many
  // tenants, so there is no single "the agent's tenant tz"):
  //   1. the agent's personal override, when set — applied to every row;
- //   2. else each row's owning-tenant tz (tenants.default_timezone);
+ //   2. else each row's owning-tenant tz (tenant_configs.default_timezone);
  //   3. else 'UTC' — which is also the tenant's own unconfigured fallback, so
  //      an agent with no override sees exactly what that company would show.
  // formatInspectionDateTime stamps the short zone label so the time reads
  // unambiguously, and reuses the same shared formatter as the inspector hub.
+ // Note: inspections.date is a mixed column — bookings/create store a full ISO
+ // datetime (rendered in the resolved zone), while an explicit YYYY-MM-DD is
+ // shown as a plain UTC-anchored date with no time/zone (so the resolved tz has
+ // no visible effect there, which is correct — it avoids a prior-day rollover).
  const agentTz = useAgentTimeZoneOverride();
 
  // Task 4c: the referral matching a conversion-flow ?welcome=<id>, if it has

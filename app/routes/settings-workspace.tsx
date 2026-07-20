@@ -157,10 +157,12 @@ export default function SettingsWorkspacePage() {
     shouldRevalidate: "onInput",
   });
 
-  // Company timezone. The <select> stays uncontrolled (Conform reads it on
-  // submit); we mirror its value into state only so the browser-timezone hint
-  // knows whether to show, and adopt a zone by writing the DOM value + firing a
-  // native change (so Conform marks it dirty and the save bar prompts to save).
+  // Company timezone. The <select> stays uncontrolled (Conform reparses its DOM
+  // value on submit); we mirror its value into state only so the browser-timezone
+  // hint knows whether to show. Adopting a zone writes the DOM value (that is
+  // what gets submitted) + fires a native change so Conform revalidates and the
+  // detected/hint lines re-evaluate; the submitted value comes from `el.value`,
+  // not a dirty flag (the save bar is always shown, not dirty-gated).
   const [searchParams] = useSearchParams();
   const tzSelectRef = useRef<HTMLSelectElement>(null);
   const [selectedTz, setSelectedTz] = useState(branding.defaultTimezone || "UTC");

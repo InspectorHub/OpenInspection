@@ -179,4 +179,17 @@ describe("AgentDashboardPage welcome banner + highlight", () => {
     expect((await findByTestId("referral-row-utc")).textContent).toContain("EDT");
     expect((await findByTestId("referral-row-la")).textContent).toContain("EDT");
   });
+
+  it("shows a plain date (no time/zone) for a calendar-only YYYY-MM-DD date, even with an override", async () => {
+    // inspections.date is a mixed column; an explicit date-only value is anchored
+    // to UTC by formatInspectionDateTime and shown without a time — so no zone
+    // label appears and the resolved tz has no visible effect (avoids rollover).
+    const { findByTestId } = renderDashboard({
+      referrals: [{ ...REFERRAL_I1, id: "dateonly", tenantTimezone: "America/Los_Angeles", date: "2026-07-18" }],
+      agentTimezone: "America/New_York",
+    });
+    const row = await findByTestId("referral-row-dateonly");
+    expect(row.textContent).toContain("Jul 18");
+    expect(row.textContent).not.toMatch(/EDT|PDT|PST|UTC|AM|PM/);
+  });
 });

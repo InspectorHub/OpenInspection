@@ -154,10 +154,12 @@ export default function SettingsProfilePage() {
   }, [photoFetcher.state, photoFetcher.data]);
 
   // Timezone field — the tenant's own display tz. The <select> stays
-  // uncontrolled (Conform reads it on submit); we mirror the current value into
-  // state only so the browser-timezone hint knows whether to show, and adopt
-  // the browser zone by writing the DOM value + firing a native change (so
-  // Conform sees it as a dirty edit and the save bar lights up).
+  // uncontrolled (Conform reparses its DOM value on submit); we mirror the
+  // current value into state only so the browser-timezone hint knows whether to
+  // show. Adopting the browser zone writes the DOM value (that is what gets
+  // submitted) + fires a native change so Conform revalidates and the hint
+  // re-evaluates. The submitted value comes from `el.value`, not from any dirty
+  // flag — the save bar is always shown, not dirty-gated.
   const companyTz = useSessionContext()?.branding.defaultTimezone ?? null;
   const tzSelectRef = useRef<HTMLSelectElement>(null);
   const [selectedTz, setSelectedTz] = useState(profile.timezone ?? "");
