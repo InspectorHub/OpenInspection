@@ -28,6 +28,6 @@ describe("CompanyClosedStrip", () => {
     expect(html).toContain("Public booking:");
     expect(html).toContain("Blocked");
     expect(html).toContain("Thanksgiving Day");
-    expect(html).toContain("2026-11-26");
+    expect(html).toContain("Nov 26, 2026"); // formatDate(UTC-anchored date-only)
   });
 });

@@ -1,6 +1,8 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/verify";
 import { createApi } from "~/lib/api-client.server";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { formatDateTime } from "~/lib/format";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
 import { m } from "~/paraglide/messages";
 
@@ -39,8 +41,21 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     });
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
+    const result = (Object.keys(d).length > 0 ? d : null) as VerifyData | null;
+    if (result) {
+      // Anchor signer timestamps to the tenant timezone, server-side. This
+      // public verify link carries no tenant slug, so brand resolution degrades
+      // to the platform default (UTC). Null signedAt stays null (not-signed).
+      const brand = await resolveTenantBrand(context, undefined);
+      result.signers = (result.signers ?? []).map((s) => ({
+        ...s,
+        signedAt: s.signedAt
+          ? formatDateTime(s.signedAt, { locale: "en-US", timeZone: brand.defaultTimezone })
+          : s.signedAt,
+      }));
+    }
     return {
-      result: (Object.keys(d).length > 0 ? d : null) as VerifyData | null,
+      result,
       error: res.ok ? null : m.public_verify_error_failed(),
     };
   } catch {

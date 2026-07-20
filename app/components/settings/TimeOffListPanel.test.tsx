@@ -48,7 +48,7 @@ describe("TimeOffListPanel", () => {
     const html = renderToStaticMarkup(<RouterProvider router={router} />);
 
     expect(html).toContain("PTO");
-    expect(html).toContain("2026-08-01");
+    expect(html).toContain("Aug 1, 2026"); // formatDate(UTC-anchored date-only)
     expect(html).toContain("All day");
     expect(html).not.toContain('data-testid="time-off-empty"');
   });

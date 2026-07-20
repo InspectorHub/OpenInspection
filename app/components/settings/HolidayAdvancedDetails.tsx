@@ -1,6 +1,8 @@
 import { Banner, SegmentedControl, Select } from "@core/shared-ui";
 import type { CustomHoliday, HolidayInternalPolicy, HolidayPublicPolicy } from "./HolidayClosedPanel";
 import { SUPPORTED_STATE_CODES, regionOptionLabel } from "./holiday-region-options";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 export function HolidayAdvancedDetails({
@@ -46,6 +48,7 @@ export function HolidayAdvancedDetails({
   failed: boolean;
   failMessage?: string;
 }) {
+  const locale = useDisplayLocale();
   const PUBLIC_OPTIONS = [
     { value: "block", label: m.settings_holiday_public_block() },
     { value: "advisory", label: m.settings_holiday_public_advisory() },
@@ -130,7 +133,7 @@ export function HolidayAdvancedDetails({
                 className="flex items-center justify-between gap-2 text-[13px] text-ih-fg-2"
               >
                 <span>
-                  <span className="font-medium tabular-nums">{h.date}</span>
+                  <span className="font-medium tabular-nums">{formatDate(h.date, { locale, timeZone: "UTC" })}</span>
                   {" — "}
                   {h.name}
                 </span>

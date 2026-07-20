@@ -1,5 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/agreement-printable";
+import { resolveTenantBrand } from "~/lib/tenant-brand.server";
+import { formatDateTime } from "~/lib/format";
 import { SanitizedHtml } from "~/components/SanitizedHtml";
 import { m } from "~/paraglide/messages";
 
@@ -25,7 +27,7 @@ interface AgreementData {
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
 
-export async function loader({ params }: Route.LoaderArgs) {
+export async function loader({ params, context }: Route.LoaderArgs) {
   try {
     const res = await fetch(
       `/m2m/agreement-render/${encodeURIComponent(params.token)}`,
@@ -33,12 +35,21 @@ export async function loader({ params }: Route.LoaderArgs) {
     );
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? {}) as Record<string, unknown>;
+    const agreement = (Object.keys(d).length > 0 ? d : null) as AgreementData | null;
+    // Humanize the signed-at ISO server-side. This m2m-rendered printable carries
+    // no tenant slug, so brand resolution degrades to the platform default (UTC)
+    // — consistent with the field's own UTC semantics. Null stays null → "--".
+    const brand = await resolveTenantBrand(context, undefined);
+    const signedAtFormatted = agreement?.signedAtUtcIso
+      ? formatDateTime(agreement.signedAtUtcIso, { locale: "en-US", timeZone: brand.defaultTimezone })
+      : null;
     return {
-      agreement: (Object.keys(d).length > 0 ? d : null) as AgreementData | null,
+      agreement,
+      signedAtFormatted,
       error: res.ok ? null : "Not found",
     };
   } catch {
-    return { agreement: null, error: "Service unavailable" };
+    return { agreement: null, signedAtFormatted: null, error: "Service unavailable" };
   }
 }
 
@@ -57,7 +68,7 @@ function ensureDataUri(b64: string | null): string {
 /* ------------------------------------------------------------------ */
 
 export default function AgreementPrintablePage() {
-  const { agreement, error } = useLoaderData<typeof loader>();
+  const { agreement, signedAtFormatted, error } = useLoaderData<typeof loader>();
 
   if (error || !agreement) {
     return (
@@ -112,7 +123,7 @@ export default function AgreementPrintablePage() {
               {m.agreement_printable_date_signed()}
             </div>
             <div className="text-[13px] font-semibold text-slate-900">
-              {agreement.signedAtUtcIso ?? "--"}
+              {signedAtFormatted ?? "--"}
             </div>
           </div>
         </div>

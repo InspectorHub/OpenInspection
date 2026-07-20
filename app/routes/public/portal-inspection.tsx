@@ -177,6 +177,13 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     overview = { ...overview, date: formatInspectionDateTime(overview.date, undefined, brand.defaultTimezone) };
   }
 
+  // Same treatment for the Progress section header date — loadProgressSection
+  // returns the raw inspections.date; format it in the tenant timezone here so
+  // <ProgressView> receives an already-humanized string (never a bare ISO).
+  if (progress?.date) {
+    progress = { ...progress, date: formatInspectionDateTime(progress.date, undefined, brand.defaultTimezone) };
+  }
+
   // Step 4b — agent report-landing context (Spec 3 Task 3): resolves whether
   // ctx.token's recipient is an agent and, if so, whether they already have a
   // global agent account — the Report section CTA (magic-login vs signup)
