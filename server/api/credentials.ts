@@ -54,10 +54,10 @@ const createRouteDef = createRoute(withMcpMetadata({
 const updateRouteDef = createRoute(withMcpMetadata({
   method: 'patch', path: '/{id}',
   tags: ['credentials'],
-  summary: 'Update a credential',
+  summary: 'Update an inspector credential label or number',
   middleware: [OWN] as const,
   request: {
-    params: z.object({ id: z.string().min(1) }),
+    params: z.object({ id: z.string().min(1).describe('The credential id to update; scoped to the signed-in inspector.') }),
     body: { content: { 'application/json': { schema: UpdateCredentialSchema } } },
   },
   responses: { 200: { content: { 'application/json': { schema: CredentialResponseSchema } }, description: 'Updated' } },
@@ -68,9 +68,9 @@ const updateRouteDef = createRoute(withMcpMetadata({
 const deleteRouteDef = createRoute(withMcpMetadata({
   method: 'delete', path: '/{id}',
   tags: ['credentials'],
-  summary: 'Delete a credential',
+  summary: 'Delete an inspector credential and its image',
   middleware: [OWN] as const,
-  request: { params: z.object({ id: z.string().min(1) }) },
+  request: { params: z.object({ id: z.string().min(1).describe('The credential id to delete; scoped to the signed-in inspector.') }) },
   responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ deleted: z.literal(true) }) }) } }, description: 'Deleted' } },
   operationId: 'deleteInspectorCredential',
   description: 'Deletes a credential and purges its uploaded image.',
@@ -82,8 +82,8 @@ const uploadRouteDef = createRoute(withMcpMetadata({
   summary: 'Upload/replace a credential badge image',
   middleware: [OWN] as const,
   request: {
-    params: z.object({ id: z.string().min(1) }),
-    body: { content: { 'multipart/form-data': { schema: z.object({ image: z.any().openapi({ type: 'string', format: 'binary' }) }) } } },
+    params: z.object({ id: z.string().min(1).describe('The credential id whose badge image is being uploaded or replaced.') }),
+    body: { content: { 'multipart/form-data': { schema: z.object({ image: z.any().openapi({ type: 'string', format: 'binary' }).describe('The badge image file (png, svg, jpeg, or webp; up to 2MB).') }) } } },
   },
   responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ imageUrl: z.string() }) }) } }, description: 'Uploaded' } },
   operationId: 'uploadInspectorCredentialImage',
