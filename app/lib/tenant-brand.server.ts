@@ -25,6 +25,7 @@ export async function resolveTenantBrand(
       companyName: d?.companyName ?? fallbackName,
       primaryColor: d?.primaryColor ?? null,
       logoUrl: d?.logoUrl ?? null,
+      defaultTimezone: d?.defaultTimezone ?? "UTC",
     };
   } catch {
     return { ...EMPTY_BRAND, companyName: fallbackName };

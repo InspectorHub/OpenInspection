@@ -26,6 +26,7 @@ import type { Route } from "./+types/portal-inspection";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { EMPTY_BRAND } from "~/lib/brand";
+import { formatInspectionDateTime } from "~/lib/format-date";
 import InspectionHub, {
   hubSectionNavHref,
   type HubSection,
@@ -164,6 +165,16 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
       date: report.date || overview.date,
       reportPublished: report.isPublished ?? overview.reportPublished,
     };
+  }
+
+  // Humanize the raw inspection date once, server-side. Both the normal overview
+  // and the agent stand-in carry inspections.date as a raw ISO/date string; the
+  // Hub header + status cards would otherwise show a bare timestamp
+  // (2026-07-20T00:27:12.605Z). Format in the TENANT timezone — the anchor for
+  // portal/report surfaces — and do it in the loader so the formatted string is
+  // serialized loader data (no client re-format, so no hydration mismatch).
+  if (overview.date) {
+    overview = { ...overview, date: formatInspectionDateTime(overview.date, undefined, brand.defaultTimezone) };
   }
 
   // Step 4b — agent report-landing context (Spec 3 Task 3): resolves whether

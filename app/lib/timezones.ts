@@ -55,6 +55,25 @@ export function getBrowserTimeZone(): string | null {
   }
 }
 
+/** Decide whether the onboarding "Set your timezone" step should pre-select the
+ *  browser's zone. Returns the zone to adopt, or null to leave the picker alone.
+ *  Only fires on the onboarding arrival (?setup=timezone), only when the tenant
+ *  is still on the default UTC (never overrides a real choice), and only for a
+ *  canonical zone the picker can actually represent (never a non-resolvable
+ *  alias). Pure, so it is unit-testable in isolation. */
+export function onboardingTzPrefill(opts: {
+  isTimezoneSetup: boolean;
+  storedTz: string | null;
+  browserTz: string | null;
+}): string | null {
+  if (!opts.isTimezoneSetup) return null;
+  const isUnset = !opts.storedTz || opts.storedTz === "UTC";
+  if (!isUnset) return null;
+  const b = opts.browserTz;
+  if (!b || b === "UTC" || !TIMEZONE_OPTIONS.includes(b)) return null;
+  return b;
+}
+
 /** `{ value, label }` options for the settings `<Select>`, sorted west→east by
  *  current UTC offset (then name) so the list reads like mainstream tz pickers.
  *  `value` is the IANA id (persisted); `label` shows the offset. */

@@ -9,9 +9,12 @@ export interface TenantBrand {
   companyName: string | null;
   primaryColor: string | null;
   logoUrl: string | null;
+  /** Tenant display timezone (IANA; 'UTC' when unset). Public/report surfaces
+   *  anchor displayed inspection dates to this zone. */
+  defaultTimezone: string;
 }
 
-export const EMPTY_BRAND: TenantBrand = { companyName: null, primaryColor: null, logoUrl: null };
+export const EMPTY_BRAND: TenantBrand = { companyName: null, primaryColor: null, logoUrl: null, defaultTimezone: "UTC" };
 
 /**
  * Pick a readable text color for content sitting ON the brand primary color.

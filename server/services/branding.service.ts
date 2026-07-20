@@ -83,10 +83,10 @@ export class BrandingService {
      * (profile / booking / report / invoice / email) paints with.
      * Returns nulls when no config row exists; callers apply platform fallbacks.
      */
-    async getBrand(tenantId: string): Promise<{ companyName: string | null; logoUrl: string | null; primaryColor: string | null }> {
+    async getBrand(tenantId: string): Promise<{ companyName: string | null; logoUrl: string | null; primaryColor: string | null; defaultTimezone: string }> {
         const db = this.getDrizzle();
         const row = await db
-            .select({ companyName: tenantConfigs.companyName, logoUrl: tenantConfigs.logoUrl, primaryColor: tenantConfigs.primaryColor })
+            .select({ companyName: tenantConfigs.companyName, logoUrl: tenantConfigs.logoUrl, primaryColor: tenantConfigs.primaryColor, defaultTimezone: tenantConfigs.defaultTimezone })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
@@ -94,6 +94,9 @@ export class BrandingService {
             companyName: row?.companyName ?? null,
             logoUrl: row?.logoUrl ?? null,
             primaryColor: row?.primaryColor ?? null,
+            // Public surfaces (portal/report) anchor displayed dates to the tenant
+            // timezone; NOT NULL DEFAULT 'UTC' so a config-less tenant is 'UTC'.
+            defaultTimezone: row?.defaultTimezone ?? 'UTC',
         };
     }
 

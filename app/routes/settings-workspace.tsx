@@ -13,7 +13,7 @@ import { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
-import { TIMEZONE_SELECT_OPTIONS, getBrowserTimeZone } from "~/lib/timezones";
+import { TIMEZONE_SELECT_OPTIONS, getBrowserTimeZone, onboardingTzPrefill } from "~/lib/timezones";
 import { LOCALE_OPTIONS, CURRENCY_OPTIONS } from "~/lib/locales";
 import { m } from "~/paraglide/messages";
 
@@ -184,13 +184,15 @@ export default function SettingsWorkspacePage() {
   // instead of defaulting silently to UTC. Runs after mount (no hydration
   // mismatch) and only once.
   useEffect(() => {
-    if (tzPrefillDone.current || searchParams.get("setup") !== "timezone") return;
-    const isUnset = !branding.defaultTimezone || branding.defaultTimezone === "UTC";
-    if (!isUnset) return;
-    const browserTz = getBrowserTimeZone();
-    if (!browserTz || browserTz === "UTC") return;
+    if (tzPrefillDone.current) return;
+    const zone = onboardingTzPrefill({
+      isTimezoneSetup: searchParams.get("setup") === "timezone",
+      storedTz: branding.defaultTimezone ?? null,
+      browserTz: getBrowserTimeZone(),
+    });
+    if (!zone) return;
     tzPrefillDone.current = true;
-    adoptTz(browserTz);
+    adoptTz(zone);
     setTzPrefilled(true);
     tzSelectRef.current?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [searchParams, branding.defaultTimezone]);

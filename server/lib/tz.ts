@@ -14,9 +14,13 @@
  * here first (e.g. push forward to 03:00).
  */
 
-/** True when `tz` is a resolvable IANA/Intl timezone id. */
+/** True when `tz` is a resolvable IANA REGION timezone id (or 'UTC').
+ *  Intl also accepts abbreviations and legacy fixed-offset zones ('EST', 'GMT',
+ *  'PST8PDT'); we reject those so stored zones are always DST-aware region ids —
+ *  a real region zone contains a '/' (e.g. 'America/New_York', 'Etc/GMT+5'). */
 export function isValidTimeZone(tz: string): boolean {
   if (!tz) return false;
+  if (tz !== 'UTC' && !tz.includes('/')) return false;
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: tz });
     return true;
