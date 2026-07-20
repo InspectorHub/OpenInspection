@@ -125,6 +125,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  error: res.ok ? null : "Report not found",
  notPublished: (res.status as number) === 403,
  styleProfile: raw?.styleProfile as ReportLoaderResult["styleProfile"],
+ inspectorCredentials: raw?.inspectorCredentials as ReportLoaderResult["inspectorCredentials"],
  initialFilter,
  printMode,
  tocPages,

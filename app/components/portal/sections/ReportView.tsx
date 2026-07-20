@@ -26,6 +26,7 @@ import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, isDefect } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
+import { CredentialBadges } from "./report/CredentialBadges";
 import { ReportDefectCard } from "./report/ReportDefectCard";
 import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
@@ -137,6 +138,7 @@ export function reportViewProps(
     error: data.error ?? null,
     notPublished: data.notPublished ?? false,
     styleProfile: data.styleProfile,
+    inspectorCredentials: data.inspectorCredentials,
     initialFilter: data.initialFilter ?? "all",
     printMode: data.printMode ?? false,
     tocPages: data.tocPages,
@@ -442,6 +444,9 @@ export function ReportView(props: ReportViewProps) {
           {data.date ? `${formatInspectionDateTime(data.date, undefined, data.reportTimeZone)} · ` : ""}
           {m.report_view_inspector({ name: data.inspectorName || m.report_view_na() })}
         </p>
+        {data.inspectorCredentials && data.inspectorCredentials.length > 0 && (
+          <CredentialBadges credentials={data.inspectorCredentials} layout={data.styleProfile?.badgeLayout ?? "strip"} />
+        )}
       </div>
 
       {/* Cover photo (DB-16) — the inspector-chosen report cover image. On load

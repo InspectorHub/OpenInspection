@@ -311,6 +311,7 @@ export interface ReportLoaderResult {
   error: string | null;
   notPublished: boolean;
   styleProfile?: StyleProfileClient;
+  inspectorCredentials?: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }>;
   initialFilter: FilterKey;
   printMode: boolean;
   /* Commercial PCA Task 19a — real TOC page numbers, two-pass Chrome + pdf-lib.

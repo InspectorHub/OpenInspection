@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, asc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits, inspectorCredentials } from '../../lib/db/schema';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
 import { resolveTenantTimeZone } from '../../lib/tz';
@@ -456,6 +456,19 @@ export class InspectionReportService extends InspectionSubService {
             inspectorLicense = inspector?.licenseNumber ?? null;
         }
 
+        // Inspector Credentials & Association Badges (Spec B) — the inspector's
+        // active credentials, resolved to public asset URLs and snapshotted into
+        // the report payload. Empty rows (no image, blank label) are dropped.
+        let credentialSnapshot: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }> = [];
+        if (inspection.inspectorId) {
+            const credRows = await db.select().from(inspectorCredentials)
+                .where(and(eq(inspectorCredentials.tenantId, tenantId), eq(inspectorCredentials.userId, inspection.inspectorId), eq(inspectorCredentials.active, true)))
+                .orderBy(asc(inspectorCredentials.sortOrder), asc(inspectorCredentials.createdAt)).all();
+            credentialSnapshot = credRows
+                .filter((c) => c.imageR2Key || (c.label ?? '').trim())
+                .map((c) => ({ label: c.label, memberNumber: c.memberNumber, imageUrl: c.imageR2Key ? `/api/public/brand-asset?key=${encodeURIComponent(c.imageR2Key)}` : null }));
+        }
+
         // Sprint 2 S2-4 — per-tenant flag controls whether the published
         // report renders "Estimated cost: $X – $Y" badges on defect cards.
         let showEstimates = false;
@@ -755,6 +768,7 @@ export class InspectionReportService extends InspectionSubService {
         return {
             inspection: { ...inspection, inspectorName },
             styleProfile: { ...styleProfile, tokens: styleProfile.tokens as Record<string, string> },
+            inspectorCredentials: credentialSnapshot,
             amendmentTrail,
             reinspection,
             // DB-16 — resolved report cover image URL (cover_photo_id holds the
