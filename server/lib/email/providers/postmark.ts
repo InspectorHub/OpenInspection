@@ -25,6 +25,13 @@ export class PostmarkProvider implements EmailProvider {
       HtmlBody: args.html,
     };
     if (args.replyTo) payload.ReplyTo = args.replyTo;
+    if (args.attachments && args.attachments.length > 0) {
+      payload.Attachments = args.attachments.map((a) => ({
+        Name: a.filename,
+        Content: a.content,
+        ContentType: a.content_type ?? 'application/octet-stream',
+      }));
+    }
 
     let res: Response;
     try {
