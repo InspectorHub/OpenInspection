@@ -120,6 +120,7 @@
   "settings_workspace_timezone_heading": "Timezone",
   "settings_workspace_timezone_subtitle": "Reports, reminders, and calendar events use this timezone. Individual users can override how times appear for them in their profile.",
   "settings_workspace_timezone_select_label": "Company timezone",
+  "settings_workspace_timezone_detected": "Detected from your browser. Save to confirm, or pick another.",
   "settings_workspace_locale_currency_heading": "Locale & Currency",
   "settings_workspace_locale_currency_subtitle": "Controls how dates, times, numbers, and money are formatted across reports and the dashboard. Individual users can override the language/locale in their profile; currency is company-wide.",
   "settings_workspace_locale_select_label": "Company locale",

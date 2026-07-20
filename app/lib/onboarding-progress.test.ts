@@ -59,7 +59,7 @@ describe('computeOnboardingSteps', () => {
 
     const tzStep = noTz.find((s) => s.id === 'timezone')!;
     expect(tzStep.done).toBe(false);
-    expect(tzStep.href).toBe('/settings/workspace');
+    expect(tzStep.href).toBe('/settings/workspace?setup=timezone');
     expect(tzStep.label).toBe('Set your timezone');
     expect(setTz.find((s) => s.id === 'timezone')!.done).toBe(true);
   });

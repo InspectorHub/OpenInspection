@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
-import { Form, useLoaderData, useActionData, useFetcher } from "react-router";
+import { useState, useEffect, useRef } from "react";
+import { Form, useLoaderData, useActionData, useFetcher, useSearchParams } from "react-router";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
+import { BrowserTimezoneHint } from "~/components/settings/BrowserTimezoneHint";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-workspace";
@@ -12,7 +13,7 @@ import { makeWorkspaceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Select } from "@core/shared-ui";
-import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
+import { TIMEZONE_SELECT_OPTIONS, getBrowserTimeZone } from "~/lib/timezones";
 import { LOCALE_OPTIONS, CURRENCY_OPTIONS } from "~/lib/locales";
 import { m } from "~/paraglide/messages";
 
@@ -156,6 +157,42 @@ export default function SettingsWorkspacePage() {
     shouldRevalidate: "onInput",
   });
 
+  // Company timezone. The <select> stays uncontrolled (Conform reads it on
+  // submit); we mirror its value into state only so the browser-timezone hint
+  // knows whether to show, and adopt a zone by writing the DOM value + firing a
+  // native change (so Conform marks it dirty and the save bar prompts to save).
+  const [searchParams] = useSearchParams();
+  const tzSelectRef = useRef<HTMLSelectElement>(null);
+  const [selectedTz, setSelectedTz] = useState(branding.defaultTimezone || "UTC");
+  const [tzPrefilled, setTzPrefilled] = useState(false);
+  const tzPrefillDone = useRef(false);
+  function adoptTz(zone: string) {
+    const el = tzSelectRef.current;
+    if (el) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set;
+      setter?.call(el, zone);
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    setSelectedTz(zone);
+  }
+  // Onboarding pre-fill (rec D): when the "Set your timezone" step deep-links
+  // here (?setup=timezone) and the tenant is still on the default UTC, suggest
+  // the browser-detected zone — pre-selected with the save bar prompting to
+  // confirm, the way mainstream field-service tools detect the zone at setup
+  // instead of defaulting silently to UTC. Runs after mount (no hydration
+  // mismatch) and only once.
+  useEffect(() => {
+    if (tzPrefillDone.current || searchParams.get("setup") !== "timezone") return;
+    const isUnset = !branding.defaultTimezone || branding.defaultTimezone === "UTC";
+    if (!isUnset) return;
+    const browserTz = getBrowserTimeZone();
+    if (!browserTz || browserTz === "UTC") return;
+    tzPrefillDone.current = true;
+    adoptTz(browserTz);
+    setTzPrefilled(true);
+    tzSelectRef.current?.closest("section")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [searchParams, branding.defaultTimezone]);
+
   if ("forbidden" in data) return <AccessDenied />;
 
   return (
@@ -229,11 +266,22 @@ export default function SettingsWorkspacePage() {
           </p>
           <div className="max-w-md">
             <Select
+              ref={tzSelectRef}
               label={m.settings_workspace_timezone_select_label()}
               name="defaultTimezone"
               defaultValue={branding.defaultTimezone ?? "UTC"}
+              onChange={(e) => {
+                setSelectedTz(e.target.value);
+                setTzPrefilled(false);
+              }}
               options={TIMEZONE_SELECT_OPTIONS}
             />
+            {tzPrefilled && (
+              <p className="mt-2 text-[12px] text-ih-primary">
+                {m.settings_workspace_timezone_detected()}
+              </p>
+            )}
+            <BrowserTimezoneHint effectiveValue={selectedTz} onUse={adoptTz} />
           </div>
         </section>
 

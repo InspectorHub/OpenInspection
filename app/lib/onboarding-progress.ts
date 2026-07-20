@@ -44,9 +44,12 @@ export function computeOnboardingSteps(input: OnboardingInput): OnboardingStep[]
     },
     {
       id: 'timezone',
+      // The `setup=timezone` marker tells the workspace page this arrival is the
+      // onboarding step, so it pre-fills the detected browser timezone and
+      // scrolls to the field (see settings-workspace.tsx). Normal visits omit it.
       label: m.helper_onboarding_timezone_label(),
       done: input.timezoneSet,
-      href: '/settings/workspace',
+      href: '/settings/workspace?setup=timezone',
     },
     {
       id: 'template',
