@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e782a15b-2dbc-41a9-8db3-6456ff9a3a8b",
+  "id": "1f8c66c7-5d38-4128-8e5c-acb7b607b4ad",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "agreement_requests": {
@@ -555,6 +555,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "recipient_role_key": {
+          "name": "recipient_role_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "channel": {
           "name": "channel",
           "type": "text",
@@ -622,7 +629,9 @@
           "columns": [
             "automation_id",
             "inspection_id",
-            "event_id"
+            "event_id",
+            "channel",
+            "recipient"
           ],
           "isUnique": true,
           "where": "event_id IS NOT NULL"
@@ -678,11 +687,18 @@
           "notNull": true,
           "autoincrement": false
         },
-        "recipient": {
-          "name": "recipient",
+        "recipient_kind": {
+          "name": "recipient_kind",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "recipient_role_profile_id": {
+          "name": "recipient_role_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "delay_minutes": {
@@ -743,8 +759,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "active": {
-          "name": "active",
+        "is_active": {
+          "name": "is_active",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -957,6 +973,27 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "external_id": {
+          "name": "external_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "transparency": {
+          "name": "transparency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -974,7 +1011,16 @@
             "date"
           ],
           "isUnique": true,
-          "where": "is_available = 0"
+          "where": "is_available = 0 AND source IS NULL"
+        },
+        "uq_avail_overrides_external": {
+          "name": "uq_avail_overrides_external",
+          "columns": [
+            "inspector_id",
+            "source",
+            "external_id"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {
@@ -1005,6 +1051,298 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "calendar_blocks": {
+      "name": "calendar_blocks",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "start_time": {
+          "name": "start_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "end_time": {
+          "name": "end_time",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_all_day": {
+          "name": "is_all_day",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_calendar_blocks_tenant_user_date": {
+          "name": "idx_calendar_blocks_tenant_user_date",
+          "columns": [
+            "tenant_id",
+            "user_id",
+            "date"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "calendar_connection_read_calendars": {
+      "name": "calendar_connection_read_calendars",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "connection_id": {
+          "name": "connection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "external_calendar_id": {
+          "name": "external_calendar_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "access_role": {
+          "name": "access_role",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_conn_read_cal": {
+          "name": "uq_conn_read_cal",
+          "columns": [
+            "connection_id",
+            "external_calendar_id"
+          ],
+          "isUnique": true
+        },
+        "idx_conn_read_cal_tenant": {
+          "name": "idx_conn_read_cal_tenant",
+          "columns": [
+            "tenant_id",
+            "connection_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "calendar_connections": {
+      "name": "calendar_connections",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "provider": {
+          "name": "provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "auth_type": {
+          "name": "auth_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "credentials_enc": {
+          "name": "credentials_enc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "credentials_dek_enc": {
+          "name": "credentials_dek_enc",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "capabilities": {
+          "name": "capabilities",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "calendar_id": {
+          "name": "calendar_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "connected_at": {
+          "name": "connected_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "last_sync_at": {
+          "name": "last_sync_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_calendar_connections_user_provider": {
+          "name": "uq_calendar_connections_user_provider",
+          "columns": [
+            "user_id",
+            "provider"
+          ],
+          "isUnique": true
+        },
+        "idx_calendar_connections_tenant_user": {
+          "name": "idx_calendar_connections_tenant_user",
+          "columns": [
+            "tenant_id",
+            "user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -1299,8 +1637,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "disabled": {
-          "name": "disabled",
+        "is_disabled": {
+          "name": "is_disabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -1435,6 +1773,120 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "contact_role_profiles": {
+      "name": "contact_role_profiles",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "kind": {
+          "name": "kind",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email_template_id": {
+          "name": "email_template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sms_template_id": {
+          "name": "sms_template_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_system": {
+          "name": "is_system",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_crp_tenant": {
+          "name": "idx_crp_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        },
+        "uq_crp_tenant_key": {
+          "name": "uq_crp_tenant_key",
+          "columns": [
+            "tenant_id",
+            "key"
+          ],
+          "isUnique": true,
+          "where": "is_active = 1"
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -1856,8 +2308,8 @@
           "autoincrement": false,
           "default": "'#6b7280'"
         },
-        "drives_summary": {
-          "name": "drives_summary",
+        "is_summary_driver": {
+          "name": "is_summary_driver",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -1962,8 +2414,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "active": {
-          "name": "active",
+        "is_active": {
+          "name": "is_active",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -2052,32 +2504,32 @@
           "notNull": true,
           "autoincrement": false
         },
-        "requested": {
-          "name": "requested",
+        "is_requested": {
+          "name": "is_requested",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "received": {
-          "name": "received",
+        "is_received": {
+          "name": "is_received",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "reviewed": {
-          "name": "reviewed",
+        "is_reviewed": {
+          "name": "is_reviewed",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "na": {
-          "name": "na",
+        "is_na": {
+          "name": "is_na",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -2460,8 +2912,8 @@
           "autoincrement": false,
           "default": 0
         },
-        "active": {
-          "name": "active",
+        "is_active": {
+          "name": "is_active",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -3222,6 +3674,82 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "inspection_people": {
+      "name": "inspection_people",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "inspection_id": {
+          "name": "inspection_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contact_id": {
+          "name": "contact_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "role_profile_id": {
+          "name": "role_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_ip_inspection": {
+          "name": "idx_ip_inspection",
+          "columns": [
+            "inspection_id"
+          ],
+          "isUnique": false
+        },
+        "idx_ip_tenant": {
+          "name": "idx_ip_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        },
+        "uq_ip_insp_contact_role": {
+          "name": "uq_ip_insp_contact_role",
+          "columns": [
+            "inspection_id",
+            "contact_id",
+            "role_profile_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "inspection_requests": {
       "name": "inspection_requests",
       "columns": {
@@ -3646,8 +4174,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "enabled": {
-          "name": "enabled",
+        "is_enabled": {
+          "name": "is_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -3878,34 +4406,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "client_contact_id": {
-          "name": "client_contact_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "client_name": {
-          "name": "client_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "client_email": {
-          "name": "client_email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "client_phone": {
-          "name": "client_phone",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "template_id": {
           "name": "template_id",
           "type": "text",
@@ -3944,13 +4444,6 @@
           "autoincrement": false,
           "default": "'unpaid'"
         },
-        "referred_by_agent_id": {
-          "name": "referred_by_agent_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "price_cents": {
           "name": "price_cents",
           "type": "integer",
@@ -3987,24 +4480,24 @@
           "notNull": false,
           "autoincrement": false
         },
-        "payment_required": {
-          "name": "payment_required",
+        "is_payment_required": {
+          "name": "is_payment_required",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "agreement_required": {
-          "name": "agreement_required",
+        "is_agreement_required": {
+          "name": "is_agreement_required",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "auto_sign_on_publish": {
-          "name": "auto_sign_on_publish",
+        "is_auto_sign_on_publish": {
+          "name": "is_auto_sign_on_publish",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -4158,15 +4651,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "selling_agent_id": {
-          "name": "selling_agent_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "disable_automations": {
-          "name": "disable_automations",
+        "is_automations_disabled": {
+          "name": "is_automations_disabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -4188,8 +4674,8 @@
           "autoincrement": false,
           "default": 1
         },
-        "report_theme_override": {
-          "name": "report_theme_override",
+        "profile_override": {
+          "name": "profile_override",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -4216,8 +4702,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "team_mode": {
-          "name": "team_mode",
+        "is_team_mode": {
+          "name": "is_team_mode",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -4310,6 +4796,41 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "scheduled_start_ms": {
+          "name": "scheduled_start_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scheduled_end_ms": {
+          "name": "scheduled_end_ms",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "duration_min": {
+          "name": "duration_min",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "badge_layout_override": {
+          "name": "badge_layout_override",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "report_photo_columns": {
+          "name": "report_photo_columns",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -4334,13 +4855,6 @@
           ],
           "isUnique": false
         },
-        "idx_inspections_agent": {
-          "name": "idx_inspections_agent",
-          "columns": [
-            "referred_by_agent_id"
-          ],
-          "isUnique": false
-        },
         "idx_inspections_tenant_status": {
           "name": "idx_inspections_tenant_status",
           "columns": [
@@ -4354,14 +4868,6 @@
           "columns": [
             "tenant_id",
             "date"
-          ],
-          "isUnique": false
-        },
-        "idx_inspections_tenant_client_email": {
-          "name": "idx_inspections_tenant_client_email",
-          "columns": [
-            "tenant_id",
-            "client_email"
           ],
           "isUnique": false
         },
@@ -4434,19 +4940,6 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "inspections_selling_agent_id_contacts_id_fk": {
-          "name": "inspections_selling_agent_id_contacts_id_fk",
-          "tableFrom": "inspections",
-          "tableTo": "contacts",
-          "columnsFrom": [
-            "selling_agent_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
         "inspections_request_id_inspection_requests_id_fk": {
           "name": "inspections_request_id_inspection_requests_id_fk",
           "tableFrom": "inspections",
@@ -4461,6 +4954,103 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "inspector_credentials": {
+      "name": "inspector_credentials",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "label": {
+          "name": "label",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "member_number": {
+          "name": "member_number",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "image_r2_key": {
+          "name": "image_r2_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "idx_inspector_credentials_tenant": {
+          "name": "idx_inspector_credentials_tenant",
+          "columns": [
+            "tenant_id"
+          ],
+          "isUnique": false
+        },
+        "idx_inspector_credentials_user": {
+          "name": "idx_inspector_credentials_user",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -4588,6 +5178,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'USD'"
         }
       },
       "indexes": {
@@ -4720,8 +5318,8 @@
           "autoincrement": false,
           "default": 0
         },
-        "featured": {
-          "name": "featured",
+        "is_featured": {
+          "name": "is_featured",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -4748,7 +5346,7 @@
           "name": "idx_marketplace_libraries_kind_featured",
           "columns": [
             "kind",
-            "featured"
+            "is_featured"
           ],
           "isUnique": false
         }
@@ -4819,8 +5417,8 @@
           "autoincrement": false,
           "default": 0
         },
-        "featured": {
-          "name": "featured",
+        "is_featured": {
+          "name": "is_featured",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -5054,8 +5652,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "sender_attached": {
-          "name": "sender_attached",
+        "has_sender_attached": {
+          "name": "has_sender_attached",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -5442,8 +6040,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "sync_enabled": {
-          "name": "sync_enabled",
+        "is_sync_enabled": {
+          "name": "is_sync_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -5610,8 +6208,8 @@
           "autoincrement": false,
           "default": 0
         },
-        "resolved": {
-          "name": "resolved",
+        "is_resolved": {
+          "name": "is_resolved",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -6233,8 +6831,8 @@
           "notNull": true,
           "autoincrement": false
         },
-        "dual_role": {
-          "name": "dual_role",
+        "is_dual_role": {
+          "name": "is_dual_role",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -6519,8 +7117,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "active": {
-          "name": "active",
+        "is_active": {
+          "name": "is_active",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -7003,13 +7601,20 @@
           "notNull": false,
           "autoincrement": false
         },
-        "featured": {
-          "name": "featured",
+        "is_featured": {
+          "name": "is_featured",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
+        },
+        "default_profile_id": {
+          "name": "default_profile_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -7043,6 +7648,75 @@
           "onUpdate": "no action"
         }
       },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "tenant_custom_holidays": {
+      "name": "tenant_custom_holidays",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "date": {
+          "name": "date",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "uq_tenant_custom_holidays_tenant_date": {
+          "name": "uq_tenant_custom_holidays_tenant_date",
+          "columns": [
+            "tenant_id",
+            "date"
+          ],
+          "isUnique": true
+        },
+        "idx_tenant_custom_holidays_tenant_date": {
+          "name": "idx_tenant_custom_holidays_tenant_date",
+          "columns": [
+            "tenant_id",
+            "date"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
@@ -7384,82 +8058,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "user_identity_links": {
-      "name": "user_identity_links",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "primary_user_id": {
-          "name": "primary_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "linked_user_id": {
-          "name": "linked_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "linked_tenant_id": {
-          "name": "linked_tenant_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "linked_role": {
-          "name": "linked_role",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "linked_display_name": {
-          "name": "linked_display_name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": "(unixepoch() * 1000)"
-        }
-      },
-      "indexes": {
-        "idx_user_identity_links_primary": {
-          "name": "idx_user_identity_links_primary",
-          "columns": [
-            "primary_user_id"
-          ],
-          "isUnique": false
-        },
-        "uq_user_identity_links_primary_linked": {
-          "name": "uq_user_identity_links_primary_linked",
-          "columns": [
-            "primary_user_id",
-            "linked_user_id"
-          ],
-          "isUnique": true
-        }
-      },
-      "foreignKeys": {},
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {}
-    },
     "email_templates": {
       "name": "email_templates",
       "columns": {
@@ -7491,8 +8089,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "enabled": {
-          "name": "enabled",
+        "is_enabled": {
+          "name": "is_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -7580,24 +8178,24 @@
           "notNull": false,
           "autoincrement": false
         },
-        "pdf_show_footer": {
-          "name": "pdf_show_footer",
+        "is_pdf_footer_shown": {
+          "name": "is_pdf_footer_shown",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": true
         },
-        "pdf_show_page_numbers": {
-          "name": "pdf_show_page_numbers",
+        "is_pdf_page_numbers_shown": {
+          "name": "is_pdf_page_numbers_shown",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": true
         },
-        "pdf_show_license": {
-          "name": "pdf_show_license",
+        "is_pdf_license_shown": {
+          "name": "is_pdf_license_shown",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -7713,13 +8311,13 @@
           "notNull": false,
           "autoincrement": false
         },
-        "report_theme": {
-          "name": "report_theme",
+        "default_profile_id": {
+          "name": "default_profile_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
-          "default": "'modern'"
+          "default": "'signature'"
         },
         "attention_thresholds": {
           "name": "attention_thresholds",
@@ -7736,40 +8334,40 @@
           "notNull": false,
           "autoincrement": false
         },
-        "show_estimates": {
-          "name": "show_estimates",
+        "is_estimates_shown": {
+          "name": "is_estimates_shown",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "enable_repair_list": {
-          "name": "enable_repair_list",
+        "is_repair_list_enabled": {
+          "name": "is_repair_list_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "enable_customer_repair_export": {
-          "name": "enable_customer_repair_export",
+        "is_customer_repair_export_enabled": {
+          "name": "is_customer_repair_export_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "block_unpaid": {
-          "name": "block_unpaid",
+        "is_unpaid_blocked": {
+          "name": "is_unpaid_blocked",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "block_unsigned_agreement": {
-          "name": "block_unsigned_agreement",
+        "is_unsigned_agreement_blocked": {
+          "name": "is_unsigned_agreement_blocked",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -7790,48 +8388,48 @@
           "notNull": false,
           "autoincrement": false
         },
-        "concierge_review_required": {
-          "name": "concierge_review_required",
+        "is_concierge_review_required": {
+          "name": "is_concierge_review_required",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "allow_inspector_choice": {
-          "name": "allow_inspector_choice",
+        "is_inspector_choice_allowed": {
+          "name": "is_inspector_choice_allowed",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "enable_pdf_pipeline": {
-          "name": "enable_pdf_pipeline",
+        "is_pdf_pipeline_enabled": {
+          "name": "is_pdf_pipeline_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "team_mode_default": {
-          "name": "team_mode_default",
+        "is_team_mode_default": {
+          "name": "is_team_mode_default",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "apprentice_review_required": {
-          "name": "apprentice_review_required",
+        "is_apprentice_review_required": {
+          "name": "is_apprentice_review_required",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": false
         },
-        "guest_invites_enabled": {
-          "name": "guest_invites_enabled",
+        "is_guest_invites_enabled": {
+          "name": "is_guest_invites_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -7861,8 +8459,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "collab_editing": {
-          "name": "collab_editing",
+        "is_collab_editing_enabled": {
+          "name": "is_collab_editing_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -7891,8 +8489,8 @@
           "autoincrement": false,
           "default": "'resend'"
         },
-        "managed_eligible": {
-          "name": "managed_eligible",
+        "is_managed_eligible": {
+          "name": "is_managed_eligible",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -7907,8 +8505,8 @@
           "autoincrement": false,
           "default": "'twilio'"
         },
-        "reserve_schedule_enabled": {
-          "name": "reserve_schedule_enabled",
+        "is_reserve_schedule_enabled": {
+          "name": "is_reserve_schedule_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -7929,6 +8527,69 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "default_timezone": {
+          "name": "default_timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'UTC'"
+        },
+        "booking_slot_mode": {
+          "name": "booking_slot_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'fixed'"
+        },
+        "booking_slot_interval_min": {
+          "name": "booking_slot_interval_min",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 30
+        },
+        "holiday_region": {
+          "name": "holiday_region",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "holiday_public_policy": {
+          "name": "holiday_public_policy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'open'"
+        },
+        "holiday_internal_policy": {
+          "name": "holiday_internal_policy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'advisory'"
+        },
+        "default_locale": {
+          "name": "default_locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'en-US'"
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'USD'"
         }
       },
       "indexes": {},
@@ -8340,8 +9001,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "signature_enabled": {
-          "name": "signature_enabled",
+        "is_signature_enabled": {
+          "name": "is_signature_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -8362,20 +9023,6 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'manager'"
-        },
-        "google_refresh_token": {
-          "name": "google_refresh_token",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "google_calendar_id": {
-          "name": "google_calendar_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
         },
         "onboarding_state": {
           "name": "onboarding_state",
@@ -8398,8 +9045,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "totp_enabled": {
-          "name": "totp_enabled",
+        "is_totp_enabled": {
+          "name": "is_totp_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -8420,24 +9067,24 @@
           "notNull": false,
           "autoincrement": false
         },
-        "notify_on_referral": {
-          "name": "notify_on_referral",
+        "is_referral_notification_enabled": {
+          "name": "is_referral_notification_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": true
         },
-        "notify_on_report": {
-          "name": "notify_on_report",
+        "is_report_notification_enabled": {
+          "name": "is_report_notification_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false,
           "default": true
         },
-        "notify_on_paid": {
-          "name": "notify_on_paid",
+        "is_paid_notification_enabled": {
+          "name": "is_paid_notification_enabled",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
@@ -8489,6 +9136,20 @@
         },
         "permission_overrides": {
           "name": "permission_overrides",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "timezone": {
+          "name": "timezone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "locale": {
+          "name": "locale",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -8815,8 +9476,8 @@
           "notNull": false,
           "autoincrement": false
         },
-        "ok": {
-          "name": "ok",
+        "is_ok": {
+          "name": "is_ok",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

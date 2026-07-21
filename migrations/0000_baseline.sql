@@ -76,6 +76,7 @@ CREATE TABLE `automation_logs` (
 	`automation_id` text NOT NULL,
 	`inspection_id` text NOT NULL,
 	`recipient` text NOT NULL,
+	`recipient_role_key` text,
 	`channel` text DEFAULT 'email' NOT NULL,
 	`send_at` integer NOT NULL,
 	`delivered_at` integer,
@@ -87,13 +88,14 @@ CREATE TABLE `automation_logs` (
 --> statement-breakpoint
 CREATE INDEX `idx_automation_logs_pending` ON `automation_logs` (`tenant_id`,`status`,`send_at`);--> statement-breakpoint
 CREATE INDEX `idx_automation_logs_insp` ON `automation_logs` (`inspection_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_automation_logs_event` ON `automation_logs` (`automation_id`,`inspection_id`,`event_id`) WHERE event_id IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_automation_logs_event` ON `automation_logs` (`automation_id`,`inspection_id`,`event_id`,`channel`,`recipient`) WHERE event_id IS NOT NULL;--> statement-breakpoint
 CREATE TABLE `automations` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
 	`name` text NOT NULL,
 	`trigger` text NOT NULL,
-	`recipient` text NOT NULL,
+	`recipient_kind` text NOT NULL,
+	`recipient_role_profile_id` text,
 	`delay_minutes` integer DEFAULT 0 NOT NULL,
 	`subject_template` text NOT NULL,
 	`body_template` text NOT NULL,
@@ -102,7 +104,7 @@ CREATE TABLE `automations` (
 	`channels` text DEFAULT '["email"]' NOT NULL,
 	`sms_body` text,
 	`sms_template_id` text,
-	`active` integer DEFAULT true NOT NULL,
+	`is_active` integer DEFAULT true NOT NULL,
 	`is_default` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
@@ -132,12 +134,61 @@ CREATE TABLE `availability_overrides` (
 	`start_time` text,
 	`end_time` text,
 	`created_at` integer NOT NULL,
+	`source` text,
+	`external_id` text,
+	`transparency` text,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`inspector_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE INDEX `idx_avail_overrides_insp` ON `availability_overrides` (`inspector_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `idx_avail_overrides_block_unique` ON `availability_overrides` (`inspector_id`,`date`) WHERE is_available = 0;--> statement-breakpoint
+CREATE UNIQUE INDEX `idx_avail_overrides_block_unique` ON `availability_overrides` (`inspector_id`,`date`) WHERE is_available = 0 AND source IS NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_avail_overrides_external` ON `availability_overrides` (`inspector_id`,`source`,`external_id`);--> statement-breakpoint
+CREATE TABLE `calendar_blocks` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`title` text NOT NULL,
+	`date` text NOT NULL,
+	`start_time` text,
+	`end_time` text,
+	`is_all_day` integer DEFAULT false NOT NULL,
+	`notes` text,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `idx_calendar_blocks_tenant_user_date` ON `calendar_blocks` (`tenant_id`,`user_id`,`date`);--> statement-breakpoint
+CREATE TABLE `calendar_connection_read_calendars` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`connection_id` text NOT NULL,
+	`external_calendar_id` text NOT NULL,
+	`summary` text,
+	`access_role` text,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_conn_read_cal` ON `calendar_connection_read_calendars` (`connection_id`,`external_calendar_id`);--> statement-breakpoint
+CREATE INDEX `idx_conn_read_cal_tenant` ON `calendar_connection_read_calendars` (`tenant_id`,`connection_id`);--> statement-breakpoint
+CREATE TABLE `calendar_connections` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`provider` text NOT NULL,
+	`auth_type` text NOT NULL,
+	`credentials_enc` text NOT NULL,
+	`credentials_dek_enc` text NOT NULL,
+	`capabilities` text NOT NULL,
+	`calendar_id` text NOT NULL,
+	`connected_at` integer NOT NULL,
+	`updated_at` integer NOT NULL,
+	`last_sync_at` integer
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_calendar_connections_user_provider` ON `calendar_connections` (`user_id`,`provider`);--> statement-breakpoint
+CREATE INDEX `idx_calendar_connections_tenant_user` ON `calendar_connections` (`tenant_id`,`user_id`);--> statement-breakpoint
 CREATE TABLE `comment_usage` (
 	`tenant_id` text NOT NULL,
 	`user_id` text NOT NULL,
@@ -180,7 +231,7 @@ CREATE TABLE `commercial_subtypes` (
 	`name` text NOT NULL,
 	`based_on` text,
 	`description` text,
-	`disabled` integer DEFAULT false NOT NULL,
+	`is_disabled` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -200,6 +251,23 @@ CREATE TABLE `concierge_confirm_tokens` (
 --> statement-breakpoint
 CREATE INDEX `idx_concierge_tokens_expiry` ON `concierge_confirm_tokens` (`expires_at`);--> statement-breakpoint
 CREATE UNIQUE INDEX `idx_concierge_confirm_token_hash` ON `concierge_confirm_tokens` (`token_hash`);--> statement-breakpoint
+CREATE TABLE `contact_role_profiles` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`key` text NOT NULL,
+	`label` text NOT NULL,
+	`kind` text NOT NULL,
+	`email_template_id` text,
+	`sms_template_id` text,
+	`is_system` integer DEFAULT false NOT NULL,
+	`sort_order` integer DEFAULT 0 NOT NULL,
+	`is_active` integer DEFAULT true NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `idx_crp_tenant` ON `contact_role_profiles` (`tenant_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_crp_tenant_key` ON `contact_role_profiles` (`tenant_id`,`key`) WHERE is_active = 1;--> statement-breakpoint
 CREATE TABLE `contacts` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -262,7 +330,7 @@ CREATE TABLE `defect_categories` (
 	`tenant_id` text NOT NULL,
 	`name` text NOT NULL,
 	`color` text DEFAULT '#6b7280' NOT NULL,
-	`drives_summary` integer DEFAULT true NOT NULL,
+	`is_summary_driver` integer DEFAULT true NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
 	`is_seed` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL
@@ -278,7 +346,7 @@ CREATE TABLE `discount_codes` (
 	`max_uses` integer,
 	`uses_count` integer DEFAULT 0 NOT NULL,
 	`expires_at` integer,
-	`active` integer DEFAULT true NOT NULL,
+	`is_active` integer DEFAULT true NOT NULL,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -291,10 +359,10 @@ CREATE TABLE `document_review_items` (
 	`inspection_id` text NOT NULL,
 	`document_key` text NOT NULL,
 	`label` text NOT NULL,
-	`requested` integer DEFAULT false NOT NULL,
-	`received` integer DEFAULT false NOT NULL,
-	`reviewed` integer DEFAULT false NOT NULL,
-	`na` integer DEFAULT false NOT NULL,
+	`is_requested` integer DEFAULT false NOT NULL,
+	`is_received` integer DEFAULT false NOT NULL,
+	`is_reviewed` integer DEFAULT false NOT NULL,
+	`is_na` integer DEFAULT false NOT NULL,
 	`notes` text,
 	`sort_order` integer DEFAULT 0 NOT NULL
 );
@@ -352,7 +420,7 @@ CREATE TABLE `event_types` (
 	`default_price_cents` integer DEFAULT 0 NOT NULL,
 	`color` text DEFAULT '#6366f1' NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
-	`active` integer DEFAULT true NOT NULL,
+	`is_active` integer DEFAULT true NOT NULL,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -460,6 +528,18 @@ CREATE TABLE `inspection_messages` (
 --> statement-breakpoint
 CREATE INDEX `idx_msg_inspection` ON `inspection_messages` (`inspection_id`,`created_at`);--> statement-breakpoint
 CREATE INDEX `idx_msg_unread` ON `inspection_messages` (`tenant_id`,`inspection_id`,`from_role`) WHERE "inspection_messages"."read_at" IS NULL;--> statement-breakpoint
+CREATE TABLE `inspection_people` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`inspection_id` text NOT NULL,
+	`contact_id` text NOT NULL,
+	`role_profile_id` text NOT NULL,
+	`created_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `idx_ip_inspection` ON `inspection_people` (`inspection_id`);--> statement-breakpoint
+CREATE INDEX `idx_ip_tenant` ON `inspection_people` (`tenant_id`);--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_ip_insp_contact_role` ON `inspection_people` (`inspection_id`,`contact_id`,`role_profile_id`);--> statement-breakpoint
 CREATE TABLE `inspection_requests` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -519,7 +599,7 @@ CREATE TABLE `inspection_types` (
 	`name` text NOT NULL,
 	`based_on` text,
 	`description` text,
-	`enabled` integer DEFAULT true NOT NULL,
+	`is_enabled` integer DEFAULT true NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL
 );
@@ -554,24 +634,19 @@ CREATE TABLE `inspections` (
 	`address_lat` real,
 	`address_lng` real,
 	`address_geocoded_at` integer,
-	`client_contact_id` text,
-	`client_name` text,
-	`client_email` text,
-	`client_phone` text,
 	`template_id` text,
 	`date` text NOT NULL,
 	`status` text DEFAULT 'requested' NOT NULL,
 	`report_status` text DEFAULT 'in_progress' NOT NULL,
 	`payment_status` text DEFAULT 'unpaid' NOT NULL,
-	`referred_by_agent_id` text,
 	`price_cents` integer DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL,
 	`confirmed_at` integer,
 	`cancel_reason` text,
 	`cancel_notes` text,
-	`payment_required` integer DEFAULT false NOT NULL,
-	`agreement_required` integer DEFAULT false NOT NULL,
-	`auto_sign_on_publish` integer DEFAULT false NOT NULL,
+	`is_payment_required` integer DEFAULT false NOT NULL,
+	`is_agreement_required` integer DEFAULT false NOT NULL,
+	`is_auto_sign_on_publish` integer DEFAULT false NOT NULL,
 	`discount_code_id` text,
 	`discount_amount_cents` integer,
 	`closing_date` text,
@@ -593,15 +668,14 @@ CREATE TABLE `inspections` (
 	`commercial_subtype` text,
 	`report_tier` text,
 	`county` text,
-	`selling_agent_id` text,
-	`disable_automations` integer DEFAULT false NOT NULL,
+	`is_automations_disabled` integer DEFAULT false NOT NULL,
 	`template_snapshot` text,
 	`template_snapshot_version` integer DEFAULT 1,
-	`report_theme_override` text,
+	`profile_override` text,
 	`require_defect_fields_override` text,
 	`request_id` text,
 	`concierge_status` text,
-	`team_mode` integer DEFAULT false NOT NULL,
+	`is_team_mode` integer DEFAULT false NOT NULL,
 	`lead_inspector_id` text,
 	`helper_inspector_ids` text DEFAULT '[]' NOT NULL,
 	`data_version` integer DEFAULT 0 NOT NULL,
@@ -614,23 +688,40 @@ CREATE TABLE `inspections` (
 	`pca_narrative` text,
 	`deviations` text,
 	`report_photo_mode` text,
+	`scheduled_start_ms` integer,
+	`scheduled_end_ms` integer,
+	`duration_min` integer,
+	`badge_layout_override` text,
+	`report_photo_columns` integer,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`inspector_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`template_id`) REFERENCES `templates`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`discount_code_id`) REFERENCES `discount_codes`(`id`) ON UPDATE no action ON DELETE no action,
-	FOREIGN KEY (`selling_agent_id`) REFERENCES `contacts`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`request_id`) REFERENCES `inspection_requests`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE INDEX `idx_inspections_tenant` ON `inspections` (`tenant_id`);--> statement-breakpoint
 CREATE INDEX `idx_inspections_request` ON `inspections` (`request_id`);--> statement-breakpoint
 CREATE INDEX `idx_inspections_inspector` ON `inspections` (`inspector_id`);--> statement-breakpoint
-CREATE INDEX `idx_inspections_agent` ON `inspections` (`referred_by_agent_id`);--> statement-breakpoint
 CREATE INDEX `idx_inspections_tenant_status` ON `inspections` (`tenant_id`,`status`);--> statement-breakpoint
 CREATE INDEX `idx_inspections_tenant_date` ON `inspections` (`tenant_id`,`date`);--> statement-breakpoint
-CREATE INDEX `idx_inspections_tenant_client_email` ON `inspections` (`tenant_id`,`client_email`);--> statement-breakpoint
 CREATE INDEX `idx_inspections_inspector_date` ON `inspections` (`inspector_id`,`date`);--> statement-breakpoint
 CREATE INDEX `idx_inspections_root` ON `inspections` (`root_inspection_id`);--> statement-breakpoint
+CREATE TABLE `inspector_credentials` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`user_id` text NOT NULL,
+	`label` text NOT NULL,
+	`member_number` text,
+	`image_r2_key` text,
+	`sort_order` integer DEFAULT 0 NOT NULL,
+	`is_active` integer DEFAULT true NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE INDEX `idx_inspector_credentials_tenant` ON `inspector_credentials` (`tenant_id`);--> statement-breakpoint
+CREATE INDEX `idx_inspector_credentials_user` ON `inspector_credentials` (`user_id`);--> statement-breakpoint
 CREATE TABLE `invoices` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -649,6 +740,7 @@ CREATE TABLE `invoices` (
 	`voided_at` integer,
 	`qbo_sync_status` text,
 	`created_at` integer NOT NULL,
+	`currency` text DEFAULT 'USD' NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`inspection_id`) REFERENCES `inspections`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`contact_id`) REFERENCES `contacts`(`id`) ON UPDATE no action ON DELETE no action
@@ -666,12 +758,12 @@ CREATE TABLE `marketplace_libraries` (
 	`author_id` text DEFAULT 'system' NOT NULL,
 	`changelog` text,
 	`download_count` integer DEFAULT 0 NOT NULL,
-	`featured` integer DEFAULT false NOT NULL,
+	`is_featured` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE INDEX `idx_marketplace_libraries_kind_featured` ON `marketplace_libraries` (`kind`,`featured`);--> statement-breakpoint
+CREATE INDEX `idx_marketplace_libraries_kind_featured` ON `marketplace_libraries` (`kind`,`is_featured`);--> statement-breakpoint
 CREATE TABLE `marketplace_templates` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
@@ -681,7 +773,7 @@ CREATE TABLE `marketplace_templates` (
 	`author_id` text DEFAULT 'system' NOT NULL,
 	`changelog` text,
 	`download_count` integer DEFAULT 0 NOT NULL,
-	`featured` integer DEFAULT false NOT NULL,
+	`is_featured` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -717,7 +809,7 @@ CREATE TABLE `messaging_compliance` (
 	`provider_meta` text,
 	`provisioned_number` text,
 	`provisioned_number_sid` text,
-	`sender_attached` integer DEFAULT false NOT NULL,
+	`has_sender_attached` integer DEFAULT false NOT NULL,
 	`compliance_status` text DEFAULT 'not_started' NOT NULL,
 	`rejection_reason` text,
 	`last_sync_at` integer,
@@ -779,7 +871,7 @@ CREATE TABLE `qbo_connections` (
 	`token_expires_at` integer NOT NULL,
 	`refresh_token_expires_at` integer NOT NULL,
 	`last_sync_at` integer,
-	`sync_enabled` integer DEFAULT true NOT NULL,
+	`is_sync_enabled` integer DEFAULT true NOT NULL,
 	`default_item_id` text DEFAULT '1' NOT NULL,
 	`created_at` integer NOT NULL
 );
@@ -805,7 +897,7 @@ CREATE TABLE `qbo_sync_errors` (
 	`error_code` text NOT NULL,
 	`error_msg` text NOT NULL,
 	`retries` integer DEFAULT 0 NOT NULL,
-	`resolved` integer DEFAULT false NOT NULL,
+	`is_resolved` integer DEFAULT false NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
@@ -899,7 +991,7 @@ CREATE TABLE `report_signoff` (
 	`qualifications_ref` text,
 	`signed_at` integer NOT NULL,
 	`signature_ref` text NOT NULL,
-	`dual_role` integer DEFAULT false NOT NULL
+	`is_dual_role` integer DEFAULT false NOT NULL
 );
 --> statement-breakpoint
 CREATE INDEX `idx_report_signoff_inspection` ON `report_signoff` (`tenant_id`,`inspection_id`);--> statement-breakpoint
@@ -943,7 +1035,7 @@ CREATE TABLE `services` (
 	`duration_minutes` integer,
 	`template_id` text,
 	`agreement_id` text,
-	`active` integer DEFAULT true NOT NULL,
+	`is_active` integer DEFAULT true NOT NULL,
 	`sort_order` integer DEFAULT 0 NOT NULL,
 	`created_at` integer NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action,
@@ -1016,12 +1108,24 @@ CREATE TABLE `templates` (
 	`property_type` text,
 	`commercial_subtype` text,
 	`description` text,
-	`featured` integer DEFAULT false NOT NULL,
+	`is_featured` integer DEFAULT false NOT NULL,
+	`default_profile_id` text,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE INDEX `idx_templates_tenant` ON `templates` (`tenant_id`);--> statement-breakpoint
 CREATE INDEX `idx_templates_rating_system` ON `templates` (`rating_system_id`);--> statement-breakpoint
+CREATE TABLE `tenant_custom_holidays` (
+	`id` text PRIMARY KEY NOT NULL,
+	`tenant_id` text NOT NULL,
+	`date` text NOT NULL,
+	`name` text NOT NULL,
+	`created_at` integer NOT NULL,
+	`updated_at` integer NOT NULL
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `uq_tenant_custom_holidays_tenant_date` ON `tenant_custom_holidays` (`tenant_id`,`date`);--> statement-breakpoint
+CREATE INDEX `idx_tenant_custom_holidays_tenant_date` ON `tenant_custom_holidays` (`tenant_id`,`date`);--> statement-breakpoint
 CREATE TABLE `tenant_library_imports` (
 	`id` text PRIMARY KEY NOT NULL,
 	`tenant_id` text NOT NULL,
@@ -1073,24 +1177,12 @@ CREATE TABLE `usage_counters` (
 );
 --> statement-breakpoint
 CREATE INDEX `idx_usage_counters_tenant` ON `usage_counters` (`tenant_id`);--> statement-breakpoint
-CREATE TABLE `user_identity_links` (
-	`id` text PRIMARY KEY NOT NULL,
-	`primary_user_id` text NOT NULL,
-	`linked_user_id` text NOT NULL,
-	`linked_tenant_id` text NOT NULL,
-	`linked_role` text NOT NULL,
-	`linked_display_name` text NOT NULL,
-	`created_at` integer DEFAULT (unixepoch() * 1000) NOT NULL
-);
---> statement-breakpoint
-CREATE INDEX `idx_user_identity_links_primary` ON `user_identity_links` (`primary_user_id`);--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_user_identity_links_primary_linked` ON `user_identity_links` (`primary_user_id`,`linked_user_id`);--> statement-breakpoint
 CREATE TABLE `email_templates` (
 	`tenant_id` text NOT NULL,
 	`trigger` text NOT NULL,
 	`subject` text,
 	`blocks` text,
-	`enabled` integer DEFAULT true NOT NULL,
+	`is_enabled` integer DEFAULT true NOT NULL,
 	`updated_at` integer NOT NULL,
 	PRIMARY KEY(`tenant_id`, `trigger`),
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
@@ -1103,9 +1195,9 @@ CREATE TABLE `tenant_configs` (
 	`logo_url` text,
 	`support_email` text,
 	`company_address` text,
-	`pdf_show_footer` integer DEFAULT true NOT NULL,
-	`pdf_show_page_numbers` integer DEFAULT true NOT NULL,
-	`pdf_show_license` integer DEFAULT true NOT NULL,
+	`is_pdf_footer_shown` integer DEFAULT true NOT NULL,
+	`is_pdf_page_numbers_shown` integer DEFAULT true NOT NULL,
+	`is_pdf_license_shown` integer DEFAULT true NOT NULL,
 	`sender_email` text,
 	`reply_to` text,
 	`email_mode` text DEFAULT 'platform' NOT NULL,
@@ -1121,34 +1213,42 @@ CREATE TABLE `tenant_configs` (
 	`dek_enc` text,
 	`ics_token` text,
 	`widget_allowed_origins` text,
-	`report_theme` text DEFAULT 'modern' NOT NULL,
+	`default_profile_id` text DEFAULT 'signature' NOT NULL,
 	`attention_thresholds` text DEFAULT '{"agreement_unsigned_h":72,"invoice_overdue_h":72,"report_unpublished_h":72}' NOT NULL,
 	`inspection_prefs` text,
-	`show_estimates` integer DEFAULT false NOT NULL,
-	`enable_repair_list` integer DEFAULT false NOT NULL,
-	`enable_customer_repair_export` integer DEFAULT false NOT NULL,
-	`block_unpaid` integer DEFAULT false NOT NULL,
-	`block_unsigned_agreement` integer DEFAULT false NOT NULL,
+	`is_estimates_shown` integer DEFAULT false NOT NULL,
+	`is_repair_list_enabled` integer DEFAULT false NOT NULL,
+	`is_customer_repair_export_enabled` integer DEFAULT false NOT NULL,
+	`is_unpaid_blocked` integer DEFAULT false NOT NULL,
+	`is_unsigned_agreement_blocked` integer DEFAULT false NOT NULL,
 	`custom_referral_sources` text,
 	`dashboard_column_prefs` text,
-	`concierge_review_required` integer DEFAULT false NOT NULL,
-	`allow_inspector_choice` integer DEFAULT false NOT NULL,
-	`enable_pdf_pipeline` integer DEFAULT false NOT NULL,
-	`team_mode_default` integer DEFAULT false NOT NULL,
-	`apprentice_review_required` integer DEFAULT false NOT NULL,
-	`guest_invites_enabled` integer DEFAULT true NOT NULL,
+	`is_concierge_review_required` integer DEFAULT false NOT NULL,
+	`is_inspector_choice_allowed` integer DEFAULT false NOT NULL,
+	`is_pdf_pipeline_enabled` integer DEFAULT false NOT NULL,
+	`is_team_mode_default` integer DEFAULT false NOT NULL,
+	`is_apprentice_review_required` integer DEFAULT false NOT NULL,
+	`is_guest_invites_enabled` integer DEFAULT true NOT NULL,
 	`require_defect_fields` text DEFAULT 'none' NOT NULL,
 	`agreement_retention_years` integer DEFAULT 6 NOT NULL,
 	`reinspection_statuses` text,
-	`collab_editing` integer DEFAULT true NOT NULL,
+	`is_collab_editing_enabled` integer DEFAULT true NOT NULL,
 	`updated_at` integer NOT NULL,
 	`sms_byo_provider` text,
 	`email_byo_provider` text DEFAULT 'resend' NOT NULL,
-	`managed_eligible` integer DEFAULT false NOT NULL,
+	`is_managed_eligible` integer DEFAULT false NOT NULL,
 	`managed_provider` text DEFAULT 'twilio' NOT NULL,
-	`reserve_schedule_enabled` integer DEFAULT false NOT NULL,
+	`is_reserve_schedule_enabled` integer DEFAULT false NOT NULL,
 	`reserve_term_years` integer DEFAULT 12 NOT NULL,
 	`inflation_rate_bps` integer,
+	`default_timezone` text DEFAULT 'UTC' NOT NULL,
+	`booking_slot_mode` text DEFAULT 'fixed' NOT NULL,
+	`booking_slot_interval_min` integer DEFAULT 30 NOT NULL,
+	`holiday_region` text,
+	`holiday_public_policy` text DEFAULT 'open' NOT NULL,
+	`holiday_internal_policy` text DEFAULT 'advisory' NOT NULL,
+	`default_locale` text DEFAULT 'en-US' NOT NULL,
+	`currency` text DEFAULT 'USD' NOT NULL,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
@@ -1208,20 +1308,18 @@ CREATE TABLE `users` (
 	`license_number` text,
 	`photo_url` text,
 	`default_signature_base64` text,
-	`signature_enabled` integer DEFAULT true NOT NULL,
+	`is_signature_enabled` integer DEFAULT true NOT NULL,
 	`slug` text,
 	`role` text DEFAULT 'manager' NOT NULL,
-	`google_refresh_token` text,
-	`google_calendar_id` text,
 	`onboarding_state` text,
 	`created_at` integer NOT NULL,
 	`totp_secret` text,
-	`totp_enabled` integer DEFAULT false NOT NULL,
+	`is_totp_enabled` integer DEFAULT false NOT NULL,
 	`totp_recovery_codes` text,
 	`totp_verified_at` integer,
-	`notify_on_referral` integer DEFAULT true NOT NULL,
-	`notify_on_report` integer DEFAULT true NOT NULL,
-	`notify_on_paid` integer DEFAULT false NOT NULL,
+	`is_referral_notification_enabled` integer DEFAULT true NOT NULL,
+	`is_report_notification_enabled` integer DEFAULT true NOT NULL,
+	`is_paid_notification_enabled` integer DEFAULT false NOT NULL,
 	`last_active_at` integer,
 	`mentor_id` text,
 	`assigned_section_ids` text DEFAULT '[]' NOT NULL,
@@ -1229,6 +1327,8 @@ CREATE TABLE `users` (
 	`deleted_at` integer,
 	`terms_accepted` text,
 	`permission_overrides` text,
+	`timezone` text,
+	`locale` text,
 	FOREIGN KEY (`tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
@@ -1274,7 +1374,7 @@ CREATE TABLE `integration_test_results` (
 	`tenant_id` text NOT NULL,
 	`target` text NOT NULL,
 	`provider` text,
-	`ok` integer NOT NULL,
+	`is_ok` integer NOT NULL,
 	`detail` text,
 	`tested_by_user_id` text,
 	`tested_at` integer NOT NULL
