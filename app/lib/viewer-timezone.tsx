@@ -10,7 +10,7 @@ import { getBrowserTimeZone, TIMEZONE_OPTIONS } from "~/lib/timezones";
 
 /**
  * Viewer timezone for public, unauthenticated surfaces that carry no tenant
- * (observe / verify / concierge / agreement-printable). These links have no
+ * (observe / verify / concierge). These links have no
  * session context and no tenant slug, so there is no configured zone to anchor
  * to — the honest anchor is the viewer's own zone. Mainstream field-service
  * tools resolve times to the viewer's browser zone rather than defaulting
