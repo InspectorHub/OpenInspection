@@ -1,5 +1,23 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import reactHooks from 'eslint-plugin-react-hooks';
+import react from 'eslint-plugin-react';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
+import importX from 'eslint-plugin-import-x';
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
+
+// T-hooks warn-first rollout: downgrade every rule in a plugin's preset rules
+// object to 'warn' (preserving any non-severity options), rather than hand-
+// picking which of a preset's rules to enable. Used for jsx-a11y's flat
+// recommended config below — see task-hooks-brief.md severity policy.
+function toWarn(rules) {
+    return Object.fromEntries(
+        Object.entries(rules).map(([name, value]) => [
+            name,
+            Array.isArray(value) ? ['warn', ...value.slice(1)] : 'warn',
+        ]),
+    );
+}
 
 export default tseslint.config(
     eslint.configs.recommended,
@@ -31,6 +49,27 @@ export default tseslint.config(
             '@typescript-eslint/no-explicit-any': 'error',
             '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
             'no-console': ['error', { allow: ['warn', 'error', 'info'] }],
+            // T-hooks Tier 1 — type-checked rules, warn-first rollout (see
+            // task-hooks-brief.md). Not swapping to recommendedTypeChecked
+            // wholesale (would flip ~20 rules to error and fail CI); these are
+            // the specific rules called out, all at 'warn' pending cleanup.
+            // floating/misused-promises are the headline pre-release signal —
+            // silent unawaited promises are a data-loss bug class on Workers.
+            '@typescript-eslint/no-floating-promises': 'warn',
+            '@typescript-eslint/no-misused-promises': 'warn',
+            '@typescript-eslint/await-thenable': 'warn',
+            '@typescript-eslint/require-await': 'warn',
+            '@typescript-eslint/no-base-to-string': 'warn',
+            '@typescript-eslint/restrict-template-expressions': 'warn',
+            '@typescript-eslint/no-unnecessary-condition': 'warn',
+            '@typescript-eslint/no-unsafe-assignment': 'warn',
+            '@typescript-eslint/no-unsafe-member-access': 'warn',
+            '@typescript-eslint/no-unsafe-call': 'warn',
+            '@typescript-eslint/no-unsafe-return': 'warn',
+            '@typescript-eslint/no-unsafe-argument': 'warn',
+            // T-hooks Tier 3 — architecture/hygiene, warn (no --fix sweep; huge diff).
+            '@typescript-eslint/consistent-type-imports': 'warn',
+            '@typescript-eslint/no-import-type-side-effects': 'warn',
             // Round 5 lesson — Alpine v3 only auto-removes x-cloak from the x-data root.
             // x-cloak on a NESTED element combined with the
             // [x-cloak]{display:none!important} rule in main-layout permanently hides
@@ -166,6 +205,99 @@ export default tseslint.config(
                     message: 'apiFetch was removed. Use createApi(context, { token }) from ~/lib/api-client.server.',
                 },
             ],
+        },
+    },
+    {
+        // T-hooks Tier 2 — React hooks / RR + a11y, scoped to the frontend +
+        // shared component library (server/ has no JSX). rules-of-hooks is a
+        // genuine bug class (error, verified 0 violations); everything else is
+        // warn-first per task-hooks-brief.md — this is existing-code surfacing,
+        // not a fix-it-now gate.
+        files: ['app/**/*.{ts,tsx}', 'packages/shared-ui/src/**/*.{ts,tsx}'],
+        plugins: {
+            'react-hooks': reactHooks,
+            react,
+            'jsx-a11y': jsxA11y,
+        },
+        languageOptions: {
+            parserOptions: { ecmaFeatures: { jsx: true } },
+        },
+        settings: {
+            // NOT 'detect': eslint-plugin-react 7.37.5's version-detection path calls
+            // context.getFilename(), which flat-config ESLint 10 no longer exposes on
+            // the rule context (TypeError: contextOrFilename.getFilename is not a
+            // function). Pinning the version explicitly (react's actual installed
+            // version) skips that codepath entirely. Bump this if/when React is
+            // upgraded, or revisit 'detect' once the plugin ships an ESLint-10 fix.
+            react: { version: '18.3.1' },
+        },
+        rules: {
+            // DOWNGRADED from the intended 'error' (task-hooks-brief.md Tier 2) to
+            // 'warn' — auditing found a genuine violation, not a false positive:
+            // app/components/editor/ItemEditor.tsx:343 calls useMemo() AFTER an
+            // early `if (!item) return null;` at line 242, so the hook only runs on
+            // some renders. Real bug, left unfixed here per the hard invariant (no
+            // mass-fix in this task) — flagged prominently in task-hooks-report.md
+            // for a human decision. Re-promote to 'error' once fixed.
+            'react-hooks/rules-of-hooks': 'warn',
+            'react-hooks/exhaustive-deps': 'warn',
+            // Deliberately NOT eslint-plugin-react's full `recommended` preset —
+            // prop-types etc. is noise in a TS codebase (types already enforce
+            // props). Only the rules called out in the brief.
+            'react/react-in-jsx-scope': 'off',
+            'react/jsx-key': 'warn',
+            'react/no-array-index-key': 'warn',
+            'react/no-unstable-nested-components': 'warn',
+            'react/jsx-no-target-blank': 'warn',
+            // jsx-a11y's flat recommended, downgraded wholesale to 'warn' (see
+            // toWarn() above) rather than hand-picking a subset — the brief
+            // offers either; this gives fuller a11y audit coverage for free.
+            ...toWarn(jsxA11y.flatConfigs.recommended.rules),
+        },
+    },
+    {
+        // T-hooks Tier 3 — import-x/no-cycle (circular-dep guard for the
+        // service/di hub). Ordering rules (import/order etc.) are intentionally
+        // skipped — cosmetic and noisy per the brief. `import-x/resolver:
+        // {typescript: true}` (the legacy shorthand) errors ("invalid interface
+        // loaded as resolver") because no-cycle actually needs the
+        // `eslint-import-resolver-typescript` package resolved through the
+        // flat-config-only `resolver-next` API — added as a devDependency and
+        // wired below so path-mapped (~/*) and .ts-extensionless imports resolve.
+        files: ['**/*.ts', '**/*.tsx'],
+        plugins: { 'import-x': importX },
+        settings: {
+            'import-x/resolver-next': [createTypeScriptImportResolver()],
+        },
+        rules: {
+            'import-x/no-cycle': 'warn',
+        },
+    },
+    {
+        // T-hooks Tier 3/4 — app<->server BFF boundary + JWT sign/verify
+        // guard, combined into one no-restricted-imports rule (paths +
+        // patterns) per the brief. Both are 'error' ONLY because verified 0
+        // violations (see task-hooks-report.md) — server/ never imports app/,
+        // and the sole hono/jwt import (server/lib/jwt-keyring.ts) is a
+        // verify-only import carrying an inline disable with a reason (the
+        // keyring IS the sanctioned wrapper).
+        files: ['server/**/*.ts'],
+        rules: {
+            'no-restricted-imports': ['error', {
+                paths: [
+                    {
+                        name: 'hono/jwt',
+                        importNames: ['sign', 'verify'],
+                        message: 'Use server/lib/jwt-keyring.ts (signJwt/verifyJwt) — direct hono/jwt sign/verify is forbidden (pins ES256 + kid). See CLAUDE.md JWT & Auth Security Rules.',
+                    },
+                ],
+                patterns: [
+                    {
+                        group: ['**/app/*', '**/app/**', '~/*'],
+                        message: 'server/ must not import from app/ (BFF boundary). Duplicate the pure util (see server/lib/format.ts twin) or move it to a shared location.',
+                    },
+                ],
+            }],
         },
     }
 );
