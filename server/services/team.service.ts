@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
-import { UserRole } from '../types/auth';
+import type { UserRole } from '../types/auth';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
@@ -138,8 +138,15 @@ export class TeamService {
             ))
             .get();
         if (!invite) throw Errors.NotFound('Invite not found');
+        // Re-assert status='pending' in the DELETE itself: if the invite is
+        // accepted between the SELECT above and here, this no-ops rather than
+        // hard-deleting the now-historical row (closes the TOCTOU window).
         await db.delete(tenantInvites)
-            .where(and(eq(tenantInvites.id, token), eq(tenantInvites.tenantId, tenantId)));
+            .where(and(
+                eq(tenantInvites.id, token),
+                eq(tenantInvites.tenantId, tenantId),
+                eq(tenantInvites.status, 'pending'),
+            ));
     }
 
     /**
