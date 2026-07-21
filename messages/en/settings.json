@@ -217,5 +217,11 @@
   "settings_team_role_inspector_name": "Inspector",
   "settings_team_role_inspector_desc": "Conducts inspections; edits and publishes reports.",
   "settings_team_role_agent_name": "Agent",
-  "settings_team_role_agent_desc": "External agent. Read-only access to their own orders."
+  "settings_team_role_agent_desc": "External agent. Read-only access to their own orders.",
+  "settings_team_cancel_invite": "Cancel invite",
+  "settings_team_resend_invite": "Resend",
+  "settings_team_invite_expires_in": "Expires in {days}d",
+  "settings_team_invite_expired": "Expired {days}d ago",
+  "settings_team_cancel_invite_title": "Cancel this invite?",
+  "settings_team_cancel_invite_confirm": "The invite to {email} will be revoked. They will no longer be able to join with the emailed link."
 }
