@@ -30,4 +30,9 @@ export const CreateInspectionFromWizardSchema = z.object({
     helperInspectorIds: z.array(z.string().min(1)).max(20).optional().describe('TODO describe helperInspectorIds field for the OpenInspection MCP integration'),
 }).openapi('CreateInspectionFromWizard');
 
+/**
+ * @public — consumed via inline `import('...').CreateInspectionFromWizardInput`
+ * type references in inspection.service.ts + inspection-core.service.ts, which
+ * knip cannot trace (dynamic-import blind spot).
+ */
 export type CreateInspectionFromWizardInput = z.infer<typeof CreateInspectionFromWizardSchema>;

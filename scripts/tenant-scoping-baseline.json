@@ -55,7 +55,7 @@
   "server/services/automation/report-email.ts:141",
   "server/services/concierge.service.ts:381",
   "server/services/concierge.service.ts:456",
-  "server/services/contact.service.ts:217",
+  "server/services/contact.service.ts:247",
   "server/services/email/transactional.ts:156",
   "server/services/event.service.ts:128",
   "server/services/inspection/inspection-annotations.service.ts:157",

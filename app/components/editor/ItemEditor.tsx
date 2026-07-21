@@ -6,7 +6,7 @@ import {
   flattenItemTabs, fragmentBeforeCaret, replaceFragmentBeforeCaret,
 } from "../../lib/comment-typeahead";
 import { CloneLastButton } from "./CloneLastButton";
-import { type DefectFieldsValue } from "./DefectFieldsRow";
+import type { DefectFieldsValue } from "./DefectFieldsRow";
 import { ItemAttributesPanel } from "./ItemAttributesPanel";
 import { RatingButtonRow } from "./RatingButtonRow";
 import {
@@ -339,12 +339,12 @@ export function ItemEditor({
  setCustomFormOpen(false);
  };
 
- // Build visible tabs for shared TabStrip (only tabs with entries)
- const visibleTabs = useMemo(() =>
- CANNED_TAB_IDS
+ // Visible canned tabs (only tabs with entries). A plain derivation, NOT a
+ // hook: it sits after the `if (!item) return null` early return, so a useMemo
+ // here would be a conditional hook (rules-of-hooks). The 3-id map is cheap.
+ const visibleTabs = CANNED_TAB_IDS
   .filter((id) => ((tabs[id] || []) as unknown[]).length > 0)
-  .map((id) => ({ id, label: cannedTabLabel(id), count: getIncludedSet(id).size || undefined })),
- [tabs, result]);
+  .map((id) => ({ id, label: cannedTabLabel(id), count: getIncludedSet(id).size || undefined }));
 
  // Photo count is read in several places (badge, caption, empty-state copy).
  const photoCount = ((result.photos as unknown[]) || []).length;

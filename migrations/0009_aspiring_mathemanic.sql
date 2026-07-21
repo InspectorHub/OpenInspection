@@ -1,1 +1,0 @@
-ALTER TABLE `calendar_connections` ADD `last_sync_at` integer;

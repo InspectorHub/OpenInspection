@@ -1,4 +1,3 @@
-import type { useFetcher } from "react-router";
 import { Link } from "react-router";
 import { Card, Pill, EmptyState, Table } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
@@ -6,14 +5,12 @@ import type { Contact } from "./contacts-helpers";
 
 export function ContactsTable({
   filtered,
-  setEditContact,
-  setModalOpen,
-  deleteFetcher,
+  onEdit,
+  onArchive,
 }: {
   filtered: Contact[];
-  setEditContact: (c: Contact | null) => void;
-  setModalOpen: (open: boolean) => void;
-  deleteFetcher: ReturnType<typeof useFetcher>;
+  onEdit: (c: Contact) => void;
+  onArchive: (c: Contact) => void;
 }) {
   return (
     <Card className="overflow-hidden">
@@ -40,12 +37,8 @@ export function ContactsTable({
             align: "right",
             cell: (c) => (
               <>
-                <button onClick={() => { setEditContact(c); setModalOpen(true); }} className="text-ih-primary text-[12px] font-bold hover:underline mr-3">{m.common_edit()}</button>
-                <deleteFetcher.Form method="post" className="inline">
-                  <input type="hidden" name="intent" value="delete" />
-                  <input type="hidden" name="id" value={c.id} />
-                  <button type="submit" className="text-ih-bad-fg text-[12px] font-bold hover:underline">{m.common_delete()}</button>
-                </deleteFetcher.Form>
+                <button onClick={() => onEdit(c)} className="text-ih-primary text-[12px] font-bold hover:underline mr-3">{m.common_edit()}</button>
+                <button onClick={() => onArchive(c)} className="text-ih-fg-3 text-[12px] font-bold hover:text-ih-fg-1 hover:underline">{m.contacts_action_archive()}</button>
               </>
             ),
           },

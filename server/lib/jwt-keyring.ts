@@ -14,6 +14,7 @@
  * scripts and CLAUDE.md "JWT & Auth Security Rules".
  */
 
+// eslint-disable-next-line no-restricted-imports -- this IS the sanctioned keyring wrapper; verifyJwt() below is the only caller allowed to reach hono/jwt's verify() directly (see CLAUDE.md JWT & Auth Security Rules).
 import { verify as honoVerify } from 'hono/jwt';
 
 interface JwtKeyringEntry {

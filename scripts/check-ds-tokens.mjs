@@ -38,8 +38,6 @@ const SCAN_DIRS = ["app", join("packages", "shared-ui", "src")];
 
 /** Entire files exempt from all rules. Keep this list short and justified. */
 const FILE_ALLOWLIST = [
-  // Print/PDF output is intentionally fixed-color (no CSS-var theming).
-  join("app", "routes", "public", "agreement-printable.tsx"),
   // Email bodies render in external clients with no dark mode / CSS vars.
   join("app", "components", "email-template", "EmailPreview.tsx"),
   // Full-screen photo-annotation studio: fixed-dark chrome in both themes,

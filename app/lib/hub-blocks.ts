@@ -15,7 +15,11 @@ import { INSPECTION_STATUS, isReportPublished } from '~/lib/status';
 import { formatCurrency } from '~/lib/format';
 import { m } from '~/paraglide/messages';
 
-/** Pill tone union — kept in sync with packages/shared-ui/src/Pill.tsx. */
+/**
+ * Pill tone union — kept in sync with packages/shared-ui/src/Pill.tsx.
+ * @public — consumed via an inline `import("~/lib/hub-blocks").PillTone` type
+ * reference in inspection-hub.tsx, which knip cannot trace (dynamic-import blind spot).
+ */
 export type PillTone =
     | 'sat'
     | 'monitor'

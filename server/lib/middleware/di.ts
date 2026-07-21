@@ -53,7 +53,6 @@ import { IcsService } from '../../services/ics.service';
 import { AgentService } from '../../services/agent.service';
 import { ConciergeService } from '../../services/concierge.service';
 import { QBOService } from '../../services/qbo.service';
-import { IdentityService } from '../../services/identity.service';
 import { IntegrationsService } from '../../services/integrations.service';
 import { AnalyticsService } from '../../services/analytics.service';
 import { RepairRequestService } from '../../services/repair-request.service';
@@ -394,9 +393,6 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'reportVersion':
                     target.reportVersion = new ReportVersionService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);
-                    break;
-                case 'identity':
-                    target.identity = new IdentityService(c.env.DB);
                     break;
                 case 'integrations':
                     target.integrations = new IntegrationsService(c.env.DB, c.env);

@@ -28,14 +28,7 @@ export interface Contact {
   type: string;
   agency: string;
   inspectionCount?: number;
-}
-
-export interface Agent {
-  id: string;
-  name: string;
-  email: string;
-  status: string;
-  linkedAt: string;
+  referralCount?: number;
 }
 
 /** Mirrors `RoleProfileSchema` (server/lib/validations/role-profile.schema.ts). */

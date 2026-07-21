@@ -37,7 +37,6 @@ export default [
     route("verify", "routes/public/verify-offline.tsx"),
     route("v/:token", "routes/public/v.$token.tsx"),
     route("observe/inspections/:id", "routes/public/observe.tsx"),
-    route("concierge/expired", "routes/public/concierge-expired.tsx"),
     // Flow A — client redeems the agent-concierge magic link emailed as
     // ${APP_BASE_URL}/confirm/<token>. Shows booking details then POSTs the
     // confirm and follows the server-chosen redirect (agreement / report).
@@ -61,10 +60,6 @@ export default [
     route("portal/:tenant", "routes/public/portal.tsx"),
     route("portal/:tenant/auth", "routes/public/portal-auth.tsx"),
     route("portal/:tenant/i/:inspectionId", "routes/public/portal-inspection.tsx"),
-    route(
-      "agreements/print/:token",
-      "routes/public/agreement-printable.tsx",
-    ),
   ]),
   // Standalone pages (own chrome, no sidebar)
   route("setup", "routes/setup.tsx"),
@@ -79,7 +74,6 @@ export default [
   ),
   // Standalone agent pages — no agent-layout chrome
   route("agent-invite/:token", "routes/agent/invite-accept.tsx"),
-  route("agent-invite-expired", "routes/agent/invite-expired.tsx"),
   route("agent-signup", "routes/agent/signup.tsx"),
   // Spec 3 Task 5 — core dual-mode agent front door (password + magic-link).
   route("agent-login", "routes/agent/login.tsx"),
@@ -95,7 +89,6 @@ export default [
   route("resources/repair-items", "routes/resources/repair-items.tsx"),
   route("resources/cost-items", "routes/resources/cost-items.tsx"),
   route("resources/cost-export", "routes/resources/cost-export.tsx"),
-  route("resources/identities", "routes/resources/identities.tsx"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),
   route("resources/inspection-media", "routes/resources/inspection-media.tsx"),
@@ -142,7 +135,6 @@ export default [
       route("settings/automations", "routes/settings-automations.tsx"),
       route("settings/data", "routes/settings-data.tsx"),
       route("settings/compliance", "routes/settings-compliance.tsx"),
-      route("settings/widget", "routes/settings-widget.tsx"),
       route("settings/account", "routes/settings-account.tsx"),
       route("settings/advanced", "routes/settings-advanced.tsx"),
       route("settings/integrations", "routes/settings-integrations.tsx"),
@@ -152,7 +144,6 @@ export default [
       route("settings/inspection-types", "routes/settings-inspection-types.tsx"),
       route("settings/schedule", "routes/settings-schedule.tsx"),
       route("settings/booking", "routes/settings-booking.tsx"),
-      route("settings/catalog/booking", "routes/settings-catalog-booking.tsx"),
       route("settings/billing", "routes/settings-billing.tsx"),
       route("settings/usage", "routes/settings-usage.tsx"),
       route("settings/security", "routes/settings-security.tsx"),

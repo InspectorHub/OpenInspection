@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useFetcher } from "react-router";
 import type { Route } from "./+types/team";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SeatBanner } from "~/components/SeatBanner";
 import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table } from "@core/shared-ui";
@@ -19,23 +20,70 @@ interface Member {
   name: string | null;
   email: string;
   role: string;
-  status: string;
+  status: "active" | "pending";
   lastActiveAt: string | null;
+  /** Present only on pending rows — the tenant_invites token to cancel/resend. */
+  token: string | null;
+  /** Present only on pending rows — ISO expiry for the "expires in Nd" label. */
+  expiresAt: string | null;
 }
+
+interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null }
+interface LoaderInvite { id: string; email: string; role: string; expiresAt: string }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
+  const api = createApi(context, { token });
+
+  // Resolve the caller role so the cancel affordance is hidden for inspectors
+  // (server enforces owner/manager regardless — this is just UI hygiene).
+  let role: string | undefined;
   try {
-    const api = createApi(context, { token });
-    const res = await api.team.members.$get();
-    const body = res.ok ? ((await res.json()) as unknown as { data?: { members?: Member[] } }) : { data: { members: [] as Member[] } };
-    return {
-      members: (body.data?.members ?? []) as Member[],
-      settings: {} as Record<string, unknown>,
-    };
+    const ctxRes = await api.sessionContext.context.$get();
+    if (ctxRes.ok) {
+      const b = (await ctxRes.json()) as { data?: { user?: { role?: string } } };
+      role = b.data?.user?.role;
+    }
   } catch {
-    return { members: [] as Member[], settings: {} };
+    role = undefined;
   }
+
+  try {
+    const res = await api.team.members.$get();
+    const body = res.ok
+      ? ((await res.json()) as unknown as { data?: { members?: LoaderActiveUser[]; invites?: LoaderInvite[] } })
+      : { data: { members: [], invites: [] } };
+    const active: Member[] = (body.data?.members ?? []).map((u) => ({
+      id: u.id, name: u.name ?? null, email: u.email, role: u.role,
+      status: "active", lastActiveAt: null, token: null, expiresAt: null,
+    }));
+    const pending: Member[] = (body.data?.invites ?? []).map((i) => ({
+      id: i.id, name: null, email: i.email, role: i.role,
+      status: "pending", lastActiveAt: null, token: i.id, expiresAt: i.expiresAt,
+    }));
+    return { members: [...active, ...pending], canManage: role === "owner" || role === "manager" };
+  } catch {
+    return { members: [] as Member[], canManage: false };
+  }
+}
+
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
+  const form = await request.formData();
+  const intent = form.get("intent") as string;
+  const api = createApi(context, { token });
+
+  if (intent === "cancel-invite") {
+    const inviteToken = form.get("token") as string;
+    const res = await api.team.invites[":token"].$delete({ param: { token: inviteToken } });
+    return { ok: res.ok };
+  }
+  if (intent === "resend-invite") {
+    const inviteToken = form.get("token") as string;
+    const res = await api.team.invites[":token"].resend.$post({ param: { token: inviteToken } });
+    return { ok: res.ok, resent: res.ok };
+  }
+  return { ok: false };
 }
 
 const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "monitor" | "sat" | "gen"> = {
@@ -49,10 +97,23 @@ const ROLE_TONES: Record<string, "primary" | "info" | "neutral" | "warning" | "m
 };
 
 export default function TeamPage() {
-  const { members } = useLoaderData<typeof loader>();
+  const { members, canManage } = useLoaderData<typeof loader>();
+  const cancelFetcher = useFetcher<{ ok?: boolean }>();
+  const resendFetcher = useFetcher<{ ok?: boolean; resent?: boolean }>();
+  const [pendingCancel, setPendingCancel] = useState<{ token: string; email: string } | null>(null);
   const sessionCtx = useSessionContext();
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
+
+  // Human "expires in Nd" / "expired Nd ago" from an ISO expiry. Whole-day
+  // granularity is enough for a 7-day invite window.
+  function expiryLabel(iso: string | null): string {
+    if (!iso) return "";
+    const ms = new Date(iso).getTime() - Date.now();
+    const days = Math.round(Math.abs(ms) / 86_400_000);
+    if (ms <= 0) return m.settings_team_invite_expired({ days });
+    return m.settings_team_invite_expires_in({ days });
+  }
 
   // Built in the render (request ALS scope) so the labels resolve per-request
   // rather than freezing the locale at module import.
@@ -145,11 +206,39 @@ export default function TeamPage() {
               {
                 label: "",
                 align: "right",
-                cell: () => (
-                  <button className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1">
-                    {m.common_edit()}
-                  </button>
-                ),
+                cell: (member) =>
+                  member.status === "pending" && member.token ? (
+                    <div className="flex items-center justify-end gap-3">
+                      <span className={`text-[11px] ${
+                        member.expiresAt && new Date(member.expiresAt).getTime() <= Date.now()
+                          ? "text-ih-bad-fg" : "text-ih-fg-4"
+                      }`}>
+                        {expiryLabel(member.expiresAt)}
+                      </span>
+                      {canManage && (
+                        <>
+                          <resendFetcher.Form method="post" className="inline">
+                            <input type="hidden" name="intent" value="resend-invite" />
+                            <input type="hidden" name="token" value={member.token} />
+                            <button type="submit" disabled={resendFetcher.state !== "idle"} className="text-[12px] font-medium text-ih-primary hover:underline disabled:opacity-50">
+                              {m.settings_team_resend_invite()}
+                            </button>
+                          </resendFetcher.Form>
+                          <button
+                            type="button"
+                            onClick={() => setPendingCancel({ token: member.token as string, email: member.email })}
+                            className="text-[12px] font-medium text-ih-bad-fg hover:underline"
+                          >
+                            {m.settings_team_cancel_invite()}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  ) : member.status === "active" ? (
+                    <button className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1">
+                      {m.common_edit()}
+                    </button>
+                  ) : null,
               },
             ]}
           />
@@ -173,6 +262,24 @@ export default function TeamPage() {
           ))}
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={pendingCancel !== null}
+        title={m.settings_team_cancel_invite_title()}
+        message={pendingCancel ? m.settings_team_cancel_invite_confirm({ email: pendingCancel.email }) : ""}
+        confirmLabel={m.settings_team_cancel_invite()}
+        busy={cancelFetcher.state !== "idle"}
+        onConfirm={() => {
+          if (pendingCancel) {
+            cancelFetcher.submit(
+              { intent: "cancel-invite", token: pendingCancel.token },
+              { method: "post" },
+            );
+            setPendingCancel(null);
+          }
+        }}
+        onCancel={() => setPendingCancel(null)}
+      />
     </div>
   );
 }

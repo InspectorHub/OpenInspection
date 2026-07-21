@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import type { OAuthHelpers } from '@cloudflare/workers-oauth-provider';
-import { UserRole } from '../types/auth';
+import type { UserRole } from '../types/auth';
 import { Errors } from '../lib/errors';
 import { logger } from '../lib/logger';
 import type { UserSyncOutbox } from '../lib/integration/user-sync';
@@ -67,6 +67,7 @@ export class TeamService {
         const [activeUsers, pendingInvites, tenantRecord] = await Promise.all([
             db.select({
                 id: users.id,
+                name: users.name,
                 email: users.email,
                 role: users.role,
                 createdAt: users.createdAt
@@ -118,6 +119,54 @@ export class TeamService {
         });
 
         return { token: inviteToken, expiresAt };
+    }
+
+    /**
+     * Cancel (hard-delete) a pending seat invite. Only rows that belong to the
+     * caller's tenant AND are still `status='pending'` are deletable — accepted
+     * invites are history (a real users row exists) and cross-tenant ids are
+     * invisible. Unlike removeMember (which soft-deletes a live users row), a
+     * pending invite has no FK dependents, so a hard delete is safe and leaves
+     * no dead row. Throws NotFound so the route returns 404 for every miss.
+     */
+    async cancelInvite(tenantId: string, token: string): Promise<void> {
+        const db = this.getDB();
+        const invite = await db.select({ id: tenantInvites.id }).from(tenantInvites)
+            .where(and(
+                eq(tenantInvites.id, token),
+                eq(tenantInvites.tenantId, tenantId),
+                eq(tenantInvites.status, 'pending'),
+            ))
+            .get();
+        if (!invite) throw Errors.NotFound('Invite not found');
+        // Re-assert status='pending' in the DELETE itself: if the invite is
+        // accepted between the SELECT above and here, this no-ops rather than
+        // hard-deleting the now-historical row (closes the TOCTOU window).
+        await db.delete(tenantInvites)
+            .where(and(
+                eq(tenantInvites.id, token),
+                eq(tenantInvites.tenantId, tenantId),
+                eq(tenantInvites.status, 'pending'),
+            ));
+    }
+
+    /**
+     * Look up a pending invite's email for the resend path. Tenant-scoped +
+     * pending-only, same visibility rule as cancelInvite. Returns null (→ 404)
+     * for unknown / accepted / cross-tenant tokens. The route reconstructs the
+     * /join link and re-sends the email; the token and its 7-day expiry are
+     * unchanged (resend, not re-issue).
+     */
+    async findPendingInvite(tenantId: string, token: string): Promise<{ email: string } | null> {
+        const db = this.getDB();
+        const row = await db.select({ email: tenantInvites.email }).from(tenantInvites)
+            .where(and(
+                eq(tenantInvites.id, token),
+                eq(tenantInvites.tenantId, tenantId),
+                eq(tenantInvites.status, 'pending'),
+            ))
+            .get();
+        return row ?? null;
     }
 
     /**

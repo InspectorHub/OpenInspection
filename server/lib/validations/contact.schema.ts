@@ -23,6 +23,7 @@ export const ContactResponseSchema = z.object({
     notes: z.string().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
     createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
     inspectionCount: z.number().optional().describe('TODO describe inspectionCount field for the OpenInspection MCP integration'),
+    referralCount: z.number().optional().describe('Inspections where this contact is the tenant buyer_agent (referrals sent).'),
 }).openapi('Contact');
 
 export const ContactListQuerySchema = z.object({

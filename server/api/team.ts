@@ -99,6 +99,56 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteTeamMember (DELETE /members/{id}, team domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'extended' }));
 
+/**
+ * DELETE /api/team/invites/:token
+ * Cancels a pending seat invite (inspector or in-house agent). owner/manager
+ * only — seats carry billing implications.
+ */
+const cancelInviteRoute = createRoute(withMcpMetadata({
+    method: 'delete',
+    path: '/invites/{token}',
+    tags: ["team"],
+    summary: 'Cancel a pending seat invite',
+    description: 'Hard-deletes a pending tenant_invites row that belongs to the caller tenant. 404 when the token is unknown, already accepted, or belongs to another tenant.',
+    middleware: [requireRole('manager', 'owner')],
+    request: {
+        params: z.object({ token: z.string().uuid().describe('The pending invite token (tenant_invites.id).') }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ cancelled: z.boolean() })) } },
+            description: 'Invite cancelled',
+        },
+        404: { description: 'Invite not found / not pending / cross-tenant' },
+    },
+    operationId: "cancelTeamInvite",
+}, { scopes: ['write'], tier: 'extended' }));
+
+/**
+ * POST /api/team/invites/:token/resend
+ * Re-sends the invitation email for an existing pending invite. Same token,
+ * same 7-day expiry — no new row. owner/manager only.
+ */
+const resendInviteRoute = createRoute(withMcpMetadata({
+    method: 'post',
+    path: '/invites/{token}/resend',
+    tags: ["team"],
+    summary: 'Resend a pending seat invite email',
+    description: 'Re-sends the invitation email for an existing pending tenant_invites row. 404 when the token is unknown, accepted, or cross-tenant.',
+    middleware: [requireRole('manager', 'owner')],
+    request: {
+        params: z.object({ token: z.string().uuid().describe('The pending invite token (tenant_invites.id).') }),
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ resent: z.boolean() })) } },
+            description: 'Invitation email re-sent',
+        },
+        404: { description: 'Invite not found / not pending / cross-tenant' },
+    },
+    operationId: "resendTeamInvite",
+}, { scopes: ['write'], tier: 'extended' }));
+
 // ─── Design System 0520 subsystem C P10.2 — team defaults ──
 
 const DefaultsSchema = z.object({
@@ -160,6 +210,21 @@ const teamRoutes = createApiRouter()
         await authService.invalidateUserSessions(memberId);
 
         return c.json({ success: true, data: { removed: true } }, 200);
+    })
+    .openapi(cancelInviteRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { token } = c.req.valid('param');
+        await c.var.services.team.cancelInvite(tenantId, token);
+        return c.json({ success: true as const, data: { cancelled: true as const } }, 200);
+    })
+    .openapi(resendInviteRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { token } = c.req.valid('param');
+        const invite = await c.var.services.team.findPendingInvite(tenantId, token);
+        if (!invite) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Invite not found' } }, 404);
+        const inviteLink = `${getBaseUrl(c)}/join?token=${token}`;
+        await c.var.services.email.sendInvitation(invite.email, inviteLink);
+        return c.json({ success: true as const, data: { resent: true as const } }, 200);
     })
     /** GET /api/team/defaults — read the team-page toggles. */
     .openapi(withMcpMetadata({

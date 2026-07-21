@@ -7,7 +7,6 @@
  *
  *   tests/unit/preflight.spec.ts          (9 tests, GREEN)
  *   tests/unit/csv-export.spec.ts         (7 tests, GREEN)
- *   tests/unit/identity-service.spec.ts   (7 tests, GREEN)
  *   tests/unit/analytics.spec.ts          (8 tests, GREEN)
  *
  * Unskip once the seed harness lands in tests/global-setup.ts.
@@ -41,18 +40,6 @@ test.skip('P3 — CSV Export downloads visible inspections', async ({ page }) =>
     await page.click('button:has-text("Export")');
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/^inspections-\d{4}-\d{2}-\d{2}\.csv$/);
-});
-
-test.skip('P4 — user with linked identity can switch into the linked tenant', async ({ page }) => {
-    await page.goto('/login');
-    await page.fill('input[name=email]',    'multi-tenant-user@seed.test');
-    await page.fill('input[name=password]', 'seedpassword');
-    await page.click('button[type=submit]');
-
-    await page.click('[aria-label="User menu"]');
-    await expect(page.locator('text=Switch identity')).toBeVisible();
-    await page.click('text=branch-b@seed.test');
-    await page.waitForURL('**/inspections');
 });
 
 test.skip('P6 — IntegrationGrid renders 6 cards with correct connected state', async ({ page }) => {

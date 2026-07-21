@@ -6,6 +6,12 @@ import { describe, it, expect } from 'vitest';
 import * as appFmt from '../../../app/lib/format';
 import * as srvFmt from '../../../server/lib/format';
 
+// Static references so dead-code analysis sees these server exports as used —
+// the parity loop below accesses them dynamically by name (knip cannot trace
+// computed member access). formatDateTime/formatNumber/formatCurrency already
+// have direct server consumers; formatDate/formatTime exist only for the twin.
+void [srvFmt.formatDate, srvFmt.formatTime];
+
 const CASES = {
   formatDate: [
     ['2026-07-17', { locale: 'en-US', timeZone: 'UTC', month: 'long' as const }],

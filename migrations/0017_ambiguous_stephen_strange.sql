@@ -1,2 +1,0 @@
-DROP INDEX `uq_automation_logs_event`;--> statement-breakpoint
-CREATE UNIQUE INDEX `uq_automation_logs_event` ON `automation_logs` (`automation_id`,`inspection_id`,`event_id`,`channel`,`recipient`) WHERE event_id IS NOT NULL;

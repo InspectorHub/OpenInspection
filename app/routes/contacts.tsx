@@ -6,13 +6,14 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 import { PageHeader, TabStrip, Button, Select } from "@core/shared-ui";
-import { inferMappingFromCsv, type Contact, type Agent, type RoleProfile, type MessageTemplateOption } from "~/components/contacts/contacts-helpers";
+import { inferMappingFromCsv, type Contact, type RoleProfile, type MessageTemplateOption } from "~/components/contacts/contacts-helpers";
 import { ContactModal } from "~/components/contacts/ContactModal";
 import { CsvImportModal } from "~/components/contacts/CsvImportModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
 import { AgentsTable } from "~/components/contacts/AgentsTable";
 import { RolesTable } from "~/components/contacts/RolesTable";
 import { RoleProfileModal } from "~/components/contacts/RoleProfileModal";
+import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 
@@ -42,15 +43,19 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const isAdmin = isAdminRole(role);
 
   try {
-    const [contactsRes, agentsRes, rolesRes, emailTemplatesRes, smsTemplatesRes] = await Promise.all([
-      api.contacts.index.$get({ query: filterType === "agent" || filterType === "client" ? { type: filterType } : {} }),
-      api.agents.links.$get(),
+    const [contactsRes, rolesRes, emailTemplatesRes, smsTemplatesRes] = await Promise.all([
+      // Always fetch the full contact list, regardless of the URL `?type=`
+      // filter. Both tabs filter locally — the Contacts tab by the `typeFilter`
+      // state (seeded from `?type=`) and the Agents tab by `type === 'agent'`.
+      // Filtering server-side would starve the Agents tab on a `?type=client`
+      // deep-link (it would receive zero agents). `filterType` still seeds the
+      // dropdown below so the deep-link intent is preserved for the Contacts tab.
+      api.contacts.index.$get({ query: {} }),
       api.roleProfiles.index.$get(),
       api.messageTemplates.index.$get({ query: { channel: "email" } }).catch(() => null),
       api.messageTemplates.index.$get({ query: { channel: "sms" } }).catch(() => null),
     ]);
     const contactsBody = contactsRes.ok ? ((await contactsRes.json()) as Record<string, unknown>) : { data: [] };
-    const agentsBody = agentsRes.ok ? ((await agentsRes.json()) as Record<string, unknown>) : { data: [] };
     const rolesBody = rolesRes.ok ? ((await rolesRes.json()) as Record<string, unknown>) : { data: [] };
     const emailTemplatesBody =
       emailTemplatesRes && emailTemplatesRes.ok ? ((await emailTemplatesRes.json()) as { data?: MessageTemplateOption[] }) : { data: [] };
@@ -58,14 +63,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       smsTemplatesRes && smsTemplatesRes.ok ? ((await smsTemplatesRes.json()) as { data?: MessageTemplateOption[] }) : { data: [] };
     return {
       contacts: (contactsBody.data ?? []) as Contact[],
-      agents: (agentsBody.data ?? []) as Agent[],
       roleProfiles: (rolesBody.data ?? []) as RoleProfile[],
       messageTemplates: [...(emailTemplatesBody.data ?? []), ...(smsTemplatesBody.data ?? [])] as MessageTemplateOption[],
       filterType,
       isAdmin,
     };
   } catch {
-    return { contacts: [], agents: [], roleProfiles: [], messageTemplates: [], filterType: "", isAdmin };
+    return { contacts: [], roleProfiles: [], messageTemplates: [], filterType: "", isAdmin };
   }
 }
 
@@ -170,14 +174,13 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function ContactsPage() {
-  const { contacts, agents, roleProfiles, messageTemplates, filterType, isAdmin } = useLoaderData<typeof loader>();
+  const { contacts, roleProfiles, messageTemplates, filterType, isAdmin } = useLoaderData<typeof loader>();
   const TABS = [
     { id: "contacts", label: m.contacts_label_contacts() },
     { id: "agents", label: m.contacts_label_agents() },
     ...(isAdmin ? [{ id: "roles", label: m.contacts_label_roles() }] : []),
   ];
   const contactList = contacts as Contact[];
-  const agentList = agents as Agent[];
   const roleProfileList = roleProfiles as RoleProfile[];
   const templateList = messageTemplates as MessageTemplateOption[];
   const [activeTab, setActiveTab] = useState("contacts");
@@ -187,7 +190,21 @@ export default function ContactsPage() {
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [editRole, setEditRole] = useState<RoleProfile | null>(null);
   const [typeFilter, setTypeFilter] = useState(filterType || "");
-  const deleteFetcher = useFetcher();
+  const [pendingArchive, setPendingArchive] = useState<Contact | null>(null);
+  const archiveFetcher = useFetcher<{ ok?: boolean }>();
+
+  const agentContacts = contactList.filter((c) => c.type === "agent");
+
+  const openEdit = (c: Contact) => { setEditContact(c); setModalOpen(true); };
+  const confirmArchive = () => {
+    if (pendingArchive) {
+      archiveFetcher.submit(
+        { intent: "delete", id: pendingArchive.id },
+        { method: "post" },
+      );
+      setPendingArchive(null);
+    }
+  };
 
   const filtered = typeFilter
     ? contactList.filter((c) => c.type === typeFilter)
@@ -228,11 +245,11 @@ export default function ContactsPage() {
       <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
 
       {activeTab === "contacts" && (
-        <ContactsTable filtered={filtered} setEditContact={setEditContact} setModalOpen={setModalOpen} deleteFetcher={deleteFetcher} />
+        <ContactsTable filtered={filtered} onEdit={openEdit} onArchive={setPendingArchive} />
       )}
 
       {activeTab === "agents" && (
-        <AgentsTable agentList={agentList} />
+        <AgentsTable agentContacts={agentContacts} onEdit={openEdit} onArchive={setPendingArchive} />
       )}
 
       {activeTab === "roles" && isAdmin && (
@@ -253,6 +270,17 @@ export default function ContactsPage() {
           templates={templateList}
         />
       )}
+
+      <ConfirmDialog
+        open={pendingArchive !== null}
+        title={m.contacts_archive_title()}
+        message={m.contacts_archive_confirm()}
+        confirmLabel={m.contacts_action_archive()}
+        tone="default"
+        busy={archiveFetcher.state !== "idle"}
+        onConfirm={confirmArchive}
+        onCancel={() => setPendingArchive(null)}
+      />
     </div>
   );
 }

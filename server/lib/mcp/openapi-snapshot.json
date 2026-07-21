@@ -518,6 +518,34 @@
     "description": "Auto-generated placeholder for cancelInspection (POST /{id}/cancel, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "cancelTeamInvite",
+    "method": "DELETE",
+    "pathTemplate": "/api/team/invites/{token}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "description": "The pending invite token (tenant_invites.id).",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The pending invite token (tenant_invites.id)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Cancel a pending seat invite",
+    "description": "Hard-deletes a pending tenant_invites row that belongs to the caller tenant. 404 when the token is unknown, already accepted, or belongs to another tenant."
+  },
+  {
     "operationId": "changeMyPassword",
     "method": "POST",
     "pathTemplate": "/api/auth/change-password",
@@ -8545,35 +8573,6 @@
     "description": "Auto-generated placeholder for leaderboardAgent (GET /leaderboard, agents domain). TODO: replace with a real description sourced from the handler."
   },
   {
-    "operationId": "linkIdentityByEmail",
-    "method": "POST",
-    "pathTemplate": "/api/identities/link",
-    "scopes": [
-      "admin"
-    ],
-    "tag": "identity",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [],
-      "body": {
-        "type": "object",
-        "properties": {
-          "targetEmail": {
-            "type": "string",
-            "format": "email",
-            "description": "Email address of the other existing user account to link into the caller's identity set."
-          }
-        },
-        "required": [
-          "targetEmail"
-        ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
-      }
-    },
-    "summary": "Link another identity by email",
-    "description": "Admin-only: links the caller's primary user record to another existing user (looked up by email) so the second seat becomes available in the switcher menu."
-  },
-  {
     "operationId": "listAgentInspectors",
     "method": "GET",
     "pathTemplate": "/api/agent/inspectors",
@@ -10288,22 +10287,6 @@
     },
     "summary": "List metrics for current tenant",
     "description": "Auto-generated placeholder for listMetrics (GET /, metrics domain). TODO: replace with a real description sourced from the handler."
-  },
-  {
-    "operationId": "listMyLinkedIdentities",
-    "method": "GET",
-    "pathTemplate": "/api/identities",
-    "scopes": [
-      "read"
-    ],
-    "tag": "identity",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [],
-      "body": null
-    },
-    "summary": "List linked identities for the caller",
-    "description": "Returns all identity seats linked to the caller, including the primary identity. Used by the identity switcher menu in the dashboard."
   },
   {
     "operationId": "listNotifications",
@@ -15132,6 +15115,34 @@
     "description": "Triggers a password reset email if the account exists. Always returns 200 even for unknown emails to avoid account enumeration."
   },
   {
+    "operationId": "resendTeamInvite",
+    "method": "POST",
+    "pathTemplate": "/api/team/invites/{token}/resend",
+    "scopes": [
+      "write"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "description": "The pending invite token (tenant_invites.id).",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The pending invite token (tenant_invites.id)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Resend a pending seat invite email",
+    "description": "Re-sends the invitation email for an existing pending tenant_invites row. 404 when the token is unknown, accepted, or cross-tenant."
+  },
+  {
     "operationId": "resetEmailTemplate",
     "method": "POST",
     "pathTemplate": "/api/admin/email-templates/{trigger}/reset",
@@ -15910,35 +15921,6 @@
     },
     "summary": "Submit report for review",
     "description": "Transitions reportStatus from in_progress → submitted. Requires inspection.status === completed."
-  },
-  {
-    "operationId": "switchActiveIdentity",
-    "method": "POST",
-    "pathTemplate": "/api/identities/switch",
-    "scopes": [
-      "write"
-    ],
-    "tag": "identity",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [],
-      "body": {
-        "type": "object",
-        "properties": {
-          "linkedUserId": {
-            "type": "string",
-            "minLength": 1,
-            "description": "UUID of the linked identity to switch into; must be one of the caller's linked seats."
-          }
-        },
-        "required": [
-          "linkedUserId"
-        ],
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
-      }
-    },
-    "summary": "Switch active identity to linked seat",
-    "description": "Issues a new JWT for the specified linked identity and replaces the session cookie. Caller must be linked to the target identity already."
   },
   {
     "operationId": "switchInspectionRatingSystem",

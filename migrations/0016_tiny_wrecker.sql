@@ -1,1 +1,0 @@
-ALTER TABLE `automation_logs` ADD `recipient_role_key` text;
