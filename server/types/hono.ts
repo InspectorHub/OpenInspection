@@ -327,7 +327,6 @@ export interface AppServices {
     unitSwitch: import('../services/unit-switch.service').UnitSwitchService;
     observerLink: import('../services/observer-link.service').ObserverLinkService;
     reportVersion: import('../services/report-version.service').ReportVersionService;
-    identity: import('../services/identity.service').IdentityService;
     integrations: import('../services/integrations.service').IntegrationsService;
     analytics: import('../services/analytics.service').AnalyticsService;
     repairRequest: import('../services/repair-request.service').RepairRequestService;
