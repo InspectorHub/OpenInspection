@@ -3,7 +3,7 @@ import { eq, and, like, sql, isNull, inArray, isNotNull } from 'drizzle-orm';
 import { contacts } from '../lib/db/schema/contact';
 import { inspections } from '../lib/db/schema/inspection';
 import { invoices } from '../lib/db/schema/invoice';
-import { inspectionPeople } from '../lib/db/schema/inspection/role-profiles';
+import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema/inspection/role-profiles';
 import { Errors } from '../lib/errors';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
@@ -16,7 +16,7 @@ export class ContactService {
 
     async listContacts(tenantId: string, opts: { type?: 'agent' | 'client'; search?: string; limit: number; offset: number }) {
         const db = this.getDrizzle();
-        const conditions = [eq(contacts.tenantId, tenantId)];
+        const conditions = [eq(contacts.tenantId, tenantId), isNull(contacts.archivedAt)];
         if (opts.type) conditions.push(eq(contacts.type, opts.type));
         if (opts.search) conditions.push(like(contacts.name, `%${escapeLikePattern(opts.search)}%`));
 
@@ -29,11 +29,18 @@ export class ContactService {
         // for clients) — a contact could hold >1 role on one inspection, so
         // count DISTINCT inspection ids.
         const withCounts = await Promise.all(rows.map(async (c) => {
-            const res = await db.select({ count: sql<number>`count(distinct ${inspectionPeople.inspectionId})` })
+            const res = await db.select({
+                count: sql<number>`count(distinct ${inspectionPeople.inspectionId})`,
+                // Referral = inspections where this contact is the tenant's
+                // buyer_agent (the metric an inspector reads as "jobs this agent
+                // sent me"). All-role count stays as inspectionCount.
+                referralCount: sql<number>`count(distinct case when ${contactRoleProfiles.key} = 'buyer_agent' then ${inspectionPeople.inspectionId} end)`,
+            })
                 .from(inspectionPeople)
+                .leftJoin(contactRoleProfiles, eq(contactRoleProfiles.id, inspectionPeople.roleProfileId))
                 .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.contactId, c.id)))
                 .get();
-            return { ...c, inspectionCount: res?.count ?? 0 };
+            return { ...c, inspectionCount: res?.count ?? 0, referralCount: res?.referralCount ?? 0 };
         }));
 
         return withCounts.map(c => ({ ...c, createdAt: safeISODate(c.createdAt) }));
@@ -157,15 +164,38 @@ export class ContactService {
         const db = this.getDrizzle();
         const existing = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Contact not found');
-        await db.update(contacts).set(data).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
-        return { ...existing, ...data, createdAt: safeISODate(existing.createdAt) };
+        // Agent email is the cross-tenant identity + referral/auto-link key
+        // (see server/services/agent/referral.ts + signup.ts): editing it can
+        // re-route report visibility to a different agent and collide with the
+        // (tenant,email) partial-unique index. Freeze it server-side — the UI
+        // also renders it read-only, but this is the authoritative guard. To
+        // change an agent's email, archive the record and add a new one.
+        const patch = { ...data };
+        if (existing.type === 'agent' && 'email' in patch) delete patch.email;
+        await db.update(contacts).set(patch).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+        return { ...existing, ...patch, createdAt: safeISODate(existing.createdAt) };
     }
 
     async deleteContact(id: string, tenantId: string) {
         const db = this.getDrizzle();
         const existing = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Contact not found');
-        await db.delete(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+        // If nothing references this contact, hard-delete so import mistakes /
+        // junk rows leave no residue and don't linger against the (tenant,email)
+        // partial-unique index. Otherwise soft-archive: inspection_people.contact_id
+        // references this row, so a hard delete would orphan historical
+        // inspections (and the agent's access to them, which the referral join
+        // preserves for archived contacts — see the referral-visibility test).
+        const ref = await db.select({ id: inspectionPeople.id }).from(inspectionPeople)
+            .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.contactId, id)))
+            .get();
+        if (!ref) {
+            await db.delete(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+            return;
+        }
+        // Idempotent — re-archiving an archived row is a no-op set.
+        await db.update(contacts).set({ archivedAt: new Date() })
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
     }
 
     /**
