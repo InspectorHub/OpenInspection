@@ -121,6 +121,47 @@ export class TeamService {
     }
 
     /**
+     * Cancel (hard-delete) a pending seat invite. Only rows that belong to the
+     * caller's tenant AND are still `status='pending'` are deletable — accepted
+     * invites are history (a real users row exists) and cross-tenant ids are
+     * invisible. Unlike removeMember (which soft-deletes a live users row), a
+     * pending invite has no FK dependents, so a hard delete is safe and leaves
+     * no dead row. Throws NotFound so the route returns 404 for every miss.
+     */
+    async cancelInvite(tenantId: string, token: string): Promise<void> {
+        const db = this.getDB();
+        const invite = await db.select({ id: tenantInvites.id }).from(tenantInvites)
+            .where(and(
+                eq(tenantInvites.id, token),
+                eq(tenantInvites.tenantId, tenantId),
+                eq(tenantInvites.status, 'pending'),
+            ))
+            .get();
+        if (!invite) throw Errors.NotFound('Invite not found');
+        await db.delete(tenantInvites)
+            .where(and(eq(tenantInvites.id, token), eq(tenantInvites.tenantId, tenantId)));
+    }
+
+    /**
+     * Look up a pending invite's email for the resend path. Tenant-scoped +
+     * pending-only, same visibility rule as cancelInvite. Returns null (→ 404)
+     * for unknown / accepted / cross-tenant tokens. The route reconstructs the
+     * /join link and re-sends the email; the token and its 7-day expiry are
+     * unchanged (resend, not re-issue).
+     */
+    async findPendingInvite(tenantId: string, token: string): Promise<{ email: string } | null> {
+        const db = this.getDB();
+        const row = await db.select({ email: tenantInvites.email }).from(tenantInvites)
+            .where(and(
+                eq(tenantInvites.id, token),
+                eq(tenantInvites.tenantId, tenantId),
+                eq(tenantInvites.status, 'pending'),
+            ))
+            .get();
+        return row ?? null;
+    }
+
+    /**
      * Reduce a requested override map to only the capabilities whose value
      * differs from the role's template default. Returns null when nothing
      * differs (the role template already covers the request) so the stored
