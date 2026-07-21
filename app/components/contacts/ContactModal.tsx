@@ -106,11 +106,16 @@ export function ContactModal({
                 defaultValue={contact?.email || ""}
                 placeholder={m.contacts_modal_email_placeholder()}
                 aria-invalid={fields.email.errors ? true : undefined}
-                className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm"
+                readOnly={isEdit && contact?.type === "agent"}
+                className={`w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card focus:border-ih-primary focus:ring-1 focus:ring-ih-primary outline-none text-sm ${
+                  isEdit && contact?.type === "agent" ? "opacity-60 cursor-not-allowed" : ""
+                }`}
               />
-              {fields.email.errors && (
+              {isEdit && contact?.type === "agent" ? (
+                <p className="mt-1 text-xs text-ih-fg-4">{m.contacts_agent_email_locked_hint()}</p>
+              ) : fields.email.errors ? (
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.email.errors[0]}</p>
-              )}
+              ) : null}
             </div>
             <div>
               <label htmlFor={fields.phone.id} className="block text-[10px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1.5">{m.contacts_field_phone()}</label>

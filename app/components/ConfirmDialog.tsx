@@ -1,16 +1,21 @@
 import { Modal } from "@core/shared-ui";
 
 export function ConfirmDialog({
-  open, title, message, confirmLabel = "Delete", busy = false, onConfirm, onCancel,
+  open, title, message, confirmLabel = "Delete", tone = "danger", busy = false, onConfirm, onCancel,
 }: {
   open: boolean;
   title: string;
   message: string;
   confirmLabel?: string;
+  tone?: "danger" | "default";
   busy?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const confirmClass =
+    tone === "danger"
+      ? "bg-ih-bad-fg text-white hover:opacity-90"
+      : "bg-ih-primary text-white hover:opacity-90";
   return (
     <Modal
       open={open}
@@ -30,7 +35,7 @@ export function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={busy}
-            className="px-4 py-2 rounded-md bg-ih-bad-fg text-white text-[13px] font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+            className={`px-4 py-2 rounded-md text-[13px] font-bold transition-opacity disabled:opacity-50 ${confirmClass}`}
           >
             {confirmLabel}
           </button>
