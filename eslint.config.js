@@ -10,12 +10,24 @@ import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescrip
 // object to 'warn' (preserving any non-severity options), rather than hand-
 // picking which of a preset's rules to enable. Used for jsx-a11y's flat
 // recommended config below — see task-hooks-brief.md severity policy.
+//
+// Rules the preset ships as 'off'/0 by design (deprecated rules like
+// jsx-a11y/label-has-for, or rules superseded by another on-rule like
+// anchor-ambiguous-text / control-has-associated-label) must NOT be force-
+// enabled here — filter those out first, then only warn-ify what the preset
+// actually turns on. (T-hooks review fix — the first pass warn-ified
+// everything including the off-by-design rules, corrupting the audit table.)
 function toWarn(rules) {
     return Object.fromEntries(
-        Object.entries(rules).map(([name, value]) => [
-            name,
-            Array.isArray(value) ? ['warn', ...value.slice(1)] : 'warn',
-        ]),
+        Object.entries(rules)
+            .filter(([, value]) => {
+                const severity = Array.isArray(value) ? value[0] : value;
+                return severity !== 'off' && severity !== 0;
+            })
+            .map(([name, value]) => [
+                name,
+                Array.isArray(value) ? ['warn', ...value.slice(1)] : 'warn',
+            ]),
     );
 }
 
