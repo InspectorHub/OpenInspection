@@ -1,7 +1,1 @@
-[
-  "duplicates:server/lib/validations/auth.schema.ts:TotpDisableSchema|TotpRegenerateSchema",
-  "exports:server/lib/format.ts:formatDate",
-  "exports:server/lib/format.ts:formatTime",
-  "types:app/lib/hub-blocks.ts:PillTone",
-  "types:server/lib/validations/wizard.schema.ts:CreateInspectionFromWizardInput"
-]
+[]

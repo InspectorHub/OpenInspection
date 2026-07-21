@@ -22,7 +22,6 @@ import { signJwt, verifyJwt } from '../../lib/jwt-keyring';
 import {
     TotpVerifySchema,
     TotpDisableSchema,
-    TotpRegenerateSchema,
     TotpLoginSchema,
     TotpSetupResponseSchema,
     Login2faResponseSchema
@@ -97,7 +96,7 @@ const totpRegenRoute = createRoute(withMcpMetadata({
     summary: 'Regenerate 2FA recovery codes',
     description: 'Invalidates all existing 2FA recovery codes and returns a fresh set of eight. Requires the current password plus a valid TOTP or recovery code.',
     tags: ['auth'],
-    request: { body: { content: { 'application/json': { schema: TotpRegenerateSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
+    request: { body: { content: { 'application/json': { schema: TotpDisableSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
     responses: {
         200: { content: { 'application/json': { schema: TotpSetupResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'New recovery codes' },
         401: { description: 'Unauthorized' },

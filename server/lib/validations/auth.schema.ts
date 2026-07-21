@@ -102,8 +102,6 @@ export const TotpDisableSchema = z.object({
     }),
 });
 
-export const TotpRegenerateSchema = TotpDisableSchema;
-
 export const TotpLoginSchema = z.object({
     challengeToken: z.string().min(10).openapi({
         example: 'eyJhbGciOiJI...',
