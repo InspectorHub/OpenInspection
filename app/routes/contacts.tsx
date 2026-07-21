@@ -44,7 +44,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   try {
     const [contactsRes, rolesRes, emailTemplatesRes, smsTemplatesRes] = await Promise.all([
-      api.contacts.index.$get({ query: filterType === "agent" || filterType === "client" ? { type: filterType } : {} }),
+      // Always fetch the full contact list, regardless of the URL `?type=`
+      // filter. Both tabs filter locally — the Contacts tab by the `typeFilter`
+      // state (seeded from `?type=`) and the Agents tab by `type === 'agent'`.
+      // Filtering server-side would starve the Agents tab on a `?type=client`
+      // deep-link (it would receive zero agents). `filterType` still seeds the
+      // dropdown below so the deep-link intent is preserved for the Contacts tab.
+      api.contacts.index.$get({ query: {} }),
       api.roleProfiles.index.$get(),
       api.messageTemplates.index.$get({ query: { channel: "email" } }).catch(() => null),
       api.messageTemplates.index.$get({ query: { channel: "sms" } }).catch(() => null),

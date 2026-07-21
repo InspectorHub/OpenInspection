@@ -111,6 +111,7 @@ export const EraseDataResponseSchema = createApiResponseSchema(z.object({
 export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
     members: z.array(z.object({
         id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+        name: z.string().nullable().describe("The member's display name; null when never set (renders as 'Unnamed')."),
         email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
         role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
         createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),

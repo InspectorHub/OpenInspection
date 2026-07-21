@@ -68,7 +68,13 @@ export default tseslint.config(
             // floating/misused-promises are the headline pre-release signal —
             // silent unawaited promises are a data-loss bug class on Workers.
             '@typescript-eslint/no-floating-promises': 'warn',
-            '@typescript-eslint/no-misused-promises': 'warn',
+            // `checksVoidReturn.attributes: false` — passing an async function to
+            // a JSX event-handler prop (`onClick={async () => …}`) is idiomatic
+            // React (the return is ignored by design); flagging it is pure noise.
+            // The pre-release triage confirmed 43/45 misused-promises hits were
+            // exactly this pattern and zero were server-executed. The remaining
+            // argument/return/property checks stay on to catch genuine misuse.
+            '@typescript-eslint/no-misused-promises': ['warn', { checksVoidReturn: { attributes: false } }],
             '@typescript-eslint/await-thenable': 'warn',
             '@typescript-eslint/require-await': 'warn',
             '@typescript-eslint/no-base-to-string': 'warn',

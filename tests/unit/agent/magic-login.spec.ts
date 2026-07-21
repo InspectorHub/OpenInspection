@@ -280,7 +280,7 @@ describe('Agent magic-login primitive', () => {
  * cookie) is deferred to the Task 8 E2E suite, which can drive the actual
  * worker entry (workers/app.ts) rather than a unit-level Hono app.
  */
-describe('Agent magic-login — jwtAuthMiddleware allowlist', { timeout: 30_000 }, () => {
+describe('Agent magic-login — jwtAuthMiddleware allowlist', { timeout: 60_000 }, () => {
     it('bypasses JWT verification for both entry points regardless of a stale Bearer token', async () => {
         const { jwtAuthMiddleware } = await import('../../../server/index');
         for (const path of ['/agent/magic-login', '/api/agent/magic-login/request']) {

@@ -67,6 +67,7 @@ export class TeamService {
         const [activeUsers, pendingInvites, tenantRecord] = await Promise.all([
             db.select({
                 id: users.id,
+                name: users.name,
                 email: users.email,
                 role: users.role,
                 createdAt: users.createdAt

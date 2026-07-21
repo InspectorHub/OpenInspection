@@ -239,7 +239,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         // blockConcurrencyWhile suspends all incoming requests until the
         // Promise resolves, guaranteeing that a hibernation-reconstructed DO
         // always has the persisted state loaded before the first message.
-        ctx.blockConcurrencyWhile(() => this.hydrate());
+        void ctx.blockConcurrencyWhile(() => this.hydrate()); // void: not awaitable in ctor; runtime gates on it internally
 
         // Relay doc updates to all connected sockets (except the originator)
         // and schedule a debounced persist. The handler is a STABLE bound method
