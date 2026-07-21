@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { CLIENT_PROFILE_LIST } from "~/lib/report-style/profiles-client";
 import { useLoaderData, useFetcher, Link, isRouteErrorResponse, useRouteError } from "react-router";
 import type { Route } from "./+types/template-edit";
 import { requireToken } from "~/lib/session.server";
@@ -90,7 +91,8 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     const defectCatBody = await defectCatRes.json() as { data?: Array<{ id: string; name: string; color: string }> };
     defectCategories = defectCatBody.data ?? [];
   }
-  return { id, name, version, schema, token, defectCategories };
+  const defaultProfileId = (tpl?.defaultProfileId as string | null) ?? null;
+  return { id, name, version, schema, token, defectCategories, defaultProfileId };
 }
 
 /* ------------------------------------------------------------------ */
@@ -103,10 +105,11 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const name = formData.get("name") as string;
   const schemaStr = formData.get("schema") as string;
   if (!schemaStr) return { error: m.templates_edit_error_no_schema() };
+  const defaultProfileIdRaw = formData.get("defaultProfileId");
   const api = createApi(context, { token });
   const res = await api.inspections.templates[":id"].$put({
     param: { id: params.id },
-    json: { name, schema: JSON.parse(schemaStr) },
+    json: { name, schema: JSON.parse(schemaStr), defaultProfileId: defaultProfileIdRaw ? (defaultProfileIdRaw as string) : null },
   });
   if (res.ok) {
     const data = await res.json();
@@ -130,7 +133,7 @@ function serializeCanned(c: CannedComment): Record<string, unknown> {
 }
 
 export default function TemplateEditPage() {
-  const { id, name: initialName, version: initialVersion, schema: initial, defectCategories } = useLoaderData<typeof loader>();
+  const { id, name: initialName, version: initialVersion, schema: initial, defectCategories, defaultProfileId: initialDefaultProfileId } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
 
   // Authoring unification Plan-4 module K — one tenant-wide category → color
@@ -146,6 +149,7 @@ export default function TemplateEditPage() {
   }, [defectCategories]);
 
   const [templateName, setTemplateName] = useState(initialName);
+  const [defaultProfileId, setDefaultProfileId] = useState<string>(initialDefaultProfileId ?? "");
   const [sections, setSections] = useState<TemplateSection[]>(initial.sections || []);
   const [propertyType, setPropertyType] = useState<PropertyType | undefined>(initial.propertyType);
   const [commercialSubtype, setCommercialSubtype] = useState<string | undefined>(initial.commercialSubtype);
@@ -392,7 +396,7 @@ export default function TemplateEditPage() {
 
   function handleSave() {
     fetcher.submit(
-      { name: templateName, schema: JSON.stringify(toV2Payload()) },
+      { name: templateName, schema: JSON.stringify(toV2Payload()), defaultProfileId: defaultProfileId ?? "" },
       { method: "post" },
     );
   }
@@ -504,12 +508,26 @@ export default function TemplateEditPage() {
         </div>
       </header>
 
-      <div className="flex items-center h-10 px-4 border-b border-ih-border bg-ih-bg-card shrink-0">
+      <div className="flex items-center h-10 px-4 border-b border-ih-border bg-ih-bg-card shrink-0 gap-4">
         <TemplatePropertyTypePanel
           propertyType={propertyType}
           commercialSubtype={commercialSubtype}
           onChange={(patch) => { setPropertyType(patch.propertyType); setCommercialSubtype(patch.commercialSubtype); }}
         />
+        <label className="flex items-center gap-2 text-[12px] text-ih-fg-3 whitespace-nowrap" title={m.templates_edit_appearance_help()}>
+          {m.templates_edit_appearance_label()}
+          <select
+            value={defaultProfileId}
+            onChange={(e) => setDefaultProfileId(e.target.value)}
+            className="h-7 px-2 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-1 text-[12px] focus:border-ih-primary focus:shadow-ih-focus outline-none"
+            data-testid="template-default-profile"
+          >
+            <option value="">{m.templates_edit_appearance_inherit()}</option>
+            {CLIENT_PROFILE_LIST.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {fetcherData?.error && (

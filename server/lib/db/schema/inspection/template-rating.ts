@@ -33,6 +33,9 @@ export const templates = sqliteTable('templates', {
     commercialSubtype: text('commercial_subtype'),
     description: text('description'),
     featured: integer('is_featured', { mode: 'boolean' }).notNull().default(false),
+    // Report Style Presets — ties a report type to a default appearance profile.
+    // NULL = inherit tenant default. Appended at table end (FK-referenced).
+    defaultProfileId: text('default_profile_id'),
 }, (t) => [
     index('idx_templates_tenant').on(t.tenantId),
     index('idx_templates_rating_system').on(t.ratingSystemId),

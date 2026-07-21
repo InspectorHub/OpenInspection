@@ -218,7 +218,7 @@ export class TemplateService {
      * Updates an existing template, incrementing the version.
      * Spec 5B: when schema is supplied it MUST validate as v2.
      */
-    async updateTemplate(id: string, tenantId: string, name?: string, schema?: string | Record<string, unknown>) {
+    async updateTemplate(id: string, tenantId: string, name?: string, schema?: string | Record<string, unknown>, defaultProfileId?: string | null) {
         const db = this.getDrizzle();
         const existing = await this.getTemplate(id, tenantId);
 
@@ -236,6 +236,7 @@ export class TemplateService {
             version: number;
             propertyType?: string | null;
             commercialSubtype?: string | null;
+            defaultProfileId?: string | null;
         } = {
             name: name ?? (existing.name as string),
             schema: nextSchema,
@@ -244,6 +245,9 @@ export class TemplateService {
         if (mirror) {
             updateData.propertyType = mirror.propertyType;
             updateData.commercialSubtype = mirror.commercialSubtype;
+        }
+        if (defaultProfileId !== undefined) {
+            updateData.defaultProfileId = defaultProfileId;
         }
 
         await db.update(templates).set(updateData).where(eq(templates.id, id));

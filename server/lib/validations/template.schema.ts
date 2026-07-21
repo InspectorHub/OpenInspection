@@ -239,6 +239,7 @@ export const TemplateSchemaV2Schema = z.object({
  */
 export const CreateTemplateSchema = z.object({
     name: z.string().min(1, 'Template name is required').max(100).describe('TODO describe name field for the OpenInspection MCP integration'),
+    defaultProfileId: z.string().nullable().optional().describe('Default report appearance profile id for inspections from this template; null inherits the tenant default'),
     schema: z.union([
         z.string().transform((s, ctx) => {
             try {

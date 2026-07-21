@@ -1,20 +1,18 @@
 import { describe, it, expect } from 'vitest';
+import { isServableBrandAsset } from '../../../server/lib/report-style/brand-asset-key';
 
 /**
- * Tests for the brand-asset R2 key guard in
- * server/api/public/inspector-profile.ts (brandAssetRoute handler).
+ * Tests for the brand-asset R2 key guard (shared predicate isServableBrandAsset,
+ * used by server/api/public/inspector-profile.ts brandAssetRoute handler).
  *
- * The guard allows only two key shapes:
- *   new:    {tenantId}/branding/logo-{uuid}.{ext}
- *   legacy: branding/{tenantId}/logo-{ts}.{ext}
+ * The guard allows only these key shapes:
+ *   new logo:   {tenantId}/branding/logo-{uuid}.{ext}
+ *   legacy:     branding/{tenantId}/logo-{ts}.{ext}
+ *   credential: {tenantId}/credentials/{credentialId}/logo-{uuid}.{ext}
  */
 
-function isBrandingLogo(key: string): boolean {
-    return (
-        /^[^/.][^/]*\/branding\/logo-[^/]+$/.test(key) ||
-        /^branding\/[^/.][^/]*\/logo-[^/]+$/.test(key)
-    );
-}
+// Alias so the existing assertions keep reading naturally.
+const isBrandingLogo = isServableBrandAsset;
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 
@@ -79,5 +77,20 @@ describe('brand-asset guard — rejection of arbitrary keys', () => {
 
     it('rejects report PDF key', () => {
         expect(isBrandingLogo(`${TENANT}/inspections/i-1/report/3.pdf`)).toBe(false);
+    });
+});
+
+describe('brand-asset guard — credential images', () => {
+    it('allows tenant-rooted credential images', () => {
+        expect(isServableBrandAsset(`${TENANT}/credentials/cred123/logo-abc.png`)).toBe(true);
+    });
+
+    it('rejects a credential key with an extra path segment', () => {
+        expect(isServableBrandAsset(`${TENANT}/credentials/cred123/logo-abc.png/extra`)).toBe(false);
+    });
+
+    it('still rejects arbitrary keys under a similar-looking prefix', () => {
+        expect(isServableBrandAsset(`${TENANT}/secrets/x.png`)).toBe(false);
+        expect(isServableBrandAsset('../etc/passwd')).toBe(false);
     });
 });

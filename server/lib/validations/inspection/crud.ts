@@ -131,7 +131,9 @@ export const UpdateInspectionSchema = z.object({
     // list ("Realtor", "Past Client", ...) plus tenant custom values both
     // round-trip without a separate enum.
     referralSource: z.string().max(100).nullable().optional().openapi({ example: 'Realtor' }).describe('TODO describe referralSource field for the OpenInspection MCP integration'),
-    reportThemeOverride: z.enum(['modern', 'classic', 'minimal']).nullable().optional().openapi({ example: 'classic' }).describe('TODO describe reportThemeOverride field for the OpenInspection MCP integration'),
+    profileOverride: z.string().nullable().optional().openapi({ example: 'meridian' }).describe('Per-inspection appearance profile override (built-in profile id); NULL inherits'),
+    badgeLayoutOverride: z.enum(['strip', 'inline']).nullable().optional().openapi({ example: 'inline' }).describe('Per-inspection credential badge layout override; NULL inherits the profile'),
+    reportPhotoColumns: z.number().int().min(1).max(4).nullable().optional().openapi({ example: 2 }).describe('Per-inspection report photo grid columns (1-4); NULL inherits the profile'),
     // DB-16 — report cover photo. References an inspection_media_pool row id
     // belonging to THIS inspection (validated in the PATCH handler via
     // isInspectionPhotoKey); null clears the cover. The value is an R2 photo

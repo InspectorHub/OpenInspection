@@ -393,7 +393,6 @@ const adminSettingsRoutes = createApiRouter()
         if (existing.length === 0) {
             await db.insert(tenantConfigs).values({
                 tenantId,
-                reportTheme: 'modern',
                 attentionThresholds: body,
                 updatedAt: new Date(),
             });

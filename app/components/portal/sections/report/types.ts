@@ -279,6 +279,19 @@ export interface CostTables {
  * route and the portal route can type their loaders against it and feed it to
  * `reportViewProps()`.
  */
+/** App-side mirror of the server StyleProfile (Report Style Presets). The report
+ *  payload carries this resolved shape; app/ cannot import server/lib. tokens is a
+ *  flat CSS-var value map consumed by presetTokens(). */
+interface StyleProfileClient {
+  id: string;
+  name: string;
+  schemaVersion: number;
+  colour: string | null;
+  badgeLayout: 'strip' | 'inline';
+  photoColumns: number;
+  tokens: Record<string, string>;
+}
+
 export interface ReportLoaderResult {
   inspectionId: string;
   address: string;
@@ -297,7 +310,8 @@ export interface ReportLoaderResult {
   brand: TenantBrand;
   error: string | null;
   notPublished: boolean;
-  reportTheme?: string;
+  styleProfile?: StyleProfileClient;
+  inspectorCredentials?: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }>;
   initialFilter: FilterKey;
   printMode: boolean;
   /* Commercial PCA Task 19a — real TOC page numbers, two-pass Chrome + pdf-lib.

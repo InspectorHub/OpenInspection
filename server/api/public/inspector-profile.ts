@@ -5,6 +5,7 @@ import { tenants } from '../../lib/db/schema';
 import { createApiRouter } from '../../lib/openapi-router';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
+import { isServableBrandAsset } from '../../lib/report-style/brand-asset-key';
 
 // A-10 — the canonical tenant brand every public surface paints with.
 // Fields are nullable verbatim from tenant_configs; null primaryColor means
@@ -68,8 +69,7 @@ const publicInspectorProfileRoutes = createApiRouter()
         // R2 objects). New layout: {tenantId}/branding/logo-{uuid}.{ext}; legacy:
         // branding/{tenantId}/logo-{ts}.{ext}. Segments must be non-empty alphanumeric
         // identifiers (no ".." path traversal).
-        const isBrandingLogo = /^[^/.][^/]*\/branding\/logo-[^/]+$/.test(key) || /^branding\/[^/.][^/]*\/logo-[^/]+$/.test(key);
-        if (!isBrandingLogo) return c.notFound();
+        if (!isServableBrandAsset(key)) return c.notFound();
         const obj = await c.env.PHOTOS.get(key);
         if (!obj) return c.notFound();
         const headers = new Headers();

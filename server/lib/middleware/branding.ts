@@ -60,7 +60,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             logoUrl: tenantConfigs.logoUrl,
             supportEmail: tenantConfigs.supportEmail,
             billingUrl: tenantConfigs.billingUrl,
-            reportTheme: tenantConfigs.reportTheme
+            defaultProfileId: tenantConfigs.defaultProfileId
         })
         .from(tenantConfigs)
         .where(eq(tenantConfigs.tenantId, tenantId))
@@ -72,7 +72,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
             logoUrl: config.logoUrl,
             supportEmail: config.supportEmail || defaultBranding.supportEmail,
             billingUrl: config.billingUrl || defaultBranding.billingUrl,
-            reportTheme: (config.reportTheme || 'modern') as 'modern' | 'classic' | 'minimal',
+            defaultProfileId: config.defaultProfileId ?? 'signature',
             // Deployment flags re-applied — these are intentionally NOT cached
             // because they depend on the deployment profile (mode + login redirect base)
             // rather than on per-tenant config, so a tenant moving between
@@ -94,7 +94,7 @@ export const brandingMiddleware: MiddlewareHandler<HonoConfig> = async (c, next)
                     supportEmail: branding.supportEmail,
                     billingUrl:   branding.billingUrl,
                 };
-                if (branding.reportTheme !== undefined)     cacheable.reportTheme     = branding.reportTheme;
+                if (branding.defaultProfileId !== undefined) cacheable.defaultProfileId = branding.defaultProfileId;
                 c.executionCtx.waitUntil(c.env.TENANT_CACHE.put(cacheKey, JSON.stringify(cacheable), { expirationTtl: 3600 }));
             } catch {
                 // executionCtx unavailable in test environments

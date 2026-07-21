@@ -38,7 +38,7 @@ import { useSessionContext } from '~/hooks/useSessionContext';
 function sessionCtx(isSaas: boolean) {
     return {
         user: { role: 'owner', name: 'Alice', email: 'alice@example.com', initials: 'A' },
-        branding: { isSaas, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, reportTheme: 'default', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null },
+        branding: { isSaas, companyName: 'Test Co', primaryColor: '#000', logoUrl: null, defaultProfileId: 'signature', tenantSlug: null, tenantStatus: 'active', currentUserSlug: null, bookingHost: null, portalBaseUrl: null, privacyUrl: null },
         deployment: { mode: isSaas ? 'saas' : 'standalone', hasBilling: isSaas, hasSeatQuota: isSaas, mcpEnabled: true },
         seatUsage: null,
     };

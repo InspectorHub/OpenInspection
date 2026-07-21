@@ -32,6 +32,7 @@ import { NotificationService } from '../../services/notification.service';
 import { WidgetService } from '../../services/widget.service';
 import { RecommendationService } from '../../services/recommendation.service';
 import { ContractorTypeService } from '../../services/contractor-type.service';
+import { CredentialService } from '../../services/credential.service';
 import { EventService } from '../../services/event.service';
 import { InspectionTypeService } from '../../services/inspection-type.service';
 import { TotpService } from '../../services/totp.service';
@@ -278,6 +279,9 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'contractorType':
                     target.contractorType = new ContractorTypeService(c.env.DB);
+                    break;
+                case 'credentials':
+                    target.credentials = new CredentialService(c.env.DB, c.env.PHOTOS);
                     break;
                 case 'event':
                     target.event = new EventService(c.env.DB);

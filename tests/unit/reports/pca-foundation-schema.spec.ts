@@ -19,10 +19,11 @@ describe('Commercial PCA Phase F foundation columns', () => {
     // Phase F appended unit_inspection_mode/location_options/sampling_declaration;
     // Phase S then appended pca_narrative/deviations after them; Phase P then
     // appended report_photo_mode; A-polish 9b then appended the scheduled instant
-    // trio. All appended at the tail (never mid-list) so db:generate emits ALTER
-    // ADD COLUMN, not a rebuild.
+    // trio; Report Style Presets (Plan 1a) then appended the badge_layout_override
+    // + report_photo_columns tweak pair. All appended at the tail (never mid-list)
+    // so db:generate emits ALTER ADD COLUMN, not a rebuild.
     const names = getTableConfig(inspections).columns.map((c) => c.name);
-    const tail = names.slice(-9);
+    const tail = names.slice(-11);
     expect(tail).toEqual([
       'unit_inspection_mode',
       'location_options',
@@ -33,6 +34,8 @@ describe('Commercial PCA Phase F foundation columns', () => {
       'scheduled_start_ms',
       'scheduled_end_ms',
       'duration_min',
+      'badge_layout_override',
+      'report_photo_columns',
     ]);
   });
 

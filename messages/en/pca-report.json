@@ -88,6 +88,7 @@
   "pca_signature_draft_note": "This report is unsigned and has not been published.",
   "pca_signature_signed_by": "Inspected & Signed By",
   "pca_signature_img_alt": "Inspector signature",
+  "pca_signature_credential_alt": "Inspector credential badge",
   "pca_signature_license": "License #{license}",
   "pca_signature_timezone_note": "All report times shown in {tz}.",
   "pca_signature_electronically_signed": "Electronically signed by {name}",

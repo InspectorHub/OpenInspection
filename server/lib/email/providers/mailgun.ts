@@ -1,6 +1,7 @@
 import { logger } from '../../logger';
 import type { EmailProvider, EmailSendArgs, EmailWebhookContext, NormalizedEmailEvent } from '../provider';
 import {
+  base64ToBytes,
   bytesToHex,
   constantTimeEquals,
   hmacSha256,
@@ -26,19 +27,46 @@ export class MailgunProvider implements EmailProvider {
   async sendEmail(
     args: EmailSendArgs,
   ): Promise<{ ok: true; id?: string } | { ok: false; error: string }> {
-    const params = new URLSearchParams();
-    params.append('from', args.from);
-    // Normalize to: string | string[] → one `to` field per address (URLSearchParams allows repeats).
-    if (Array.isArray(args.to)) {
-      for (const addr of args.to) {
-        params.append('to', addr);
+    const hasAttachments = !!(args.attachments && args.attachments.length > 0);
+    // Binary attachments can't ride urlencoded — switch to multipart only when present,
+    // keeping the urlencoded path (and its assertions) intact for the common no-attachment case.
+    const headers: Record<string, string> = { 'Authorization': this.authHeader };
+    let body: FormData | string;
+
+    if (hasAttachments) {
+      const form = new FormData();
+      form.append('from', args.from);
+      for (const addr of Array.isArray(args.to) ? args.to : [args.to]) form.append('to', addr);
+      form.append('subject', args.subject);
+      form.append('html', args.html);
+      if (args.replyTo) form.append('h:Reply-To', args.replyTo);
+      for (const a of args.attachments!) {
+        const bytes = base64ToBytes(a.content);
+        form.append(
+          'attachment',
+          new Blob([bytes], { type: a.content_type ?? 'application/octet-stream' }),
+          a.filename,
+        );
       }
+      // fetch sets the multipart Content-Type + boundary automatically — do not set it by hand.
+      body = form;
     } else {
-      params.append('to', args.to);
+      const params = new URLSearchParams();
+      params.append('from', args.from);
+      // Normalize to: string | string[] → one `to` field per address (URLSearchParams allows repeats).
+      if (Array.isArray(args.to)) {
+        for (const addr of args.to) {
+          params.append('to', addr);
+        }
+      } else {
+        params.append('to', args.to);
+      }
+      params.append('subject', args.subject);
+      params.append('html', args.html);
+      if (args.replyTo) params.append('h:Reply-To', args.replyTo);
+      headers['Content-Type'] = 'application/x-www-form-urlencoded';
+      body = params.toString();
     }
-    params.append('subject', args.subject);
-    params.append('html', args.html);
-    if (args.replyTo) params.append('h:Reply-To', args.replyTo);
 
     let res: Response;
     try {
@@ -46,11 +74,8 @@ export class MailgunProvider implements EmailProvider {
         `https://api.mailgun.net/v3/${this.creds.domain}/messages`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': this.authHeader,
-          },
-          body: params.toString(),
+          headers,
+          body,
         },
       );
     } catch (err) {

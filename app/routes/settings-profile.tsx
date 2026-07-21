@@ -16,6 +16,7 @@ import { Select } from "@core/shared-ui";
 import { TIMEZONE_SELECT_OPTIONS } from "~/lib/timezones";
 import { LOCALE_OPTIONS } from "~/lib/locales";
 import { SectionNav } from "~/components/settings/SectionNav";
+import { CredentialsEditor, type EditorCredential } from "~/components/settings/CredentialsEditor";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -42,9 +43,13 @@ interface Profile {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });
-  const res = await api.profile.index.$get();
+  const [res, credRes] = await Promise.all([
+    api.profile.index.$get(),
+    api.credentials.index.$get(),
+  ]);
   const body = res.ok ? ((await res.json()) as Record<string, unknown>) : {};
-  return { profile: (body.data ?? {}) as Profile };
+  const credBody = credRes.ok ? ((await credRes.json()) as { data?: EditorCredential[] }) : { data: [] };
+  return { profile: (body.data ?? {}) as Profile, credentials: credBody.data ?? [] };
 }
 
 /* ------------------------------------------------------------------ */
@@ -91,6 +96,35 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { success: true, error: null, intent };
   }
 
+  // Inspector credentials (Spec B) — each mutation revalidates the loader so the
+  // editor re-renders with fresh rows. '' member number clears to null.
+  if (intent === "credential-add") {
+    await api.credentials.index.$post({ json: { label: "" } });
+    return { success: true, error: null, intent };
+  }
+  if (intent === "credential-update") {
+    const id = fd.get("id") as string;
+    const patch: Record<string, unknown> = {};
+    if (fd.has("label")) patch.label = fd.get("label") as string;
+    if (fd.has("memberNumber")) patch.memberNumber = (fd.get("memberNumber") as string) || null;
+    await api.credentials[":id"].$patch({ param: { id }, json: patch });
+    return { success: true, error: null, intent };
+  }
+  if (intent === "credential-delete") {
+    const id = fd.get("id") as string;
+    await api.credentials[":id"].$delete({ param: { id } });
+    return { success: true, error: null, intent };
+  }
+  if (intent === "credential-image") {
+    const id = fd.get("id") as string;
+    const image = fd.get("image");
+    if (!(image instanceof File) || image.size === 0) {
+      return { success: false, error: m.settings_profile_error_no_photo(), intent };
+    }
+    await api.credentials[":id"].image.$post({ param: { id }, form: { image } } as Parameters<typeof api.credentials[":id"]["image"]["$post"]>[0]);
+    return { success: true, error: null, intent };
+  }
+
   // Default: save profile fields
   const submission = parseWithZod(fd, { schema: makeProfileSchema() });
   if (submission.status !== "success") {
@@ -125,7 +159,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function SettingsProfilePage() {
-  const { profile } = useLoaderData<typeof loader>();
+  const { profile, credentials } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [avatarSource, setAvatarSource] = useState<string | null>(null);
   // DB-12 / IA-26 — useSessionContext / tenantSlug removed; slug section gone.
@@ -153,6 +187,35 @@ export default function SettingsProfilePage() {
       window.location.reload();
     }
   }, [photoFetcher.state, photoFetcher.data]);
+
+  // Inspector credentials (Spec B) — mutations route through the action (BFF);
+  // RR revalidates the loader afterward, so the editor re-renders with fresh rows.
+  const credFetcher = useFetcher();
+  const credImageFetcher = useFetcher<{ intent?: string }>();
+  const [uploadingCredId, setUploadingCredId] = useState<string | null>(null);
+  useEffect(() => {
+    if (credImageFetcher.state === "idle") setUploadingCredId(null);
+  }, [credImageFetcher.state]);
+  const onCredAdd = () => credFetcher.submit({ intent: "credential-add" }, { method: "post" });
+  const onCredUpdate = (id: string, patch: { label?: string; memberNumber?: string }) =>
+    credFetcher.submit(
+      {
+        intent: "credential-update",
+        id,
+        ...(patch.label !== undefined ? { label: patch.label } : {}),
+        ...(patch.memberNumber !== undefined ? { memberNumber: patch.memberNumber } : {}),
+      },
+      { method: "post" },
+    );
+  const onCredDelete = (id: string) => credFetcher.submit({ intent: "credential-delete", id }, { method: "post" });
+  const onCredUpload = (id: string, file: File) => {
+    setUploadingCredId(id);
+    const f = new FormData();
+    f.append("intent", "credential-image");
+    f.append("id", id);
+    f.append("image", file);
+    credImageFetcher.submit(f, { method: "post", encType: "multipart/form-data" });
+  };
 
   // Timezone field — the tenant's own display tz. The <select> stays
   // uncontrolled (Conform reparses its DOM value on submit); we mirror the
@@ -189,6 +252,7 @@ export default function SettingsProfilePage() {
     { id: "photo", label: m.settings_profile_photo_heading() },
     { id: "signature", label: m.settings_profile_signature_heading() },
     { id: "saved-signature", label: m.settings_profile_saved_signature_heading() },
+    { id: "credentials", label: m.settings_profile_credentials_heading() },
   ];
 
   return (
@@ -411,6 +475,15 @@ export default function SettingsProfilePage() {
           </button>
         )}
       </section>
+
+      <CredentialsEditor
+        credentials={credentials}
+        uploadingId={uploadingCredId}
+        onAdd={onCredAdd}
+        onUpdate={onCredUpdate}
+        onDelete={onCredDelete}
+        onUpload={onCredUpload}
+      />
 
       {avatarSource && (
         <AvatarCropper

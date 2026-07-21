@@ -84,6 +84,7 @@ import notificationsRoutes from './api/notifications';
 import inspectionSyncRoutes from './api/inspection-sync';
 import recommendationsRoutes from './api/recommendations';
 import contractorTypesRoutes from './api/contractor-types';
+import credentialsRoutes from './api/credentials';
 import roleProfilesRoutes from './api/role-profiles';
 import ratingSystemsRoutes from './api/rating-systems';
 import eventsRoutes from './api/events';
@@ -455,6 +456,7 @@ const routes = app
   .route('/api/integrations', integrationsApiRoutes)
   .route('/api/analytics', analyticsRoutes)
   .route('/api/inspections', inspectionsRoutes)
+  .route('/api/credentials', credentialsRoutes)
   // Design System 0520 subsystem B phase 2 — tenant-level presence channel
   // (one WS per dashboard tab). Per-inspection presence is mounted inline on
   // inspectionsRoutes above as /api/inspections/:id/presence/ws.

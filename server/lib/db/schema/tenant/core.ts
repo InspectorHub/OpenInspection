@@ -84,7 +84,9 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     dekEnc: text('dek_enc'),
     icsToken: text('ics_token'),
     widgetAllowedOrigins: text('widget_allowed_origins', { mode: 'json' }).$type<string[]>(),
-    reportTheme: text('report_theme', { enum: ['modern', 'classic', 'minimal'] }).notNull().default('modern'),
+    // Report Style Presets — default appearance profile id (built-in: signature|meridian|terra).
+    // Open-ended (Phase 2 adds tenant-authored profiles); resolveProfile falls back to 'signature'.
+    defaultProfileId: text('default_profile_id').notNull().default('signature'),
     // handoff-decisions §1 — per-team attention thresholds in hours.
     // Default 72h applies uniformly to the three categories.
     attentionThresholds: text('attention_thresholds', { mode: 'json' })

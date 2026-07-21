@@ -25,6 +25,14 @@ export class SendgridProvider implements EmailProvider {
       content: [{ type: 'text/html', value: args.html }],
     };
     if (args.replyTo) payload.reply_to = { email: args.replyTo };
+    if (args.attachments && args.attachments.length > 0) {
+      payload.attachments = args.attachments.map((a) => ({
+        content: a.content,
+        filename: a.filename,
+        ...(a.content_type ? { type: a.content_type } : {}),
+        disposition: 'attachment',
+      }));
+    }
 
     let res: Response;
     try {

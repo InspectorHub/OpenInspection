@@ -1708,6 +1708,11 @@
             "maxLength": 100,
             "description": "TODO describe name field for the OpenInspection MCP integration"
           },
+          "defaultProfileId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default report appearance profile id for inspections from this template; null inherits the tenant default"
+          },
           "schema": {
             "anyOf": [
               {
@@ -4030,6 +4035,42 @@
     "description": "Auto-generated placeholder for createInspectionWizard (POST /wizard, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "createInspectorCredential",
+    "method": "POST",
+    "pathTemplate": "/api/credentials",
+    "scopes": [
+      "write"
+    ],
+    "tag": "credentials",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "default": "",
+            "description": "Human-readable credential label shown on reports, e.g. \"InterNACHI Certified Professional Inspector\"."
+          },
+          "memberNumber": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60,
+            "description": "Optional membership or license number displayed alongside the credential label."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Display order for this credential within the inspector list (ascending)."
+          }
+        }
+      }
+    },
+    "summary": "Add a credential for the signed-in inspector",
+    "description": "Adds a credential row for the signed-in inspector (image uploaded separately)."
+  },
+  {
     "operationId": "createInvoice",
     "method": "POST",
     "pathTemplate": "/api/invoices",
@@ -5542,6 +5583,34 @@
     },
     "summary": "Delete a walk-through video from the backend + drop the pool row",
     "description": "Delete a video from the active backend (Cloudflare Stream or R2) and remove its media-pool row. Pass the Stream UID for Stream videos or the mediaId for R2 videos."
+  },
+  {
+    "operationId": "deleteInspectorCredential",
+    "method": "DELETE",
+    "pathTemplate": "/api/credentials/{id}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "credentials",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The credential id to delete; scoped to the signed-in inspector.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The credential id to delete; scoped to the signed-in inspector."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Delete an inspector credential and its image",
+    "description": "Deletes a credential and purges its uploaded image."
   },
   {
     "operationId": "deleteInvoice",
@@ -9932,6 +10001,22 @@
     },
     "summary": "Diff version :n against ?from=<version>",
     "description": "Auto-generated placeholder for listInspectionVersionsDiff (GET /{id}/versions/{n}/diff, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "listInspectorCredentials",
+    "method": "GET",
+    "pathTemplate": "/api/credentials",
+    "scopes": [
+      "read"
+    ],
+    "tag": "credentials",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "List the signed-in inspector's credentials",
+    "description": "Lists the signed-in inspector self-asserted credentials (label, member number, badge image)."
   },
   {
     "operationId": "listIntegrationStatus",
@@ -16615,6 +16700,11 @@
             "maxLength": 100,
             "description": "TODO describe name field for the OpenInspection MCP integration"
           },
+          "defaultProfileId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default report appearance profile id for inspections from this template; null inherits the tenant default"
+          },
           "schema": {
             "anyOf": [
               {
@@ -18733,6 +18823,54 @@
     "description": "Auto-generated placeholder for updateInspectionTemplate (PUT /templates/{id}, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "updateInspectorCredential",
+    "method": "PATCH",
+    "pathTemplate": "/api/credentials/{id}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "credentials",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The credential id to update; scoped to the signed-in inspector.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The credential id to update; scoped to the signed-in inspector."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 120,
+            "default": "",
+            "description": "Human-readable credential label shown on reports, e.g. \"InterNACHI Certified Professional Inspector\"."
+          },
+          "memberNumber": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 60,
+            "description": "Optional membership or license number displayed alongside the credential label."
+          },
+          "sortOrder": {
+            "type": "integer",
+            "description": "Display order for this credential within the inspector list (ascending)."
+          }
+        }
+      }
+    },
+    "summary": "Update an inspector credential label or number",
+    "description": "Updates a credential's label / member number / sort order."
+  },
+  {
     "operationId": "updateMessageTemplate",
     "method": "PATCH",
     "pathTemplate": "/api/message-templates/{id}",
@@ -19213,6 +19351,34 @@
     },
     "summary": "Upload inspection for current tenant",
     "description": "Auto-generated placeholder for uploadInspection (POST /{id}/upload, inspections domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "uploadInspectorCredentialImage",
+    "method": "POST",
+    "pathTemplate": "/api/credentials/{id}/image",
+    "scopes": [
+      "write"
+    ],
+    "tag": "credentials",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The credential id whose badge image is being uploaded or replaced.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The credential id whose badge image is being uploaded or replaced."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Upload/replace a credential badge image",
+    "description": "Uploads (or replaces) the badge image for a credential; returns the public asset URL."
   },
   {
     "operationId": "uploadMessageInspection",

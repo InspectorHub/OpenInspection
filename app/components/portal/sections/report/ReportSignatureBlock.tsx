@@ -18,9 +18,12 @@ export interface ReportSignatureBlockProps {
   ownerPreview: boolean;
   /** Tenant timezone (IANA) that anchors report times. Defaults to UTC. */
   timeZone?: string;
+  /** Report Style Presets (Spec B) — one small credential badge shown beside the
+   *  signer info. Text credentials stay on the license line; at most one badge. */
+  credentialBadgeUrl?: string | null;
 }
 
-export function ReportSignatureBlock({ isPublished, signature, ownerPreview, timeZone = "UTC" }: ReportSignatureBlockProps) {
+export function ReportSignatureBlock({ isPublished, signature, ownerPreview, timeZone = "UTC", credentialBadgeUrl = null }: ReportSignatureBlockProps) {
   const sig = signatureBlockModel({ isPublished, signature, ownerPreview });
   if (sig.variant === "draft") {
     return (
@@ -47,7 +50,7 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview, tim
             />
           )}
           {sig.variant === "typed" && (
-            <div className="font-serif italic text-2xl text-ih-fg-1 border-b border-ih-border pb-1 min-w-[160px]">
+            <div className="italic text-2xl text-ih-fg-1 border-b border-ih-border pb-1 min-w-[160px]" style={{ fontFamily: "var(--report-heading-font)" }}>
               {sig.inspectorName}
             </div>
           )}
@@ -55,6 +58,9 @@ export function ReportSignatureBlock({ isPublished, signature, ownerPreview, tim
             <div className="font-semibold text-ih-fg-1">{sig.inspectorName}</div>
             {sig.license && (
               <div className="text-ih-fg-4 text-xs">{m.pca_signature_license({ license: sig.license })}</div>
+            )}
+            {credentialBadgeUrl && (
+              <img src={credentialBadgeUrl} alt={m.pca_signature_credential_alt()} className="h-8 w-auto mt-1" />
             )}
             {sig.signedAt != null && (
               <div className="text-ih-fg-4 text-xs">{m.pca_signed_date({ date: formatEpochMs(sig.signedAt, timeZone) })}</div>

@@ -107,12 +107,10 @@ export function makeProfileSchema() {
 
 /**
  * Workspace branding — mirrors the API's `UpdateBrandingSchema`
- * (companyName 1..50, primaryColor #hex, reportTheme enum, customReferralSources
- * is a textarea split per-line in the action so it is NOT validated as an
- * array here).
+ * (companyName 1..50, primaryColor #hex, customReferralSources is a textarea
+ * split per-line in the action so it is NOT validated as an array here).
+ * The report appearance profile picker lives in a dedicated control (Plan 1b).
  */
-const THEMES = ["modern", "classic", "minimal"] as const;
-
 export function makeWorkspaceSchema() {
   return z.object({
     companyName: z
@@ -123,7 +121,7 @@ export function makeWorkspaceSchema() {
       .string()
       .regex(/^#[0-9A-Fa-f]{6}$/, m.validation_workspace_color_invalid())
       .optional(),
-    reportTheme: z.enum(THEMES).optional(),
+    defaultProfileId: z.enum(["signature", "meridian", "terra"]).optional(),
     customReferralSources: z.string().optional(),
     // Report-feature flags. Rendered as conform-native checkboxes (single input,
     // value "on", NO hidden "false" sibling) so a checked box submits ONE value that

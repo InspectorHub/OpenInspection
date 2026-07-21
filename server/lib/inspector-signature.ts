@@ -32,6 +32,10 @@ export interface SignatureUser {
     tenantSlug?: string | null;
     /** Per-inspector opt-in for the email footer; when false the footer is omitted. */
     signatureEnabled?: boolean | null;
+    /** Report Style Presets (Spec B) — the inspector's active credentials. Image
+     *  badges render in HTML (absolutized against host); all credentials also
+     *  render as text in both variants so a blocked image never loses them. */
+    credentials?: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }> | null;
 }
 
 export interface SignatureOutput {
@@ -73,6 +77,20 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
     const htmlLines: string[] = [];
     if (name)    htmlLines.push(`<strong>— ${name}</strong>`);
     if (license) htmlLines.push(`<span style="color:#475569">Licensed home inspector · ${license}</span>`);
+    // Credential badges (Spec B): images in HTML, all credentials also as text.
+    const creds = (user.credentials ?? []).filter((c) => c.imageUrl || (c.label ?? '').trim());
+    if (creds.length) {
+        const imgs = creds
+            .filter((c) => c.imageUrl)
+            .map((c) => {
+                const abs = c.imageUrl!.startsWith('/') ? `https://${host}${c.imageUrl}` : c.imageUrl!;
+                return `<img src="${escapeHtml(abs)}" alt="${escapeHtml(c.label || 'Credential')}" style="height:28px;width:auto;vertical-align:middle;margin-right:6px">`;
+            })
+            .join('');
+        if (imgs) htmlLines.push(imgs);
+        const credText = creds.map((c) => (c.memberNumber ? `${c.label} #${c.memberNumber}` : c.label)).filter((t) => t.trim()).join(' · ');
+        if (credText) htmlLines.push(`<span style="color:#475569">${escapeHtml(credText)}</span>`);
+    }
     const contactBits: string[] = [];
     if (phoneRaw && phoneE164) contactBits.push(`📞 <a href="tel:${phoneE164}">${phoneRaw}</a>`);
     if (email)                 contactBits.push(`✉️ <a href="mailto:${email}">${email}</a>`);
@@ -83,6 +101,11 @@ export function inspectorSignature(user: SignatureUser, host: string): Signature
     const textLines: string[] = ['--'];
     if (user.name)    textLines.push(`— ${user.name}`);
     if (user.licenseNumber) textLines.push(`Licensed home inspector · ${user.licenseNumber}`);
+    const credTextAll = (user.credentials ?? [])
+        .map((c) => (c.memberNumber ? `${c.label} #${c.memberNumber}` : c.label))
+        .filter((t) => (t ?? '').trim())
+        .join(' · ');
+    if (credTextAll) textLines.push(credTextAll);
     if (user.phone || user.email) {
         const cb: string[] = [];
         if (user.phone) cb.push(user.phone);

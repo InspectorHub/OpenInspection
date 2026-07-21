@@ -30,6 +30,10 @@ export const r2Keys = {
     `${t}/inspections/${i}/agreements/${envelopeId}/${name}`,
   brandingLogo: (t: string, mediaId: string, ext: string) =>
     `${t}/branding/logo-${mediaId}.${ext}`,
+  // Credential badge image — the `logo-` segment keeps it matching the shared
+  // brand-asset serving predicate (isServableBrandAsset).
+  credentialImage: (t: string, credentialId: string, mediaId: string, ext: string) =>
+    `${t}/credentials/${credentialId}/logo-${mediaId}.${ext}`,
   inspectorPhoto: (t: string, userId: string, ext: string) =>
     `${t}/inspector-photos/${userId}.${ext}`,
   /** Serve-side variant — accepts the full filename (userId.ext) from the URL param. */

@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, desc, asc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits } from '../../lib/db/schema';
+import { inspections, inspectionResults, templates, users, tenantConfigs, reportVersions, inspectionUnits, inspectorCredentials } from '../../lib/db/schema';
 import { buildUnitConditionMatrix, defectCountsByUnit } from '../../lib/unit-scope';
 import { Errors } from '../../lib/errors';
 import { resolveTenantTimeZone } from '../../lib/tz';
@@ -20,6 +20,7 @@ import { buildSystemsSummary } from '../../lib/pca-systems-summary';
 import { buildPcaReportBlock } from '../../lib/pca-report-block';
 import { gatedSectionRegistry } from '../../lib/pca-section-registry';
 import { buildReportOutline } from '../../lib/report-outline';
+import { resolveProfile } from '../../lib/report-style/resolve';
 import type { Deviation } from '../../lib/pca-deviations';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import { resolveCoverUrl, resolveDefectMustacheVars, RECOMMENDATION_CATEGORY_LABELS } from './shared';
@@ -455,10 +456,24 @@ export class InspectionReportService extends InspectionSubService {
             inspectorLicense = inspector?.licenseNumber ?? null;
         }
 
+        // Inspector Credentials & Association Badges (Spec B) — the inspector's
+        // active credentials, resolved to public asset URLs and snapshotted into
+        // the report payload. Empty rows (no image, blank label) are dropped.
+        let credentialSnapshot: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }> = [];
+        if (inspection.inspectorId) {
+            const credRows = await db.select().from(inspectorCredentials)
+                .where(and(eq(inspectorCredentials.tenantId, tenantId), eq(inspectorCredentials.userId, inspection.inspectorId), eq(inspectorCredentials.active, true)))
+                .orderBy(asc(inspectorCredentials.sortOrder), asc(inspectorCredentials.createdAt)).all();
+            credentialSnapshot = credRows
+                .filter((c) => c.imageR2Key || (c.label ?? '').trim())
+                .map((c) => ({ label: c.label, memberNumber: c.memberNumber, imageUrl: c.imageR2Key ? `/api/public/brand-asset?key=${encodeURIComponent(c.imageR2Key)}` : null }));
+        }
+
         // Sprint 2 S2-4 — per-tenant flag controls whether the published
         // report renders "Estimated cost: $X – $Y" badges on defect cards.
         let showEstimates = false;
-        let reportTheme: 'modern' | 'classic' | 'minimal' = 'modern';
+        // Report Style Presets — tenant's default appearance profile id (resolved below).
+        let tenantDefaultProfileId: string | null = null;
         // Per-tenant report-feature flags surfaced to the published report so the
         // client report can render the "View Repair List" and "Build repair request"
         // entries. Read live here (not part of the cached report content).
@@ -475,7 +490,7 @@ export class InspectionReportService extends InspectionSubService {
         try {
             const cfg = await db.select({
                 showEstimates: tenantConfigs.showEstimates,
-                reportTheme:   tenantConfigs.reportTheme,
+                defaultProfileId: tenantConfigs.defaultProfileId,
                 enableRepairList: tenantConfigs.enableRepairList,
                 enableCustomerRepairExport: tenantConfigs.enableCustomerRepairExport,
                 reserveScheduleEnabled: tenantConfigs.reserveScheduleEnabled,
@@ -494,20 +509,18 @@ export class InspectionReportService extends InspectionSubService {
                 reserveTermYears = cfg.reserveTermYears ?? 12;
                 inflationRateBps = cfg.inflationRateBps ?? null;
                 reportTimeZone = resolveTenantTimeZone(cfg.defaultTimezone);
-                if (cfg.reportTheme === 'classic' || cfg.reportTheme === 'minimal') {
-                    reportTheme = cfg.reportTheme;
-                }
+                tenantDefaultProfileId = cfg.defaultProfileId ?? null;
             }
         } catch {
             // tenant_configs row missing — defaults apply.
         }
-        // Per-inspection override wins over tenant default.
-        const inspectionThemeOverride = (inspection as { reportThemeOverride?: string | null }).reportThemeOverride;
-        if (inspectionThemeOverride === 'classic' || inspectionThemeOverride === 'minimal') {
-            reportTheme = inspectionThemeOverride;
-        } else if (inspectionThemeOverride === 'modern') {
-            reportTheme = 'modern';
-        }
+        // Report Style Presets (Plan 1a) — three-tier resolution + field-level tweaks.
+        const insp = inspection as { profileOverride?: string | null; badgeLayoutOverride?: string | null; reportPhotoColumns?: number | null };
+        const styleProfile = resolveProfile(
+            { profileOverride: insp.profileOverride ?? null, badgeLayoutOverride: insp.badgeLayoutOverride ?? null, reportPhotoColumns: insp.reportPhotoColumns ?? null },
+            template ? { defaultProfileId: (template as { defaultProfileId?: string | null }).defaultProfileId ?? null } : null,
+            { defaultProfileId: tenantDefaultProfileId },
+        );
 
         // Round-2 backlog G1 (Spectora §E.2) — Property Facts banner rendered
         // at the top of the published report. Surface the six dedicated
@@ -754,7 +767,8 @@ export class InspectionReportService extends InspectionSubService {
 
         return {
             inspection: { ...inspection, inspectorName },
-            theme: reportTheme,
+            styleProfile: { ...styleProfile, tokens: styleProfile.tokens as Record<string, string> },
+            inspectorCredentials: credentialSnapshot,
             amendmentTrail,
             reinspection,
             // DB-16 — resolved report cover image URL (cover_photo_id holds the

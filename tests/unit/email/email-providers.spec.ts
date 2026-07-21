@@ -124,6 +124,31 @@ describe('SendgridProvider', () => {
     const res = await new SendgridProvider({ apiKey: 'SG.x' }).validateCredentials!();
     expect(res).toEqual({ ok: false, error: 'SendGrid 403' });
   });
+
+  it('forwards attachments as SendGrid attachment objects', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 202 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new SendgridProvider({ apiKey: 'SG.test' });
+    const res = await provider.sendEmail({
+      from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>',
+      attachments: [{ filename: 'report.pdf', content: 'YmFzZTY0', content_type: 'application/pdf' }],
+    });
+    expect(res).toEqual({ ok: true });
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.attachments).toEqual([
+      { content: 'YmFzZTY0', filename: 'report.pdf', type: 'application/pdf', disposition: 'attachment' },
+    ]);
+  });
+
+  it('omits attachments field when none are present', async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 202 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await new SendgridProvider({ apiKey: 'SG.test' }).sendEmail({
+      from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>',
+    });
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect('attachments' in body).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -253,6 +278,33 @@ describe('PostmarkProvider', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 401 })));
     const res = await new PostmarkProvider({ apiKey: 'pm-x' }).validateCredentials!();
     expect(res).toEqual({ ok: false, error: 'Postmark 401' });
+  });
+
+  it('forwards attachments as Postmark Attachment objects (PascalCase)', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ MessageID: 'm1' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new PostmarkProvider({ apiKey: 'pm-test' });
+    await provider.sendEmail({
+      from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>',
+      attachments: [{ filename: 'invite.ics', content: 'aWNz', content_type: 'text/calendar' }],
+    });
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.Attachments).toEqual([
+      { Name: 'invite.ics', Content: 'aWNz', ContentType: 'text/calendar' },
+    ]);
+  });
+
+  it('defaults Postmark ContentType to application/octet-stream when content_type absent', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ MessageID: 'm2' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await new PostmarkProvider({ apiKey: 'pm-test' }).sendEmail({
+      from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>',
+      attachments: [{ filename: 'blob.bin', content: 'YmluYXJ5' }],
+    });
+    const body = JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.Attachments).toEqual([
+      { Name: 'blob.bin', Content: 'YmluYXJ5', ContentType: 'application/octet-stream' },
+    ]);
   });
 });
 
@@ -384,5 +436,33 @@ describe('MailgunProvider', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 401 })));
     const res = await new MailgunProvider({ apiKey: 'key-mg', domain: 'mg.example.com' }).validateCredentials!();
     expect(res).toEqual({ ok: false, error: 'Mailgun 401' });
+  });
+
+  it('sends attachments via multipart FormData (not urlencoded)', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'mg1' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new MailgunProvider({ apiKey: 'k', domain: 'mg.example.com' });
+    await provider.sendEmail({
+      from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>',
+      attachments: [{ filename: 'report.pdf', content: 'YmFzZTY0', content_type: 'application/pdf' }],
+    });
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(init.body).toBeInstanceOf(FormData);
+    const form = init.body as FormData;
+    expect(form.get('subject')).toBe('S');
+    const att = form.getAll('attachment');
+    expect(att.length).toBe(1);
+    expect((att[0] as File).name).toBe('report.pdf');
+    // no hand-written urlencoded Content-Type header when multipart
+    expect((init.headers as Record<string, string>)['Content-Type']).toBeUndefined();
+  });
+
+  it('keeps urlencoded body when there are no attachments', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: 'mg2' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const provider = new MailgunProvider({ apiKey: 'k', domain: 'mg.example.com' });
+    await provider.sendEmail({ from: 'a@x.com', to: 'b@y.com', subject: 'S', html: '<p>h</p>' });
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(typeof init.body).toBe('string'); // URLSearchParams string
   });
 });

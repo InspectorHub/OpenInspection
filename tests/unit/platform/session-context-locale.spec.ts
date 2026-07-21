@@ -76,7 +76,7 @@ function buildApp() {
             companyName: 'Test',
             primaryColor: '#000',
             logoUrl: null,
-            reportTheme: 'modern',
+            defaultProfileId: 'signature',
             isSaas: false,
             portalBaseUrl: null,
             tenantSlug: 'locale-test-co',

@@ -17,7 +17,7 @@ export interface BrandingConfig {
     logoUrl: string | null;
     supportEmail: string;
     billingUrl: string;
-    reportTheme?: 'modern' | 'classic' | 'minimal' | undefined;
+    defaultProfileId?: string | undefined;
     /** Sprint B-1 — signed-in user's booking slug. Plumbed via the
      *  inspectorPaletteMiddleware so MainLayout can pass it to
      *  <CommandPalette /> for the "Copy my booking link" action. Null when

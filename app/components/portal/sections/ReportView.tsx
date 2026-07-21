@@ -21,10 +21,12 @@ import { useState } from "react";
 import { m } from "~/paraglide/messages";
 import { usePdfExport, pdfActionLabel, pdfBusyHint } from "~/hooks/usePdfExport";
 import { brandTokens } from "~/lib/brand";
+import { presetTokens } from "~/lib/report-style/preset-tokens";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
 import { getSectionIcon, isDefect } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
+import { CredentialBadges } from "./report/CredentialBadges";
 import { ReportDefectCard } from "./report/ReportDefectCard";
 import { PhotoAppendix } from "./report/PhotoAppendix";
 import { ReportSignatureBlock } from "./report/ReportSignatureBlock";
@@ -135,7 +137,8 @@ export function reportViewProps(
     brand: data.brand,
     error: data.error ?? null,
     notPublished: data.notPublished ?? false,
-    reportTheme: data.reportTheme,
+    styleProfile: data.styleProfile,
+    inspectorCredentials: data.inspectorCredentials,
     initialFilter: data.initialFilter ?? "all",
     printMode: data.printMode ?? false,
     tocPages: data.tocPages,
@@ -177,6 +180,10 @@ export function reportViewProps(
  * report was published). We render a calm panel rather than hiding the
  * cover section, so the report never looks half-broken to the client.
  */
+// Report heading typography — driven by the resolved profile's --report-* vars
+// (Report Style Presets). Shared by the report title and every section heading.
+const REPORT_HEADING_STYLE = { fontFamily: "var(--report-heading-font)", fontWeight: "var(--report-heading-weight)" as unknown as number, letterSpacing: "var(--report-heading-spacing)", textTransform: "var(--report-heading-transform)" as unknown as "none" };
+
 function CoverPhotoPlaceholder() {
   return (
     <div className="w-full h-44 sm:h-56 rounded-xl border border-ih-border bg-ih-bg-muted flex flex-col items-center justify-center gap-2 text-ih-fg-4">
@@ -330,7 +337,7 @@ export function ReportView(props: ReportViewProps) {
       : data.sections;
 
   return (
-    <div className={standalone ? "min-h-screen bg-ih-bg-card" : undefined} data-theme={data.reportTheme || undefined} style={brandTokens(data.brand.primaryColor)}>
+    <div className={standalone ? "min-h-screen bg-ih-bg-card" : undefined} data-report-profile={data.styleProfile?.id || undefined} style={{ ...brandTokens(data.brand.primaryColor), ...presetTokens(data.styleProfile?.tokens) }}>
       {/* Download PDF FAB + Export to Word (Commercial PCA Phase W Task 6 —
           owner-only, commercial reports only; the public token viewer never
           has ownerPreview true, and `<ReportView>` is rendered standalone in
@@ -429,7 +436,7 @@ export function ReportView(props: ReportViewProps) {
             here would duplicate the address. The inspector/date cert line below
             stays in both modes (functional, not chrome). */}
         {standalone && (
-          <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-2 text-ih-fg-1">
+          <h1 className="text-2xl sm:text-3xl leading-tight mb-2 text-ih-fg-1" style={REPORT_HEADING_STYLE}>
             {data.address}
           </h1>
         )}
@@ -437,6 +444,9 @@ export function ReportView(props: ReportViewProps) {
           {data.date ? `${formatInspectionDateTime(data.date, undefined, data.reportTimeZone)} · ` : ""}
           {m.report_view_inspector({ name: data.inspectorName || m.report_view_na() })}
         </p>
+        {data.inspectorCredentials && data.inspectorCredentials.length > 0 && (
+          <CredentialBadges credentials={data.inspectorCredentials} layout={data.styleProfile?.badgeLayout ?? "strip"} />
+        )}
       </div>
 
       {/* Cover photo (DB-16) — the inspector-chosen report cover image. On load
@@ -539,16 +549,16 @@ export function ReportView(props: ReportViewProps) {
         {filteredSections.map((section, sectionIdx) => {
           if (filter === "defects" && section.items.length === 0) return null;
           return (
-            <div key={section.id} id={section.id} className="mb-6 group/section relative scroll-mt-4">
+            <div key={section.id} id={section.id} className="mb-6 group/section relative scroll-mt-4" style={section.alwaysPageBreak ? { breakBefore: "page" } : undefined}>
               <div className={`flex items-center gap-3 mb-4 ${PRINT_SECTION_HEADING_CLASS}`}>
                 <span className="text-2xl">{getSectionIcon(section.title)}</span>
-                <h2 className="text-2xl font-bold italic text-ih-fg-1">
-                  <span className="font-mono not-italic mr-1 text-ih-fg-4">
+                <h2 className="text-2xl text-ih-fg-1" style={REPORT_HEADING_STYLE}>
+                  <span className="mr-1 text-ih-fg-4">
                     {sectionIdx + 1} -
                   </span>
                   {section.title}
                 </h2>
-                <div className="flex-1 h-px border-t border-ih-border" />
+                <div className="flex-1 h-px" style={{ borderTop: "1px solid var(--report-band)" }} />
                 <span className="text-xs font-mono text-ih-fg-4">
                   {m.report_view_section_items({ count: section.items.length })}
                 </span>
@@ -560,8 +570,8 @@ export function ReportView(props: ReportViewProps) {
                   {section.items.map((item) => (
                     <div
                       key={item.id}
-                      className={`bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden ${PRINT_CARD_CLASS}`}
-                      style={{ borderLeftWidth: 4, borderLeftColor: item.ratingColor }}
+                      className={`bg-ih-bg-card border border-ih-border overflow-hidden ${PRINT_CARD_CLASS}`}
+                      style={{ borderRadius: "var(--report-radius)", borderLeftWidth: 4, borderLeftColor: item.ratingColor }}
                     >
                       <div className="p-4">
                         <div className="flex items-start justify-between mb-2">
@@ -736,7 +746,7 @@ export function ReportView(props: ReportViewProps) {
       )}
 
       {/* ── Signature block ──────────────────────────────────────────── */}
-      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} timeZone={data.reportTimeZone} />
+      <ReportSignatureBlock isPublished={data.isPublished} signature={data.signature} ownerPreview={data.ownerPreview} timeZone={data.reportTimeZone} credentialBadgeUrl={data.inspectorCredentials?.find((c) => c.imageUrl)?.imageUrl ?? null} />
 
       {/* ── Verification block ───────────────────────────────────────── */}
       <ReportVerificationBlock verification={data.verification} baseUrl={data.baseUrl} timeZone={data.reportTimeZone} />

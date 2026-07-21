@@ -221,7 +221,20 @@ export const ReportDataResponseSchema = z.object({
     status: z.string().describe('TODO describe status field for the OpenInspection MCP integration'),
     inspectorName: z.string().nullable().describe('TODO describe inspectorName field for the OpenInspection MCP integration'),
   }).describe('TODO describe inspection field for the OpenInspection MCP integration'),
-  theme: z.enum(['modern', 'classic', 'minimal']).describe('TODO describe theme field for the OpenInspection MCP integration'),
+  styleProfile: z.object({
+    id: z.string(),
+    name: z.string(),
+    schemaVersion: z.number(),
+    colour: z.string().nullable(),
+    badgeLayout: z.enum(['strip', 'inline']),
+    photoColumns: z.number(),
+    tokens: z.record(z.string(), z.string()),
+  }).describe('Resolved report appearance profile (Report Style Presets)'),
+  inspectorCredentials: z.array(z.object({
+    label: z.string(),
+    memberNumber: z.string().nullable(),
+    imageUrl: z.string().nullable(),
+  })).describe('Inspector self-asserted credentials snapshotted into the report (Spec B)'),
   stats: z.object({
     total: z.number().describe('TODO describe total field for the OpenInspection MCP integration'),
     satisfactory: z.number().describe('TODO describe satisfactory field for the OpenInspection MCP integration'),

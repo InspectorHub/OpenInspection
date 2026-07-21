@@ -10,7 +10,7 @@ export interface SessionContext {
     companyName: string;
     primaryColor: string;
     logoUrl: string | null;
-    reportTheme: string;
+    defaultProfileId: string;
     isSaas: boolean;
     portalBaseUrl: string | null;
     tenantSlug: string | null;
