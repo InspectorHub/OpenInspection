@@ -518,6 +518,34 @@
     "description": "Auto-generated placeholder for cancelInspection (POST /{id}/cancel, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "cancelTeamInvite",
+    "method": "DELETE",
+    "pathTemplate": "/api/team/invites/{token}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "description": "The pending invite token (tenant_invites.id).",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The pending invite token (tenant_invites.id)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Cancel a pending seat invite",
+    "description": "Hard-deletes a pending tenant_invites row that belongs to the caller tenant. 404 when the token is unknown, already accepted, or belongs to another tenant."
+  },
+  {
     "operationId": "changeMyPassword",
     "method": "POST",
     "pathTemplate": "/api/auth/change-password",
@@ -15130,6 +15158,34 @@
     },
     "summary": "Request a password reset email",
     "description": "Triggers a password reset email if the account exists. Always returns 200 even for unknown emails to avoid account enumeration."
+  },
+  {
+    "operationId": "resendTeamInvite",
+    "method": "POST",
+    "pathTemplate": "/api/team/invites/{token}/resend",
+    "scopes": [
+      "write"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "token",
+          "in": "path",
+          "required": true,
+          "description": "The pending invite token (tenant_invites.id).",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The pending invite token (tenant_invites.id)."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Resend a pending seat invite email",
+    "description": "Re-sends the invitation email for an existing pending tenant_invites row. 404 when the token is unknown, accepted, or cross-tenant."
   },
   {
     "operationId": "resetEmailTemplate",
