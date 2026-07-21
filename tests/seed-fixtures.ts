@@ -46,7 +46,7 @@ export function seedFixtures(appDir: string): void {
     const cwd = appDir;
     const now = new Date().toISOString();
 
-    // Two tenants so the IdentitySwitcher (E P4) has somewhere to land.
+    // Two tenants — Tenant A is the default; Tenant B backs the branch-B fixture user below.
     d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
         VALUES ('${TENANT_A_ID}', 'Seed Tenant A', 'seed-a', 'active', 'shared', 'free', 5, '${now}')`, cwd);
     d1(`INSERT OR REPLACE INTO tenants (id, name, slug, status, deployment_mode, tier, max_users, created_at)
@@ -71,21 +71,13 @@ export function seedFixtures(appDir: string): void {
         VALUES ('55555555-5555-5555-5555-555555555cc1', '00000000-0000-0000-0000-000000000cc1',
                 '${ADMIN_FULL_EMAIL}', '${SEED_PASSWORD_HASH}', 'At-Cap Admin', 'admin', '${now}')`, cwd);
 
-    // Multi-tenant user for IdentitySwitcher E P4 E2E.
+    // Multi-tenant fixture users (tenant A primary + tenant B branch).
     d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, created_at)
         VALUES ('66666666-6666-6666-6666-666666666aa1', '${TENANT_A_ID}',
                 '${MULTI_EMAIL}', '${SEED_PASSWORD_HASH}', 'Multi-Tenant Primary', 'admin', '${now}')`, cwd);
     d1(`INSERT OR REPLACE INTO users (id, tenant_id, email, password_hash, name, role, created_at)
         VALUES ('77777777-7777-7777-7777-777777777bb1', '${TENANT_B_ID}',
                 '${BRANCH_B_EMAIL}', '${SEED_PASSWORD_HASH}', 'Branch B Identity', 'admin', '${now}')`, cwd);
-
-    // Identity link between the two so the switcher dropdown surfaces it.
-    d1(`INSERT OR REPLACE INTO user_identity_links
-        (id, primary_user_id, linked_user_id, linked_tenant_id, linked_role, linked_display_name, created_at)
-        VALUES ('88888888-8888-8888-8888-888888888aa1',
-                '66666666-6666-6666-6666-666666666aa1',
-                '77777777-7777-7777-7777-777777777bb1',
-                '${TENANT_B_ID}', 'admin', 'branch-b@seed.test', '${now}')`, cwd);
 
     // Inspections — empty / half-done / team / delivered / republished
     // referenced by the E2E spec stubs. Templates intentionally NULL so
@@ -104,7 +96,7 @@ export function seedFixtures(appDir: string): void {
     d1(inspectionRow('seed-delivered-inspection',    '5 Delivered Ln',    'delivered'), cwd);
     d1(inspectionRow('seed-republished-inspection',  '6 Republished Ct',  'delivered'), cwd);
 
-    console.info('[seed-fixtures] Seeded tenants + 7 users + 6 inspections + 1 identity link.');
+    console.info('[seed-fixtures] Seeded tenants + 7 users + 6 inspections.');
 }
 
 export const SEED_PASSWORD = 'seedpassword';
