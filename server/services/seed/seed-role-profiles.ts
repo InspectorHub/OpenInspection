@@ -16,5 +16,9 @@ export async function seedRoleProfiles(db: DrizzleD1Database, tenantId: string, 
         isSystem: p.isSystem, sortOrder: p.sortOrder, active: true,
         createdAt: now, updatedAt: now,
     }));
-    if (toInsert.length > 0) await db.insert(contactRoleProfiles).values(toInsert);
+    // onConflictDoNothing guards the check-then-insert race: two concurrent
+    // first-use seeds (e.g. two ensureSeeds in flight) would otherwise collide on
+    // the deterministic PK `crp_<tenant>_<key>`. Deterministic ids make the
+    // insert naturally idempotent under the conflict.
+    if (toInsert.length > 0) await db.insert(contactRoleProfiles).values(toInsert).onConflictDoNothing();
 }

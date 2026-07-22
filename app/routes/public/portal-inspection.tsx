@@ -212,7 +212,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 type AgentMagicLoginActionResult =
-  | { ok: true; intent: "agent-magic-login"; loginUrl: string | null }
+  | { ok: true; intent: "agent-magic-login"; sent: boolean }
   | { ok: false; intent: "agent-magic-login"; error?: string }
   | { ok: false; intent: string };
 
@@ -232,11 +232,11 @@ export async function action({ request, params, context }: Route.ActionArgs) {
       if (!res.ok) {
         return { ok: false, intent: "agent-magic-login" } satisfies AgentMagicLoginActionResult;
       }
-      const body = (await res.json()) as { data?: { loginUrl: string | null } };
+      const body = (await res.json()) as { data?: { sent?: boolean } };
       return {
         ok: true,
         intent: "agent-magic-login",
-        loginUrl: body.data?.loginUrl ?? null,
+        sent: body.data?.sent ?? true,
       } satisfies AgentMagicLoginActionResult;
     } catch {
       return { ok: false, intent: "agent-magic-login" } satisfies AgentMagicLoginActionResult;

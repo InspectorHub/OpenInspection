@@ -17,6 +17,6 @@ export const MagicLoginRequestSchema = z.object({
 
 export const MagicLoginRequestResponseSchema = createApiResponseSchema(
     z.object({
-        loginUrl: z.string().nullable().describe('One-time magic-login URL (900s TTL), or null when no agent account exists for the report link recipient (anti-oracle — not an error).'),
+        sent: z.boolean().describe('Always true — a single-use sign-in link is EMAILED to the agent\'s account inbox (never returned here). Identical response and timing whether or not an agent account exists for the report link recipient (anti-oracle — the link is never returned to the caller, closing the report-link → session takeover vector).'),
     }),
 ).openapi('AgentMagicLoginRequestResponse');

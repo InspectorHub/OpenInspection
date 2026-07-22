@@ -103,6 +103,44 @@ describe('AuthService', () => {
             .rejects.toThrow('Invalid email or password');
     });
 
+    // #258 review #3 — the tenant /login front door must exclude global-agent
+    // rows (role='agent', tenant_id IS NULL). Agents authenticate only via
+    // /agent-login; without this a shared email locks the member out.
+    it('excludes global-agent rows so a member sharing the email still authenticates', async () => {
+        const email = 'dual@example.com';
+        const memberPw = 'member-secret-123';
+        const memberHash = await authService.hashPassword(memberPw);
+        const agentHash = await authService.hashPassword('agent-secret-999');
+
+        // Global agent row inserted FIRST (lower rowid) — the pre-fix `.get()`
+        // with no ORDER BY would return this row and shadow the member.
+        await testDb.insert(users).values({
+            id: 'agent-1', tenantId: null, email, passwordHash: agentHash,
+            role: 'agent', createdAt: new Date(),
+        });
+        await testDb.insert(users).values({
+            id: 'member-1', tenantId: 't1', email, passwordHash: memberHash,
+            role: 'owner', createdAt: new Date(),
+        });
+
+        const result = await authService.validateCredentials(email, memberPw);
+        expect(result.id).toBe('member-1');
+        expect(result.tenantId).toBe('t1');
+    });
+
+    it('rejects a global-agent-only email at the tenant login front door', async () => {
+        const email = 'agent-only@example.com';
+        const password = 'agent-secret-999';
+        const hash = await authService.hashPassword(password);
+        await testDb.insert(users).values({
+            id: 'agent-2', tenantId: null, email, passwordHash: hash,
+            role: 'agent', createdAt: new Date(),
+        });
+        // Correct password, but the row is excluded → generic invalid-credentials.
+        await expect(authService.validateCredentials(email, password))
+            .rejects.toThrow('Invalid email or password');
+    });
+
     it('should allow joining a team with valid invitation', async () => {
         const token = 'invite-123';
         const email = 'new@example.com';

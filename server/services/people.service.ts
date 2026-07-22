@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq } from 'drizzle-orm';
-import { contacts, contactRoleProfiles, inspectionPeople } from '../lib/db/schema';
+import { and, eq, sql } from 'drizzle-orm';
+import { contacts, contactRoleProfiles, inspectionPeople, messageTemplates } from '../lib/db/schema';
 import { capabilitiesForKind, type RoleCapabilities, type RoleKind } from '../lib/people/capabilities';
 import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { Errors } from '../lib/errors';
@@ -25,23 +25,53 @@ export class PeopleService {
     async addPerson(tenantId: string, inspectionId: string, contactId: string, roleProfileId: string): Promise<void> {
         const prof = await this.profile(tenantId, roleProfileId);
         if (prof.key === PRIMARY_CLIENT_KEY) {
-            const existing = await this.db.select({ id: inspectionPeople.id }).from(inspectionPeople)
+            // Atomic insert-if-no-existing-client. A bare SELECT-then-INSERT leaves
+            // a TOCTOU race open: two concurrent adds of DIFFERENT client contacts
+            // both pass the existence check and both land, giving the inspection
+            // two primary clients (getPrimaryClient then returns a nondeterministic
+            // one). D1 serializes writes, so an INSERT ... SELECT ... WHERE NOT
+            // EXISTS evaluates the guard against committed rows and only one wins.
+            // ON CONFLICT keeps the same-contact idempotent dedup. See #258 review.
+            await this.db.run(sql`
+                INSERT INTO inspection_people (id, tenant_id, inspection_id, contact_id, role_profile_id, created_at)
+                SELECT ${crypto.randomUUID()}, ${tenantId}, ${inspectionId}, ${contactId}, ${roleProfileId}, ${Date.now()}
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM inspection_people ip
+                    JOIN contact_role_profiles crp ON ip.role_profile_id = crp.id
+                    WHERE ip.tenant_id = ${tenantId} AND ip.inspection_id = ${inspectionId} AND crp.key = ${PRIMARY_CLIENT_KEY}
+                )
+                ON CONFLICT (inspection_id, contact_id, role_profile_id) DO NOTHING
+            `);
+            // Verify our contact now holds the client role; if a different contact
+            // won the race (or was already the client), surface the friendly 409.
+            const winner = await this.db.select({ contactId: inspectionPeople.contactId }).from(inspectionPeople)
                 .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
                 .where(and(
                     eq(inspectionPeople.tenantId, tenantId),
                     eq(inspectionPeople.inspectionId, inspectionId),
                     eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
                 )).get();
-            if (existing) throw Errors.Conflict('An inspection already has a primary client; use co_client for a second buyer.');
+            if (!winner || winner.contactId !== contactId) {
+                throw Errors.Conflict('An inspection already has a primary client; use co_client for a second buyer.');
+            }
+            return;
         }
         await this.db.insert(inspectionPeople).values({
             id: crypto.randomUUID(), tenantId, inspectionId, contactId, roleProfileId, createdAt: new Date(),
         }).onConflictDoNothing();
     }
 
-    async removePerson(tenantId: string, inspectionPersonId: string): Promise<void> {
+    async removePerson(tenantId: string, inspectionId: string, inspectionPersonId: string): Promise<void> {
+        // Scope the delete to the URL's inspection as well as the tenant — the
+        // personId path segment is asserted to belong to `inspectionId`, so a
+        // person row from a DIFFERENT inspection (same tenant) must not be
+        // deletable via /inspections/:id/people/:personId. See #258 review.
         await this.db.delete(inspectionPeople)
-            .where(and(eq(inspectionPeople.tenantId, tenantId), eq(inspectionPeople.id, inspectionPersonId)));
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.inspectionId, inspectionId),
+                eq(inspectionPeople.id, inspectionPersonId),
+            ));
     }
 
     async listPeople(tenantId: string, inspectionId: string): Promise<PersonRow[]> {
@@ -148,8 +178,21 @@ export class PeopleService {
             .orderBy(contactRoleProfiles.sortOrder);
     }
 
+    /** Rejects any template id that is not an active row in THIS tenant's
+     *  message_templates — a role profile must never reference another tenant's
+     *  (or a bogus) template id. Null/undefined ids are allowed (no reference). */
+    private async assertTemplatesOwned(tenantId: string, emailTemplateId?: string | null, smsTemplateId?: string | null) {
+        for (const id of [emailTemplateId, smsTemplateId]) {
+            if (!id) continue;
+            const row = await this.db.select({ id: messageTemplates.id }).from(messageTemplates)
+                .where(and(eq(messageTemplates.tenantId, tenantId), eq(messageTemplates.id, id))).get();
+            if (!row) throw Errors.NotFound('Message template not found');
+        }
+    }
+
     /** Creates a tenant-defined (non-system) role profile with a unique, slugified key. */
     async createProfile(tenantId: string, input: { label: string; kind: RoleKind; emailTemplateId?: string; smsTemplateId?: string }) {
+        await this.assertTemplatesOwned(tenantId, input.emailTemplateId, input.smsTemplateId);
         const key = await this.uniqueKey(tenantId, input.label);
         const now = new Date();
         const row = { id: crypto.randomUUID(), tenantId, key, label: input.label, kind: input.kind,
@@ -165,6 +208,21 @@ export class PeopleService {
             .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id))).get();
         if (!cur) throw Errors.NotFound('Role profile not found');
         if (cur.isSystem && patch.active === false) throw Errors.Conflict('System role profiles cannot be deactivated');
+        if (patch.emailTemplateId !== undefined || patch.smsTemplateId !== undefined) {
+            await this.assertTemplatesOwned(tenantId, patch.emailTemplateId, patch.smsTemplateId);
+        }
+        // Reactivating a profile whose key collides with an already-active profile
+        // would hit the partial unique index `uq_crp_tenant_key` (WHERE is_active=1)
+        // and surface a raw SQLite constraint error (500). Map it to a clean 409.
+        if (patch.active === true && !cur.active) {
+            const clash = await this.db.select({ id: contactRoleProfiles.id }).from(contactRoleProfiles)
+                .where(and(
+                    eq(contactRoleProfiles.tenantId, tenantId),
+                    eq(contactRoleProfiles.key, cur.key),
+                    eq(contactRoleProfiles.active, true),
+                )).get();
+            if (clash) throw Errors.Conflict('Another active role profile already uses this key');
+        }
         await this.db.update(contactRoleProfiles).set({ ...patch, updatedAt: new Date() })
             .where(and(eq(contactRoleProfiles.tenantId, tenantId), eq(contactRoleProfiles.id, id)));
     }

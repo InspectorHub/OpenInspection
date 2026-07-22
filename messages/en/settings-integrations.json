@@ -257,6 +257,7 @@
   "settings_automations_dothis_legend": "Do this",
   "settings_automations_delay_title": "Delay in minutes (for reminders: minutes BEFORE the inspection)",
   "settings_automations_pick_channel": "Pick at least one delivery channel.",
+  "settings_automations_all_recipients_warning": "\"Everyone on the inspection\" sends to every report-receiving person added to each inspection — including any listing (seller's) agent. Use a specific role if the buyer's report should not reach the seller's side.",
   "settings_automations_template_label": "Template",
   "settings_automations_select_template": "— Select a template —",
   "settings_automations_edit_new_template": "Edit / New template",

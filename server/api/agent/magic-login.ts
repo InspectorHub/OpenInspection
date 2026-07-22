@@ -30,15 +30,15 @@ const requestRoute = createRoute(withMcpMetadata({
     method: 'post',
     path: '/magic-login/request',
     tags: ['agents', 'public'],
-    summary: 'Exchange an agent report token for a login code',
-    description: 'Public, unauthenticated endpoint for the agent unified link. Exchanges a live, agent-kind report-link token for a single-use magic-login code (900 second TTL) that mints an agent session cookie on redeem. Returns loginUrl: null with 200 (not an error) when the token is valid but no global agent account exists yet for the recipient email, so probing tokens cannot be used to enumerate accounts.',
+    summary: 'Email an agent a single-use sign-in link for a report token',
+    description: 'Public, unauthenticated endpoint for the agent unified link. For a live, agent-kind report-link token whose recipient email has a global agent account, EMAILS a single-use magic-login link (900 second TTL) to that agent\'s account inbox — the link is never returned to the caller, so a leaked/forwarded report link cannot be replayed into a full agent session. Always returns { sent: true } with 200 (identical response and timing whether or not an account exists) so probing tokens cannot enumerate accounts.',
     request: {
         body: { content: { 'application/json': { schema: MagicLoginRequestSchema } } },
     },
     responses: {
         200: {
             content: { 'application/json': { schema: MagicLoginRequestResponseSchema } },
-            description: 'Login code issued, or loginUrl: null when no agent account exists for the recipient',
+            description: 'Always { sent: true } — a sign-in link is emailed to the agent when an account exists; nothing is sent otherwise. The link is never returned here.',
         },
         401: { description: 'Invalid, revoked, expired, inspection-mismatched, or non-agent report token' },
     },
@@ -66,7 +66,7 @@ const redeemRoute = createRoute(withMcpMetadata({
 export const agentMagicLoginRequestRoutes = createApiRouter()
     .openapi(requestRoute, async (c) => {
         const body = c.req.valid('json');
-        const loginUrl = await requestMagicLogin({
+        const result = await requestMagicLogin({
             portalAccess: c.var.services.portalAccess,
             kv: c.env.TENANT_CACHE,
             db: c.env.DB,
@@ -74,7 +74,35 @@ export const agentMagicLoginRequestRoutes = createApiRouter()
             reportToken: body.token,
             coreBaseUrl: getBaseUrl(c),
         });
-        return c.json({ success: true as const, data: { loginUrl } }, 200);
+        // EMAIL the single-use sign-in link to the agent's own account inbox —
+        // never return it to the caller. The durable report link is a reusable
+        // bearer, so returning a full-session login URL to whoever presents it
+        // was an account-takeover vector (#258 review #5). Only the agent's inbox
+        // can now complete sign-in; report VIEWING via the token is unchanged.
+        if (result) {
+            // Defer the send to waitUntil — awaiting only on the account-exists
+            // path would make it measurably slower than the no-account path, a
+            // timing enumeration oracle. Mirrors server/api/agent/login.ts's
+            // loginLink and portal.ts's requestLink.
+            const sendPromise = (async () => {
+                try {
+                    await c.var.services.email.sendAgentLoginLink(result.email, result.loginUrl);
+                } catch (err) {
+                    logger.error('agent.magic_login.link_send_failed', {}, err instanceof Error ? err : undefined);
+                }
+            })();
+            let execCtx: Pick<ExecutionContext, 'waitUntil'> | undefined;
+            try {
+                execCtx = c.executionCtx;
+            } catch {
+                execCtx = undefined;
+            }
+            if (execCtx) execCtx.waitUntil(sendPromise);
+            else await sendPromise;
+        }
+        // Anti-oracle: identical { sent: true } response (and timing) whether or
+        // not an agent account exists for the report link's recipient.
+        return c.json({ success: true as const, data: { sent: true as const } }, 200);
     });
 
 /** GET /agent/magic-login — mounted at the TOP LEVEL (not under /api); see workers/app.ts. */

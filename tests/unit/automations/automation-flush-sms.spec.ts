@@ -51,7 +51,7 @@ beforeEach(async () => {
 // `over.contactId` (when set) seeds a contact + inspection_people 'client' row
 // under that SAME id, so tests that grant consent for `over.contactId` keep
 // working unchanged.
-async function seedSmsLog(over: { contactId?: string | null; smsBody?: string } = {}) {
+async function seedSmsLog(over: { contactId?: string | null; smsBody?: string; recipientKind?: 'role' | 'all' } = {}) {
     const inspId = crypto.randomUUID();
     await db.insert(schema.inspections).values({
         id: inspId, tenantId: TENANT, propertyAddress: '1 Main',
@@ -67,15 +67,17 @@ async function seedSmsLog(over: { contactId?: string | null; smsBody?: string } 
     }
     const ruleId = crypto.randomUUID();
     const smsBody = over.smsBody ?? 'Hi {{client_name}} — {{company_name}}';
+    const recipientKind = over.recipientKind ?? 'role';
     await db.insert(schema.automations).values({
-        id: ruleId, tenantId: TENANT, name: 'R', trigger: 'report.published', recipientKind: 'role', recipientRoleProfileId: roleProfileId('client'),
+        id: ruleId, tenantId: TENANT, name: 'R', trigger: 'report.published',
+        recipientKind, recipientRoleProfileId: recipientKind === 'role' ? roleProfileId('client') : null,
         delayMinutes: 0, subjectTemplate: 'S', bodyTemplate: 'B', smsBody,
         channels: '["sms"]', channel: 'sms', active: true, isDefault: false, createdAt: new Date(),
     } as never);
     const logId = crypto.randomUUID();
     await db.insert(schema.automationLogs).values({
         id: logId, tenantId: TENANT, automationId: ruleId, inspectionId: inspId,
-        recipient: '+15551234567', channel: 'sms',
+        recipient: '+15551234567', channel: 'sms', recipientRoleKey: 'client',
         sendAt: new Date(Date.now() - 1000), status: 'pending',
     } as never);
     // SP2 — give the seeded sms rule a referenced template (body == embedded smsBody),
@@ -115,6 +117,18 @@ describe('flush() — SMS branch (Track L)', () => {
         expect(r?.status).toBe('skipped');
         expect(r?.error).toMatch(/consent/);
         // Provider not called (skipped before resolve)
+        expect(fakeSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('#1 recipientKind="all" does NOT bypass the client consent gate → skipped', async () => {
+        // Regression: the gate keys on the per-recipient log.recipientRoleKey, not
+        // the rule's recipientKind. An 'all' rule fanning out to the client must
+        // still be blocked without recorded consent (was a TCPA bypass).
+        const { logId } = await seedSmsLog({ contactId: 'c1', recipientKind: 'all' });
+        await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+        const r = await statusOf(logId);
+        expect(r?.status).toBe('skipped');
+        expect(r?.error).toMatch(/consent/);
         expect(fakeSendMessage).not.toHaveBeenCalled();
     });
 

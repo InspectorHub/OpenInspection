@@ -4,7 +4,7 @@ import { automations, automationLogs, inspections } from '../../lib/db/schema';
 import { nanoid } from 'nanoid';
 import { logger } from '../../lib/logger';
 import { createOiTemplateStore } from './template-store';
-import { type Constructor, type TriggerContext } from './shared';
+import type { Constructor, TriggerContext } from './shared';
 import type { AutomationBase, HasEnsureSeeds, HasParseChannels } from './shared';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { PeopleService } from '../people.service';
@@ -303,7 +303,22 @@ export function AutomationTrigger<TBase extends Constructor<AutomationBase & Has
                 }];
             }
 
-            const people = await new PeopleService({ DB: this.db }).listPeople(inspection.tenantId, inspection.id);
+            // Honor the "never throws" contract (see the doc comment above): the
+            // inspector branch already guards its query, but a bare listPeople()
+            // here would propagate a transient D1 error out of the per-rule loop
+            // in trigger(), aborting the ENTIRE fan-out for every rule/recipient
+            // with no retry (publish marks status='completed' first). Fail to an
+            // empty recipient set for this rule/channel instead — same posture as
+            // resolveAddress/contactForRole.
+            let people: Awaited<ReturnType<PeopleService['listPeople']>>;
+            try {
+                people = await new PeopleService({ DB: this.db }).listPeople(inspection.tenantId, inspection.id);
+            } catch (err) {
+                logger.error('resolveRecipients: listPeople failed; skipping this rule\'s recipients', {
+                    inspectionId: inspection.id, tenantId: inspection.tenantId, channel,
+                }, err instanceof Error ? err : undefined);
+                return [];
+            }
             const targets = rule.recipientKind === 'role'
                 ? people.filter(p => p.roleProfileId === rule.recipientRoleProfileId)
                 : people.filter(p => capabilitiesForKind(p.kind).receivesReport);

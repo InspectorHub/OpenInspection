@@ -1,6 +1,7 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { automationLogs, automations, tenants, tenantConfigs, contactRoleProfiles } from '../../lib/db/schema';
+import type { automations, tenants} from '../../lib/db/schema';
+import { automationLogs, tenantConfigs } from '../../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { logger } from '../../lib/logger';
 import { currentPeriodKey } from '../../lib/usage/period';
@@ -78,37 +79,22 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
                 : null;
             if (!tpl || tpl.channel !== 'sms' || !tpl.body.trim()) return void (await skip('no sms template'));
 
-            // Consent gate — client only (agents/inspector implied; D5). Gate
-            // fires when the rule's recipient discriminator resolves to the
-            // PRIMARY_CLIENT_KEY role profile (replaces the old `recipient ===
-            // 'client'` enum check; same consent-required-only-for-client behavior).
-            if (automation.recipientKind === 'role' && automation.recipientRoleProfileId) {
-                // try/catch (not `.get().catch()`) so this works under both the async
-                // D1 driver and the synchronous better-sqlite3 test driver.
-                let roleRow: { key: string } | null = null;
-                try {
-                    roleRow = await db.select({ key: contactRoleProfiles.key }).from(contactRoleProfiles)
-                        .where(and(
-                            eq(contactRoleProfiles.tenantId, inspection.tenantId),
-                            eq(contactRoleProfiles.id, automation.recipientRoleProfileId),
-                        )).get() ?? null;
-                } catch (err) {
-                    // DB error on consent-gate role lookup: fail closed (do not send).
-                    // When we cannot prove the recipient is NOT a consent-requiring client, we must not send.
-                    logger.error('sms consent-gate role lookup failed; failing closed (skipping send)', {
-                        automationId: automation.id,
-                        inspectionId: inspection.id,
-                        tenantId: inspection.tenantId,
-                    }, err instanceof Error ? err : undefined);
-                    return void (await skip('consent-gate role lookup failed'));
-                }
-                if (roleRow?.key === PRIMARY_CLIENT_KEY) {
-                    const { SmsConsentService } = await import('../sms-consent.service');
-                    const consentSvc = new SmsConsentService(this.db);
-                    const contactId = inspection.clientContactId;
-                    const latest = contactId ? await consentSvc.getLatest(inspection.tenantId, contactId) : null;
-                    if (latest !== 'granted') return void (await skip('no sms consent'));
-                }
+            // Consent gate — client only (agents/inspector implied; D5). Keyed on
+            // the PER-RECIPIENT role stamped on the log (log.recipientRoleKey),
+            // NOT the rule's recipientKind. This fires for the primary-client
+            // recipient whether the rule targets the client directly
+            // (recipientKind='role') OR fans out to everyone (recipientKind='all'):
+            // the old gate keyed on `recipientKind === 'role'` and so never
+            // covered 'all', letting an 'all' rule text the client with no
+            // recorded TCPA consent. resolveRecipients stamps recipientRoleKey
+            // from the contact_role_profiles.key of each resolved person, so
+            // `=== PRIMARY_CLIENT_KEY` is an exact, lookup-free client match.
+            if (log.recipientRoleKey === PRIMARY_CLIENT_KEY) {
+                const { SmsConsentService } = await import('../sms-consent.service');
+                const consentSvc = new SmsConsentService(this.db);
+                const contactId = inspection.clientContactId;
+                const latest = contactId ? await consentSvc.getLatest(inspection.tenantId, contactId) : null;
+                if (latest !== 'granted') return void (await skip('no sms consent'));
             }
 
             const resolved = await sms.resolveProvider(inspection.tenantId);

@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, sql, isNull } from 'drizzle-orm';
+import { eq, ne, and, or, sql, isNull, isNotNull } from 'drizzle-orm';
 import { users, tenantInvites, tenants } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { hashPassword, verifyPassword } from '../lib/password';
@@ -61,7 +61,23 @@ export class AuthService {
         // Soft-deleted (removed member / self-deleted account) rows are
         // excluded — a matching row that isn't NULL-deleted-at must never
         // authenticate, even if the caller somehow still knows the password.
-        const user = await db.select().from(users).where(and(eq(users.email, email), isNull(users.deletedAt))).get();
+        //
+        // Global agents (role='agent', tenant_id IS NULL) are ALSO excluded: they
+        // authenticate exclusively through /agent-login (findGlobalAgentByEmail),
+        // never this tenant front door. Without this guard, `users.email` being
+        // unique only per (tenant_id, email) means an email held by BOTH a global
+        // agent and an invited tenant member returns a nondeterministic `.get()`
+        // row — the earlier-inserted agent row can shadow the member and lock the
+        // member out (and /agent-signup is self-serve, so the collision is
+        // attacker-seedable). See #258 review.
+        // De Morgan of NOT(role='agent' AND tenant_id IS NULL): keep every row
+        // that is either not an agent OR is tenant-scoped, i.e. exclude only the
+        // global-agent rows.
+        const user = await db.select().from(users).where(and(
+            eq(users.email, email),
+            isNull(users.deletedAt),
+            or(ne(users.role, 'agent'), isNotNull(users.tenantId)),
+        )).get();
 
         if (!user) {
             // Perform a throwaway verification against a fixed hash so the response time

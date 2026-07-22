@@ -31,9 +31,9 @@ function renderActions(
 }
 
 describe("AgentReportActions — registered agent (hasAccount: true)", () => {
-  it('renders the "Go to my workspace" CTA', () => {
+  it('renders the "Email me a sign-in link" CTA', () => {
     const { getByTestId } = renderActions(true);
-    expect(getByTestId("agent-report-workspace-cta").textContent).toBe("Go to my workspace");
+    expect(getByTestId("agent-report-workspace-cta").textContent).toBe("Email me a sign-in link");
   });
 
   it("submitting posts the agent-magic-login intent with tenant/inspectionId/token", async () => {
@@ -41,7 +41,7 @@ describe("AgentReportActions — registered agent (hasAccount: true)", () => {
     const { getByTestId } = renderActions(true, async ({ request }) => {
       const formData = await request.formData();
       submitted = Object.fromEntries(formData.entries());
-      return { ok: true, intent: "agent-magic-login", loginUrl: null };
+      return { ok: true, intent: "agent-magic-login", sent: true };
     });
 
     fireEvent.click(getByTestId("agent-report-workspace-cta"));
@@ -56,6 +56,19 @@ describe("AgentReportActions — registered agent (hasAccount: true)", () => {
     });
   });
 
+  it("shows a check-your-email confirmation on success (never navigates)", async () => {
+    const { getByTestId, findByTestId } = renderActions(true, async () => ({
+      ok: true,
+      intent: "agent-magic-login",
+      sent: true,
+    }));
+
+    fireEvent.click(getByTestId("agent-report-workspace-cta"));
+
+    const confirm = await findByTestId("agent-report-workspace-sent");
+    expect(confirm.textContent).toMatch(/check your email/i);
+  });
+
   it("shows an error message when the action reports failure", async () => {
     const { getByTestId, findByText } = renderActions(true, async () => ({
       ok: false,
@@ -64,7 +77,7 @@ describe("AgentReportActions — registered agent (hasAccount: true)", () => {
 
     fireEvent.click(getByTestId("agent-report-workspace-cta"));
 
-    await findByText(/couldn't sign you in/i);
+    await findByText(/couldn't send your sign-in link/i);
   });
 });
 

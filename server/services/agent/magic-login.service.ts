@@ -46,12 +46,20 @@ export interface RequestMagicLoginParams {
  * invalid/revoked/expired/inspection-mismatched, or when it resolves to a
  * non-agent-kind role (e.g. a client link) — those are hard auth failures.
  *
+ * Returns the login URL PLUS the agent's account email so the ROUTE can EMAIL
+ * the single-use link to that inbox — the link is NEVER returned to the HTTP
+ * caller. A durable agent report link is a reusable bearer (often no expiry)
+ * sent over email; handing a full-session login URL back to anyone who POSTs it
+ * turned a leaked/forwarded report link into full agent-account takeover (#258
+ * review #5). Emailing to the account owner means only the agent's inbox can
+ * complete sign-in, while report VIEWING via the durable token is unchanged.
+ *
  * Returns `null` (NOT an error) when the token is valid and agent-kind but no
- * global agent account exists yet for the recipient email — this is the
- * anti-oracle case: the route returns the SAME `{ loginUrl: null }` 200 shape
- * so a caller can't probe report tokens to learn which emails have accounts.
+ * global agent account exists yet for the recipient email — the route returns
+ * the SAME `{ sent: true }` 200 shape (and defers the send to waitUntil) so a
+ * caller can't probe report tokens to learn which emails have accounts.
  */
-export async function requestMagicLogin(params: RequestMagicLoginParams): Promise<string | null> {
+export async function requestMagicLogin(params: RequestMagicLoginParams): Promise<{ loginUrl: string; email: string } | null> {
     const { portalAccess, kv, db, inspectionId, reportToken, coreBaseUrl } = params;
 
     const grant = await resolvePortalAccess(portalAccess, reportToken, inspectionId);
@@ -86,7 +94,7 @@ export async function requestMagicLogin(params: RequestMagicLoginParams): Promis
 
     if (!account) return null;
 
-    return mintLoginCode(kv, account.id, coreBaseUrl);
+    return { loginUrl: await mintLoginCode(kv, account.id, coreBaseUrl), email: account.email };
 }
 
 export interface RequestMagicLoginByEmailParams {

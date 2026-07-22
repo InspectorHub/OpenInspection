@@ -147,7 +147,7 @@ const peopleRoutes = createApiRouter()
         const tenantId = getTenantId(c);
         const { id, personId } = c.req.valid('param');
         await assertInspectionOwned(getDrizzle(c), id, tenantId);
-        await c.var.services.people.removePerson(tenantId, personId);
+        await c.var.services.people.removePerson(tenantId, id, personId);
         return c.json({ success: true as const }, 200);
     });
 

@@ -137,6 +137,11 @@ export function AutomationEditorModal({
             <input name="delayMinutes" type="number" min={0} defaultValue={rule?.delayMinutes ?? 0}
               className="w-24 h-9 px-3 rounded-md border border-ih-border bg-ih-bg-input text-[13px]" title={m.settings_automations_delay_title()} />
           </div>
+          {recipientKind === "all" && (
+            <p className="text-[11px] text-ih-watch-fg" data-testid="automation-all-recipients-warning">
+              {m.settings_automations_all_recipients_warning()}
+            </p>
+          )}
           {noChannel && (
             <p className="text-[11px] text-ih-watch-fg">{m.settings_automations_pick_channel()}</p>
           )}

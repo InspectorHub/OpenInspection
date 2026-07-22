@@ -98,14 +98,17 @@ describe('Agent magic-login primitive', () => {
     }
 
     function buildRequestApp(resolveToken: ReturnType<typeof vi.fn>, kv: ReturnType<typeof makeKv>) {
+        // The request route now EMAILS the single-use link (never returns it), so
+        // stub the email service and expose the spy for assertions.
+        const sendAgentLoginLink = vi.fn().mockResolvedValue(undefined);
         const app = withErrorHandler(new OpenAPIHono<HonoConfig>());
         app.use('*', async (c, next) => {
             c.env = { DB: {}, TENANT_CACHE: kv } as unknown as HonoConfig['Bindings'];
-            c.set('services', { portalAccess: { resolveToken } } as unknown as HonoConfig['Variables']['services']);
+            c.set('services', { portalAccess: { resolveToken }, email: { sendAgentLoginLink } } as unknown as HonoConfig['Variables']['services']);
             await next();
         });
         app.route('/api/agent', agentMagicLoginRequestRoutes);
-        return app;
+        return { app, sendAgentLoginLink };
     }
 
     function buildRedeemApp(kv: ReturnType<typeof makeKv>) {
@@ -120,7 +123,7 @@ describe('Agent magic-login primitive', () => {
     }
 
     describe('POST /api/agent/magic-login/request', () => {
-        it('valid agent-kind token + email with an agent account → loginUrl with a code, KV seeded', async () => {
+        it('valid agent-kind token + email with an agent account → link EMAILED to the agent, KV seeded, { sent: true }', async () => {
             await seedRoleProfile('buyer_agent', 'agent');
             await seedGlobalAgent(AGENT_USER_ID, AGENT_EMAIL);
 
@@ -129,7 +132,7 @@ describe('Agent magic-login primitive', () => {
                 recipientEmail: AGENT_EMAIL, revokedAt: null, expiresAt: null,
             });
             const kv = makeKv();
-            const app = buildRequestApp(resolveToken, kv);
+            const { app, sendAgentLoginLink } = buildRequestApp(resolveToken, kv);
 
             const res = await app.request('/api/agent/magic-login/request', {
                 method: 'POST',
@@ -138,17 +141,24 @@ describe('Agent magic-login primitive', () => {
             });
 
             expect(res.status).toBe(200);
-            const body = await res.json() as { data: { loginUrl: string | null } };
-            expect(body.data.loginUrl).toMatch(/\/agent\/magic-login\?code=[0-9a-f-]+$/);
+            const body = await res.json() as { data: { sent: boolean } };
+            expect(body.data.sent).toBe(true);
             expect(resolveToken).toHaveBeenCalledWith('live-report-token');
 
-            const code = new URL(body.data.loginUrl!, 'http://x').searchParams.get('code');
+            // The single-use link is EMAILED to the agent's own inbox, never
+            // returned to the caller (closes the report-link → session takeover).
+            expect(sendAgentLoginLink).toHaveBeenCalledTimes(1);
+            const [toEmail, loginUrl] = sendAgentLoginLink.mock.calls[0] as [string, string];
+            expect(toEmail).toBe(AGENT_EMAIL);
+            expect(loginUrl).toMatch(/\/agent\/magic-login\?code=[0-9a-f-]+$/);
+
+            const code = new URL(loginUrl, 'http://x').searchParams.get('code');
             const raw = await kv.get(`agent_ml:${code}`);
             expect(raw).not.toBeNull();
             expect(JSON.parse(raw!)).toMatchObject({ userId: AGENT_USER_ID });
         });
 
-        it('no agent account for the recipient email → loginUrl: null, no KV write (anti-oracle)', async () => {
+        it('no agent account for the recipient email → { sent: true }, no email, no KV write (anti-oracle)', async () => {
             await seedRoleProfile('buyer_agent', 'agent');
             // Deliberately no users row for this email.
 
@@ -157,7 +167,7 @@ describe('Agent magic-login primitive', () => {
                 recipientEmail: 'nobody@example.com', revokedAt: null, expiresAt: null,
             });
             const kv = makeKv();
-            const app = buildRequestApp(resolveToken, kv);
+            const { app, sendAgentLoginLink } = buildRequestApp(resolveToken, kv);
 
             const res = await app.request('/api/agent/magic-login/request', {
                 method: 'POST',
@@ -165,16 +175,19 @@ describe('Agent magic-login primitive', () => {
                 body: JSON.stringify({ tenant: 'acme', inspectionId: INSP_ID, token: 'live-report-token' }),
             });
 
+            // Anti-oracle: identical { sent: true } response, but no email + no KV
+            // write when no agent account exists for the recipient.
             expect(res.status).toBe(200);
-            const body = await res.json() as { data: { loginUrl: string | null } };
-            expect(body.data.loginUrl).toBeNull();
+            const body = await res.json() as { data: { sent: boolean } };
+            expect(body.data.sent).toBe(true);
+            expect(sendAgentLoginLink).not.toHaveBeenCalled();
             expect(kv.store.size).toBe(0);
         });
 
         it('invalid/revoked/expired/inspection-mismatched report token → 401', async () => {
             const resolveToken = vi.fn().mockResolvedValue(null);
             const kv = makeKv();
-            const app = buildRequestApp(resolveToken, kv);
+            const { app } = buildRequestApp(resolveToken, kv);
 
             const res = await app.request('/api/agent/magic-login/request', {
                 method: 'POST',
@@ -194,7 +207,7 @@ describe('Agent magic-login primitive', () => {
                 recipientEmail: 'client@example.com', revokedAt: null, expiresAt: null,
             });
             const kv = makeKv();
-            const app = buildRequestApp(resolveToken, kv);
+            const { app } = buildRequestApp(resolveToken, kv);
 
             const res = await app.request('/api/agent/magic-login/request', {
                 method: 'POST',
