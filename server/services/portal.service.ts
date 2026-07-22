@@ -15,7 +15,7 @@
  */
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, inArray, isNull, or, gt } from 'drizzle-orm';
-import { inspectionAccessTokens, inspections, agreementRequests, inspectionMessages } from '../lib/db/schema';
+import { inspectionAccessTokens, inspections, agreementRequests, inspectionMessages, contactRoleProfiles } from '../lib/db/schema';
 import { isReportPublished } from '../lib/status/report-status';
 import { PeopleService } from './people.service';
 
@@ -119,6 +119,38 @@ export class PortalService {
             reportPublished: isReportPublished(r.reportStatus),
             paymentStatus: r.paymentStatus,
         }));
+    }
+
+    /**
+     * True when this email holds a live (non-revoked, non-expired) access token
+     * whose role profile is CLIENT-kind (client/co_client) in this tenant.
+     *
+     * Deliberately NARROWER than listRecipientInspections: that method is
+     * capability-driven (selfRetrieveReport) and so ALSO matches AGENT-kind
+     * grants (Spec 3 opened selfRetrieveReport for agents). The find-my-report
+     * redeem branch must route only GENUINE clients to a client session and
+     * still send agents to the agent dashboard — so it keys on kind='client'
+     * specifically, not the shared self-retrieve capability (#258 review #9).
+     */
+    async hasLiveClientGrant(tenantId: string, email: string): Promise<boolean> {
+        const db = this.d();
+        const now = new Date();
+        const clientKeys = (await db.select({ key: contactRoleProfiles.key }).from(contactRoleProfiles)
+            .where(and(
+                eq(contactRoleProfiles.tenantId, tenantId),
+                eq(contactRoleProfiles.kind, 'client'),
+                eq(contactRoleProfiles.active, true),
+            ))).map((r) => r.key);
+        if (clientKeys.length === 0) return false;
+        const row = await db.select({ id: inspectionAccessTokens.id }).from(inspectionAccessTokens)
+            .where(and(
+                eq(inspectionAccessTokens.tenantId, tenantId),
+                eq(inspectionAccessTokens.recipientEmail, email),
+                inArray(inspectionAccessTokens.role, clientKeys),
+                isNull(inspectionAccessTokens.revokedAt),
+                or(isNull(inspectionAccessTokens.expiresAt), gt(inspectionAccessTokens.expiresAt, now)),
+            )).get();
+        return row != null;
     }
 
     /**

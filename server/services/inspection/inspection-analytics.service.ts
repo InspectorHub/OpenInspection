@@ -504,10 +504,15 @@ export class InspectionAnalyticsService extends InspectionSubService {
         // roles for every inspection in `all` — listing_agent = the selling
         // agent, buyer_agent = the referred/buyer's agent — mirroring the
         // priority the legacy code gave sellingAgentId over referredByAgentId.
-        const allIds = all.map(i => i.id as string);
+        // Scope to `uniqueIds` (rendered bucket ids), NOT every inspection in
+        // `all` — only bucket rows are decorate()'d — and chunk under D1's ~100
+        // bound-param cap. The pre-fix code bound the full per-tenant inspection
+        // set and threw past ~95 inspections, breaking the dashboard (#258 review).
         const listingAgentNameByInspection = new Map<string, string>();
         const buyerAgentNameByInspection   = new Map<string, string>();
-        if (allIds.length > 0) {
+        const AGENT_ROLE_ID_CHUNK = 90; // headroom for the fixed binds (tenantId ×2, role keys ×2)
+        for (let off = 0; off < uniqueIds.length; off += AGENT_ROLE_ID_CHUNK) {
+            const chunk = uniqueIds.slice(off, off + AGENT_ROLE_ID_CHUNK);
             const agentRoleRows = await db.select({
                 inspectionId: inspectionPeople.inspectionId,
                 roleKey:      contactRoleProfiles.key,
@@ -526,7 +531,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 ))
                 .where(and(
                     eq(inspectionPeople.tenantId, tenantId),
-                    inArray(inspectionPeople.inspectionId, allIds),
+                    inArray(inspectionPeople.inspectionId, chunk),
                 ));
             for (const r of agentRoleRows) {
                 if (!r.contactName) continue;

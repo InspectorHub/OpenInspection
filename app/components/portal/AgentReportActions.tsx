@@ -7,9 +7,11 @@
  * never sees this component.
  *
  * hasAccount branches the CTA:
- *   - true  : "Go to my workspace" — posts the agent-magic-login intent and
- *     full-navigates to the single-use loginUrl on success (a 302 that mints
- *     a cookie, so it cannot be a client fetch + client-side redirect).
+ *   - true  : "Email me a sign-in link" — posts the agent-magic-login intent;
+ *     the server EMAILS a single-use sign-in link to the agent's account inbox
+ *     (never returns it), so on success we show a "check your email"
+ *     confirmation rather than navigating. Emailing (vs. returning the link)
+ *     closes the report-link → agent-session takeover vector (#258 review #5).
  *   - false : "Create your free agent account" — a plain link into
  *     /agent-signup with the recipient email + returnTo prefilled.
  *
@@ -29,7 +31,8 @@ import { m } from "~/paraglide/messages";
 interface AgentMagicLoginActionResult {
   ok: boolean;
   intent?: string;
-  loginUrl?: string | null;
+  /** True when the server accepted the request and (if an account exists) emailed the sign-in link. */
+  sent?: boolean;
 }
 
 export interface AgentReportActionsProps {
@@ -53,18 +56,19 @@ export function AgentReportActions({
 }: AgentReportActionsProps) {
   const fetcher = useFetcher<AgentMagicLoginActionResult>();
   const [error, setError] = useState(false);
+  const [sent, setSent] = useState(false);
   const lastHandled = useRef<AgentMagicLoginActionResult | undefined>(undefined);
 
   // Consume the action result exactly once per response (mirrors
   // WordExportButton's guard — fetcher.data keeps the same reference across
-  // renders, so without it this effect would re-fire and re-navigate).
+  // renders). The server emails the sign-in link and answers { sent: true }
+  // (anti-oracle — identical whether or not an account exists), so on success
+  // we show a "check your email" confirmation instead of navigating anywhere.
   useEffect(() => {
     if (fetcher.state !== "idle" || !fetcher.data || fetcher.data === lastHandled.current) return;
     lastHandled.current = fetcher.data;
-    if (fetcher.data.ok && fetcher.data.loginUrl) {
-      // Full navigation (not client-side) — the redeem endpoint is a
-      // cookie-setting 302, which a client-side router transition can't relay.
-      window.location.assign(fetcher.data.loginUrl);
+    if (fetcher.data.ok) {
+      setSent(true);
     } else {
       setError(true);
     }
@@ -93,6 +97,16 @@ export function AgentReportActions({
   }
 
   const submitting = fetcher.state !== "idle";
+
+  if (sent) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-8 print:hidden" data-testid="agent-report-actions">
+        <Banner tone="success">
+          <span data-testid="agent-report-workspace-sent">{m.agent_report_actions_workspace_sent()}</span>
+        </Banner>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 pb-8 print:hidden" data-testid="agent-report-actions">

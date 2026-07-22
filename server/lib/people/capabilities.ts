@@ -17,5 +17,10 @@ export function capabilitiesForKind(kind: RoleKind): RoleCapabilities {
         case 'client': return { receivesReport: true, selfRetrieveReport: true,  canSign: true,  canPay: true,  canHaveAccount: false };
         case 'agent':  return { receivesReport: true, selfRetrieveReport: true,  canSign: true,  canPay: true,  canHaveAccount: true  };
         case 'other':  return { receivesReport: true, selfRetrieveReport: false, canSign: false, canPay: false, canHaveAccount: false };
+        // Fail closed: callers cast DB `kind` strings through `as RoleKind`, so a
+        // corrupt/out-of-enum value would otherwise return undefined and throw on
+        // `[cap]` access. An unknown role gets NO capabilities (no report, no
+        // sign/pay/account), never an accidental grant.
+        default:       return { receivesReport: false, selfRetrieveReport: false, canSign: false, canPay: false, canHaveAccount: false };
     }
 }

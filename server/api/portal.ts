@@ -390,16 +390,28 @@ const portalRoutes = portalRouter
             return c.json({ error: 'Invalid or expired link' }, 401);
         }
 
-        // SECURITY: a find-my-report magic link redeemed by an agent must mint
-        // an AGENT JWT (mirrors server/api/agent/login.ts's password mint
-        // EXACTLY — no tenantId) and NEVER the client __Host-portal_session
-        // cookie. Global agent accounts (findGlobalAgentByEmail — the single
-        // source of the "live global agent" predicate) are a SEPARATE identity
-        // plane from tenant-scoped client/co_client contacts; there is no
-        // token/grant object on this magic-link path (unlike exchangeRoute),
-        // only a verified email, so the global-agent-account lookup is the
-        // correct signal to branch on here.
-        const agent = await findGlobalAgentByEmail(c.env.DB, verified.email);
+        // Prefer a client session when this email holds a live CLIENT-KIND grant
+        // in this tenant, even if it ALSO has a global agent account — else a
+        // dual-identity recipient could never reach their client report (#258
+        // review #9). hasLiveClientGrant is kind='client' specific, NOT
+        // listRecipientInspections (capability-based → also matches agent grants
+        // via the Spec 3 self-retrieve flip). Agent-role report tokens still can't
+        // unlock the client hub — that guard lives in exchangeRoute (role-based).
+        const tenantId = resolveTenantId(c);
+        let hasClientAccess = false;
+        if (tenantId) {
+            try {
+                hasClientAccess = await c.var.services.portal.hasLiveClientGrant(tenantId, verified.email);
+            } catch (err) {
+                logger.error('[portal] redeem client-access lookup failed', {}, err instanceof Error ? err : undefined);
+            }
+        }
+
+        // SECURITY: an agent-only email (no client access) mints an AGENT JWT
+        // (mirrors server/api/agent/login.ts — no tenantId) and NEVER the client
+        // __Host-portal_session cookie. Global agents (findGlobalAgentByEmail) are
+        // a SEPARATE identity plane from tenant-scoped client/co_client contacts.
+        const agent = hasClientAccess ? null : await findGlobalAgentByEmail(c.env.DB, verified.email);
         if (agent) {
             const keyring = await c.var.keyringPromise!;
             const now = Math.floor(Date.now() / 1000);

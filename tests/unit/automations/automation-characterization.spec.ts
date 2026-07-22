@@ -91,7 +91,7 @@ async function seedRuleAndLog(opts: {
   await db.insert(schema.automationLogs).values({
     id: logId, tenantId: TENANT, automationId: ruleId, inspectionId: opts.inspectionId,
     recipient: opts.channel === 'sms' ? '+15551234567' : 'jane@example.com',
-    channel: opts.channel ?? 'email',
+    channel: opts.channel ?? 'email', recipientRoleKey: 'client',
     sendAt: new Date(Date.now() - 1000), status: 'pending',
   } as never);
   return logId;
