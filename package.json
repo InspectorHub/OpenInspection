@@ -37,7 +37,7 @@
     "type-check": "npm run i18n:compile && react-router typegen && npm run type-check:app && npm run type-check:api",
     "type-check:app": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.json --noEmit --incremental --tsBuildInfoFile ./.tsbuildinfo.app",
     "type-check:api": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.api.json --noEmit --incremental --tsBuildInfoFile ./.tsbuildinfo.api",
-    "lint": "cross-env NODE_OPTIONS=--max-old-space-size=8192 eslint . --cache --cache-strategy content && npm run lint:ds && npm run lint:svg && npm run lint:erasure && npm run lint:migrefs && npm run lint:filesize && npm run lint:dup && npm run lint:tenant-scope && npm run lint:tests && npm run lint:deadcode && npm run lint:timestamps && npm run lint:tz && npm run lint:i18n && npm run lint:i18n-catalog && npm run lint:naming",
+    "lint": "cross-env NODE_OPTIONS=--max-old-space-size=12288 eslint . --cache --cache-strategy content && npm run lint:ds && npm run lint:svg && npm run lint:erasure && npm run lint:migrefs && npm run lint:filesize && npm run lint:dup && npm run lint:tenant-scope && npm run lint:tests && npm run lint:deadcode && npm run lint:timestamps && npm run lint:tz && npm run lint:i18n && npm run lint:i18n-catalog && npm run lint:naming",
     "lint:ds": "node scripts/check-ds-tokens.mjs",
     "lint:naming": "node scripts/check-naming.mjs",
     "lint:svg": "node scripts/check-svg-dimensions.mjs",
@@ -176,7 +176,9 @@
     "esbuild": "^0.28.1",
     "uuid": "^11.1.1",
     "undici": "^7.28.0",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "sharp": ">=0.35.0",
+    "@hono/node-server": ">=2.0.5"
   },
   "optionalDependencies": {
     "@rolldown/binding-linux-x64-gnu": "1.0.3",
