@@ -15065,8 +15065,8 @@
         "$ref": "#/components/schemas/AgentMagicLoginRequest"
       }
     },
-    "summary": "Exchange an agent report token for a login code",
-    "description": "Public, unauthenticated endpoint for the agent unified link. Exchanges a live, agent-kind report-link token for a single-use magic-login code (900 second TTL) that mints an agent session cookie on redeem. Returns loginUrl: null with 200 (not an error) when the token is valid but no global agent account exists yet for the recipient email, so probing tokens cannot be used to enumerate accounts."
+    "summary": "Email an agent a single-use sign-in link for a report token",
+    "description": "Public, unauthenticated endpoint for the agent unified link. For a live, agent-kind report-link token whose recipient email has a global agent account, EMAILS a single-use magic-login link (900 second TTL) to that agent's account inbox — the link is never returned to the caller, so a leaked/forwarded report link cannot be replayed into a full agent session. Always returns { sent: true } with 200 (identical response and timing whether or not an account exists) so probing tokens cannot enumerate accounts."
   },
   {
     "operationId": "requestInvoicePayment",

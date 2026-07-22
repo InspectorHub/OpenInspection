@@ -9,15 +9,16 @@
  *     renders the report directly instead of bouncing to the generic
  *     "Sign in to your portal" page — Task 6's loader agent-branch
  *     (app/lib/portal-exchange.ts's `isAgentToken` short-circuit).
- *   - Below the report, <AgentReportActions> (Task 3) shows either "Go to my
- *     workspace" (a global agent account already exists for the recipient
+ *   - Below the report, <AgentReportActions> (Task 3) shows either "Email me a
+ *     sign-in link" (a global agent account already exists for the recipient
  *     email) or "Create your free agent account" (it doesn't).
- *   - "Go to my workspace" exchanges the durable report token for a single-use
- *     magic-login code (POST /api/agent/magic-login/request, Task 2) and
- *     redeems it (GET /agent/magic-login?code=) into an agent JWT — a
- *     SEPARATE token family from the report token itself (see the SECURITY
- *     note in server/api/agent/magic-login.ts). The report token alone can
- *     NEVER mint that session.
+ *   - "Email me a sign-in link" asks the server (POST /api/agent/magic-login/
+ *     request, Task 2) to EMAIL a single-use magic-login link to the agent's
+ *     own inbox — the link is never returned to the caller (#258 review #5), so
+ *     a leaked/forwarded report link can't be replayed into a session. The agent
+ *     opens the emailed link (GET /agent/magic-login?code=) to mint an agent JWT
+ *     — a SEPARATE token family from the report token itself. The report token
+ *     alone can NEVER mint that session.
  *   - "Create your free agent account" prefills /agent-signup?email=... (Task
  *     4) and, on conversion from a report link, lands the new agent on
  *     /agent-dashboard?welcome=<inspectionId> (Task 4c).
@@ -35,9 +36,10 @@
  * not the actual :8789 wrangler dev port). Calling the SAME underlying public
  * API endpoints directly over a genuine top-level HTTP request (as this file
  * does via `request.post`/`request.get`) exercises the identical service code
- * (server/services/agent/magic-login.service.ts) but gets a loginUrl built off
- * the REAL request Host — the only difference from clicking the on-page CTA is
- * which HTTP client fires the request, not which server code runs.
+ * (server/services/agent/magic-login.service.ts) and emails the sign-in link
+ * built off the REAL request Host — the only difference from clicking the
+ * on-page CTA is which HTTP client fires the request, not which server code runs.
+ * The emitted link is then read back from the E2E email sink.
  *
  * Run: npm run test:e2e -- agent-unified-link
  */
@@ -281,7 +283,7 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
     expect(publishBRes.status(), 'inspection B report must publish').toBe(200);
   });
 
-  test('Scenario 1 — registered agent: report link renders + "Go to my workspace" -> authenticated /agent-dashboard', async ({
+  test('Scenario 1 — registered agent: report link renders + "Email me a sign-in link" -> emailed code -> authenticated /agent-dashboard', async ({
     page,
     request,
   }) => {
@@ -309,12 +311,15 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
 
       const workspaceCta = freshPage.getByTestId('agent-report-workspace-cta');
       await expect(workspaceCta).toBeVisible();
-      await expect(workspaceCta).toHaveText('Go to my workspace');
+      await expect(workspaceCta).toHaveText('Email me a sign-in link');
 
       // Drive the SAME exchange the CTA's click posts through
       // (POST /api/agent/magic-login/request) directly over a real top-level
       // request — see the file header for why this, not a UI click, is the
-      // robust way to prove the redeem in this harness.
+      // robust way to prove the redeem in this harness. The endpoint EMAILS the
+      // single-use sign-in link to the agent's own inbox (never returns it), so
+      // it answers { sent: true } and we fetch the link from the email sink —
+      // this is the takeover-hardening from #258 review #5.
       const reportToken = new URL(portalUrl!).searchParams.get('token');
       expect(reportToken, 'portal link must carry ?token=').toBeTruthy();
 
@@ -324,10 +329,21 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
       });
       expect(magicRes.status(), 'magic-login/request for a registered agent').toBe(200);
       const magicBody = await magicRes.json();
-      const loginUrl = magicBody.data?.loginUrl as string | null;
-      expect(loginUrl, 'a registered agent must get a non-null loginUrl').toBeTruthy();
+      expect(magicBody.data?.sent, 'request must report { sent: true } (link is emailed, never returned)').toBe(true);
 
-      await freshPage.goto(loginUrl!, { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
+      // The sign-in link email lands AFTER the report email already in the sink
+      // (deferred via waitUntil), so poll until the latest email carries a
+      // magic-login code rather than the report link.
+      let code: string | null = null;
+      for (let attempt = 0; attempt < 15; attempt++) {
+        const em = await pollLastEmail(request, REGISTERED_AGENT.email);
+        code = extractMagicLoginCode(String(em.html));
+        if (code) break;
+        await new Promise((resolve) => setTimeout(resolve, 300));
+      }
+      expect(code, 'the emailed sign-in link must contain a magic-login code').toBeTruthy();
+
+      await freshPage.goto(`${BASE_URL}/agent/magic-login?code=${code}`, { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
       expect(freshPage.url()).toContain('/agent-dashboard');
       await expect(freshPage.getByRole('heading', { name: 'Agent Dashboard' })).toBeVisible({ timeout: 10000 });
       await expect(freshPage.getByTestId(`referral-row-${inspectionAId}`)).toBeVisible({ timeout: 10000 });
@@ -451,22 +467,42 @@ test.describe.serial('Agent unified link (Spec 3 Task 8)', () => {
     const reportToken = new URL(registeredPortalUrl).searchParams.get('token');
     expect(reportToken, 'registeredPortalUrl must still carry ?token=').toBeTruthy();
 
+    // Earlier scenarios already emailed this agent a sign-in code, and the sink
+    // returns the LATEST email — so capture that stale code first and then wait
+    // for THIS request's fresh code to supersede it (the link is emailed now,
+    // never returned — #258 review #5).
+    let prevCode: string | null = null;
+    try {
+      prevCode = extractMagicLoginCode(String((await pollLastEmail(request, REGISTERED_AGENT.email)).html));
+    } catch {
+      prevCode = null;
+    }
+
     const magicRes = await request.post(`${BASE_URL}/api/agent/magic-login/request`, {
       data: { tenant: 'e2e-agent-unified-link', inspectionId: inspectionAId, token: reportToken },
       headers: { 'Content-Type': 'application/json' },
     });
     expect(magicRes.status()).toBe(200);
-    const loginUrl = (await magicRes.json()).data?.loginUrl as string | null;
-    expect(loginUrl, 'a fresh magic-login code must be issued').toBeTruthy();
+    expect((await magicRes.json()).data?.sent, 'request must report { sent: true }').toBe(true);
 
-    const first = await request.get(loginUrl!, { maxRedirects: 0 });
+    let code: string | null = null;
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const em = await pollLastEmail(request, REGISTERED_AGENT.email);
+      const c = extractMagicLoginCode(String(em.html));
+      if (c && c !== prevCode) { code = c; break; }
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    expect(code, 'a fresh magic-login code must be emailed').toBeTruthy();
+    const loginUrl = `${BASE_URL}/agent/magic-login?code=${code}`;
+
+    const first = await request.get(loginUrl, { maxRedirects: 0 });
     expect(first.status(), 'first redeem must succeed').toBe(302);
     expect(first.headers()['location']).toContain('/agent-dashboard');
     expect(first.headers()['set-cookie'] ?? '', 'first redeem must mint the session cookie').toContain(
       '__Host-inspector_token',
     );
 
-    const second = await request.get(loginUrl!, { maxRedirects: 0 });
+    const second = await request.get(loginUrl, { maxRedirects: 0 });
     expect(second.status(), 'second redeem of the SAME code must fail').toBe(302);
     expect(second.headers()['location']).toContain('/agent-login');
     expect(second.headers()['location']).toContain('error=expired_link');
