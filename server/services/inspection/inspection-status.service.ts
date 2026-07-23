@@ -54,14 +54,14 @@ export class InspectionStatusService extends InspectionSubService {
     }
 
     /**
-     * Submits a completed inspection's report for manager review.
+     * Submits an inspection's report for manager review.
      * Transitions: reportStatus in_progress → submitted.
      */
     async submitReport(inspectionId: string, tenantId: string): Promise<void> {
         const { db, inspection } = await this.fetchForStatusChange(tenantId, inspectionId);
-        if (inspection.status !== INSPECTION_STATUS.COMPLETED) {
-            throw Errors.BadRequest('Inspection must be completed before submitting the report.');
-        }
+        // Sending a report up for review is a report axis move; it carries no
+        // claim about whether the on-site work is wrapped up. Keeping the two
+        // axes coupled here would also make the two submit paths disagree.
         const reportStatus = inspection.reportStatus as string;
         if (reportStatus !== REPORT_STATUS.IN_PROGRESS) {
             throw Errors.BadRequest(`Cannot submit a report in status ${reportStatus}.`);

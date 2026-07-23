@@ -5,7 +5,6 @@ import { safeISODate } from '../../lib/date';
 import { resolveLocale } from '../../lib/locale';
 import { InvoiceService } from '../invoice.service';
 import { PeopleService } from '../people.service';
-import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import type { AgreementService } from '../agreement.service';
 import type { TemplateSchemaV2 } from '../../types/template-schema';
@@ -408,7 +407,8 @@ export class InspectionPublishService extends InspectionSubService {
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
-        if (inspection.status !== INSPECTION_STATUS.COMPLETED) throw Errors.BadRequest('Inspection must be completed before publishing the report.');
+        // The order lifecycle does not gate delivery — a report can ship while
+        // the order is still scheduled. Content completeness: publishReadiness.
 
         await db.update(inspections)
             .set({ reportStatus: REPORT_STATUS.PUBLISHED })
