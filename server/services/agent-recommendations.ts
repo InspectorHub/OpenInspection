@@ -9,6 +9,8 @@
 // override the canned default; same for photos.
 
 import type { DefectCategory } from '../types/template-schema';
+import { readItemDefectStates } from '../lib/read-item-defects';
+import type { ResultsProjection, DefectState } from '../lib/collab/results-doc.types';
 
 export interface AgentRecommendationRow {
     inspectionId:    string;
@@ -41,17 +43,6 @@ interface ItemShape    { id: string; label: string; tabs?: { defects?: CannedDef
 interface SectionShape { id: string; title: string; items?: ItemShape[] }
 interface SnapshotShape { sections?: SectionShape[] }
 
-interface DefectStateShape {
-    cannedId:  string;
-    included?: boolean;
-    comment?:  string | null;
-    category?: string;
-    location?: string | null;
-    photos?:   Array<{ key?: string } | string> | null;
-}
-interface ResultsItemShape  { defects?: DefectStateShape[] }
-interface ResultsDataShape  { [itemId: string]: ResultsItemShape | undefined }
-
 export interface RawInspectionForRecommendations {
     id:               string;
     propertyAddress:  string;
@@ -64,7 +55,7 @@ function isCategory(v: unknown): v is DefectCategory {
     return v === 'safety' || v === 'recommendation' || v === 'maintenance';
 }
 
-function flattenPhotos(photos: DefectStateShape['photos']): string[] {
+function flattenPhotos(photos: DefectState['photos']): string[] {
     if (!photos || !Array.isArray(photos)) return [];
     const out: string[] = [];
     for (const p of photos) {
@@ -88,15 +79,17 @@ export function flattenInspectionToRecommendations(
     // D1 sometimes hands back a JSON column as a raw string (depending on
     // how the row was originally written); coerce defensively.
     const snapshot = coerceJson<SnapshotShape>(insp.templateSnapshot);
-    const results  = coerceJson<ResultsDataShape>(insp.resultsData);
+    const results  = coerceJson<ResultsProjection>(insp.resultsData) ?? {};
     if (!snapshot || !Array.isArray(snapshot.sections)) return [];
 
     const out: AgentRecommendationRow[] = [];
     for (const section of snapshot.sections) {
         for (const item of section.items ?? []) {
             const cannedDefects = item.tabs?.defects ?? [];
-            const itemResults   = results?.[item.id];
-            const defectStates  = itemResults?.defects ?? [];
+            // Read via the shared resolver — the canonical findingKey with a
+            // bare-itemId fallback, then `.tabs.defects`. Keying by bare itemId
+            // or skipping `.tabs` (the prior bug) reads nothing (IA-31).
+            const defectStates  = readItemDefectStates(results, section.id, item.id);
             // Index canned by id for fast lookup.
             const cannedById = new Map<string, CannedDefectShape>();
             for (const c of cannedDefects) cannedById.set(c.id, c);

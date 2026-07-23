@@ -10,13 +10,13 @@ import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
 import { renderTemplate } from '../../lib/mustache';
 import { mapRepairItems } from '../../lib/report-repair-items';
 import { selectReportMedia, type ReportMediaContext } from '../../lib/report-video';
-import { findingKey, DEFAULT_UNIT } from '../../lib/finding-key';
+import { readItemEntry } from '../../lib/read-item-defects';
 import { sha256Hex } from '../signing-key.service';
 import { RENDER_VERSION } from '../../lib/pdf';
 import { resolvePdfSettings, type PdfSettings } from '../../lib/pdf-settings';
 import { isReportPublished } from '../../lib/status/report-status';
 import { resolveBuildingProfile } from '../../lib/building-profile';
-import { buildSystemsSummary } from '../../lib/pca-systems-summary';
+import type { buildSystemsSummary } from '../../lib/pca-systems-summary';
 import { buildPcaReportBlock } from '../../lib/pca-report-block';
 import { gatedSectionRegistry } from '../../lib/pca-section-registry';
 import { buildReportOutline } from '../../lib/report-outline';
@@ -269,7 +269,7 @@ export class InspectionReportService extends InspectionSubService {
                 : null,
             alwaysPageBreak: sec.alwaysPageBreak === true,
             items: sec.items.map((item: SchemaItem) => {
-                const res = resultData[findingKey(DEFAULT_UNIT, sec.id, item.id)] || resultData[item.id] || {};
+                const res = readItemEntry(resultData, sec.id, item.id);
                 const ratingId = res.rating ?? null;
                 const bucket = getRatingBucket(ratingId, levels);
                 const level = levels.find((l: RatingLevel) => l.id === ratingId);
