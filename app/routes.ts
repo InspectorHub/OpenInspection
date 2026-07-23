@@ -90,6 +90,7 @@ export default [
   route("resources/cost-items", "routes/resources/cost-items.tsx"),
   route("resources/cost-export", "routes/resources/cost-export.tsx"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
+  route("resources/marketplace-install", "routes/resources/marketplace-install.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),
   route("resources/inspection-media", "routes/resources/inspection-media.tsx"),
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),

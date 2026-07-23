@@ -124,6 +124,8 @@
   "marketplace_empty_title": "Marketplace is empty",
   "marketplace_empty_desc": "Community templates and content packs will appear here.",
   "marketplace_install": "Install",
+  "marketplace_installing": "Installing…",
+  "marketplace_install_error": "Couldn't install this template. Please try again.",
   "notifications_meta_title": "Notifications - OpenInspection",
   "notifications_heading": "Notifications",
   "notifications_meta": "{count} notifications",
