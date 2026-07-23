@@ -30,11 +30,24 @@ export async function resolveBuilderAccess(
 ): Promise<{ tenantId: string; creator: Creator; ownerPreview: boolean } | null> {
     const token = c.req.query('token');
 
-    // Path 1: persistent portal token (client / co_client / agent role).
+    // Path 1: persistent portal token. The grant's role kind decides the actor —
+    // assuming 'client' for every resolvable token let an agent-kind token
+    // (buyer_agent / listing_agent) act as the client on the builder's five
+    // write endpoints (IA-35), exactly what the sibling client-actor resolver
+    // guards against. client/co_client → client; agent → agent; anything else
+    // (attorney, title company, …) has no builder role → reject.
     const grant = await resolvePortalAccess(c.var.services.portalAccess, token, id);
     if (grant) {
-        const creator: Creator = { kind: 'client', ref: grant.recipientEmail };
-        return { tenantId: grant.tenantId, creator, ownerPreview: false };
+        const kind = await c.var.services.portalAccess.getRoleKind(grant.tenantId, grant.role);
+        if (kind === 'client') {
+            const creator: Creator = { kind: 'client', ref: grant.recipientEmail };
+            return { tenantId: grant.tenantId, creator, ownerPreview: false };
+        }
+        if (kind === 'agent') {
+            const creator: Creator = { kind: 'agent', ref: grant.recipientEmail };
+            return { tenantId: grant.tenantId, creator, ownerPreview: false };
+        }
+        return null;
     }
 
     // Path 2: legacy KV agent-view token (existing share links).
