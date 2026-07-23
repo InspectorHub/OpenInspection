@@ -18,6 +18,7 @@ import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/valida
 import { PublishInspectionSchema, CreateReinspectionSchema, CancelInspectionSchema } from '../../lib/validations/inspection.schema';
 import { drizzle } from 'drizzle-orm/d1';
 import { inspections as inspectionTable } from '../../lib/db/schema';
+import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { eq, and } from 'drizzle-orm';
 import { getTenantId } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
@@ -286,41 +287,23 @@ const publishRoutes = createApiRouter()
         const service = c.var.services.inspection;
         const { inspection } = await service.getInspection(id, tenantId);
 
-        // Idempotency: if already completed, short-circuit to prevent accidental
-        // email storms when the client retries on network errors or double-clicks.
-        if (inspection.status === 'completed' || inspection.status === 'delivered') {
+        // Idempotency: if already completed, short-circuit so a retry on a
+        // network error or double-click does not re-run the admin notification.
+        if (inspection.status === INSPECTION_STATUS.COMPLETED) {
             return c.json({ success: true }, 200);
         }
 
         const db = drizzle(c.env.DB);
-        await db.update(inspectionTable).set({ status: 'completed' }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
+        await db.update(inspectionTable).set({ status: INSPECTION_STATUS.COMPLETED }).where(and(eq(inspectionTable.id, id), eq(inspectionTable.tenantId, tenantId)));
 
         // Task 9a (people-role-profiles) — resolve the recipient via the
         // inspection_people join (PeopleService) instead of the legacy
         // inspection.clientEmail/.clientName column, which is being dropped.
-        // Resolved here only for the admin notification's metadata below — the
-        // actual report delivery is the automation trigger fired next.
+        // Used for the admin notification's metadata below. Report delivery is
+        // NOT fired here: report.published is a report event, produced solely by
+        // the publish path. Firing it on order completion would deliver a report
+        // that may never have been published (see IA-30).
         const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, id);
-
-        // Route report delivery through the single automation engine (report.published)
-        // instead of an inline per-route send. The seeded report.published rules
-        // (client active, buyer_agent active, listing_agent inactive) fan out one
-        // per-recipient automation_log; the cron flush renders the PDF once and sends
-        // each recipient their role-keyed tokenized link. Idempotent per inspection
-        // (see the auto:report.published:<id> dedup key), so a later /publish that
-        // fires the same event does not double-send.
-        try {
-            await c.var.services.automation.trigger({
-                tenantId,
-                inspectionId: id,
-                triggerEvent: 'report.published',
-                companyName: '',
-                reportBaseUrl: '',
-            });
-        } catch (err) {
-            logger.error('[complete] report.published automation trigger failed',
-                { inspectionId: id }, err instanceof Error ? err : undefined);
-        }
 
         // B3: in-app notification for report ready
         c.executionCtx.waitUntil(

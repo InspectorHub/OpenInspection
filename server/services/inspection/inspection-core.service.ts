@@ -13,7 +13,7 @@ import { computePreflightFromData } from '../../lib/preflight';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { findingKey, DEFAULT_UNIT } from '../../lib/finding-key';
 import { parseReinspectionStatuses, isOpenStatus } from '../../lib/reinspection-status';
-import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
+import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation, type Inspection, type InspectionListParams, type CreateInspectionData } from './shared';
 import { InspectionSubService } from './base';
@@ -300,7 +300,7 @@ export class InspectionCoreService extends InspectionSubService {
                 clientName: primaryClient?.name ?? null,
                 clientEmail: primaryClient?.email ?? null,
                 clientPhone: primaryClient?.phone ?? null,
-                status: result.status as 'draft' | 'completed' | 'delivered',
+                status: result.status as InspectionStatus,
                 date: result.date as string,
                 inspectorId: result.inspectorId as string | null,
                 templateId: result.templateId as string | null,
