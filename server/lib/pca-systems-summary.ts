@@ -38,10 +38,22 @@ const SEVERITY_RANK: Record<SeverityRank, number> = {
   significant: 3,
 };
 
+/**
+ * Normalize an item's `severityBucket` (the getRatingBucket domain
+ * `satisfactory | monitor | defect | other`) to the severity axis this table
+ * ranks. It is the inverse of getRatingBucket — the summary reads bucket
+ * values, so accepting the severity domain directly (the prior bug) made every
+ * real bucket fall through to 'good'. IA-43 tracks unifying the two domains so
+ * this local inverse can be retired.
+ */
 function asSeverity(bucket: string | undefined): SeverityRank {
-  return bucket === 'marginal' || bucket === 'significant' || bucket === 'minor'
-    ? bucket
-    : 'good';
+  switch (bucket) {
+    case 'defect':       return 'significant';
+    case 'monitor':      return 'marginal';
+    case 'other':        return 'minor';
+    case 'satisfactory': return 'good';
+    default:             return 'good';
+  }
 }
 
 export function buildSystemsSummary(sections: SystemsSummaryInput[]): SystemsSummaryRow[] {
