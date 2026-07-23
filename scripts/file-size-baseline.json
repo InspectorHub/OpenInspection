@@ -1,7 +1,7 @@
 {
-  "app/routes/inspection-edit.tsx": 2443,
+  "app/routes/inspection-edit.tsx": 2474,
   "server/services/inspection/inspection-core.service.ts": 1083,
-  "app/routes/inspection-hub.tsx": 1010,
+  "app/routes/inspection-hub.tsx": 1048,
   "server/services/booking.service.ts": 967,
   "server/services/inspection/inspection-report.service.ts": 903,
   "server/durable-objects/inspection-doc.ts": 896,
@@ -43,7 +43,7 @@
   "server/services/inspection-request.service.ts": 501,
   "server/services/report-export-consumer.ts": 499,
   "server/api/repair-builder.ts": 496,
-  "app/routes/inspection-edit/action.server.ts": 482,
+  "app/routes/inspection-edit/action.server.ts": 496,
   "app/components/collab/VersionHistoryPanel.tsx": 478,
   "app/routes/settings-workspace.tsx": 477,
   "server/api/bookings.ts": 477,

@@ -15,7 +15,21 @@ export async function action({ request, params, context }: Route.ActionArgs) {
  // data loss (the save pill said "Saved" either way).
  let ok = true;
 
+ // `complete` is not on the typed client (like submit/return/unpublish).
+ const completeEndpoint = () => (api.inspections[":id"] as unknown as {
+ complete: { $post: (args: { param: { id: string } }) => Promise<Response> };
+ }).complete.$post({ param: { id: params.id } });
+
+ if (intent === "complete") {
+ // Advisory order-lifecycle move; decoupled from publishing, never a gate.
+ const res = await completeEndpoint();
+ return { ok: res.ok, intent: "complete" as const };
+ }
+
  if (intent === "publish") {
+ // "Mark complete and publish": fire complete first — idempotent and
+ // non-blocking, so a failure there never stops the publish that follows.
+ if (formData.get("markComplete") === "true") await completeEndpoint().catch(() => undefined);
  const res = await api.inspections[":id"].publish.$post({ param: { id: params.id }, json: {} });
  // Publish has meaningful precondition failures (e.g. "Inspection must be
  // completed before publishing the report.") that the inspector MUST see —

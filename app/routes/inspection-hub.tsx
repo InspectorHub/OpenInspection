@@ -6,7 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { deriveBlockStates, formatCents, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
-import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
+import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
@@ -266,6 +266,14 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     return toActionResult(res, "unpublish", m.inspections_hub_error_unpublish());
   }
 
+  if (intent === "complete") {
+    const completeApi = api.inspections[":id"] as unknown as {
+      complete: { $post: (args: { param: { id: string } }) => Promise<Response> };
+    };
+    const res = await completeApi.complete.$post({ param: { id } });
+    return toActionResult(res, "complete", m.inspections_hub_lifecycle_error());
+  }
+
   if (intent === "create-reinspection") {
     // #119 Task 6 — carry the checked baseline items forward into a new
     // re-inspection. The form submits one `selectedItemIds` value per checked
@@ -438,6 +446,8 @@ export default function InspectionHubPage() {
   const submitReport = useFetcher<typeof action>();
   const returnReport = useFetcher<typeof action>();
   const unpublishReport = useFetcher<typeof action>();
+  const completeInspection = useFetcher<typeof action>();
+  const markingComplete = completeInspection.state !== "idle";
   const submittingReport = submitReport.state !== "idle";
   const returningReport = returnReport.state !== "idle";
   const unpublishingReport = unpublishReport.state !== "idle";
@@ -585,6 +595,34 @@ export default function InspectionHubPage() {
           >
             {m.inspections_hub_schedule_reschedule()}
           </Link>
+        </Card>
+
+        {/* 2b. Order lifecycle — independent of report publishing. "Mark
+            fieldwork complete" is the only producer of `completed`; advisory,
+            never a publish precondition. */}
+        <Card className="p-5">
+          <BlockHeading
+            title={m.inspections_hub_lifecycle_title()}
+            pill={{ tone: statusTone(inspection.status), label: humanizeStatus(inspection.status) }}
+          />
+          {inspection.status !== INSPECTION_STATUS.COMPLETED &&
+           inspection.status !== INSPECTION_STATUS.CANCELLED && (
+            <>
+              <p className="text-[12px] text-ih-fg-3 mb-3">
+                {m.inspections_hub_lifecycle_hint()}
+              </p>
+              <completeInspection.Form method="post">
+                <input type="hidden" name="intent" value="complete" />
+                <button
+                  type="submit"
+                  disabled={markingComplete}
+                  className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
+                >
+                  {markingComplete ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
+                </button>
+              </completeInspection.Form>
+            </>
+          )}
         </Card>
 
         {/* 3. Services ---------------------------------------------- */}
