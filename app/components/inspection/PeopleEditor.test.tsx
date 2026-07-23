@@ -116,7 +116,8 @@ describe("PeopleEditor", () => {
     );
     expect(getByText("Primary")).toBeTruthy();
     // Exactly one Remove control — the agent row, not the primary client.
-    const removeButtons = queryAllByText("Remove");
+    // (IA-36 renamed the row button to "Remove from inspection".)
+    const removeButtons = queryAllByText("Remove from inspection");
     expect(removeButtons).toHaveLength(1);
     expect(removeButtons[0].closest("div")?.textContent).toContain("Amy Agent");
   });

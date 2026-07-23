@@ -508,6 +508,11 @@ const publishRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const result = await runReportTransition(() => c.var.services.inspection.unpublishReport(id, tenantId), 'Failed to unpublish report');
         if (!result.ok) return c.json({ success: false as const, error: { code: 'BAD_REQUEST', message: result.message } }, 400);
+        // IA-36 — unpublishing retracts the report, so the links that point at
+        // it must stop working too; otherwise a recipient keeps a live URL to a
+        // report the inspector has withdrawn. Expire all of this inspection's
+        // access tokens immediately.
+        await c.var.services.portalAccess.setExpiryForInspection(tenantId, id, Date.now());
         return c.json({ success: true as const, data: { reportStatus: 'in_progress' } }, 200);
     });
 

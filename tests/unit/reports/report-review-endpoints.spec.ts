@@ -77,6 +77,8 @@ function buildApp(
             // Stubs for other services the router may touch:
             reportVersion: { snapshotOnPublish: vi.fn().mockResolvedValue({ versionNumber: 1 }) },
             reportPdf: { isPipelineEnabled: vi.fn().mockResolvedValue(false) },
+            // IA-36 — unpublish expires the inspection's access tokens.
+            portalAccess: { setExpiryForInspection: vi.fn().mockResolvedValue(undefined) },
         } as unknown as HonoConfig['Variables']['services']);
         await next();
     });

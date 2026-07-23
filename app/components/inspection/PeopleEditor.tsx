@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useFetcher } from "react-router";
-import { Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { Card, Pill, Button, EmptyState, Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { AddPersonModal } from "./AddPersonModal";
@@ -78,8 +78,14 @@ export function PeopleEditor({
     if (modalOpen && addSucceeded) setModalOpen(false);
   }, [modalOpen, addSucceeded]);
 
+  // Removing a person also revokes their report-access link (IA-36), so the
+  // action is confirmed — a silent side effect on an already-ambiguous button
+  // is exactly what the audit flagged.
+  const [removeTarget, setRemoveTarget] = useState<PersonRow | null>(null);
+
   function handleRemove(personId: string) {
     removeFetcher.submit({ intent: "person-remove", personId }, { method: "post" });
+    setRemoveTarget(null);
   }
 
   const groups = GROUP_ORDER.map((kind) => ({
@@ -147,7 +153,7 @@ export function PeopleEditor({
                       {!isPrimary && (
                         <button
                           type="button"
-                          onClick={() => handleRemove(person.id)}
+                          onClick={() => setRemoveTarget(person)}
                           disabled={removeFetcher.state !== "idle"}
                           className="text-[11px] font-bold text-ih-bad-fg hover:underline disabled:opacity-60 shrink-0"
                         >
@@ -170,6 +176,26 @@ export function PeopleEditor({
         isAdmin={isAdmin}
         fetcher={addFetcher}
       />
+
+      <Modal
+        open={removeTarget !== null}
+        onClose={() => setRemoveTarget(null)}
+        title={m.inspections_hub_people_remove_title()}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setRemoveTarget(null)}>{m.common_cancel()}</Button>
+            <Button
+              variant="danger"
+              disabled={removeFetcher.state !== "idle"}
+              onClick={() => removeTarget && handleRemove(removeTarget.id)}
+            >{m.inspections_hub_people_remove_cta()}</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-ih-fg-3">
+          {m.inspections_hub_people_remove_confirm({ name: removeTarget?.name ?? "" })}
+        </p>
+      </Modal>
     </Card>
   );
 }

@@ -62,4 +62,14 @@ describe('PeopleService', () => {
     const id = await svc.contactIdForRole('t1', 'i1', 'buyer_agent');
     expect(id).toBeNull();
   });
+
+  // IA-36 — removePerson returns the removed recipient's email so the caller
+  // can revoke their report-access token.
+  it('removePerson returns the removed recipient email', async () => {
+    await svc.addPerson('t1', 'i1', 'c1', rp('client'));
+    const [row] = await svc.listPeople('t1', 'i1');
+    const res = await svc.removePerson('t1', 'i1', row.id);
+    expect(res).toEqual({ email: 'b1@x.com' });
+    expect(await svc.listPeople('t1', 'i1')).toHaveLength(0);
+  });
 });
