@@ -765,8 +765,15 @@ export class InspectionReportService extends InspectionSubService {
             ? defectCountsByUnit(matrixUnits, resultData as Record<string, unknown>, levels)
             : {};
 
+        // IA-33 (boundary A) — this object is returned verbatim by the public
+        // report endpoint to any link holder (incl. agent-kind tokens); strip
+        // the columns the account track withholds from agents (agent.schema.ts):
+        // private `internalNotes` and commercial `price`.
+        const publicInspection = { ...inspection, inspectorName };
+        delete (publicInspection as Partial<typeof publicInspection>).internalNotes;
+        delete (publicInspection as Partial<typeof publicInspection>).price;
         return {
-            inspection: { ...inspection, inspectorName },
+            inspection: publicInspection,
             styleProfile: { ...styleProfile, tokens: styleProfile.tokens as Record<string, string> },
             inspectorCredentials: credentialSnapshot,
             amendmentTrail,
