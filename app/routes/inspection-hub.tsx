@@ -6,7 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { deriveBlockStates, formatCents, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
-import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
+import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
@@ -333,20 +333,18 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 /**
- * Derive which report action buttons to render given the current user's
- * capabilities, the report status, and the inspection lifecycle status.
- * Returns an ordered array of action identifiers for the Report card.
+ * Report action buttons for the current user's capabilities and report status.
+ * The order lifecycle is deliberately not an input: it tracks the job, not the
+ * report, and gating on it here left the card empty for every inspection that
+ * was never marked completed. Returns an ordered array of action identifiers.
  */
 export function reportActions(
   caps: { publish: boolean },
   reportStatus: string,
-  inspectionStatus: string,
 ): Array<'submit' | 'publish' | 'return' | 'unpublish'> {
-  if (inspectionStatus !== INSPECTION_STATUS.COMPLETED) return [];
   if (reportStatus === REPORT_STATUS.PUBLISHED) return caps.publish ? ['unpublish'] : [];
   if (reportStatus === REPORT_STATUS.SUBMITTED) return caps.publish ? ['publish', 'return'] : [];
-  // in_progress (or unknown)
-  return caps.publish ? ['publish'] : ['submit'];
+  return caps.publish ? ['publish'] : ['submit']; // in_progress (or unknown)
 }
 
 /* ------------------------------------------------------------------ */
@@ -471,18 +469,19 @@ export default function InspectionHubPage() {
     }
   }, [createReinspection.state, createReinspection.data, navigate]);
 
-  // "View report" only makes sense once the report is shipped to the client.
-  const reportShipped = isReportPublished(inspection.reportStatus);
+  // Shipped-to-client: gates the header "View report" link and the card body.
+  const reportShipped = isReportShipped(hub);
 
-  // Report card affordance: active publish CTA vs read-only-shipped.
-  const reportPublished = isReportShipped(hub);
+  // `publish` is the user's permission; the report's own eligibility lives in
+  // canPublish, which reportShipped above reads.
+  const reportActionList = reportActions({ publish: canPublishCap }, inspection.reportStatus);
 
-  // Report action matrix — what buttons to show in the Report card.
-  const reportActionList = reportActions(
-    { publish: canPublishCap },
-    inspection.reportStatus,
-    inspection.status,
-  );
+  // Incomplete content: drives the count line, the "resolve" link, and whether
+  // the action row has anything to hold.
+  const reportBlockersPending =
+    inspection.reportStatus === REPORT_STATUS.IN_PROGRESS &&
+    !hub.publishReadiness.ready &&
+    hub.publishReadiness.blockingCount > 0;
 
   const servicesTotalCents = services.reduce((sum, s) => sum + s.priceCents, 0);
 
@@ -674,7 +673,7 @@ export default function InspectionHubPage() {
         {/* 6. Report ------------------------------------------------ */}
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_report()} pill={blocks.report} />
-          {reportPublished ? (
+          {reportShipped ? (
             // Already shipped — read-only for publishing. The header "View report"
             // link covers viewing. #119: a published baseline can spawn a
             // re-inspection that carries forward its still-open flagged items.
@@ -713,7 +712,9 @@ export default function InspectionHubPage() {
                 )}
               </div>
             </>
-          ) : reportActionList.length > 0 ? (
+          ) : (
+            // Not shipped yet: the status line always applies, the action row
+            // only for roles that have an action to take.
             <>
               {inspection.reportStatus === 'submitted' && (
                 <p className="text-[12px] text-ih-fg-3 mb-3">
@@ -725,11 +726,12 @@ export default function InspectionHubPage() {
                   {m.inspections_hub_report_ready()}
                 </p>
               )}
-              {inspection.reportStatus === 'in_progress' && !hub.publishReadiness.ready && hub.publishReadiness.blockingCount > 0 && (
+              {reportBlockersPending && (
                 <p className="text-[12px] text-ih-fg-3 mb-3">
                   {m.inspections_hub_report_blockers({ count: hub.publishReadiness.blockingCount })}
                 </p>
               )}
+              {(reportActionList.length > 0 || reportBlockersPending) && (
               <div className="flex items-center gap-2 flex-wrap">
                 {reportActionList.includes('publish') && (
                   <Button
@@ -764,7 +766,7 @@ export default function InspectionHubPage() {
                     </button>
                   </returnReport.Form>
                 )}
-                {inspection.reportStatus === 'in_progress' && !hub.publishReadiness.ready && hub.publishReadiness.blockingCount > 0 && (
+                {reportBlockersPending && (
                   <Link
                     to={`/inspections/${inspection.id}/edit`}
                     className="text-[12px] font-bold text-ih-primary hover:underline"
@@ -773,10 +775,8 @@ export default function InspectionHubPage() {
                   </Link>
                 )}
               </div>
+              )}
             </>
-          ) : (
-            // Pre-completion (in progress) — nothing to publish yet.
-            <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_report_in_progress()}</p>
           )}
         </Card>
       </div>

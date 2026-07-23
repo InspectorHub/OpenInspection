@@ -103,7 +103,6 @@
   "inspections_hub_report_returning": "Returning…",
   "inspections_hub_report_return": "Return to inspector",
   "inspections_hub_report_resolve": "Resolve in editor",
-  "inspections_hub_report_in_progress": "Report is still in progress.",
   "inspections_hub_doc_upload_failed": "Upload failed. Please try again.",
   "inspections_hub_doc_delete_failed": "Could not delete the document. Please try again.",
   "inspections_hub_sms_granted": "granted",

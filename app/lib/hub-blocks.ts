@@ -11,7 +11,7 @@
  * en-US/USD (behavior-preserving) and callers thread the viewer values when known.
  */
 
-import { INSPECTION_STATUS, isReportPublished } from '~/lib/status';
+import { isReportPublished } from '~/lib/status';
 import { formatCurrency } from '~/lib/format';
 import { m } from '~/paraglide/messages';
 
@@ -168,17 +168,22 @@ export function deriveBlockStates(hub: HubPayload): BlockStates {
 
 /**
  * Whether the hub Report card should offer an active "Publish report" button.
- * True only when the inspection is `completed` AND the report is not already
- * published. The `completed` gate excludes cancelled / requested / in-progress
- * regardless of report status.
+ * Reads the report axis only: anything not yet published can be published.
+ * The order lifecycle (requested → … → completed) tracks the job rather than
+ * the report and the API does not gate publication on it, so gating here would
+ * only hide an action the server would have accepted.
  */
 export function canPublish(hub: HubPayload): boolean {
-    return hub.inspection.status === INSPECTION_STATUS.COMPLETED && !isReportPublished(hub.inspection.reportStatus);
+    return !isReportPublished(hub.inspection.reportStatus);
 }
 
-/** Whether the report has already been shipped to the client (read-only state). */
+/**
+ * Whether the report has already been shipped to the client (read-only state).
+ * The exact complement of `canPublish` — stated as such so the two can never
+ * drift into disagreeing about the same report.
+ */
 export function isReportShipped(hub: HubPayload): boolean {
-    return isReportPublished(hub.inspection.reportStatus);
+    return !canPublish(hub);
 }
 
 /* ------------------------------------------------------------------ */
