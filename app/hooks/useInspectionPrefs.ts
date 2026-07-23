@@ -16,6 +16,9 @@ export interface InspectionPrefs {
     /** Track H (IA-7) — which defect fields the publish gate REQUIRES
      *  tenant-wide. 'none' (default) = gaps warn but never block. */
     requireDefectFields: RequireDefectFields;
+    /** IA-35 / IA-73 — tenant policy for agent access to the repair list.
+     *  'readwrite' (default) = agents may view and edit. */
+    agentRepairAccess: 'off' | 'read' | 'readwrite';
 }
 
 const DEFAULTS: InspectionPrefs = {
@@ -24,6 +27,7 @@ const DEFAULTS: InspectionPrefs = {
     autoAdvanceDelayMs: 200,
     pinnedTagIds:       [],
     requireDefectFields: 'none',
+    agentRepairAccess: 'readwrite',
 };
 
 /**

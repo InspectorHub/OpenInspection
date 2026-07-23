@@ -67,7 +67,14 @@ export async function runAssertCanEdit(
     inspectionId: string,
     rrId: string,
     creator: import('../services/repair-request.service').Creator,
+    accessLevel: 'read' | 'readwrite' = 'readwrite',
 ): Promise<Response | null> {
+    // IA-35 / IA-73 — a read-only actor (agent under the tenant's `read`
+    // policy) may see the list but not mutate it. Refuse before the ownership
+    // check so a read-only agent gets a clean 403, not a "not the creator" one.
+    if (accessLevel !== 'readwrite') {
+        return c.json({ success: false as const, error: { code: 'FORBIDDEN', message: 'Read-only access to the repair list.' } }, 403);
+    }
     try {
         await c.var.services.repairRequest.assertCanEdit(tenantId, inspectionId, rrId, creator);
         return null;

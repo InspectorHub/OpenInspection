@@ -85,3 +85,68 @@ describe('resolveBuilderAccess — actor kind from the grant role (IA-35)', () =
         expect(tokenCreator.kind).toBe(sessionCreator.kind);
     });
 });
+
+describe('agentRepairAccess switch (IA-73)', () => {
+    const agentToken = { ...VALID_TOKEN_ROW, role: 'buyer_agent', recipientEmail: 'agent@example.com' };
+
+    function agentServices(setting: 'off' | 'read' | 'readwrite') {
+        return makeServices({
+            portalAccessResolveToken: vi.fn().mockResolvedValue(agentToken),
+            portalAccessGetRoleKind: vi.fn().mockResolvedValue('agent'),
+            getAgentRepairAccess: vi.fn().mockResolvedValue(setting),
+        });
+    }
+
+    it('off — the agent is refused entirely (read AND write)', async () => {
+        const { app } = buildApp({ services: agentServices('off'), reportStatus: 'published' });
+        const read = await app.request('/api/public/repair-builder/t1/insp1/source?token=tok1');
+        expect(read.status).toBe(401);
+        const write = await app.request('/api/public/repair-builder/t1/insp1', { method: 'POST' });
+        expect(write.status).toBe(401);
+    });
+
+    it('read — the agent may read but every write endpoint is 403', async () => {
+        const { app } = buildApp({ services: agentServices('read'), reportStatus: 'published' });
+        expect((await app.request('/api/public/repair-builder/t1/insp1/source?token=tok1')).status).toBe(200);
+        // create list
+        expect((await app.request('/api/public/repair-builder/t1/insp1?token=tok1', { method: 'POST' })).status).toBe(403);
+        // add item
+        const addItem = await app.request('/api/public/repair-builder/t1/insp1/lists/rr1/items?token=tok1', {
+            method: 'POST', headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ findingKey: 'canned:s1:item1:x', sectionTitle: 'Roof', itemLabel: 'Shingles' }),
+        });
+        expect(addItem.status).toBe(403);
+    });
+
+    it('readwrite — the agent may read and write', async () => {
+        // Fresh app per request: makeTwoQueryDb keys off call-count, so a second
+        // request on the same app would read the wrong gate row.
+        const { app: readApp } = buildApp({ services: agentServices('readwrite'), reportStatus: 'published' });
+        expect((await readApp.request('/api/public/repair-builder/t1/insp1/source?token=tok1')).status).toBe(200);
+        const { app: writeApp } = buildApp({ services: agentServices('readwrite'), reportStatus: 'published' });
+        expect((await writeApp.request('/api/public/repair-builder/t1/insp1?token=tok1', { method: 'POST' })).status).toBe(200);
+    });
+
+    it('parity — the token track and the session track get the same action set for the same setting', async () => {
+        for (const setting of ['off', 'read', 'readwrite'] as const) {
+            // Token track.
+            const { app: tokenApp } = buildApp({ services: agentServices(setting), reportStatus: 'published' });
+            const tokenRead = (await tokenApp.request('/api/public/repair-builder/t1/insp1/source?token=tok1')).status;
+            const tokenWrite = (await tokenApp.request('/api/public/repair-builder/t1/insp1?token=tok1', { method: 'POST' })).status;
+
+            // Session track (no portal token; agent session resolves the inspection).
+            vi.mocked(resolveAgentSession).mockResolvedValue({ userId: 'agent-user-1' } as never);
+            const sessionSvc = makeServices({
+                portalAccessResolveToken: vi.fn().mockResolvedValue(null),
+                accessToInspection: vi.fn().mockResolvedValue({ tenantId: 't1' }),
+                getAgentRepairAccess: vi.fn().mockResolvedValue(setting),
+            });
+            const { app: sessionApp } = buildApp({ services: sessionSvc, reportStatus: 'published' });
+            const sessionRead = (await sessionApp.request('/api/public/repair-builder/t1/insp1/source')).status;
+            const sessionWrite = (await sessionApp.request('/api/public/repair-builder/t1/insp1', { method: 'POST' })).status;
+
+            expect({ read: tokenRead, write: tokenWrite }).toEqual({ read: sessionRead, write: sessionWrite });
+        }
+        vi.mocked(resolveAgentSession).mockResolvedValue(null as never);
+    });
+});

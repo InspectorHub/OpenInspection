@@ -24,11 +24,24 @@ import type { HonoConfig } from '../types/hono';
  *               authenticated via a logged-in agent-portal session JWT
  *   inspector → userId from the verified owner-preview JWT
  */
+/** Whether the resolved actor may read only, or read and write. */
+export type BuilderAccessLevel = 'read' | 'readwrite';
+
 export async function resolveBuilderAccess(
     c: Context<HonoConfig>,
     id: string,
-): Promise<{ tenantId: string; creator: Creator; ownerPreview: boolean } | null> {
+): Promise<{ tenantId: string; creator: Creator; ownerPreview: boolean; accessLevel: BuilderAccessLevel } | null> {
     const token = c.req.query('token');
+
+    // Whether/how an agent may act on the repair list is a tenant policy
+    // (IA-35 / IA-73): off → no access at all, read → view only (writes 403),
+    // readwrite → full. Both agent tracks (portal token and agent session) go
+    // through here, so they can never disagree. client / inspector actors are
+    // always readwrite.
+    const agentLevel = async (tenantId: string): Promise<BuilderAccessLevel | null> => {
+        const setting = await c.var.services.inspection.getAgentRepairAccess(tenantId);
+        return setting === 'off' ? null : setting;
+    };
 
     // Path 1: persistent portal token. The grant's role kind decides the actor —
     // assuming 'client' for every resolvable token let an agent-kind token
@@ -40,12 +53,12 @@ export async function resolveBuilderAccess(
     if (grant) {
         const kind = await c.var.services.portalAccess.getRoleKind(grant.tenantId, grant.role);
         if (kind === 'client') {
-            const creator: Creator = { kind: 'client', ref: grant.recipientEmail };
-            return { tenantId: grant.tenantId, creator, ownerPreview: false };
+            return { tenantId: grant.tenantId, creator: { kind: 'client', ref: grant.recipientEmail }, ownerPreview: false, accessLevel: 'readwrite' };
         }
         if (kind === 'agent') {
-            const creator: Creator = { kind: 'agent', ref: grant.recipientEmail };
-            return { tenantId: grant.tenantId, creator, ownerPreview: false };
+            const accessLevel = await agentLevel(grant.tenantId);
+            if (!accessLevel) return null;
+            return { tenantId: grant.tenantId, creator: { kind: 'agent', ref: grant.recipientEmail }, ownerPreview: false, accessLevel };
         }
         return null;
     }
@@ -54,16 +67,16 @@ export async function resolveBuilderAccess(
     if (token) {
         const legacy = await c.var.services.inspection.resolveAgentViewToken(token);
         if (legacy && legacy.inspectionId === id) {
-            const creator: Creator = { kind: 'agent', ref: token };
-            return { tenantId: legacy.tenantId, creator, ownerPreview: false };
+            const accessLevel = await agentLevel(legacy.tenantId);
+            if (!accessLevel) return null;
+            return { tenantId: legacy.tenantId, creator: { kind: 'agent', ref: token }, ownerPreview: false, accessLevel };
         }
     }
 
     // Path 3: owner-preview via session Bearer JWT (tenant user / inspector).
     const ownerFull = await resolveOwnerPreviewFull(c);
     if (ownerFull) {
-        const creator: Creator = { kind: 'inspector', ref: ownerFull.userId };
-        return { tenantId: ownerFull.tenantId, creator, ownerPreview: true };
+        return { tenantId: ownerFull.tenantId, creator: { kind: 'inspector', ref: ownerFull.userId }, ownerPreview: true, accessLevel: 'readwrite' };
     }
 
     // Path 4: logged-in agent-portal session JWT (tokenless dashboard link).
@@ -73,10 +86,11 @@ export async function resolveBuilderAccess(
     // inspection row, never from the URL `:tenant` segment.
     const agentSession = await resolveAgentSession(c);
     if (agentSession) {
-        const access = await c.var.services.agent.accessToInspection(agentSession.userId, id);
-        if (access) {
-            const creator: Creator = { kind: 'agent', ref: agentSession.userId };
-            return { tenantId: access.tenantId, creator, ownerPreview: false };
+        const assoc = await c.var.services.agent.accessToInspection(agentSession.userId, id);
+        if (assoc) {
+            const accessLevel = await agentLevel(assoc.tenantId);
+            if (!accessLevel) return null;
+            return { tenantId: assoc.tenantId, creator: { kind: 'agent', ref: agentSession.userId }, ownerPreview: false, accessLevel };
         }
     }
 

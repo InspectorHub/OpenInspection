@@ -273,6 +273,10 @@ const repairBuilderRoutes = createApiRouter()
         const access = await resolveBuilderAccess(c, id);
         if (!access) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'No access.' } }, 401);
         const { tenantId, creator } = access;
+        // IA-35 / IA-73 — creating a list is a write; a read-only agent is refused.
+        if (access.accessLevel !== 'readwrite') {
+            return c.json({ success: false as const, error: { code: 'FORBIDDEN', message: 'Read-only access to the repair list.' } }, 403);
+        }
 
         const gateResult = await runBuilderGate(c, id, tenantId);
         if (gateResult) return gateResult;
@@ -315,7 +319,7 @@ const repairBuilderRoutes = createApiRouter()
         if (gateResult) return gateResult;
 
         // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
-        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator);
+        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
         if (guardResult) return guardResult;
 
         // Map Zod-output (undefined optional) to service ItemInput (null optional)
@@ -344,7 +348,7 @@ const repairBuilderRoutes = createApiRouter()
         if (gateResult) return gateResult;
 
         // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
-        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator);
+        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
         if (guardResult) return guardResult;
 
         // Map Zod-output optional fields to service patch type (null not undefined).
@@ -369,7 +373,7 @@ const repairBuilderRoutes = createApiRouter()
         if (gateResult) return gateResult;
 
         // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
-        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator);
+        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
         if (guardResult) return guardResult;
 
         // I1: pass inspectionId so the service guards against cross-inspection deletes.
@@ -390,7 +394,7 @@ const repairBuilderRoutes = createApiRouter()
         if (gateResult) return gateResult;
 
         // I1: pass inspectionId so assertCanEdit rejects RRs from a different inspection.
-        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator);
+        const guardResult = await runAssertCanEdit(c, tenantId, id, rrId, creator, access.accessLevel);
         if (guardResult) return guardResult;
 
         // I1: pass inspectionId so the service guards against cross-inspection writes.
