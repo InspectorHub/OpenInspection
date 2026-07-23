@@ -5,9 +5,8 @@ import type { Route } from "./+types/inspections";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { buildCreateInspectionJson } from "~/lib/inspection-create";
-import { type WizardTeamMember } from "~/components/NewInspectionWizard";
+import type { WizardTeamMember } from "~/components/NewInspectionWizard";
 import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist";
-import { CommandPalette } from "~/components/CommandPalette";
 import { SeatBanner } from "~/components/SeatBanner";
 import { QuotaBanner } from "~/components/QuotaBanner";
 import { useSessionContext } from "~/hooks/useSessionContext";
@@ -867,8 +866,8 @@ export default function InspectionsPage() {
         })()
       )}
 
-      {/* Command Palette */}
-      <CommandPalette onNewInspection={() => navigate("/inspections/new")} />
+      {/* Command Palette is mounted once at auth-layout (IA-49) so Cmd/Ctrl+K
+          works workspace-wide, not only on this page. */}
 
       {/* Filters drawer */}
       <FiltersDrawer

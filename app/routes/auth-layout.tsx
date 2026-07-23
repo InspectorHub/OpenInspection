@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Outlet, useLoaderData, useLocation, useNavigation } from "react-router";
+import { Outlet, useLoaderData, useLocation, useNavigate, useNavigation } from "react-router";
 import type { Route } from "./+types/auth-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import { CommandPalette } from "~/components/CommandPalette";
 import { Sidebar, MobileHeader } from "~/components/Sidebar";
 import { RouteSkeleton } from "~/components/RouteSkeleton";
 import type { SessionContext } from "~/hooks/useSessionContext";
@@ -49,6 +50,7 @@ export default function AuthLayout() {
   const { context } = useLoaderData<typeof loader>();
   const navigation = useNavigation();
   const location = useLocation();
+  const navigate = useNavigate();
 
   // Show a content-pane skeleton only during a *real* page navigation:
   // - navigation.state === "loading" (loader in flight, not a form submission)
@@ -90,6 +92,10 @@ export default function AuthLayout() {
           </div>
         </main>
       </div>
+
+      {/* IA-49 — mounted at the workspace layout (not just /inspections) so the
+          global Cmd/Ctrl+K command palette works on every authenticated page. */}
+      <CommandPalette onNewInspection={() => navigate("/inspections/new")} />
     </>
   );
 }
