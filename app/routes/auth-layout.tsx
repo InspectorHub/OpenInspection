@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Outlet, useLoaderData, useLocation, useNavigate, useNavigation } from "react-router";
 import type { Route } from "./+types/auth-layout";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { CommandPalette } from "~/components/CommandPalette";
+import { CommandPalette, CommandPaletteProvider } from "~/components/CommandPalette";
 import { Sidebar, MobileHeader } from "~/components/Sidebar";
 import { RouteSkeleton } from "~/components/RouteSkeleton";
 import type { SessionContext } from "~/hooks/useSessionContext";
@@ -52,6 +52,13 @@ export default function AuthLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Command palette open state lives here so both the Cmd/Ctrl+K listener
+  // (inside CommandPalette) and workspace triggers (sidebar search button,
+  // MobileHeader) can drive it (IA-38).
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const openPalette = useCallback(() => setPaletteOpen(true), []);
+  const paletteCtx = useMemo(() => ({ openPalette }), [openPalette]);
+
   // Show a content-pane skeleton only during a *real* page navigation:
   // - navigation.state === "loading" (loader in flight, not a form submission)
   // - navigation.location is set (guards against revalidation, which has no location)
@@ -67,7 +74,7 @@ export default function AuthLayout() {
   const showSkeleton = useDelayedFlag(isNavigatingToNewPage, 180);
 
   return (
-    <>
+    <CommandPaletteProvider value={paletteCtx}>
       {/* F4 — Suspension banner */}
       {context?.branding?.tenantStatus === "suspended" && (
         <div className="bg-ih-watch-bg border-b border-ih-watch px-4 py-3 flex items-center justify-center gap-3 z-50">
@@ -94,8 +101,13 @@ export default function AuthLayout() {
       </div>
 
       {/* IA-49 — mounted at the workspace layout (not just /inspections) so the
-          global Cmd/Ctrl+K command palette works on every authenticated page. */}
-      <CommandPalette onNewInspection={() => navigate("/inspections/new")} />
-    </>
+          global Cmd/Ctrl+K command palette works on every authenticated page.
+          Controlled here so the sidebar search button can open it too (IA-38). */}
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        onNewInspection={() => navigate("/inspections/new")}
+      />
+    </CommandPaletteProvider>
   );
 }

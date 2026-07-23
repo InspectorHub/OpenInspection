@@ -1,7 +1,19 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
 import { useNavigate, useFetcher } from "react-router";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
+
+/**
+ * Lets any workspace surface (the sidebar search button, MobileHeader) open the
+ * command palette. The provider (auth-layout) owns the open state; consumers
+ * call `openPalette()`. Default is a no-op so a stray consumer outside the
+ * provider fails silently rather than throwing.
+ */
+const CommandPaletteContext = createContext<{ openPalette: () => void }>({ openPalette: () => {} });
+export function useCommandPalette() {
+  return useContext(CommandPaletteContext);
+}
+export const CommandPaletteProvider = CommandPaletteContext.Provider;
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -135,8 +147,20 @@ function PaletteIcon({ type }: { type: string }) {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function CommandPalette({ onNewInspection }: { onNewInspection?: () => void }) {
-  const [open, setOpen] = useState(false);
+export function CommandPalette({
+  open,
+  onOpenChange,
+  onNewInspection,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onNewInspection?: () => void;
+}) {
+  const setOpen = onOpenChange;
+  // The Cmd/Ctrl+K listener registers once (empty deps) but must toggle the
+  // CURRENT open state — read it through a ref so the closure never goes stale.
+  const openRef = useRef(open);
+  openRef.current = open;
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -171,7 +195,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setOpen((prev) => !prev);
+        setOpen(!openRef.current);
         setQuery("");
         setActiveIdx(0);
       }
@@ -179,7 +203,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [setOpen]);
 
   // Focus input when opened; lazy-load recent inspections via BFF resource route
   useEffect(() => {
