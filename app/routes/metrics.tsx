@@ -16,10 +16,11 @@ interface MetricsData {
   totalInspections: number;
   totalRevenue: number;
   avgOrderValue: number;
-  months: { ym: string; count: number; revenue: number }[];
+  // Field names mirror the server's response exactly (server/api/metrics.ts):
+  // the monthly series is `monthly[]` with `{ month, count, revenue }`.
+  monthly: { month: string; count: number; revenue: number }[];
   topAgents: { agentName: string; count: number; revenue: number }[];
   byInspector: { inspectorId: string | null; inspectorName: string; count: number; revenue: number; avgTurnaroundDays: number | null }[];
-  heatmap: { section: string; satisfactory: number; monitor: number; defect: number }[];
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -101,19 +102,19 @@ export default function MetricsPage() {
       {/* Inspections per month chart placeholder */}
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_chart_inspections()}</p>
-        {data && data.months?.length > 0 ? (
+        {data && data.monthly?.length > 0 ? (
           <div className="flex items-end gap-2 h-40">
-            {data.months.map((mo) => {
-              const max = Math.max(...data.months.map((x) => x.count), 1);
+            {data.monthly.map((mo) => {
+              const max = Math.max(...data.monthly.map((x) => x.count), 1);
               const pct = (mo.count / max) * 100;
               return (
-                <div key={mo.ym} className="flex-1 flex flex-col items-center gap-1">
+                <div key={mo.month} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[10px] font-bold text-ih-fg-3">{mo.count}</span>
                   <div
                     className="w-full bg-ih-primary rounded-t"
                     style={{ height: `${Math.max(pct, 4)}%` }}
                   />
-                  <span className="text-[10px] text-ih-fg-4">{mo.ym.slice(5)}</span>
+                  <span className="text-[10px] text-ih-fg-4">{mo.month.slice(5)}</span>
                 </div>
               );
             })}
@@ -126,19 +127,19 @@ export default function MetricsPage() {
       {/* Revenue per month bar chart */}
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_chart_revenue()}</p>
-        {data && data.months?.length > 0 ? (
+        {data && data.monthly?.length > 0 ? (
           <div className="flex items-end gap-2 h-40">
-            {data.months.map((mo) => {
-              const maxRev = Math.max(...data.months.map((x) => x.revenue), 1);
+            {data.monthly.map((mo) => {
+              const maxRev = Math.max(...data.monthly.map((x) => x.revenue), 1);
               const pct = (mo.revenue / maxRev) * 100;
               return (
-                <div key={mo.ym + "-rev"} className="flex-1 flex flex-col items-center gap-1">
+                <div key={mo.month + "-rev"} className="flex-1 flex flex-col items-center gap-1">
                   <span className="text-[10px] font-bold text-ih-fg-3">{fmt(mo.revenue)}</span>
                   <div
                     className="w-full bg-ih-ok rounded-t"
                     style={{ height: `${Math.max(pct, 4)}%` }}
                   />
-                  <span className="text-[10px] text-ih-fg-4">{mo.ym.slice(5)}</span>
+                  <span className="text-[10px] text-ih-fg-4">{mo.month.slice(5)}</span>
                 </div>
               );
             })}
@@ -148,28 +149,7 @@ export default function MetricsPage() {
         )}
       </Card>
 
-      {/* Findings heatmap */}
-      <Card className="p-5">
-        <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_heatmap_title()}</p>
-        {data && data.heatmap?.length > 0 ? (
-          <div className="overflow-x-auto">
-            <Table<MetricsData["heatmap"][number]>
-              rows={data.heatmap}
-              getRowKey={(row) => row.section}
-              columns={[
-                { label: m.metrics_col_section(), cell: (row) => <span className="font-medium text-ih-fg-1">{row.section}</span> },
-                { label: <span className="text-ih-ok-fg">{m.metrics_col_satisfactory()}</span>, align: "center", cell: (row) => <span className="text-ih-ok-fg">{row.satisfactory}</span> },
-                { label: <span className="text-ih-watch-fg">{m.metrics_col_monitor()}</span>, align: "center", cell: (row) => <span className="text-ih-watch-fg">{row.monitor}</span> },
-                { label: <span className="text-ih-bad-fg">{m.metrics_col_defect()}</span>, align: "center", cell: (row) => <span className="text-ih-bad-fg">{row.defect}</span> },
-              ]}
-            />
-          </div>
-        ) : (
-          <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_findings()}</p>
-        )}
-      </Card>
-
-      {/* By inspector (IA-63) — team productivity: count, revenue, turnaround */}
+      {/* By inspector — team productivity: count, revenue, turnaround */}
       <Card className="p-5">
         <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_by_inspector()}</p>
         {data && data.byInspector?.length > 0 ? (
