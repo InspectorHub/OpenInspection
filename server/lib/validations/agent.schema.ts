@@ -104,6 +104,10 @@ export const ConciergeBookResponseSchema = createApiResponseSchema(
 // route-response schemas.
 const RecommendationRowSchema = z.object({
     inspectionId:    z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    // Owning company: shown inline under the property heading, and the slug
+    // addresses that inspection's repair share channel.
+    tenantName:      z.string().describe('Owning inspection company name.'),
+    tenantSlug:      z.string().describe('Owning inspection company slug (addresses the repair share channel).'),
     propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
     inspectionDate:  z.string().describe('TODO describe inspectionDate field for the OpenInspection MCP integration'),
     sectionTitle:    z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),

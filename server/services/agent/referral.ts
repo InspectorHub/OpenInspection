@@ -324,6 +324,8 @@ export async function listRecommendationsForAgent(
         .select({
             id:                inspections.id,
             tenantId:          inspections.tenantId,
+            tenantName:        tenants.name,
+            tenantSlug:        tenants.slug,
             propertyAddress:   inspections.propertyAddress,
             date:              inspections.date,
             templateSnapshot:  inspections.templateSnapshot,
@@ -341,6 +343,7 @@ export async function listRecommendationsForAgent(
                 eq(agentTenantLinks.status, 'active'),
             ),
         )
+        .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
         // Buyer's-agent attribution via inspection_people — see listReferrals
         // above for why contact_role_profiles is joined before
         // inspection_people (avoids fanning out over every role).
@@ -385,6 +388,8 @@ export async function listRecommendationsForAgent(
 
     const flat = filtered.flatMap((r) => flattenInspectionToRecommendations({
         id:               r.id,
+        tenantName:       r.tenantName,
+        tenantSlug:       r.tenantSlug,
         propertyAddress:  r.propertyAddress,
         date:             r.date,
         templateSnapshot: r.templateSnapshot,

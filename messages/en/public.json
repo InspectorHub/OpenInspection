@@ -116,7 +116,7 @@
   "agent_portal_recommendations_print": "Print as PDF",
   "agent_portal_recommendations_item_one": "item",
   "agent_portal_recommendations_item_other": "items",
-  "agent_portal_recommendations_empty": "No {label} items in your referred reports.",
+  "agent_portal_repair_empty": "No repair items in your referred reports yet.",
   "agent_portal_settings_meta_title": "Agent Settings - OpenInspection",
   "agent_portal_settings_title": "Settings",
   "agent_portal_settings_subtitle": "Your public referral slug and the emails we send you.",

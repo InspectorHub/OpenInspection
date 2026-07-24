@@ -14,6 +14,10 @@ import type { ResultsProjection, DefectState } from '../lib/collab/results-doc.t
 
 export interface AgentRecommendationRow {
     inspectionId:    string;
+    // Owning company. The agent portal groups by property and shows the company
+    // inline; the slug also addresses the per-inspection repair share channel.
+    tenantName:      string;
+    tenantSlug:      string;
     propertyAddress: string;
     inspectionDate:  string;
     sectionTitle:    string;
@@ -50,6 +54,8 @@ interface SnapshotShape { sections?: SectionShape[] }
 
 export interface RawInspectionForRecommendations {
     id:               string;
+    tenantName:       string;
+    tenantSlug:       string;
     propertyAddress:  string;
     date:             string;
     templateSnapshot: unknown;
@@ -106,6 +112,8 @@ export function flattenInspectionToRecommendations(
                 const category = (state.category ?? canned.category ?? 'maintenance').toString();
                 out.push({
                     inspectionId:    insp.id,
+                    tenantName:      insp.tenantName,
+                    tenantSlug:      insp.tenantSlug,
                     propertyAddress: insp.propertyAddress,
                     inspectionDate:  insp.date,
                     sectionTitle:    section.title,
@@ -128,6 +136,8 @@ export function flattenInspectionToRecommendations(
                 if (!cd.included) continue;
                 out.push({
                     inspectionId:    insp.id,
+                    tenantName:      insp.tenantName,
+                    tenantSlug:      insp.tenantSlug,
                     propertyAddress: insp.propertyAddress,
                     inspectionDate:  insp.date,
                     sectionTitle:    section.title,

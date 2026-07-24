@@ -5,6 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Banner, Select } from "@core/shared-ui";
 import { formatInspectionDateTime } from "~/lib/format-date";
+import { propertyGroupKey, inspectionDateValue } from "~/lib/property-groups";
 import { useAgentTimeZoneOverride } from "~/routes/agent-layout";
 import { m } from "~/paraglide/messages";
 
@@ -68,23 +69,6 @@ function statusColor(s: string): string {
  return "bg-ih-bg-muted text-ih-fg-2";
 }
 
-// Property/transaction grouping key (IA-51): normalized address so casing and
-// whitespace variants of the same property collapse together; falls back to the
-// inspection id when a referral has no address yet (each such row is its own
-// group rather than all merging into one "No address" bucket).
-function propertyGroupKey(r: Referral): string {
- const addr = r.propertyAddress?.trim().toLowerCase().replace(/\s+/g, " ");
- return addr ? `addr:${addr}` : `insp:${r.id}`;
-}
-
-// Sortable timestamp for a referral's mixed date column (full ISO or
-// YYYY-MM-DD). Missing / unparseable dates sort last.
-function referralDateValue(date: string | null): number {
- if (!date) return -Infinity;
- const t = Date.parse(date);
- return Number.isNaN(t) ? -Infinity : t;
-}
-
 export default function AgentDashboardPage() {
  const { referrals, unreadReports, welcomeInspectionId } = useLoaderData<typeof loader>();
  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
@@ -131,11 +115,11 @@ export default function AgentDashboardPage() {
  const visible = companyFilter ? referrals.filter((r) => r.tenantName === companyFilter) : referrals;
  const groups = new Map<string, { label: string; rows: Referral[]; recency: number }>();
  for (const r of visible) {
- const key = propertyGroupKey(r);
+ const key = propertyGroupKey(r.propertyAddress, r.id);
  const g = groups.get(key) || { label: r.propertyAddress?.trim() || m.agent_portal_no_address(), rows: [], recency: -Infinity };
  if (welcomeReferral && r.id === welcomeReferral.id) g.rows.unshift(r);
  else g.rows.push(r);
- g.recency = Math.max(g.recency, referralDateValue(r.date));
+ g.recency = Math.max(g.recency, inspectionDateValue(r.date));
  groups.set(key, g);
  }
  return Array.from(groups.entries())
