@@ -95,6 +95,12 @@ export const agreementSigners = sqliteTable('agreement_signers', {
     onBehalfDisclaimer: text('on_behalf_disclaimer'),     // disclaimer text snapshot shown at sign time
     lastRemindedAt:     integer('last_reminded_at', { mode: 'timestamp_ms' }),
     createdAt:          integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    // IA-37 — signer-token lifecycle. Appended at the table end (D1 can't add a
+    // column mid-table on a referenced table — reference_d1_add_column_at_end).
+    // NULL expiresAt = never expires (legacy / synthesized signers); revokedAt
+    // set = link killed regardless of expiry. Resolution fails closed on either.
+    expiresAt:          integer('expires_at', { mode: 'timestamp_ms' }),
+    revokedAt:          integer('revoked_at', { mode: 'timestamp_ms' }),
 }, (t) => [
     index('idx_agreement_signers_tenant_request').on(t.tenantId, t.requestId),
     uniqueIndex('idx_agreement_signers_request_email').on(t.requestId, t.email),

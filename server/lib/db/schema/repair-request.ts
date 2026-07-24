@@ -12,6 +12,11 @@ export const repairRequests = sqliteTable('repair_requests', {
   shareToken: text('share_token').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
+  // IA-37 — share-token lifecycle (mirrors agreement_signers). Appended at the
+  // table end (reference_d1_add_column_at_end). NULL expiresAt = never expires;
+  // revokedAt set = link killed. Public share resolution fails closed on either.
+  expiresAt: integer('expires_at', { mode: 'timestamp_ms' }),
+  revokedAt: integer('revoked_at', { mode: 'timestamp_ms' }),
 }, (t) => ({
   idxInspection: index('idx_repair_requests_inspection').on(t.tenantId, t.inspectionId),
   uqShare: uniqueIndex('idx_repair_requests_share_token').on(t.shareToken),
