@@ -397,14 +397,11 @@ export function ReportView(props: ReportViewProps) {
             </span>
           </div>
           <div className="flex items-center gap-2 print:hidden">
-            {!data.hideClientActions && data.enableRepairList && (
-              <a
-                href={`/inspections/${data.inspectionId}/repair-list`}
-                className="px-4 py-2 text-sm font-medium rounded-lg border border-ih-border text-ih-fg-3 flex items-center gap-2 hover:bg-ih-bg-muted transition-colors"
-              >
-                {m.report_view_repair_list_link()}
-              </a>
-            )}
+            {/* IA-68 — the "View Repair List" button pointed at
+                /inspections/:id/repair-list, a page route that does not exist
+                (only the API route does), so it 404'd. The "Build repair
+                request" button below already reaches the real repair capability;
+                the dead affordance is removed rather than pointed somewhere new. */}
             {!data.hideClientActions && data.enableCustomerRepairExport && (
               <a
                 href={`/repair-builder/${tenant}/${id}${urlToken ? `?token=${encodeURIComponent(urlToken)}` : ""}`}

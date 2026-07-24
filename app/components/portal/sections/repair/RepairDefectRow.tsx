@@ -16,8 +16,18 @@ interface ItemDraft {
   note: string;
 }
 
+// IA-60 — the category pill was hardcoded English on a client-facing surface.
+// Resolved at call time (not module load) so paraglide's ALS locale scope is
+// active, matching recommendations.tsx groupLabel().
 function categoryLabel(cat: Defect["category"]): string {
-  return cat === "safety" ? "Safety" : cat === "recommendation" ? "Recommendation" : "Maintenance";
+  switch (cat) {
+    case "safety":
+      return m.portal_repair_category_safety();
+    case "recommendation":
+      return m.portal_repair_category_recommendation();
+    default:
+      return m.portal_repair_category_maintenance();
+  }
 }
 
 function categoryClass(cat: Defect["category"]): string {

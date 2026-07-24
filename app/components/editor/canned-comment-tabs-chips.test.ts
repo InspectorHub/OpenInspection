@@ -59,7 +59,7 @@ describe("CannedCommentTabs category pills", () => {
     const out = html([]);
     expect(out).toContain("bg-ih-bg-muted");
     expect(out).toContain(">maintenance<");
-    // custom "custom" badge still present
-    expect(out).toContain(">custom<");
+    // IA-62 — the inspector-added badge (formerly "custom") still present
+    expect(out).toContain(">inspector-added<");
   });
 });
