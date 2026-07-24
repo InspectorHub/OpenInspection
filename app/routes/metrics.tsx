@@ -18,6 +18,7 @@ interface MetricsData {
   avgOrderValue: number;
   months: { ym: string; count: number; revenue: number }[];
   topAgents: { agentName: string; count: number; revenue: number }[];
+  byInspector: { inspectorId: string | null; inspectorName: string; count: number; revenue: number; avgTurnaroundDays: number | null }[];
   heatmap: { section: string; satisfactory: number; monitor: number; defect: number }[];
 }
 
@@ -165,6 +166,29 @@ export default function MetricsPage() {
           </div>
         ) : (
           <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_findings()}</p>
+        )}
+      </Card>
+
+      {/* By inspector (IA-63) — team productivity: count, revenue, turnaround */}
+      <Card className="p-5">
+        <p className="text-sm font-bold text-ih-fg-1 mb-4">{m.metrics_by_inspector()}</p>
+        {data && data.byInspector?.length > 0 ? (
+          <div className="overflow-x-auto">
+            <Table<MetricsData["byInspector"][number]>
+              rows={data.byInspector}
+              getRowKey={(row) => row.inspectorId ?? row.inspectorName}
+              columns={[
+                { label: m.metrics_col_inspector(), cell: (row) => <span className="font-medium text-ih-fg-1">{row.inspectorName}</span> },
+                { label: m.metrics_col_inspections(), align: "center", cell: (row) => <span className="text-ih-fg-2">{row.count}</span> },
+                { label: m.metrics_col_revenue(), align: "right", cell: (row) => <span className="text-ih-fg-2">{fmt(row.revenue)}</span> },
+                { label: m.metrics_col_turnaround(), align: "right", cell: (row) => (
+                  <span className="text-ih-fg-2">{row.avgTurnaroundDays == null ? m.metrics_turnaround_na() : m.metrics_turnaround_days({ days: row.avgTurnaroundDays })}</span>
+                ) },
+              ]}
+            />
+          </div>
+        ) : (
+          <p className="text-[13px] text-ih-fg-3 text-center py-8">{m.metrics_no_inspectors()}</p>
         )}
       </Card>
 

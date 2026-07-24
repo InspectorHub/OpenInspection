@@ -3,7 +3,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { MetricsQuerySchema, MetricsApiResponseSchema } from '../lib/validations/metrics.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections, inspectionServices, contacts, inspectionPeople, contactRoleProfiles } from '../lib/db/schema';
+import { inspections, inspectionServices, contacts, inspectionPeople, contactRoleProfiles, users, reportVersions } from '../lib/db/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
@@ -109,6 +109,45 @@ const metricsRoutes = createApiRouter()
     const paidAmt   = Number(paymentSummary.find(r => r.status === 'paid')?.revenue ?? 0);
     const unpaidAmt = Number(paymentSummary.find(r => r.status === 'unpaid')?.revenue ?? 0);
 
+    // Per-inspector productivity (IA-63) — multi-inspector companies need count,
+    // revenue, and turnaround per inspector for team management + commission.
+    // "Who did this inspection" authority: lead_inspector_id, falling back to
+    // inspector_id (schema: lead is primary, NULL ⇒ inspector_id). Turnaround =
+    // first publish (report_versions v1 published_at) − inspection date, in days;
+    // the LEFT JOIN keeps unpublished inspections in the count while avg() skips
+    // their NULL turnaround (so an all-unpublished inspector reports null, not 0).
+    // Explicit column projection keeps well under D1's 100-column result cap.
+    const inspectorKey = sql<string>`coalesce(${inspections.leadInspectorId}, ${inspections.inspectorId})`;
+    const byInspector = await db.select({
+        inspectorId:       inspectorKey,
+        inspectorName:     users.name,
+        count:             sql<number>`count(*)`,
+        revenue:           sql<number>`sum(${inspections.price})`,
+        avgTurnaroundDays: sql<number | null>`avg(julianday(${reportVersions.publishedAt} / 1000.0, 'unixepoch') - julianday(${inspections.date}))`,
+    })
+        .from(inspections)
+        .leftJoin(reportVersions, and(
+            eq(reportVersions.inspectionId, inspections.id),
+            eq(reportVersions.tenantId, inspections.tenantId),
+            eq(reportVersions.versionNumber, 1),
+        ))
+        .leftJoin(users, eq(users.id, inspectorKey))
+        .where(and(
+            eq(inspections.tenantId, tenantId),
+            gte(inspections.date, fromStr),
+            sql`${inspectorKey} is not null`,
+        ))
+        .groupBy(inspectorKey)
+        .orderBy(sql`count(*) desc`)
+        .limit(50)
+        .then(rows => rows.map(r => ({
+            inspectorId:       r.inspectorId ?? null,
+            inspectorName:     r.inspectorName || r.inspectorId || 'Unknown',
+            count:             Number(r.count),
+            revenue:           Number(r.revenue || 0),
+            avgTurnaroundDays: r.avgTurnaroundDays == null ? null : Math.round(Number(r.avgTurnaroundDays) * 10) / 10,
+        })));
+
     return c.json({
         success: true,
         data: {
@@ -118,6 +157,7 @@ const metricsRoutes = createApiRouter()
             avgOrderValue,
             monthly: monthly.map(r => ({ month: r.month, revenue: Number(r.revenue || 0), count: Number(r.count) })),
             topAgents,
+            byInspector,
             serviceBreakdown: serviceBreakdown.map(r => ({
                 serviceName: r.serviceName,
                 count:       Number(r.count),

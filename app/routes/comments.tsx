@@ -7,6 +7,7 @@ import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination } from
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
 import { CommentEditor } from "~/components/CommentEditor";
+import { EntityAuditTrail } from "~/components/audit/EntityAuditTrail";
 import type { Severity } from "~/lib/severity";
 import { SEVERITIES, SEVERITY_LABEL, isSeverity } from "~/lib/severity";
 import { m } from "~/paraglide/messages";
@@ -135,6 +136,7 @@ export default function CommentsPage() {
                     {m.common_edit()}
                   </button>
                 </div>
+                <EntityAuditTrail entityId={c.id} />
               </Card>
             ))}
           </div>

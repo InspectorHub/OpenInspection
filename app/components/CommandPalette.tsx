@@ -33,6 +33,14 @@ interface PaletteItem {
 /*  Static sources                                                     */
 /* ------------------------------------------------------------------ */
 
+// Recents is the one unbounded group (a busy workspace has hundreds of
+// inspections), so it is capped at its source. The static navigation groups
+// (Pages, Settings) are bounded lists and must render in full — see the
+// `groups` memo, which deliberately does NOT re-truncate per group (#IA-50:
+// the old blanket `< 8` cap silently hid 6 of the 14 Settings destinations
+// whenever the palette was browsed without a filter word).
+const RECENTS_CAP = 8;
+
 // Built as thunks (not module-level consts) so the Paraglide `m.*()` labels
 // resolve inside the per-request locale scope instead of freezing at import.
 function getPages(): PaletteItem[] {
@@ -62,8 +70,10 @@ function getSettings(): PaletteItem[] {
     { id: "s-theme", label: m.command_palette_settings_theme(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/workspace" },
     { id: "s-services", label: m.command_palette_settings_services(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/services" },
     { id: "s-email", label: m.command_palette_settings_email(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/communication" },
+    { id: "s-email-templates", label: m.command_palette_settings_email_templates(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/communication/templates" },
     { id: "s-automations", label: m.command_palette_settings_automations(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/automations" },
     { id: "s-integrations", label: m.command_palette_settings_integrations(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/integrations" },
+    { id: "s-qbo", label: m.command_palette_settings_qbo(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/integrations/qbo" },
     { id: "s-password", label: m.command_palette_settings_password(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/security" },
     { id: "s-2fa", label: m.command_palette_settings_2fa(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/security" },
     { id: "s-account", label: m.command_palette_settings_account(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/security" },
@@ -229,7 +239,7 @@ export function CommandPalette({
     } else if (isPeople) {
       sources = []; // contacts would need a search endpoint
     } else {
-      const recents: PaletteItem[] = (recentsFetcher.data?.inspections ?? []).map((insp, i) => {
+      const recents: PaletteItem[] = (recentsFetcher.data?.inspections ?? []).slice(0, RECENTS_CAP).map((insp, i) => {
         const addr = [insp.address1, insp.city, insp.state].filter(Boolean).join(", ") || m.command_palette_recent_fallback({ id: String(insp.id || "").slice(0, 6) });
         return {
           id: `ri-${i}`,
@@ -251,12 +261,15 @@ export function CommandPalette({
       .map((x) => x.item);
   }, [query, recentsFetcher.data]);
 
-  // Group the filtered results
+  // Group the filtered results. No per-group truncation: every source group is
+  // already bounded (Pages/Settings are fixed lists; Recents is sliced to
+  // RECENTS_CAP at its source; quick actions are few). A blanket cap here only
+  // hid reachable-nowhere-else destinations (#IA-50).
   const groups = useMemo(() => {
     const map = new Map<string, PaletteItem[]>();
     for (const a of allItems) {
       const list = map.get(a.group) || [];
-      if (list.length < 8) list.push(a);
+      list.push(a);
       map.set(a.group, list);
     }
     return map;

@@ -95,6 +95,7 @@ export default [
   route("resources/inspection-media", "routes/resources/inspection-media.tsx"),
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
   route("resources/recent-inspections", "routes/resources/recent-inspections.tsx"),
+  route("resources/entity-audit", "routes/resources/entity-audit.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
   route("resources/template-search", "routes/resources/template-search.tsx"),
   route("resources/inspection-search", "routes/resources/inspection-search.tsx"),
