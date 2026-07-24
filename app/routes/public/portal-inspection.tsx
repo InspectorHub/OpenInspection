@@ -224,10 +224,14 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 
   if (intent === "agent-magic-login") {
     const token = String(formData.get("token") ?? "");
+    // IA-47 — derive returnTo server-side (never from the client) so the redeem
+    // step lands the agent back on this exact report page instead of the
+    // dashboard. Server-derived → not an open-redirect vector.
+    const returnTo = `/portal/${tenant}/i/${inspectionId}?token=${encodeURIComponent(token)}&section=report`;
     const api = createApi(context);
     try {
       const res = (await api.agentMagicLogin["magic-login"].request.$post({
-        json: { tenant, inspectionId, token },
+        json: { tenant, inspectionId, token, returnTo },
       })) as unknown as Response;
       if (!res.ok) {
         return { ok: false, intent: "agent-magic-login" } satisfies AgentMagicLoginActionResult;

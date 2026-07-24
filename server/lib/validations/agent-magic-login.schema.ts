@@ -13,6 +13,10 @@ export const MagicLoginRequestSchema = z.object({
     tenant: z.string().min(1).describe('Tenant slug or id the report link is scoped to (consistency/telemetry only — the token is the security boundary).'),
     inspectionId: z.string().min(1).describe('Inspection id the presented report token must grant access to.'),
     token: z.string().min(1).describe('The durable agent report token from the link.'),
+    // IA-47 — where to land the agent after redeeming the emailed link (the
+    // report page they were on). Server-derived by the BFF action; the redeem
+    // step re-validates it is a safe relative path before honouring it.
+    returnTo: z.string().optional().describe('Relative path to return to after sign-in (defaults to the agent dashboard).'),
 }).openapi('AgentMagicLoginRequest');
 
 export const MagicLoginRequestResponseSchema = createApiResponseSchema(

@@ -23,6 +23,9 @@ const MAGIC_LOGIN_TTL_SECONDS = 900;
 interface MagicLoginKvPayload {
     userId: string;
     issuedAt: number;
+    // IA-47 — relative path to redirect to after redeem (the report the agent
+    // was viewing). Validated as a safe relative path at redeem time.
+    returnTo?: string;
 }
 
 export interface RequestMagicLoginParams {
@@ -35,6 +38,8 @@ export interface RequestMagicLoginParams {
     // caller resolves this via getBaseUrl(c) so this module stays Context-free
     // and unit-testable with a plain string.
     coreBaseUrl: string;
+    // IA-47 — optional relative path to return to after redeem.
+    returnTo?: string;
 }
 
 /**
@@ -60,7 +65,7 @@ export interface RequestMagicLoginParams {
  * caller can't probe report tokens to learn which emails have accounts.
  */
 export async function requestMagicLogin(params: RequestMagicLoginParams): Promise<{ loginUrl: string; email: string } | null> {
-    const { portalAccess, kv, db, inspectionId, reportToken, coreBaseUrl } = params;
+    const { portalAccess, kv, db, inspectionId, reportToken, coreBaseUrl, returnTo } = params;
 
     const grant = await resolvePortalAccess(portalAccess, reportToken, inspectionId);
     if (!grant) {
@@ -94,7 +99,7 @@ export async function requestMagicLogin(params: RequestMagicLoginParams): Promis
 
     if (!account) return null;
 
-    return { loginUrl: await mintLoginCode(kv, account.id, coreBaseUrl), email: account.email };
+    return { loginUrl: await mintLoginCode(kv, account.id, coreBaseUrl, returnTo), email: account.email };
 }
 
 export interface RequestMagicLoginByEmailParams {
@@ -134,9 +139,9 @@ export async function requestMagicLoginByEmail(params: RequestMagicLoginByEmailP
  * (and, for the report-token path, that the token is live and agent-kind)
  * before calling this.
  */
-async function mintLoginCode(kv: KVNamespace, userId: string, coreBaseUrl: string): Promise<string> {
+async function mintLoginCode(kv: KVNamespace, userId: string, coreBaseUrl: string, returnTo?: string): Promise<string> {
     const code = crypto.randomUUID();
-    const payload: MagicLoginKvPayload = { userId, issuedAt: Date.now() };
+    const payload: MagicLoginKvPayload = { userId, issuedAt: Date.now(), ...(returnTo ? { returnTo } : {}) };
     await kv.put(`${MAGIC_LOGIN_KV_PREFIX}${code}`, JSON.stringify(payload), {
         expirationTtl: MAGIC_LOGIN_TTL_SECONDS,
     });
@@ -164,7 +169,7 @@ export async function redeemMagicLogin(
     kv: KVNamespace,
     db: D1Database,
     code: string,
-): Promise<{ userId: string; email: string }> {
+): Promise<{ userId: string; email: string; returnTo?: string }> {
     const key = `${MAGIC_LOGIN_KV_PREFIX}${code}`;
     const raw = await kv.get(key);
     await kv.delete(key);
@@ -187,5 +192,5 @@ export async function redeemMagicLogin(
         throw Errors.Unauthorized('Agent account no longer available');
     }
 
-    return { userId: account.id, email: account.email };
+    return { userId: account.id, email: account.email, ...(parsed.returnTo ? { returnTo: parsed.returnTo } : {}) };
 }
