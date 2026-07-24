@@ -81,12 +81,20 @@ export function RepairDefectRow({
           )}
         </span>
         <span className="flex-1 min-w-0">
+          {/* IA-55 — the defect's own title distinguishes two defects on one
+              item; the item + section give context, and location helps a
+              contractor find it. */}
           <span className="block text-[13px] font-semibold text-ih-fg-1">
-            {defect.itemLabel}
+            {defect.defectTitle || defect.itemLabel}
           </span>
           <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-            {defect.sectionTitle}
+            {defect.itemLabel} &middot; {defect.sectionTitle}
           </span>
+          {defect.location && (
+            <span className="block text-[12px] text-ih-fg-4 mt-0.5">
+              {m.repair_defect_location_prefix()} {defect.location}
+            </span>
+          )}
           {defect.comment && (
             <span className="block text-[12px] text-ih-fg-4 mt-0.5 line-clamp-2">
               {defect.comment}
@@ -114,6 +122,26 @@ export function RepairDefectRow({
                 ariaLabel={m.repair_defect_credit_aria({ label: defect.itemLabel })}
                 className="w-full h-8 px-3 rounded-md border border-ih-border bg-ih-bg-app text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:outline-none focus:border-ih-primary"
               />
+              {/* IA-56 — surface the report's Est. Cost as a credit hint so the
+                  client doesn't submit a blank/$0 request. "Use estimate" fills
+                  the field (dollars → cents) but never auto-submits a value. */}
+              {defect.estimateHigh != null && (
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-ih-fg-4">
+                  <span>
+                    {m.repair_defect_estimate_hint({
+                      low: (defect.estimateLow ?? defect.estimateHigh).toLocaleString(),
+                      high: defect.estimateHigh.toLocaleString(),
+                    })}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onUpdateCredit(defect, Math.round((defect.estimateHigh ?? 0) * 100))}
+                    className="font-bold text-ih-primary hover:underline"
+                  >
+                    {m.repair_defect_use_estimate()}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
           <div>

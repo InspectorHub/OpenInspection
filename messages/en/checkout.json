@@ -103,6 +103,8 @@
   "repair_request_col_section": "Section",
   "repair_request_col_item": "Item",
   "repair_request_col_finding": "Finding",
+  "repair_request_col_priority": "Priority",
+  "repair_request_col_location_prefix": "Location:",
   "repair_request_col_note": "Note",
   "repair_request_col_credit": "Credit",
   "repair_request_total_label": "Total Requested Credit",

@@ -159,6 +159,21 @@
             "type": "string",
             "description": "Report item label snapshot for this defect."
           },
+          "defectTitle": {
+            "type": "string",
+            "nullable": true,
+            "description": "Defect title snapshot at add time."
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "description": "Defect location snapshot at add time."
+          },
+          "category": {
+            "type": "string",
+            "nullable": true,
+            "description": "Defect category snapshot at add time."
+          },
           "commentSnapshot": {
             "type": "string",
             "nullable": true,

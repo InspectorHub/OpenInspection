@@ -37,11 +37,18 @@ export interface Defect {
   sectionTitle: string;
   itemId: string;
   itemLabel: string;
+  // IA-55 — the defect's own title + location, so the list is distinguishable
+  // and locatable (both snapshotted onto the item when added).
+  defectTitle: string;
+  location: string | null;
   comment: string;
   category: "safety" | "recommendation" | "maintenance";
   // IA-42 — the rating-axis severity of the parent item (getRatingBucket
   // domain). Distinct from `category`; drives the real "Severity" sort.
   severityBucket: "satisfactory" | "monitor" | "defect" | "other";
+  // IA-56 — the report's Est. Cost, shown only as a credit-input hint.
+  estimateLow: number | null;
+  estimateHigh: number | null;
 }
 
 export interface RepairRequestItem {
@@ -373,6 +380,9 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
         fd.append("findingKey", key);
         fd.append("sectionTitle", defect.sectionTitle);
         fd.append("itemLabel", defect.itemLabel);
+        fd.append("defectTitle", defect.defectTitle);
+        if (defect.location) fd.append("location", defect.location);
+        fd.append("category", defect.category);
         fd.append("commentSnapshot", defect.comment);
         const draft = drafts[key];
         if (draft?.requestedCreditCents != null) {

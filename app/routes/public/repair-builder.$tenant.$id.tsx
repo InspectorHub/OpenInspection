@@ -125,6 +125,10 @@ export async function action({
       const findingKey = String(form.get("findingKey") ?? "");
       const sectionTitle = String(form.get("sectionTitle") ?? "");
       const itemLabel = String(form.get("itemLabel") ?? "");
+      // IA-55 — snapshot defect title / location / category at add time.
+      const defectTitle = (form.get("defectTitle") as string | null) ?? null;
+      const location = (form.get("location") as string | null) ?? null;
+      const category = (form.get("category") as string | null) ?? null;
       const commentSnapshot = (form.get("commentSnapshot") as string | null) ?? null;
       const creditRaw = form.get("requestedCreditCents");
       const requestedCreditCents = creditRaw !== null && creditRaw !== "" ? Number(creditRaw) : null;
@@ -137,6 +141,9 @@ export async function action({
           findingKey,
           sectionTitle,
           itemLabel,
+          defectTitle,
+          location,
+          category,
           commentSnapshot,
           requestedCreditCents,
           note,

@@ -34,11 +34,15 @@ function makeEntry(
         sectionTitle: overrides.sectionTitle ?? `Section ${sectionId}`,
         itemId,
         itemLabel:    overrides.itemLabel    ?? `Item ${itemId}`,
+        defectTitle:  overrides.itemLabel    ?? `Item ${itemId}`,
         comment:      overrides.comment      ?? '',
+        location:     null,
         category:     overrides.category     ?? ('maintenance' as const),
         // Repair-list entries come off defect-rated items; the pipeline always
         // stamps a bucket. Default to 'defect' so the fixture mirrors production.
         severityBucket: overrides.severityBucket ?? ('defect' as const),
+        estimateLow:  null,
+        estimateHigh: null,
         source,
         recommendationId,
     };

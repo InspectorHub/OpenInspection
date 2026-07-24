@@ -138,6 +138,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
             sectionTitle:        string;
             itemId:              string;
             itemLabel:           string;
+            // IA-55 — the defect's own title, distinct from the item label.
+            defectTitle:         string;
             comment:             string;
             location:            string | null;
             category:            'safety' | 'recommendation' | 'maintenance';
@@ -173,6 +175,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                         sectionTitle: section.title,
                         itemId:       item.id,
                         itemLabel:    item.label,
+                        defectTitle:  d.title ?? item.label,
                         comment:      d.effectiveComment ?? '',
                         location:     (typeof d.effectiveLocation === 'string' && d.effectiveLocation.length > 0)
                             ? d.effectiveLocation
@@ -198,6 +201,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                         sectionTitle: section.title,
                         itemId:       item.id,
                         itemLabel:    c.title || item.label,
+                        defectTitle:  c.title || item.label,
                         comment:      c.comment ?? '',
                         location:     (typeof c.location === 'string' && c.location.length > 0)
                             ? c.location

@@ -28,6 +28,13 @@ export const repairRequestItems = sqliteTable('repair_request_items', {
   requestedCreditCents: integer('requested_credit_cents'),
   note: text('note'),
   sortOrder: integer('sort_order').notNull().default(0),
+  // IA-55 — defect title / location / category snapshots so the public share
+  // page shows a locatable, distinguishable, priority-tagged list that stays
+  // stable after the report changes. Appended at the table end (D1 can't add a
+  // column mid-table on a referenced table — reference_d1_add_column_at_end).
+  defectTitleSnapshot: text('defect_title_snapshot'),
+  locationSnapshot: text('location_snapshot'),
+  categorySnapshot: text('category_snapshot'),
 }, (t) => ({
   idxRr: index('idx_repair_request_items_rr').on(t.repairRequestId),
 }));

@@ -9,6 +9,10 @@ type ItemInput = {
     findingKey: string;
     sectionTitle: string;
     itemLabel: string;
+    // IA-55 — snapshots captured at add time (stable after report changes).
+    defectTitle?: string | null;
+    location?: string | null;
+    category?: string | null;
     commentSnapshot?: string | null;
     requestedCreditCents?: number | null;
     note?: string | null;
@@ -165,6 +169,9 @@ export class RepairRequestService {
             const patch = {
                 sectionTitle:         input.sectionTitle,
                 itemLabel:            input.itemLabel,
+                defectTitleSnapshot:  input.defectTitle ?? null,
+                locationSnapshot:     input.location ?? null,
+                categorySnapshot:     input.category ?? null,
                 commentSnapshot:      input.commentSnapshot ?? null,
                 requestedCreditCents: input.requestedCreditCents ?? null,
                 note:                 input.note ?? null,
@@ -189,6 +196,9 @@ export class RepairRequestService {
             findingKey: input.findingKey,
             sectionTitle: input.sectionTitle,
             itemLabel: input.itemLabel,
+            defectTitleSnapshot: input.defectTitle ?? null,
+            locationSnapshot: input.location ?? null,
+            categorySnapshot: input.category ?? null,
             commentSnapshot: input.commentSnapshot ?? null,
             requestedCreditCents: input.requestedCreditCents ?? null,
             note: input.note ?? null,

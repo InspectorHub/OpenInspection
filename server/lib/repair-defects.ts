@@ -15,11 +15,21 @@ export type RepairDefect = {
     sectionTitle: string;
     itemId:       string;
     itemLabel:    string;
+    // IA-55 — the defect's own title (distinct from itemLabel, which is the
+    // parent item). Two defects on one item are otherwise indistinguishable.
+    defectTitle:  string;
     comment:      string;
+    // IA-55 — where the defect is, so a contractor can find it without calling.
+    location:     string | null;
     category:     'safety' | 'recommendation' | 'maintenance';
     // IA-42 — the parent item's rating-axis severity (getRatingBucket domain),
     // distinct from `category`. Drives the builder's real "Severity" sort.
     severityBucket: 'satisfactory' | 'monitor' | 'defect' | 'other';
+    // IA-56 — the report's Est. Cost, carried ONLY as a credit-input hint in the
+    // builder (placeholder / "use estimate"). Never written to the credit value
+    // and never snapshotted to the public share page — RRB stays pure-credit.
+    estimateLow:  number | null;
+    estimateHigh: number | null;
 };
 
 /**
@@ -38,9 +48,13 @@ export interface InspectionSvcForDefects {
             sectionTitle:     string;
             itemId:           string;
             itemLabel:        string;
+            defectTitle:      string;
             comment:          string;
+            location:         string | null;
             category:         'safety' | 'recommendation' | 'maintenance';
             severityBucket:   'satisfactory' | 'monitor' | 'defect' | 'other';
+            estimateLow:      number | null;
+            estimateHigh:     number | null;
             source:           'canned' | 'custom';
             recommendationId: string | null;
         }>;
@@ -81,9 +95,13 @@ export async function flattenReportDefects(
             sectionTitle: d.sectionTitle,
             itemId:       d.itemId,
             itemLabel:    d.itemLabel,
+            defectTitle:  d.defectTitle,
             comment:      d.comment,
+            location:     d.location,
             category:     d.category,
             severityBucket: d.severityBucket,
+            estimateLow:  d.estimateLow,
+            estimateHigh: d.estimateHigh,
         };
     });
 }
