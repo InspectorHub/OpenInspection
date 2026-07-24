@@ -128,6 +128,8 @@
   "portal_agreement_thanks_signed": "Thank you for signing this agreement.",
   "portal_agreement_download_pdf": "Download as PDF",
   "portal_agreement_print_hint": "In the print dialog, choose \"Save as PDF\" as destination.",
+  "portal_agreement_verify_link": "Verify this signature",
+  "portal_agreement_verify_hint": "Use this link anytime to confirm this signature hasn't been altered.",
   "portal_agreement_draw_prompt": "Draw your signature below:",
   "portal_agreement_signing_pending": "Signing...",
   "portal_agreement_sign_submit": "Sign Agreement",
