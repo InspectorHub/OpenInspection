@@ -10,7 +10,11 @@ export const automations = sqliteTable('automations', {
     trigger: text('trigger', {
         enum: [
             'inspection.created', 'inspection.confirmed', 'inspection.cancelled',
-            'report.published', 'invoice.created', 'payment.received', 'agreement.signed',
+            // report.amended fires when a report is re-published (a second or
+            // later version exists) — a distinct event from the first-publish
+            // "report ready" so amendment notifications can carry the change
+            // summary and their own template instead of looking like a duplicate.
+            'report.published', 'report.amended', 'invoice.created', 'payment.received', 'agreement.signed',
             'agreement.signer_signed',
             'agreement.viewed', 'agreement.declined', 'agreement.expired',
             'event.created', 'event.completed',

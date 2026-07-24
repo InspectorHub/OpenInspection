@@ -36,8 +36,20 @@ export function getSectionIcon(title: string): string {
 /* Filter helpers */
 /* ------------------------------------------------------------------ */
 
-export function isDefect(bucket: string): boolean {
-  return /defect|safety|major/i.test(bucket);
+/**
+ * IA-66 — whether an item belongs in the "Defects Only" filter and shows the
+ * "Add to repair request" checkbox. Both used to disagree (the filter ran a
+ * severityBucket regex `/defect|safety|major/i` that dropped 'monitor' and never
+ * matched a tenant custom category; the checkbox showed for defect OR monitor).
+ * Now both read the same first-class, per-category switch the tenant configures:
+ * defect_categories.drivesSummary, resolved server-side onto each ResolvedDefect.
+ * An item drives the summary when it has at least one included defect whose
+ * category drives the summary (unset → the server default of true).
+ */
+export function itemDrivesSummary(item: {
+  resolvedTabs?: { defects?: Array<{ drivesSummary?: boolean }> };
+}): boolean {
+  return (item.resolvedTabs?.defects ?? []).some((d) => d.drivesSummary !== false);
 }
 
 /* ------------------------------------------------------------------ */

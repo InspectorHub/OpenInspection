@@ -131,7 +131,15 @@ describe('POST .../lists/:rrId/items — add item', () => {
         // I1: assertCanEdit now receives inspectionId as 2nd arg.
         expect(assertCanEdit).toHaveBeenCalledWith('t1', 'insp1', 'rr1', { kind: 'client', ref: 'buyer@example.com' });
         // Route normalizes undefined optional fields to null per ItemInput.
-        expect(addItem).toHaveBeenCalledWith('t1', 'rr1', { ...ITEM_BODY, commentSnapshot: null });
+        // IA-55 — the handler always forwards the defect title / location /
+        // category snapshots (null when the body omits them).
+        expect(addItem).toHaveBeenCalledWith('t1', 'rr1', {
+            ...ITEM_BODY,
+            defectTitle: null,
+            location: null,
+            category: null,
+            commentSnapshot: null,
+        });
     });
 
     it('403 FORBIDDEN when assertCanEdit throws (not the creator)', async () => {

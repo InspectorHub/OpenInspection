@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import { inspectionAccessTokens } from '../lib/db/schema/portal-access';
 import { contactRoleProfiles } from '../lib/db/schema';
+import type { RoleKind } from '../lib/people/capabilities';
 import type { PortalAccessRow, PortalRole } from '../lib/public-access';
 import { mintToken, hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
 import { sealToken, openToken } from '../lib/config-crypto';
@@ -49,6 +50,25 @@ export class PortalAccessService {
         if (!row.tokenEnc) throw Errors.Internal('Portal token cannot be reconstructed (no token_enc)');
         const s = this.requireSecrets();
         return openToken(row.tokenEnc, row.tenantId, s.jwtSecret, s.jwtSecretPrevious);
+    }
+
+    /**
+     * Resolve a portal grant's role KEY to its role-profile KIND
+     * (client / agent / other). The `role` on a token is a free-form key, so a
+     * caller that needs to know "is this an agent?" must map key → kind here
+     * rather than hardcode the seed keys (which misses tenant-custom profiles).
+     * Returns null when the key has no active profile for the tenant.
+     */
+    async getRoleKind(tenantId: string, roleKey: string): Promise<RoleKind | null> {
+        const db = this.getDrizzle();
+        const row = await db.select({ kind: contactRoleProfiles.kind }).from(contactRoleProfiles)
+            .where(and(
+                eq(contactRoleProfiles.tenantId, tenantId),
+                eq(contactRoleProfiles.key, roleKey),
+                eq(contactRoleProfiles.active, true),
+            ))
+            .get();
+        return (row?.kind as RoleKind | undefined) ?? null;
     }
 
     /**

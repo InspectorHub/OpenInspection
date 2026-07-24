@@ -3,6 +3,7 @@ import { agreements, agreementRequests, agreementSigners, inspections } from '..
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { mintToken, hashToken } from '../../lib/token-hash';
+import { SIGNER_TOKEN_TTL_MS } from '../../lib/token-ttl';
 import { sealToken } from '../../lib/config-crypto';
 import { PeopleService } from '../people.service';
 import { sha256Hex, type Constructor, type SignerInput } from './base';
@@ -200,6 +201,9 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                     tokenEnc: this.secrets ? await sealToken(plaintext, tenantId, this.secrets.jwtSecret) : null,
                     status: 'sent',
                     createdAt: now,
+                    // IA-37 — issue the signer link with a default TTL so a stale
+                    // signing email can't be reused indefinitely.
+                    expiresAt: new Date(now.getTime() + SIGNER_TOKEN_TTL_MS),
                 });
             }
 

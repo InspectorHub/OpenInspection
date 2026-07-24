@@ -7,12 +7,14 @@
  * inspection_people populated, so it fails against the old implementation
  * (which reads only inspection.clientEmail and skips the send entirely).
  *
- * Spec 2 Task 4 — /complete no longer sends the report inline. It fires the
- * `report.published` automation trigger (the same engine path the live
- * /publish route already uses), so this spec now spies on
- * `c.var.services.automation.trigger` instead of asserting inline send-method
- * call counts. The in-app admin notification (createForAllAdmins) is
- * unchanged — still fired directly from the route, not by the engine.
+ * IA-30 Task 3 — /complete no longer fires the `report.published` automation
+ * trigger at all. Once report publishing was decoupled from order completion
+ * (Task 1/2), marking fieldwork complete could fire report delivery for a
+ * report that was never published — clients would receive a link to an
+ * unpublished report. `report.published` is a report event and now fires from
+ * publish only; /complete is a pure order-lifecycle action. This spec asserts
+ * the trigger is NOT called and no inline send happens; the in-app admin
+ * notification (createForAllAdmins) still fires directly from the route.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as schema from '../../../server/lib/db/schema';
@@ -95,7 +97,7 @@ function buildApp(inspectionStub: { status: string; clientEmail: string | null; 
 
 const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET: 'test-secret' } as never;
 
-describe('POST /api/inspections/:id/complete — primary-client resolution (Task 9a) + engine-routed delivery (Spec 2 Task 4)', () => {
+describe('POST /api/inspections/:id/complete — primary-client resolution (Task 9a) + no report delivery (IA-30 Task 3)', () => {
     beforeEach(async () => {
         const fixture = createTestDb();
         db = fixture.db;
@@ -130,7 +132,7 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         return req;
     }
 
-    it('fires report.published through the automation engine, not the inline send methods, for a primary client resolved via PeopleService', async () => {
+    it('does not fire report.published (delivery is publish\'s job) but still records the admin notification with the resolved primary-client email', async () => {
         const { ctx, settle } = makeExecCtx();
         const app = buildApp({
             status: 'in_progress', clientEmail: null, clientName: null,
@@ -140,23 +142,15 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         expect(res.status).toBe(200);
         await settle();
 
-        // The engine trigger is fired (awaited inline, not via waitUntil) with
-        // the right tenant/inspection/event.
-        expect(automationTrigger).toHaveBeenCalledTimes(1);
-        expect(automationTrigger.mock.calls[0][0]).toMatchObject({
-            tenantId: TENANT,
-            inspectionId: INSP_ID,
-            triggerEvent: 'report.published',
-        });
-
-        // The route itself no longer performs an inline send — delivery is the
-        // engine's job now (per-recipient PDF + role-keyed link, cron-flushed).
+        // report.published belongs to publish. Marking fieldwork complete must
+        // not deliver a report — it may not even be published yet.
+        expect(automationTrigger).not.toHaveBeenCalled();
         expect(issueToken).not.toHaveBeenCalled();
         expect(sendInspectionReportPdf).not.toHaveBeenCalled();
         expect(sendReportReady).not.toHaveBeenCalled();
 
-        // The in-app admin notification's metadata still carries the resolved
-        // primary-client email (unrelated to the automation engine).
+        // The in-app admin notification still fires, and its metadata carries the
+        // primary-client email resolved via PeopleService (Task 9a).
         expect(createForAllAdmins).toHaveBeenCalledTimes(1);
         expect(createForAllAdmins.mock.calls[0][1]).toMatchObject({
             type: 'report.published',
@@ -164,7 +158,7 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         });
     });
 
-    it('no primary client at all — still fires the trigger (engine resolves zero recipients) and the notification carries clientEmail:null', async () => {
+    it('no primary client at all — no delivery, notification carries clientEmail:null', async () => {
         // Remove the seeded inspection_people row so getPrimaryClient resolves null.
         const { eq } = await import('drizzle-orm');
         await db.delete(schema.inspectionPeople).where(eq(schema.inspectionPeople.inspectionId, INSP_ID));
@@ -178,16 +172,7 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         expect(res.status).toBe(200);
         await settle();
 
-        // report.published still fires unconditionally — the engine (not this
-        // route) is responsible for resolving recipients and no-op'ing when
-        // there are none.
-        expect(automationTrigger).toHaveBeenCalledTimes(1);
-        expect(automationTrigger.mock.calls[0][0]).toMatchObject({
-            tenantId: TENANT,
-            inspectionId: INSP_ID,
-            triggerEvent: 'report.published',
-        });
-
+        expect(automationTrigger).not.toHaveBeenCalled();
         expect(issueToken).not.toHaveBeenCalled();
         expect(sendReportReady).not.toHaveBeenCalled();
         expect(sendInspectionReportPdf).not.toHaveBeenCalled();
@@ -198,24 +183,7 @@ describe('POST /api/inspections/:id/complete — primary-client resolution (Task
         expect(createForAllAdmins.mock.calls[0][1]).toMatchObject({ metadata: { clientEmail: null } });
     });
 
-    it('a failed automation trigger does not 500 the completion (log + continue)', async () => {
-        const { ctx, settle } = makeExecCtx();
-        const app = buildApp({
-            status: 'in_progress', clientEmail: null, clientName: null,
-            propertyAddress: '1 Main St', inspectorId: null, id: INSP_ID,
-        });
-        automationTrigger.mockRejectedValueOnce(new Error('enqueue failed'));
-
-        const res = await app.fetch(post(), ENV, ctx);
-        expect(res.status).toBe(200);
-        await settle();
-
-        expect(automationTrigger).toHaveBeenCalledTimes(1);
-        // Completion + admin notification still happen even though the trigger failed.
-        expect(createForAllAdmins).toHaveBeenCalledTimes(1);
-    });
-
-    it('already-completed inspection short-circuits — no trigger, no notification', async () => {
+    it('already-completed inspection short-circuits — no notification', async () => {
         const { ctx, settle } = makeExecCtx();
         const app = buildApp({
             status: 'completed', clientEmail: null, clientName: null,

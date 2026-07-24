@@ -23,9 +23,6 @@ export default [
   // Public pages — no auth, minimal layout, SSR for SEO
   layout("routes/public-layout.tsx", [
     route("book/:tenant", "routes/public/booking.tsx"),
-    // IA-26 — legacy per-inspector URL kept alive as a deep link: 302 to the
-    // company page with ?inspector=<slug> (preserves ?ref= and other params).
-    route("book/:tenant/:slug", "routes/public/booking-inspector-redirect.tsx"),
     route("report/:tenant/:id", "routes/public/report.tsx"),
     route(
       "agreements/sign/:tenant/:token",
@@ -65,13 +62,9 @@ export default [
   route("setup", "routes/setup.tsx"),
   route("join/:token", "routes/join.tsx"),
   route("version-diff/:id", "routes/version-diff.tsx"),
-  // Standalone public — no layout (iframe-friendly)
-  // IA-26 — company-level embed (no inspector slug); legacy per-inspector kept alive.
+  // Standalone public — no layout (iframe-friendly). Company-level embed only
+  // (no inspector slug); the server auto-assigns the first available inspector.
   route("embed/:tenant", "routes/public/booking-embed-company.tsx"),
-  route(
-    "embed/:tenant/:slug",
-    "routes/public/booking-embed.tsx",
-  ),
   // Standalone agent pages — no agent-layout chrome
   route("agent-invite/:token", "routes/agent/invite-accept.tsx"),
   route("agent-signup", "routes/agent/signup.tsx"),
@@ -90,10 +83,12 @@ export default [
   route("resources/cost-items", "routes/resources/cost-items.tsx"),
   route("resources/cost-export", "routes/resources/cost-export.tsx"),
   route("resources/inspection-prefs", "routes/resources/inspection-prefs.tsx"),
+  route("resources/marketplace-install", "routes/resources/marketplace-install.tsx"),
   route("resources/inspection-settings-sheet", "routes/resources/inspection-settings-sheet.tsx"),
   route("resources/inspection-media", "routes/resources/inspection-media.tsx"),
   route("resources/publish-readiness", "routes/resources/publish-readiness.tsx"),
   route("resources/recent-inspections", "routes/resources/recent-inspections.tsx"),
+  route("resources/entity-audit", "routes/resources/entity-audit.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
   route("resources/template-search", "routes/resources/template-search.tsx"),
   route("resources/inspection-search", "routes/resources/inspection-search.tsx"),
@@ -166,6 +161,8 @@ export default [
     route("agent-dashboard", "routes/agent/dashboard.tsx"),
     route("agent-settings/profile", "routes/agent/settings-profile.tsx"),
     route("agent-inspectors", "routes/agent/inspectors.tsx"),
-    route("agent-recommendations", "routes/agent/recommendations.tsx"),
+    route("agent-repair-items", "routes/agent/repair-items.tsx"),
+    // IA-54 — old path 301s to the renamed one.
+    route("agent-recommendations", "routes/agent/agent-repair-items-redirect.tsx"),
   ]),
 ] satisfies RouteConfig;

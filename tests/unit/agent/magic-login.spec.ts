@@ -184,6 +184,28 @@ describe('Agent magic-login primitive', () => {
             expect(kv.store.size).toBe(0);
         });
 
+        it('IA-47 — threads a returnTo into the KV payload when provided', async () => {
+            await seedRoleProfile('buyer_agent', 'agent');
+            await seedGlobalAgent(AGENT_USER_ID, AGENT_EMAIL);
+            const resolveToken = vi.fn().mockResolvedValue({
+                inspectionId: INSP_ID, tenantId: TENANT_ID, role: 'buyer_agent',
+                recipientEmail: AGENT_EMAIL, revokedAt: null, expiresAt: null,
+            });
+            const kv = makeKv();
+            const { app, sendAgentLoginLink } = buildRequestApp(resolveToken, kv);
+            const returnTo = `/portal/acme/i/${INSP_ID}?token=live&section=report`;
+            const res = await app.request('/api/agent/magic-login/request', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ tenant: 'acme', inspectionId: INSP_ID, token: 'live', returnTo }),
+            });
+            expect(res.status).toBe(200);
+            const [, loginUrl] = sendAgentLoginLink.mock.calls[0] as [string, string];
+            const code = new URL(loginUrl, 'http://x').searchParams.get('code');
+            const raw = await kv.get(`agent_ml:${code}`);
+            expect(JSON.parse(raw!)).toMatchObject({ userId: AGENT_USER_ID, returnTo });
+        });
+
         it('invalid/revoked/expired/inspection-mismatched report token → 401', async () => {
             const resolveToken = vi.fn().mockResolvedValue(null);
             const kv = makeKv();
@@ -246,6 +268,31 @@ describe('Agent magic-login primitive', () => {
             expect(res2.status).toBe(302);
             expect(res2.headers.get('location')).toBe('/agent-login?error=expired_link');
             expect(res2.headers.get('set-cookie')).toBeNull();
+        });
+
+        it('IA-47 — redeems to a safe relative returnTo instead of /agent-dashboard', async () => {
+            await seedGlobalAgent(AGENT_USER_ID, AGENT_EMAIL);
+            const returnTo = `/portal/acme/i/x?token=t&section=report`;
+            const kv = makeKv({
+                'agent_ml:code-rt': JSON.stringify({ userId: AGENT_USER_ID, issuedAt: Date.now(), returnTo }),
+            });
+            const app = buildRedeemApp(kv);
+            const res = await app.request('/agent/magic-login?code=code-rt');
+            expect(res.status).toBe(302);
+            expect(res.headers.get('location')).toBe(returnTo);
+            expect(res.headers.get('set-cookie')).toContain('__Host-inspector_token');
+        });
+
+        it('IA-47 — ignores an unsafe returnTo (open-redirect) and falls back to /agent-dashboard', async () => {
+            await seedGlobalAgent(AGENT_USER_ID, AGENT_EMAIL);
+            for (const bad of ['//evil.com', 'https://evil.com', 'http://x', '/\\evil.com', 'evil.com']) {
+                const kv = makeKv({
+                    'agent_ml:bad': JSON.stringify({ userId: AGENT_USER_ID, issuedAt: Date.now(), returnTo: bad }),
+                });
+                const app = buildRedeemApp(kv);
+                const res = await app.request('/agent/magic-login?code=bad');
+                expect(res.headers.get('location'), `unsafe returnTo=${bad}`).toBe('/agent-dashboard');
+            }
         });
 
         it('missing/expired code → friendly redirect, no cookie', async () => {

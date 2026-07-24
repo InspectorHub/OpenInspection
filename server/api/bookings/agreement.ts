@@ -11,7 +11,7 @@ import { agreements, tenantConfigs, invoices, inspections } from '../../lib/db/s
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
-import { runEnvelopeCompletionPipeline } from '../../lib/sign-effects';
+import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 
 // Local aliases for the literal unions the DB columns are narrowed to in the
 // JSON responses below. Kept file-local (not exported) so the public router
@@ -36,6 +36,7 @@ const getAgreementByTokenRoute = createRoute(withMcpMetadata({
                         success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
                         data: z.object({
                             status: z.enum(['pending', 'sent', 'viewed', 'signed', 'declined', 'expired']).describe('Envelope aggregate status'),
+                            envelopeId: z.string().describe('Stable envelope id — the public /verify/:envelopeId page identifier surfaced to signers after signing'),
                             clientName: z.string().nullable().describe('TODO describe clientName field for the OpenInspection MCP integration'),
                             agreementName: z.string().describe('TODO describe agreementName field for the OpenInspection MCP integration'),
                             agreementContent: z.string().describe('Pinned content snapshot served to the signer (never the live template)'),
@@ -221,6 +222,7 @@ const agreementRoutes = createApiRouter()
             success: true as const,
             data: {
                 status: envelope.status as EnvelopeStatus,
+                envelopeId: envelope.id,
                 clientName: envelope.clientName ?? null,
                 agreementName: agreementRow?.name ?? 'Agreement',
                 agreementContent: snapshot.content,
@@ -420,6 +422,24 @@ const agreementRoutes = createApiRouter()
                 clientEmail: envelope.clientEmail ?? null,
                 clientName: envelope.clientName ?? null,
                 agreementId: envelope.agreementId,
+            });
+        }
+
+        // IA-46 — per-signer receipt at THIS signer's own email carrying the
+        // tamper-evident /verify/:envelopeId link, mirroring the in-person route.
+        // Without it a remote co-signer (or any non-client signer) walks away
+        // with nothing: the completion pipeline emails only the envelope client.
+        // Skip the duplicate only when this same signature completed the envelope
+        // AND the signer IS the envelope client (already emailed above).
+        const completedSelf = result.envelopeCompletedNow
+            && !!envelope.clientEmail
+            && signer.email.trim().toLowerCase() === envelope.clientEmail.trim().toLowerCase();
+        if (!completedSelf) {
+            await runSignerReceiptEffects(c, {
+                signerEmail: signer.email,
+                signerName: signer.name,
+                inspectionId: result.inspectionId,
+                requestId: result.requestId,
             });
         }
 

@@ -100,6 +100,8 @@ export interface CannedCommentTabsProps {
   customTitle: string;
   customComment: string;
   customCategory: CustomDefectCategory;
+  /** IA-59 — tenant defect categories offered in the custom-defect dropdown. */
+  customCategories?: Array<{ id: string; name: string }>;
   saveToLibrary: boolean;
   showSaveToLibrary: boolean;
   onCustomTitleChange: (value: string) => void;
@@ -144,6 +146,7 @@ export function CannedCommentTabs({
   customTitle,
   customComment,
   customCategory,
+  customCategories,
   saveToLibrary,
   showSaveToLibrary,
   onCustomTitleChange,
@@ -319,6 +322,7 @@ export function CannedCommentTabs({
                   title={customTitle}
                   comment={customComment}
                   category={customCategory}
+                  categories={customCategories}
                   saveToLibrary={saveToLibrary}
                   showSaveToLibrary={showSaveToLibrary}
                   onTitleChange={onCustomTitleChange}

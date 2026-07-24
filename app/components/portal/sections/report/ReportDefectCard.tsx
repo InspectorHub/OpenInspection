@@ -55,6 +55,29 @@ export function ReportDefectCard({ item, mediaVisible, renderMediaTile, showPhot
                 {d.effectiveComment}
               </p>
             )}
+            {(d.effectiveTrade || d.effectiveTimeframe) && (
+              <div
+                data-defect-meta
+                className="mt-1.5 flex flex-wrap gap-x-4 gap-y-0.5 text-[11px] text-ih-fg-4"
+              >
+                {d.effectiveTrade && (
+                  <span>
+                    <span className="font-bold uppercase tracking-wider">
+                      {m.report_defect_trade_label()}
+                    </span>{" "}
+                    {d.effectiveTrade}
+                  </span>
+                )}
+                {d.effectiveTimeframe && (
+                  <span>
+                    <span className="font-bold uppercase tracking-wider">
+                      {m.report_defect_timeframe_label()}
+                    </span>{" "}
+                    {d.effectiveTimeframe}
+                  </span>
+                )}
+              </div>
+            )}
             {showPhotos && (d.defectPhotos ?? []).filter(mediaVisible).length > 0 && (
               <div className={`mt-2 ${DEFECT_PHOTO_GRID_CLASS}`}>
                 {(d.defectPhotos ?? [])

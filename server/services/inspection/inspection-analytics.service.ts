@@ -138,9 +138,15 @@ export class InspectionAnalyticsService extends InspectionSubService {
             sectionTitle:        string;
             itemId:              string;
             itemLabel:           string;
+            // IA-55 — the defect's own title, distinct from the item label.
+            defectTitle:         string;
             comment:             string;
             location:            string | null;
             category:            'safety' | 'recommendation' | 'maintenance';
+            // IA-42 — the parent item's rating-axis severity, distinct from the
+            // safety/recommendation/maintenance category. Lets the repair builder
+            // offer a real "worst first" sort.
+            severityBucket:      'satisfactory' | 'monitor' | 'defect' | 'other';
             recommendationId:    string | null;
             recommendationLabel: string | null;
             estimateLow:         number | null;
@@ -169,11 +175,13 @@ export class InspectionAnalyticsService extends InspectionSubService {
                         sectionTitle: section.title,
                         itemId:       item.id,
                         itemLabel:    item.label,
+                        defectTitle:  d.title ?? item.label,
                         comment:      d.effectiveComment ?? '',
                         location:     (typeof d.effectiveLocation === 'string' && d.effectiveLocation.length > 0)
                             ? d.effectiveLocation
                             : null,
                         category:            cat,
+                        severityBucket:      item.severityBucket,
                         recommendationId:    slug,
                         recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
                         estimateLow:         d.estimateLow ?? null,
@@ -193,11 +201,13 @@ export class InspectionAnalyticsService extends InspectionSubService {
                         sectionTitle: section.title,
                         itemId:       item.id,
                         itemLabel:    c.title || item.label,
+                        defectTitle:  c.title || item.label,
                         comment:      c.comment ?? '',
                         location:     (typeof c.location === 'string' && c.location.length > 0)
                             ? c.location
                             : null,
                         category:            cat,
+                        severityBucket:      item.severityBucket,
                         recommendationId:    slug,
                         recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
                         estimateLow:         c.estimateLow ?? null,

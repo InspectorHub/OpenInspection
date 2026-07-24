@@ -42,6 +42,7 @@ export const TRIGGER_LABELS: Record<string, string> = {
   get "inspection.cancelled"() { return m.label_trigger_inspection_cancelled(); },
   get "inspection.reminder"() { return m.label_trigger_inspection_reminder(); },
   get "report.published"() { return m.label_trigger_report_published(); },
+  get "report.amended"() { return m.label_trigger_report_amended(); },
   get "invoice.created"() { return m.label_trigger_invoice_created(); },
   get "payment.received"() { return m.label_trigger_payment_received(); },
   get "agreement.signed"() { return m.label_trigger_agreement_signed(); },

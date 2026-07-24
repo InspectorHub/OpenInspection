@@ -10,13 +10,13 @@ import { mapRatingSystemLevels } from '../../lib/map-rating-levels';
 import { renderTemplate } from '../../lib/mustache';
 import { mapRepairItems } from '../../lib/report-repair-items';
 import { selectReportMedia, type ReportMediaContext } from '../../lib/report-video';
-import { findingKey, DEFAULT_UNIT } from '../../lib/finding-key';
+import { readItemEntry } from '../../lib/read-item-defects';
 import { sha256Hex } from '../signing-key.service';
 import { RENDER_VERSION } from '../../lib/pdf';
 import { resolvePdfSettings, type PdfSettings } from '../../lib/pdf-settings';
 import { isReportPublished } from '../../lib/status/report-status';
 import { resolveBuildingProfile } from '../../lib/building-profile';
-import { buildSystemsSummary } from '../../lib/pca-systems-summary';
+import type { buildSystemsSummary } from '../../lib/pca-systems-summary';
 import { buildPcaReportBlock } from '../../lib/pca-report-block';
 import { gatedSectionRegistry } from '../../lib/pca-section-registry';
 import { buildReportOutline } from '../../lib/report-outline';
@@ -269,7 +269,7 @@ export class InspectionReportService extends InspectionSubService {
                 : null,
             alwaysPageBreak: sec.alwaysPageBreak === true,
             items: sec.items.map((item: SchemaItem) => {
-                const res = resultData[findingKey(DEFAULT_UNIT, sec.id, item.id)] || resultData[item.id] || {};
+                const res = readItemEntry(resultData, sec.id, item.id);
                 const ratingId = res.rating ?? null;
                 const bucket = getRatingBucket(ratingId, levels);
                 const level = levels.find((l: RatingLevel) => l.id === ratingId);
@@ -291,10 +291,14 @@ export class InspectionReportService extends InspectionSubService {
                     const included = st ? !!st.included : !!d.default;
                     const override = st && typeof st.comment === 'string' && st.comment.length > 0 ? st.comment : null;
                     const effectiveCategory = st?.category ?? d.category;
+                    // IA-57 — resolve the Mustache vars once and reuse them: the
+                    // comment interpolation and the independent trade/timeframe
+                    // render points must share the same label resolution.
+                    const mustacheVars = resolveDefectMustacheVars(st as DefectCommentState | undefined, d as CannedDefect, res.attributes);
                     return {
                         ...d,
                         included,
-                        effectiveComment: renderTemplate(override ?? d.comment, resolveDefectMustacheVars(st as DefectCommentState | undefined, d as CannedDefect, res.attributes)),
+                        effectiveComment: renderTemplate(override ?? d.comment, mustacheVars),
                         effectiveCategory,
                         // Authoring unification Plan-4 module K — the tenant's
                         // configured category color; undefined (no color) falls
@@ -308,6 +312,12 @@ export class InspectionReportService extends InspectionSubService {
                         // Summary filter (spec §9), which no consumer conflates.
                         drivesSummary: defectDrivesSummary(effectiveCategory, defectCategories),
                         effectiveLocation: (typeof st?.location === 'string' && st.location.length > 0) ? st.location : d.location,
+                        // IA-57 — surface trade/timeframe as their own resolved
+                        // labels so they render independently of the comment
+                        // (they were invisible whenever the canned prose lacked
+                        // the {{trade}}/{{timeframe}} placeholder).
+                        effectiveTrade:     mustacheVars.trade,
+                        effectiveTimeframe: mustacheVars.timeframe,
                         // #181 PR-G: pending uploads have no R2 object yet — skip them.
                         defectPhotos: (st?.photos ?? []).filter(p => !p.pendingUpload).map(mapReportPhoto),
                         // Sprint 2 S2-3 / S2-4 — per-defect contractor recommendation +
@@ -765,8 +775,15 @@ export class InspectionReportService extends InspectionSubService {
             ? defectCountsByUnit(matrixUnits, resultData as Record<string, unknown>, levels)
             : {};
 
+        // IA-33 (boundary A) — this object is returned verbatim by the public
+        // report endpoint to any link holder (incl. agent-kind tokens); strip
+        // the columns the account track withholds from agents (agent.schema.ts):
+        // private `internalNotes` and commercial `price`.
+        const publicInspection = { ...inspection, inspectorName };
+        delete (publicInspection as Partial<typeof publicInspection>).internalNotes;
+        delete (publicInspection as Partial<typeof publicInspection>).price;
         return {
-            inspection: { ...inspection, inspectorName },
+            inspection: publicInspection,
             styleProfile: { ...styleProfile, tokens: styleProfile.tokens as Record<string, string> },
             inspectorCredentials: credentialSnapshot,
             amendmentTrail,

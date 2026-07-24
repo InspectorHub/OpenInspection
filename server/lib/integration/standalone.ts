@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants, users, templates, tenantConfigs } from '../db/schema';
-import { IntegrationProvider, TenantUpdateParams } from '../integration';
+import type { IntegrationProvider, TenantUpdateParams } from '../integration';
 import { logger } from '../logger';
 
 /**
@@ -86,6 +86,8 @@ async function seedDefaultAutomations(db: D1Database, tenantId: string): Promise
         ['report.published', 'client', 'Report Ready (Client)', 'Your inspection report is ready — {{property_address}}', '<p>Hi {{client_name}},</p><p>Your inspection report for <strong>{{property_address}}</strong> is ready to view.</p><p><a href="{{report_url}}">View Report</a></p><p>— {{company_name}}</p>', 1, '{{company_name}}: your inspection report for {{property_address}} is ready: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}'],
         ['report.published', 'buyer_agent', "Report Ready (Buyer's Agent)", 'Your inspection report is ready — {{property_address}}', '<p>The inspection report for <strong>{{property_address}}</strong> is ready.</p><p><a href="{{report_url}}">View Report</a></p><p>— {{company_name}}</p>', 1, null],
         ['report.published', 'listing_agent', 'Report Ready (Listing Agent)', 'Your inspection report is ready — {{property_address}}', '<p>The inspection report for <strong>{{property_address}}</strong> is ready.</p><p><a href="{{report_url}}">View Report</a></p><p>— {{company_name}}</p>', 0, null], // active=0: listing agent seeded inactive by default (Spec 2 §3.5)
+        ['report.amended', 'client', 'Report Updated (Client)', 'Your inspection report was updated — {{property_address}}', '<p>Hi {{client_name}},</p><p>Your inspection report for <strong>{{property_address}}</strong> has been updated.</p><p>{{summary}}</p><p><a href="{{report_url}}">View the updated report</a></p><p>— {{company_name}}</p>', 1, '{{company_name}}: your inspection report for {{property_address}} was updated: {{report_url}} Reply STOP to opt out; questions? call {{company_phone}}'],
+        ['report.amended', 'buyer_agent', "Report Updated (Buyer's Agent)", 'Inspection report updated — {{property_address}}', '<p>The inspection report for <strong>{{property_address}}</strong> has been updated.</p><p>{{summary}}</p><p><a href="{{report_url}}">View the updated report</a></p><p>— {{company_name}}</p>', 1, null],
         ['inspection.confirmed', 'client', '24-Hour Reminder', 'Reminder: Inspection tomorrow — {{property_address}}', '<p>Hi {{client_name}},</p><p>Just a reminder that your inspection at <strong>{{property_address}}</strong> is scheduled for <strong>{{scheduled_date}}</strong>. Your inspector will arrive during the scheduled window.</p><p>— {{company_name}}</p>', 1, '{{company_name}}: reminder — your inspection at {{property_address}} is {{scheduled_date}}. Reply STOP to opt out; questions? call {{company_phone}}'],
         ['inspection.cancelled', 'client', 'Cancellation Notice (Client)', 'Inspection cancelled — {{property_address}}', '<p>Hi {{client_name}},</p><p>Your inspection at <strong>{{property_address}}</strong> has been cancelled. Please contact us to reschedule.</p><p>— {{company_name}}</p>', 1, null],
         ['inspection.cancelled', 'buyer_agent', "Cancellation Notice (Buyer's Agent)", 'Inspection cancelled — {{property_address}}', '<p>The inspection at <strong>{{property_address}}</strong> has been cancelled. The client may need to reschedule.</p><p>— {{company_name}}</p>', 1, null],

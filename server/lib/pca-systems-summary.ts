@@ -7,6 +7,8 @@
  * `severityBucket` (severity axis) and resolved defects' `effectiveCategory`
  * (the safety/recommendation/maintenance category axis). Server-only.
  */
+import { bucketToSeverity } from './report-utils';
+
 type SeverityRank = 'good' | 'marginal' | 'significant' | 'minor';
 
 export interface SystemsSummaryRow {
@@ -38,18 +40,13 @@ const SEVERITY_RANK: Record<SeverityRank, number> = {
   significant: 3,
 };
 
-function asSeverity(bucket: string | undefined): SeverityRank {
-  return bucket === 'marginal' || bucket === 'significant' || bucket === 'minor'
-    ? bucket
-    : 'good';
-}
-
 export function buildSystemsSummary(sections: SystemsSummaryInput[]): SystemsSummaryRow[] {
   return sections.map((section) => {
     let worst: SeverityRank = 'good';
     const counts = { safety: 0, recommendation: 0, maintenance: 0 };
     for (const item of section.items ?? []) {
-      const sev = asSeverity(item.severityBucket);
+      // IA-43 — one shared inverse (report-utils) instead of a private copy.
+      const sev = bucketToSeverity(item.severityBucket);
       if (SEVERITY_RANK[sev] > SEVERITY_RANK[worst]) worst = sev;
       for (const d of item.resolvedTabs?.defects ?? []) {
         if (d.included === false) continue;

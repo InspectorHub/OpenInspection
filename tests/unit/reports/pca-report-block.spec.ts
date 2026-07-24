@@ -7,8 +7,11 @@ import { describe, it, expect } from 'vitest';
 import { buildPcaReportBlock } from '../../../server/lib/pca-report-block';
 import { PCA_NARRATIVE_SEED } from '../../../server/lib/pca-narrative';
 
+// severityBucket carries the getRatingBucket domain the report pipeline emits
+// (`monitor` → marginal severity); the prior 'marginal' here was a value that
+// domain never produces (IA-32).
 const sections = [
-  { id: 'site', title: 'Site', items: [{ severityBucket: 'marginal', resolvedTabs: { defects: [{ included: true, effectiveCategory: 'safety' }] } }] },
+  { id: 'site', title: 'Site', items: [{ severityBucket: 'monitor', resolvedTabs: { defects: [{ included: true, effectiveCategory: 'safety' }] } }] },
 ];
 
 describe('buildPcaReportBlock — commercial gate', () => {

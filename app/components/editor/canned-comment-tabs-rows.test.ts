@@ -70,11 +70,11 @@ describe("CannedCommentTabs rows (behavior-preserving swap)", () => {
     expect((included.match(/data-testid="photo-chip"/g) || []).length).toBe(2);
   });
 
-  it("renders the custom row with its category chip, custom badge, and photo chip", () => {
+  it("renders the custom row with its category chip, inspector-added badge, and photo chip", () => {
     const out = html([]);
     expect(out).toContain("Gutter loose");
     expect(out).toContain(">maintenance<");
-    expect(out).toContain(">custom<");
+    expect(out).toContain(">inspector-added<");
     // custom defect is included:true => its photo chip mounts
     expect(out).toContain('data-testid="photo-chip"');
   });

@@ -147,7 +147,11 @@ const peopleRoutes = createApiRouter()
         const tenantId = getTenantId(c);
         const { id, personId } = c.req.valid('param');
         await assertInspectionOwned(getDrizzle(c), id, tenantId);
-        await c.var.services.people.removePerson(tenantId, id, personId);
+        const { email } = await c.var.services.people.removePerson(tenantId, id, personId);
+        // IA-36 — leaving the inspection stops the person's report link. Their
+        // access token is revoked (revokedAt beats any expiry, so the link is
+        // dead regardless of the report-link TTL).
+        if (email) await c.var.services.portalAccess.revokeForRecipient(tenantId, id, email);
         return c.json({ success: true as const }, 200);
     });
 

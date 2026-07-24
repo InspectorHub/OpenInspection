@@ -30,10 +30,11 @@ export const users = sqliteTable('users', {
     // booking slug is retired — /book/:tenant is the canonical public entry
     // and no inspector-facing route writes this column anymore. Live READERS
     // that still resolve inspectors by slug: the ICS calendar feed
-    // (ics.service.ts), audit records (lib/audit.ts), and the legacy
-    // /book/:tenant/:slug profile endpoint behind the deep-link redirect —
-    // check those before any reuse. Global AGENT slugs (tenant_id IS NULL,
-    // role='agent') still use this column actively — do not repurpose.
+    // (ics.service.ts), audit records (lib/audit.ts), and the public
+    // /api/public/book/:tenant/:slug profile endpoint (still reached via the
+    // company page's ?inspector=<slug> deep-link resolution) — check those
+    // before any reuse. Global AGENT slugs (tenant_id IS NULL, role='agent')
+    // still use this column actively — do not repurpose.
     slug: text('slug'),
     // DDL default is FROZEN (D1 cannot alter column defaults without a
     // table rebuild and users is FK-referenced). Every insert path MUST pass an

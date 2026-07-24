@@ -42,7 +42,7 @@ export function useAgentTimeZoneOverride(): string | null {
 // scope), not at module load.
 const NAV_ITEMS: { to: string; label: () => string }[] = [
   { to: "/agent-dashboard", label: () => m.agent_portal_nav_dashboard() },
-  { to: "/agent-recommendations", label: () => m.agent_portal_repair_items() },
+  { to: "/agent-repair-items", label: () => m.agent_portal_repair_items() },
   { to: "/agent-inspectors", label: () => m.agent_portal_nav_inspectors() },
   { to: "/agent-settings/profile", label: () => m.agent_portal_settings_title() },
 ];

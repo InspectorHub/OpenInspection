@@ -3,6 +3,7 @@ import { agreementRequests, agreementSigners } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { mintToken, hashToken, deadTokenSentinel, resolveTokenRow } from '../../lib/token-hash';
+import { isTokenRevokedOrExpired } from '../../lib/token-ttl';
 import { sealToken, openToken } from '../../lib/config-crypto';
 import { computeEnvelopeStatus, type Constructor, type ResolvedSigner } from './base';
 import type { AgreementServiceBase } from './base';
@@ -50,6 +51,10 @@ export function SignerStateMixin<TBase extends Constructor<AgreementServiceBase>
                 upgrade: async () => { /* nothing to upgrade — hash is the only key */ },
             });
             if (signer) {
+                // IA-37 — fail closed on a revoked or expired signer link. A dead
+                // token must resolve to nothing (NotFound at the route), never to a
+                // signable envelope.
+                if (isTokenRevokedOrExpired(signer, Date.now())) return null;
                 const envRows = await db.select().from(agreementRequests).where(eq(agreementRequests.id, signer.requestId)).limit(1);
                 if (envRows.length === 0) return null;
                 return { signer, envelope: envRows[0] };

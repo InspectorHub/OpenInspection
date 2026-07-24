@@ -2,6 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq } from 'drizzle-orm';
 import { repairRequests, repairRequestItems } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { SHARE_TOKEN_TTL_MS, isTokenRevokedOrExpired } from '../lib/token-ttl';
 
 export type Creator = { kind: 'client' | 'agent' | 'inspector'; ref: string };
 
@@ -9,6 +10,10 @@ type ItemInput = {
     findingKey: string;
     sectionTitle: string;
     itemLabel: string;
+    // IA-55 — snapshots captured at add time (stable after report changes).
+    defectTitle?: string | null;
+    location?: string | null;
+    category?: string | null;
     commentSnapshot?: string | null;
     requestedCreditCents?: number | null;
     note?: string | null;
@@ -36,6 +41,10 @@ export class RepairRequestService {
             shareToken: this.genId(),
             createdAt: new Date(ts),
             updatedAt: new Date(ts),
+            // IA-37 — issue the share link with a default TTL (contractors forward
+            // these, so they outlive signer links but are not permanent).
+            expiresAt: new Date(ts + SHARE_TOKEN_TTL_MS),
+            revokedAt: null,
         };
         await this.d().insert(repairRequests).values(row);
         return row;
@@ -109,6 +118,8 @@ export class RepairRequestService {
             .where(eq(repairRequests.shareToken, shareToken))
             .get();
         if (!request) return null;
+        // IA-37 — fail closed on a revoked or expired share link.
+        if (isTokenRevokedOrExpired(request, this.now())) return null;
         const items = await this.d()
             .select()
             .from(repairRequestItems)
@@ -165,6 +176,9 @@ export class RepairRequestService {
             const patch = {
                 sectionTitle:         input.sectionTitle,
                 itemLabel:            input.itemLabel,
+                defectTitleSnapshot:  input.defectTitle ?? null,
+                locationSnapshot:     input.location ?? null,
+                categorySnapshot:     input.category ?? null,
                 commentSnapshot:      input.commentSnapshot ?? null,
                 requestedCreditCents: input.requestedCreditCents ?? null,
                 note:                 input.note ?? null,
@@ -189,6 +203,9 @@ export class RepairRequestService {
             findingKey: input.findingKey,
             sectionTitle: input.sectionTitle,
             itemLabel: input.itemLabel,
+            defectTitleSnapshot: input.defectTitle ?? null,
+            locationSnapshot: input.location ?? null,
+            categorySnapshot: input.category ?? null,
             commentSnapshot: input.commentSnapshot ?? null,
             requestedCreditCents: input.requestedCreditCents ?? null,
             note: input.note ?? null,

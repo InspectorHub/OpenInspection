@@ -12,8 +12,12 @@
  *
  * Baseline-ratchet model:
  *   Current hits are frozen in `scripts/tenant-scoping-baseline.json` (a sorted
- *   JSON array of "relative/path.ts:LINE" keys). Normal run: any NEW hit not in
- *   the baseline → print it and exit 1. Hits in the baseline pass silently.
+ *   JSON array of `relative/path.ts::symbol::signature` keys — the shared
+ *   symbol-keyed scheme from scripts/lib/symbol-baseline.mjs). The key anchors a
+ *   hit to its enclosing function, not a line number, so inserting an unrelated
+ *   line above a frozen hit no longer renumbers it into a false failure; the
+ *   `signature` keeps two hits in one function distinct. Normal run: any NEW hit
+ *   not in the baseline → print it and exit 1. Baselined hits pass silently.
  *   Stale baseline entries that no longer hit do NOT cause a failure (run
  *   `--update` to clean them out).
  *
@@ -34,9 +38,17 @@
  * rule is server-only).
  */
 
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import {
+  enclosingSymbol,
+  normalizeSignature,
+  makeKey,
+  diffBaseline,
+  loadBaseline,
+  writeBaseline,
+} from "./lib/symbol-baseline.mjs";
 
 export { findUnscopedByIdQueries };
 
@@ -144,7 +156,9 @@ function findUnscopedByIdQueries(source, tenantTables) {
       const lineStart = source.lastIndexOf("\n", start) + 1;
       const lineEnd = source.indexOf("\n", start);
       const context = source.slice(lineStart, lineEnd === -1 ? source.length : lineEnd).trim();
-      hits.push({ line, context });
+      // `index` (char offset of `.where(`) lets the gate anchor each hit to its
+      // enclosing symbol for a drift-immune baseline key.
+      hits.push({ line, context, index: start });
     }
     pos = start + 1; // advance past this `.where(` to find next
   }
@@ -181,36 +195,23 @@ if (_scriptPath === _argv1 || _argv1.endsWith("/check-tenant-scoping.mjs")) {
       const source = readFileSync(file, "utf8");
       const hits = findUnscopedByIdQueries(source, tenantTables);
       for (const hit of hits) {
-        const key = `${rel}:${hit.line}`;
+        const key = makeKey(rel, enclosingSymbol(source, hit.index), normalizeSignature(hit.context));
         currentHits.set(key, hit.context);
       }
     }
   }
 
   if (process.argv.includes("--update")) {
-    const sorted = [...currentHits.keys()].sort();
-    writeFileSync(BASELINE, JSON.stringify(sorted, null, 2) + "\n");
+    const count = writeBaseline(BASELINE, [...currentHits.keys()]);
     console.log(
       `Updated ${BASELINE.replace(ROOT + "\\", "").replace(ROOT + "/", "")}: ` +
-        `${sorted.length} baseline entries.`,
+        `${count} baseline entries.`,
     );
     process.exit(0);
   }
 
-  const baseline = new Set(
-    existsSync(BASELINE) ? JSON.parse(readFileSync(BASELINE, "utf8")) : [],
-  );
-
-  const violations = [];
-  for (const [key, context] of currentHits) {
-    if (!baseline.has(key)) {
-      const verb = detectVerb(context);
-      violations.push({ key, context, verb });
-    }
-  }
-
-  // Stale baseline keys (no longer hit) — informational only, not a failure.
-  const stale = [...baseline].filter((k) => !currentHits.has(k));
+  const baseline = loadBaseline(BASELINE);
+  const { violations, stale } = diffBaseline(currentHits, baseline);
 
   if (violations.length > 0) {
     console.error("\nTenant-scoping gate FAILED — new unscoped by-id queries detected:\n");
@@ -225,8 +226,9 @@ if (_scriptPath === _argv1 || _argv1.endsWith("/check-tenant-scoping.mjs")) {
         "        or truly global table), run `node scripts/check-tenant-scoping.mjs --update`\n" +
         "        after verifying each new entry — this freezes the new baseline.\n",
     );
-    for (const v of violations) {
-      console.error(`  [${v.verb}] ${v.key}  →  ${v.context.substring(0, 120)}`);
+    for (const key of violations) {
+      const context = currentHits.get(key);
+      console.error(`  [${detectVerb(context)}] ${key}\n      ${context.substring(0, 120)}`);
     }
     console.error(`\n${violations.length} violation(s).`);
     process.exit(1);

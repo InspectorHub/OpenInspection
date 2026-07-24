@@ -5,12 +5,12 @@ import { safeISODate } from '../../lib/date';
 import { resolveLocale } from '../../lib/locale';
 import { InvoiceService } from '../invoice.service';
 import { PeopleService } from '../people.service';
-import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import type { AgreementService } from '../agreement.service';
 import type { TemplateSchemaV2 } from '../../types/template-schema';
 import {
     fireAutomation,
+    resolvePublishTrigger,
     resolveRequireDefectFields,
     computePublishReadinessFromState,
     type RequireDefectFields,
@@ -184,9 +184,13 @@ export class InspectionPublishService extends InspectionSubService {
             actionUrl = `/invoice/${inspectionId}`;
             actionLabel = 'Pay invoice';
         } else {
+            // IA-45 — when no signer link can be reconstructed, fall back to the
+            // Hub overview (which now carries the lock reason + CTA inline), never
+            // to /report-gate: that route is retired and the old self-reference
+            // formed a closed loop (the page's own CTA pointed back at itself).
             actionUrl = agreementLinkToken
                 ? `/agreements/sign/${tenantSlug}/${agreementLinkToken}`
-                : `/report-gate/${tenantSlug}/${inspectionId}`;
+                : `/portal/${tenantSlug}/i/${inspectionId}?section=overview`;
             actionLabel = 'Sign agreement';
         }
 
@@ -408,7 +412,8 @@ export class InspectionPublishService extends InspectionSubService {
             .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
             .get();
         if (!inspection) throw Errors.NotFound('Inspection not found');
-        if (inspection.status !== INSPECTION_STATUS.COMPLETED) throw Errors.BadRequest('Inspection must be completed before publishing the report.');
+        // The order lifecycle does not gate delivery — a report can ship while
+        // the order is still scheduled. Content completeness: publishReadiness.
 
         await db.update(inspections)
             .set({ reportStatus: REPORT_STATUS.PUBLISHED })
@@ -417,8 +422,11 @@ export class InspectionPublishService extends InspectionSubService {
         // before the response goes out — the prior fire-and-forget pattern
         // dangled the promise so CF terminated the isolate before the insert
         // completed (and ditto for inspection.confirmed / cancelled / created
-        // below — all four paths now block on trigger).
-        await fireAutomation(this.db, tenantId, inspectionId, 'report.published');
+        // below — all four paths now block on trigger). First publish fires
+        // report.published; a re-publish (a prior version row exists) fires
+        // report.amended so the client gets a distinct amendment notice.
+        const reportTrigger = await resolvePublishTrigger(this.db, tenantId, inspectionId);
+        await fireAutomation(this.db, tenantId, inspectionId, reportTrigger);
 
         // Spec 5H D2 — auto-sign on publish: if the inspection has the flag
         // enabled AND the assigned inspector has a saved signature, inject

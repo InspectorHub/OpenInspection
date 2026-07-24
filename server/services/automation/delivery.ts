@@ -1,5 +1,5 @@
-import { eq, and, lte, ne } from 'drizzle-orm';
-import { automations, automationLogs, inspections, tenants, tenantConfigs, contacts, contactRoleProfiles, inspectionPeople } from '../../lib/db/schema';
+import { eq, and, lte, ne, desc } from 'drizzle-orm';
+import { automations, automationLogs, inspections, tenants, tenantConfigs, contacts, contactRoleProfiles, inspectionPeople, reportVersions } from '../../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
 import { resolveLocale } from '../../lib/locale';
@@ -173,6 +173,26 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
             // Declared once per flush() call; see report-email.ts:deliverReportEmail.
             const pdfMemo = new Map<string, Promise<ArrayBuffer | null>>();
 
+            // report.amended templates carry the re-publish change note
+            // ({{summary}}) from the latest report_versions row. Fetch once per
+            // inspection per flush; only amended emails need it, so the query is
+            // gated at the call site below (never runs for the common triggers).
+            const summaryMemo = new Map<string, Promise<string>>();
+            const latestSummary = (inspectionId: string, tenantId: string): Promise<string> => {
+                let p = summaryMemo.get(inspectionId);
+                if (!p) {
+                    p = db.select({ summary: reportVersions.summary })
+                        .from(reportVersions)
+                        .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, inspectionId)))
+                        .orderBy(desc(reportVersions.versionNumber))
+                        .limit(1)
+                        .get()
+                        .then(r => r?.summary ?? '');
+                    summaryMemo.set(inspectionId, p);
+                }
+                return p;
+            };
+
             for (const { log, automation, inspection, tenant } of pending) {
                 try {
                     const verdict = await this.evaluateConditions(db, automation, inspection);
@@ -218,7 +238,11 @@ export function AutomationDelivery<TBase extends Constructor<AutomationBase & Ha
                     const bodySource = tpl.body;
 
                     const vars: Record<string, string> = {
-                        ...buildBaseTemplateVars(inspection, tenant, appName, appHost),
+                        ...buildBaseTemplateVars(inspection, tenant, appName, appHost, {
+                            summary: automation.trigger === 'report.amended'
+                                ? await latestSummary(inspection.id, inspection.tenantId)
+                                : '',
+                        }),
                         inspector_name:   '',
                         invoice_url:      `${appBaseUrl}/invoices`,
                         payment_url:      `${appBaseUrl}/invoices`,

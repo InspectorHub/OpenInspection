@@ -13,7 +13,7 @@ import { computePreflightFromData } from '../../lib/preflight';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
 import { findingKey, DEFAULT_UNIT } from '../../lib/finding-key';
 import { parseReinspectionStatuses, isOpenStatus } from '../../lib/reinspection-status';
-import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
+import { INSPECTION_STATUS, type InspectionStatus } from '../../lib/status/inspection-status';
 import { REPORT_STATUS } from '../../lib/status/report-status';
 import { fireAutomation, type Inspection, type InspectionListParams, type CreateInspectionData } from './shared';
 import { InspectionSubService } from './base';
@@ -82,6 +82,20 @@ export class InspectionCoreService extends InspectionSubService {
      * to `tenantId`. Throws BadRequest for the first id that fails — preventing
      * cross-tenant contact/agent references from being persisted (D1 does not
      * enforce FK constraints at runtime, so this is the application-layer gate).
+     * IA-35 / IA-73 — the tenant's policy for whether agents may act on the
+     * repair request list (`off` / `read` / `readwrite`). Stored in the
+     * inspectionPrefs JSON; absent → `readwrite` (see the schema default).
+     */
+    async getAgentRepairAccess(tenantId: string): Promise<'off' | 'read' | 'readwrite'> {
+        const db = this.getDrizzle();
+        const row = await db.select({ prefs: tenantConfigs.inspectionPrefs })
+            .from(tenantConfigs)
+            .where(eq(tenantConfigs.tenantId, tenantId))
+            .get();
+        return row?.prefs?.agentRepairAccess ?? 'readwrite';
+    }
+
+    /**
      * Called in createInspection before the inspections insert.
      */
     private async assertContactsBelongToTenant(tenantId: string, ids: Array<string | null | undefined>) {
@@ -300,7 +314,7 @@ export class InspectionCoreService extends InspectionSubService {
                 clientName: primaryClient?.name ?? null,
                 clientEmail: primaryClient?.email ?? null,
                 clientPhone: primaryClient?.phone ?? null,
-                status: result.status as 'draft' | 'completed' | 'delivered',
+                status: result.status as InspectionStatus,
                 date: result.date as string,
                 inspectorId: result.inspectorId as string | null,
                 templateId: result.templateId as string | null,

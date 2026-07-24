@@ -1,0 +1,18 @@
+[
+  "app/components/editor/PublishModal.tsx::PublishModal::status !== \"completed\"",
+  "app/lib/dashboard-filters.ts::reportStateLabel::reportStatus === \"in_progress\"",
+  "app/lib/dashboard-filters.ts::reportStateLabel::reportStatus === \"published\"",
+  "app/lib/dashboard-filters.ts::reportStateLabel::reportStatus === \"submitted\"",
+  "app/routes/agent/dashboard.tsx::AgentDashboardPage::reportStatus === \"published\"",
+  "app/routes/inspection-hub.tsx::onDocDelete::reportStatus === 'in_progress'",
+  "app/routes/inspection-hub.tsx::onDocDelete::reportStatus === 'submitted'",
+  "server/api/inspections/publish.ts::renderBoth::reportStatus: 'in_progress'",
+  "server/api/inspections/publish.ts::renderBoth::reportStatus: 'submitted'",
+  "server/lib/google-calendar.ts::syncEventsToGcal::status === 'completed'",
+  "server/portal/outbox.service.ts::publishRow::status: 'published'",
+  "server/services/concierge.service.ts::approveByInspector::status: 'confirmed'",
+  "server/services/concierge.service.ts::createBooking::status: 'scheduled'",
+  "server/services/event.service.ts::createEvent::status: 'scheduled'",
+  "server/services/event.service.ts::updateEventStatus::status === 'cancelled'",
+  "server/services/event.service.ts::updateEventStatus::status === 'completed'"
+]

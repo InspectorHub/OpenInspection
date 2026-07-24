@@ -31,23 +31,20 @@ describe('isReportShipped', () => {
     });
 });
 
-describe('canPublish', () => {
-    it('completed + in_progress → true', () => {
-        expect(canPublish(hub({ inspection: { status: 'completed', reportStatus: 'in_progress' } }))).toBe(true);
+// canPublish reads the report axis and nothing else. The order lifecycle
+// (requested → … → completed) tracks the job, not the report, and the server
+// stopped gating publication on it — a UI gate here would only re-create the
+// mismatch where the hub hides an action the API would have accepted.
+describe('canPublish — report axis only', () => {
+    it('allows publishing from every point in the order lifecycle', () => {
+        for (const status of ['requested', 'scheduled', 'confirmed', 'completed', 'cancelled'] as const) {
+            expect(canPublish(hub({ inspection: { status, reportStatus: 'in_progress' } }))).toBe(true);
+        }
     });
-    it('completed + submitted → true (can still publish bypassing review)', () => {
-        expect(canPublish(hub({ inspection: { status: 'completed', reportStatus: 'submitted' } }))).toBe(true);
+    it('allows publishing a submitted report, bypassing review', () => {
+        expect(canPublish(hub({ inspection: { status: 'confirmed', reportStatus: 'submitted' } }))).toBe(true);
     });
-    it('completed + published → false (already published)', () => {
-        expect(canPublish(hub({ inspection: { status: 'completed', reportStatus: 'published' } }))).toBe(false);
-    });
-    it('requested + in_progress → false (not completed)', () => {
-        expect(canPublish(hub({ inspection: { status: 'requested', reportStatus: 'in_progress' } }))).toBe(false);
-    });
-    it('cancelled + in_progress → false (cancelled)', () => {
-        expect(canPublish(hub({ inspection: { status: 'cancelled', reportStatus: 'in_progress' } }))).toBe(false);
-    });
-    it('scheduled + in_progress → false (not completed)', () => {
-        expect(canPublish(hub({ inspection: { status: 'scheduled', reportStatus: 'in_progress' } }))).toBe(false);
+    it('does not offer publishing for an already published report', () => {
+        expect(canPublish(hub({ inspection: { status: 'confirmed', reportStatus: 'published' } }))).toBe(false);
     });
 });

@@ -8,6 +8,7 @@ vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
 import { AutomationService } from '../../../server/services/automation.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
+import { AUTOMATION_SEEDS } from '../../../server/data/automation-seeds';
 
 const TENANT = '00000000-0000-0000-0000-000000000001';
 let db: BetterSQLite3Database<typeof schema>;
@@ -48,5 +49,27 @@ describe('Track J seeds (#122)', () => {
         const review = await db.select().from(schema.automations)
             .where(and(eq(schema.automations.tenantId, TENANT), eq(schema.automations.name, 'Review request')));
         expect(review.length).toBe(1);
+    });
+});
+
+describe('report.amended seed (amendment notification)', () => {
+    it('seeds an active report.amended client rule', async () => {
+        await svc.ensureSeeds(TENANT);
+        const amended = await db.select().from(schema.automations)
+            .where(and(eq(schema.automations.tenantId, TENANT), eq(schema.automations.trigger, 'report.amended')));
+        // At least the client rule; buyer's-agent is also seeded.
+        const client = amended.find(a => a.name === 'Report Updated');
+        expect(client).toBeTruthy();
+        expect(client?.active).toBe(true);
+    });
+
+    it('the report.amended client seed body references the change {{summary}}', () => {
+        // The summary token is what distinguishes an amendment mail from the
+        // first "report ready" — assert it on the seed definition directly.
+        const client = AUTOMATION_SEEDS.find(
+            s => s.trigger === 'report.amended' && s.recipientRoleKey === 'client',
+        );
+        expect(client).toBeTruthy();
+        expect(client?.bodyTemplate).toContain('{{summary}}');
     });
 });

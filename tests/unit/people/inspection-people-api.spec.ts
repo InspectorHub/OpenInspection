@@ -37,7 +37,11 @@ function buildApp(userRole: string = 'owner') {
     app.use('*', async (c, next) => {
         c.set('userRole', userRole as HonoConfig['Variables']['userRole']);
         c.set('tenantId', TENANT_ID);
-        c.set('services', { people: new PeopleService({ DB: {} as D1Database } as unknown as { DB: D1Database }) } as unknown as HonoConfig['Variables']['services']);
+        c.set('services', {
+            people: new PeopleService({ DB: {} as D1Database } as unknown as { DB: D1Database }),
+            // IA-36 — removePerson now cascades to revoke the report link.
+            portalAccess: { revokeForRecipient: async () => undefined },
+        } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
     app.route('/api/inspections', peopleRoutes);

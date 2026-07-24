@@ -101,6 +101,8 @@ interface ItemEditorProps {
   *  lookup (keyed by name AND id), forwarded to CannedCommentTabs so every
   *  canned/custom defect chip renders the tenant's configured color. */
  categoryColor?: Map<string, string>;
+ /** IA-59 — tenant defect categories offered in the custom-defect dropdown. */
+ defectCategories?: Array<{ id: string; name: string }>;
  onItemAttribute?: (itemId: string, attributeId: string, value: string | number | boolean | null) => void;
  onCloneLast?: (scope: 'rating' | 'rating_notes' | 'all') => void;
  cloneDefaultScope?: 'rating' | 'rating_notes' | 'all';
@@ -167,6 +169,7 @@ export function ItemEditor({
  missingFields,
  requiredDefectFields,
  categoryColor,
+ defectCategories,
  onItemAttribute,
  onCloneLast,
  cloneDefaultScope,
@@ -555,6 +558,7 @@ export function ItemEditor({
  customTitle={customTitle}
  customComment={customComment}
  customCategory={customCategory}
+ customCategories={defectCategories}
  saveToLibrary={saveToLibrary}
  showSaveToLibrary={!!onSaveDefectToLibrary}
  onCustomTitleChange={setCustomTitle}

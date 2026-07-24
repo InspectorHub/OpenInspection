@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useLoaderData, Link } from "react-router";
 import type { Route } from "./+types/dashboard";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, Banner } from "@core/shared-ui";
+import { PageHeader, Banner, Select } from "@core/shared-ui";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useAgentTimeZoneOverride } from "~/routes/agent-layout";
 import { m } from "~/paraglide/messages";
@@ -68,6 +68,23 @@ function statusColor(s: string): string {
  return "bg-ih-bg-muted text-ih-fg-2";
 }
 
+// Property/transaction grouping key (IA-51): normalized address so casing and
+// whitespace variants of the same property collapse together; falls back to the
+// inspection id when a referral has no address yet (each such row is its own
+// group rather than all merging into one "No address" bucket).
+function propertyGroupKey(r: Referral): string {
+ const addr = r.propertyAddress?.trim().toLowerCase().replace(/\s+/g, " ");
+ return addr ? `addr:${addr}` : `insp:${r.id}`;
+}
+
+// Sortable timestamp for a referral's mixed date column (full ISO or
+// YYYY-MM-DD). Missing / unparseable dates sort last.
+function referralDateValue(date: string | null): number {
+ if (!date) return -Infinity;
+ const t = Date.parse(date);
+ return Number.isNaN(t) ? -Infinity : t;
+}
+
 export default function AgentDashboardPage() {
  const { referrals, unreadReports, welcomeInspectionId } = useLoaderData<typeof loader>();
  const [welcomeDismissed, setWelcomeDismissed] = useState(false);
@@ -92,19 +109,39 @@ export default function AgentDashboardPage() {
  ? referrals.find((r) => r.id === welcomeInspectionId) ?? null
  : null;
 
- // Group by tenant, pinning the just-converted referral to the top of its
- // group so "welcome" lands on something visible, not buried in the list.
- const grouped = new Map<string, Referral[]>();
- for (const r of referrals) {
- const existing = grouped.get(r.tenantName) || [];
- if (welcomeReferral && r.id === welcomeReferral.id) {
- existing.unshift(r);
- } else {
- existing.push(r);
+ // Company filter (SECONDARY). The inspection company is just one vendor on a
+ // deal, so it is a filter — not the top-level grouping (IA-51). Distinct
+ // companies drive both the dropdown and the "across N teams" stat.
+ const [companyFilter, setCompanyFilter] = useState<string>("");
+ const companies = useMemo(
+ () => Array.from(new Set(referrals.map((r) => r.tenantName))).sort((a, b) => a.localeCompare(b)),
+ [referrals],
+ );
+
+ // Group by PROPERTY / transaction, NOT by company (IA-51). An agent's unit of
+ // work is the deal, so the first-level heading is the address; two referrals at
+ // the same address from different companies collapse into one group of two rows
+ // rather than being split across company sections. An agent landing from a
+ // report email (context = one property) then finds that property at the top
+ // level instead of having to recall which company inspected it. Groups sort by
+ // most-recent inspection date; the just-converted ?welcome group is pinned
+ // first, with its row pinned within so "welcome" always lands on something
+ // visible.
+ const sections = useMemo(() => {
+ const visible = companyFilter ? referrals.filter((r) => r.tenantName === companyFilter) : referrals;
+ const groups = new Map<string, { label: string; rows: Referral[]; recency: number }>();
+ for (const r of visible) {
+ const key = propertyGroupKey(r);
+ const g = groups.get(key) || { label: r.propertyAddress?.trim() || m.agent_portal_no_address(), rows: [], recency: -Infinity };
+ if (welcomeReferral && r.id === welcomeReferral.id) g.rows.unshift(r);
+ else g.rows.push(r);
+ g.recency = Math.max(g.recency, referralDateValue(r.date));
+ groups.set(key, g);
  }
- grouped.set(r.tenantName, existing);
- }
- const sections = Array.from(grouped.entries());
+ return Array.from(groups.entries())
+ .map(([key, g]) => ({ key, ...g, isWelcome: !!welcomeReferral && g.rows.some((r) => r.id === welcomeReferral.id) }))
+ .sort((a, b) => (a.isWelcome ? -1 : b.isWelcome ? 1 : b.recency - a.recency));
+ }, [referrals, companyFilter, welcomeReferral]);
 
  return (
  <div className="space-y-6">
@@ -121,9 +158,9 @@ export default function AgentDashboardPage() {
  <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest mb-1">{m.agent_portal_dashboard_active_referrals()}</p>
  <p className="text-3xl font-bold text-ih-fg-1">{referrals.length}</p>
  <p className="text-[13px] text-ih-fg-3 mt-1">
- {sections.length === 1
- ? m.agent_portal_dashboard_across_team_one({ count: sections.length })
- : m.agent_portal_dashboard_across_team_other({ count: sections.length })}
+ {companies.length === 1
+ ? m.agent_portal_dashboard_across_team_one({ count: companies.length })
+ : m.agent_portal_dashboard_across_team_other({ count: companies.length })}
  </p>
  </div>
  <div className={`bg-ih-bg-card border border-ih-border rounded-xl p-5 ${unreadReports > 0 ? "border-ih-primary/40" : ""}`}>
@@ -137,7 +174,25 @@ export default function AgentDashboardPage() {
  </div>
  </div>
 
- {/* Referrals by tenant */}
+ {/* Company filter (secondary to the property grouping) — only when the
+ agent partners with more than one company, otherwise it is noise. */}
+ {companies.length > 1 && (
+ <div className="flex justify-end">
+ <Select
+ bare
+ aria-label={m.agent_portal_dashboard_filter_by_company()}
+ value={companyFilter}
+ onChange={(e) => setCompanyFilter(e.target.value)}
+ className="max-w-xs"
+ options={[
+ { value: "", label: m.agent_portal_dashboard_all_companies() },
+ ...companies.map((c) => ({ value: c, label: c })),
+ ]}
+ />
+ </div>
+ )}
+
+ {/* Referrals grouped by property/transaction */}
  {sections.length === 0 ? (
  <div className="bg-ih-bg-card border border-dashed border-ih-border-strong rounded-xl p-8 text-center">
  <h3 className="text-lg font-bold text-ih-fg-1 mb-2">{m.agent_portal_dashboard_empty_title()}</h3>
@@ -152,17 +207,17 @@ export default function AgentDashboardPage() {
  </Link>
  </div>
  ) : (
- sections.map(([tenantName, rows]) => (
- <div key={tenantName} className="bg-ih-bg-card border border-ih-border rounded-xl overflow-hidden">
+ sections.map((section) => (
+ <div key={section.key} className="bg-ih-bg-card border border-ih-border rounded-xl overflow-hidden">
  <div className="flex items-center gap-3 px-5 py-3 bg-ih-bg-app/30 border-b border-ih-border">
  <span className="w-1 h-6 rounded bg-ih-primary" />
- <span className="text-sm font-bold text-ih-fg-1">{tenantName}</span>
- <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest ml-auto">
- {rows.length} {rows.length === 1 ? m.agent_portal_dashboard_referral_one() : m.agent_portal_dashboard_referral_other()}
+ <span className="text-sm font-bold text-ih-fg-1 truncate">{section.label}</span>
+ <span className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest ml-auto shrink-0">
+ {section.rows.length} {section.rows.length === 1 ? m.agent_portal_dashboard_referral_one() : m.agent_portal_dashboard_referral_other()}
  </span>
  </div>
  <div className="divide-y divide-ih-border">
- {rows.map((r) => (
+ {section.rows.map((r) => (
  <div
  key={r.id}
  data-testid={`referral-row-${r.id}`}
@@ -171,7 +226,7 @@ export default function AgentDashboardPage() {
  >
  <div className="min-w-0 flex-1">
  <p className="text-[13px] font-semibold text-ih-fg-1 truncate">
- {r.propertyAddress || m.agent_portal_no_address()}
+ {r.tenantName}
  </p>
  <p className="text-[11px] text-ih-fg-3 mt-0.5">
  {r.clientName || m.agent_portal_dashboard_no_client()}{r.date ? ` · ${formatInspectionDateTime(r.date, undefined, agentTz || r.tenantTimezone)}` : ""}
