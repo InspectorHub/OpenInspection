@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { users, inspections, agreementRequests, agreements } from './db/schema';
 import { logger } from './logger';
 import { getBookingHost } from './url';
+import { envelopeVerifyUrl } from './agreement-verify-url';
 import type { HonoConfig } from '../types/hono';
 
 /**
@@ -185,7 +186,7 @@ async function buildSignedConfirmation(
         const host = c.req.header('host');
         return host ? `https://${host}` : '';
     })();
-    const verifyUrl = baseUrl ? `${baseUrl}/verify/${requestId}` : `/verify/${requestId}`;
+    const verifyUrl = envelopeVerifyUrl(baseUrl, requestId);
     const confirmationId = requestId.replace(/-/g, '').slice(0, 8).toUpperCase();
 
     let inspectorEmail: string | null = null;

@@ -193,3 +193,70 @@ describe("AgentDashboardPage welcome banner + highlight", () => {
     expect(row.textContent).not.toMatch(/EDT|PDT|PST|UTC|AM|PM/);
   });
 });
+
+describe("AgentDashboardPage property/transaction grouping (IA-51)", () => {
+  it("groups two same-address referrals from different companies into ONE section of two rows", async () => {
+    const { findByTestId, getAllByText, queryByText } = renderDashboard({
+      referrals: [
+        { ...REFERRAL_I1, id: "acme", tenantName: "Acme Inspections", propertyAddress: "123 Main St", date: "2026-07-18" },
+        // Same property, different company + casing/whitespace — must collapse.
+        { ...REFERRAL_I1, id: "best", tenantName: "Best Inspect", propertyAddress: "123  main st ", date: "2026-07-12" },
+      ],
+      welcomeInspectionId: "best",
+    });
+
+    // Both referrals render as rows inside one section...
+    const acme = await findByTestId("referral-row-acme");
+    const best = await findByTestId("referral-row-best");
+    // The address appears exactly once — as the single group header, NOT once
+    // per company section (the old behavior was two sections).
+    expect(getAllByText("123 Main St")).toHaveLength(1);
+    // ...and the company name is now inline row metadata, not the header.
+    expect(acme.textContent).toContain("Acme Inspections");
+    expect(best.textContent).toContain("Best Inspect");
+    // The ?welcome row stays highlighted even after the merge.
+    expect(best.getAttribute("data-welcome-highlight")).toBe("true");
+    // There is no company section header anymore.
+    expect(queryByText("Acme Inspections", { selector: "span.text-sm" })).toBeNull();
+  });
+
+  it("uses the property address as the section header and the company as an inline row label", async () => {
+    const { getByText, findByTestId } = renderDashboard({
+      referrals: [{ ...REFERRAL_I1, id: "one", tenantName: "Acme Inspections", propertyAddress: "789 Pine Rd" }],
+    });
+    // Row leads with the company (the vendor on this deal), demoted from header.
+    const row = await findByTestId("referral-row-one");
+    expect(row.textContent).toContain("Acme Inspections");
+    // Header = address.
+    expect(getByText("789 Pine Rd")).toBeTruthy();
+  });
+
+  it("filters referrals to a single company via the secondary company dropdown", async () => {
+    const { getByLabelText, findByTestId, queryByTestId } = renderDashboard({
+      referrals: [
+        { ...REFERRAL_I1, id: "acme", tenantName: "Acme Inspections", propertyAddress: "123 Main St" },
+        { ...REFERRAL_I2, id: "best", tenantName: "Best Inspect", propertyAddress: "456 Oak Ave" },
+      ],
+    });
+    // Both visible initially.
+    await findByTestId("referral-row-acme");
+    await findByTestId("referral-row-best");
+
+    const filter = getByLabelText("Filter referrals by company") as HTMLSelectElement;
+    fireEvent.change(filter, { target: { value: "Best Inspect" } });
+
+    expect(queryByTestId("referral-row-acme")).toBeNull();
+    expect(queryByTestId("referral-row-best")).toBeTruthy();
+  });
+
+  it("hides the company filter when the agent partners with only one company", async () => {
+    const { queryByLabelText, findByTestId } = renderDashboard({
+      referrals: [
+        { ...REFERRAL_I1, id: "a", tenantName: "Acme Inspections", propertyAddress: "1 A St" },
+        { ...REFERRAL_I2, id: "b", tenantName: "Acme Inspections", propertyAddress: "2 B St" },
+      ],
+    });
+    await findByTestId("referral-row-a");
+    expect(queryByLabelText("Filter referrals by company")).toBeNull();
+  });
+});

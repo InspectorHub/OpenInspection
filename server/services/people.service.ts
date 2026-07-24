@@ -61,7 +61,21 @@ export class PeopleService {
         }).onConflictDoNothing();
     }
 
-    async removePerson(tenantId: string, inspectionId: string, inspectionPersonId: string): Promise<void> {
+    async removePerson(tenantId: string, inspectionId: string, inspectionPersonId: string): Promise<{ email: string | null }> {
+        // Resolve the recipient email BEFORE the delete so the caller can revoke
+        // this person's report-access token (IA-36): removing someone from an
+        // inspection must stop their report link, which otherwise stays live
+        // forever. Returned rather than revoked here to keep PeopleService free
+        // of the portal-access dependency.
+        const row = await this.db.select({ email: contacts.email })
+            .from(inspectionPeople)
+            .innerJoin(contacts, eq(inspectionPeople.contactId, contacts.id))
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.inspectionId, inspectionId),
+                eq(inspectionPeople.id, inspectionPersonId),
+            ))
+            .get();
         // Scope the delete to the URL's inspection as well as the tenant — the
         // personId path segment is asserted to belong to `inspectionId`, so a
         // person row from a DIFFERENT inspection (same tenant) must not be
@@ -72,6 +86,7 @@ export class PeopleService {
                 eq(inspectionPeople.inspectionId, inspectionId),
                 eq(inspectionPeople.id, inspectionPersonId),
             ));
+        return { email: row?.email ?? null };
     }
 
     async listPeople(tenantId: string, inspectionId: string): Promise<PersonRow[]> {

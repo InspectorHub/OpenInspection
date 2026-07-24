@@ -5,33 +5,34 @@ const publishCaps = { publish: true };
 const noCaps = { publish: false };
 
 describe('reportActions', () => {
-  it('non-completed → []', () => {
-    expect(reportActions(publishCaps, 'in_progress', 'requested')).toEqual([]);
-    expect(reportActions(publishCaps, 'in_progress', 'scheduled')).toEqual([]);
-    expect(reportActions(publishCaps, 'in_progress', 'cancelled')).toEqual([]);
+  // The order lifecycle no longer gates report actions: the hub used to render
+  // nothing at all until the inspection was marked completed, which no surface
+  // could do, so the Report card was a dead end for every real inspection.
+  it('offers publish from every point in the order lifecycle', () => {
+    expect(reportActions(publishCaps, 'in_progress')).toEqual(['publish']);
   });
 
-  it('completed + published + publish cap → unpublish', () => {
-    expect(reportActions(publishCaps, 'published', 'completed')).toEqual(['unpublish']);
+  it('published + publish cap → unpublish', () => {
+    expect(reportActions(publishCaps, 'published')).toEqual(['unpublish']);
   });
 
-  it('completed + published + no cap → []', () => {
-    expect(reportActions(noCaps, 'published', 'completed')).toEqual([]);
+  it('published + no cap → []', () => {
+    expect(reportActions(noCaps, 'published')).toEqual([]);
   });
 
-  it('completed + submitted + publish cap → publish, return', () => {
-    expect(reportActions(publishCaps, 'submitted', 'completed')).toEqual(['publish', 'return']);
+  it('submitted + publish cap → publish, return', () => {
+    expect(reportActions(publishCaps, 'submitted')).toEqual(['publish', 'return']);
   });
 
-  it('completed + submitted + no cap → []', () => {
-    expect(reportActions(noCaps, 'submitted', 'completed')).toEqual([]);
+  it('submitted + no cap → []', () => {
+    expect(reportActions(noCaps, 'submitted')).toEqual([]);
   });
 
-  it('completed + in_progress + publish cap → publish', () => {
-    expect(reportActions(publishCaps, 'in_progress', 'completed')).toEqual(['publish']);
+  it('in_progress + publish cap → publish', () => {
+    expect(reportActions(publishCaps, 'in_progress')).toEqual(['publish']);
   });
 
-  it('completed + in_progress + no cap → submit', () => {
-    expect(reportActions(noCaps, 'in_progress', 'completed')).toEqual(['submit']);
+  it('in_progress + no cap → submit', () => {
+    expect(reportActions(noCaps, 'in_progress')).toEqual(['submit']);
   });
 });

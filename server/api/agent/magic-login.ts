@@ -73,6 +73,7 @@ export const agentMagicLoginRequestRoutes = createApiRouter()
             inspectionId: body.inspectionId,
             reportToken: body.token,
             coreBaseUrl: getBaseUrl(c),
+            ...(body.returnTo ? { returnTo: body.returnTo } : {}),
         });
         // EMAIL the single-use sign-in link to the agent's own account inbox —
         // never return it to the caller. The durable report link is a reusable
@@ -106,11 +107,23 @@ export const agentMagicLoginRequestRoutes = createApiRouter()
     });
 
 /** GET /agent/magic-login — mounted at the TOP LEVEL (not under /api); see workers/app.ts. */
+/**
+ * IA-47 — only honour a returnTo that is a same-origin relative path. We mint an
+ * agent session cookie immediately before this redirect, so an attacker-shaped
+ * absolute URL here would be an authenticated open redirect. Require a single
+ * leading slash and reject scheme-relative (`//`) and backslash tricks (`/\`).
+ */
+function safeReturnTo(returnTo: string | undefined): string | null {
+    if (!returnTo || !returnTo.startsWith('/')) return null;
+    if (returnTo.startsWith('//') || returnTo.startsWith('/\\')) return null;
+    return returnTo;
+}
+
 export const agentMagicLoginRedeemRoutes = createApiRouter()
     .openapi(redeemRoute, async (c) => {
         const { code } = c.req.valid('query');
         try {
-            const { userId, email } = await redeemMagicLogin(c.env.TENANT_CACHE, c.env.DB, code);
+            const { userId, email, returnTo } = await redeemMagicLogin(c.env.TENANT_CACHE, c.env.DB, code);
 
             // Agent JWT claim shape mirrors server/api/agent-signup.ts:101-108
             // EXACTLY — no tenantId/custom:tenantId. Agents are global users;
@@ -140,7 +153,9 @@ export const agentMagicLoginRedeemRoutes = createApiRouter()
             // same kind of tenant-less session with structured logging only.
             logger.info('agent.magic_login.redeemed', { userId });
 
-            return c.redirect('/agent-dashboard', 302);
+            // IA-47 — land the agent back on the report they were viewing when a
+            // safe returnTo was threaded through; otherwise the dashboard.
+            return c.redirect(safeReturnTo(returnTo) ?? '/agent-dashboard', 302);
         } catch (err) {
             logger.warn('agent.magic_login.redeem_failed', {
                 error: err instanceof Error ? err.message : String(err),

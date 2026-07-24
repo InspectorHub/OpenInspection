@@ -1,13 +1,13 @@
-// IA-26 — company-level embed variant: same widget, no inspector slug.
-// Bookings submit without inspectorId and the server auto-assigns the
-// first available qualified inspector.
+// Company-level embed: the only booking embed. Bookings submit without an
+// inspectorId and the server auto-assigns the first available qualified
+// inspector.
 
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/booking-embed-company";
 import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { readLegalLinks } from "~/lib/legal-links.server";
-import { EmbedWizard, type EmbedData } from "./booking-embed";
+import { EmbedWizard, type EmbedData } from "./booking-embed-widget";
 import { m } from "~/paraglide/messages";
 
 export function meta() {

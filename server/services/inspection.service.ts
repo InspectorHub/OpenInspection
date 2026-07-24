@@ -1,10 +1,10 @@
-import { type CoverCrop, type PhotoCrop } from '../lib/validations/inspection.schema';
-import { ScopedDB } from '../lib/db/scoped';
+import type { CoverCrop, PhotoCrop } from '../lib/validations/inspection.schema';
+import type { ScopedDB } from '../lib/db/scoped';
 import type { AgreementService } from './agreement.service';
-import { type ReportMediaContext } from '../lib/report-video';
-import { type ImagesBinding } from '../lib/media/strip-exif';
-import { type PdfSettings } from '../lib/pdf-settings';
-import { type DeviationInput } from '../lib/pca-deviations';
+import type { ReportMediaContext } from '../lib/report-video';
+import type { ImagesBinding } from '../lib/media/strip-exif';
+import type { PdfSettings } from '../lib/pdf-settings';
+import type { DeviationInput } from '../lib/pca-deviations';
 
 // Module-level types, constants, and pure helpers now live in
 // ./inspection/shared.ts (single source of truth shared by the facade + every
@@ -552,6 +552,11 @@ export class InspectionService {
      */
     async getRepairList(inspectionId: string, tenantId: string) {
         return this.analytics.getRepairList(inspectionId, tenantId);
+    }
+
+    /** IA-35 / IA-73 — tenant policy for agent access to the repair list. */
+    async getAgentRepairAccess(tenantId: string): Promise<'off' | 'read' | 'readwrite'> {
+        return this.core.getAgentRepairAccess(tenantId);
     }
 
     /**

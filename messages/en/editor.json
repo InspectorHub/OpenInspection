@@ -49,7 +49,7 @@
   "editor_canned_from_library": "From your library",
   "editor_canned_any_severity": "any severity",
   "editor_canned_tap_to_use": "tap to use as custom defect",
-  "editor_canned_custom_badge": "custom",
+  "editor_canned_custom_badge": "inspector-added",
   "editor_canned_add_custom": "+ Add custom defect",
   "editor_clone_scope_rating": "Rating only",
   "editor_clone_scope_rating_notes": "Rating + Notes",

@@ -97,6 +97,21 @@ export default function SettingsInspectionPage() {
             </section>
 
             <section>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_agent_repair_heading()}</h2>
+                <p className="text-[12px] text-ih-fg-3 mb-2">{m.settings_inspection_agent_repair_hint()}</p>
+                <RadioGroup
+                    name="agentRepairAccess"
+                    value={prefs.agentRepairAccess}
+                    onChange={v => patch({ agentRepairAccess: v as 'off' | 'read' | 'readwrite' })}
+                    options={[
+                        { value: 'off', label: m.settings_inspection_agent_repair_off() },
+                        { value: 'read', label: m.settings_inspection_agent_repair_read() },
+                        { value: 'readwrite', label: m.settings_inspection_agent_repair_readwrite() },
+                    ]}
+                />
+            </section>
+
+            <section>
                 <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_pinned_heading({ count: prefs.pinnedTagIds.length })}</h2>
                 <p className="text-[12px] text-ih-fg-3 mb-3">{m.settings_inspection_pinned_help()}</p>
                 <ul className="space-y-1">

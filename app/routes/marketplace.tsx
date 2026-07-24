@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { useLoaderData } from "react-router";
+import { useEffect, useState } from "react";
+import { useFetcher, useLoaderData, useNavigate } from "react-router";
 import type { Route } from "./+types/marketplace";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination } from "@core/shared-ui";
+import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination, Banner } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
 import { m } from "~/paraglide/messages";
@@ -52,6 +52,26 @@ export default function MarketplacePage() {
   const [activeTab, setActiveTab] = useState("all");
   const { setPage, setPageSize } = usePagination();
 
+  // IA-39 — Install now actually installs. One fetcher; the submitting card is
+  // tracked so only its button shows the pending state. On success we jump to
+  // the freshly imported template in the library.
+  const navigate = useNavigate();
+  const installFetcher = useFetcher<{ ok: boolean; localTemplateId?: string | null; error?: string }>();
+  const [installingId, setInstallingId] = useState<string | null>(null);
+
+  function handleInstall(id: string) {
+    setInstallingId(id);
+    installFetcher.submit({ templateId: id }, { method: "post", action: "/resources/marketplace-install" });
+  }
+
+  useEffect(() => {
+    if (installFetcher.state !== "idle" || !installFetcher.data) return;
+    if (installFetcher.data.ok && installFetcher.data.localTemplateId) {
+      navigate(`/library/templates?imported=${installFetcher.data.localTemplateId}`);
+    }
+    setInstallingId(null);
+  }, [installFetcher.state, installFetcher.data, navigate]);
+
   return (
     <div className="space-y-ih-list">
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.marketplace_heading() }]} />
@@ -61,6 +81,12 @@ export default function MarketplacePage() {
       />
 
       <TabStrip tabs={getTabs()} activeId={activeTab} onChange={setActiveTab} />
+
+      {installFetcher.data && installFetcher.data.ok === false && (
+        <div className="mt-3">
+          <Banner tone="danger">{m.marketplace_install_error()}</Banner>
+        </div>
+      )}
 
       {templates.length === 0 ? (
         <Card>
@@ -89,7 +115,14 @@ export default function MarketplacePage() {
                       <span className="text-[11px] text-ih-fg-4">{t.author}</span>
                     )}
                   </div>
-                  <Button variant="primary" size="sm">{m.marketplace_install()}</Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleInstall(t.id)}
+                    disabled={installFetcher.state !== "idle"}
+                  >
+                    {installingId === t.id ? m.marketplace_installing() : m.marketplace_install()}
+                  </Button>
                 </div>
               </Card>
               );

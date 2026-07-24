@@ -16,23 +16,13 @@ function joinUrl(host: string, path: string): string {
     return `${scheme(host)}://${host}${path}`;
 }
 
-export function bookingUrl(host: string, tenantSlug: string, inspectorSlug: string): string {
-    return joinUrl(host, `/book/${tenantSlug}/${inspectorSlug}`);
-}
+// The company booking page is the only public booking URL form. Per-inspector
+// deep links (`/book/<tenant>/<slug>` and `/embed/<tenant>/<slug>`) are retired;
+// inspector-shared links point at the company page and the server auto-assigns.
 
-/** Company-level embed — no inspector slug required (Task 10 / IA-26). */
+/** Company-level embed — no inspector slug required. */
 export function embedBookingCompanyUrl(host: string, tenantSlug: string): string {
     return joinUrl(host, `/embed/${tenantSlug}`);
-}
-
-/**
- * Per-inspector embed deep link.
- * @deprecated the old path `/embed/book/<tenant>/<slug>` never existed.
- * The real route is `/embed/:tenant/:slug`. Kept for referential use;
- * prefer embedBookingCompanyUrl for new surfaces.
- */
-export function embedBookingUrl(host: string, tenantSlug: string, inspectorSlug: string): string {
-    return joinUrl(host, `/embed/${tenantSlug}/${inspectorSlug}`);
 }
 
 export function reportUrl(host: string, tenantSlug: string, inspectionId: string): string {

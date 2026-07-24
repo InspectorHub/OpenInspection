@@ -84,6 +84,8 @@ export function makeServices(overrides: {
     creditTotal?: ReturnType<typeof vi.fn>;
     assertCanEdit?: ReturnType<typeof vi.fn>;
     accessToInspection?: ReturnType<typeof vi.fn>;
+    portalAccessGetRoleKind?: ReturnType<typeof vi.fn>;
+    getAgentRepairAccess?: ReturnType<typeof vi.fn>;
 } = {}) {
     const defaultPortalToken = vi.fn().mockResolvedValue(null);
     const defaultAgent = vi.fn().mockResolvedValue(null);
@@ -93,10 +95,15 @@ export function makeServices(overrides: {
     return {
         portalAccess: {
             resolveToken: overrides.portalAccessResolveToken ?? defaultPortalToken,
+            // Default matches VALID_TOKEN_ROW.role ('client') so existing specs
+            // keep resolving a client creator.
+            getRoleKind: overrides.portalAccessGetRoleKind ?? vi.fn().mockResolvedValue('client'),
         },
         inspection: {
             resolveAgentViewToken: overrides.resolveAgentViewToken ?? defaultAgent,
             getRepairList:         overrides.getRepairList ?? defaultRepairList,
+            // IA-35 / IA-73 — tenant agent-repair policy; default readwrite.
+            getAgentRepairAccess:  overrides.getAgentRepairAccess ?? vi.fn().mockResolvedValue('readwrite'),
         },
         agent: {
             accessToInspection: overrides.accessToInspection ?? vi.fn().mockResolvedValue(null),

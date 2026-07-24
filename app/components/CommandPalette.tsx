@@ -1,7 +1,19 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from "react";
 import { useNavigate, useFetcher } from "react-router";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
+
+/**
+ * Lets any workspace surface (the sidebar search button, MobileHeader) open the
+ * command palette. The provider (auth-layout) owns the open state; consumers
+ * call `openPalette()`. Default is a no-op so a stray consumer outside the
+ * provider fails silently rather than throwing.
+ */
+const CommandPaletteContext = createContext<{ openPalette: () => void }>({ openPalette: () => {} });
+export function useCommandPalette() {
+  return useContext(CommandPaletteContext);
+}
+export const CommandPaletteProvider = CommandPaletteContext.Provider;
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -20,6 +32,14 @@ interface PaletteItem {
 /* ------------------------------------------------------------------ */
 /*  Static sources                                                     */
 /* ------------------------------------------------------------------ */
+
+// Recents is the one unbounded group (a busy workspace has hundreds of
+// inspections), so it is capped at its source. The static navigation groups
+// (Pages, Settings) are bounded lists and must render in full — see the
+// `groups` memo, which deliberately does NOT re-truncate per group (#IA-50:
+// the old blanket `< 8` cap silently hid 6 of the 14 Settings destinations
+// whenever the palette was browsed without a filter word).
+const RECENTS_CAP = 8;
 
 // Built as thunks (not module-level consts) so the Paraglide `m.*()` labels
 // resolve inside the per-request locale scope instead of freezing at import.
@@ -50,8 +70,10 @@ function getSettings(): PaletteItem[] {
     { id: "s-theme", label: m.command_palette_settings_theme(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/workspace" },
     { id: "s-services", label: m.command_palette_settings_services(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/services" },
     { id: "s-email", label: m.command_palette_settings_email(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/communication" },
+    { id: "s-email-templates", label: m.command_palette_settings_email_templates(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/communication/templates" },
     { id: "s-automations", label: m.command_palette_settings_automations(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/automations" },
     { id: "s-integrations", label: m.command_palette_settings_integrations(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/integrations" },
+    { id: "s-qbo", label: m.command_palette_settings_qbo(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/integrations/qbo" },
     { id: "s-password", label: m.command_palette_settings_password(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/security" },
     { id: "s-2fa", label: m.command_palette_settings_2fa(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/security" },
     { id: "s-account", label: m.command_palette_settings_account(), group: m.command_palette_group_settings(), icon: "gear", to: "/settings/security" },
@@ -135,8 +157,20 @@ function PaletteIcon({ type }: { type: string }) {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export function CommandPalette({ onNewInspection }: { onNewInspection?: () => void }) {
-  const [open, setOpen] = useState(false);
+export function CommandPalette({
+  open,
+  onOpenChange,
+  onNewInspection,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onNewInspection?: () => void;
+}) {
+  const setOpen = onOpenChange;
+  // The Cmd/Ctrl+K listener registers once (empty deps) but must toggle the
+  // CURRENT open state — read it through a ref so the closure never goes stale.
+  const openRef = useRef(open);
+  openRef.current = open;
   const [query, setQuery] = useState("");
   const [activeIdx, setActiveIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -150,8 +184,11 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     const slug = sessionCtx?.branding?.currentUserSlug;
     const host = sessionCtx?.branding?.bookingHost;
     const tenant = sessionCtx?.branding?.tenantSlug;
+    // Per-inspector booking deep links are retired: bookings go to the
+    // company page and the server auto-assigns. `slug` still gates the action
+    // to bookable inspectors, but the copied link is the company URL.
     if (slug && host && tenant) {
-      const bookingUrl = `https://${host}/book/${tenant}/${slug}`;
+      const bookingUrl = `https://${host}/book/${tenant}`;
       actions.push({
         id: "qa-copy-booking-link",
         label: m.command_palette_action_copy_booking_link(),
@@ -171,7 +208,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setOpen((prev) => !prev);
+        setOpen(!openRef.current);
         setQuery("");
         setActiveIdx(0);
       }
@@ -179,7 +216,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [setOpen]);
 
   // Focus input when opened; lazy-load recent inspections via BFF resource route
   useEffect(() => {
@@ -205,7 +242,7 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
     } else if (isPeople) {
       sources = []; // contacts would need a search endpoint
     } else {
-      const recents: PaletteItem[] = (recentsFetcher.data?.inspections ?? []).map((insp, i) => {
+      const recents: PaletteItem[] = (recentsFetcher.data?.inspections ?? []).slice(0, RECENTS_CAP).map((insp, i) => {
         const addr = [insp.address1, insp.city, insp.state].filter(Boolean).join(", ") || m.command_palette_recent_fallback({ id: String(insp.id || "").slice(0, 6) });
         return {
           id: `ri-${i}`,
@@ -227,12 +264,15 @@ export function CommandPalette({ onNewInspection }: { onNewInspection?: () => vo
       .map((x) => x.item);
   }, [query, recentsFetcher.data]);
 
-  // Group the filtered results
+  // Group the filtered results. No per-group truncation: every source group is
+  // already bounded (Pages/Settings are fixed lists; Recents is sliced to
+  // RECENTS_CAP at its source; quick actions are few). A blanket cap here only
+  // hid reachable-nowhere-else destinations (#IA-50).
   const groups = useMemo(() => {
     const map = new Map<string, PaletteItem[]>();
     for (const a of allItems) {
       const list = map.get(a.group) || [];
-      if (list.length < 8) list.push(a);
+      list.push(a);
       map.set(a.group, list);
     }
     return map;

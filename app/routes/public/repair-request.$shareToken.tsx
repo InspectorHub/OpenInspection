@@ -16,6 +16,10 @@ export function meta() {
 interface ShareItem {
   sectionTitle: string;
   itemLabel: string;
+  // IA-55 — snapshots so the shared list is distinguishable, locatable, tagged.
+  defectTitleSnapshot?: string | null;
+  locationSnapshot?: string | null;
+  categorySnapshot?: string | null;
   commentSnapshot: string | null;
   requestedCreditCents: number | null;
   note: string | null;
@@ -32,6 +36,9 @@ interface ShareApiData {
 export interface ShareViewRow {
   sectionTitle: string;
   itemLabel: string;
+  defectTitle: string | null;
+  location: string | null;
+  category: string | null;
   comment: string;
   note: string | null;
   creditDisplay: string;
@@ -53,6 +60,9 @@ export function shareViewModel(data: ShareApiData): ShareViewModel {
   const rows: ShareViewRow[] = items.map((item) => ({
     sectionTitle: item.sectionTitle,
     itemLabel: item.itemLabel,
+    defectTitle: item.defectTitleSnapshot ?? null,
+    location: item.locationSnapshot ?? null,
+    category: item.categorySnapshot ?? null,
     comment: item.commentSnapshot ?? "",
     note: item.note ?? null,
     creditDisplay:
@@ -67,6 +77,18 @@ export function shareViewModel(data: ShareApiData): ShareViewModel {
     creditTotalDisplay: formatCents(data.creditTotal ?? 0),
     rows,
   };
+}
+
+/** IA-55/IA-60 — localize the built-in category snapshot; a tenant custom
+ *  category snapshot (rare) falls back to its stored value. Resolved at call
+ *  time for the paraglide locale scope. */
+function sharePriorityLabel(category: string): string {
+  switch (category) {
+    case "safety": return m.portal_repair_category_safety();
+    case "recommendation": return m.portal_repair_category_recommendation();
+    case "maintenance": return m.portal_repair_category_maintenance();
+    default: return category;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -173,24 +195,44 @@ export default function RepairRequestSharePage() {
       ) : (
         <div className="rounded-lg border border-ih-border overflow-hidden mb-8">
           {/* Table header */}
-          <div className="grid grid-cols-[1fr_1fr_2fr_1fr_auto] gap-0 bg-ih-bg-muted border-b border-ih-border px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-4">
+          <div className="grid grid-cols-[1fr_1fr_2fr_auto_1fr_auto] gap-0 bg-ih-bg-muted border-b border-ih-border px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] text-ih-fg-4">
             <span>{m.repair_request_col_section()}</span>
             <span>{m.repair_request_col_item()}</span>
             <span>{m.repair_request_col_finding()}</span>
+            <span>{m.repair_request_col_priority()}</span>
             <span>{m.repair_request_col_note()}</span>
             <span className="text-right min-w-[80px]">{m.repair_request_col_credit()}</span>
           </div>
-          {/* Rows */}
+          {/* Rows — IA-55: the Finding cell now leads with the defect's own
+              title + location so two defects on one item are distinguishable
+              and locatable; Priority surfaces the category the client sorted by. */}
           {vm.rows.map((row, i) => (
             <div
               key={i}
-              className={`grid grid-cols-[1fr_1fr_2fr_1fr_auto] gap-0 px-4 py-3 text-[13px] ${
+              className={`grid grid-cols-[1fr_1fr_2fr_auto_1fr_auto] gap-0 px-4 py-3 text-[13px] ${
                 i < vm.rows.length - 1 ? "border-b border-ih-border" : ""
               }`}
             >
               <span className="text-ih-fg-3 pr-3">{row.sectionTitle}</span>
               <span className="text-ih-fg-1 font-medium pr-3">{row.itemLabel}</span>
-              <span className="text-ih-fg-2 pr-3 leading-snug">{row.comment}</span>
+              <span className="pr-3 leading-snug">
+                {row.defectTitle && (
+                  <span className="block font-semibold text-ih-fg-1">{row.defectTitle}</span>
+                )}
+                {row.location && (
+                  <span className="block text-[11px] text-ih-fg-4">
+                    {m.repair_request_col_location_prefix()} {row.location}
+                  </span>
+                )}
+                {row.comment && <span className="block text-ih-fg-2">{row.comment}</span>}
+              </span>
+              <span className="pr-3">
+                {row.category && (
+                  <span className="inline-flex items-center h-5 px-2 rounded bg-ih-bg-muted text-ih-fg-3 text-[10px] font-bold uppercase tracking-wider">
+                    {sharePriorityLabel(row.category)}
+                  </span>
+                )}
+              </span>
               <span className="text-ih-fg-3 pr-3 leading-snug">{row.note ?? ""}</span>
               <span className="text-right font-mono tabular-nums text-ih-fg-1 min-w-[80px]">
                 {row.creditDisplay}

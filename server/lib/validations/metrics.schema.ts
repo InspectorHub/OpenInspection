@@ -18,6 +18,14 @@ const TopAgentSchema = z.object({
     revenue:   z.number().describe('TODO describe revenue field for the OpenInspection MCP integration'),
 });
 
+const ByInspectorSchema = z.object({
+    inspectorId:       z.string().nullable().describe('User id of the lead (or fallback) inspector for this row.'),
+    inspectorName:     z.string().describe('Display name of the inspector, falling back to id then Unknown.'),
+    count:             z.number().describe('Number of inspections attributed to this inspector in the period.'),
+    revenue:           z.number().describe('Summed inspection price attributed to this inspector.'),
+    avgTurnaroundDays: z.number().nullable().describe('Average days from inspection date to first publish; null when none published.'),
+});
+
 const ServiceDistributionSchema = z.object({
     serviceName: z.string().describe('TODO describe serviceName field for the OpenInspection MCP integration'),
     count:       z.number().describe('TODO describe count field for the OpenInspection MCP integration'),
@@ -31,6 +39,7 @@ const MetricsResponseSchema = z.object({
     avgOrderValue:    z.number().describe('TODO describe avgOrderValue field for the OpenInspection MCP integration'),
     monthly:          z.array(MonthlyDataSchema).describe('TODO describe monthly field for the OpenInspection MCP integration'),
     topAgents:        z.array(TopAgentSchema).describe('TODO describe topAgents field for the OpenInspection MCP integration'),
+    byInspector:      z.array(ByInspectorSchema).describe('Per-inspector productivity: count, revenue, and average turnaround days.'),
     serviceBreakdown: z.array(ServiceDistributionSchema).describe('TODO describe serviceBreakdown field for the OpenInspection MCP integration'),
     paymentSummary: z.object({
         paid:    z.number().describe('TODO describe paid field for the OpenInspection MCP integration'),

@@ -217,9 +217,13 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
             .where(eq(schema.agreementRequests.id, requestId)).get();
         expect(env!.status).not.toBe('signed');
         expect(workflowCreate).not.toHaveBeenCalled();
-        // No completion side-effects until the envelope completes.
+        // No ENVELOPE-completion side-effects until the envelope completes.
         expect(notificationCreate).not.toHaveBeenCalled();
-        expect(emailConfirm).not.toHaveBeenCalled();
+        // IA-46 — but the remote signer still gets their own per-signer receipt
+        // (with the verify link) at their own email the moment they sign.
+        expect(emailConfirm).toHaveBeenCalledTimes(1);
+        expect(emailConfirm.mock.calls[0][0]).toBe('jane@test.com');
+        expect(emailConfirm.mock.calls[0][4]).toBe(`https://example.test/verify/${requestId}`);
 
         const ec2 = makeExecCtx();
         const r2 = await app.request(`/agreements/${token2}/sign`, signReq({ signatureBase64: SIG }), FAKE_ENV, ec2.ctx);
@@ -243,9 +247,17 @@ describe('public agreement routes — per-signer (Track I-a)', () => {
                 title: 'Agreement signed — Standard Agreement',
             }),
         );
-        // Confirmation email goes to the envelope's client email (first arg).
-        expect(emailConfirm).toHaveBeenCalledTimes(1);
-        expect(emailConfirm.mock.calls[0][0]).toBe('jane@test.com');
+        // IA-46 — three emails total across both signs: signer-1 receipt (jane),
+        // the envelope-completion email (jane, the client), and signer-2's own
+        // receipt (john). John is a remote co-signer who previously got NOTHING.
+        const recipients = emailConfirm.mock.calls.map((call) => call[0]);
+        expect(recipients.filter((r) => r === 'jane@test.com')).toHaveLength(2);
+        expect(recipients.filter((r) => r === 'john@test.com')).toHaveLength(1);
+        // Every delivered link is the human /verify page, never the JSON API.
+        for (const call of emailConfirm.mock.calls) {
+            expect(call[4]).toBe(`https://example.test/verify/${requestId}`);
+            expect(call[4]).not.toContain('/api/');
+        }
     });
 
     it('idempotent re-sign: POST same signer token twice -> 200 both times, workflow created EXACTLY once, no second notification', async () => {

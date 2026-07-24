@@ -105,7 +105,11 @@ describe('listRecommendationsForAgent — buyer_agent via inspection_people (Tas
             }],
         }],
     };
-    const resultsData = { item1: { defects: [{ cannedId: 'd1', included: true }] } };
+    // Canonical storage shape: composite findingKey + `.tabs.defects` — exactly
+    // what the editor writes. The prior fixture used a bare itemId with a
+    // top-level `.defects`, a shape the UI never produces; that made this test a
+    // false green over the IA-31 read bug (page empty for every real agent).
+    const resultsData = { '_default:sec1:item1': { tabs: { defects: [{ cannedId: 'd1', included: true }] } } };
 
     it('legacy referredByAgentId NULL, buyer_agent inspection_people row present — surfaces the recommendation', async () => {
         await db.insert(schema.inspections).values({

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useRevalidator } from "react-router";
+import { INSPECTION_STATUS } from "~/lib/status";
 import { findRatingLevel, ratingAdvanceDecision } from "~/lib/rating-levels";
 import { makeCustomDefect } from "~/lib/custom-defects";
 import { useInspectionState, type InspectionSchema, type ItemFilter } from "~/hooks/useInspection";
@@ -159,6 +160,9 @@ export default function InspectionEditPage() {
  // message is surfaced inline in the publish modal instead.
  const publishFetcher = useFetcher<{ ok: boolean; intent?: string; error?: string }>();
  const [publishError, setPublishError] = useState<string | null>(null);
+ // Order-lifecycle "Finish fieldwork" — its own fetcher so marking the on-site
+ // work complete never contends with an in-flight autosave or publish.
+ const completeFetcher = useFetcher<{ ok: boolean; intent?: string }>();
  // Commercial PCA Phase S — narrative editor panel. Own fetcher (mirrors the
  // notes/upload isolation reasoning above) so a per-block blur save cannot be
  // aborted by an unrelated in-flight mutation. Dispatches the "save-pca-narrative"
@@ -668,6 +672,11 @@ export default function InspectionEditPage() {
   state.setShowPublishModal(true);
  }, [state.inspection.id, state.setShowPublishModal]);
 
+ /* Finish fieldwork — advisory order-lifecycle move (never a publish gate). */
+ const handleFinishFieldwork = useCallback(() => {
+  completeFetcher.submit({ intent: "complete" }, { method: "post" });
+ }, [completeFetcher]);
+
  /* ---------------------------------------------------------------- */
  /* Item attribute handler */
  /* ---------------------------------------------------------------- */
@@ -884,6 +893,18 @@ export default function InspectionEditPage() {
  setPublishError(data.error ?? "Couldn't publish the report. Please try again.");
  }
  }, [publishFetcher.state, publishFetcher.data, state.setShowPublishModal, revalidator]);
+
+ /* Finish-fieldwork result — the editor's inspection copy is frozen at mount
+  * (see useInspectionState), so revalidation alone leaves the header badge and
+  * the toolbar button stale. Patch status locally the same way structural edits
+  * do, then revalidate for anything loader-derived. */
+ useEffect(() => {
+ if (completeFetcher.state !== "idle" || !completeFetcher.data) return;
+ if (completeFetcher.data.ok) {
+ state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED }));
+ revalidator.revalidate();
+ }
+ }, [completeFetcher.state, completeFetcher.data, revalidator, state]);
 
  /* ---------------------------------------------------------------- */
  /* Rating handler with auto-advance */
@@ -1547,6 +1568,7 @@ export default function InspectionEditPage() {
  missingFields={missingFields}
  requiredDefectFields={requiredDefectFields}
  categoryColor={catColor}
+ defectCategories={loaderData.defectCategories}
  onDefectFields={(cannedId, patch) => {
  if (state.activeItemId && state.currentSection) {
  findings.setDefectFields(
@@ -2015,11 +2037,19 @@ export default function InspectionEditPage() {
  publishError={publishError}
  isSubmitting={publishFetcher.state !== "idle"}
  onClose={() => { setPublishError(null); state.setShowPublishModal(false); }}
- onPublish={() => {
+ onPublish={(markComplete: boolean) => {
  // Keep the modal open: the publish-result effect closes it on success
- // and shows the real server reason inline on failure.
+ // and shows the real server reason inline on failure. `markComplete`
+ // also closes the order axis first (advisory — never blocks publish);
+ // patch status locally so the badge reflects it without a reload.
  setPublishError(null);
- publishFetcher.submit({ intent: "publish" }, { method: "post" });
+ if (markComplete) {
+ state.setInspection((prev) => ({ ...prev, status: INSPECTION_STATUS.COMPLETED }));
+ }
+ publishFetcher.submit(
+ markComplete ? { intent: "publish", markComplete: "true" } : { intent: "publish" },
+ { method: "post" },
+ );
  }}
  autoSign={autoSign}
  onAutoSignToggle={handleAutoSignToggle}
@@ -2129,6 +2159,8 @@ export default function InspectionEditPage() {
  tenantSlug={loaderData.tenantSlug}
  setSignModalOpen={setSignModalOpen}
  handlePublishClick={handlePublishClick}
+ handleFinishFieldwork={handleFinishFieldwork}
+ finishingFieldwork={completeFetcher.state !== "idle"}
  collabEditing={loaderData.collabEditing}
  onOpenVersionHistory={() => setVersionHistoryOpen(true)}
  onChangeTemplate={() => state.setSettingsOpen(true)}

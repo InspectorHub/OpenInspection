@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { Table, Icon } from "@core/shared-ui";
 import { TemplateIcon } from "./TemplateIcon";
 import { countItems, type Template } from "./types";
+import { EntityAuditTrail } from "~/components/audit/EntityAuditTrail";
 import { m } from "~/paraglide/messages";
 
 interface TemplatesListViewProps {
@@ -76,6 +77,7 @@ export function TemplatesListView({
                   {t.description && (
                     <p className="text-[11px] text-ih-fg-4 mt-0.5 line-clamp-1">{t.description}</p>
                   )}
+                  <EntityAuditTrail entityId={t.id} />
                 </div>
               </div>
             ),

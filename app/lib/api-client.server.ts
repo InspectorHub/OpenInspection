@@ -41,6 +41,7 @@ import type {
     MessageTemplatesApi,
     MessagesApi,
     MetricsApi,
+    AuditApi,
     NotificationsApi,
     PlacesApi,
     PortalApi,
@@ -164,6 +165,7 @@ export interface Api {
     messageTemplates:   ReturnType<typeof hc<MessageTemplatesApi>>;
     messages:           ReturnType<typeof hc<MessagesApi>>;
     metrics:            ReturnType<typeof hc<MetricsApi>>;
+    audit:              ReturnType<typeof hc<AuditApi>>;
     notifications:      ReturnType<typeof hc<NotificationsApi>>;
     places:             ReturnType<typeof hc<PlacesApi>>;
     portal:             ReturnType<typeof hc<PortalApi>>;
@@ -237,6 +239,7 @@ const MOUNT: Record<keyof Api, string> = {
     messageTemplates:   "/api/message-templates",
     messages:           "/api/messages",
     metrics:            "/api/metrics",
+    audit:              "/api/audit",
     notifications:      "/api/notifications",
     places:             "/api/places",
     portal:             "/api/portal",
@@ -328,6 +331,7 @@ export function createApi(context: AppLoadContext, opts: CreateApiOptions = {}):
         messageTemplates:   mk<MessageTemplatesApi>(MOUNT.messageTemplates),
         messages:           mk<MessagesApi>(MOUNT.messages),
         metrics:            mk<MetricsApi>(MOUNT.metrics),
+        audit:              mk<AuditApi>(MOUNT.audit),
         notifications:      mk<NotificationsApi>(MOUNT.notifications),
         places:             mk<PlacesApi>(MOUNT.places),
         portal:             mk<PortalApi>(MOUNT.portal),

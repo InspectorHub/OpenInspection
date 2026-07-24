@@ -66,6 +66,14 @@ export default defineConfig({
             name: 'inspection-hub',
             testMatch: 'inspection-hub.spec.ts',
         },
+        {
+            // IA-29 / IA-30 — publishing is decoupled from order completion.
+            // Self-seeds its own inspection (mutates order state), so it depends
+            // on `api` for the admin workspace, not the shared editor-seed.
+            name: 'lifecycle-publish',
+            testMatch: 'inspection-lifecycle-publish.spec.ts',
+            dependencies: ['api'],
+        },
         // ...all projects previously in playwright.api.config.ts, verbatim
         // (the `api` initializer project is declared first, above):
         {

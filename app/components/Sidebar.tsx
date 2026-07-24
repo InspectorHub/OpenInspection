@@ -6,6 +6,7 @@ import { IC, WORKSPACE_ITEMS } from "~/components/sidebar/nav-items";
 import { SidebarGroup } from "~/components/sidebar/SidebarGroup";
 import { UserMenuPopover } from "~/components/sidebar/UserMenuPopover";
 import { MobileHeader } from "~/components/sidebar/MobileHeader";
+import { useCommandPalette } from "~/components/CommandPalette";
 import { Avatar } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -22,6 +23,7 @@ export function Sidebar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const ctx = useSessionContext();
+  const { openPalette } = useCommandPalette();
 
   const companyName = ctx?.branding?.companyName || "OpenInspection";
   const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
@@ -70,6 +72,7 @@ export function Sidebar() {
         <div className="px-2 pt-2.5 pb-1">
           <button
             type="button"
+            onClick={openPalette}
             className="w-full flex items-center gap-2 px-[10px] py-[7px] rounded-ih-button bg-ih-bg-muted hover:bg-ih-bg-muted/80 text-ih-fg-4 transition-all border border-ih-border text-[12px]"
             aria-label={m.nav_action_command_palette()}
           >

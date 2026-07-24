@@ -18,6 +18,10 @@ export interface EditorHeaderProps {
  setSignModalOpen: (open: boolean) => void;
  /** Publish button click handler. */
  handlePublishClick: () => void;
+ /** Marks the on-site work complete (advisory order-lifecycle move). */
+ handleFinishFieldwork: () => void;
+ /** Whether the finish-fieldwork request is in flight. */
+ finishingFieldwork: boolean;
  /** #181 — whether collab (and thus version history) is available. */
  collabEditing?: boolean;
  /** Opens the version-history panel. */
@@ -44,6 +48,8 @@ export function EditorHeader({
  tenantSlug,
  setSignModalOpen,
  handlePublishClick,
+ handleFinishFieldwork,
+ finishingFieldwork,
  collabEditing,
  onOpenVersionHistory,
  perUnitControls,
@@ -295,6 +301,22 @@ export function EditorHeader({
  >
   {m.editor_header_sign()}
  </Button>
+
+ {/* Finish fieldwork — advisory order-lifecycle move, shown until the
+     on-site work is marked complete. Publishing does not require it. A more
+     central action than Sign (xl-only), so it appears from lg up. */}
+ {(state.inspection.status as string) !== "completed" && (
+ <Button
+  variant="secondary"
+  size="md"
+  onClick={handleFinishFieldwork}
+  disabled={finishingFieldwork}
+  className="hidden lg:inline-flex"
+  icon={<Icon name="check" className="w-3.5 h-3.5" />}
+ >
+  {finishingFieldwork ? m.editor_finish_fieldwork_pending() : m.editor_finish_fieldwork()}
+ </Button>
+ )}
 
  {/* Publish button */}
  <Button

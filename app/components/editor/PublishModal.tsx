@@ -8,7 +8,8 @@ export interface PublishModalProps {
  publishError: string | null;
  isSubmitting: boolean;
  onClose: () => void;
- onPublish: () => void;
+ /** Publish the report. `markComplete` also closes the order axis first. */
+ onPublish: (markComplete: boolean) => void;
  /** Whether to auto-sign the report on publish. */
  autoSign: boolean;
  /** Handler for the auto-sign checkbox. */
@@ -16,20 +17,40 @@ export interface PublishModalProps {
 }
 
 export function PublishModal({ open, progress, status, publishError, isSubmitting, onClose, onPublish, autoSign, onAutoSignToggle }: PublishModalProps) {
+ // The order lifecycle does not gate publishing (report and order axes are
+ // independent). When the on-site work is not yet marked complete, offer an
+ // advisory choice — do both, or just publish — but never block.
+ const notCompleted = status !== "completed";
  return (
  <Modal
  open={open}
  onClose={onClose}
  title={m.editor_publish_title()}
  footer={
+ notCompleted ? (
+ <>
+ <Button variant="ghost" onClick={onClose}>{m.common_cancel()}</Button>
+ <Button
+ variant="secondary"
+ disabled={isSubmitting}
+ onClick={() => onPublish(false)}
+ >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_just_publish()}</Button>
+ <Button
+ variant="primary"
+ disabled={isSubmitting}
+ onClick={() => onPublish(true)}
+ >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_mark_complete_and_publish()}</Button>
+ </>
+ ) : (
  <>
  <Button variant="ghost" onClick={onClose}>{m.common_cancel()}</Button>
  <Button
  variant="primary"
  disabled={isSubmitting}
- onClick={onPublish}
+ onClick={() => onPublish(false)}
  >{isSubmitting ? m.editor_publish_publishing() : m.editor_publish_now()}</Button>
  </>
+ )
  }
  >
  <p className="text-[13px] text-ih-fg-3">
@@ -45,6 +66,11 @@ export function PublishModal({ open, progress, status, publishError, isSubmittin
  <div className="flex justify-between"><span className="text-ih-fg-3">{m.editor_publish_stat_completion()}</span><span className="font-bold">{progress.pct}%</span></div>
  <div className="flex justify-between"><span className="text-ih-fg-3">{m.editor_publish_stat_status()}</span><span className="font-bold uppercase">{status}</span></div>
  </div>
+ {notCompleted && (
+ <p className="mt-3 text-[12px] text-ih-fg-3">
+ {m.editor_publish_not_completed_prompt()}
+ </p>
+ )}
  {publishError && (
  <div role="alert" className="mt-4 p-3 rounded-lg bg-ih-bad/10 border border-ih-bad/30 text-[12px] text-ih-bad font-medium">
  {publishError}

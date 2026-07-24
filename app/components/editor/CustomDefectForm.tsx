@@ -1,5 +1,5 @@
 import { Button } from "@core/shared-ui";
-import type { CustomDefectCategory } from "../../lib/custom-defects";
+import { BUILT_IN_DEFECT_CATEGORIES, type CustomDefectCategory } from "../../lib/custom-defects";
 import { m } from "~/paraglide/messages";
 
 export interface CustomDefectFormProps {
@@ -9,6 +9,9 @@ export interface CustomDefectFormProps {
   saveToLibrary: boolean;
   /** When set, renders the "Save to my library" checkbox (Track H B-20 回流). */
   showSaveToLibrary: boolean;
+  /** IA-59 — the tenant's configured defect categories, offered alongside the
+   *  three built-in seeds so field-added defects can use a custom category. */
+  categories?: Array<{ id: string; name: string }>;
   onTitleChange: (value: string) => void;
   onCommentChange: (value: string) => void;
   onCategoryChange: (value: CustomDefectCategory) => void;
@@ -24,6 +27,7 @@ export function CustomDefectForm({
   category,
   saveToLibrary,
   showSaveToLibrary,
+  categories,
   onTitleChange,
   onCommentChange,
   onCategoryChange,
@@ -58,6 +62,13 @@ export function CustomDefectForm({
           <option value="safety">{m.editor_customdefect_category_safety()}</option>
           <option value="recommendation">{m.editor_customdefect_category_recommendation()}</option>
           <option value="maintenance">{m.editor_customdefect_category_maintenance()}</option>
+          {/* IA-59 — tenant's configured categories, minus the three built-ins
+              (matched by name, case-insensitive) so nothing shows up twice. */}
+          {(categories ?? [])
+            .filter((c) => !BUILT_IN_DEFECT_CATEGORIES.includes(c.name.trim().toLowerCase() as (typeof BUILT_IN_DEFECT_CATEGORIES)[number]))
+            .map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
         </select>
         {/* Track H (B-20 回流) — default OFF so one-off findings don't pollute the library */}
         {showSaveToLibrary && (

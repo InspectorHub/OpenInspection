@@ -8,6 +8,20 @@
       "when": 1784630456652,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1784865849531,
+      "tag": "0001_gifted_doorman",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1784876433223,
+      "tag": "0002_stale_clint_barton",
+      "breakpoints": true
     }
   ]
 }

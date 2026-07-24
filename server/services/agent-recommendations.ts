@@ -9,6 +9,8 @@
 // override the canned default; same for photos.
 
 import type { DefectCategory } from '../types/template-schema';
+import { readItemDefectStates, readItemEntry } from '../lib/read-item-defects';
+import type { ResultsProjection, DefectState } from '../lib/collab/results-doc.types';
 
 export interface AgentRecommendationRow {
     inspectionId:    string;
@@ -17,10 +19,15 @@ export interface AgentRecommendationRow {
     sectionTitle:    string;
     itemLabel:       string;
     defectTitle:     string;
+    // A defect_categories.id or legacy seed name (DefectCategory is `string`).
+    // Kept verbatim — IA-41 no longer drops tenant custom categories.
     category:        DefectCategory;
     comment:         string;
     location:        string | null;
     photos:          string[];
+    // IA-41 — true for field-added defects (customComments.defects). Drives the
+    // "inspector-added" badge, matching the report side.
+    isCustom:        boolean;
 }
 
 export interface AgentRecommendationGroups {
@@ -41,17 +48,6 @@ interface ItemShape    { id: string; label: string; tabs?: { defects?: CannedDef
 interface SectionShape { id: string; title: string; items?: ItemShape[] }
 interface SnapshotShape { sections?: SectionShape[] }
 
-interface DefectStateShape {
-    cannedId:  string;
-    included?: boolean;
-    comment?:  string | null;
-    category?: string;
-    location?: string | null;
-    photos?:   Array<{ key?: string } | string> | null;
-}
-interface ResultsItemShape  { defects?: DefectStateShape[] }
-interface ResultsDataShape  { [itemId: string]: ResultsItemShape | undefined }
-
 export interface RawInspectionForRecommendations {
     id:               string;
     propertyAddress:  string;
@@ -60,11 +56,7 @@ export interface RawInspectionForRecommendations {
     resultsData:      unknown;
 }
 
-function isCategory(v: unknown): v is DefectCategory {
-    return v === 'safety' || v === 'recommendation' || v === 'maintenance';
-}
-
-function flattenPhotos(photos: DefectStateShape['photos']): string[] {
+function flattenPhotos(photos: DefectState['photos']): string[] {
     if (!photos || !Array.isArray(photos)) return [];
     const out: string[] = [];
     for (const p of photos) {
@@ -88,15 +80,17 @@ export function flattenInspectionToRecommendations(
     // D1 sometimes hands back a JSON column as a raw string (depending on
     // how the row was originally written); coerce defensively.
     const snapshot = coerceJson<SnapshotShape>(insp.templateSnapshot);
-    const results  = coerceJson<ResultsDataShape>(insp.resultsData);
+    const results  = coerceJson<ResultsProjection>(insp.resultsData) ?? {};
     if (!snapshot || !Array.isArray(snapshot.sections)) return [];
 
     const out: AgentRecommendationRow[] = [];
     for (const section of snapshot.sections) {
         for (const item of section.items ?? []) {
             const cannedDefects = item.tabs?.defects ?? [];
-            const itemResults   = results?.[item.id];
-            const defectStates  = itemResults?.defects ?? [];
+            // Read via the shared resolver — the canonical findingKey with a
+            // bare-itemId fallback, then `.tabs.defects`. Keying by bare itemId
+            // or skipping `.tabs` (the prior bug) reads nothing (IA-31).
+            const defectStates  = readItemDefectStates(results, section.id, item.id);
             // Index canned by id for fast lookup.
             const cannedById = new Map<string, CannedDefectShape>();
             for (const c of cannedDefects) cannedById.set(c.id, c);
@@ -105,10 +99,11 @@ export function flattenInspectionToRecommendations(
                 if (!state.included) continue;
                 const canned = cannedById.get(state.cannedId);
                 if (!canned) continue;
-                const category = isCategory(state.category)
-                    ? state.category
-                    : (isCategory(canned.category) ? canned.category : null);
-                if (!category) continue;
+                // IA-41 — keep the category verbatim (tenant custom categories
+                // included); fall back to 'maintenance' only when truly unset,
+                // mirroring the report side. No longer dropped for being off the
+                // three legacy buckets.
+                const category = (state.category ?? canned.category ?? 'maintenance').toString();
                 out.push({
                     inspectionId:    insp.id,
                     propertyAddress: insp.propertyAddress,
@@ -120,6 +115,29 @@ export function flattenInspectionToRecommendations(
                     comment:         (state.comment ?? canned.comment ?? '').toString(),
                     location:        state.location ?? null,
                     photos:          flattenPhotos(state.photos),
+                    isCustom:        false,
+                });
+            }
+
+            // IA-41 — field-added custom defects live in customComments.defects,
+            // not in the template's tabs.defects, so the canned pass above never
+            // sees them. The report + repair-list surfaces already read them;
+            // the agent feed was the lone consumer that dropped them.
+            const entry = readItemEntry(results, section.id, item.id);
+            for (const cd of entry.customComments?.defects ?? []) {
+                if (!cd.included) continue;
+                out.push({
+                    inspectionId:    insp.id,
+                    propertyAddress: insp.propertyAddress,
+                    inspectionDate:  insp.date,
+                    sectionTitle:    section.title,
+                    itemLabel:       item.label,
+                    defectTitle:     cd.title,
+                    category:        (cd.category ?? 'maintenance').toString(),
+                    comment:         (cd.comment ?? '').toString(),
+                    location:        cd.location ?? null,
+                    photos:          flattenPhotos(cd.photos),
+                    isCustom:        true,
                 });
             }
         }
@@ -132,15 +150,15 @@ export function groupRecommendations(
 ): AgentRecommendationGroups {
     const out: AgentRecommendationGroups = { safety: [], recommendation: [], maintenance: [] };
     for (const r of rows) {
-        // Authoring unification Plan-4 module K widened DefectCategory to a
-        // tenant-defined reference. This agent-facing feed only understands the
-        // 3 fixed legacy buckets it was built around — a defect tagged with a
-        // custom tenant category simply doesn't surface here (no fixed bucket
-        // to file it under), matching the pre-widening behavior where such a
-        // value could never have occurred.
-        if (r.category === 'safety' || r.category === 'recommendation' || r.category === 'maintenance') {
-            out[r.category].push(r);
-        }
+        // IA-41 — safety and maintenance file directly; everything else —
+        // 'recommendation' plus any tenant custom category — merges into the
+        // recommendation bucket. This matches the PCA Systems Summary's merge
+        // direction (pca-systems-summary.ts) so the two client surfaces agree,
+        // and it stops the silent drop of custom-category defects. Each row
+        // keeps its real `category`, so the page can flag that a merge happened.
+        if (r.category === 'safety') out.safety.push(r);
+        else if (r.category === 'maintenance') out.maintenance.push(r);
+        else out.recommendation.push(r);
     }
     return out;
 }

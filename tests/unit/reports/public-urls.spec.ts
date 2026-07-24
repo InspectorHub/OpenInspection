@@ -1,12 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { bookingUrl, reportUrl, signUrl, agreementSignUrl, agreementSignPath, checkoutUrl, embedBookingUrl, embedBookingCompanyUrl, m2mAgreementRenderUrl } from '../../../server/lib/public-urls';
+import { reportUrl, signUrl, agreementSignUrl, agreementSignPath, checkoutUrl, embedBookingCompanyUrl, m2mAgreementRenderUrl } from '../../../server/lib/public-urls';
 
 describe('public URL builders', () => {
-    it('bookingUrl emits /book/<tenant>/<inspector>', () => {
-        expect(bookingUrl('app.example.com', 'acme', 'jane')).toBe('https://app.example.com/book/acme/jane');
-    });
     it('uses http for localhost', () => {
-        expect(bookingUrl('localhost:8788', 'acme', 'jane')).toBe('http://localhost:8788/book/acme/jane');
+        expect(embedBookingCompanyUrl('localhost:8788', 'acme')).toBe('http://localhost:8788/embed/acme');
     });
     it('reportUrl emits /report-view/<tenant>/<id> (canonical renderer)', () => {
         expect(reportUrl('app.example.com', 'acme', 'abc-123')).toBe('https://app.example.com/report-view/acme/abc-123');
@@ -23,10 +20,7 @@ describe('public URL builders', () => {
     it('checkoutUrl emits /checkout/<tenant>/<token>', () => {
         expect(checkoutUrl('app.example.com', 'acme', 'tok-xyz')).toBe('https://app.example.com/checkout/acme/tok-xyz');
     });
-    it('embedBookingUrl emits /embed/<tenant>/<slug> (real route, not /embed/book/)', () => {
-        expect(embedBookingUrl('app.example.com', 'acme', 'jane')).toBe('https://app.example.com/embed/acme/jane');
-    });
-    it('embedBookingCompanyUrl emits /embed/<tenant> (company-level, IA-26)', () => {
+    it('embedBookingCompanyUrl emits /embed/<tenant> (company-level)', () => {
         expect(embedBookingCompanyUrl('app.example.com', 'acme')).toBe('https://app.example.com/embed/acme');
     });
     it('m2mAgreementRenderUrl emits /m2m/agreement-render/<tenant>/<requestId>', () => {

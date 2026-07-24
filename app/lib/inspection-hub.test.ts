@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { deriveBlockStates, formatCents, canPublish, isReportShipped, type HubPayload } from '~/lib/hub-blocks';
+// canPublish / isReportShipped are covered in hub-blocks.test.ts — one home per rule.
+import { deriveBlockStates, formatCents, type HubPayload } from '~/lib/hub-blocks';
 
 /**
  * Issue #111 — pure block-state derivation for the `/inspections/:id` hub page.
@@ -147,58 +148,6 @@ describe('deriveBlockStates — report block (reportStatus axis)', () => {
     it('unknown reportStatus → neutral / In Progress (safe default)', () => {
         const s = deriveBlockStates(hub({ inspection: { reportStatus: 'unknown_value' } }));
         expect(s.report).toEqual({ tone: 'neutral', label: 'In Progress' });
-    });
-});
-
-describe('canPublish — report publish affordance', () => {
-    it('completed + in_progress → true (active publish CTA)', () => {
-        expect(canPublish(hub({
-            inspection: { status: 'completed', reportStatus: 'in_progress' },
-        }))).toBe(true);
-    });
-
-    it('completed + submitted → true (can still publish bypassing review)', () => {
-        expect(canPublish(hub({
-            inspection: { status: 'completed', reportStatus: 'submitted' },
-        }))).toBe(true);
-    });
-
-    it('completed + published → false (already published)', () => {
-        expect(canPublish(hub({
-            inspection: { status: 'completed', reportStatus: 'published' },
-        }))).toBe(false);
-    });
-
-    it('requested + in_progress → false (status gate: not completed yet)', () => {
-        expect(canPublish(hub({
-            inspection: { status: 'requested', reportStatus: 'in_progress' },
-        }))).toBe(false);
-    });
-
-    it('cancelled + in_progress → false (status gate excludes cancelled)', () => {
-        expect(canPublish(hub({
-            inspection: { status: 'cancelled', reportStatus: 'in_progress' },
-        }))).toBe(false);
-    });
-
-    it('scheduled + in_progress → false (not completed)', () => {
-        expect(canPublish(hub({
-            inspection: { status: 'scheduled', reportStatus: 'in_progress' },
-        }))).toBe(false);
-    });
-});
-
-describe('isReportShipped', () => {
-    it('published reportStatus → true', () => {
-        expect(isReportShipped(hub({ inspection: { reportStatus: 'published' } }))).toBe(true);
-    });
-
-    it('in_progress reportStatus → false', () => {
-        expect(isReportShipped(hub({ inspection: { reportStatus: 'in_progress' } }))).toBe(false);
-    });
-
-    it('submitted reportStatus → false', () => {
-        expect(isReportShipped(hub({ inspection: { reportStatus: 'submitted' } }))).toBe(false);
     });
 });
 

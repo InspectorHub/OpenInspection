@@ -1,5 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { formatEpochMs, formatUnixSeconds } from './report-helpers';
+import { formatEpochMs, formatUnixSeconds, itemDrivesSummary } from './report-helpers';
+
+// IA-66 — "Defects Only" filter + "Add to repair request" checkbox must agree,
+// and both must honour the tenant's per-category drivesSummary switch (not a
+// severityBucket regex that never matched custom categories).
+describe('itemDrivesSummary', () => {
+  const item = (defects: Array<{ drivesSummary?: boolean }>) =>
+    ({ severityBucket: 'defect', resolvedTabs: { defects } }) as never;
+
+  it('is true when any included defect drives the summary', () => {
+    expect(itemDrivesSummary(item([{ drivesSummary: true }]))).toBe(true);
+    expect(itemDrivesSummary(item([{ drivesSummary: false }, { drivesSummary: true }]))).toBe(true);
+  });
+  it('treats an unset drivesSummary as true (server default)', () => {
+    expect(itemDrivesSummary(item([{}]))).toBe(true);
+  });
+  it('is false when every defect category is switched off', () => {
+    expect(itemDrivesSummary(item([{ drivesSummary: false }]))).toBe(false);
+  });
+  it('is false for an item with no defects', () => {
+    expect(itemDrivesSummary(item([]))).toBe(false);
+    expect(itemDrivesSummary({ severityBucket: 'satisfactory' } as never)).toBe(false);
+  });
+});
 
 describe('report-helpers timezone', () => {
   it('formatEpochMs renders in the supplied tenant tz', () => {

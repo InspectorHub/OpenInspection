@@ -1,8 +1,10 @@
-import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from 'cloudflare:workers';
+import type { WorkflowStep, WorkflowEvent } from 'cloudflare:workers';
+import { WorkflowEntrypoint } from 'cloudflare:workers';
 import type { AppEnv } from '../types/hono';
 import { SigningKeyService } from '../services/signing-key.service';
 import { AuditLogService } from '../services/audit-log.service';
 import { m2mAgreementRenderUrl } from '../lib/public-urls';
+import { envelopeVerifyUrl } from '../lib/agreement-verify-url';
 import { buildEvidencePack } from '../services/evidence-pack.service';
 import { buildTenantEmailService } from '../lib/email/build-email-service';
 import { getDeploymentProfile } from '../lib/deployment-profile';
@@ -219,7 +221,7 @@ export class SignCompletionWorkflow extends WorkflowEntrypoint<AppEnv, SignCompl
                 const evidenceBytes = new Uint8Array(await new Response(evidenceObj.body).arrayBuffer());
                 const verifyUrl = req.verificationToken
                     ? `${baseUrl(env)}/v/${req.verificationToken}`
-                    : `${baseUrl(env)}/api/public/verify/${requestId}`;
+                    : envelopeVerifyUrl(baseUrl(env), requestId);
                 // B-13: resolve the tenant's sender identity + branded renderer
                 // (own/platform Resend, display name, reply-to, template overrides)
                 // even though Workflows run outside diMiddleware.

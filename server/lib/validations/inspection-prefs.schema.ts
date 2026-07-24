@@ -20,6 +20,12 @@ export const InspectionPrefsSchema = z.object({
      *  `tenant_configs.require_defect_fields` column (the readiness service
      *  reads it directly). Default LOOSE — gaps warn, not block. */
     requireDefectFields: z.enum(['none', 'location', 'trade', 'both']).default('none'),
+    /** IA-35 / IA-73 — whether agents may act on the repair request list.
+     *  `off` = no access, `read` = view only (write endpoints refuse),
+     *  `readwrite` = full. Default `readwrite`: account-track agents already
+     *  get a builder link, so defaulting off would remove a shipped ability —
+     *  the fix here is stopping the identity impersonation, not the access. */
+    agentRepairAccess: z.enum(['off', 'read', 'readwrite']).default('readwrite'),
 }).openapi('InspectionPrefs');
 
 export type InspectionPrefs = z.infer<typeof InspectionPrefsSchema>;
@@ -33,6 +39,7 @@ export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     autoAdvanceDelayMs: 200,
     pinnedTagIds:       [],
     requireDefectFields: 'none',
+    agentRepairAccess:  'readwrite',
 };
 
 /** Merge a possibly-partial DB row with the defaults. */

@@ -76,17 +76,34 @@ describe('Report review workflow (submit / publish / return / unpublish)', () =>
         expect(row.status).toBe(INSPECTION_STATUS.COMPLETED);
     });
 
-    it('2. publish throws when inspection status !== completed (e.g. scheduled)', async () => {
-        await testDb.insert(schema.inspections).values([
-            makeInspection({ id: 'insp-pub-2', status: INSPECTION_STATUS.SCHEDULED }),
-        ]);
+    // The order lifecycle axis (inspections.status) and the report axis
+    // (inspections.report_status) advance independently: a report can ship
+    // while the order is still scheduled or confirmed. Publishing used to
+    // require status=completed, which made the order axis a hidden gate on
+    // report delivery.
+    it('2. publish works from every order lifecycle state, leaving status untouched', async () => {
+        const states = [
+            INSPECTION_STATUS.REQUESTED,
+            INSPECTION_STATUS.SCHEDULED,
+            INSPECTION_STATUS.CONFIRMED,
+            INSPECTION_STATUS.COMPLETED,
+        ] as const;
 
-        await expect(
-            svc.publishInspection('insp-pub-2', TENANT, {
+        for (const status of states) {
+            const id = `insp-pub-2-${status}`;
+            await testDb.insert(schema.inspections).values([
+                makeInspection({ id, status, reportStatus: REPORT_STATUS.IN_PROGRESS }),
+            ]);
+
+            await svc.publishInspection(id, TENANT, {
                 theme: 'default', notifyClient: false, notifyAgent: false,
                 requireSignature: false, requirePayment: false,
-            })
-        ).rejects.toThrow(/must be completed/i);
+            });
+
+            const row = await readStatuses(testDb, id);
+            expect(row.reportStatus).toBe(REPORT_STATUS.PUBLISHED);
+            expect(row.status).toBe(status);
+        }
     });
 
     it('6. re-publish an already-published completed inspection stays published', async () => {
@@ -119,13 +136,18 @@ describe('Report review workflow (submit / publish / return / unpublish)', () =>
         expect(row.status).toBe(INSPECTION_STATUS.COMPLETED);
     });
 
-    it('submitReport throws when inspection status !== completed (e.g. scheduled)', async () => {
+    // Same decoupling as publish: sending a report up for review is a report
+    // axis move and says nothing about whether the on-site work is wrapped up.
+    it('submitReport works while the order is still scheduled', async () => {
         await testDb.insert(schema.inspections).values([
             makeInspection({ id: 'insp-sub-2', status: INSPECTION_STATUS.SCHEDULED }),
         ]);
 
-        await expect(svc.submitReport('insp-sub-2', TENANT))
-            .rejects.toThrow(/must be completed/i);
+        await svc.submitReport('insp-sub-2', TENANT);
+
+        const row = await readStatuses(testDb, 'insp-sub-2');
+        expect(row.reportStatus).toBe(REPORT_STATUS.SUBMITTED);
+        expect(row.status).toBe(INSPECTION_STATUS.SCHEDULED);
     });
 
     it('submitReport throws when reportStatus is not in_progress (e.g. already submitted)', async () => {
