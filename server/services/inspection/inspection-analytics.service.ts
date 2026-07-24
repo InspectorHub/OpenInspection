@@ -141,6 +141,10 @@ export class InspectionAnalyticsService extends InspectionSubService {
             comment:             string;
             location:            string | null;
             category:            'safety' | 'recommendation' | 'maintenance';
+            // IA-42 — the parent item's rating-axis severity, distinct from the
+            // safety/recommendation/maintenance category. Lets the repair builder
+            // offer a real "worst first" sort.
+            severityBucket:      'satisfactory' | 'monitor' | 'defect' | 'other';
             recommendationId:    string | null;
             recommendationLabel: string | null;
             estimateLow:         number | null;
@@ -174,6 +178,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                             ? d.effectiveLocation
                             : null,
                         category:            cat,
+                        severityBucket:      item.severityBucket,
                         recommendationId:    slug,
                         recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
                         estimateLow:         d.estimateLow ?? null,
@@ -198,6 +203,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                             ? c.location
                             : null,
                         category:            cat,
+                        severityBucket:      item.severityBucket,
                         recommendationId:    slug,
                         recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
                         estimateLow:         c.estimateLow ?? null,

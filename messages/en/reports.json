@@ -152,6 +152,7 @@
   "portal_repair_subtitle": "Check the defects you want to request repair or credit for. Add amounts and notes for each.",
   "portal_repair_sort_by": "Sort by:",
   "portal_repair_sort_section": "Section",
+  "portal_repair_sort_category": "Category",
   "portal_repair_sort_severity": "Severity",
   "portal_repair_deselect_all": "Deselect all",
   "portal_repair_select_all": "Select all",

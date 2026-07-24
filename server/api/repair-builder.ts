@@ -43,6 +43,7 @@ const SourceResponseSchema = z.object({
             itemLabel:    z.string(),
             comment:      z.string(),
             category:     z.enum(['safety', 'recommendation', 'maintenance']),
+            severityBucket: z.enum(['satisfactory', 'monitor', 'defect', 'other']),
         })).describe('Flattened repair-rated defects from the published report.'),
         mine: z.array(z.any()).describe('Caller\'s existing repair requests for this inspection.'),
     }),

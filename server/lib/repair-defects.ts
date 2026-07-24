@@ -17,6 +17,9 @@ export type RepairDefect = {
     itemLabel:    string;
     comment:      string;
     category:     'safety' | 'recommendation' | 'maintenance';
+    // IA-42 — the parent item's rating-axis severity (getRatingBucket domain),
+    // distinct from `category`. Drives the builder's real "Severity" sort.
+    severityBucket: 'satisfactory' | 'monitor' | 'defect' | 'other';
 };
 
 /**
@@ -37,6 +40,7 @@ export interface InspectionSvcForDefects {
             itemLabel:        string;
             comment:          string;
             category:         'safety' | 'recommendation' | 'maintenance';
+            severityBucket:   'satisfactory' | 'monitor' | 'defect' | 'other';
             source:           'canned' | 'custom';
             recommendationId: string | null;
         }>;
@@ -79,6 +83,7 @@ export async function flattenReportDefects(
             itemLabel:    d.itemLabel,
             comment:      d.comment,
             category:     d.category,
+            severityBucket: d.severityBucket,
         };
     });
 }

@@ -39,6 +39,9 @@ export interface Defect {
   itemLabel: string;
   comment: string;
   category: "safety" | "recommendation" | "maintenance";
+  // IA-42 — the rating-axis severity of the parent item (getRatingBucket
+  // domain). Distinct from `category`; drives the real "Severity" sort.
+  severityBucket: "satisfactory" | "monitor" | "defect" | "other";
 }
 
 export interface RepairRequestItem {
@@ -78,24 +81,33 @@ export function builderCreditTotal(
   return items.reduce((sum, it) => sum + (it.requestedCreditCents ?? 0), 0);
 }
 
-const SEVERITY_RANK: Record<string, number> = {
+// IA-42 — the CATEGORY axis (safety/recommendation/maintenance). Renamed from
+// the misleading SEVERITY_RANK: it never ranked severity, it ranked category.
+const CATEGORY_RANK: Record<string, number> = {
   safety: 0,
   recommendation: 1,
   maintenance: 2,
 };
 
-export function sortDefects(
-  defects: Defect[],
-  key: "section" | "severity",
-): Defect[] {
+// IA-42 — the real SEVERITY axis (getRatingBucket domain), worst first.
+// 'other' is the not-applicable bucket (NI/NP), so it sorts last.
+const SEVERITY_RANK: Record<string, number> = {
+  defect: 0,
+  monitor: 1,
+  satisfactory: 2,
+  other: 3,
+};
+
+export type SortKey = "section" | "category" | "severity";
+
+export function sortDefects(defects: Defect[], key: SortKey): Defect[] {
   const copy = [...defects];
   if (key === "section") {
     copy.sort((a, b) => a.sectionTitle.localeCompare(b.sectionTitle));
+  } else if (key === "category") {
+    copy.sort((a, b) => (CATEGORY_RANK[a.category] ?? 9) - (CATEGORY_RANK[b.category] ?? 9));
   } else {
-    copy.sort(
-      (a, b) =>
-        (SEVERITY_RANK[a.category] ?? 9) - (SEVERITY_RANK[b.category] ?? 9),
-    );
+    copy.sort((a, b) => (SEVERITY_RANK[a.severityBucket] ?? 9) - (SEVERITY_RANK[b.severityBucket] ?? 9));
   }
   return copy;
 }
@@ -219,7 +231,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
     initialItemIds[it.findingKey] = it.id;
   }
 
-  const [sortKey, setSortKey] = useState<"section" | "severity">("section");
+  const [sortKey, setSortKey] = useState<SortKey>("section");
   const [selected, setSelected] = useState<Set<string>>(initialSelected);
   const [drafts, setDrafts] = useState<Record<string, ItemDraft>>(initialDrafts);
   // findingKey → server item id. Kept in a ref (not state) because reads must see
@@ -474,28 +486,26 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
       {/* Sort controls */}
       <div className="flex items-center gap-2">
         <span className="text-[12px] font-bold text-ih-fg-4 uppercase tracking-widest">{m.portal_repair_sort_by()}</span>
-        <button
-          type="button"
-          onClick={() => setSortKey("section")}
-          className={`h-7 px-3 rounded text-[12px] font-semibold transition-colors ${
-            sortKey === "section"
-              ? "bg-ih-primary text-ih-primary-fg"
-              : "border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"
-          }`}
-        >
-          {m.portal_repair_sort_section()}
-        </button>
-        <button
-          type="button"
-          onClick={() => setSortKey("severity")}
-          className={`h-7 px-3 rounded text-[12px] font-semibold transition-colors ${
-            sortKey === "severity"
-              ? "bg-ih-primary text-ih-primary-fg"
-              : "border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"
-          }`}
-        >
-          {m.portal_repair_sort_severity()}
-        </button>
+        {(
+          [
+            ["section", m.portal_repair_sort_section()],
+            ["category", m.portal_repair_sort_category()],
+            ["severity", m.portal_repair_sort_severity()],
+          ] as Array<[SortKey, string]>
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setSortKey(key)}
+            className={`h-7 px-3 rounded text-[12px] font-semibold transition-colors ${
+              sortKey === key
+                ? "bg-ih-primary text-ih-primary-fg"
+                : "border border-ih-border text-ih-fg-3 hover:bg-ih-bg-muted"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
         {sorted.length > 0 && (
           <button
             type="button"

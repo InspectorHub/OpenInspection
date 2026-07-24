@@ -22,10 +22,11 @@ function makeEntry(
     source: 'canned' | 'custom',
     recommendationId: string | null,
     overrides: Partial<{
-        sectionTitle: string;
-        itemLabel:    string;
-        comment:      string;
-        category:     'safety' | 'recommendation' | 'maintenance';
+        sectionTitle:   string;
+        itemLabel:      string;
+        comment:        string;
+        category:       'safety' | 'recommendation' | 'maintenance';
+        severityBucket: 'satisfactory' | 'monitor' | 'defect' | 'other';
     }> = {},
 ) {
     return {
@@ -35,6 +36,9 @@ function makeEntry(
         itemLabel:    overrides.itemLabel    ?? `Item ${itemId}`,
         comment:      overrides.comment      ?? '',
         category:     overrides.category     ?? ('maintenance' as const),
+        // Repair-list entries come off defect-rated items; the pipeline always
+        // stamps a bucket. Default to 'defect' so the fixture mirrors production.
+        severityBucket: overrides.severityBucket ?? ('defect' as const),
         source,
         recommendationId,
     };
