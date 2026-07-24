@@ -1,5 +1,7 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
+  "report_defect_trade_label": "Recommended trade:",
+  "report_defect_timeframe_label": "Timeframe:",
   "report_meta_title": "Report - {name} - OpenInspection",
   "report_meta_title_fallback": "Inspection",
   "report_word_export_error_generic": "Couldn't start the Word export. Please try again.",

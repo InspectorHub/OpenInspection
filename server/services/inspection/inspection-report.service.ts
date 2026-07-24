@@ -291,10 +291,14 @@ export class InspectionReportService extends InspectionSubService {
                     const included = st ? !!st.included : !!d.default;
                     const override = st && typeof st.comment === 'string' && st.comment.length > 0 ? st.comment : null;
                     const effectiveCategory = st?.category ?? d.category;
+                    // IA-57 — resolve the Mustache vars once and reuse them: the
+                    // comment interpolation and the independent trade/timeframe
+                    // render points must share the same label resolution.
+                    const mustacheVars = resolveDefectMustacheVars(st as DefectCommentState | undefined, d as CannedDefect, res.attributes);
                     return {
                         ...d,
                         included,
-                        effectiveComment: renderTemplate(override ?? d.comment, resolveDefectMustacheVars(st as DefectCommentState | undefined, d as CannedDefect, res.attributes)),
+                        effectiveComment: renderTemplate(override ?? d.comment, mustacheVars),
                         effectiveCategory,
                         // Authoring unification Plan-4 module K — the tenant's
                         // configured category color; undefined (no color) falls
@@ -308,6 +312,12 @@ export class InspectionReportService extends InspectionSubService {
                         // Summary filter (spec §9), which no consumer conflates.
                         drivesSummary: defectDrivesSummary(effectiveCategory, defectCategories),
                         effectiveLocation: (typeof st?.location === 'string' && st.location.length > 0) ? st.location : d.location,
+                        // IA-57 — surface trade/timeframe as their own resolved
+                        // labels so they render independently of the comment
+                        // (they were invisible whenever the canned prose lacked
+                        // the {{trade}}/{{timeframe}} placeholder).
+                        effectiveTrade:     mustacheVars.trade,
+                        effectiveTimeframe: mustacheVars.timeframe,
                         // #181 PR-G: pending uploads have no R2 object yet — skip them.
                         defectPhotos: (st?.photos ?? []).filter(p => !p.pendingUpload).map(mapReportPhoto),
                         // Sprint 2 S2-3 / S2-4 — per-defect contractor recommendation +

@@ -58,6 +58,13 @@ export interface ResolvedDefect {
    *  (defect_categories.drivesSummary), resolved server-side. */
   drivesSummary?: boolean;
   effectiveLocation?: string | null;
+  /** IA-57 — the inspector-selected trade + timeframe, resolved to their
+   *  human labels server-side (e.g. 'licensed plumber', '1 to 3 years'). These
+   *  were previously only Mustache-interpolated into the comment, so they
+   *  vanished whenever the template author omitted the placeholder. Null when
+   *  the inspector left the dropdown blank. */
+  effectiveTrade?: string | null;
+  effectiveTimeframe?: string | null;
   defectPhotos?: ReportPhoto[];
 }
 
