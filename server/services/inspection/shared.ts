@@ -4,13 +4,16 @@
 // source of truth (fixes the prior drift risk where these helpers were
 // duplicated). Behavior-preserving: bodies are byte-identical moves.
 
-import { z } from 'zod';
+import type { z } from 'zod';
+import { drizzle } from 'drizzle-orm/d1';
+import { and, eq } from 'drizzle-orm';
 import { AutomationService } from '../automation.service';
+import { reportVersions } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { RECOMMENDATION_CATEGORIES, RECOMMENDATION_CATEGORY_IDS } from '../../lib/recommendation-categories';
 import { isDefectTrade, isDefectDeadline, isDefectTimeframe, DEFECT_TRADE_LABELS, DEFECT_DEADLINE_LABELS, DEFECT_TIMEFRAME_LABELS } from '../../types/defect-fields';
 import { listUnresolved } from '../../lib/mustache';
-import { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../../lib/validations/inspection.schema';
+import type { InspectionSchema, InspectionListQuerySchema, CreateInspectionSchema } from '../../lib/validations/inspection.schema';
 import type { Severity } from '../../lib/validations/rating-system.schema';
 import type { DefectCommentState } from '../../types/inspection-item-state';
 import type { CannedDefect, TemplateSchemaV2 } from '../../types/template-schema';
@@ -99,6 +102,28 @@ export function fireAutomation(db: D1Database, tenantId: string, inspectionId: s
     return new AutomationService(db)
         .trigger({ tenantId, inspectionId, triggerEvent: event, companyName: '', reportBaseUrl: '' })
         .catch(err => logger.error('automation trigger failed', { event }, err instanceof Error ? err : undefined));
+}
+
+/**
+ * Which report trigger a publish should fire. The first publish of an
+ * inspection is `report.published`; any later re-publish (a prior
+ * report_versions row already exists) is `report.amended`, so amendment
+ * notifications get their own template + change summary instead of looking
+ * like a duplicate "report ready" mail. Called BEFORE the new snapshot row is
+ * written, so "a prior row exists" == "this publish produces version ≥ 2".
+ */
+export async function resolvePublishTrigger(
+    db: D1Database,
+    tenantId: string,
+    inspectionId: string,
+): Promise<'report.published' | 'report.amended'> {
+    const prior = await drizzle(db)
+        .select({ id: reportVersions.id })
+        .from(reportVersions)
+        .where(and(eq(reportVersions.tenantId, tenantId), eq(reportVersions.inspectionId, inspectionId)))
+        .limit(1)
+        .get();
+    return prior ? 'report.amended' : 'report.published';
 }
 
 // mapRatingSystemLevels moved to ../lib/map-rating-levels (B-18: pure +

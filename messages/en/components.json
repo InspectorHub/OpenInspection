@@ -95,6 +95,7 @@
   "hub_publish_pending": "Publishing…",
   "hub_publish_submit": "Publish report",
   "hub_publish_notify_client": "Notify client by email",
+  "hub_publish_notify_client_amendment": "Notify client of this amendment by email",
   "hub_publish_notify_agent": "Notify agent",
   "hub_publish_require_signature": "Require signature before viewing",
   "hub_publish_require_payment": "Require payment before viewing",

@@ -10,6 +10,7 @@ import type { AgreementService } from '../agreement.service';
 import type { TemplateSchemaV2 } from '../../types/template-schema';
 import {
     fireAutomation,
+    resolvePublishTrigger,
     resolveRequireDefectFields,
     computePublishReadinessFromState,
     type RequireDefectFields,
@@ -421,8 +422,11 @@ export class InspectionPublishService extends InspectionSubService {
         // before the response goes out — the prior fire-and-forget pattern
         // dangled the promise so CF terminated the isolate before the insert
         // completed (and ditto for inspection.confirmed / cancelled / created
-        // below — all four paths now block on trigger).
-        await fireAutomation(this.db, tenantId, inspectionId, 'report.published');
+        // below — all four paths now block on trigger). First publish fires
+        // report.published; a re-publish (a prior version row exists) fires
+        // report.amended so the client gets a distinct amendment notice.
+        const reportTrigger = await resolvePublishTrigger(this.db, tenantId, inspectionId);
+        await fireAutomation(this.db, tenantId, inspectionId, reportTrigger);
 
         // Spec 5H D2 — auto-sign on publish: if the inspection has the flag
         // enabled AND the assigned inspector has a saved signature, inject

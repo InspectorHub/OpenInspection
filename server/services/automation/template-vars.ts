@@ -25,6 +25,11 @@ export function buildBaseTemplateVars(
     tenant: typeof tenants.$inferSelect,
     appName: string,
     appHost: string,
+    // `summary` is the re-publish change note from the latest report_version;
+    // only report.amended templates reference {{summary}}. Absent → '' (the
+    // interpolate helper already renders missing tokens blank, so passing it
+    // explicitly just lets the amended mail carry the inspector's note).
+    extra?: { summary?: string },
 ): Record<string, string> {
     return {
         client_name:      inspection.clientName ?? '',
@@ -32,5 +37,6 @@ export function buildBaseTemplateVars(
         scheduled_date:   inspection.date,
         report_url:       reportUrl(appHost, tenant.slug, inspection.id),
         company_name:     appName,
+        summary:          extra?.summary ?? '',
     };
 }

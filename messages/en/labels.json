@@ -84,6 +84,7 @@
   "label_trigger_inspection_cancelled": "Inspection cancelled",
   "label_trigger_inspection_reminder": "Before the inspection (reminder)",
   "label_trigger_report_published": "Report published",
+  "label_trigger_report_amended": "Report amended",
   "label_trigger_invoice_created": "Invoice created",
   "label_trigger_payment_received": "Payment received",
   "label_trigger_agreement_signed": "Agreement signed",

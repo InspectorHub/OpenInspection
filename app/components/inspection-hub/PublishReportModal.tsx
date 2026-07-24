@@ -58,7 +58,11 @@ export function PublishReportModal({
         <input type="hidden" name="intent" value="publish" />
         {/* No theme picker — rides the editor's effective default (server
             'modern'); the action sends theme:"modern" explicitly. */}
-        <ToggleRow name="notifyClient" label={m.hub_publish_notify_client()} defaultChecked />
+        <ToggleRow
+          name="notifyClient"
+          label={isAmendment ? m.hub_publish_notify_client_amendment() : m.hub_publish_notify_client()}
+          defaultChecked
+        />
         <ToggleRow name="notifyAgent" label={m.hub_publish_notify_agent()} defaultChecked={false} />
         <ToggleRow
           name="requireSignature"
