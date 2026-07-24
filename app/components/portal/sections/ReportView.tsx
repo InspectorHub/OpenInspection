@@ -24,7 +24,7 @@ import { brandTokens } from "~/lib/brand";
 import { presetTokens } from "~/lib/report-style/preset-tokens";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { ErrorState } from "~/components/ErrorState";
-import { getSectionIcon, isDefect } from "~/lib/report-helpers";
+import { getSectionIcon, itemDrivesSummary } from "~/lib/report-helpers";
 import { ReportMediaTile } from "./report/ReportMediaTile";
 import { CredentialBadges } from "./report/CredentialBadges";
 import { ReportDefectCard } from "./report/ReportDefectCard";
@@ -332,7 +332,7 @@ export function ReportView(props: ReportViewProps) {
           .filter((s) => s.defectCount > 0)
           .map((s) => ({
             ...s,
-            items: s.items.filter((i) => isDefect(i.severityBucket)),
+            items: s.items.filter((i) => itemDrivesSummary(i)),
           }))
       : data.sections;
 
@@ -671,8 +671,7 @@ export function ReportView(props: ReportViewProps) {
                           </div>
                         )}
 
-                        {(item.severityBucket === "defect" ||
-                          item.severityBucket === "monitor") && (
+                        {itemDrivesSummary(item) && (
                           <label className="print:hidden flex items-center gap-2 mt-3 cursor-pointer text-sm text-ih-fg-3">
                             <input
                               type="checkbox"

@@ -1568,6 +1568,7 @@ export default function InspectionEditPage() {
  missingFields={missingFields}
  requiredDefectFields={requiredDefectFields}
  categoryColor={catColor}
+ defectCategories={loaderData.defectCategories}
  onDefectFields={(cannedId, patch) => {
  if (state.activeItemId && state.currentSection) {
  findings.setDefectFields(

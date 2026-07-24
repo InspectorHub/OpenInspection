@@ -8,7 +8,13 @@
  * needed — the client just has to write the same shape.
  */
 
-export type CustomDefectCategory = 'safety' | 'recommendation' | 'maintenance';
+// IA-59 — a field-added defect's category is a defect_categories.id or one of
+// the three legacy seed names; the form now offers the tenant's configured
+// categories, not just the three built-ins. Widened from the old 3-value union.
+export type CustomDefectCategory = string;
+
+/** The three built-in seed categories, always offered even with no tenant config. */
+export const BUILT_IN_DEFECT_CATEGORIES = ['safety', 'recommendation', 'maintenance'] as const;
 
 export interface CustomDefect {
   id: string;
