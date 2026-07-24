@@ -72,6 +72,8 @@
   "agent_portal_dashboard_setup_slug": "Set up your referral slug",
   "agent_portal_dashboard_referral_one": "referral",
   "agent_portal_dashboard_referral_other": "referrals",
+  "agent_portal_dashboard_all_companies": "All companies",
+  "agent_portal_dashboard_filter_by_company": "Filter referrals by company",
   "agent_portal_dashboard_welcome_banner": "Welcome! Here's the inspection you were just added to.",
   "agent_portal_no_address": "No address",
   "agent_portal_dashboard_no_client": "No client",
