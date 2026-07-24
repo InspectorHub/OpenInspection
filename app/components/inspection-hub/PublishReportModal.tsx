@@ -1,4 +1,4 @@
-import { useFetcher } from "react-router";
+import type { useFetcher } from "react-router";
 import { Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
 import { m } from "~/paraglide/messages";
@@ -13,6 +13,7 @@ export function PublishReportModal({
   open,
   agreementRequired,
   paymentRequired,
+  isAmendment,
   fetcher,
   submitting,
   error,
@@ -21,6 +22,8 @@ export function PublishReportModal({
   open: boolean;
   agreementRequired: boolean;
   paymentRequired: boolean;
+  /** IA-40 — this publish creates versionNumber > 1; ask what changed. */
+  isAmendment: boolean;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
   submitting: boolean;
   error: string | undefined;
@@ -67,6 +70,21 @@ export function PublishReportModal({
           label={m.hub_publish_require_payment()}
           defaultChecked={paymentRequired}
         />
+
+        {isAmendment && (
+          <label className="block">
+            <span className="block text-[13px] font-medium text-ih-fg-1 mb-1">
+              {m.inspections_hub_publish_summary_label()}
+            </span>
+            <textarea
+              name="summary"
+              rows={3}
+              maxLength={500}
+              placeholder={m.inspections_hub_publish_summary_ph()}
+              className="w-full rounded-md border border-ih-border bg-ih-bg-card px-2.5 py-1.5 text-[13px] text-ih-fg-1 placeholder:text-ih-fg-4 focus:border-ih-primary focus:ring-1 focus:ring-ih-primary"
+            />
+          </label>
+        )}
 
         {error && <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>}
       </fetcher.Form>

@@ -174,6 +174,8 @@
   "misc_version_diff_col_before": "Before",
   "misc_version_diff_col_after": "After",
   "misc_version_diff_empty_value": "empty",
+  "misc_version_diff_added": "Added",
+  "misc_version_diff_removed": "Removed",
   "dashboard_row_no_address": "No address",
   "dashboard_row_no_client": "No client",
   "dashboard_row_open_editor": "Open editor",

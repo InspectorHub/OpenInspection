@@ -180,7 +180,21 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     // Best-effort: fail open to empty list
   }
 
-  return { hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin };
+  // IA-40 — published report versions for the Report card's Versions list.
+  // Best-effort and unconditional (mirrors the people/consent fetches above): an
+  // inspection that was published then unpublished still carries its version
+  // history, and that history drives both the diff links and whether the next
+  // publish is an amendment. Degrades to an empty list on any failure.
+  const versionsGet = api.inspections?.[":id"]?.versions?.$get as unknown as
+    | ((args: { param: { id: string } }) => Promise<Response>)
+    | undefined;
+  const versionsRes = versionsGet ? await versionsGet({ param: { id } }).catch(() => null) : null;
+  const versions: ReportVersionRow[] =
+    versionsRes && versionsRes.ok
+      ? (((await versionsRes.json()) as { data?: { versions?: ReportVersionRow[] } }).data?.versions ?? [])
+      : [];
+
+  return { hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin, versions };
 }
 
 /* ------------------------------------------------------------------ */
@@ -229,6 +243,11 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     // schema default ('modern'). We send the same value explicitly here —
     // the hub deliberately renders NO theme picker (YAGNI), matching the
     // editor's effective tenant default.
+    // summary: IA-40 — for an amendment (a re-publish, versionNumber > 1) the
+    // inspector describes what changed; the server records it on the frozen
+    // report_versions row (snapshotOnPublish already accepts it). Empty → omit
+    // so a first publish rides the server default.
+    const summary = String(formData.get("summary") ?? "").trim();
     const res = await api.inspections[":id"].publish.$post({
       param: { id },
       json: {
@@ -237,6 +256,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
         notifyAgent: formData.get("notifyAgent") === "on",
         requireSignature: formData.get("requireSignature") === "on",
         requirePayment: formData.get("requirePayment") === "on",
+        ...(summary ? { summary } : {}),
       },
     });
     return toActionResult(res, "publish", m.inspections_hub_error_publish());
@@ -356,11 +376,33 @@ export function reportActions(
 }
 
 /* ------------------------------------------------------------------ */
+/*  Report version links (pure — testable)                            */
+/* ------------------------------------------------------------------ */
+
+/** One published snapshot as returned by GET /inspections/:id/versions. */
+export interface ReportVersionRow {
+  versionNumber: number;
+  publishedAt: number | null; // unix seconds
+  summary: string | null;
+}
+
+/**
+ * IA-40 — the version-diff page (`/version-diff/:id?n=&from=`) had no inbound
+ * links anywhere in the app; the only way in was hand-typing the URL. This
+ * builds the link from a version to a diff against its immediate predecessor.
+ * Version 1 has nothing earlier to compare against, so it gets no link.
+ */
+export function versionDiffHref(inspectionId: string, versionNumber: number): string | null {
+  if (versionNumber <= 1) return null;
+  return `/version-diff/${inspectionId}?n=${versionNumber}&from=${versionNumber - 1}`;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
 
 export default function InspectionHubPage() {
-  const { hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin } =
+  const { hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin, versions } =
     useLoaderData<typeof loader>();
   // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
   // inspector — still used for the header meta line + modal default emails);
@@ -485,6 +527,10 @@ export default function InspectionHubPage() {
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
   const reportActionList = reportActions({ publish: canPublishCap }, inspection.reportStatus);
+
+  // IA-40 — when a version already exists, the next publish increments to
+  // versionNumber > 1 (an amendment), so the publish modal asks what changed.
+  const nextPublishIsAmendment = versions.length > 0;
 
   // Incomplete content: drives the count line, the "resolve" link, and whether
   // the action row has anything to hold.
@@ -816,6 +862,52 @@ export default function InspectionHubPage() {
               )}
             </>
           )}
+
+          {/* IA-40 — Report versions. The signed, immutable version history had
+              no entry point anywhere in the app; this is it. Each amendment
+              links to a field-level diff against its immediate predecessor. */}
+          {versions.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-ih-border">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-ih-fg-4 mb-2">
+                {m.inspections_hub_versions_title()}
+              </p>
+              <ul className="space-y-2">
+                {versions.map((v) => {
+                  const href = versionDiffHref(inspection.id, v.versionNumber);
+                  return (
+                    <li key={v.versionNumber} className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[13px] font-semibold text-ih-fg-1">
+                            {m.inspections_hub_versions_version({ n: v.versionNumber })}
+                          </span>
+                          {v.versionNumber > 1 && (
+                            <Pill tone="gen">{m.inspections_hub_versions_amendment()}</Pill>
+                          )}
+                          {v.publishedAt && (
+                            <span className="text-[11px] text-ih-fg-4">
+                              {formatInspectionDateTime(new Date(v.publishedAt * 1000).toISOString(), undefined, displayTz)}
+                            </span>
+                          )}
+                        </div>
+                        {v.summary && (
+                          <p className="text-[12px] text-ih-fg-3 mt-0.5 line-clamp-2">{v.summary}</p>
+                        )}
+                      </div>
+                      {href && (
+                        <Link
+                          to={href}
+                          className="shrink-0 text-[12px] font-bold text-ih-primary hover:underline"
+                        >
+                          {m.inspections_hub_versions_view_changes()}
+                        </Link>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
         </Card>
       </div>
 
@@ -862,6 +954,7 @@ export default function InspectionHubPage() {
         open={publishModal.open}
         agreementRequired={inspection.agreementRequired}
         paymentRequired={inspection.paymentRequired}
+        isAmendment={nextPublishIsAmendment}
         fetcher={publishModal.fetcher}
         submitting={publishModal.busy}
         error={publishModal.error}
