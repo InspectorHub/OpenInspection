@@ -1,7 +1,7 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
   "pca_severity_good": "Good",
-  "pca_severity_minor": "Minor",
+  "pca_severity_minor": "Not Applicable",
   "pca_severity_marginal": "Marginal",
   "pca_severity_significant": "Significant",
   "pca_signed_date": "Signed {date}",

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeReportStats, getRatingColor, getRatingBucket } from '../../../server/lib/report-utils';
+import { computeReportStats, getRatingColor, getRatingBucket, bucketToSeverity } from '../../../server/lib/report-utils';
 import { findingKey, DEFAULT_UNIT } from '../../../server/lib/finding-key';
 
 const defaultLevels = [
@@ -153,5 +153,23 @@ describe('computeReportStats', () => {
     expect(stats.satisfactory).toBe(1);
     expect(stats.monitor).toBe(1);
     expect(stats.other).toBe(1);
+  });
+});
+
+describe('bucketToSeverity', () => {
+  // IA-43 — the single, shared inverse of getRatingBucket. Replaces the local
+  // copy pca-systems-summary carried since IA-32 so the two value domains have
+  // one bridge, not several.
+  it('maps each getRatingBucket value back to its severity', () => {
+    expect(bucketToSeverity('satisfactory')).toBe('good');
+    expect(bucketToSeverity('monitor')).toBe('marginal');
+    expect(bucketToSeverity('defect')).toBe('significant');
+    expect(bucketToSeverity('other')).toBe('minor');
+  });
+
+  it('round-trips every severity through getRatingBucket and back', () => {
+    for (const level of defaultLevels) {
+      expect(bucketToSeverity(getRatingBucket(level.id, defaultLevels))).toBe(level.severity);
+    }
   });
 });

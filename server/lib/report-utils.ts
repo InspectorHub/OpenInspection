@@ -126,6 +126,27 @@ export function getRatingBucket(
 }
 
 /**
+ * IA-43 — the inverse of getRatingBucket: the report payload carries the bucket
+ * domain (`satisfactory | monitor | defect | other`), but the Systems Summary
+ * ranks on the severity domain (`good | marginal | significant | minor`). This
+ * is the single bridge between them; pca-systems-summary carried a private copy
+ * since IA-32 (where feeding the wrong domain made every bucket read as 'good').
+ * Unknown input falls to 'good' to match that original behaviour — getRatingBucket
+ * never emits anything but the four handled values.
+ */
+export function bucketToSeverity(
+  bucket: string | undefined,
+): 'good' | 'marginal' | 'significant' | 'minor' {
+  switch (bucket) {
+    case 'defect':       return 'significant';
+    case 'monitor':      return 'marginal';
+    case 'other':        return 'minor';
+    case 'satisfactory': return 'good';
+    default:             return 'good';
+  }
+}
+
+/**
  * Commercial PCA Phase F (F1) — distinguish "Not Inspected" (NI) from
  * "Not Present" (NP). Both seed levels map to bucket 'na' → severity 'minor'
  * (see server/data/rating-system-seeds.ts + map-rating-levels.ts), so they are
