@@ -23,9 +23,6 @@ export default [
   // Public pages — no auth, minimal layout, SSR for SEO
   layout("routes/public-layout.tsx", [
     route("book/:tenant", "routes/public/booking.tsx"),
-    // IA-26 — legacy per-inspector URL kept alive as a deep link: 302 to the
-    // company page with ?inspector=<slug> (preserves ?ref= and other params).
-    route("book/:tenant/:slug", "routes/public/booking-inspector-redirect.tsx"),
     route("report/:tenant/:id", "routes/public/report.tsx"),
     route(
       "agreements/sign/:tenant/:token",
@@ -65,13 +62,9 @@ export default [
   route("setup", "routes/setup.tsx"),
   route("join/:token", "routes/join.tsx"),
   route("version-diff/:id", "routes/version-diff.tsx"),
-  // Standalone public — no layout (iframe-friendly)
-  // IA-26 — company-level embed (no inspector slug); legacy per-inspector kept alive.
+  // Standalone public — no layout (iframe-friendly). Company-level embed only
+  // (no inspector slug); the server auto-assigns the first available inspector.
   route("embed/:tenant", "routes/public/booking-embed-company.tsx"),
-  route(
-    "embed/:tenant/:slug",
-    "routes/public/booking-embed.tsx",
-  ),
   // Standalone agent pages — no agent-layout chrome
   route("agent-invite/:token", "routes/agent/invite-accept.tsx"),
   route("agent-signup", "routes/agent/signup.tsx"),

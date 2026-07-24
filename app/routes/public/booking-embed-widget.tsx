@@ -1,26 +1,24 @@
 import { useEffect, useState } from "react";
-import { useLoaderData } from "react-router";
-import type { Route } from "./+types/booking-embed";
-import { createApi } from "~/lib/api-client.server";
-import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
-import { readLegalLinks } from "~/lib/legal-links.server";
 import { m } from "~/paraglide/messages";
 
-export function meta() {
-  return [{ title: m.booking_embed_meta_title() }];
-}
-
 /* ------------------------------------------------------------------ */
-/*  Types                                                              */
+/*  Shared embed widget                                                */
 /* ------------------------------------------------------------------ */
+/*
+ * The booking embed is company-level only (booking-embed-company.tsx): the
+ * server auto-assigns the first available qualified inspector. This module is
+ * the shared presentation the route renders — a plain component library, not a
+ * route itself. The per-inspector embed route (`/embed/:tenant/:slug`) was
+ * retired along with the other per-inspector booking URL forms.
+ */
 
 export interface EmbedData {
-  /** Inspector slug, or "" for company-level auto-assign (IA-26). */
+  /** Inspector slug, or "" for company-level auto-assign. */
   slug: string;
-  /** Inspector UUID, or "" for company-level auto-assign (IA-26). */
+  /** Inspector UUID, or "" for company-level auto-assign. */
   inspectorId: string;
-  /** Inspector name for per-inspector variant; company name for company variant. */
+  /** Company name for the company embed. */
   inspectorName: string;
   tenantSlug: string;
   siteKey: string;
@@ -30,69 +28,6 @@ export interface EmbedData {
   privacyUrl: string | null;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Loader                                                             */
-/* ------------------------------------------------------------------ */
-
-export async function loader({ params, request, context }: Route.LoaderArgs) {
-  const url = new URL(request.url);
-  const raw = url.searchParams.get("style");
-  const theme: EmbedData["theme"] =
-    raw === "dark" ? "dark" : raw === "branded" ? "branded" : "light";
-  try {
-    const api = createApi(context);
-    // C-6 — branded mode renders light with the tenant's accent tokens.
-    const [res, brand] = await Promise.all([
-      api.bookings.book[":tenant"][":slug"].$get({
-        param: { tenant: params.tenant ?? "", slug: params.slug ?? "" },
-      }),
-      theme === "branded" ? resolveTenantBrand(context, params.tenant) : Promise.resolve(null),
-    ]);
-    const body = res.ok ? await res.json() : {};
-    // Shape returned by GET /api/public/book/:tenant/:slug — see server/api/bookings.ts:
-    //   { inspectorId, name, company, avatar, turnstileSiteKey, services }
-    // NOTE: the field names here (`name`, `turnstileSiteKey`) differ from this
-    // route's EmbedData; map them explicitly rather than relying on matching keys.
-    const d = res.ok
-      ? (((body as Record<string, unknown>).data ?? null) as
-          | {
-              inspectorId?: string;
-              name?: string;
-              turnstileSiteKey?: string | null;
-              bookingOpen?: boolean;
-            }
-          | null)
-      : null;
-    const legal = readLegalLinks(context);
-    return {
-      data: d
-        ? ({
-            slug: params.slug ?? "",
-            inspectorId: d.inspectorId ?? "",
-            inspectorName: d.name ?? m.booking_inspector_default_name(),
-            tenantSlug: params.tenant ?? "",
-            siteKey: d.turnstileSiteKey ?? "",
-            theme,
-            brand,
-            bookingOpen: d.bookingOpen !== false,
-            privacyUrl: legal?.privacyUrl ?? null,
-          } satisfies EmbedData)
-        : null,
-      error: res.ok ? null : "Not found",
-    };
-  } catch {
-    return { data: null, error: "Service unavailable" };
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Shared embed widget — consumed by both route variants              */
-/* ------------------------------------------------------------------ */
-
-/**
- * IA-26 — exported so the company-level route (booking-embed-company.tsx)
- * can render the same widget with different EmbedData values.
- */
 export function EmbedWizard({
   data,
   error,
@@ -154,15 +89,6 @@ export function EmbedWizard({
 }
 
 /* ------------------------------------------------------------------ */
-/*  Page (no layout -- standalone iframe)                              */
-/* ------------------------------------------------------------------ */
-
-export default function BookingEmbedPage() {
-  const { data, error } = useLoaderData<typeof loader>();
-  return <EmbedWizard data={data} error={error} />;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Booking form fragment                                              */
 /* ------------------------------------------------------------------ */
 
@@ -177,7 +103,7 @@ function BookingForm({ data, privacyUrl }: { data: EmbedData; privacyUrl: string
 
     const fd = new FormData(e.currentTarget);
     try {
-      // IA-26 — omit inspectorId when empty so the server auto-assigns.
+      // Omit inspectorId when empty so the server auto-assigns.
       const inspectorId = fd.get("inspectorId") || "";
       const res = await fetch("/api/public/book", {
         method: "POST",

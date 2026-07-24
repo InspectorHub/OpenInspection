@@ -184,8 +184,11 @@ export function CommandPalette({
     const slug = sessionCtx?.branding?.currentUserSlug;
     const host = sessionCtx?.branding?.bookingHost;
     const tenant = sessionCtx?.branding?.tenantSlug;
+    // Per-inspector booking deep links are retired: bookings go to the
+    // company page and the server auto-assigns. `slug` still gates the action
+    // to bookable inspectors, but the copied link is the company URL.
     if (slug && host && tenant) {
-      const bookingUrl = `https://${host}/book/${tenant}/${slug}`;
+      const bookingUrl = `https://${host}/book/${tenant}`;
       actions.push({
         id: "qa-copy-booking-link",
         label: m.command_palette_action_copy_booking_link(),
