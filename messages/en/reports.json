@@ -1,5 +1,10 @@
 {
   "$schema": "https://inlang.com/schema/inlang-message-format",
+  "portal_report_lock_heading": "Your report isn't available yet",
+  "portal_report_lock_agreement_body": "Sign the inspection agreement to unlock your report.",
+  "portal_report_lock_payment_body": "Complete payment to unlock your report.",
+  "portal_report_lock_agreement_cta": "Sign agreement",
+  "portal_report_lock_payment_cta": "Complete payment",
   "report_defect_trade_label": "Recommended trade:",
   "report_defect_timeframe_label": "Timeframe:",
   "report_meta_title": "Report - {name} - OpenInspection",

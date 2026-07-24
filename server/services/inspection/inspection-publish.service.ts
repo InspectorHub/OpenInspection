@@ -183,9 +183,13 @@ export class InspectionPublishService extends InspectionSubService {
             actionUrl = `/invoice/${inspectionId}`;
             actionLabel = 'Pay invoice';
         } else {
+            // IA-45 — when no signer link can be reconstructed, fall back to the
+            // Hub overview (which now carries the lock reason + CTA inline), never
+            // to /report-gate: that route is retired and the old self-reference
+            // formed a closed loop (the page's own CTA pointed back at itself).
             actionUrl = agreementLinkToken
                 ? `/agreements/sign/${tenantSlug}/${agreementLinkToken}`
-                : `/report-gate/${tenantSlug}/${inspectionId}`;
+                : `/portal/${tenantSlug}/i/${inspectionId}?section=overview`;
             actionLabel = 'Sign agreement';
         }
 

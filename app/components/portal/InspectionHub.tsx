@@ -1,7 +1,7 @@
 import type React from "react";
 import { Link } from "react-router";
 import { brandTokens, type TenantBrand } from "~/lib/brand";
-import InspectionStatusCards, { type StatusOverview } from "./InspectionStatusCards";
+import InspectionStatusCards, { reportLockNotice, type StatusOverview } from "./InspectionStatusCards";
 import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
 import { m } from "~/paraglide/messages";
 
@@ -167,10 +167,44 @@ export default function InspectionHub({
       {/* Body — overview shows the status cards; any other section renders the
           route-supplied slot. */}
       {activeSection === "overview" ? (
-        <InspectionStatusCards overview={overview} />
+        <OverviewBody overview={overview} ctx={ctx} />
       ) : (
         <section className="mt-2">{sectionSlot}</section>
       )}
     </div>
+  );
+}
+
+/**
+ * IA-45 — overview body: an inline "why the report is locked + next step"
+ * notice (absorbed from the retired /report-gate page) above the status cards.
+ * The notice only appears when an agreement or payment is outstanding.
+ */
+function OverviewBody({ overview, ctx }: { overview: StatusOverview; ctx: HubLinkCtx }) {
+  const lock = reportLockNotice(overview);
+  return (
+    <>
+      {lock && (
+        <div className="mb-3 rounded-lg border border-ih-watch bg-ih-watch-bg p-4">
+          <p className="text-sm font-semibold text-ih-watch-fg">
+            {m.portal_report_lock_heading()}
+          </p>
+          <p className="mt-1 text-[13px] text-ih-watch-fg">
+            {lock.reason === "agreement"
+              ? m.portal_report_lock_agreement_body()
+              : m.portal_report_lock_payment_body()}
+          </p>
+          <Link
+            to={hubSectionNavHref(lock.section, ctx)}
+            className="mt-3 inline-flex items-center justify-center h-9 px-4 rounded-md text-[13px] font-bold text-ih-primary-fg bg-ih-primary hover:opacity-95 transition"
+          >
+            {lock.reason === "agreement"
+              ? m.portal_report_lock_agreement_cta()
+              : m.portal_report_lock_payment_cta()}
+          </Link>
+        </div>
+      )}
+      <InspectionStatusCards overview={overview} />
+    </>
   );
 }

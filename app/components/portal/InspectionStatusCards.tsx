@@ -92,6 +92,27 @@ export function statusCardModels(ov: StatusOverview): StatusCardModel[] {
   ];
 }
 
+/**
+ * IA-45 — what (if anything) is keeping the client from their report, and which
+ * Hub section resolves it. The report is gated behind the agreement first, then
+ * payment (same precedence as the server's report-gate context). Returns null
+ * when nothing is outstanding — a not-yet-published report with no gate is
+ * simply pending on the inspector, not something the client can act on.
+ *
+ * Pure so the overview can render a "here's why + next step" notice without a
+ * second server round-trip; the retired /report-gate page's explanation now
+ * lives inline on the Hub the client already reaches.
+ */
+export type ReportLockReason = "agreement" | "payment";
+
+export function reportLockNotice(
+  ov: Pick<StatusOverview, "agreementSigned" | "paymentStatus">,
+): { reason: ReportLockReason; section: "agreement" | "payment" } | null {
+  if (!ov.agreementSigned) return { reason: "agreement", section: "agreement" };
+  if (ov.paymentStatus.toLowerCase() !== "paid") return { reason: "payment", section: "payment" };
+  return null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Component */
 /* ------------------------------------------------------------------ */

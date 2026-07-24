@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { statusCardModels } from '../../../app/components/portal/InspectionStatusCards';
+import { statusCardModels, reportLockNotice } from '../../../app/components/portal/InspectionStatusCards';
 import { hubSectionNavHref } from '../../../app/components/portal/InspectionHub';
 describe('portal hub models', () => {
   it('statusCardModels renders 6 cards with correct states', () => {
@@ -25,5 +25,23 @@ describe('portal hub models', () => {
     // No token → clean URL with no query when overview.
     expect(hubSectionNavHref('overview', { tenant:'t', inspectionId:'i', token:'' }))
       .toBe('/portal/t/i/i');
+  });
+});
+
+describe('reportLockNotice (IA-45)', () => {
+  it('agreement gate takes precedence when unsigned', () => {
+    expect(reportLockNotice({ agreementSigned: false, paymentStatus: 'unpaid' }))
+      .toEqual({ reason: 'agreement', section: 'agreement' });
+  });
+  it('payment gate when signed but unpaid', () => {
+    expect(reportLockNotice({ agreementSigned: true, paymentStatus: 'unpaid' }))
+      .toEqual({ reason: 'payment', section: 'payment' });
+  });
+  it('partial payment still gates', () => {
+    expect(reportLockNotice({ agreementSigned: true, paymentStatus: 'partial' }))
+      .toEqual({ reason: 'payment', section: 'payment' });
+  });
+  it('no notice once signed and paid (case-insensitive)', () => {
+    expect(reportLockNotice({ agreementSigned: true, paymentStatus: 'Paid' })).toBeNull();
   });
 });

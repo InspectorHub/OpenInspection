@@ -32,7 +32,7 @@
   "server/api/calendar.ts": 547,
   "app/components/NewInspectionWizard.tsx": 545,
   "server/api/inspections/core.ts": 541,
-  "server/services/inspection/inspection-publish.service.ts": 536,
+  "server/services/inspection/inspection-publish.service.ts": 540,
   "server/services/agent/referral.ts": 533,
   "server/services/inspection/inspection-photo.service.ts": 531,
   "server/api/inspections/media-studio.ts": 529,
