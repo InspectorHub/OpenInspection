@@ -167,6 +167,8 @@ export default [
     route("agent-dashboard", "routes/agent/dashboard.tsx"),
     route("agent-settings/profile", "routes/agent/settings-profile.tsx"),
     route("agent-inspectors", "routes/agent/inspectors.tsx"),
-    route("agent-recommendations", "routes/agent/recommendations.tsx"),
+    route("agent-repair-items", "routes/agent/repair-items.tsx"),
+    // IA-54 — old path 301s to the renamed one.
+    route("agent-recommendations", "routes/agent/agent-repair-items-redirect.tsx"),
   ]),
 ] satisfies RouteConfig;

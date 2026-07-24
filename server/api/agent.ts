@@ -63,7 +63,8 @@ const getReportsRoute = createRoute(withMcpMetadata({
  */
 const myRecommendationsRoute = createRoute(withMcpMetadata({
     method: 'get',
-    path: '/my-recommendations',
+    // IA-54 — canonical name is "repair items" (matches the agent page + sidebar).
+    path: '/my-repair-items',
     tags: ["agents"],
     summary: 'Defects from referred inspections grouped by category',
     responses: {
@@ -75,8 +76,8 @@ const myRecommendationsRoute = createRoute(withMcpMetadata({
         403: { description: 'Forbidden' },
     },
     security: [{ bearerAuth: [] }],
-    operationId: "listAgentMyRecommendations",
-    description: "Auto-generated placeholder for listAgentMyRecommendations (GET /my-recommendations, agents domain). TODO: replace with a real description sourced from the handler."
+    operationId: "listAgentMyRepairItems",
+    description: "Repair items (defects from the agent's referred, delivered inspections) grouped by category. GET /my-repair-items, agents domain."
 }, { scopes: ['agent'], tier: 'extended' }));
 
 /**
