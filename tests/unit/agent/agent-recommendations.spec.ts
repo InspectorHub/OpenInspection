@@ -7,7 +7,7 @@
  * (`_default:{sectionId}:{itemId}` → `.tabs.defects[]`).
  */
 import { describe, it, expect } from 'vitest';
-import { flattenInspectionToRecommendations, type RawInspectionForRecommendations } from '../../../server/services/agent-recommendations';
+import { flattenInspectionToRecommendations, groupRecommendations, type AgentRecommendationRow, type RawInspectionForRecommendations } from '../../../server/services/agent-recommendations';
 
 const snapshot = {
     sections: [{
@@ -53,5 +53,59 @@ describe('flattenInspectionToRecommendations — storage-shaped results', () => 
 
     it('returns nothing when there are no recorded results', () => {
         expect(flattenInspectionToRecommendations(raw({}))).toHaveLength(0);
+    });
+});
+
+// IA-41 — the agent feed was the only consumer that dropped field-added custom
+// defects and defects tagged with a tenant custom category. Both must surface.
+const snap2 = {
+    sections: [{
+        id: 's', title: 'Sec',
+        items: [{ id: 'it', label: 'Item', tabs: { defects: [{ id: 'dc', title: 'Canned', category: 'Environmental', comment: 'c' }] } }],
+    }],
+};
+const raw2 = (resultsData: unknown): RawInspectionForRecommendations =>
+    ({ id: 'i', propertyAddress: 'A', date: 'd', templateSnapshot: snap2, resultsData });
+
+describe('flattenInspectionToRecommendations — custom defects + tenant categories (IA-41)', () => {
+    it('surfaces field-added custom defects with isCustom=true', () => {
+        const rows = flattenInspectionToRecommendations(raw2({
+            '_default:s:it': { customComments: { defects: [{ id: 'cd1', title: 'Cracked pane', comment: 'note', category: 'safety', included: true }] } },
+        }));
+        const custom = rows.find((r) => r.defectTitle === 'Cracked pane');
+        expect(custom).toBeTruthy();
+        expect(custom?.isCustom).toBe(true);
+        expect(custom?.category).toBe('safety');
+        expect(custom?.comment).toBe('note');
+    });
+
+    it('does not drop a defect tagged with a tenant custom category', () => {
+        const rows = flattenInspectionToRecommendations(raw2({
+            '_default:s:it': { tabs: { defects: [{ cannedId: 'dc', included: true }] } },
+        }));
+        expect(rows).toHaveLength(1);
+        expect(rows[0].category).toBe('Environmental');
+        expect(rows[0].isCustom).toBe(false);
+    });
+
+    it('excludes custom defects marked not included', () => {
+        const rows = flattenInspectionToRecommendations(raw2({
+            '_default:s:it': { customComments: { defects: [{ id: 'cd1', title: 'X', comment: '', category: 'safety', included: false }] } },
+        }));
+        expect(rows).toHaveLength(0);
+    });
+});
+
+describe('groupRecommendations — custom categories merge into recommendation (IA-41)', () => {
+    const row = (category: string, isCustom = false): AgentRecommendationRow => ({
+        inspectionId: 'i', propertyAddress: 'A', inspectionDate: 'd', sectionTitle: 'S',
+        itemLabel: 'I', defectTitle: 'D', category, comment: '', location: null, photos: [], isCustom,
+    });
+    it('files safety and maintenance directly; recommendation + any custom category merge into recommendation', () => {
+        const g = groupRecommendations([row('safety'), row('maintenance'), row('recommendation'), row('Environmental'), row('Historic', true)]);
+        expect(g.safety).toHaveLength(1);
+        expect(g.maintenance).toHaveLength(1);
+        expect(g.recommendation).toHaveLength(3);
+        expect(g.recommendation.map((r) => r.category)).toContain('Environmental');
     });
 });

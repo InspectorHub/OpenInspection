@@ -8605,9 +8605,9 @@
     "description": "Auto-generated placeholder for listAgentLinks (GET /links, agents domain). TODO: replace with a real description sourced from the handler."
   },
   {
-    "operationId": "listAgentMyRecommendations",
+    "operationId": "listAgentMyRepairItems",
     "method": "GET",
-    "pathTemplate": "/api/agent/my-recommendations",
+    "pathTemplate": "/api/agent/my-repair-items",
     "scopes": [
       "agent"
     ],
@@ -8618,7 +8618,7 @@
       "body": null
     },
     "summary": "Defects from referred inspections grouped by category",
-    "description": "Auto-generated placeholder for listAgentMyRecommendations (GET /my-recommendations, agents domain). TODO: replace with a real description sourced from the handler."
+    "description": "Repair items (defects from the agent's referred, delivered inspections) grouped by category. GET /my-repair-items, agents domain."
   },
   {
     "operationId": "listAgentMyReports",
