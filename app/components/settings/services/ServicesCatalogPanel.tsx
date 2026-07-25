@@ -32,7 +32,8 @@ interface ServicesCatalogPanelProps {
   onEdit?: (id: string | null) => void;
 }
 
-/** "1 hr 30 min" / "1 hr" / "45 min", or "Not set" when the service carries none. */
+/** "1h 30m" / "1h" / "45m", or "Not set" when the service carries none. Compact
+ *  because the DURATION column is narrow enough that "1 hr 30 min" wrapped. */
 function durationLabel(minutes: number | null): string {
   const split = splitDurationMinutes(minutes);
   if (!split) return m.settings_services_duration_unset();

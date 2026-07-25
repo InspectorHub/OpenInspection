@@ -17,7 +17,7 @@ import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
-import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
+import type { PillTone } from "~/lib/hub-blocks";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,
@@ -558,8 +558,10 @@ export default function InspectionHubPage() {
   const invoiceSent = hub.invoice?.status === "sent" || hub.invoice?.status === "partial";
 
   return (
-    /* ds-allow: page bottom gutter (60px), bespoke page-shell spacing with no token */
-    <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-ih-list">
+    // The page shell (width, gutters) belongs to the auth layout this route now
+    // renders inside — it was duplicated here, verbatim, from the days when the
+    // hub stood outside it without the workspace nav.
+    <div className="space-y-ih-list">
       {/* Breadcrumb — Inspections > this inspection */}
       <Breadcrumb
         items={[
@@ -586,9 +588,8 @@ export default function InspectionHubPage() {
         }
         actions={
           <>
-            {/* Shared theme control (xl+; keeps this read-only hub consistent
-                with the editor it links into). */}
-            <ThemeSegmentControl className="hidden xl:flex" />
+            {/* The theme control that used to sit here was standing in for the
+                sidebar's user menu, which this page did not have. It does now. */}
             <Link
               to={`/inspections/${inspection.id}/edit`}
               className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600"
@@ -1035,30 +1036,29 @@ function ClientSmsConsent({
 
   const label =
     consent === "granted" ? m.inspections_hub_sms_granted() : consent === "revoked" ? m.inspections_hub_sms_revoked() : m.inspections_hub_sms_not_recorded();
-  const tone =
-    consent === "granted" ? "text-ih-ok-fg" : consent === "revoked" ? "text-ih-bad-fg" : "text-ih-fg-4";
+  const tone: PillTone =
+    consent === "granted" ? "sat" : consent === "revoked" ? "defect" : "neutral";
 
+  // A heading, because every other card on this page has one and without it this
+  // card read as a divider between two others. And a button rather than an 11px
+  // text link, because recording that a client agreed to be texted is a claim the
+  // operator stands behind — the weakest control on the page was carrying the
+  // page's only legal attestation.
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-      <span className="text-ih-fg-3">
-        {m.inspections_hub_sms_label()} <span className={`font-bold ${tone}`}>{label}</span>
-      </span>
-      {/* Offer the attestation only when not already granted. Framed as an
-          inspector confirmation that the client agreed (not a consent-less
-          override) — the deliberate basis for phone/in-person bookings. */}
+    <div className="space-y-2">
+      <BlockHeading title={m.inspections_hub_sms_heading()} pill={{ tone, label }} />
       {consent !== "granted" && (
-        <fetcher.Form method="post">
-          <input type="hidden" name="intent" value="attest-sms" />
-          <button
-            type="submit"
-            disabled={attesting}
-            className="text-[11px] font-bold text-ih-primary hover:underline disabled:opacity-60"
-          >
-            {attesting ? m.inspections_hub_sms_recording() : m.inspections_hub_sms_confirm()}
-          </button>
-        </fetcher.Form>
+        <>
+          <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_sms_explainer()}</p>
+          <fetcher.Form method="post">
+            <input type="hidden" name="intent" value="attest-sms" />
+            <Button type="submit" variant="secondary" size="sm" disabled={attesting}>
+              {attesting ? m.inspections_hub_sms_recording() : m.inspections_hub_sms_confirm()}
+            </Button>
+          </fetcher.Form>
+        </>
       )}
-      {error && <span className="text-ih-bad-fg">{error}</span>}
+      {error && <p className="text-[12px] text-ih-bad-fg">{error}</p>}
     </div>
   );
 }

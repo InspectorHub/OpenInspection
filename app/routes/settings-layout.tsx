@@ -14,7 +14,10 @@ export default function SettingsLayout() {
   return (
     <div>
       {isHub && <PageHeader title={m.settings_crumb_settings()} />}
-      <div className={`max-w-3xl ${isHub ? "mt-ih-list" : ""}`}>
+      {/* Subpages are forms — a reading column. The hub is a three-across grid of
+          cards, and squeezing it into the same 768px wrapped every card's
+          description onto three lines while a quarter of the page sat empty. */}
+      <div className={isHub ? "mt-ih-list" : "max-w-3xl"}>
         <Outlet />
       </div>
     </div>

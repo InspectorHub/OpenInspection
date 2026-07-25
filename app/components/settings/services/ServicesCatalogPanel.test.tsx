@@ -47,7 +47,9 @@ const base = {
 describe("ServicesCatalogPanel", () => {
     it("renders a stored duration in hours and minutes", () => {
         renderPanel([{ ...base, durationMinutes: 90, templateId: "tpl-1" }]);
-        expect(screen.getByText("1 hr 30 min")).toBeTruthy();
+        // Compact: the column is narrow enough that "1 hr 30 min" wrapped onto
+        // two lines while the cell beside it had room to spare.
+        expect(screen.getByText("1h 30m")).toBeTruthy();
     });
 
     it("renders whole hours and bare minutes without a zero component", () => {
@@ -55,8 +57,8 @@ describe("ServicesCatalogPanel", () => {
             { ...base, id: "a", name: "A", durationMinutes: 120, templateId: "tpl-1" },
             { ...base, id: "b", name: "B", durationMinutes: 45, templateId: "tpl-1" },
         ]);
-        expect(screen.getByText("2 hr")).toBeTruthy();
-        expect(screen.getByText("45 min")).toBeTruthy();
+        expect(screen.getByText("2h")).toBeTruthy();
+        expect(screen.getByText("45m")).toBeTruthy();
     });
 
     it("says a duration is not set rather than showing a bare dash", () => {

@@ -207,7 +207,11 @@ export default function VerifyTokenPage() {
   if (model.state === "legacy") {
     return (
       <div className="max-w-xl mx-auto p-6">
-        <div className="rounded-lg bg-ih-warn-bg text-ih-warn-fg p-4 text-center mb-6">
+        {/* `ih-warn-*` is not a token in this design system — the warning tone is
+            `ih-watch-*`. As written, this banner had no background and inherited
+            its text colour, so the one thing on the page that needed to stand out
+            did not. */}
+        <div className="rounded-lg bg-ih-watch-bg text-ih-watch-fg p-4 text-center mb-6">
           <p className="text-lg font-bold">
             {m.report_verify_legacy_heading()}
           </p>
