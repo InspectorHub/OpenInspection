@@ -31,6 +31,7 @@ import {
   type TabKey,
 } from "~/lib/dashboard-schema";
 import { matchesFilter, matchesWorkflow, tabMatches } from "~/lib/dashboard-filters";
+import { dedupeBucketMembership, emptyDashboard } from "~/lib/dashboard-buckets";
 import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspectionRow";
 import { FiltersDrawer } from "~/components/dashboard/FiltersDrawer";
 import { ColumnsPopover } from "~/components/dashboard/ColumnsPopover";
@@ -50,34 +51,6 @@ export function meta() {
 /* ------------------------------------------------------------------ */
 /*  Loader                                                             */
 /* ------------------------------------------------------------------ */
-
-// Empty dashboard payload — the loader's fail-closed fallback. Returning it from
-// a single source keeps the bucket shape identical to the success path (the two
-// must stay in sync, so we never let them drift).
-function emptyDashboard() {
-  return {
-    buckets: {
-      needsAttention: [] as Inspection[],
-      today: [] as Inspection[],
-      thisWeek: [] as Inspection[],
-      later: [] as Inspection[],
-      recentReports: [] as Inspection[],
-      cancelled: [] as Inspection[],
-    },
-    conciergePending: 0,
-    greeting: m.inspections_list_greeting_morning(),
-    tags: [] as Tag[],
-    templates: [] as TemplateOption[],
-    services: [] as ServiceOption[],
-    teamMembers: [] as WizardTeamMember[],
-    checklistDismissed: false,
-    templateCount: 0,
-    serviceCount: 0,
-    scheduleSet: false,
-    quotaCaps: null as { inspections: number; sms: number; email: number } | null,
-    quotaUsage: null as { inspections: number; sms: number; email: number } | null,
-  };
-}
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
@@ -405,7 +378,9 @@ export default function InspectionsPage() {
       const f = items.filter((i) => matchesWorkflow(i, activeTab));
       if (f.length > 0) result[key] = f;
     }
-    return result;
+    // The payload's buckets overlap on purpose — the stat cards read them as
+    // separate lenses — but the list showed one inspection as two rows.
+    return dedupeBucketMembership(result);
   }, [buckets, activeTab, activeFilter, searchQuery, activeTagFilter, filterDateFrom, filterDateTo, filterAgentId]);
 
   /* ---- Paginated list for flat mode ---- */
