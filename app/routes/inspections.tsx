@@ -14,7 +14,7 @@ import { useSessionContext, useDisplayTimeZone } from "~/hooks/useSessionContext
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
 import { getScheduleSet } from "~/lib/schedule-onboarding.server";
 import { INSPECTION_STATUS, isReportPublished } from "~/lib/status";
-import { PageHeader, TabStrip, Pill, Card, EmptyState, Button, Icon } from "@core/shared-ui";
+import { PageHeader, TabStrip, Pill, Card, Button, Icon } from "@core/shared-ui";
 import {
   DEFAULT_COLUMNS,
   ALWAYS_ON,
@@ -35,6 +35,9 @@ import { DashboardInspectionRow } from "~/components/dashboard/DashboardInspecti
 import { FiltersDrawer } from "~/components/dashboard/FiltersDrawer";
 import { ColumnsPopover } from "~/components/dashboard/ColumnsPopover";
 import { InspectionsToolbar } from "~/components/dashboard/InspectionsToolbar";
+import { InspectionsFilterStrip } from "~/components/dashboard/InspectionsFilterStrip";
+import { InspectionsEmptyState } from "~/components/dashboard/InspectionsEmptyState";
+import { InspectionsStatCards } from "~/components/dashboard/InspectionsStatCards";
 import { m } from "~/paraglide/messages";
 
 // Re-exported for unit tests (tests/web import these from ~/routes/inspections).
@@ -580,6 +583,41 @@ export default function InspectionsPage() {
     ? Object.values(filteredBuckets).flat().length
     : filteredInspections.length;
 
+  // Everything that can narrow the list — read by the empty state to tell
+  // "nothing here" from "nothing matching", and cleared as a set below.
+  const listFilterState = {
+    tab: activeTab,
+    timeFilter: activeFilter,
+    tagId: activeTagFilter,
+    dateFrom: filterDateFrom,
+    dateTo: filterDateTo,
+    agentId: filterAgentId,
+    search: searchQuery,
+  };
+
+  // The workflow tab lives in the URL, not in state — one writer for it, used by
+  // the tab strip and by "Clear filters".
+  //   replace:true so tab flips don't pollute browser history;
+  //   preventScrollReset keeps the list scroll position on switch.
+  function setWorkflowTab(id: string) {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id === "all") next.delete("workflow");
+      else next.set("workflow", id);
+      return next;
+    }, { replace: true, preventScrollReset: true });
+  }
+
+  function clearAllFilters() {
+    setActiveFilter("all");
+    setActiveTagFilter("");
+    setSearchQuery("");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setFilterAgentId("");
+    setWorkflowTab("all");
+  }
+
   // #111: tenant slug for the public report deep-link (Published tab). Available
   // from the auth-layout session context the dashboard already consumes.
   const tenantSlug = sessionCtx?.branding?.tenantSlug ?? null;
@@ -670,22 +708,7 @@ export default function InspectionsPage() {
       />
 
       {/* Stat cards — quick-jump to buckets */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: m.inspections_list_stat_upcoming(), value: counts.upcoming, icon: "calendar" as const, color: "text-ih-primary bg-ih-primary-tint" },
-          { label: m.inspections_list_stat_in_progress(), value: counts.inProgress, icon: "edit" as const, color: "text-ih-watch-fg bg-ih-watch-bg" },
-          { label: m.inspections_list_stat_needs_attention(), value: counts.needsAttention, icon: "zap" as const, color: "text-ih-bad-fg bg-ih-bad-bg" },
-          { label: m.inspections_list_stat_recent_reports(), value: counts.recent, icon: "check" as const, color: "text-ih-ok-fg bg-ih-ok-bg" },
-        ].map((stat) => (
-          <Card key={stat.label} className="p-ih-card cursor-pointer hover:shadow-ih-popover transition-all">
-            <div className={`w-10 h-10 rounded-md flex items-center justify-center mb-3 ${stat.color}`}>
-              <Icon name={stat.icon} size={20} />
-            </div>
-            <div className="text-xl font-bold text-ih-fg-1 tabular-nums">{stat.value}</div>
-            <div className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-[0.15em]">{stat.label}</div>
-          </Card>
-        ))}
-      </div>
+      <InspectionsStatCards counts={counts} />
 
       {/* IA-12 — Onboarding checklist (hidden when dismissed or allDone) */}
       <OnboardingChecklist
@@ -705,51 +728,17 @@ export default function InspectionsPage() {
       <TabStrip
         tabs={TABS.map((t) => ({ id: t.key, label: t.label, count: t.key === "all" ? undefined : (tabCounts[t.key] ?? 0) }))}
         activeId={activeTab}
-        onChange={(id) =>
-          setSearchParams(
-            (prev) => {
-              const next = new URLSearchParams(prev);
-              if (id === "all") next.delete("workflow");
-              else next.set("workflow", id);
-              return next;
-            },
-            // replace:true so tab flips don't pollute browser history;
-            // preventScrollReset keeps the list scroll position on switch.
-            { replace: true, preventScrollReset: true },
-          )
-        }
+        onChange={setWorkflowTab}
       />
 
-      {/* Time filter strip — underline style */}
-      <div className="flex items-center gap-0 flex-wrap border-b border-ih-border">
-        {INSPECTION_FILTERS.map((f) => (
-          <button
-            key={f.id}
-            onClick={() => setActiveFilter(f.id)}
-            className={`px-3 py-2 border-b-2 text-[11px] font-bold transition-colors ${
-              activeFilter === f.id
-                ? "border-ih-primary text-ih-primary"
-                : "border-transparent text-ih-fg-3 hover:text-ih-fg-1"
-            }`}
-          >
-            {f.label}
-            <span className="ml-1 opacity-70">{filterCounts[f.id] ?? 0}</span>
-          </button>
-        ))}
-        {/* Tag filter */}
-        {tags.length > 0 && (
-          <select
-            value={activeTagFilter}
-            onChange={(e) => setActiveTagFilter(e.target.value)}
-            className="h-7 px-2 rounded-md text-[11px] font-bold bg-ih-bg-muted text-ih-fg-3 border-0 outline-none ml-2"
-          >
-            <option value="">{m.inspections_list_filter_all_tags()}</option>
-            {tags.map((t) => (
-              <option key={t.id} value={t.id}>{t.name}</option>
-            ))}
-          </select>
-        )}
-      </div>
+      <InspectionsFilterStrip
+        activeFilter={activeFilter}
+        setActiveFilter={setActiveFilter}
+        filterCounts={filterCounts}
+        tags={tags}
+        activeTagFilter={activeTagFilter}
+        setActiveTagFilter={setActiveTagFilter}
+      />
 
       {/* Table toolbar strip — list controls (search + filters + columns).
           Split out of the page header per the DS two-layer actions convention.
@@ -775,13 +764,20 @@ export default function InspectionsPage() {
         </div>
       )}
 
-      {/* Inspection list */}
+      {/* Inspection list. An empty list has two causes and they need opposite
+          remedies: a workspace with nothing in it wants a way to create the
+          first inspection, and a list emptied by filters wants those filters
+          gone. It used to say the first thing in both cases — telling a
+          workspace with two hundred inspections that it had none — and to point
+          at a button ("+ New Inspection") that does not exist under that name,
+          instead of containing one. */}
       {totalFiltered === 0 ? (
         <Card>
-          <EmptyState
-            icon={<Icon name="check" size={32} />}
-            title={m.inspections_list_empty_title()}
-            description={m.inspections_list_empty_desc()}
+          <InspectionsEmptyState
+            totalAll={allInspections.length}
+            filters={listFilterState}
+            onClearFilters={clearAllFilters}
+            onCreate={() => navigate("/inspections/new")}
           />
         </Card>
       ) : filteredBuckets ? (

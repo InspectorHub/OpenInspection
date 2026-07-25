@@ -94,3 +94,58 @@ export function reportStateLabel(reportStatus: string): string {
   if (reportStatus === "published") return "Published";
   return reportStatus;
 }
+
+/* ------------------------------------------------------------------ */
+/*  Empty list: nothing here, or nothing matching?                     */
+/* ------------------------------------------------------------------ */
+
+/** Every control that can narrow the inspection list. `"all"` means "not narrowing". */
+export interface ListFilterState {
+    tab: string;
+    timeFilter: string;
+    tagId: string;
+    dateFrom: string;
+    dateTo: string;
+    agentId: string;
+    search: string;
+}
+
+/**
+ * Which narrowing controls are currently set.
+ *
+ * The empty state used to be driven by the FILTERED count alone, so a workspace
+ * with two hundred inspections was told it had none as soon as a tab, a tag or a
+ * search excluded them all — and offered "create your first one" as the remedy
+ * for a list that was merely filtered. A date range counts as ONE filter: from
+ * and to are two ends of a single control.
+ */
+export function activeListFilters(f: ListFilterState): string[] {
+    const active: string[] = [];
+    if (f.tab && f.tab !== "all") active.push("workflow");
+    if (f.timeFilter && f.timeFilter !== "all") active.push("time");
+    if (f.tagId) active.push("tag");
+    if (f.dateFrom || f.dateTo) active.push("date");
+    if (f.agentId) active.push("agent");
+    if (f.search.trim()) active.push("search");
+    return active;
+}
+
+/**
+ * Why is the list empty — because the workspace has no inspections, or because
+ * the filters exclude all of them?
+ *
+ * `totalAll` is what the loader returned before filtering. With any filter set
+ * the answer is always "no matches": search also queries the server, so a zero
+ * local count with a query in the box says nothing about whether the workspace
+ * is empty.
+ */
+export function emptyListReason(
+    totalAll: number,
+    f: ListFilterState,
+): "no-inspections" | "no-matches" {
+    if (activeListFilters(f).length > 0) return "no-matches";
+    // With nothing filtering, an empty list means an empty workspace — and
+    // `totalAll > 0` cannot reach here, since the caller only asks when the
+    // rendered count is zero. Named anyway so the argument is not decoration.
+    return totalAll > 0 ? "no-matches" : "no-inspections";
+}

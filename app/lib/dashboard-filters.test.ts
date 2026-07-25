@@ -9,7 +9,7 @@
  * they carry — the rename must not quietly change what each filter selects.
  */
 import { describe, it, expect } from "vitest";
-import { matchesFilter } from "./dashboard-filters";
+import { matchesFilter, activeListFilters, emptyListReason } from "./dashboard-filters";
 import { INSPECTION_FILTERS, type FilterId } from "./dashboard-schema";
 import type { Inspection } from "./dashboard-schema";
 
@@ -49,4 +49,71 @@ describe("dashboard filter vocabulary", () => {
       expect(f.label).not.toBe(f.id);
     }
   });
+});
+
+/**
+ * Batch D — the list's empty state said "No inspections yet. Click + New
+ * Inspection above to get started." whenever the FILTERED count hit zero, so a
+ * workspace with two hundred inspections was told it had none the moment a tab,
+ * a tag or a search excluded them all. And the button it named does not exist:
+ * the real control reads "New Inspection", it is at the top of the page, and an
+ * empty state is exactly the place to put one rather than point at one.
+ *
+ * These two decide which of the two situations it is, and what to offer.
+ */
+describe("activeListFilters", () => {
+    const none = {
+        tab: "all", timeFilter: "all", tagId: "", dateFrom: "", dateTo: "", agentId: "", search: "",
+    };
+
+    it("reports nothing active when the list is unfiltered", () => {
+        expect(activeListFilters(none)).toEqual([]);
+    });
+
+    it("names each narrowing control that is set", () => {
+        expect(activeListFilters({ ...none, tab: "published" })).toEqual(["workflow"]);
+        expect(activeListFilters({ ...none, timeFilter: "week" })).toEqual(["time"]);
+        expect(activeListFilters({ ...none, tagId: "tag-1" })).toEqual(["tag"]);
+        expect(activeListFilters({ ...none, dateFrom: "2026-01-01" })).toEqual(["date"]);
+        expect(activeListFilters({ ...none, dateTo: "2026-01-31" })).toEqual(["date"]);
+        expect(activeListFilters({ ...none, agentId: "c-1" })).toEqual(["agent"]);
+        expect(activeListFilters({ ...none, search: "smith" })).toEqual(["search"]);
+    });
+
+    it("counts a date RANGE as one filter, not two", () => {
+        expect(activeListFilters({ ...none, dateFrom: "2026-01-01", dateTo: "2026-01-31" }))
+            .toEqual(["date"]);
+    });
+
+    it("ignores whitespace-only search text", () => {
+        expect(activeListFilters({ ...none, search: "   " })).toEqual([]);
+    });
+
+    it("lists every active filter together", () => {
+        expect(activeListFilters({ ...none, tab: "to_review", tagId: "t", search: "x" }))
+            .toEqual(["workflow", "tag", "search"]);
+    });
+});
+
+describe("emptyListReason", () => {
+    const none = {
+        tab: "all", timeFilter: "all", tagId: "", dateFrom: "", dateTo: "", agentId: "", search: "",
+    };
+
+    it("is 'no-inspections' only for a workspace that genuinely has none", () => {
+        expect(emptyListReason(0, none)).toBe("no-inspections");
+    });
+
+    it("is 'no-matches' when a filter is what emptied the list", () => {
+        // The defect: 200 inspections, a tab that excludes all of them, and the
+        // UI concluding the workspace was empty.
+        expect(emptyListReason(200, { ...none, tab: "published" })).toBe("no-matches");
+        expect(emptyListReason(200, { ...none, search: "nobody" })).toBe("no-matches");
+    });
+
+    it("is 'no-matches' when a search returns nothing, even with no rows loaded", () => {
+        // Search also queries the server, so a zero local count with a query in
+        // the box says nothing about whether the workspace is empty.
+        expect(emptyListReason(0, { ...none, search: "nobody" })).toBe("no-matches");
+    });
 });

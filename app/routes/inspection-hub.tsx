@@ -13,7 +13,7 @@ import {
   publishNotified,
   type HubPayload,
 } from "~/lib/hub-blocks";
-import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
+import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
@@ -23,6 +23,8 @@ import DocumentsSection, {
   type DocumentCategory,
   type DocumentVisibility,
 } from "~/components/DocumentsSection";
+import { BlockHeading } from "~/components/inspection-hub/BlockHeading";
+import { LifecycleCard } from "~/components/inspection-hub/LifecycleCard";
 import { SendAgreementModal } from "~/components/inspection-hub/SendAgreementModal";
 import { RequestPaymentModal } from "~/components/inspection-hub/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspection-hub/PublishReportModal";
@@ -482,7 +484,6 @@ export default function InspectionHubPage() {
   const returnReport = useFetcher<typeof action>();
   const unpublishReport = useFetcher<typeof action>();
   const completeInspection = useFetcher<typeof action>();
-  const markingComplete = completeInspection.state !== "idle";
   const submittingReport = submitReport.state !== "idle";
   const returningReport = returnReport.state !== "idle";
   const unpublishingReport = unpublishReport.state !== "idle";
@@ -648,33 +649,8 @@ export default function InspectionHubPage() {
           </Link>
         </Card>
 
-        {/* 2b. Order lifecycle — independent of report publishing. "Mark
-            fieldwork complete" is the only producer of `completed`; advisory,
-            never a publish precondition. */}
-        <Card className="p-5">
-          <BlockHeading
-            title={m.inspections_hub_lifecycle_title()}
-            pill={{ tone: statusTone(inspection.status), label: humanizeStatus(inspection.status) }}
-          />
-          {inspection.status !== INSPECTION_STATUS.COMPLETED &&
-           inspection.status !== INSPECTION_STATUS.CANCELLED && (
-            <>
-              <p className="text-[12px] text-ih-fg-3 mb-3">
-                {m.inspections_hub_lifecycle_hint()}
-              </p>
-              <completeInspection.Form method="post">
-                <input type="hidden" name="intent" value="complete" />
-                <button
-                  type="submit"
-                  disabled={markingComplete}
-                  className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
-                >
-                  {markingComplete ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
-                </button>
-              </completeInspection.Form>
-            </>
-          )}
-        </Card>
+        {/* 2b. Order lifecycle — independent of report publishing. */}
+        <LifecycleCard status={inspection.status} fetcher={completeInspection} />
 
         {/* 3. Services ---------------------------------------------- */}
         <Card className="p-5">
@@ -1110,17 +1086,6 @@ function CopyLinkButton({ url }: { url: string }) {
 }
 
 /** Shared block heading: a label plus an optional derived status pill. */
-function BlockHeading({ title, pill }: { title: string; pill?: { tone: import("~/lib/hub-blocks").PillTone; label: string } }) {
-  return (
-    <div className="flex items-center justify-between mb-3">
-      <h2 className="text-[13px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3">
-        {title}
-      </h2>
-      {pill && <Pill tone={pill.tone}>{pill.label}</Pill>}
-    </div>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /*  Error boundary                                                     */
 /* ------------------------------------------------------------------ */

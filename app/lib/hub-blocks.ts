@@ -11,7 +11,7 @@
  * en-US/USD (behavior-preserving) and callers thread the viewer values when known.
  */
 
-import { isReportPublished } from '~/lib/status';
+import { isReportPublished, INSPECTION_STATUS } from '~/lib/status';
 import { formatCurrency } from '~/lib/format';
 import { m } from '~/paraglide/messages';
 
@@ -246,4 +246,20 @@ export function formatCents(
     opts?: { locale?: string; currency?: string },
 ): string {
     return formatCurrency(cents ?? 0, { locale: opts?.locale ?? 'en-US', currency: opts?.currency ?? 'USD' });
+}
+
+/**
+ * What the hub's status card should say.
+ *
+ * `actionable` still offers "Mark fieldwork complete"; the two terminal states
+ * do not, and used to render nothing in its place — leaving a card whose entire
+ * content was a heading and a status pill above blank space. They are also not
+ * the same statement: completed means the visit happened, cancelled means it will
+ * not. An unrecognised status is treated as actionable rather than blank, so a
+ * status added later cannot silently hide the only control on the card.
+ */
+export function lifecycleState(status: string): "actionable" | "completed" | "cancelled" {
+    if (status === INSPECTION_STATUS.COMPLETED) return "completed";
+    if (status === INSPECTION_STATUS.CANCELLED) return "cancelled";
+    return "actionable";
 }

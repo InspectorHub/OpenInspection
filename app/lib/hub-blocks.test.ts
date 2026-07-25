@@ -6,6 +6,7 @@ import {
     latestPublishedAt,
     publishNotified,
     invoiceFromParty,
+    lifecycleState,
     type HubPayload,
 } from '~/lib/hub-blocks';
 
@@ -133,5 +134,35 @@ describe('invoiceFromParty', () => {
     it('shows an em dash when the document names nobody', () => {
         expect(invoiceFromParty(null, null)).toBe('—');
         expect(invoiceFromParty('', '')).toBe('—');
+    });
+});
+
+/**
+ * Batch D — the hub's status card rendered its heading and its status badge, and
+ * then, for a completed or cancelled inspection, nothing at all: a card whose
+ * whole content was a title and a pill above empty space. The "Mark fieldwork
+ * complete" button is hidden in those states (correctly — they are terminal), and
+ * nothing took its place, so the card read as broken rather than finished.
+ *
+ * Three states, three things to render, never a blank one.
+ */
+describe("lifecycleState", () => {
+    it("is actionable while the fieldwork can still be marked complete", () => {
+        expect(lifecycleState("requested")).toBe("actionable");
+        expect(lifecycleState("scheduled")).toBe("actionable");
+        expect(lifecycleState("confirmed")).toBe("actionable");
+        expect(lifecycleState("in_progress")).toBe("actionable");
+    });
+
+    it("distinguishes the two terminal states, which mean different things", () => {
+        // Completed: the visit happened. Cancelled: it will not.
+        expect(lifecycleState("completed")).toBe("completed");
+        expect(lifecycleState("cancelled")).toBe("cancelled");
+    });
+
+    it("treats an unrecognised status as actionable rather than hiding the control", () => {
+        // Failing closed here would leave the card blank again, and hide the only
+        // action on it, for any status added later.
+        expect(lifecycleState("something_new")).toBe("actionable");
     });
 });
