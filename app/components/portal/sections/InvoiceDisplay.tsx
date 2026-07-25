@@ -8,6 +8,7 @@ import { money, STATUS_TONE, Field, Row, type InvoiceData } from "./payment-help
 import { StripePayPanel } from "./StripePayPanel";
 import { m } from "~/paraglide/messages";
 import { Pill } from "@core/shared-ui";
+import { invoiceFromParty } from "~/lib/hub-blocks";
 import type { TenantBrand } from "~/lib/brand";
 
 interface InvoiceDisplayProps {
@@ -61,7 +62,7 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
         </div>
 
         <div className="grid grid-cols-2 gap-x-4 gap-y-3 mt-5 text-[13px]">
-          <Field label={m.portal_invoice_field_from()}>{invoice.inspectorName || m.portal_invoice_inspector_fallback()}</Field>
+          <Field label={m.portal_invoice_field_from()}>{invoiceFromParty(invoice.inspectorName, brand.companyName)}</Field>
           <Field label={m.portal_invoice_field_bill_to()}>{invoice.clientName || "—"}</Field>
           <Field label={m.portal_invoice_field_issued()}>{invoice.date || "—"}</Field>
           <Field label={m.portal_invoice_field_due()}>{invoice.dueDate || m.portal_invoice_due_on_receipt()}</Field>

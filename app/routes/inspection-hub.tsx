@@ -5,7 +5,14 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { deriveBlockStates, formatCents, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
+import {
+  deriveBlockStates,
+  formatCents,
+  isReportShipped,
+  latestPublishedAt,
+  publishNotified,
+  type HubPayload,
+} from "~/lib/hub-blocks";
 import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
@@ -20,6 +27,7 @@ import { SendAgreementModal } from "~/components/inspection-hub/SendAgreementMod
 import { RequestPaymentModal } from "~/components/inspection-hub/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspection-hub/PublishReportModal";
 import { CreateReinspectionModal } from "~/components/inspection-hub/CreateReinspectionModal";
+import { PublishNotice } from "~/components/inspection-hub/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
@@ -29,7 +37,7 @@ import {
   handlePersonRemove,
   handleSearchContacts,
 } from "~/lib/inspection-hub-actions";
-import type { ReinspectCandidate } from "~/lib/inspection-hub-helpers";
+import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspection-hub-helpers";
 import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 
@@ -248,18 +256,25 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     // report_versions row (snapshotOnPublish already accepts it). Empty → omit
     // so a first publish rides the server default.
     const summary = String(formData.get("summary") ?? "").trim();
+    const notifyClient = formData.get("notifyClient") === "on";
+    const notifyAgent = formData.get("notifyAgent") === "on";
     const res = await api.inspections[":id"].publish.$post({
       param: { id },
       json: {
         theme: "modern",
-        notifyClient: formData.get("notifyClient") === "on",
-        notifyAgent: formData.get("notifyAgent") === "on",
+        notifyClient,
+        notifyAgent,
         requireSignature: formData.get("requireSignature") === "on",
         requirePayment: formData.get("requirePayment") === "on",
         ...(summary ? { summary } : {}),
       },
     });
-    return toActionResult(res, "publish", m.inspections_hub_error_publish());
+    // Publishing succeeded silently: the modal closed and the card flipped to a
+    // sentence claiming the client had the report, whether or not anyone was
+    // emailed. The answer only exists in this form, so it travels back with the
+    // result rather than being guessed at on the client.
+    const published = await toActionResult(res, "publish", m.inspections_hub_error_publish());
+    return { ...published, notified: publishNotified({ notifyClient, notifyAgent }) };
   }
 
   if (intent === "submit") {
@@ -373,28 +388,6 @@ export function reportActions(
   if (reportStatus === REPORT_STATUS.PUBLISHED) return caps.publish ? ['unpublish'] : [];
   if (reportStatus === REPORT_STATUS.SUBMITTED) return caps.publish ? ['publish', 'return'] : [];
   return caps.publish ? ['publish'] : ['submit']; // in_progress (or unknown)
-}
-
-/* ------------------------------------------------------------------ */
-/*  Report version links (pure — testable)                            */
-/* ------------------------------------------------------------------ */
-
-/** One published snapshot as returned by GET /inspections/:id/versions. */
-export interface ReportVersionRow {
-  versionNumber: number;
-  publishedAt: number | null; // unix seconds
-  summary: string | null;
-}
-
-/**
- * IA-40 — the version-diff page (`/version-diff/:id?n=&from=`) had no inbound
- * links anywhere in the app; the only way in was hand-typing the URL. This
- * builds the link from a version to a diff against its immediate predecessor.
- * Version 1 has nothing earlier to compare against, so it gets no link.
- */
-export function versionDiffHref(inspectionId: string, versionNumber: number): string | null {
-  if (versionNumber <= 1) return null;
-  return `/version-diff/${inspectionId}?n=${versionNumber}&from=${versionNumber - 1}`;
 }
 
 /* ------------------------------------------------------------------ */
@@ -524,6 +517,16 @@ export default function InspectionHubPage() {
   // Shipped-to-client: gates the header "View report" link and the card body.
   const reportShipped = isReportShipped(hub);
 
+  // When the report was last published. The Report card states this instead of
+  // claiming a delivery nothing here records.
+  const publishedAt = latestPublishedAt(versions);
+
+  // Post-publish confirmation: the action reports who it emailed, PublishNotice
+  // owns the dismissal.
+  const publishData = publishModal.fetcher.data;
+  const publishNotice =
+    publishModal.succeeded && publishData && "notified" in publishData ? publishData.notified : null;
+
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
   const reportActionList = reportActions({ publish: canPublishCap }, inspection.reportStatus);
@@ -602,6 +605,8 @@ export default function InspectionHubPage() {
           </>
         }
       />
+
+      <PublishNotice notified={publishNotice} />
 
       {/* Six blocks — responsive 2-col grid (1-col on mobile) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -762,8 +767,16 @@ export default function InspectionHubPage() {
             // link covers viewing. #119: a published baseline can spawn a
             // re-inspection that carries forward its still-open flagged items.
             <>
+              {/* Publication, which report_versions records — not delivery, which
+                  nothing here does. "Delivered to the client" was false for any
+                  inspector who left the notify boxes unticked, and the Send
+                  report button below is the tell. */}
               <p className="text-[12px] text-ih-fg-3 mb-3">
-                {m.inspections_hub_report_delivered()}
+                {publishedAt
+                  ? m.inspections_hub_report_published_on({
+                      date: formatInspectionDateTime(new Date(publishedAt * 1000).toISOString(), undefined, displayTz),
+                    })
+                  : m.inspections_hub_report_published()}
               </p>
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
