@@ -37,7 +37,7 @@ export interface RepairDefectRowViewProps {
 // Resolved at call time (not module load) so paraglide's ALS locale scope is
 // active. An unrecognized value is a tenant custom category: show the tenant's
 // own word instead of relabeling it as one of the seeds (IA-41).
-export function repairCategoryLabel(category: string): string {
+function repairCategoryLabel(category: string): string {
   switch (category) {
     case "safety":
       return m.portal_repair_category_safety();

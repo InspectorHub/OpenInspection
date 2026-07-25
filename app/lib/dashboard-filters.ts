@@ -26,8 +26,11 @@ function startOfWeek(d: Date) {
 export function matchesFilter(insp: Inspection, filter: FilterId, now: Date): boolean {
   if (filter === "all") return true;
   const status = (insp.status || "").toLowerCase();
-  if (filter === "unconfirmed") return status === INSPECTION_STATUS.SCHEDULED || status === INSPECTION_STATUS.REQUESTED;
-  if (filter === "in_progress") return status === INSPECTION_STATUS.COMPLETED && !isReportPublished(insp.reportStatus);
+  // Named for what they select, not for a status value they do not share:
+  // "needs confirmation" is booked-but-unconfirmed, and "awaiting report" is
+  // the work done with the report not yet out.
+  if (filter === "needs_confirmation") return status === INSPECTION_STATUS.SCHEDULED || status === INSPECTION_STATUS.REQUESTED;
+  if (filter === "awaiting_report") return status === INSPECTION_STATUS.COMPLETED && !isReportPublished(insp.reportStatus);
   if (!insp.date) return false;
   const date = new Date(insp.date);
   if (isNaN(date.getTime())) return false;

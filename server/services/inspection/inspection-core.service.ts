@@ -134,7 +134,6 @@ export class InspectionCoreService extends InspectionSubService {
         const tabParam = (params as { tab?: string }).tab;
         if (tabParam && tabParam !== 'all') {
             const todayStr = new Date().toISOString().slice(0, 10);
-            const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
             switch (tabParam) {
                 case 'today':
                     conditions.push(sql`date(${inspections.date}) = ${todayStr}`);
@@ -149,12 +148,14 @@ export class InspectionCoreService extends InspectionSubService {
                         inArray(inspections.status, ['completed', 'cancelled'])
                     )!);
                     break;
-                case 'unconfirmed':
-                    conditions.push(eq(inspections.status, 'scheduled'));
-                    conditions.push(sql`${inspections.createdAt} < ${cutoff}`);
+                // Same two definitions the workspace filters use — one word, one
+                // meaning, whichever tier asks.
+                case 'needs_confirmation':
+                    conditions.push(inArray(inspections.status, [INSPECTION_STATUS.SCHEDULED, INSPECTION_STATUS.REQUESTED]));
                     break;
-                case 'in_progress':
-                    conditions.push(eq(inspections.reportStatus, REPORT_STATUS.IN_PROGRESS));
+                case 'awaiting_report':
+                    conditions.push(eq(inspections.status, INSPECTION_STATUS.COMPLETED));
+                    conditions.push(sql`${inspections.reportStatus} <> ${REPORT_STATUS.PUBLISHED}`);
                     break;
             }
         }

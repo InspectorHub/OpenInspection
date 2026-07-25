@@ -9836,7 +9836,7 @@
           "name": "tab",
           "in": "query",
           "required": false,
-          "description": "TODO describe tab field for the OpenInspection MCP integration",
+          "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report.",
           "schema": {
             "type": "string",
             "enum": [
@@ -9844,11 +9844,11 @@
               "today",
               "upcoming",
               "past",
-              "unconfirmed",
-              "in_progress"
+              "needs_confirmation",
+              "awaiting_report"
             ],
             "example": "today",
-            "description": "TODO describe tab field for the OpenInspection MCP integration"
+            "description": "Named filter over the list: date buckets, or needs_confirmation / awaiting_report."
           }
         }
       ],

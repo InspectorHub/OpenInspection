@@ -199,7 +199,8 @@ export class ConciergeService {
 
         if (params.services?.length) {
             const total = await attachHoldServices(db, params.tenantId, inspectionId, params.services);
-            await db.update(inspections).set({ price: total }).where(eq(inspections.id, inspectionId));
+            await db.update(inspections).set({ price: total })
+                .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, params.tenantId)));
         }
 
         // Task 7b (people-role-profiles), FIXED (Task 9b regression) — mirror

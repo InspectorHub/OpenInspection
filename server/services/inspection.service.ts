@@ -565,7 +565,7 @@ export class InspectionService {
      */
     async getCounts(tenantId: string): Promise<{
         all: number; today: number; upcoming: number;
-        past: number; unconfirmed: number; inProgress: number;
+        past: number; needsConfirmation: number; awaitingReport: number;
     }> {
         return this.analytics.getCounts(tenantId);
     }

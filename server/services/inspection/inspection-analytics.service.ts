@@ -258,19 +258,20 @@ export class InspectionAnalyticsService extends InspectionSubService {
      */
     async getCounts(tenantId: string): Promise<{
         all: number; today: number; upcoming: number;
-        past: number; unconfirmed: number; inProgress: number;
+        past: number; needsConfirmation: number; awaitingReport: number;
     }> {
         const db = this.getDrizzle();
         const todayStr = new Date().toISOString().slice(0, 10);
-        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 
         const result = await db.select({
             all:         sql<number>`count(*)`,
             today:       sql<number>`sum(case when date(${inspections.date}) = ${todayStr} then 1 else 0 end)`,
             upcoming:    sql<number>`sum(case when ${inspections.date} > ${todayStr} and ${inspections.status} not in ('completed','cancelled') then 1 else 0 end)`,
             past:        sql<number>`sum(case when ${inspections.date} < ${todayStr} or ${inspections.status} in ('completed','cancelled') then 1 else 0 end)`,
-            unconfirmed: sql<number>`sum(case when ${inspections.status} = 'requested' and ${inspections.createdAt} < ${cutoff} then 1 else 0 end)`,
-            inProgress:  sql<number>`sum(case when ${inspections.status} = 'completed' and ${inspections.reportStatus} = 'in_progress' then 1 else 0 end)`,
+            // Same two definitions the workspace filters use, so a stat tile and
+            // its filter can never disagree about what they count.
+            needsConfirmation: sql<number>`sum(case when ${inspections.status} in (${INSPECTION_STATUS.SCHEDULED}, ${INSPECTION_STATUS.REQUESTED}) then 1 else 0 end)`,
+            awaitingReport:    sql<number>`sum(case when ${inspections.status} = ${INSPECTION_STATUS.COMPLETED} and ${inspections.reportStatus} <> ${REPORT_STATUS.PUBLISHED} then 1 else 0 end)`,
         }).from(inspections).where(eq(inspections.tenantId, tenantId));
 
         const row = result[0] ?? {};
@@ -279,8 +280,8 @@ export class InspectionAnalyticsService extends InspectionSubService {
             today:       Number(row.today ?? 0),
             upcoming:    Number(row.upcoming ?? 0),
             past:        Number(row.past ?? 0),
-            unconfirmed: Number(row.unconfirmed ?? 0),
-            inProgress:  Number(row.inProgress ?? 0),
+            needsConfirmation: Number(row.needsConfirmation ?? 0),
+            awaitingReport:    Number(row.awaitingReport ?? 0),
         };
     }
 

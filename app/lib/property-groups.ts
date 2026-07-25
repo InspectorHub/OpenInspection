@@ -12,7 +12,7 @@
  */
 
 /** Case/whitespace-insensitive address form used as the grouping identity. */
-export function normalizeAddress(address: string | null | undefined): string {
+function normalizeAddress(address: string | null | undefined): string {
   return (address ?? "").trim().toLowerCase().replace(/\s+/g, " ");
 }
 
