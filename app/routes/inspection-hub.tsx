@@ -5,21 +5,31 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { deriveBlockStates, formatCents, isReportShipped, type HubPayload } from "~/lib/hub-blocks";
-import { INSPECTION_STATUS, REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
+import {
+  deriveBlockStates,
+  formatCents,
+  isReportShipped,
+  latestPublishedAt,
+  publishNotified,
+  type HubPayload,
+} from "~/lib/hub-blocks";
+import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
-import { ThemeSegmentControl } from "~/components/sidebar/ThemeSegmentControl";
+import type { PillTone } from "~/lib/hub-blocks";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,
   type DocumentVisibility,
 } from "~/components/DocumentsSection";
+import { BlockHeading } from "~/components/inspection-hub/BlockHeading";
+import { LifecycleCard } from "~/components/inspection-hub/LifecycleCard";
 import { SendAgreementModal } from "~/components/inspection-hub/SendAgreementModal";
 import { RequestPaymentModal } from "~/components/inspection-hub/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspection-hub/PublishReportModal";
 import { CreateReinspectionModal } from "~/components/inspection-hub/CreateReinspectionModal";
+import { PublishNotice } from "~/components/inspection-hub/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
@@ -29,7 +39,7 @@ import {
   handlePersonRemove,
   handleSearchContacts,
 } from "~/lib/inspection-hub-actions";
-import type { ReinspectCandidate } from "~/lib/inspection-hub-helpers";
+import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspection-hub-helpers";
 import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 
@@ -248,18 +258,25 @@ export async function action({ request, params, context }: Route.ActionArgs) {
     // report_versions row (snapshotOnPublish already accepts it). Empty → omit
     // so a first publish rides the server default.
     const summary = String(formData.get("summary") ?? "").trim();
+    const notifyClient = formData.get("notifyClient") === "on";
+    const notifyAgent = formData.get("notifyAgent") === "on";
     const res = await api.inspections[":id"].publish.$post({
       param: { id },
       json: {
         theme: "modern",
-        notifyClient: formData.get("notifyClient") === "on",
-        notifyAgent: formData.get("notifyAgent") === "on",
+        notifyClient,
+        notifyAgent,
         requireSignature: formData.get("requireSignature") === "on",
         requirePayment: formData.get("requirePayment") === "on",
         ...(summary ? { summary } : {}),
       },
     });
-    return toActionResult(res, "publish", m.inspections_hub_error_publish());
+    // Publishing succeeded silently: the modal closed and the card flipped to a
+    // sentence claiming the client had the report, whether or not anyone was
+    // emailed. The answer only exists in this form, so it travels back with the
+    // result rather than being guessed at on the client.
+    const published = await toActionResult(res, "publish", m.inspections_hub_error_publish());
+    return { ...published, notified: publishNotified({ notifyClient, notifyAgent }) };
   }
 
   if (intent === "submit") {
@@ -376,28 +393,6 @@ export function reportActions(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Report version links (pure — testable)                            */
-/* ------------------------------------------------------------------ */
-
-/** One published snapshot as returned by GET /inspections/:id/versions. */
-export interface ReportVersionRow {
-  versionNumber: number;
-  publishedAt: number | null; // unix seconds
-  summary: string | null;
-}
-
-/**
- * IA-40 — the version-diff page (`/version-diff/:id?n=&from=`) had no inbound
- * links anywhere in the app; the only way in was hand-typing the URL. This
- * builds the link from a version to a diff against its immediate predecessor.
- * Version 1 has nothing earlier to compare against, so it gets no link.
- */
-export function versionDiffHref(inspectionId: string, versionNumber: number): string | null {
-  if (versionNumber <= 1) return null;
-  return `/version-diff/${inspectionId}?n=${versionNumber}&from=${versionNumber - 1}`;
-}
-
-/* ------------------------------------------------------------------ */
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -489,7 +484,6 @@ export default function InspectionHubPage() {
   const returnReport = useFetcher<typeof action>();
   const unpublishReport = useFetcher<typeof action>();
   const completeInspection = useFetcher<typeof action>();
-  const markingComplete = completeInspection.state !== "idle";
   const submittingReport = submitReport.state !== "idle";
   const returningReport = returnReport.state !== "idle";
   const unpublishingReport = unpublishReport.state !== "idle";
@@ -524,6 +518,16 @@ export default function InspectionHubPage() {
   // Shipped-to-client: gates the header "View report" link and the card body.
   const reportShipped = isReportShipped(hub);
 
+  // When the report was last published. The Report card states this instead of
+  // claiming a delivery nothing here records.
+  const publishedAt = latestPublishedAt(versions);
+
+  // Post-publish confirmation: the action reports who it emailed, PublishNotice
+  // owns the dismissal.
+  const publishData = publishModal.fetcher.data;
+  const publishNotice =
+    publishModal.succeeded && publishData && "notified" in publishData ? publishData.notified : null;
+
   // `publish` is the user's permission; the report's own eligibility lives in
   // canPublish, which reportShipped above reads.
   const reportActionList = reportActions({ publish: canPublishCap }, inspection.reportStatus);
@@ -554,8 +558,10 @@ export default function InspectionHubPage() {
   const invoiceSent = hub.invoice?.status === "sent" || hub.invoice?.status === "partial";
 
   return (
-    /* ds-allow: page bottom gutter (60px), bespoke page-shell spacing with no token */
-    <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9 space-y-ih-list">
+    // The page shell (width, gutters) belongs to the auth layout this route now
+    // renders inside — it was duplicated here, verbatim, from the days when the
+    // hub stood outside it without the workspace nav.
+    <div className="space-y-ih-list">
       {/* Breadcrumb — Inspections > this inspection */}
       <Breadcrumb
         items={[
@@ -573,7 +579,7 @@ export default function InspectionHubPage() {
               {humanizeStatus(inspection.status)}
             </Pill>
             <span className="text-ih-fg-3">
-              {formatInspectionDateTime(inspection.date)}
+              {formatInspectionDateTime(inspection.date, undefined, displayTz)}
             </span>
             {peopleCard.inspector?.name && (
               <span className="text-ih-fg-3">&middot; {peopleCard.inspector.name}</span>
@@ -582,9 +588,8 @@ export default function InspectionHubPage() {
         }
         actions={
           <>
-            {/* Shared theme control (xl+; keeps this read-only hub consistent
-                with the editor it links into). */}
-            <ThemeSegmentControl className="hidden xl:flex" />
+            {/* The theme control that used to sit here was standing in for the
+                sidebar's user menu, which this page did not have. It does now. */}
             <Link
               to={`/inspections/${inspection.id}/edit`}
               className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-primary text-ih-fg-inverse hover:bg-ih-primary-600"
@@ -602,6 +607,8 @@ export default function InspectionHubPage() {
           </>
         }
       />
+
+      <PublishNotice notified={publishNotice} />
 
       {/* Six blocks — responsive 2-col grid (1-col on mobile) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -633,7 +640,7 @@ export default function InspectionHubPage() {
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_schedule()} />
           <p className="text-[15px] font-medium text-ih-fg-1">
-            {formatInspectionDateTime(inspection.date)}
+            {formatInspectionDateTime(inspection.date, undefined, displayTz)}
           </p>
           <Link
             to={`/inspections/${inspection.id}/edit`}
@@ -643,33 +650,8 @@ export default function InspectionHubPage() {
           </Link>
         </Card>
 
-        {/* 2b. Order lifecycle — independent of report publishing. "Mark
-            fieldwork complete" is the only producer of `completed`; advisory,
-            never a publish precondition. */}
-        <Card className="p-5">
-          <BlockHeading
-            title={m.inspections_hub_lifecycle_title()}
-            pill={{ tone: statusTone(inspection.status), label: humanizeStatus(inspection.status) }}
-          />
-          {inspection.status !== INSPECTION_STATUS.COMPLETED &&
-           inspection.status !== INSPECTION_STATUS.CANCELLED && (
-            <>
-              <p className="text-[12px] text-ih-fg-3 mb-3">
-                {m.inspections_hub_lifecycle_hint()}
-              </p>
-              <completeInspection.Form method="post">
-                <input type="hidden" name="intent" value="complete" />
-                <button
-                  type="submit"
-                  disabled={markingComplete}
-                  className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
-                >
-                  {markingComplete ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
-                </button>
-              </completeInspection.Form>
-            </>
-          )}
-        </Card>
+        {/* 2b. Order lifecycle — independent of report publishing. */}
+        <LifecycleCard status={inspection.status} fetcher={completeInspection} />
 
         {/* 3. Services ---------------------------------------------- */}
         <Card className="p-5">
@@ -762,8 +744,16 @@ export default function InspectionHubPage() {
             // link covers viewing. #119: a published baseline can spawn a
             // re-inspection that carries forward its still-open flagged items.
             <>
+              {/* Publication, which report_versions records — not delivery, which
+                  nothing here does. "Delivered to the client" was false for any
+                  inspector who left the notify boxes unticked, and the Send
+                  report button below is the tell. */}
               <p className="text-[12px] text-ih-fg-3 mb-3">
-                {m.inspections_hub_report_delivered()}
+                {publishedAt
+                  ? m.inspections_hub_report_published_on({
+                      date: formatInspectionDateTime(new Date(publishedAt * 1000).toISOString(), undefined, displayTz),
+                    })
+                  : m.inspections_hub_report_published()}
               </p>
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
@@ -1046,30 +1036,29 @@ function ClientSmsConsent({
 
   const label =
     consent === "granted" ? m.inspections_hub_sms_granted() : consent === "revoked" ? m.inspections_hub_sms_revoked() : m.inspections_hub_sms_not_recorded();
-  const tone =
-    consent === "granted" ? "text-ih-ok-fg" : consent === "revoked" ? "text-ih-bad-fg" : "text-ih-fg-4";
+  const tone: PillTone =
+    consent === "granted" ? "sat" : consent === "revoked" ? "defect" : "neutral";
 
+  // A heading, because every other card on this page has one and without it this
+  // card read as a divider between two others. And a button rather than an 11px
+  // text link, because recording that a client agreed to be texted is a claim the
+  // operator stands behind — the weakest control on the page was carrying the
+  // page's only legal attestation.
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px]">
-      <span className="text-ih-fg-3">
-        {m.inspections_hub_sms_label()} <span className={`font-bold ${tone}`}>{label}</span>
-      </span>
-      {/* Offer the attestation only when not already granted. Framed as an
-          inspector confirmation that the client agreed (not a consent-less
-          override) — the deliberate basis for phone/in-person bookings. */}
+    <div className="space-y-2">
+      <BlockHeading title={m.inspections_hub_sms_heading()} pill={{ tone, label }} />
       {consent !== "granted" && (
-        <fetcher.Form method="post">
-          <input type="hidden" name="intent" value="attest-sms" />
-          <button
-            type="submit"
-            disabled={attesting}
-            className="text-[11px] font-bold text-ih-primary hover:underline disabled:opacity-60"
-          >
-            {attesting ? m.inspections_hub_sms_recording() : m.inspections_hub_sms_confirm()}
-          </button>
-        </fetcher.Form>
+        <>
+          <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_sms_explainer()}</p>
+          <fetcher.Form method="post">
+            <input type="hidden" name="intent" value="attest-sms" />
+            <Button type="submit" variant="secondary" size="sm" disabled={attesting}>
+              {attesting ? m.inspections_hub_sms_recording() : m.inspections_hub_sms_confirm()}
+            </Button>
+          </fetcher.Form>
+        </>
       )}
-      {error && <span className="text-ih-bad-fg">{error}</span>}
+      {error && <p className="text-[12px] text-ih-bad-fg">{error}</p>}
     </div>
   );
 }
@@ -1097,17 +1086,6 @@ function CopyLinkButton({ url }: { url: string }) {
 }
 
 /** Shared block heading: a label plus an optional derived status pill. */
-function BlockHeading({ title, pill }: { title: string; pill?: { tone: import("~/lib/hub-blocks").PillTone; label: string } }) {
-  return (
-    <div className="flex items-center justify-between mb-3">
-      <h2 className="text-[13px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3">
-        {title}
-      </h2>
-      {pill && <Pill tone={pill.tone}>{pill.label}</Pill>}
-    </div>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /*  Error boundary                                                     */
 /* ------------------------------------------------------------------ */

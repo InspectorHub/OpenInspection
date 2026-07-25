@@ -10,6 +10,7 @@
  *     real R2 key and clears the pending markers.
  */
 
+import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as Y from 'yjs';
 import {

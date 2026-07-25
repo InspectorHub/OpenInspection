@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest';
 import { rangeIds } from '~/lib/editor/batch-range';
 const ids = ['a','b','c','d'];

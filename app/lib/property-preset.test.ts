@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { resolveActivePropertyPreset } from "./property-preset";
 import type { PropertyMetaField } from "../../server/lib/commercial-subtypes";

@@ -327,12 +327,11 @@ describe('Agent magic-login primitive', () => {
  *
  * Both entry points are UNAUTHENTICATED (report token or one-time KV code,
  * never a session) and must bypass the global JWT middleware's allowlist
- * (`isAgentPublic` in server/index.ts) so a stale/expired session cookie on
- * the visiting browser can never 401 the redeem hop. This exercises the REAL
- * exported jwtAuthMiddleware directly (not a hand-rolled copy of the
- * predicate) — importing server/index.ts pulls the whole app graph, so it
- * gets its own generous timeout (mirrors tests/unit/platform/route-metadata
- * and middleware-order specs).
+ * (`isAgentPublic` in server/lib/middleware/jwt-auth.ts) so a stale/expired
+ * session cookie on the visiting browser can never 401 the redeem hop. This
+ * exercises the REAL exported jwtAuthMiddleware directly (not a hand-rolled
+ * copy of the predicate); it imports the middleware module rather than
+ * server/index.ts, so it no longer drags in the whole app graph.
  *
  * TODO(agent-unified-link): the full SaaS-mode `/login` portal-bounce
  * non-interference assertion (APP_MODE='saas' + PORTAL_API_URL set, proving
@@ -342,7 +341,7 @@ describe('Agent magic-login primitive', () => {
  */
 describe('Agent magic-login — jwtAuthMiddleware allowlist', { timeout: 60_000 }, () => {
     it('bypasses JWT verification for both entry points regardless of a stale Bearer token', async () => {
-        const { jwtAuthMiddleware } = await import('../../../server/index');
+        const { jwtAuthMiddleware } = await import('../../../server/lib/middleware/jwt-auth');
         for (const path of ['/agent/magic-login', '/api/agent/magic-login/request']) {
             const next = vi.fn(async () => {});
             const fakeContext = {

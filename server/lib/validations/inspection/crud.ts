@@ -28,7 +28,10 @@ export const InspectionListQuerySchema = z.object({
     inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-01-01' }).describe('TODO describe dateFrom field for the OpenInspection MCP integration'),
     dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-12-31' }).describe('TODO describe dateTo field for the OpenInspection MCP integration'),
-    tab: z.enum(['all', 'today', 'upcoming', 'past', 'unconfirmed', 'in_progress']).optional().openapi({ example: 'today' }).describe('TODO describe tab field for the OpenInspection MCP integration'),
+    // One filter vocabulary across the API and the workspace: a filter is named
+    // for what it selects, never for a status value whose meaning it does not
+    // share (`awaiting_report` is not the report status `in_progress`).
+    tab: z.enum(['all', 'today', 'upcoming', 'past', 'needs_confirmation', 'awaiting_report']).optional().openapi({ example: 'today' }).describe('Named filter over the list: date buckets, or needs_confirmation / awaiting_report.'),
 }).openapi('InspectionListQuery');
 
 /**
@@ -159,8 +162,8 @@ export const InspectionCountsSchema = z.object({
     today:       z.number().openapi({ example: 3 }).describe('TODO describe today field for the OpenInspection MCP integration'),
     upcoming:    z.number().openapi({ example: 12 }).describe('TODO describe upcoming field for the OpenInspection MCP integration'),
     past:        z.number().openapi({ example: 27 }).describe('TODO describe past field for the OpenInspection MCP integration'),
-    unconfirmed: z.number().openapi({ example: 2 }).describe('TODO describe unconfirmed field for the OpenInspection MCP integration'),
-    inProgress:  z.number().openapi({ example: 1 }).describe('TODO describe inProgress field for the OpenInspection MCP integration'),
+    needsConfirmation: z.number().openapi({ example: 2 }).describe('Booked but not confirmed by the client yet.'),
+    awaitingReport: z.number().openapi({ example: 1 }).describe('Inspection finished, report not published yet.'),
 }).openapi('InspectionCounts');
 
 /**

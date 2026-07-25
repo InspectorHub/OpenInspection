@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { useLoaderData, useFetcher, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/templates";
+import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { Pagination, PageHeader, Icon } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { usePagination } from "~/hooks/usePagination";
-import { type SortKey, type Template } from "~/components/templates/types";
+import type { SortKey, Template } from "~/components/templates/types";
 import { TemplatesListView } from "~/components/templates/TemplatesListView";
 import { TemplatesCardView } from "~/components/templates/TemplatesCardView";
 import { CreateTemplateModal } from "~/components/templates/CreateTemplateModal";
@@ -153,6 +154,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function TemplatesPage() {
   const { templates, meta, q: loaderQ, spectoraMappingSeen: loaderMappingSeen } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
+  const displayTz = useDisplayTimeZone();
   const mappingFetcher = useFetcher();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -351,6 +353,7 @@ export default function TemplatesPage() {
           setCreateOpen={setCreateOpen}
           handleDuplicate={handleDuplicate}
           setDeleteConfirm={setDeleteConfirm}
+          timeZone={displayTz}
         />
       )}
 

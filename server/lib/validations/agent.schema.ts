@@ -80,7 +80,12 @@ export const AgentProfileResponseSchema = createApiResponseSchema(
 // reviewer mode).
 export const ConciergeBookSchema = z.object({
     tenantId:           z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    inspectorContactId: z.string().min(1).describe('TODO describe inspectorContactId field for the OpenInspection MCP integration'),
+    // Naming an inspector is optional — a hold with nobody assigned is normal
+    // when the agent takes whoever is free. A booking form knows the inspector's
+    // user id; the tenant's own tooling knows the contact id.
+    inspectorUserId:    z.string().min(1).optional().describe('Inspector user id, as published on the company booking profile.'),
+    inspectorContactId: z.string().min(1).optional().describe('Inspector contact id, as used by the tenant contact list.'),
+    services:           z.array(z.object({ serviceId: z.string().min(1) })).optional().describe('Services the agent requested; snapshotted onto the hold.'),
     date:               z.string().regex(/^\d{4}-\d{2}-\d{2}/, 'Date must be ISO YYYY-MM-DD').describe('TODO describe date field for the OpenInspection MCP integration'),
     timeSlot:           z.string().min(1).max(20).describe('TODO describe timeSlot field for the OpenInspection MCP integration'),
     propertyAddress:    z.string().min(3).max(500).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
@@ -104,6 +109,12 @@ export const ConciergeBookResponseSchema = createApiResponseSchema(
 // route-response schemas.
 const RecommendationRowSchema = z.object({
     inspectionId:    z.string().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    // Owning company: shown inline under the property heading, and the slug
+    // addresses that inspection's repair share channel.
+    tenantName:      z.string().describe('Owning inspection company name.'),
+    tenantSlug:      z.string().describe('Owning inspection company slug (addresses the repair share channel).'),
+    // The portal offers only what the API would allow (IA-35).
+    repairAccess:    z.enum(['off', 'read', 'readwrite']).describe("This company's policy for agents on its repair list."),
     propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
     inspectionDate:  z.string().describe('TODO describe inspectionDate field for the OpenInspection MCP integration'),
     sectionTitle:    z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
@@ -142,13 +153,20 @@ export const AgentReferralRowSchema = z.object({
     status:          z.string().describe('Inspection lifecycle status.'),
     reportStatus:    z.string().nullable().describe('Report lifecycle status (published = repair builder available).'),
     inspectorName:   z.string().nullable().describe('Assigned inspector name.'),
+    // The portal offers only what the API would allow (IA-35).
+    repairAccess:    z.enum(['off', 'read', 'readwrite']).describe("This company's policy for agents on its repair list."),
 });
 
 // C-10 ③-C — row shape for GET /api/agent/inspectors.
 export const AgentInspectorRowSchema = z.object({
+    // The id a booking form names when the agent picks this inspector.
+    inspectorUserId:   z.string().nullable().describe('Inspector user id (null when the link came from auto-link).'),
     inspectorName:     z.string().nullable().describe('Inspector display name.'),
     inspectorSlug:     z.string().nullable().describe('Inspector public profile slug.'),
     inspectorPhotoUrl: z.string().nullable().describe('Inspector avatar URL.'),
     tenantName:        z.string().describe('Inspecting company name.'),
     tenantSlug:   z.string().describe('Tenant slug for the booking link.'),
+    // The company this link belongs to, named the way the hold endpoint expects.
+    // Already returned by the service; declaring it keeps the contract honest.
+    tenantId:          z.string().describe('Inspecting company id.'),
 });

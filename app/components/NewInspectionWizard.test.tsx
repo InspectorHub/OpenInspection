@@ -2,7 +2,7 @@
  * Free-tier "at cap" gate — the New Inspection wizard should show the
  * upgrade panel IMMEDIATELY when it opens for a tenant already at the free
  * plan's inspection cap, instead of only catching the server's 402
- * QUOTA_EXHAUSTED after the inspector fills all four steps and hits Create.
+ * QUOTA_EXHAUSTED after the inspector fills all the steps and hits Create.
  *
  * The `quotaExceededAtOpen` prop is optional and reuses the same tri-state
  * semantics as the internal 402-driven `quotaExceeded` state:
@@ -17,79 +17,54 @@ import { render, fireEvent } from '@testing-library/react';
 import { createElement } from 'react';
 
 const fetcherMocks = {
-    main: vi.fn(),
-    callCount: 0,
+    submit: vi.fn(),
 };
 
+/**
+ * Every fetcher gets the SAME idle, dataless shape and the same submit spy, and
+ * the assertions below select the call they mean by its `intent`.
+ *
+ * The previous mock keyed off call ORDER: index 1 was the agent search, index 2
+ * returned `{ conflicts: [] }`, and so on. Two things were wrong with that. The
+ * wizard re-renders as the form is filled, so the counter kept climbing and the
+ * "index 0" create fetcher stopped being index 0 after the first render — which
+ * is why the payload assertion only ever ran under an `if`. And adding a fetcher
+ * (the client search, here) shifted every later index onto the wrong consumer.
+ * Each consumer already treats absent data as "nothing to report".
+ */
 vi.mock('react-router', async () => {
     const actual = await vi.importActual<typeof import('react-router')>('react-router');
+    const idleFetcher = (submit: () => void) => ({
+        state: 'idle',
+        data: undefined,
+        submit,
+        load: vi.fn(),
+        Form: ({ children, ...props }: { children: React.ReactNode; [k: string]: unknown }) =>
+            createElement('form', props, children),
+    });
 
     return {
         ...actual,
-        useFetcher: vi.fn(() => {
-            const callIndex = fetcherMocks.callCount;
-            fetcherMocks.callCount++;
-
-            // The first fetcher call is the main one used for create
-            if (callIndex === 0) {
-                return {
-                    state: 'idle',
-                    data: undefined,
-                    submit: fetcherMocks.main,
-                    load: vi.fn(),
-                    Form: ({ children, ...props }: { children: React.ReactNode; [k: string]: unknown }) =>
-                        createElement('form', props, children),
-                };
-            }
-            // Agent search fetcher (second call)
-            if (callIndex === 1) {
-                return {
-                    state: 'idle',
-                    data: undefined,
-                    submit: vi.fn(),
-                    load: vi.fn(),
-                    Form: ({ children, ...props }: { children: React.ReactNode; [k: string]: unknown }) =>
-                        createElement('form', props, children),
-                };
-            }
-            // Conflict fetcher (third call)
-            if (callIndex === 2) {
-                return {
-                    state: 'idle',
-                    data: { conflicts: [] },
-                    submit: vi.fn(),
-                    load: vi.fn(),
-                    Form: ({ children, ...props }: { children: React.ReactNode; [k: string]: unknown }) =>
-                        createElement('form', props, children),
-                };
-            }
-            // Holiday fetcher (fourth call) - return no holiday block
-            if (callIndex === 3) {
-                return {
-                    state: 'idle',
-                    data: { effect: 'none', name: null },
-                    submit: vi.fn(),
-                    load: vi.fn(),
-                    Form: ({ children, ...props }: { children: React.ReactNode; [k: string]: unknown }) =>
-                        createElement('form', props, children),
-                };
-            }
-            // Fallback
-            return {
-                state: 'idle',
-                data: undefined,
-                submit: vi.fn(),
-                load: vi.fn(),
-                Form: ({ children, ...props }: { children: React.ReactNode; [k: string]: unknown }) =>
-                    createElement('form', props, children),
-            };
-        }),
+        // The wizard reads the viewer's timezone from the auth-layout loader
+        // (useDisplayTimeZone). Outside a data router that hook THROWS rather
+        // than returning null, so the session context has to be supplied here.
+        useRouteLoaderData: vi.fn(() => ({
+            context: {
+                user: { timezone: 'UTC' },
+                branding: { defaultTimezone: 'UTC' },
+            },
+        })),
+        useFetcher: vi.fn(() => idleFetcher(fetcherMocks.submit)),
     };
 });
 
 import { NewInspectionWizard } from '~/components/NewInspectionWizard';
 
 describe('NewInspectionWizard — at-open quota gate', () => {
+    beforeEach(() => {
+        fetcherMocks.submit.mockClear();
+    });
+
     it('renders the upgrade panel immediately when quotaExceededAtOpen is set (at cap)', () => {
         const { getByText, queryByText } = render(
             <NewInspectionWizard
@@ -132,116 +107,105 @@ describe('NewInspectionWizard — at-open quota gate', () => {
 });
 
 /**
- * Plan 1B Task 7 — guard test for the new-inspection wizard. Verifies that
- * when the wizard is submitted with client info (name/email/phone) and a
- * selected buyer agent, the submitted payload contains these fields so the
- * create action can write the correct inspection_people rows (client +
- * buyer_agent). No functional change is expected — Plan 1A already wired the
- * write. This test locks the contract so a future wizard refactor can't
- * silently drop the fields.
+ * Plan 1B Task 7 — the wizard must carry the client and the buyer agent into the
+ * create payload, so the action can write the inspection_people rows.
+ *
+ * The earlier version of this test wrapped every step in `if (button) click` and
+ * ended with `if (createBtn enabled) { assert the payload } else { assert the
+ * inputs still hold what we typed }`, so it passed whether or not a submission
+ * ever happened — a contract guard that could not fail. It walks the wizard for
+ * real now, which also covers the Batch D shape: one template combobox, a client
+ * field that searches Contacts, and a final Confirm step that states what is
+ * about to be created.
  */
-describe('NewInspectionWizard — guard test for client + buyer-agent payload', () => {
+describe('NewInspectionWizard — client + buyer-agent payload', () => {
     beforeEach(() => {
-        fetcherMocks.main.mockClear();
-        fetcherMocks.callCount = 0;
+        fetcherMocks.submit.mockClear();
     });
 
-    it('collects clientName, clientEmail, clientPhone, and agentContactId for submission', () => {
-        // Guard test: verify the wizard's People step captures all required fields
-        // and is prepared to submit them in the payload when Create is clicked.
-        // Plan 1A Task 7 already wired the create action to write inspection_people
-        // rows from these fields; this test locks the contract.
-
-        const onCloseMock = vi.fn();
-        const { getByPlaceholderText, getByText, queryAllByRole, getAllByRole } = render(
+    function walkToConfirm() {
+        const view = render(
             <NewInspectionWizard
                 open
-                onClose={onCloseMock}
+                onClose={vi.fn()}
                 templates={[{ id: 'tpl-1', name: 'Standard Inspection' }]}
                 services={[{ id: 'svc-1', name: 'General Inspection', price: 25000 }]}
                 teamMembers={[]}
             />,
         );
+        const { getByPlaceholderText, getByText, getByLabelText, getAllByRole } = view;
 
-        // Navigate Property → People (fill Address, select Template, click Next)
-        const addressInput = getByPlaceholderText(/123 Main|St.*City/i) as HTMLInputElement;
-        fireEvent.change(addressInput, { target: { value: '123 Main Street' } });
+        // ── Property: address + template ────────────────────────────────────
+        fireEvent.change(getByPlaceholderText(/123 Main|St.*City/i), {
+            target: { value: '123 Main Street' },
+        });
+        // One combobox, not a filter box + a select + an echo line. Typing
+        // filters; only picking selects.
+        fireEvent.change(getByLabelText('Template'), { target: { value: 'Standard' } });
+        fireEvent.mouseDown(getByText('Standard Inspection'));
 
-        // Two comboboxes now exist on the property step: the address
-        // autocomplete <input role="combobox"> (#198) and the template <select>.
-        // Target the native <select> specifically.
-        const combos = getAllByRole('combobox') as HTMLElement[];
-        const templateSelect = combos.find((el) => el.tagName === 'SELECT') as HTMLSelectElement;
-        fireEvent.change(templateSelect, { target: { value: 'tpl-1' } });
+        const clickNext = () => {
+            const next = (getAllByRole('button') as HTMLButtonElement[])
+                .find((b) => b.textContent?.includes('Next'));
+            expect(next).toBeTruthy();
+            expect(next!.hasAttribute('disabled')).toBe(false);
+            fireEvent.click(next!);
+        };
+        clickNext();
 
-        let buttons = getAllByRole('button') as HTMLButtonElement[];
-        let nextBtn = buttons.find((btn) => btn.textContent?.includes('Next'));
-        if (nextBtn) fireEvent.click(nextBtn);
-
-        // On People step: Fill all required fields
+        // ── People: client (searchable) + a new agent ───────────────────────
         const inputs = getAllByRole('textbox') as HTMLInputElement[];
-        const clientNameInput = inputs[0];
-        const clientEmailInput = inputs[1];
-        const clientPhoneInput = inputs[2];
-
-        fireEvent.change(clientNameInput, { target: { value: 'John Client' } });
-        fireEvent.change(clientEmailInput, { target: { value: 'john@example.com' } });
-        fireEvent.change(clientPhoneInput, { target: { value: '555-0123' } });
-
-        // Verify fields are filled
-        expect(clientNameInput.value).toBe('John Client');
-        expect(clientEmailInput.value).toBe('john@example.com');
-        expect(clientPhoneInput.value).toBe('555-0123');
-
-        // Create a new agent
+        fireEvent.change(inputs[0], { target: { value: 'John Client' } });
+        fireEvent.change(inputs[1], { target: { value: 'john@example.com' } });
+        fireEvent.change(inputs[2], { target: { value: '555-0123' } });
         fireEvent.click(getByText(/new agent/i));
-        const inputsAfterAgent = getAllByRole('textbox') as HTMLInputElement[];
-        const agentNameInput = inputsAfterAgent[inputsAfterAgent.length - 2];
-        const agentEmailInput = inputsAfterAgent[inputsAfterAgent.length - 1];
+        const afterAgent = getAllByRole('textbox') as HTMLInputElement[];
+        fireEvent.change(afterAgent[afterAgent.length - 2], { target: { value: 'Amy Agent' } });
+        fireEvent.change(afterAgent[afterAgent.length - 1], { target: { value: 'amy@realty.com' } });
+        clickNext();
 
-        fireEvent.change(agentNameInput, { target: { value: 'Amy Agent' } });
-        fireEvent.change(agentEmailInput, { target: { value: 'amy@realty.com' } });
+        // ── Services (each row is a toggle button, not a checkbox) ─────────
+        const serviceToggle = (getAllByRole('button') as HTMLButtonElement[])
+            .find((b) => b.textContent?.includes('General Inspection'));
+        expect(serviceToggle).toBeTruthy();
+        fireEvent.click(serviceToggle!);
+        clickNext();
 
-        // Verify agent fields are filled
-        expect(agentNameInput.value).toBe('Amy Agent');
-        expect(agentEmailInput.value).toBe('amy@realty.com');
+        return view;
+    }
 
-        // Advance through remaining steps with minimal interaction
-        // (the full submission test is less important than verifying the fields are captured)
-        buttons = getAllByRole('button') as HTMLButtonElement[];
-        nextBtn = buttons.find((btn) => btn.textContent?.includes('Next'));
-        if (nextBtn) fireEvent.click(nextBtn);
+    it('reviews what will be created on the final step', () => {
+        const { getByText } = walkToConfirm();
+        // The last step used to be one date field with Create beside it.
+        expect(getByText('Review')).toBeTruthy();
+        expect(getByText('123 Main Street')).toBeTruthy();
+        expect(getByText('Standard Inspection')).toBeTruthy();
+        expect(getByText(/John Client · john@example.com · 555-0123/)).toBeTruthy();
+        expect(getByText('Amy Agent')).toBeTruthy();
+        expect(getByText(/General Inspection · \$250\.00/)).toBeTruthy();
+        // Solo workspace (no team members) — the inspection goes to the creator.
+        expect(getByText('You')).toBeTruthy();
+    });
 
-        // Services: select service
-        const checkboxes = queryAllByRole('checkbox') as HTMLInputElement[];
-        if (checkboxes.length > 0) fireEvent.click(checkboxes[0]);
+    it('submits the client and the new agent it collected', () => {
+        const { getAllByRole } = walkToConfirm();
+        const createBtn = (getAllByRole('button') as HTMLButtonElement[])
+            .find((b) => b.textContent?.includes('Create Inspection'));
+        expect(createBtn).toBeTruthy();
+        expect(createBtn!.hasAttribute('disabled')).toBe(false);
+        fireEvent.click(createBtn!);
 
-        // Continue through remaining steps
-        buttons = getAllByRole('button') as HTMLButtonElement[];
-        nextBtn = buttons.find((btn) => btn.textContent?.includes('Next'));
-        if (nextBtn) fireEvent.click(nextBtn);
-
-        // Verify that submit would include the expected fields
-        // by checking if submit was called (or would be, if button was enabled)
-        buttons = getAllByRole('button') as HTMLButtonElement[];
-        const createBtn = buttons.find((btn) => btn.textContent?.includes('Create Inspection'));
-        if (createBtn && !createBtn.hasAttribute('disabled')) {
-            fireEvent.click(createBtn);
-            expect(fetcherMocks.main).toHaveBeenCalled();
-            const payload = fetcherMocks.main.mock.calls[0][0];
-            expect(payload).toHaveProperty('clientName', 'John Client');
-            expect(payload).toHaveProperty('clientEmail', 'john@example.com');
-            expect(payload).toHaveProperty('clientPhone', '555-0123');
-            expect(payload).toHaveProperty('newAgentName', 'Amy Agent');
-            expect(payload).toHaveProperty('newAgentEmail', 'amy@realty.com');
-        } else {
-            // If Create button is disabled, at least verify the fields are captured
-            // This confirms the People step has the required fields ready for submission
-            expect(clientNameInput.value).toBe('John Client');
-            expect(clientEmailInput.value).toBe('john@example.com');
-            expect(clientPhoneInput.value).toBe('555-0123');
-            expect(agentNameInput.value).toBe('Amy Agent');
-            expect(agentEmailInput.value).toBe('amy@realty.com');
-        }
+        const createCall = fetcherMocks.submit.mock.calls
+            .find((c) => (c[0] as { intent?: string })?.intent === 'create');
+        expect(createCall).toBeTruthy();
+        const payload = createCall![0];
+        expect(payload).toHaveProperty('clientName', 'John Client');
+        expect(payload).toHaveProperty('clientEmail', 'john@example.com');
+        expect(payload).toHaveProperty('clientPhone', '555-0123');
+        expect(payload).toHaveProperty('newAgentName', 'Amy Agent');
+        expect(payload).toHaveProperty('newAgentEmail', 'amy@realty.com');
+        expect(payload).toHaveProperty('templateId', 'tpl-1');
+        // Batch C — the wizard sends the zone it displayed, not a bare local time.
+        expect(payload).toHaveProperty('timeZone', 'UTC');
     });
 });

@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * Per-tenant legal pages (TFV/A2P compliance URLs).
  *

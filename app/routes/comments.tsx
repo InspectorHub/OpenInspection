@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useLoaderData, useSearchParams } from "react-router";
 import type { Route } from "./+types/comments";
+import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Pagination } from "@core/shared-ui";
@@ -80,6 +81,7 @@ const SEVERITY_TONE: Record<Severity, "sat" | "monitor" | "defect" | "gen"> = {
 
 export default function CommentsPage() {
   const { comments, meta, contractorTypes } = useLoaderData<typeof loader>();
+  const displayTz = useDisplayTimeZone();
   const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = isSeverity(searchParams.get("severity") ?? "") ? (searchParams.get("severity") as Severity) : "all";
   const { setPage, setPageSize } = usePagination();
@@ -136,7 +138,7 @@ export default function CommentsPage() {
                     {m.common_edit()}
                   </button>
                 </div>
-                <EntityAuditTrail entityId={c.id} />
+                <EntityAuditTrail entityId={c.id} timeZone={displayTz} />
               </Card>
             ))}
           </div>

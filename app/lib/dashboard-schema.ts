@@ -96,8 +96,8 @@ export const INSPECTION_FILTERS = [
   { id: "tomorrow", get label() { return m.label_filter_tomorrow(); } },
   { id: "this_week", get label() { return m.label_filter_this_week(); } },
   { id: "future", get label() { return m.label_filter_future(); } },
-  { id: "unconfirmed", get label() { return m.label_filter_unconfirmed(); } },
-  { id: "in_progress", get label() { return m.label_filter_in_progress(); } },
+  { id: "needs_confirmation", get label() { return m.label_filter_needs_confirmation(); } },
+  { id: "awaiting_report", get label() { return m.label_filter_awaiting_report(); } },
 ] as const;
 
 export type FilterId = (typeof INSPECTION_FILTERS)[number]["id"];

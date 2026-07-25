@@ -317,5 +317,25 @@ export default tseslint.config(
                 ],
             }],
         },
+    },
+    // The composition root is exempt from type-aware linting. It imports every
+    // route module, and giving a file with that fan-in full type information
+    // exhausts the heap: measured on server/index.ts, eslint died with SIGABRT
+    // after 91s at 4GB and after 189s at 6GB, needed 8GB to finish at all, and
+    // took ~3min there. With type-aware rules off it lints in 2.7s at 4GB.
+    //
+    // Splitting the file does NOT fix this — the cost is the import fan-in, not
+    // the length. Flattening the 157-line chained `.route()` accumulation into
+    // 81 separate statements still OOMed at 4GB (147s), and any file that mounts
+    // 81 routers imports all 81 of them.
+    //
+    // The trade is that the typed rules (all 'warn' here) stop covering this
+    // file, so nothing security-bearing may live in it. That is why the JWT
+    // middleware moved out to server/lib/middleware/jwt-auth.ts, where it keeps
+    // no-floating-promises and the rest. Keep this file as wiring: `app.use`,
+    // `app.route`, and small inline handlers.
+    {
+        files: ['server/index.ts'],
+        ...tseslint.configs.disableTypeChecked,
     }
 );

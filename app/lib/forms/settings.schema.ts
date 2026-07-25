@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredText } from "~/lib/forms/required-text";
 // i18n — locale-aware validation messages. `m.*()` resolves to the active locale
 // via paraglide's ALS (server) / cookie (client), so schemas carrying user-facing
 // messages are built by a FACTORY called per validation (never a module-level
@@ -22,8 +23,7 @@ import { m } from "~/paraglide/messages";
 /* ------------------------------------------------------------------ */
 
 function makeStrongPassword() {
-  return z
-    .string()
+  return requiredText(m.validation_password_min8())
     .min(8, m.validation_password_min8())
     .regex(/[A-Z]/, m.validation_password_uppercase())
     .regex(/[0-9]/, m.validation_password_number())
@@ -41,8 +41,7 @@ function makeStrongPassword() {
  */
 export function makeDeleteAccountSchema() {
   return z.object({
-    confirmEmail: z
-      .string()
+    confirmEmail: requiredText(m.validation_delete_account_email_required())
       .min(1, m.validation_delete_account_email_required())
       .email(m.validation_delete_account_email_invalid()),
   });
@@ -61,9 +60,9 @@ export function makeDeleteAccountSchema() {
 export function makeChangePasswordSchema() {
   return z
     .object({
-      currentPassword: z.string().min(1, m.validation_change_password_current_required()),
+      currentPassword: requiredText(m.validation_change_password_current_required()).min(1, m.validation_change_password_current_required()),
       newPassword: makeStrongPassword(),
-      confirmPassword: z.string().min(1, m.validation_change_password_confirm_required()),
+      confirmPassword: requiredText(m.validation_change_password_confirm_required()).min(1, m.validation_change_password_confirm_required()),
     })
     .refine((d) => d.newPassword === d.confirmPassword, {
       message: m.validation_change_password_mismatch(),
@@ -113,8 +112,7 @@ export function makeProfileSchema() {
  */
 export function makeWorkspaceSchema() {
   return z.object({
-    companyName: z
-      .string()
+    companyName: requiredText(m.validation_workspace_name_required())
       .min(1, m.validation_workspace_name_required())
       .max(50, m.validation_workspace_name_too_long()),
     primaryColor: z
@@ -156,11 +154,17 @@ export function makeWorkspaceSchema() {
  * description max 1000 optional, price >= 0). The price is entered in dollars
  * and converted to integer cents in the action, so we validate the raw dollar
  * input as a non-negative number string.
+ *
+ * `durationMinutes` and `templateId` are optional here for the same reason they
+ * are optional on the API: a service is a nameable, priceable thing before it is
+ * a schedulable one. But both are consumed downstream — the catalog table shows
+ * the duration and public booking sums it to size the appointment, and a booking
+ * that selects a service builds its inspection from that service's template.
+ * Until this form carried them, neither could ever be set.
  */
 export function makeCreateServiceSchema() {
   return z.object({
-    name: z
-      .string()
+    name: requiredText(m.validation_service_name_required())
       .min(1, m.validation_service_name_required())
       .max(200, m.validation_service_name_too_long()),
     description: z.string().max(1000, m.validation_service_description_too_long()).optional(),
@@ -171,6 +175,31 @@ export function makeCreateServiceSchema() {
         (v) => v == null || v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0),
         m.validation_service_price_invalid(),
       ),
+    // Whole minutes. The upper bound rejects a slipped decimal point ("1800"
+    // meant as 18:00), which would otherwise size a booking window absurdly.
+    durationMinutes: z
+      .string()
+      .optional()
+      .refine((v) => {
+        if (v == null || v === "") return true;
+        const n = Number(v);
+        return Number.isInteger(n) && n > 0 && n < 1440;
+      }, m.validation_service_duration_invalid()),
+    templateId: z.string().optional(),
+  });
+}
+
+/**
+ * Editing an existing service: the same fields, plus which service.
+ *
+ * Extended rather than restated so the two forms cannot drift into disagreeing
+ * about what a valid duration is — the create form gained that bound because a
+ * slipped decimal point sizes a booking window absurdly, and the edit form is
+ * where an existing bad value would be corrected.
+ */
+export function makeUpdateServiceSchema() {
+  return makeCreateServiceSchema().extend({
+    id: requiredText(m.validation_service_id_required()).min(1, m.validation_service_id_required()),
   });
 }
 

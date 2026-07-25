@@ -11,11 +11,14 @@ export function BookingWizard({
   privacyUrl,
   termsUrl,
   form,
+  agentBooking,
 }: {
   profile: CompanyProfile;
   privacyUrl: string | null;
   termsUrl: string | null;
   form: BookingFormState;
+  /** Set when a signed-in agent is booking on behalf of a client. */
+  agentBooking?: { agentName: string; tenantId: string } | null;
 }) {
   const {
     step, setStep,
@@ -40,6 +43,9 @@ export function BookingWizard({
     chosenInspectorName,
     handleSubmit,
     tenant,
+    prefilledFromDevice,
+    clearRememberedContact,
+    rememberContact,
   } = form;
 
   useTurnstileWidget(profile.turnstileSiteKey, turnstileRef, step, setTurnstileToken);
@@ -57,6 +63,17 @@ export function BookingWizard({
           {m.booking_wizard_subtitle()}
         </p>
       </div>
+
+      {/* Booking on behalf of someone else changes what the contact fields
+          mean and what happens next, so say so before the first question. */}
+      {agentBooking && (
+        <div className="mb-8 rounded-lg border border-ih-border bg-ih-bg-muted px-4 py-3">
+          <p className="text-[13px] font-semibold text-ih-fg-1">
+            {m.booking_agent_on_behalf_heading({ name: agentBooking.agentName })}
+          </p>
+          <p className="text-[12px] text-ih-fg-3 mt-0.5">{m.booking_agent_on_behalf_body()}</p>
+        </div>
+      )}
 
       {/* Step indicator */}
       <div className="flex items-center gap-1 mb-8">
@@ -117,6 +134,9 @@ export function BookingWizard({
           tenant={tenant}
           serviceIds={serviceIds}
           conciergeReviewRequired={!!profile.conciergeReviewRequired}
+          contactIsSelf={rememberContact}
+          prefilledFromDevice={prefilledFromDevice}
+          onClearRememberedContact={clearRememberedContact}
         />
       )}
 

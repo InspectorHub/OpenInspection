@@ -6,7 +6,7 @@ import { EntityAuditTrail, type AuditEntry } from './EntityAuditTrail';
 // entity's audit trail and surface "Last edited by X" plus the full history.
 function renderTrail(entries: AuditEntry[]) {
   const Stub = createRoutesStub([
-    { path: '/', Component: () => <EntityAuditTrail entityId="tmpl-1" /> },
+    { path: '/', Component: () => <EntityAuditTrail entityId="tmpl-1" timeZone="UTC" /> },
     { path: '/resources/entity-audit', loader: () => ({ entries }) },
   ]);
   return render(<Stub initialEntries={['/']} />);

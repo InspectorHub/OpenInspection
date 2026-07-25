@@ -5,6 +5,8 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Banner, Select } from "@core/shared-ui";
 import { formatInspectionDateTime } from "~/lib/format-date";
+import { propertyGroupKey, inspectionDateValue } from "~/lib/property-groups";
+import { agentMayReadRepairList, type AgentRepairAccess } from "~/lib/agent-repair-access";
 import { useAgentTimeZoneOverride } from "~/routes/agent-layout";
 import { m } from "~/paraglide/messages";
 
@@ -24,6 +26,8 @@ interface Referral {
  status: string;
  reportStatus: string | null;
  inspectorName: string | null;
+ /** This company's policy for agents on its repair list (IA-35). */
+ repairAccess: AgentRepairAccess;
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -66,23 +70,6 @@ function statusColor(s: string): string {
  if (lower === "in_progress" || lower === "completed") return "bg-ih-info-bg text-ih-info-fg";
  if (lower === "cancelled") return "bg-ih-bad-bg text-ih-bad-fg";
  return "bg-ih-bg-muted text-ih-fg-2";
-}
-
-// Property/transaction grouping key (IA-51): normalized address so casing and
-// whitespace variants of the same property collapse together; falls back to the
-// inspection id when a referral has no address yet (each such row is its own
-// group rather than all merging into one "No address" bucket).
-function propertyGroupKey(r: Referral): string {
- const addr = r.propertyAddress?.trim().toLowerCase().replace(/\s+/g, " ");
- return addr ? `addr:${addr}` : `insp:${r.id}`;
-}
-
-// Sortable timestamp for a referral's mixed date column (full ISO or
-// YYYY-MM-DD). Missing / unparseable dates sort last.
-function referralDateValue(date: string | null): number {
- if (!date) return -Infinity;
- const t = Date.parse(date);
- return Number.isNaN(t) ? -Infinity : t;
 }
 
 export default function AgentDashboardPage() {
@@ -131,11 +118,11 @@ export default function AgentDashboardPage() {
  const visible = companyFilter ? referrals.filter((r) => r.tenantName === companyFilter) : referrals;
  const groups = new Map<string, { label: string; rows: Referral[]; recency: number }>();
  for (const r of visible) {
- const key = propertyGroupKey(r);
+ const key = propertyGroupKey(r.propertyAddress, r.id);
  const g = groups.get(key) || { label: r.propertyAddress?.trim() || m.agent_portal_no_address(), rows: [], recency: -Infinity };
  if (welcomeReferral && r.id === welcomeReferral.id) g.rows.unshift(r);
  else g.rows.push(r);
- g.recency = Math.max(g.recency, referralDateValue(r.date));
+ g.recency = Math.max(g.recency, inspectionDateValue(r.date));
  groups.set(key, g);
  }
  return Array.from(groups.entries())
@@ -234,7 +221,9 @@ export default function AgentDashboardPage() {
  </p>
  </div>
  <div className="flex items-center gap-2 shrink-0">
- {r.reportStatus === "published" && r.tenantSlug && (
+ {/* Offer the builder only when this company lets agents in: the
+ same policy the API enforces, so the link cannot lead to a 403. */}
+ {r.reportStatus === "published" && r.tenantSlug && agentMayReadRepairList(r.repairAccess) && (
  <Link
  to={`/repair-builder/${r.tenantSlug}/${r.id}`}
  className="inline-flex items-center h-6 px-2 rounded border border-ih-border text-[11px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"

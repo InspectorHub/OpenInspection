@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect, afterEach } from 'vitest';
 import { makeForgotPasswordSchema, makeResetPasswordSchema, makePasswordHint, makeLoginSchema } from './auth.schema';
 import { overwriteGetLocale } from '~/paraglide/runtime';

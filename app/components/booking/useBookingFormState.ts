@@ -1,15 +1,21 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useFetcher } from "react-router";
 import type { CompanyProfile } from "./booking-constants";
 import { m } from "~/paraglide/messages";
+
+/** Where a returning visitor's own contact details are remembered (this device only). */
+const REMEMBERED_CONTACT_KEY = "oi.booking.contact";
 
 interface UseBookingFormStateArgs {
   profile: CompanyProfile | null;
   preselected: { id: string; name: string } | null;
   tenant: string | undefined;
   agentRefSlug: string | null;
+  /** Set when a signed-in agent is booking on behalf of a client. */
+  agentBooking?: { agentName: string; tenantId: string } | null;
 }
 
-export function useBookingFormState({ profile, preselected, tenant, agentRefSlug }: UseBookingFormStateArgs) {
+export function useBookingFormState({ profile, preselected, tenant, agentRefSlug, agentBooking }: UseBookingFormStateArgs) {
   const [step, setStep] = useState(0);
 
   // Form state
@@ -28,6 +34,48 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
 
+  // Repeat visitors re-typed their own name and email on every booking. Their
+  // OWN contact details are remembered on this device only — never the address
+  // or the services, which belong to one property, and never in an agent's
+  // booking, where the fields hold someone else's client.
+  const [prefilledFromDevice, setPrefilledFromDevice] = useState(false);
+  const rememberContact = !agentBooking;
+  useEffect(() => {
+    if (!rememberContact) return;
+    try {
+      const raw = localStorage.getItem(REMEMBERED_CONTACT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { name?: string; email?: string };
+      if (!saved.name && !saved.email) return;
+      setClientName((current) => current || saved.name || "");
+      setClientEmail((current) => current || saved.email || "");
+      setPrefilledFromDevice(true);
+    } catch {
+      // A malformed or blocked store just means no prefill.
+    }
+  }, [rememberContact]);
+
+  /** "Not you?" — a different person on a shared device starts clean. */
+  function clearRememberedContact() {
+    try {
+      localStorage.removeItem(REMEMBERED_CONTACT_KEY);
+    } catch {
+      // Nothing to do: the value was never readable in the first place.
+    }
+    setClientName("");
+    setClientEmail("");
+    setPrefilledFromDevice(false);
+  }
+
+  function saveRememberedContact() {
+    if (!rememberContact) return;
+    try {
+      localStorage.setItem(REMEMBERED_CONTACT_KEY, JSON.stringify({ name: clientName, email: clientEmail }));
+    } catch {
+      // Private mode / storage disabled — booking still succeeded.
+    }
+  }
+
   const toggleService = (id: string) =>
     setSelectedServices((prev) => {
       const next = new Set(prev);
@@ -42,7 +90,9 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
       .reduce((sum, s) => sum + s.price / 100, 0);
   }, [selectedServices, profile]);
 
-  const needsTurnstile = !!profile?.turnstileSiteKey;
+  // An authenticated agent is not an anonymous visitor, so the bot challenge
+  // does not apply to them; every anonymous submit still faces it.
+  const needsTurnstile = !!profile?.turnstileSiteKey && !agentBooking;
   const canNext =
     step === 0 ? address.length > 2 :
     step === 1 ? selectedServices.size > 0 :
@@ -64,7 +114,38 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     return m.helper_booking_inspector_default();
   }, [chosenInspectorId, inspectorOptions]);
 
+  // The agent branch submits through the route action: the hold endpoint is
+  // authenticated and the session token never leaves the server side of this
+  // app. The anonymous branch keeps posting to the public endpoint directly.
+  const agentFetcher = useFetcher<{ ok?: boolean; error?: string }>();
+  useEffect(() => {
+    if (agentFetcher.state !== "idle" || !agentFetcher.data) return;
+    if (agentFetcher.data.ok) {
+      setMessage({ text: m.helper_booking_submit_success(), ok: true });
+      setStep(3);
+    } else {
+      setMessage({ text: agentFetcher.data.error || m.helper_booking_submit_error(), ok: false });
+    }
+  }, [agentFetcher.state, agentFetcher.data]);
+
+  function submitAgentHold() {
+    const fd = new FormData();
+    fd.append("_intent", "agent-book");
+    fd.append("address", address);
+    fd.append("date", inspectionDate);
+    fd.append("timeSlot", timeWindow === "custom" ? customTime : timeWindow);
+    if (chosenInspectorId) fd.append("inspectorId", chosenInspectorId);
+    for (const id of selectedServices) fd.append("serviceId", id);
+    fd.append("clientName", clientName);
+    fd.append("clientEmail", clientEmail);
+    agentFetcher.submit(fd, { method: "post" });
+  }
+
   async function handleSubmit() {
+    if (agentBooking) {
+      submitAgentHold();
+      return;
+    }
     setSubmitting(true);
     setMessage(null);
     try {
@@ -87,6 +168,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
         }),
       });
       if (res.ok) {
+        saveRememberedContact();
         setMessage({ text: m.helper_booking_submit_success(), ok: true });
         setStep(3);
       } else {
@@ -111,7 +193,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     clientEmail, setClientEmail,
     smsOptin, setSmsOptin,
     chosenInspectorId, setChosenInspectorId,
-    submitting,
+    submitting: submitting || agentFetcher.state === "submitting",
     message,
     turnstileToken, setTurnstileToken,
     turnstileRef,
@@ -123,5 +205,8 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     chosenInspectorName,
     handleSubmit,
     tenant,
+    prefilledFromDevice,
+    clearRememberedContact,
+    rememberContact,
   };
 }

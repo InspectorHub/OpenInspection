@@ -12,6 +12,8 @@ interface TemplatesListViewProps {
   setCreateOpen: (open: boolean) => void;
   handleDuplicate: (t: Template) => void;
   setDeleteConfirm: (id: string | null) => void;
+  /** Viewer's effective zone for the audit-trail timestamps. */
+  timeZone: string;
 }
 
 export function TemplatesListView({
@@ -21,6 +23,7 @@ export function TemplatesListView({
   setCreateOpen,
   handleDuplicate,
   setDeleteConfirm,
+  timeZone,
 }: TemplatesListViewProps) {
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
@@ -77,7 +80,7 @@ export function TemplatesListView({
                   {t.description && (
                     <p className="text-[11px] text-ih-fg-4 mt-0.5 line-clamp-1">{t.description}</p>
                   )}
-                  <EntityAuditTrail entityId={t.id} />
+                  <EntityAuditTrail entityId={t.id} timeZone={timeZone} />
                 </div>
               </div>
             ),

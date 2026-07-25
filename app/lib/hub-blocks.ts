@@ -11,7 +11,7 @@
  * en-US/USD (behavior-preserving) and callers thread the viewer values when known.
  */
 
-import { isReportPublished } from '~/lib/status';
+import { isReportPublished, INSPECTION_STATUS } from '~/lib/status';
 import { formatCurrency } from '~/lib/format';
 import { m } from '~/paraglide/messages';
 
@@ -186,6 +186,55 @@ export function isReportShipped(hub: HubPayload): boolean {
     return !canPublish(hub);
 }
 
+/**
+ * The newest instant any version of this report was published (unix seconds), or
+ * null when none has been.
+ *
+ * Takes the minimum slice of a version row rather than the route's
+ * ReportVersionRow, for the same reason HubPayload is a slice: this helper and its
+ * tests stay decoupled from the wider schema.
+ */
+export function latestPublishedAt(versions: Array<{ publishedAt: number | null }>): number | null {
+    const stamps = versions.map((v) => v.publishedAt).filter((t): t is number => typeof t === 'number');
+    return stamps.length ? Math.max(...stamps) : null;
+}
+
+/**
+ * Who publishing actually emailed, read off the submitted publish form.
+ *
+ * The hub payload records that a report is published; it records nothing about
+ * delivery. Publishing takes `notifyClient` / `notifyAgent` checkboxes, so the
+ * form is the only place the answer exists — and 'none' is a real outcome, not an
+ * error: an inspector may publish to have the link, and send it later.
+ */
+export function publishNotified(flags: {
+    notifyClient?: boolean | undefined;
+    notifyAgent?: boolean | undefined;
+}): 'both' | 'client' | 'agent' | 'none' {
+    const client = flags.notifyClient === true;
+    const agent = flags.notifyAgent === true;
+    if (client && agent) return 'both';
+    if (client) return 'client';
+    if (agent) return 'agent';
+    return 'none';
+}
+
+/**
+ * The party an invoice is FROM.
+ *
+ * This is who the client owes, so it may not be filled with a placeholder: the
+ * field previously read "Your inspector" whenever the invoice carried no
+ * inspector name, which looks like an answer and is not one. The company is the
+ * correct substitute, and an em dash is what remains when the document names
+ * nobody — matching the BILL TO field beside it.
+ */
+export function invoiceFromParty(
+    inspectorName: string | null | undefined,
+    companyName: string | null | undefined,
+): string {
+    return inspectorName?.trim() || companyName?.trim() || '—';
+}
+
 /* ------------------------------------------------------------------ */
 /*  Money formatting                                                   */
 /* ------------------------------------------------------------------ */
@@ -197,4 +246,20 @@ export function formatCents(
     opts?: { locale?: string; currency?: string },
 ): string {
     return formatCurrency(cents ?? 0, { locale: opts?.locale ?? 'en-US', currency: opts?.currency ?? 'USD' });
+}
+
+/**
+ * What the hub's status card should say.
+ *
+ * `actionable` still offers "Mark fieldwork complete"; the two terminal states
+ * do not, and used to render nothing in its place — leaving a card whose entire
+ * content was a heading and a status pill above blank space. They are also not
+ * the same statement: completed means the visit happened, cancelled means it will
+ * not. An unrecognised status is treated as actionable rather than blank, so a
+ * status added later cannot silently hide the only control on the card.
+ */
+export function lifecycleState(status: string): "actionable" | "completed" | "cancelled" {
+    if (status === INSPECTION_STATUS.COMPLETED) return "completed";
+    if (status === INSPECTION_STATUS.CANCELLED) return "cancelled";
+    return "actionable";
 }

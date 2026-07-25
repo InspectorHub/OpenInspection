@@ -2,12 +2,14 @@
 /**
  * Unit tests for app/lib/collab/results-doc-connection.ts
  *
- * Uses fake-indexeddb (wired in tests/unit/setup-client.ts) and a minimal
- * WebSocket stub to drive the connection without a real server.
+ * Uses fake-indexeddb (imported below, not via a global setup file — that loaded
+ * the polyfill for all 561 specs to serve three) and a minimal WebSocket stub to
+ * drive the connection without a real server.
  *
  * Frame helpers are ported from tests/workers/collab-multiclient.spec.ts.
  */
 
+import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as Y from 'yjs';
 import * as syncProtocol from 'y-protocols/sync';

@@ -13,7 +13,7 @@ import { resolvePortalAccess, resolveObserverAccess, resolveOwnerPreview } from 
 // Re-export so existing callers that import resolveOwnerPreviewToken from this
 // module (e.g. tests) continue to work without changes.
 export { resolveOwnerPreviewToken } from '../lib/public-access';
-import { contentDisposition } from '../lib/content-disposition';
+import { servePhotoObject, imagesBinding } from '../lib/media/serve-photo';
 import { InvoiceNotPayableError } from '../lib/stripe-helpers';
 import { logger } from '../lib/logger';
 import { buildRenderReportUrl } from '../lib/public-urls';
@@ -370,41 +370,14 @@ const publicReportRoutes = createApiRouter()
         if (!publicReportAccessAllowed({ renderMode, ownerPreview, reportStatus: photoGate?.reportStatus })) {
             return c.notFound();
         }
-        if (!c.env.PHOTOS) return c.notFound();
         // Ownership: keys are `${tenantId}/inspections/${inspectionId}/...` — reject
         // anything outside the token's tenant + the requested inspection.
         if (!key.startsWith(`${tenantId}/inspections/${id}/`)) return c.notFound();
-        const obj = await c.env.PHOTOS.get(key);
-        if (!obj) return c.notFound();
-        const width = w ? Math.min(Math.max(parseInt(w, 10) || 0, 16), 2000) : 0;
-        const images = (c.env as unknown as { IMAGES?: {
-            input(s: ReadableStream): { transform(o: { width: number }): { output(o: { format: string }): Promise<{ response(): Response }> } };
-        } }).IMAGES;
-        if (width > 0 && images && obj.body) {
-            try {
-                const out = await images.input(obj.body).transform({ width }).output({ format: 'image/webp' });
-                const r = out.response();
-                const h = new Headers(r.headers);
-                h.set('Cache-Control', 'private, max-age=300');
-                return new Response(r.body, { status: 200, headers: h });
-            } catch (err) {
-                logger.warn('[photo] thumbnail transform failed — serving original', { key, width, error: String(err) });
-                const orig = await c.env.PHOTOS.get(key);
-                if (orig) {
-                    const hh = new Headers();
-                    hh.set('Content-Type', orig.httpMetadata?.contentType || 'application/octet-stream');
-                    hh.set('Cache-Control', 'private, max-age=300');
-                    return new Response(orig.body, { status: 200, headers: hh });
-                }
-                return c.notFound();
-            }
-        }
-        const headers = new Headers();
-        headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
-        headers.set('Content-Disposition', contentDisposition(obj.customMetadata?.originalName, download === '1'));
-        headers.set('Cache-Control', 'private, max-age=300');
-        if (obj.httpEtag) headers.set('etag', obj.httpEtag);
-        return new Response(obj.body, { status: 200, headers });
+        const photo = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
+            width: w,
+            download: download === '1',
+        });
+        return photo ?? c.notFound();
     })
     .openapi(reportPdfDownloadRoute, async (c) => {
         const { tenant, id } = c.req.valid('param');

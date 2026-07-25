@@ -114,7 +114,8 @@ describe('ConciergeService — A3', () => {
             const insp = await testDb.select().from(schema.inspections)
                 .where(eq(schema.inspections.id, result.inspectionId)).get();
             expect(insp?.conciergeStatus).toBe('awaiting_inspector');
-            expect(insp?.status).toBe('scheduled');
+            // A hold, not a settled booking — the office moves it on from here.
+            expect(insp?.status).toBe('requested');
             expect(insp?.tenantId).toBe(T1);
             expect(insp?.inspectorId).toBe(INSPECTOR);
             // No client token minted yet — inspector hasn't approved.
@@ -201,6 +202,77 @@ describe('ConciergeService — A3', () => {
             const created = await svc.createBooking(baseParams());
             const OTHER = '00000000-0000-0000-0000-0000000000ff';
             await expect(svc.approveByInspector(created.inspectionId, OTHER)).rejects.toThrow(/not found/i);
+        });
+    });
+
+    /**
+     * An agent booking on behalf of a client is a HOLD: someone wants an
+     * inspection, nothing is settled. These pin the inputs a booking FORM can
+     * actually supply — the inspector as a user id (no front end can know a
+     * contact row id) or nobody at all, plus the services the agent picked.
+     */
+    describe('createBooking — the shape a booking form can submit', () => {
+        it('lands as requested, not scheduled — the office still has to settle it', async () => {
+            await seedFixture(testDb);
+            const created = await svc.createBooking(baseParams());
+            const insp = await testDb.select().from(schema.inspections)
+                .where(eq(schema.inspections.id, created.inspectionId)).get();
+            expect(insp?.status).toBe('requested');
+        });
+
+        it('accepts the inspector as a user id (what the booking page knows)', async () => {
+            await seedFixture(testDb);
+            const { inspectorContactId: _drop, ...rest } = baseParams();
+            const created = await svc.createBooking({ ...rest, inspectorUserId: INSPECTOR });
+            const insp = await testDb.select().from(schema.inspections)
+                .where(eq(schema.inspections.id, created.inspectionId)).get();
+            expect(insp?.inspectorId).toBe(INSPECTOR);
+        });
+
+        it('rejects an inspector user from another tenant', async () => {
+            await seedFixture(testDb);
+            const { inspectorContactId: _drop, ...rest } = baseParams();
+            await expect(
+                svc.createBooking({ ...rest, inspectorUserId: '00000000-0000-0000-0000-0000000000ff' }),
+            ).rejects.toThrow(/inspector/i);
+        });
+
+        it('leaves the inspection unassigned when the agent picked no inspector', async () => {
+            await seedFixture(testDb);
+            const { inspectorContactId: _drop, ...rest } = baseParams();
+            const created = await svc.createBooking(rest);
+            const insp = await testDb.select().from(schema.inspections)
+                .where(eq(schema.inspections.id, created.inspectionId)).get();
+            expect(insp?.inspectorId).toBeNull();
+            expect(insp?.status).toBe('requested');
+        });
+
+        it('snapshots the requested services and prices the hold from them', async () => {
+            await seedFixture(testDb);
+            const SVC_A = '00000000-0000-0000-0000-0000000000b1';
+            const SVC_B = '00000000-0000-0000-0000-0000000000b2';
+            await testDb.insert(schema.services).values([
+                { id: SVC_A, tenantId: T1, name: 'Full Inspection', price: 45000, createdAt: new Date() },
+                { id: SVC_B, tenantId: T1, name: 'Radon', price: 15000, createdAt: new Date() },
+            ]);
+            const created = await svc.createBooking({
+                ...baseParams(),
+                services: [{ serviceId: SVC_A }, { serviceId: SVC_B }],
+            });
+            const lines = await testDb.select().from(schema.inspectionServices)
+                .where(eq(schema.inspectionServices.inspectionId, created.inspectionId)).all();
+            expect(lines).toHaveLength(2);
+            expect(lines.map((l) => l.nameSnapshot).sort()).toEqual(['Full Inspection', 'Radon']);
+            const insp = await testDb.select().from(schema.inspections)
+                .where(eq(schema.inspections.id, created.inspectionId)).get();
+            expect(insp?.price).toBe(60000);
+        });
+
+        it('refuses a service from another tenant rather than silently dropping it', async () => {
+            await seedFixture(testDb);
+            await expect(
+                svc.createBooking({ ...baseParams(), services: [{ serviceId: 'no-such-service' }] }),
+            ).rejects.toThrow(/service/i);
         });
     });
 

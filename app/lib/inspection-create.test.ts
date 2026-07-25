@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { buildCreateInspectionJson, dollarsToCents } from "~/lib/inspection-create";
 
@@ -24,7 +25,33 @@ describe("buildCreateInspectionJson", () => {
         }));
         expect(json.propertyAddress).toBe("100 Smoke Test Lane, Austin, TX");
         expect(json.templateId).toBe("625fb306-bde0-4fe9-a0e8-d8151296b23a");
-        expect(json.date).toBe("2026-06-02T09:00:00Z");
+        // No timeZone field posted → UTC, which is what this always meant.
+        expect(json.date).toBe("2026-06-02T09:00:00.000Z");
+    });
+
+    /**
+     * The typed time is a wall clock, not an instant. This used to be combined as
+     * `${date}T${time}:00Z`, so 9am in a Texas workspace was stored as 9am UTC —
+     * four hours early, and invisible to anyone testing from UTC. The wizard now
+     * posts the zone it displayed while the inspector typed.
+     */
+    it("reads the typed time in the posted timezone, not as UTC", () => {
+        const json = buildCreateInspectionJson(fd({
+            address: "1 A St",
+            templateId: "t",
+            date: "2026-06-02",
+            time: "09:00",
+            timeZone: "America/Chicago",
+        }));
+        // 09:00 CDT is 14:00Z.
+        expect(json.date).toBe("2026-06-02T14:00:00.000Z");
+    });
+
+    it("falls back to UTC when no zone is posted, so an older caller still works", () => {
+        const json = buildCreateInspectionJson(fd({
+            address: "1 A St", templateId: "t", date: "2026-06-02", time: "09:00", timeZone: "",
+        }));
+        expect(json.date).toBe("2026-06-02T09:00:00.000Z");
     });
 
     it("omits date when no date is provided", () => {
@@ -45,7 +72,7 @@ describe("buildCreateInspectionJson", () => {
 
     it("defaults the time to 09:00 when only a date is given", () => {
         const json = buildCreateInspectionJson(fd({ address: "1 A St", templateId: "t", date: "2026-06-02" }));
-        expect(json.date).toBe("2026-06-02T09:00:00Z");
+        expect(json.date).toBe("2026-06-02T09:00:00.000Z");
     });
 
     // IA-1 People step tests

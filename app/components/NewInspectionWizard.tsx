@@ -1,11 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
-import { buildWizardSteps, todayLocalISO, type WizardStepId } from "~/lib/wizard-steps";
+import { useContactSearch } from "~/hooks/useContactSearch";
+import { buildWizardSteps, stepBlockedReason, todayLocalISO, type WizardStepId } from "~/lib/wizard-steps";
+import { summariseNewInspection } from "~/lib/wizard-review";
+import { buildWizardCreatePayload } from "~/lib/wizard-submit";
 import { PropertyStep } from "./new-inspection/PropertyStep";
 import { PeopleStep } from "./new-inspection/PeopleStep";
 import { ServicesStep } from "./new-inspection/ServicesStep";
-import { ScheduleStep } from "./new-inspection/ScheduleStep";
-import { TeamStep } from "./new-inspection/TeamStep";
+import { ConfirmStep } from "./new-inspection/ConfirmStep";
+import { ReviewPanel } from "./new-inspection/ReviewPanel";
+import { WizardLayout } from "./new-inspection/WizardLayout";
+import { Breadcrumb } from "./Breadcrumb";
+import { PageHeader } from "@core/shared-ui";
+import { civilToInstantISO } from "~/lib/civil-time";
+import { useDisplayTimeZone, useSessionContext } from "~/hooks/useSessionContext";
 import { QuotaExceededPanel } from "./new-inspection/QuotaExceededPanel";
 import type { AddressSelection } from "~/routes/resources/places";
 import { m } from "~/paraglide/messages";
@@ -15,8 +23,7 @@ function stepLabel(id: WizardStepId): string {
     case "property": return m.new_inspection_step_property();
     case "people": return m.new_inspection_step_people();
     case "services": return m.new_inspection_step_services();
-    case "schedule": return m.new_inspection_step_schedule();
-    case "team": return m.new_inspection_step_team();
+    case "confirm": return m.new_inspection_step_confirm();
   }
 }
 
@@ -42,6 +49,14 @@ export interface AgentResult {
   id: string;
   name: string;
   email: string | null;
+}
+
+/** Client row returned by the search-clients action intent. Carries a phone the agent search has no use for. */
+export interface ClientResult {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -78,10 +93,31 @@ export function NewInspectionWizard({
   quotaExceededAtOpen?: string | null;
 }) {
   const fetcher = useFetcher();
-  // IA-1 — dedicated fetcher for agent typeahead (B-17: per-intent convention,
-  // separate fetcher prevents competing mutations from cancelling each other).
-  const agentFetcher = useFetcher<{ intent: "search-agents"; agents: AgentResult[] }>();
-  const agentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The zone the Schedule step names, and the zone the typed time is read in.
+  // Both must be the same value or the inspector is told one thing and the
+  // booking stores another.
+  const displayTz = useDisplayTimeZone();
+  const sessionCtx = useSessionContext();
+  // IA-1 agent typeahead, and (Batch D) the same search for the client — one
+  // hook, two instances, each with its own fetcher.
+  const [agentSearch, setAgentSearch] = useState("");
+  const agentSearchCtl = useContactSearch<{ intent: "search-agents"; agents: AgentResult[] }>(
+    "search-agents",
+    setAgentSearch,
+  );
+  const [clientName, setClientName] = useState("");
+  /** Set when the client fields were filled from a Contacts hit; cleared on any
+   *  hand edit, since the values are then no longer that contact's. */
+  const [pickedClientId, setPickedClientId] = useState<string | null>(null);
+  // The client's search box IS the name field — there is no separate query to
+  // keep, and typing a name nobody has on file is still a valid answer.
+  const clientSearchCtl = useContactSearch<{ intent: "search-clients"; clients: ClientResult[] }>(
+    "search-clients",
+    (value) => {
+      setClientName(value);
+      setPickedClientId(null);
+    },
+  );
   // IA-6 — advisory schedule conflict detection (separate fetcher to avoid
   // cancelling the submit fetcher; B-17 convention).
   const conflictFetcher = useFetcher<{
@@ -111,13 +147,10 @@ export function NewInspectionWizard({
   const [soloMode, setSoloMode] = useState(true);
   const [inspectorId, setInspectorId] = useState("");
 
-  // IA-1 People step state
-  const [clientName, setClientName] = useState("");
+  // IA-1 People step state (clientName lives with its search hook above)
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   // Agent: either a selected existing contact or inline-new mode.
-  const [agentSearch, setAgentSearch] = useState("");
-  const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentResult | null>(null);
   const [newAgentMode, setNewAgentMode] = useState(false);
   const [newAgentName, setNewAgentName] = useState("");
@@ -142,35 +175,34 @@ export function NewInspectionWizard({
 
   // B-21 — steps with nothing to decide are skipped instead of rendered as
   // empty placeholders ("No services configured" + a mandatory Next click).
-  const steps = useMemo(
-    () =>
-      buildWizardSteps({
-        hasServiceCatalog,
-        hasTeamChoices: teamMembers.length > 0,
-      }),
-    [hasServiceCatalog, teamMembers.length],
-  );
+  // Batch D — Schedule and Team merged into `confirm`, which also reviews.
+  const steps = useMemo(() => buildWizardSteps({ hasServiceCatalog }), [hasServiceCatalog]);
   const step: WizardStepId = steps[Math.min(stepIdx, steps.length - 1)];
 
-  // Typeahead filter for the template picker (B-6).
-  const [templateQuery, setTemplateQuery] = useState("");
-  const filteredTemplates = useMemo(() => {
-    const q = templateQuery.trim().toLowerCase();
-    if (!q) return templates;
-    return templates.filter((t) => t.name.toLowerCase().includes(q));
-  }, [templates, templateQuery]);
-  const selectedTemplate = useMemo(
-    () => templates.find((t) => t.id === templateId),
-    [templates, templateId],
+  // What the final step states back before Create is pressed.
+  const summary = useMemo(
+    () =>
+      summariseNewInspection({
+        address,
+        templates,
+        templateId,
+        clientName,
+        clientEmail,
+        clientPhone,
+        selectedAgent,
+        newAgentName,
+        serviceCatalog,
+        selectedServiceIds: [...services],
+        priceOverrides,
+        soloMode,
+        inspectorId,
+        teamMembers,
+        selfName: sessionCtx?.user.name ?? null,
+      }),
+    [address, templates, templateId, clientName, clientEmail, clientPhone, selectedAgent,
+      newAgentName, serviceCatalog, services, priceOverrides, soloMode, inspectorId, teamMembers,
+      sessionCtx],
   );
-
-  // B-21 — when the search narrows to exactly one template, select it; the
-  // search box and dropdown previously acted as two disconnected controls.
-  useEffect(() => {
-    if (templateQuery.trim() && filteredTemplates.length === 1) {
-      setTemplateId(filteredTemplates[0].id);
-    }
-  }, [templateQuery, filteredTemplates]);
 
   useEffect(() => {
     if (!open) {
@@ -179,7 +211,6 @@ export function NewInspectionWizard({
       setAddress("");
       setAddressSel(null);
       setTemplateId("");
-      setTemplateQuery("");
       setServices(new Set());
       setPriceOverrides(new Map());
       setDate(todayLocalISO());
@@ -190,8 +221,9 @@ export function NewInspectionWizard({
       setClientName("");
       setClientEmail("");
       setClientPhone("");
+      clientSearchCtl.setDropdownOpen(false);
       setAgentSearch("");
-      setAgentDropdownOpen(false);
+      agentSearchCtl.setDropdownOpen(false);
       setSelectedAgent(null);
       setNewAgentMode(false);
       setNewAgentName("");
@@ -241,7 +273,7 @@ export function NewInspectionWizard({
   // will be assigned to. Advisory only — never blocks.
   useEffect(() => {
     if (!date) return;
-    const combinedDate = `${date}T${time}:00Z`;
+    const combinedDate = civilToInstantISO(date, time, displayTz);
     const params = new URLSearchParams({ date: combinedDate });
     if (inspectorId) params.set("inspectorId", inspectorId);
     const t = setTimeout(() => {
@@ -260,26 +292,24 @@ export function NewInspectionWizard({
     return () => clearTimeout(t);
   }, [date]);
 
-  // IA-1 — agent typeahead: debounce ~300 ms, then POST search-agents intent
-  // via the dedicated agentFetcher (BFF pattern, no direct client fetch).
-  function handleAgentSearchChange(value: string) {
-    setAgentSearch(value);
-    setAgentDropdownOpen(value.trim().length >= 2);
-    if (agentDebounceRef.current) clearTimeout(agentDebounceRef.current);
-    if (value.trim().length >= 2) {
-      agentDebounceRef.current = setTimeout(() => {
-        agentFetcher.submit(
-          { intent: "search-agents", search: value.trim() },
-          { method: "post", action: "/inspections" },
-        );
-      }, 300);
-    }
+  function selectClient(client: ClientResult) {
+    // Fill all three fields: the create endpoint deduplicates the contact by
+    // email, so carrying it over is what links this inspection to the existing
+    // client instead of making a second row with the same name.
+    setClientName(client.name);
+    setClientEmail(client.email ?? "");
+    setClientPhone(client.phone ?? "");
+    // Remember that these three values came from a contact. Picking an existing
+    // client and typing a new one left the fields looking identical, and they
+    // mean different things — one joins a history, the other starts one.
+    setPickedClientId(client.id);
+    clientSearchCtl.setDropdownOpen(false);
   }
 
   function selectAgent(agent: AgentResult) {
     setSelectedAgent(agent);
     setAgentSearch("");
-    setAgentDropdownOpen(false);
+    agentSearchCtl.setDropdownOpen(false);
     setNewAgentMode(false);
     setNewAgentName("");
     setNewAgentEmail("");
@@ -288,14 +318,14 @@ export function NewInspectionWizard({
   function clearAgent() {
     setSelectedAgent(null);
     setAgentSearch("");
-    setAgentDropdownOpen(false);
+    agentSearchCtl.setDropdownOpen(false);
   }
 
   function enableNewAgentMode() {
     setNewAgentMode(true);
     setSelectedAgent(null);
     setAgentSearch("");
-    setAgentDropdownOpen(false);
+    agentSearchCtl.setDropdownOpen(false);
   }
 
   // #198 — editing the address text by hand invalidates any previously picked
@@ -348,69 +378,38 @@ export function NewInspectionWizard({
   const clientHasContact = clientEmail.trim().length > 0 || clientPhone.trim().length > 0;
   const clientNameMissing = clientHasContact && clientName.trim().length === 0;
 
-  function canAdvanceFromStep(): boolean {
-    switch (step) {
-      case "property":
-        // propertyAddress has a min(5) server constraint — enforce it here so the
-        // wizard cannot advance into an inevitable 400.
-        return address.trim().length >= 5 && templateId.length > 0;
-      case "people":
-        // People: optional, but name is required when email or phone are filled.
-        return !clientNameMissing;
-      case "services":
-        return services.size > 0;
-      case "schedule":
-        return date.length > 0 && holidayFetcher.data?.effect !== "block";
-      default:
-        return true;
-    }
-  }
-  const canNext = canAdvanceFromStep();
+  // A single source for both "may we advance" and "why not" — the button was
+  // disabled with no explanation, twice in one wizard.
+  const blockedReason = stepBlockedReason(step, {
+    address,
+    templateId,
+    clientNameMissing,
+    serviceCount: services.size,
+    date,
+    holidayBlocked: holidayFetcher.data?.effect === "block",
+  });
 
   function handleSubmit() {
-    // P-4: Build serviceSelections with optional per-row price overrides.
-    // Also keep legacy serviceIds for backward compat (the server uses
-    // serviceSelections as the authoritative source when both are present).
-    const serviceSelectionsJson = JSON.stringify(
-      [...services].map((id) => {
-        const override = priceOverrides.get(id);
-        return override !== undefined
-          ? { serviceId: id, priceOverrideCents: override }
-          : { serviceId: id };
-      }),
-    );
-
     fetcher.submit(
-      {
-        intent: "create",
+      buildWizardCreatePayload({
         propertyType,
         address,
-        // #198 — structured geocoded address (empty strings when the inspector
-        // typed a free-form address the API couldn't match; the server stamps
-        // addressGeocodedAt itself).
-        addressPlaceId: addressSel?.placeId ?? "",
-        addressStreet: addressSel?.street ?? "",
-        addressCity: addressSel?.city ?? "",
-        addressState: addressSel?.state ?? "",
-        addressZip: addressSel?.zip ?? "",
-        addressCounty: addressSel?.county ?? "",
-        addressLat: addressSel?.lat != null ? String(addressSel.lat) : "",
-        addressLng: addressSel?.lng != null ? String(addressSel.lng) : "",
+        addressSel,
         templateId,
-        serviceIds: [...services].join(","),
-        serviceSelectionsJson,
+        serviceIds: [...services],
+        priceOverrides,
         date,
         time,
-        soloMode: String(soloMode),
+        timeZone: displayTz,
+        soloMode,
         inspectorId,
-        // IA-1 People step fields
         clientName,
         clientEmail,
         clientPhone,
-        agentContactId: selectedAgent?.id ?? "",
-        newAgentName: !selectedAgent ? newAgentName : "",
-        newAgentEmail: !selectedAgent ? newAgentEmail : "",
-      },
+        selectedAgentId: selectedAgent?.id ?? null,
+        newAgentName,
+        newAgentEmail,
+      }),
       { method: "post", action: "/inspections" },
     );
     // Closing happens once the fetcher settles (see the effect above) — a
@@ -418,31 +417,41 @@ export function NewInspectionWizard({
     // panel instead of closing immediately on submit.
   }
 
-  return (
-    <div className="w-full max-w-[720px] mx-auto flex flex-col bg-ih-bg-card rounded-xl border border-ih-border shadow-ih-popover">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-ih-border">
-          <h2 className="text-[16px] font-bold">{m.new_inspection_title()}</h2>
-          <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none">&times;</button>
-        </div>
-
-        {quotaExceeded !== undefined ? (
+  if (quotaExceeded !== undefined) {
+    return (
+      <div className="w-full">
+        <Breadcrumb items={[{ label: m.nav_item_inspections(), href: "/inspections" }, { label: m.new_inspection_title() }]} />
+        <div className="mt-1"><PageHeader title={m.new_inspection_title()} /></div>
+        <div className="mt-ih-list max-w-[720px] bg-ih-bg-card rounded-xl border border-ih-border">
           <QuotaExceededPanel billingPortalUrl={quotaExceeded} onClose={onClose} />
-        ) : (
-        <>
-        {/* Step indicator */}
-        <div className="flex items-center gap-1 px-6 pt-4">
-          {steps.map((s, i) => (
-            <div key={s} className="flex items-center gap-1 flex-1">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${i <= stepIdx ? "bg-ih-primary text-white" : "bg-ih-bg-muted text-ih-fg-4"}`}>{i + 1}</div>
-              <span className={`text-[11px] font-medium hidden sm:inline ${i <= stepIdx ? "text-ih-primary" : "text-ih-fg-4"}`}>{stepLabel(s)}</span>
-              {i < steps.length - 1 && <div className={`flex-1 h-px mx-1 ${i < stepIdx ? "bg-ih-primary" : "bg-ih-bg-muted"}`} />}
-            </div>
-          ))}
         </div>
+      </div>
+    );
+  }
 
-        {/* Body — flex-1 + scroll so a tall step never pushes the footer off-screen (card capped at max-h-[90vh]) */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+  return (
+    <WizardLayout
+      steps={steps}
+      stepIdx={stepIdx}
+      stepLabel={stepLabel}
+      blockedReason={blockedReason}
+      isLastStep={stepIdx === steps.length - 1}
+      onBack={() => (stepIdx > 0 ? setStepIdx(stepIdx - 1) : onClose())}
+      onNext={() => (stepIdx < steps.length - 1 ? setStepIdx(stepIdx + 1) : handleSubmit())}
+      review={
+        <ReviewPanel
+          summary={summary}
+          scheduledIso={civilToInstantISO(date, time, displayTz)}
+          timeZone={displayTz}
+          currentStep={step}
+          onJump={(target) => {
+            const idx = steps.indexOf(target);
+            if (idx >= 0) setStepIdx(idx);
+          }}
+        />
+      }
+    >
+        <div>
           {step === "property" && (
             <PropertyStep
               propertyType={propertyType}
@@ -455,19 +464,20 @@ export function NewInspectionWizard({
               templates={templates}
               templateId={templateId}
               setTemplateId={setTemplateId}
-              templateQuery={templateQuery}
-              setTemplateQuery={setTemplateQuery}
-              filteredTemplates={filteredTemplates}
-              selectedTemplate={selectedTemplate}
             />
           )}
 
           {step === "people" && (
             <PeopleStep
               clientName={clientName}
-              setClientName={setClientName}
+              clientSearch={clientSearchCtl}
+              selectClient={selectClient}
               clientEmail={clientEmail}
-              setClientEmail={setClientEmail}
+              setClientEmail={(v) => {
+                setClientEmail(v);
+                setPickedClientId(null);
+              }}
+              clientIsExistingContact={pickedClientId !== null}
               clientPhone={clientPhone}
               setClientPhone={setClientPhone}
               clientNameMissing={clientNameMissing}
@@ -479,10 +489,7 @@ export function NewInspectionWizard({
               newAgentEmail={newAgentEmail}
               setNewAgentEmail={setNewAgentEmail}
               agentSearch={agentSearch}
-              agentDropdownOpen={agentDropdownOpen}
-              setAgentDropdownOpen={setAgentDropdownOpen}
-              agentFetcher={agentFetcher}
-              handleAgentSearchChange={handleAgentSearchChange}
+              agentSearchCtl={agentSearchCtl}
               selectAgent={selectAgent}
               clearAgent={clearAgent}
               enableNewAgentMode={enableNewAgentMode}
@@ -499,46 +506,24 @@ export function NewInspectionWizard({
             />
           )}
 
-          {step === "schedule" && (
-            <ScheduleStep
+          {step === "confirm" && (
+            <ConfirmStep
               date={date}
               setDate={setDate}
               time={time}
               setTime={setTime}
+              timeZone={displayTz}
               conflictFetcher={conflictFetcher}
               holidayFetcher={holidayFetcher}
-            />
-          )}
-
-          {step === "team" && (
-            <TeamStep
+              showTeam={teamMembers.length > 0}
               soloMode={soloMode}
               setSoloMode={setSoloMode}
               inspectorId={inspectorId}
               setInspectorId={setInspectorId}
               teamMembers={teamMembers}
-              conflictFetcher={conflictFetcher}
             />
           )}
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-ih-border">
-          <button onClick={() => stepIdx > 0 ? setStepIdx(stepIdx - 1) : onClose()} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
-            {stepIdx > 0 ? m.common_back() : m.common_cancel()}
-          </button>
-          {stepIdx < steps.length - 1 ? (
-            <button disabled={!canNext} onClick={() => setStepIdx(stepIdx + 1)} className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed">
-              {m.common_next()}
-            </button>
-          ) : (
-            <button disabled={!canNext} onClick={handleSubmit} className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed">
-              {m.new_inspection_create()}
-            </button>
-          )}
-        </div>
-        </>
-        )}
-    </div>
+    </WizardLayout>
   );
 }

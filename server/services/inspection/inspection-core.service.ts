@@ -1,5 +1,6 @@
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions, contactRoleProfiles, inspectionPeople } from '../../lib/db/schema';
+import { resolveAgentRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
 import { contacts } from '../../lib/db/schema/contact';
 import { PeopleService } from '../people.service';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
@@ -86,13 +87,15 @@ export class InspectionCoreService extends InspectionSubService {
      * repair request list (`off` / `read` / `readwrite`). Stored in the
      * inspectionPrefs JSON; absent → `readwrite` (see the schema default).
      */
-    async getAgentRepairAccess(tenantId: string): Promise<'off' | 'read' | 'readwrite'> {
+    async getAgentRepairAccess(tenantId: string): Promise<AgentRepairAccess> {
         const db = this.getDrizzle();
         const row = await db.select({ prefs: tenantConfigs.inspectionPrefs })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
-        return row?.prefs?.agentRepairAccess ?? 'readwrite';
+        // Shared with the agent portal, which decides what to OFFER from the
+        // same answer this enforces.
+        return resolveAgentRepairAccess(row?.prefs);
     }
 
     /**
@@ -131,7 +134,6 @@ export class InspectionCoreService extends InspectionSubService {
         const tabParam = (params as { tab?: string }).tab;
         if (tabParam && tabParam !== 'all') {
             const todayStr = new Date().toISOString().slice(0, 10);
-            const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
             switch (tabParam) {
                 case 'today':
                     conditions.push(sql`date(${inspections.date}) = ${todayStr}`);
@@ -146,12 +148,14 @@ export class InspectionCoreService extends InspectionSubService {
                         inArray(inspections.status, ['completed', 'cancelled'])
                     )!);
                     break;
-                case 'unconfirmed':
-                    conditions.push(eq(inspections.status, 'scheduled'));
-                    conditions.push(sql`${inspections.createdAt} < ${cutoff}`);
+                // Same two definitions the workspace filters use — one word, one
+                // meaning, whichever tier asks.
+                case 'needs_confirmation':
+                    conditions.push(inArray(inspections.status, [INSPECTION_STATUS.SCHEDULED, INSPECTION_STATUS.REQUESTED]));
                     break;
-                case 'in_progress':
-                    conditions.push(eq(inspections.reportStatus, REPORT_STATUS.IN_PROGRESS));
+                case 'awaiting_report':
+                    conditions.push(eq(inspections.status, INSPECTION_STATUS.COMPLETED));
+                    conditions.push(sql`${inspections.reportStatus} <> ${REPORT_STATUS.PUBLISHED}`);
                     break;
             }
         }
@@ -443,6 +447,22 @@ export class InspectionCoreService extends InspectionSubService {
         // must never burn a free tenant's lifetime slot.
         await this.planQuota?.consumeInspection(tenantId);
         await this.sdb.insert(inspections, newInspection);
+        // Every inspection starts with a results row.
+        //
+        // The collaborative editor's Durable Object writes findings by UPDATEing
+        // this row, and an UPDATE that matches nothing changes nothing without
+        // complaining — so an inspection created without it accepted edits in
+        // the UI that never reached the database. The DO now inserts as a
+        // fallback, but the invariant belongs here, where the inspection is
+        // born: results exist for every inspection, empty until someone rates
+        // something.
+        await db.insert(inspectionResults).values({
+            id:           crypto.randomUUID(),
+            tenantId,
+            inspectionId: id,
+            data:         {},
+            lastSyncedAt: createdAt,
+        });
         // DB-8: mirror assignment into inspection_inspectors link table.
         // Non-fatal — a sync failure must not roll back a committed inspection row.
         try {

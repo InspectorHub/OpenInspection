@@ -9,11 +9,18 @@
 // override the canned default; same for photos.
 
 import type { DefectCategory } from '../types/template-schema';
+import type { AgentRepairAccess } from '../lib/people/agent-repair-access';
 import { readItemDefectStates, readItemEntry } from '../lib/read-item-defects';
 import type { ResultsProjection, DefectState } from '../lib/collab/results-doc.types';
 
 export interface AgentRecommendationRow {
     inspectionId:    string;
+    // Owning company. The agent portal groups by property and shows the company
+    // inline; the slug also addresses the per-inspection repair share channel.
+    tenantName:      string;
+    tenantSlug:      string;
+    /** This company's policy for agents on its repair list (IA-35). */
+    repairAccess:    AgentRepairAccess;
     propertyAddress: string;
     inspectionDate:  string;
     sectionTitle:    string;
@@ -50,6 +57,9 @@ interface SnapshotShape { sections?: SectionShape[] }
 
 export interface RawInspectionForRecommendations {
     id:               string;
+    tenantName:       string;
+    tenantSlug:       string;
+    repairAccess:     AgentRepairAccess;
     propertyAddress:  string;
     date:             string;
     templateSnapshot: unknown;
@@ -106,6 +116,9 @@ export function flattenInspectionToRecommendations(
                 const category = (state.category ?? canned.category ?? 'maintenance').toString();
                 out.push({
                     inspectionId:    insp.id,
+                    tenantName:      insp.tenantName,
+                    tenantSlug:      insp.tenantSlug,
+                    repairAccess:    insp.repairAccess,
                     propertyAddress: insp.propertyAddress,
                     inspectionDate:  insp.date,
                     sectionTitle:    section.title,
@@ -128,6 +141,9 @@ export function flattenInspectionToRecommendations(
                 if (!cd.included) continue;
                 out.push({
                     inspectionId:    insp.id,
+                    tenantName:      insp.tenantName,
+                    tenantSlug:      insp.tenantSlug,
+                    repairAccess:    insp.repairAccess,
                     propertyAddress: insp.propertyAddress,
                     inspectionDate:  insp.date,
                     sectionTitle:    section.title,
