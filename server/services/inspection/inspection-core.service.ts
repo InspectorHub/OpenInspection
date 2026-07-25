@@ -447,6 +447,22 @@ export class InspectionCoreService extends InspectionSubService {
         // must never burn a free tenant's lifetime slot.
         await this.planQuota?.consumeInspection(tenantId);
         await this.sdb.insert(inspections, newInspection);
+        // Every inspection starts with a results row.
+        //
+        // The collaborative editor's Durable Object writes findings by UPDATEing
+        // this row, and an UPDATE that matches nothing changes nothing without
+        // complaining — so an inspection created without it accepted edits in
+        // the UI that never reached the database. The DO now inserts as a
+        // fallback, but the invariant belongs here, where the inspection is
+        // born: results exist for every inspection, empty until someone rates
+        // something.
+        await db.insert(inspectionResults).values({
+            id:           crypto.randomUUID(),
+            tenantId,
+            inspectionId: id,
+            data:         {},
+            lastSyncedAt: createdAt,
+        });
         // DB-8: mirror assignment into inspection_inspectors link table.
         // Non-fatal — a sync failure must not roll back a committed inspection row.
         try {

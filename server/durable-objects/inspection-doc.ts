@@ -495,7 +495,7 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
         const db: DrizzleD1Database = drizzle(this.env.DB);
         const projection = projectResults(this.doc);
 
-        await db
+        const updated = await db
             .update(inspectionResults)
             .set({
                 ydocState:    stateUpdate,
@@ -508,6 +508,22 @@ export class InspectionDocDO extends DurableObject<AppEnv> {
                     eq(inspectionResults.inspectionId, inspectionId),
                 ),
             );
+
+        // An UPDATE that matches no row is not an error — it quietly changes
+        // nothing. `createInspection` does not create this row, so for every
+        // inspection made through the wizard that silence WAS the bug: the
+        // editor showed ratings, the socket said Connected, and D1 stayed empty.
+        // Insert on the way through instead of dropping the document.
+        if ((updated.meta?.changes ?? 0) === 0) {
+            await db.insert(inspectionResults).values({
+                id:           crypto.randomUUID(),
+                tenantId,
+                inspectionId,
+                ydocState:    stateUpdate,
+                data:         projection,
+                lastSyncedAt: new Date(),
+            });
+        }
     }
 
     // ── Snapshot version history (#181 Phase 4) ───────────────────────────────

@@ -101,6 +101,32 @@ export async function requireToken(context: AppLoadContext, request: Request): P
   return token;
 }
 
+/**
+ * The raw JWT cookie the API authenticates by, built here so the app tier can
+ * plant it too.
+ *
+ * Why the app has to: a browser-direct hit on the API (portal SSO, `GET /sso`)
+ * receives this cookie straight from Hono, but a form login goes through the
+ * BFF, and Workers' fetch() strips Set-Cookie on that server-to-server hop —
+ * see the comment at server/api/auth.ts:317, which is why that endpoint also
+ * returns the JWT in its body. Without this, the browser holds only the React
+ * Router session cookie: loaders work (they relay the token as a Bearer) while
+ * anything the BROWSER issues directly does not, which is what left the collab
+ * WebSocket answering 401 and the editor's edits stranded in IndexedDB.
+ *
+ * Attributes mirror the API's own `authCookieOptions()` exactly — one credential
+ * with one set of rules, whichever tier writes it. Max-Age tracks the JWT's own
+ * 24h life so the cookie cannot outlive the token inside it.
+ *
+ * Note `Secure`: the `__Host-` prefix requires it, so a plain-http origin (local
+ * `wrangler dev`) will refuse this cookie. Browser-direct API calls therefore
+ * still need https locally — a tunnel, or a TLS terminator.
+ */
+export function browserJwtCookie(token: string): string {
+  const maxAge = 60 * 60 * 24;
+  return `__Host-inspector_token=${token}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Strict`;
+}
+
 export async function createSessionWithToken(
   context: AppLoadContext,
   token: string,
@@ -108,11 +134,10 @@ export async function createSessionWithToken(
 ) {
   const session = await getStorage(context).getSession();
   session.set("token", token);
-  return redirect(redirectTo, {
-    headers: {
-      "Set-Cookie": await getStorage(context).commitSession(session),
-    },
-  });
+  const headers = new Headers();
+  headers.append("Set-Cookie", await getStorage(context).commitSession(session));
+  headers.append("Set-Cookie", browserJwtCookie(token));
+  return redirect(redirectTo, { headers });
 }
 
 export async function destroyUserSession(context: AppLoadContext, request: Request) {

@@ -9,7 +9,7 @@
  */
 import { describe, it, expect } from "vitest";
 import type { AppLoadContext } from "react-router";
-import { requireToken } from "./session.server";
+import { requireToken, browserJwtCookie } from "./session.server";
 
 const CONTEXT = {} as AppLoadContext;
 
@@ -89,5 +89,46 @@ describe("requireToken", () => {
       const res = await captureThrown(() => requireToken(CONTEXT, requestWithToken(bad)));
       expect(res.headers.get("Location")).toBe("/login");
     }
+  });
+});
+
+/**
+ * Two login paths, one credential — only one of them used to plant it.
+ *
+ * A browser-direct hit on the API (portal SSO, `GET /sso`) gets
+ * `Set-Cookie: __Host-inspector_token` straight from Hono. A form login goes
+ * through the BFF instead, and Workers' fetch() strips Set-Cookie on that
+ * server-to-server hop (see the comment at server/api/auth.ts:317) — so the
+ * browser ended up holding only the React-Router session cookie. Loaders kept
+ * working, because they relay the token as a Bearer; anything the BROWSER
+ * issues directly did not: the collab WebSocket 401'd on every handshake, and
+ * the editor's edits never left IndexedDB.
+ *
+ * So the app tier plants the same cookie the SSO path plants. Asserted on the
+ * header string, not a Response: this environment strips Set-Cookie from a
+ * scripted Response, so a Response-level assertion would test the stub.
+ */
+describe("browserJwtCookie", () => {
+  const TOKEN = "header.payload.signature";
+
+  it("carries the JWT under the name the API authenticates", () => {
+    expect(browserJwtCookie(TOKEN)).toContain(`__Host-inspector_token=${TOKEN}`);
+  });
+
+  it("matches the attributes the API's own cookie uses", () => {
+    const cookie = browserJwtCookie(TOKEN);
+    // __Host- requires Secure + Path=/ + no Domain; Strict keeps it off
+    // cross-site requests; HttpOnly keeps it out of document.cookie.
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).toContain("Secure");
+    expect(cookie).toContain("SameSite=Strict");
+    expect(cookie).toContain("Path=/");
+    expect(cookie).not.toContain("Domain=");
+  });
+
+  it("expires with the JWT rather than outliving it", () => {
+    // The token itself is a 24h JWT; a longer-lived cookie would just carry a
+    // dead credential the API rejects.
+    expect(browserJwtCookie(TOKEN)).toContain(`Max-Age=${60 * 60 * 24}`);
   });
 });
