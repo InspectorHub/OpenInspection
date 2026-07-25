@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { m } from "~/paraglide/messages";
 
 export interface SuggestedContact {
@@ -17,6 +18,7 @@ export function ContactSuggestions<T extends SuggestedContact>({
     contacts,
     emptyLabel,
     onPick,
+    style,
 }: {
     open: boolean;
     loading: boolean;
@@ -24,10 +26,17 @@ export function ContactSuggestions<T extends SuggestedContact>({
     contacts: T[] | undefined;
     emptyLabel: string;
     onPick: (contact: T) => void;
+    /** Fixed-position placement from `useContactSearch` — see useAnchoredDropdown. */
+    style: React.CSSProperties | null;
 }) {
-    if (!open) return null;
-    return (
-        <div className="absolute z-10 w-full mt-1 rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover overflow-hidden">
+    // Portaled to <body>: the wizard body scrolls, and an absolutely-positioned
+    // list inside it gets clipped by that scroll box.
+    if (!open || !style) return null;
+    return createPortal(
+        <div
+            style={style}
+            className="z-50 rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover overflow-y-auto"
+        >
             {loading ? (
                 <p className="px-3 py-2 text-[12px] text-ih-fg-4">{m.newinsp_people_searching()}</p>
             ) : contacts && contacts.length > 0 ? (
@@ -47,6 +56,7 @@ export function ContactSuggestions<T extends SuggestedContact>({
             ) : contacts ? (
                 <p className="px-3 py-2 text-[12px] text-ih-fg-4">{emptyLabel}</p>
             ) : null}
-        </div>
+        </div>,
+        document.body,
     );
 }

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useFetcher } from "react-router";
+import { useAnchoredDropdown } from "~/hooks/useAnchoredDropdown";
 
 /**
  * A debounced Contacts typeahead, driven through the /inspections action.
@@ -20,6 +21,9 @@ export function useContactSearch<D>(
     const fetcher = useFetcher<D>();
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [dropdownOpen, setDropdownOpen] = useState(false);
+    // The suggestion list is portaled out of the wizard's scrolling body, so it
+    // has to be told where the field is. `anchorRef` goes on the input.
+    const { anchorRef, style } = useAnchoredDropdown<HTMLInputElement>(dropdownOpen);
 
     function onQueryChange(value: string) {
         onText(value);
@@ -33,5 +37,5 @@ export function useContactSearch<D>(
         }
     }
 
-    return { fetcher, dropdownOpen, setDropdownOpen, onQueryChange };
+    return { fetcher, dropdownOpen, setDropdownOpen, onQueryChange, anchorRef, dropdownStyle: style };
 }

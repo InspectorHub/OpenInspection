@@ -65,6 +65,7 @@ export function PeopleStep({
         <div className="relative">
           <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_people_name_label()}</label>
           <input
+            ref={clientSearch.anchorRef}
             value={clientName}
             onChange={(e) => clientSearch.onQueryChange(e.target.value)}
             onBlur={() => {
@@ -80,6 +81,7 @@ export function PeopleStep({
             contacts={clientSearch.fetcher.data?.clients}
             emptyLabel={m.newinsp_people_no_clients()}
             onPick={selectClient}
+            style={clientSearch.dropdownStyle}
           />
           {clientNameMissing && (
             <p className="text-[12px] text-ih-danger mt-1">{m.newinsp_people_name_required()}</p>
@@ -163,6 +165,7 @@ export function PeopleStep({
           /* Typeahead search */
           <div className="relative">
             <input
+              ref={agentSearchCtl.anchorRef}
               value={agentSearch}
               onChange={(e) => agentSearchCtl.onQueryChange(e.target.value)}
               onBlur={() => {
@@ -178,6 +181,7 @@ export function PeopleStep({
               contacts={agentSearchCtl.fetcher.data?.agents}
               emptyLabel={m.newinsp_people_no_agents()}
               onPick={selectAgent}
+              style={agentSearchCtl.dropdownStyle}
             />
           </div>
         )}

@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { WizardTemplate } from "../NewInspectionWizard";
 import { matchTemplates } from "~/lib/wizard-review";
+import { useAnchoredDropdown } from "~/hooks/useAnchoredDropdown";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -34,6 +36,9 @@ export function TemplateCombobox({
     const [open, setOpen] = useState(false);
     const [activeIdx, setActiveIdx] = useState(0);
     const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // The list is portaled to <body>: the wizard body scrolls, and an `absolute`
+    // list inside it was clipped to a 16px sliver.
+    const { anchorRef, style } = useAnchoredDropdown<HTMLInputElement>(open);
 
     const selected = useMemo(() => templates.find((t) => t.id === templateId), [templates, templateId]);
     const matches = useMemo(() => matchTemplates(templates, query), [templates, query]);
@@ -85,6 +90,7 @@ export function TemplateCombobox({
     return (
         <div className="relative">
             <input
+                ref={anchorRef}
                 id={id}
                 role="combobox"
                 aria-expanded={open}
@@ -111,11 +117,12 @@ export function TemplateCombobox({
                 onKeyDown={onKeyDown}
                 className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
             />
-            {open && (
+            {open && style && createPortal(
                 <ul
                     id="template-combobox-list"
                     role="listbox"
-                    className="absolute z-20 left-0 right-0 mt-1 max-h-56 overflow-y-auto rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover"
+                    style={style}
+                    className="z-50 overflow-y-auto rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover"
                 >
                     {matches.length === 0 ? (
                         <li className="px-3 py-2 text-[12px] text-ih-fg-4">
@@ -147,7 +154,8 @@ export function TemplateCombobox({
                             </li>
                         ))
                     )}
-                </ul>
+                </ul>,
+                document.body,
             )}
         </div>
     );
