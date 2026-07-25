@@ -9,10 +9,10 @@
  * Pattern: createRoutesStub, mirroring app/routes/agent/dashboard.test.tsx.
  */
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, fireEvent, waitFor } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
-import AgentRepairItemsPage from "~/routes/agent/repair-items";
+import AgentRepairItemsPage, { pickLiveShareToken } from "~/routes/agent/repair-items";
 
 interface Row {
   inspectionId: string;
@@ -46,12 +46,13 @@ const BASE: Row = {
   photos: [],
 };
 
-function renderPage(items: Row[]) {
+function renderPage(items: Row[], onAction?: (form: FormData) => unknown) {
   const Stub = createRoutesStub([
     {
       path: "/agent-repair-items",
       Component: AgentRepairItemsPage,
       loader: () => ({ items }),
+      action: async ({ request }) => (onAction ? onAction(await request.formData()) : null),
     },
   ]);
   return render(<Stub initialEntries={["/agent-repair-items"]} />);
@@ -134,7 +135,89 @@ describe("AgentRepairItemsPage renders the shared client row", () => {
   it("shows no credit input — the agent view is read-only", async () => {
     const { findByTestId } = renderPage([{ ...BASE, inspectionId: "i1" }]);
     const block = await findByTestId("repair-inspection-i1");
-    expect(block.querySelectorAll("input")).toHaveLength(0);
-    expect(block.querySelectorAll("textarea")).toHaveLength(0);
+    // The defect rows carry no credit/note inputs. (The share form below the
+    // block is a separate affordance and lives outside the rows.)
+    const rows = block.querySelectorAll("[data-testid^='repair-row-']");
+    for (const row of rows) {
+      expect(row.querySelectorAll("input, textarea")).toHaveLength(0);
+    }
+  });
+});
+
+describe("AgentRepairItemsPage delivery outlet", () => {
+  it("shares the list for THAT inspection — one share action per inspection block", async () => {
+    const submissions: FormData[] = [];
+    const { findByTestId } = renderPage(
+      [
+        { ...BASE, inspectionId: "i1", tenantSlug: "acme" },
+        { ...BASE, inspectionId: "i2", tenantSlug: "best", propertyAddress: "456 Oak Ave" },
+      ],
+      (form) => {
+        submissions.push(form);
+        return { ok: true, inspectionId: String(form.get("inspectionId")), shareToken: "tok-1" };
+      },
+    );
+
+    const block = await findByTestId("repair-inspection-i2");
+    fireEvent.click(block.querySelector("[data-testid='repair-share-i2']")!);
+
+    await waitFor(() => expect(submissions).toHaveLength(1));
+    expect(submissions[0].get("_intent")).toBe("share");
+    // Scoped to that block's inspection + its owning company, never an
+    // aggregate across properties (the share channel is per-inspection).
+    expect(submissions[0].get("inspectionId")).toBe("i2");
+    expect(submissions[0].get("tenantSlug")).toBe("best");
+  });
+
+  it("reveals the shared client share panel once the action returns a token", async () => {
+    const { findByTestId } = renderPage(
+      [{ ...BASE, inspectionId: "i1" }],
+      (form) => ({ ok: true, inspectionId: String(form.get("inspectionId")), shareToken: "tok-1" }),
+    );
+
+    const block = await findByTestId("repair-inspection-i1");
+    fireEvent.click(block.querySelector("[data-testid='repair-share-i1']")!);
+
+    // The same panel the client repair builder uses — copy link, PDF, and the
+    // email form — rather than a second agent-only share UI.
+    await waitFor(() => {
+      expect(document.body.textContent).toContain("Copy share link");
+    });
+    expect(document.querySelector("input[type='email']")).toBeTruthy();
+    // The trigger is gone: one live link per inspection, not a mint button that
+    // keeps minting.
+    expect(document.querySelector("[data-testid='repair-share-i1']")).toBeNull();
+  });
+
+  it("keeps print as a secondary outlet", async () => {
+    const { findByText } = renderPage([{ ...BASE }]);
+    expect(await findByText(/print/i)).toBeTruthy();
+  });
+});
+
+describe("pickLiveShareToken", () => {
+  const now = 1_800_000_000_000;
+  it("reuses the newest live list so a second share does not mint a second link", () => {
+    const picked = pickLiveShareToken(
+      [
+        { shareToken: "old", createdAt: now - 20_000, expiresAt: null, revokedAt: null, items: [] },
+        { shareToken: "new", createdAt: now - 10_000, expiresAt: null, revokedAt: null, items: [] },
+      ],
+      now,
+    );
+    expect(picked?.shareToken).toBe("new");
+  });
+
+  it("ignores an expired or revoked list — its link is already dead", () => {
+    expect(
+      pickLiveShareToken([{ shareToken: "a", createdAt: now, expiresAt: now - 1, revokedAt: null, items: [] }], now),
+    ).toBeNull();
+    expect(
+      pickLiveShareToken([{ shareToken: "b", createdAt: now, expiresAt: null, revokedAt: now - 1, items: [] }], now),
+    ).toBeNull();
+  });
+
+  it("returns null when the agent has no list yet", () => {
+    expect(pickLiveShareToken([], now)).toBeNull();
   });
 });

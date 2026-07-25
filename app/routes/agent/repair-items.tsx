@@ -5,31 +5,34 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader } from "@core/shared-ui";
 import { propertyGroupKey, inspectionDateValue } from "~/lib/property-groups";
+import type { RepairDefectPhoto } from "~/components/portal/sections/repair/RepairDefectRowView";
 import {
-  RepairDefectRowView,
-  type RepairDefectPhoto,
-} from "~/components/portal/sections/repair/RepairDefectRowView";
+  AgentRepairInspectionBlock,
+  type AgentRepairRow,
+} from "~/components/agent/AgentRepairInspectionBlock";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
   return [{ title: m.agent_portal_recommendations_meta_title() }];
 }
 
-export interface RepairItemRow {
-  inspectionId: string;
+/** A block row plus the property/company context this page groups by. */
+export interface RepairItemRow extends AgentRepairRow {
   tenantName: string;
   tenantSlug: string;
   propertyAddress: string | null;
   inspectionDate: string | null;
+}
+
+/** One row of the canonical report defect list (GET .../source). */
+interface SourceDefect {
+  findingKey: string;
   sectionTitle: string;
   itemLabel: string;
-  defectTitle: string;
-  location: string | null;
-  comment: string | null;
-  // A defect_categories.id or legacy seed name — kept verbatim (IA-41).
-  category: string;
-  isCustom: boolean;
-  photos: string[];
+  defectTitle?: string | null;
+  location?: string | null;
+  category?: string | null;
+  comment?: string | null;
 }
 
 const FIXED_CATEGORIES = new Set(["safety", "recommendation", "maintenance"]);
@@ -65,11 +68,138 @@ export async function loader({ request, context }: Route.LoaderArgs) {
  * tenant-staff-only and the public one wants a portal token — an agent session
  * satisfies neither, so pointing at either silently renders broken images.
  */
-function agentPhotos(row: RepairItemRow): RepairDefectPhoto[] {
+function agentPhotos(row: AgentRepairRow): RepairDefectPhoto[] {
   return (row.photos ?? []).map((key) => ({
     key,
     url: `/api/agent/inspections/${row.inspectionId}/photo?key=${encodeURIComponent(key)}&w=320`,
   }));
+}
+
+interface ExistingList {
+  shareToken: string | null;
+  createdAt: string | number | Date;
+  expiresAt: string | number | Date | null;
+  revokedAt: string | number | Date | null;
+  items?: unknown[];
+}
+
+function toMillis(v: string | number | Date | null | undefined): number | null {
+  if (v == null) return null;
+  const t = v instanceof Date ? v.getTime() : typeof v === "number" ? v : Date.parse(v);
+  return Number.isNaN(t) ? null : t;
+}
+
+/**
+ * The newest still-usable list this agent already has for the inspection.
+ * Sharing twice must hand out the SAME link — a second row would leave the
+ * client holding a link the agent thinks they revoked. Expired and revoked
+ * rows are skipped: their links are already dead, so reusing one would
+ * silently share nothing.
+ */
+export function pickLiveShareToken(mine: ExistingList[], now: number): ExistingList | null {
+  const live = mine.filter((rr) => {
+    if (!rr.shareToken || rr.revokedAt) return false;
+    const expires = toMillis(rr.expiresAt);
+    return expires === null || expires > now;
+  });
+  if (live.length === 0) return null;
+  return live.reduce((newest, rr) =>
+    (toMillis(rr.createdAt) ?? 0) > (toMillis(newest.createdAt) ?? 0) ? rr : newest,
+  );
+}
+
+/**
+ * Delivery reuses the client repair-builder's per-inspection share channel:
+ * mint-or-reuse the `repair_requests` row for this inspection, populate it from
+ * the canonical report defect list, and hand back the `/repair-request/:token`
+ * page the client builder already produces. No second share mechanism, and no
+ * aggregate link across properties — the channel is per-inspection by design.
+ */
+export async function action({ request, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
+  const form = await request.formData();
+  const intent = String(form.get("_intent") ?? "");
+  const api = createApi(context, { token });
+
+  try {
+    if (intent === "send-email") {
+      const shareToken = String(form.get("shareToken") ?? "");
+      const to = String(form.get("to") ?? "");
+      const message = (form.get("message") as string | null) ?? undefined;
+      if (!shareToken || !to) return { ok: false as const, error: m.repair_builder_error_missing_recipient() };
+      const res = await api.repairBuilder["repair-request"].share[":shareToken"].email.$post({
+        param: { shareToken },
+        json: { to, message },
+      });
+      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_send_email() };
+      return { ok: true as const };
+    }
+
+    if (intent !== "share") {
+      return { ok: false as const, error: m.repair_builder_error_unknown_intent({ intent }) };
+    }
+
+    const inspectionId = String(form.get("inspectionId") ?? "");
+    const tenant = String(form.get("tenantSlug") ?? "");
+    if (!inspectionId || !tenant) {
+      return { ok: false as const, error: m.repair_builder_error_create_list() };
+    }
+
+    // The source endpoint authorizes this agent for THIS inspection (the agent
+    // session path in resolveBuilderAccess) and returns the canonical defect
+    // list with its stable findingKeys — the same input the client builder uses.
+    const srcRes = await api.repairBuilder["repair-builder"][":tenant"][":id"].source.$get({
+      param: { tenant, id: inspectionId },
+      query: {},
+    });
+    if (!srcRes.ok) return { ok: false as const, error: m.repair_builder_error_create_list() };
+    const src = (await srcRes.json()) as { data?: { defects?: SourceDefect[]; mine?: ExistingList[] } };
+    const defects = src.data?.defects ?? [];
+
+    const existing = pickLiveShareToken(src.data?.mine ?? [], Date.now());
+    if (existing?.shareToken && (existing.items?.length ?? 0) > 0) {
+      return { ok: true as const, inspectionId, shareToken: existing.shareToken };
+    }
+
+    let rr = existing as (ExistingList & { id?: string }) | null;
+    if (!rr) {
+      const createRes = await api.repairBuilder["repair-builder"][":tenant"][":id"].$post({
+        param: { tenant, id: inspectionId },
+        query: {},
+      });
+      if (!createRes.ok) return { ok: false as const, error: m.repair_builder_error_create_list() };
+      const created = (await createRes.json()) as { data?: ExistingList & { id: string } };
+      rr = created.data ?? null;
+    }
+    const rrId = (rr as { id?: string } | null)?.id;
+    if (!rr?.shareToken || !rrId) return { ok: false as const, error: m.repair_builder_error_create_list() };
+
+    // The agent forwards the whole list, so every defect goes on it with no
+    // credit — asking for money is the client's decision, made in their own
+    // builder, not the agent's.
+    for (const d of defects) {
+      const res = await api.repairBuilder["repair-builder"][":tenant"][":id"].lists[":rrId"].items.$post({
+        param: { tenant, id: inspectionId, rrId },
+        query: {},
+        json: {
+          findingKey: d.findingKey,
+          sectionTitle: d.sectionTitle,
+          itemLabel: d.itemLabel,
+          defectTitle: d.defectTitle ?? null,
+          location: d.location ?? null,
+          category: d.category ?? null,
+          commentSnapshot: d.comment ?? null,
+          requestedCreditCents: null,
+          note: null,
+        },
+      });
+      if (!res.ok) return { ok: false as const, error: m.repair_builder_error_add_item() };
+    }
+
+    return { ok: true as const, inspectionId, shareToken: rr.shareToken };
+  } catch {
+    return { ok: false as const, error: m.repair_builder_error_server() };
+  }
 }
 
 interface InspectionBlock {
@@ -180,28 +310,14 @@ export default function AgentRepairItemsPage() {
             </div>
             <div className="divide-y divide-ih-border">
               {section.blocks.map((block) => (
-                <div key={block.inspectionId} data-testid={`repair-inspection-${block.inspectionId}`} className="p-5 space-y-3">
-                  <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">
-                    {block.tenantName}
-                  </p>
-                  {block.rows.map((row, i) => (
-                    <div
-                      key={`${row.inspectionId}-${row.defectTitle}-${i}`}
-                      className="flex items-start gap-3 p-4 border border-ih-border rounded-md bg-ih-bg-app/30"
-                    >
-                      <RepairDefectRowView
-                        sectionTitle={row.sectionTitle}
-                        itemLabel={row.itemLabel}
-                        defectTitle={row.defectTitle}
-                        location={row.location}
-                        comment={row.comment}
-                        category={row.category}
-                        isCustom={row.isCustom}
-                        photos={agentPhotos(row)}
-                      />
-                    </div>
-                  ))}
-                </div>
+                <AgentRepairInspectionBlock
+                  key={block.inspectionId}
+                  inspectionId={block.inspectionId}
+                  tenantName={block.tenantName}
+                  tenantSlug={block.tenantSlug}
+                  rows={block.rows}
+                  photosFor={agentPhotos}
+                />
               ))}
             </div>
           </section>
