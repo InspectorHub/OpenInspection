@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { expect, test } from "vitest";
 import { SEVERITY_LABEL, SEVERITIES, isSeverity } from "./severity";
 

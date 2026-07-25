@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { buildCreateInspectionJson, dollarsToCents } from "~/lib/inspection-create";
 
