@@ -45,6 +45,7 @@
     "lint:migrefs": "node scripts/check-migration-refs.mjs",
     "lint:filesize": "node scripts/check-file-size.mjs",
     "lint:dup": "jscpd server app packages",
+    "lint:gates": "node scripts/run-gates.mjs",
     "lint:tenant-scope": "node scripts/check-tenant-scoping.mjs",
     "lint:status-literals": "node scripts/check-status-literals.mjs",
     "lint:tests": "node scripts/check-test-layout.mjs",

@@ -128,58 +128,21 @@ else
     fail "Lint failed  →  npx lint-staged"
 fi
 
-# 3. Design System token conformance (fast full-repo scan; also gated in CI via npm run lint)
-step "DS token conformance"
-if node scripts/check-ds-tokens.mjs > /dev/null 2>&1; then
-    pass "DS token conformance passed"
+# 3. Conformance gates, all in ONE node process (scripts/run-gates.mjs):
+#      DS tokens · SVG dimensions · migration-reference hygiene · large-file
+#      ratchet · calendar timezone-safety · duplicate-code ceiling
+#    Each was its own `node scripts/check-*.mjs` spawn. The checks themselves scan
+#    a few hundred files in milliseconds; what cost 0.7-1.3s apiece was node
+#    starting up, so paying it six times was almost all of the 5.5s these gates
+#    took. Merged: 1.9s. The runner prints the same per-gate ✓/✗ lines, runs every
+#    gate even after one fails, and shows violations only for the ones that did.
+#    CI still runs them individually via `npm run lint` -- that stays the
+#    authoritative gate, and jscpd is a child process either way.
+step "Conformance gates"
+if node scripts/run-gates.mjs; then
+    :
 else
-    fail "DS token check failed  →  npm run lint:ds"
-fi
-
-# 3a-svg. SVG-dimensions guardrail — every public SVG must declare intrinsic
-#     width + height so an <img src=*.svg> never FOUC-flashes at ~300px before
-#     CSS loads (also gated in CI via npm run lint).
-step "SVG dimensions"
-if node scripts/check-svg-dimensions.mjs > /dev/null 2>&1; then
-    pass "SVG dimensions passed"
-else
-    fail "SVG-dimensions check failed  →  npm run lint:svg"
-fi
-
-# 3b. Migration-reference hygiene — no dangling migration sequence numbers in
-#     comments (fast full-repo scan; also gated in CI via npm run lint).
-step "Migration-reference hygiene"
-if node scripts/check-migration-refs.mjs > /dev/null 2>&1; then
-    pass "Migration-reference hygiene passed"
-else
-    fail "Migration-reference check failed  →  npm run lint:migrefs"
-fi
-
-# 3c. Large-file ratchet — no new files over the size limit; grandfathered
-#     monoliths may not grow (fast full-repo scan; also gated in CI via npm run lint).
-step "Large-file ratchet"
-if node scripts/check-file-size.mjs > /dev/null 2>&1; then
-    pass "Large-file ratchet passed"
-else
-    fail "Large-file gate failed  →  npm run lint:filesize"
-fi
-
-# 3d. Duplicate-code ceiling — copy/paste duplication must stay under the jscpd
-#     threshold (also gated in CI via npm run lint).
-step "Duplicate-code ceiling"
-if npm run lint:dup > /dev/null 2>&1; then
-    pass "Duplicate-code ceiling passed"
-else
-    fail "Duplicate-code gate failed  →  npm run lint:dup"
-fi
-
-# 3e. Calendar timezone-safety — no UTC-day bucketing / hardcoded-Z instants on
-#     the calendar surface (fast scoped scan; also gated in CI via npm run lint).
-step "Calendar timezone-safety"
-if node scripts/check-tz-safety.mjs > /dev/null 2>&1; then
-    pass "Calendar timezone-safety passed"
-else
-    fail "Timezone-safety gate failed  →  npm run lint:tz"
+    FAILED=1
 fi
 
 # NOTE: the Worker bundle-size gate lives in .githooks/pre-push, not here. The
