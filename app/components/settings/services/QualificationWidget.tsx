@@ -112,7 +112,10 @@ export function QualificationWidget({ service, initialUserIds, members }: Qualif
             onClick={() => setOpen(true)}
             className="text-[12px] font-semibold text-ih-primary hover:underline"
           >
-            {m.common_edit()}
+            {/* Named for what it opens. As a bare "Edit" it read as the way to
+                edit the SERVICE — which is what a reader looks for after the
+                row's own red "no template" warning — and it is not. */}
+            {m.settings_qual_change_link()}
           </button>
           {saved && <span className="text-[12px] text-ih-ok-fg font-bold">{m.settings_holiday_saved()}</span>}
         </div>

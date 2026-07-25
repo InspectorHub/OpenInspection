@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { DEDICATED_FACT_KEYS, isDedicatedFactKey } from "./property-facts-keys";
 

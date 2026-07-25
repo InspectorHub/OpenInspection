@@ -1,5 +1,6 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { versionDiffHref } from '~/routes/inspection-hub';
+import { versionDiffHref } from '~/lib/inspection-hub-helpers';
 
 // IA-40 — the version-diff page had zero inbound links; the Report card's
 // Versions list is now the entry point. The href builder is the pure core: it

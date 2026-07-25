@@ -22,11 +22,11 @@ function actionLabel(action: string): string {
   return m.audit_action_other();
 }
 
-function when(createdAt: number, timeZone?: string): string {
+function when(createdAt: number, timeZone: string): string {
   return formatInspectionDateTime(new Date(createdAt).toISOString(), undefined, timeZone);
 }
 
-export function EntityAuditTrail({ entityId, timeZone }: { entityId: string; timeZone?: string }) {
+export function EntityAuditTrail({ entityId, timeZone }: { entityId: string; timeZone: string }) {
   const [open, setOpen] = useState(false);
   const fetcher = useFetcher<{ entries: AuditEntry[] }>();
 

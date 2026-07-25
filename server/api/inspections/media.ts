@@ -8,8 +8,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
-import { contentDisposition } from '../../lib/content-disposition';
-import { logger } from '../../lib/logger';
+import { servePhotoObject, imagesBinding } from '../../lib/media/serve-photo';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import {
     MediaCenterResponseSchema,
@@ -352,48 +351,16 @@ const mediaRoutes = createApiRouter()
         const tenantId = c.get('tenantId') as string;
         const { id } = c.req.valid('param');
         const { key, download, w } = c.req.valid('query');
-        if (!c.env.PHOTOS) return c.notFound();
         // Ownership: keys are `${tenantId}/${inspectionId}/...`; reject anything
         // outside this caller's tenant + the inspection in the path.
         if (!key.startsWith(`${tenantId}/inspections/${id}/`)) return c.notFound();
-        const obj = await c.env.PHOTOS.get(key);
-        if (!obj) return c.notFound();
-
-        // DB-16 — optional on-the-fly thumbnail (`?w=`) for grid previews so the
-        // browser doesn't download full-resolution originals. Uses the Cloudflare
-        // Images binding when available; ANY failure (no binding / no entitlement /
-        // non-image) falls back to streaming the original, so it never regresses.
-        const width = w ? Math.min(Math.max(parseInt(w, 10) || 0, 16), 2000) : 0;
-        const images = (c.env as unknown as { IMAGES?: {
-            input(s: ReadableStream): { transform(o: { width: number }): { output(o: { format: string }): Promise<{ response(): Response }> } };
-        } }).IMAGES;
-        if (width > 0 && images && obj.body) {
-            try {
-                const out = await images.input(obj.body).transform({ width }).output({ format: 'image/webp' });
-                const r = out.response();
-                const h = new Headers(r.headers);
-                h.set('Cache-Control', 'private, max-age=300');
-                return new Response(r.body, { status: 200, headers: h });
-            } catch (err) {
-                logger.warn('[photo] thumbnail transform failed — serving original', { key, width, error: String(err) });
-                // fall through to original below (re-fetch since the stream was consumed)
-                const orig = await c.env.PHOTOS.get(key);
-                if (orig) {
-                    const hh = new Headers();
-                    hh.set('Content-Type', orig.httpMetadata?.contentType || 'application/octet-stream');
-                    hh.set('Cache-Control', 'private, max-age=300');
-                    return new Response(orig.body, { status: 200, headers: hh });
-                }
-                return c.notFound();
-            }
-        }
-
-        const headers = new Headers();
-        headers.set('Content-Type', obj.httpMetadata?.contentType || 'application/octet-stream');
-        headers.set('Content-Disposition', contentDisposition(obj.customMetadata?.originalName, download === '1'));
-        headers.set('Cache-Control', 'private, max-age=300');
-        if (obj.httpEtag) headers.set('etag', obj.httpEtag);
-        return new Response(obj.body, { status: 200, headers });
+        // DB-16 — `?w=` asks for an on-the-fly thumbnail so grid previews don't
+        // download full-resolution originals.
+        const res = await servePhotoObject(c.env.PHOTOS, imagesBinding(c.env), key, {
+            width: w,
+            download: download === '1',
+        });
+        return res ?? c.notFound();
     })
     .openapi(mediaCenterRoute, async (c) => {
         const { id } = c.req.valid('param');

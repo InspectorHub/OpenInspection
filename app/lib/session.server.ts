@@ -68,10 +68,63 @@ export async function getToken(context: AppLoadContext, request: Request): Promi
   return readRawCookie(request, "__Host-inspector_token");
 }
 
+/**
+ * Whether a session token is past its `exp`, read from the JWT payload.
+ *
+ * This is NOT verification — the API verifies the signature through the ES256
+ * keyring, and nothing here may be trusted for authorization. It answers one
+ * cheaper question: is it even worth sending? A token whose payload cannot be
+ * read counts as expired, so an unreadable value can never be passed on.
+ */
+function isTokenExpired(token: string, nowMs: number): boolean {
+  const payload = token.split(".")[1];
+  if (!payload) return true;
+  try {
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const exp = (JSON.parse(json) as { exp?: unknown }).exp;
+    if (typeof exp !== "number") return true;
+    return exp * 1000 <= nowMs;
+  } catch {
+    return true;
+  }
+}
+
 export async function requireToken(context: AppLoadContext, request: Request): Promise<string> {
   const token = await getToken(context, request);
   if (!token) throw redirect("/login");
+  // An expired session is the ordinary end of a session, not a failure. Without
+  // this, the cookie still EXISTS so the loader proceeded, every API call
+  // answered 401, and the page fell into its error boundary — the visitor saw
+  // "something went wrong" when all that happened is that they need to log in
+  // again. Clear the dead cookies on the way out so the next request is clean.
+  if (isTokenExpired(token, Date.now())) throw await destroyUserSession(context, request);
   return token;
+}
+
+/**
+ * The raw JWT cookie the API authenticates by, built here so the app tier can
+ * plant it too.
+ *
+ * Why the app has to: a browser-direct hit on the API (portal SSO, `GET /sso`)
+ * receives this cookie straight from Hono, but a form login goes through the
+ * BFF, and Workers' fetch() strips Set-Cookie on that server-to-server hop —
+ * see the comment at server/api/auth.ts:317, which is why that endpoint also
+ * returns the JWT in its body. Without this, the browser holds only the React
+ * Router session cookie: loaders work (they relay the token as a Bearer) while
+ * anything the BROWSER issues directly does not, which is what left the collab
+ * WebSocket answering 401 and the editor's edits stranded in IndexedDB.
+ *
+ * Attributes mirror the API's own `authCookieOptions()` exactly — one credential
+ * with one set of rules, whichever tier writes it. Max-Age tracks the JWT's own
+ * 24h life so the cookie cannot outlive the token inside it.
+ *
+ * Note `Secure`: the `__Host-` prefix requires it, so a plain-http origin (local
+ * `wrangler dev`) will refuse this cookie. Browser-direct API calls therefore
+ * still need https locally — a tunnel, or a TLS terminator.
+ */
+export function browserJwtCookie(token: string): string {
+  const maxAge = 60 * 60 * 24;
+  return `__Host-inspector_token=${token}; Max-Age=${maxAge}; Path=/; HttpOnly; Secure; SameSite=Strict`;
 }
 
 export async function createSessionWithToken(
@@ -81,11 +134,10 @@ export async function createSessionWithToken(
 ) {
   const session = await getStorage(context).getSession();
   session.set("token", token);
-  return redirect(redirectTo, {
-    headers: {
-      "Set-Cookie": await getStorage(context).commitSession(session),
-    },
-  });
+  const headers = new Headers();
+  headers.append("Set-Cookie", await getStorage(context).commitSession(session));
+  headers.append("Set-Cookie", browserJwtCookie(token));
+  return redirect(redirectTo, { headers });
 }
 
 export async function destroyUserSession(context: AppLoadContext, request: Request) {

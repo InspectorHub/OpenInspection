@@ -102,7 +102,12 @@ export function SegmentedControl({
             onKeyDown={(e) => onKeyDown(e, i)}
             className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-ih-pill font-bold transition-colors focus:outline-none focus:shadow-ih-focus ${sizeClass} ${
               active
-                ? "bg-ih-bg-card text-ih-primary shadow-ih-card"
+                // The ring is what makes the selection legible on a card
+                // surface: the lifted segment is itself `bg-ih-bg-card`, so on a
+                // popover or card the control read as four plain words with one
+                // of them coloured — the strongest cue, the surface change,
+                // cancelled out against its own container.
+                ? "bg-ih-bg-card text-ih-primary shadow-ih-card ring-1 ring-ih-border"
                 : "bg-transparent text-ih-fg-3 hover:text-ih-fg-1"
             }`}
           >

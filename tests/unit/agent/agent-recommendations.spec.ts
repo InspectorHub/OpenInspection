@@ -22,7 +22,16 @@ const snapshot = {
 };
 
 function raw(resultsData: unknown): RawInspectionForRecommendations {
-    return { id: 'insp-1', propertyAddress: '1 Main St', date: '2026-06-01', templateSnapshot: snapshot, resultsData };
+    return {
+        id: 'insp-1',
+        tenantName: 'Acme Inspections',
+        tenantSlug: 'acme',
+        repairAccess: 'readwrite',
+        propertyAddress: '1 Main St',
+        date: '2026-06-01',
+        templateSnapshot: snapshot,
+        resultsData,
+    };
 }
 
 describe('flattenInspectionToRecommendations — storage-shaped results', () => {
@@ -34,6 +43,14 @@ describe('flattenInspectionToRecommendations — storage-shaped results', () => 
         expect(rows[0].defectTitle).toBe('Missing shingles');
         expect(rows[0].category).toBe('safety');
         expect(rows[0].itemLabel).toBe('Shingles');
+    });
+
+    it('carries the owning company onto every row (property grouping + share channel need it)', () => {
+        const rows = flattenInspectionToRecommendations(raw({
+            '_default:s_roof:i_shingles': { tabs: { defects: [{ cannedId: 'd_missing', included: true }] } },
+        }));
+        expect(rows[0].tenantName).toBe('Acme Inspections');
+        expect(rows[0].tenantSlug).toBe('acme');
     });
 
     it('still reads a legacy bare-itemId row (pre-composite-key fallback), also under .tabs', () => {
@@ -65,7 +82,7 @@ const snap2 = {
     }],
 };
 const raw2 = (resultsData: unknown): RawInspectionForRecommendations =>
-    ({ id: 'i', propertyAddress: 'A', date: 'd', templateSnapshot: snap2, resultsData });
+    ({ id: 'i', tenantName: 'Acme Inspections', tenantSlug: 'acme', repairAccess: 'readwrite', propertyAddress: 'A', date: 'd', templateSnapshot: snap2, resultsData });
 
 describe('flattenInspectionToRecommendations — custom defects + tenant categories (IA-41)', () => {
     it('surfaces field-added custom defects with isCustom=true', () => {
@@ -98,7 +115,8 @@ describe('flattenInspectionToRecommendations — custom defects + tenant categor
 
 describe('groupRecommendations — custom categories merge into recommendation (IA-41)', () => {
     const row = (category: string, isCustom = false): AgentRecommendationRow => ({
-        inspectionId: 'i', propertyAddress: 'A', inspectionDate: 'd', sectionTitle: 'S',
+        inspectionId: 'i', tenantName: 'Acme Inspections', tenantSlug: 'acme',
+        repairAccess: 'readwrite', propertyAddress: 'A', inspectionDate: 'd', sectionTitle: 'S',
         itemLabel: 'I', defectTitle: 'D', category, comment: '', location: null, photos: [], isCustom,
     });
     it('files safety and maintenance directly; recommendation + any custom category merge into recommendation', () => {

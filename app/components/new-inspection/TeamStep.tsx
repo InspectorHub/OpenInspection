@@ -1,27 +1,27 @@
-import type { useFetcher } from "react-router";
 import type { WizardTeamMember } from "../NewInspectionWizard";
 import { m } from "~/paraglide/messages";
 
-type ConflictFetcher = ReturnType<
-  typeof useFetcher<{
-    conflicts: Array<{ inspectionId: string; propertyAddress: string; date: string }>;
-  }>
->;
-
+/**
+ * Assignee picker. Rendered inside the final Confirm step, not as a step of its
+ * own — it is one decision, and a screen per decision is what made the wizard
+ * end without ever showing what it would create.
+ *
+ * The schedule-conflict warning used to be repeated here as well as on the
+ * Schedule step. Now that both are on the same screen it is stated once, next to
+ * the date and time that cause it.
+ */
 export function TeamStep({
   soloMode,
   setSoloMode,
   inspectorId,
   setInspectorId,
   teamMembers,
-  conflictFetcher,
 }: {
   soloMode: boolean;
   setSoloMode: (v: boolean) => void;
   inspectorId: string;
   setInspectorId: (v: string) => void;
   teamMembers: WizardTeamMember[];
-  conflictFetcher: ConflictFetcher;
 }) {
   return (
     <div className="space-y-4">
@@ -48,18 +48,6 @@ export function TeamStep({
             </select>
           ) : (
             <input value={inspectorId} onChange={(e) => setInspectorId(e.target.value)} placeholder={m.newinsp_team_inspector_ph()} className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none" />
-          )}
-          {/* IA-6 — advisory conflict warning; non-blocking */}
-          {(conflictFetcher.data?.conflicts?.length ?? 0) > 0 && (
-            <div className="mt-2 rounded-md border border-ih-watch/40 bg-ih-watch-bg px-3 py-2">
-              <p className="text-[12px] font-bold text-ih-watch-fg">
-                <strong>{m.newinsp_conflict_title()}</strong>{" "}
-                {conflictFetcher.data!.conflicts.length === 1
-                  ? m.newinsp_conflict_one({ address: conflictFetcher.data!.conflicts[0].propertyAddress })
-                  : m.newinsp_conflict_many({ count: conflictFetcher.data!.conflicts.length })}{" "}
-                {m.newinsp_conflict_suffix()}
-              </p>
-            </div>
           )}
         </div>
       )}

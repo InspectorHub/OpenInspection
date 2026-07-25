@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest';
 import { parseWithZod } from '@conform-to/zod/v4';
 import { makeWorkspaceSchema } from '../../../app/lib/forms/settings.schema';

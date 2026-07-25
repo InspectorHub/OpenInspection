@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useFetcher } from "react-router";
 import type { AddressSelection, PlaceSuggestion } from "~/routes/resources/places";
+import { useAnchoredDropdown } from "~/hooks/useAnchoredDropdown";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -34,10 +35,6 @@ export function AddressAutocomplete({
 
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  // Dropdown is portaled to <body> as position:fixed so it floats above the
-  // modal's overflow-y-auto box instead of extending it (which grew a scrollbar).
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(null);
   const sessionRef = useRef<string>("");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Set the moment a suggestion is clicked; the details effect below consumes it
@@ -94,27 +91,13 @@ export function AddressAutocomplete({
     // this from re-firing on unrelated parent renders (RR fetcher convention).
   }, [detailsFetcher.state, detailsFetcher.data]);
 
-  // Position the portaled dropdown against the input. Re-measure on scroll
-  // (capture:true so we also catch the modal's own scroll container, not just
-  // window) and on resize. pos stays null until measured, so SSR renders no
-  // portal (never touches document).
+  // The dropdown is portaled to <body> as position:fixed so it floats above the
+  // panel's overflow-y-auto box instead of being clipped by it. Placement (and
+  // the flip-when-cramped rule) is shared with the template and contact
+  // typeaheads — this measurement used to be a local copy here, and the two later
+  // typeaheads were written without it and clipped.
   const dropdownOpen = open && suggestions.length > 0;
-  useEffect(() => {
-    if (!dropdownOpen) { setPos(null); return; }
-    const measure = () => {
-      const el = inputRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.left, width: r.width });
-    };
-    measure();
-    window.addEventListener("scroll", measure, true);
-    window.addEventListener("resize", measure);
-    return () => {
-      window.removeEventListener("scroll", measure, true);
-      window.removeEventListener("resize", measure);
-    };
-  }, [dropdownOpen]);
+  const { anchorRef: inputRef, style: dropdownStyle } = useAnchoredDropdown<HTMLInputElement>(dropdownOpen);
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (!open || suggestions.length === 0) return;
@@ -153,12 +136,12 @@ export function AddressAutocomplete({
         onBlur={() => setTimeout(() => setOpen(false), 120)}
         className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none"
       />
-      {dropdownOpen && pos && createPortal(
+      {dropdownOpen && dropdownStyle && createPortal(
         <ul
           id={listboxId}
           role="listbox"
-          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
-          className="z-50 max-h-64 overflow-y-auto rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover py-1"
+          style={dropdownStyle}
+          className="z-50 overflow-y-auto rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover py-1"
         >
           {suggestions.map((s, i) => (
             <li

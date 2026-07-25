@@ -1,22 +1,34 @@
 import { formatDate, formatTime } from './format';
 
 /** C-14 part 1: humanize raw ISO timestamps on dashboard rows. en-US (US-market product).
- *  `now`/`timeZone` are injectable for deterministic tests; callers omit them.
+ *  `now` is injectable for deterministic tests; callers pass undefined.
  *
  *  Date/time rendering delegates to the shared formatter (app/lib/format); this
  *  wrapper keeps the dashboard-specific composition — drop the year in the current
  *  year, and join `date · time` with a short zone label. locale is pinned to
- *  'en-US'; Phase A threads the viewer's effective locale through. */
+ *  'en-US'; Phase A threads the viewer's effective locale through.
+ *
+ *  `timeZone` is REQUIRED, and that is the point. It used to be optional, and four
+ *  of fourteen call sites left it off — two of them on the inspection hub, whose
+ *  other calls passed it. An omitted zone falls through to Intl's default, which is
+ *  the viewer's browser zone, so a single page rendered one instant in two zones: an
+ *  inspection booked for 09:00 read 09:00 in the schedule card and 5:00 PM in the
+ *  header for anyone eight hours off the tenant. The two calls were identical apart
+ *  from a trailing argument, so review could not see it. Naming the zone is now a
+ *  compile-time obligation; get one from `useDisplayTimeZone()` (viewer, then
+ *  tenant) or the tenant brand's `defaultTimezone` on public surfaces. A blank
+ *  value falls back to UTC rather than to whoever is looking. */
 export function formatInspectionDateTime(
     iso: string | null | undefined,
-    now: Date = new Date(),
-    timeZone?: string,
+    now: Date | undefined,
+    timeZone: string,
 ): string {
     if (!iso) return 'no date';
     const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso);
     const d = new Date(dateOnly ? `${iso}T00:00:00Z` : iso);
     if (isNaN(d.getTime())) return 'no date';
-    const tz = dateOnly ? 'UTC' : timeZone;
+    now = now ?? new Date();
+    const tz = dateOnly ? 'UTC' : timeZone || 'UTC';
     // en-US formatDate always ends in `, YYYY`; strip it when the year matches now.
     const full = formatDate(iso, { locale: 'en-US', timeZone: tz, month: 'short' });
     const yearMatch = full.match(/,\s*(\d{4})$/);

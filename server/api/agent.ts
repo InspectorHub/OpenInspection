@@ -24,6 +24,7 @@ import {
 } from '../lib/validations/agent.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
+import agentPhotoRoutes from './agent/photo';
 
 /**
  * GET /api/agents/my-reports
@@ -233,6 +234,8 @@ const inspectorsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['agent'], tier: 'extended' }));
 
 const agentRoutes = createApiRouter()
+    // Byte-serving lives in its own module (file-size ratchet on this one).
+    .route('/', agentPhotoRoutes)
     .openapi(getReportsRoute, async (c) => {
         // Move RBAC check inside to fix OpenAPIHono type inference issues with context
         await requireRole('manager')(c, async () => {});
@@ -363,18 +366,16 @@ const agentRoutes = createApiRouter()
         if (!agentUserId) throw Errors.Unauthorized('Agent identity missing from token');
 
         const body = c.req.valid('json');
+        // Optional fields are spread conditionally: exactOptionalPropertyTypes
+        // rejects an explicit `undefined` for an omitted one.
+        const { inspectorUserId, inspectorContactId, services, clientPhone, ...rest } = body;
         const result = await c.var.services.concierge.createBooking({
-            tenantId: body.tenantId,
+            ...rest,
             agentUserId,
-            inspectorContactId: body.inspectorContactId,
-            date: body.date,
-            timeSlot: body.timeSlot,
-            propertyAddress: body.propertyAddress,
-            clientName: body.clientName,
-            clientEmail: body.clientEmail,
-            ...(body.clientPhone ? { clientPhone: body.clientPhone } : {}),
-            agreementRequired: body.agreementRequired,
-            paymentRequired: body.paymentRequired,
+            ...(inspectorUserId ? { inspectorUserId } : {}),
+            ...(inspectorContactId ? { inspectorContactId } : {}),
+            ...(services?.length ? { services } : {}),
+            ...(clientPhone ? { clientPhone } : {}),
         });
         return c.json({ success: true as const, data: result }, 200);
     })

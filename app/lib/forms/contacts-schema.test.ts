@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from "vitest";
 import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
 

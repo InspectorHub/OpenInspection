@@ -177,7 +177,6 @@
   "portal_invoice_paid_stamp": "Paid",
   "portal_invoice_eyebrow": "Invoice",
   "portal_invoice_field_from": "From",
-  "portal_invoice_inspector_fallback": "Your inspector",
   "portal_invoice_field_bill_to": "Bill to",
   "portal_invoice_field_issued": "Issued",
   "portal_invoice_field_due": "Due",

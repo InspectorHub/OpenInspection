@@ -1,4 +1,5 @@
 import type { WizardTemplate } from "../NewInspectionWizard";
+import { TemplateCombobox } from "./TemplateCombobox";
 import { AddressAutocomplete } from "../address/AddressAutocomplete";
 import { GoogleMap } from "../address/GoogleMap";
 import type { AddressSelection } from "~/routes/resources/places";
@@ -23,10 +24,6 @@ export function PropertyStep({
   templates,
   templateId,
   setTemplateId,
-  templateQuery,
-  setTemplateQuery,
-  filteredTemplates,
-  selectedTemplate,
 }: {
   propertyType: string;
   setPropertyType: (v: string) => void;
@@ -39,10 +36,6 @@ export function PropertyStep({
   templates: WizardTemplate[];
   templateId: string;
   setTemplateId: (v: string) => void;
-  templateQuery: string;
-  setTemplateQuery: (v: string) => void;
-  filteredTemplates: WizardTemplate[];
-  selectedTemplate: WizardTemplate | undefined;
 }) {
   return (
     <div className="space-y-4">
@@ -71,44 +64,9 @@ export function PropertyStep({
         )}
       </div>
       <div>
-        <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_property_template_label()}</label>
-        {templates.length === 0 ? (
-          <p className="text-[12px] text-ih-fg-4 px-1 py-2">
-            {m.newinsp_property_no_templates()}
-          </p>
-        ) : (
-          <>
-            {templates.length > 6 && (
-              <input
-                value={templateQuery}
-                onChange={(e) => setTemplateQuery(e.target.value)}
-                placeholder={m.newinsp_property_filter_ph()}
-                className="w-full h-9 px-3 mb-2 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
-              />
-            )}
-            <select
-              value={templateId}
-              onChange={(e) => setTemplateId(e.target.value)}
-              className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none"
-            >
-              <option value="">{m.newinsp_property_select_option()}</option>
-              {filteredTemplates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                  {typeof t.itemCount === "number" ? ` (${t.itemCount} item${t.itemCount === 1 ? "" : "s"})` : ""}
-                </option>
-              ))}
-            </select>
-            {templateQuery && filteredTemplates.length === 0 && (
-              <p className="text-[12px] text-ih-fg-4 mt-1">{m.newinsp_property_no_match({ query: templateQuery })}</p>
-            )}
-            {selectedTemplate && (
-              <p className="text-[12px] text-ih-fg-4 mt-1">
-                {m.newinsp_property_selected({ name: selectedTemplate.name })}
-              </p>
-            )}
-          </>
-        )}
+        <label htmlFor="newinsp-template" className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_property_template_label()}</label>
+        {/* One combobox, not a filter box + a select + an echo line. */}
+        <TemplateCombobox id="newinsp-template" templates={templates} templateId={templateId} setTemplateId={setTemplateId} />
       </div>
     </div>
   );

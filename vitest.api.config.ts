@@ -32,7 +32,12 @@ export default defineConfig({
     // docblock to client-side test files (db, sync-engine, photo-resize, etc.)
     // that need a DOM environment. This is the vitest v4 equivalent of the
     // v1 `environmentMatchGlobs` option (removed in v2+).
-    setupFiles: ['tests/unit/setup-client.ts'],
+    //
+    // No global setupFiles. The only thing setup ever did was pull in
+    // fake-indexeddb for the three happy-dom collab specs, and a setup file runs
+    // for EVERY spec: 558 node-environment files were loading an IndexedDB
+    // polyfill they never touch (measured: 76s of the suite's CPU). The three
+    // that need it import it themselves.
     include: ['tests/unit/**/*.spec.ts'],
     coverage: {
       provider: 'v8',

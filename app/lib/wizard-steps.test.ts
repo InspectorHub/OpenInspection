@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildWizardSteps, todayLocalISO, formatPriceCents } from '~/lib/wizard-steps';
+import { stepBlockedReason, type StepGateState, buildWizardSteps, todayLocalISO, formatPriceCents } from '~/lib/wizard-steps';
 
 /**
  * FE-7 — services.price is stored in CENTS (schema comment, and every other
@@ -28,34 +28,28 @@ describe('formatPriceCents', () => {
  *
  * IA-1 — People step inserted unconditionally after Property so client + agent
  * capture is always reachable regardless of catalog or team configuration.
+ *
+ * Batch D — Schedule and Team were each ONE decision on a step of their own (a
+ * date field; a two-way radio), and whichever came last was where "Create"
+ * lived, so the wizard ended without ever showing what it was about to create.
+ * They are now one final `confirm` step: both controls plus a review of every
+ * earlier answer. That also removes the `hasTeamChoices` input — an empty team
+ * hides a control inside the step now, it does not remove a step.
  */
 describe('buildWizardSteps', () => {
   it('always includes people as the second step', () => {
-    // People is unconditional — all four combinations below confirm it.
-    expect(buildWizardSteps({ hasServiceCatalog: true,  hasTeamChoices: true  })[1]).toBe('people');
-    expect(buildWizardSteps({ hasServiceCatalog: false, hasTeamChoices: true  })[1]).toBe('people');
-    expect(buildWizardSteps({ hasServiceCatalog: true,  hasTeamChoices: false })[1]).toBe('people');
-    expect(buildWizardSteps({ hasServiceCatalog: false, hasTeamChoices: false })[1]).toBe('people');
+    expect(buildWizardSteps({ hasServiceCatalog: true })[1]).toBe('people');
+    expect(buildWizardSteps({ hasServiceCatalog: false })[1]).toBe('people');
   });
 
-  it('keeps all five steps when services + team choices exist', () => {
-    expect(buildWizardSteps({ hasServiceCatalog: true, hasTeamChoices: true }))
-      .toEqual(['property', 'people', 'services', 'schedule', 'team']);
+  it('ends on confirm, which carries the schedule, the assignee and the review', () => {
+    expect(buildWizardSteps({ hasServiceCatalog: true }))
+      .toEqual(['property', 'people', 'services', 'confirm']);
   });
 
   it('skips Services when the tenant has no service catalog', () => {
-    expect(buildWizardSteps({ hasServiceCatalog: false, hasTeamChoices: true }))
-      .toEqual(['property', 'people', 'schedule', 'team']);
-  });
-
-  it('skips Team when there is nobody to choose (solo workspace)', () => {
-    expect(buildWizardSteps({ hasServiceCatalog: true, hasTeamChoices: false }))
-      .toEqual(['property', 'people', 'services', 'schedule']);
-  });
-
-  it('collapses to Property → People → Schedule for the common solo/no-services tenant', () => {
-    expect(buildWizardSteps({ hasServiceCatalog: false, hasTeamChoices: false }))
-      .toEqual(['property', 'people', 'schedule']);
+    expect(buildWizardSteps({ hasServiceCatalog: false }))
+      .toEqual(['property', 'people', 'confirm']);
   });
 });
 
@@ -71,4 +65,53 @@ describe('todayLocalISO', () => {
   it('uses local time, not UTC (23:30 local on the 4th stays the 4th)', () => {
     expect(todayLocalISO(new Date(2026, 5, 4, 23, 30))).toBe('2026-06-04');
   });
+});
+
+/**
+ * A disabled Next with no explanation happened twice in one wizard: Property
+ * greys out until both an address and a template are set, Services until a
+ * service is ticked. The button said nothing either time.
+ */
+describe("stepBlockedReason", () => {
+    const ok: StepGateState = {
+        address: "412 Alder Court, Springfield, IL",
+        templateId: "tpl-1",
+        clientNameMissing: false,
+        serviceCount: 1,
+        date: "2026-07-25",
+        holidayBlocked: false,
+    };
+
+    it("is silent when the step is complete", () => {
+        for (const step of ["property", "people", "services", "confirm"] as const) {
+            expect(stepBlockedReason(step, ok)).toBeNull();
+        }
+    });
+
+    it("names the address before the template — the first thing to fix, reading down", () => {
+        expect(stepBlockedReason("property", { ...ok, address: "", templateId: "" })).toMatch(/address/i);
+        expect(stepBlockedReason("property", { ...ok, templateId: "" })).toMatch(/template/i);
+    });
+
+    it("treats a too-short address as missing, matching the server's own bound", () => {
+        expect(stepBlockedReason("property", { ...ok, address: "12 A" })).toMatch(/address/i);
+    });
+
+    it("explains the people rule, which is conditional and therefore invisible", () => {
+        // Name is required only because an email or phone was filled in. Without
+        // saying so, the inspector sees a dead button beside an empty name field
+        // they were never asked to fill.
+        expect(stepBlockedReason("people", { ...ok, clientNameMissing: true })).toMatch(/name/i);
+    });
+
+    it("asks for a service, and for a date", () => {
+        expect(stepBlockedReason("services", { ...ok, serviceCount: 0 })).toMatch(/service/i);
+        expect(stepBlockedReason("confirm", { ...ok, date: "" })).toMatch(/date/i);
+    });
+
+    it("distinguishes a blocked date from a missing one", () => {
+        const blocked = stepBlockedReason("confirm", { ...ok, holidayBlocked: true });
+        expect(blocked).toBeTruthy();
+        expect(blocked).not.toBe(stepBlockedReason("confirm", { ...ok, date: "" }));
+    });
 });

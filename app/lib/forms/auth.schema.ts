@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredText } from "~/lib/forms/required-text";
 // i18n Phase C (auth pilot) — locale-aware validation messages. `m.*()` resolves
 // to the active locale via paraglide's ALS (server) / cookie (client), so schemas
 // carrying user-facing messages are built by a FACTORY called per validation
@@ -18,11 +19,10 @@ import { m } from "~/paraglide/messages";
  */
 export function makeLoginSchema() {
   return z.object({
-    email: z
-      .string()
+    email: requiredText(m.auth_validation_email_required())
       .min(1, m.auth_validation_email_required())
       .email(m.auth_validation_email_invalid()),
-    password: z.string().min(1, m.auth_validation_password_required()),
+    password: requiredText(m.auth_validation_password_required()).min(1, m.auth_validation_password_required()),
   });
 }
 
@@ -35,8 +35,7 @@ export function makeLoginSchema() {
  * import time.
  */
 function makeStrongPassword() {
-  return z
-    .string()
+  return requiredText(m.auth_validation_password_min8())
     .min(8, m.auth_validation_password_min8())
     .regex(/[A-Z]/, m.auth_validation_password_uppercase())
     .regex(/[0-9]/, m.auth_validation_password_number())
@@ -51,17 +50,15 @@ function makeStrongPassword() {
  */
 export function makeSetupSchema() {
   return z.object({
-    workspaceName: z.string().min(2, m.auth_validation_workspace_name_required()),
-    adminName: z
-      .string()
+    workspaceName: requiredText(m.auth_validation_workspace_name_required()).min(2, m.auth_validation_workspace_name_required()),
+    adminName: requiredText(m.auth_validation_your_name_required())
       .min(2, m.auth_validation_your_name_required())
       .max(120, m.auth_validation_name_too_long()),
-    email: z
-      .string()
+    email: requiredText(m.auth_validation_email_required())
       .min(1, m.auth_validation_email_required())
       .email(m.auth_validation_email_invalid()),
     password: makeStrongPassword(),
-    setupCode: z.string().min(6, m.auth_validation_setup_code_min()),
+    setupCode: requiredText(m.auth_validation_setup_code_min()).min(6, m.auth_validation_setup_code_min()),
   });
 }
 
@@ -80,8 +77,7 @@ export function makePasswordHint() {
  */
 export function makeForgotPasswordSchema() {
   return z.object({
-    email: z
-      .string()
+    email: requiredText(m.auth_validation_email_required())
       .min(1, m.auth_validation_email_required())
       .email(m.auth_validation_email_invalid()),
   });
@@ -106,8 +102,7 @@ export function makeResetPasswordSchema() {
  */
 export function makeJoinSchema() {
   return z.object({
-    name: z
-      .string()
+    name: requiredText(m.auth_validation_name_required())
       .min(1, m.auth_validation_name_required())
       .max(120, m.auth_validation_name_too_long()),
     password: makeStrongPassword(),
@@ -121,11 +116,10 @@ export function makeJoinSchema() {
  */
 export function makeAgentInviteAcceptSchema() {
   return z.object({
-    name: z
-      .string()
+    name: requiredText(m.auth_validation_full_name_required())
       .min(2, m.auth_validation_full_name_required())
       .max(120, m.auth_validation_name_too_long()),
-    password: z.string().min(12, m.auth_validation_password_min12()),
+    password: requiredText(m.auth_validation_password_min12()).min(12, m.auth_validation_password_min12()),
   });
 }
 
@@ -136,16 +130,13 @@ export function makeAgentInviteAcceptSchema() {
  */
 export function makeAgentSignupSchema() {
   return z.object({
-    name: z
-      .string()
+    name: requiredText(m.auth_validation_full_name_required())
       .min(2, m.auth_validation_full_name_required())
       .max(120, m.auth_validation_name_too_long()),
-    email: z
-      .string()
+    email: requiredText(m.auth_validation_email_required())
       .min(1, m.auth_validation_email_required())
       .email(m.auth_validation_email_invalid()),
-    password: z
-      .string()
+    password: requiredText(m.auth_validation_password_min12())
       .min(12, m.auth_validation_password_min12())
       .max(120, m.auth_validation_password_too_long()),
   });
@@ -159,11 +150,10 @@ export function makeAgentSignupSchema() {
  */
 export function makeAgentLoginSchema() {
   return z.object({
-    email: z
-      .string()
+    email: requiredText(m.auth_validation_email_required())
       .min(1, m.auth_validation_email_required())
       .email(m.auth_validation_email_invalid()),
-    password: z.string().min(1, m.auth_validation_password_required()),
+    password: requiredText(m.auth_validation_password_required()).min(1, m.auth_validation_password_required()),
   });
 }
 
@@ -173,8 +163,7 @@ export function makeAgentLoginSchema() {
  */
 export function makeAgentLoginLinkSchema() {
   return z.object({
-    email: z
-      .string()
+    email: requiredText(m.auth_validation_email_required())
       .min(1, m.auth_validation_email_required())
       .email(m.auth_validation_email_invalid()),
   });

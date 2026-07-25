@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, it, expect } from 'vitest';
 import { computeOnboardingSteps, allDone } from '~/lib/onboarding-progress';
 import type { OnboardingStep } from '~/lib/onboarding-progress';

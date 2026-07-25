@@ -16,6 +16,15 @@ npm run dev          # Build + run the worker locally (react-router build + wran
 npm run dev:hmr      # Vite dev server with HMR (react-router dev). The fast iteration loop.
                      # Works since the lazy-API entry refactor (workers/app.ts) — the entry
                      # must keep its top-level import graph tiny; see the comment there.
+npm run dev:tunnel   # Like `dev`, but also exposed over a Cloudflare Quick Tunnel (https).
+                     # REQUIRED to exercise the collab/presence WebSockets: the session
+                     # cookie is `Secure`, and a page served over http://localhost opens
+                     # `ws://` — which browsers do not treat as a secure scheme, so the
+                     # cookie is withheld and the handshake 401s. Over the tunnel the same
+                     # endpoints upgrade (wss://) and both presence and Y.Doc sync work.
+                     # The tunnel URL is a new origin: log in again there. It is PUBLIC
+                     # while running — stop it when finished. (A self-signed
+                     # `--local-protocol https` is not a substitute: Chrome refuses it.)
 npm run build        # react-router build — bundles server/ (API) + app/ (RR SSR) into one worker
 npm run deploy       # standalone: build + wrangler deploy (real ids via wrangler.local.jsonc)
 npm run deploy:saas  # saas: build + wrangler deploy with wrangler.saas.jsonc
@@ -273,6 +282,27 @@ Migration sequence numbers are an unstable, positional ordering token — squash
 - **State the invariant, not the history.** Put *why a column/index exists* next to its definition in `server/lib/db/schema/` (it travels with the field and survives any renumber). "the `lot_size` column on `inspections`" beats "the `lot_size` column added in migration 0045". History lives in `git blame`.
 - **For traceability, cite a stable id** — PR# / issue# (`see #144`) or a feature name — never a migration number. These never renumber and link to full context.
 - **"Must stay in sync with X" coupling → make it executable, not prose.** A comment that says "must match the inline DDL / the backfill list" is a latent bug; people forget. Prefer a shared constant both sides import, or a test that asserts the equality. Example: `tests/unit/inline-ddl-schema-sync.spec.ts` asserts the workers specs' hand-maintained `tenant_configs` DDL covers every Drizzle schema column — replacing the old "remember to sync this DDL" comment that blocked #164.
+
+## Cross-Portal Reuse
+
+The client portal (token track: `/checkout`, `/agreements/sign`, `/invoice`,
+`/repair-builder`, Hub `?section=`) and the agent portal (account track,
+`/agent-*`) show many of the same entities. They are ONE product surface with
+two audiences, not two products.
+
+- **Same entity in both portals ⇒ same component.** Render the client component
+  and express the difference as a prop. A parallel component drifts, and only
+  one of the two gets the next fix — that is how the agent repair-items page
+  ended up dropping photos and the item label that were already in its payload.
+- **A deliberate fork must say why, in a code comment at the fork.** State the
+  invariant that makes the two genuinely different (not the history of how it
+  happened). "Agent view is read-only" is a prop; "the agent's list spans
+  inspections while the client's is one inspection" is a reason.
+- **Capabilities come from one function, not from a page.** Whether an actor may
+  do something is decided where it is ENFORCED (server) and read by the UI, so
+  a page can never offer an action the API refuses.
+- Guarded by `app/components/agent/cross-portal-reuse.test.tsx`, which renders
+  one defect through both portals and compares what a reader sees.
 
 ## Product Terminology (canonical)
 

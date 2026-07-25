@@ -14,6 +14,9 @@ interface DashboardInspectionRowProps {
   isColumnVisible: (id: string) => boolean;
   toggleSelect: (id: string) => void;
   transitionStatus: (id: string, status: string) => void;
+  /** Viewer's effective zone (useDisplayTimeZone in the owning route). Required:
+   *  an omitted zone renders scheduled times in whatever zone the browser is in. */
+  timeZone: string;
 }
 
 /* ---- Render inspection row ---- */
@@ -27,6 +30,7 @@ export function DashboardInspectionRow({
   isColumnVisible,
   toggleSelect,
   transitionStatus,
+  timeZone,
 }: DashboardInspectionRowProps) {
   const isSelected = selectedIds.has(insp.id);
   const showReportLink =
@@ -57,7 +61,7 @@ export function DashboardInspectionRow({
             )}
             {isColumnVisible("date") && insp.date && (
               <span className="text-[11px] text-ih-fg-3">
-                &middot; {formatInspectionDateTime(insp.date)}
+                &middot; {formatInspectionDateTime(insp.date, undefined, timeZone)}
               </span>
             )}
             {isColumnVisible("agent") && insp.agentName && (
