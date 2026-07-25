@@ -32,6 +32,8 @@
   "booking_wizard_heading": "Schedule an inspection",
   "booking_wizard_subtitle": "Tell us about the property and pick a time that works.",
   "booking_wizard_submit": "Request Inspection",
+  "booking_prefill_remembered_notice": "Filled in from your last booking in this browser.",
+  "booking_prefill_clear": "Not you? Clear",
   "booking_agent_on_behalf_heading": "Booking on behalf of a client as {name}",
   "booking_agent_on_behalf_body": "Enter your client's contact details below. They will be asked to confirm, and the company will settle the schedule and price.",
   "booking_submitting": "Submitting...",

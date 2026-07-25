@@ -43,6 +43,9 @@ export function BookingWizard({
     chosenInspectorName,
     handleSubmit,
     tenant,
+    prefilledFromDevice,
+    clearRememberedContact,
+    rememberContact,
   } = form;
 
   useTurnstileWidget(profile.turnstileSiteKey, turnstileRef, step, setTurnstileToken);
@@ -131,6 +134,9 @@ export function BookingWizard({
           tenant={tenant}
           serviceIds={serviceIds}
           conciergeReviewRequired={!!profile.conciergeReviewRequired}
+          contactIsSelf={rememberContact}
+          prefilledFromDevice={prefilledFromDevice}
+          onClearRememberedContact={clearRememberedContact}
         />
       )}
 

@@ -3,6 +3,9 @@ import { useFetcher } from "react-router";
 import type { CompanyProfile } from "./booking-constants";
 import { m } from "~/paraglide/messages";
 
+/** Where a returning visitor's own contact details are remembered (this device only). */
+const REMEMBERED_CONTACT_KEY = "oi.booking.contact";
+
 interface UseBookingFormStateArgs {
   profile: CompanyProfile | null;
   preselected: { id: string; name: string } | null;
@@ -30,6 +33,48 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const turnstileRef = useRef<HTMLDivElement>(null);
+
+  // Repeat visitors re-typed their own name and email on every booking. Their
+  // OWN contact details are remembered on this device only — never the address
+  // or the services, which belong to one property, and never in an agent's
+  // booking, where the fields hold someone else's client.
+  const [prefilledFromDevice, setPrefilledFromDevice] = useState(false);
+  const rememberContact = !agentBooking;
+  useEffect(() => {
+    if (!rememberContact) return;
+    try {
+      const raw = localStorage.getItem(REMEMBERED_CONTACT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { name?: string; email?: string };
+      if (!saved.name && !saved.email) return;
+      setClientName((current) => current || saved.name || "");
+      setClientEmail((current) => current || saved.email || "");
+      setPrefilledFromDevice(true);
+    } catch {
+      // A malformed or blocked store just means no prefill.
+    }
+  }, [rememberContact]);
+
+  /** "Not you?" — a different person on a shared device starts clean. */
+  function clearRememberedContact() {
+    try {
+      localStorage.removeItem(REMEMBERED_CONTACT_KEY);
+    } catch {
+      // Nothing to do: the value was never readable in the first place.
+    }
+    setClientName("");
+    setClientEmail("");
+    setPrefilledFromDevice(false);
+  }
+
+  function saveRememberedContact() {
+    if (!rememberContact) return;
+    try {
+      localStorage.setItem(REMEMBERED_CONTACT_KEY, JSON.stringify({ name: clientName, email: clientEmail }));
+    } catch {
+      // Private mode / storage disabled — booking still succeeded.
+    }
+  }
 
   const toggleService = (id: string) =>
     setSelectedServices((prev) => {
@@ -123,6 +168,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
         }),
       });
       if (res.ok) {
+        saveRememberedContact();
         setMessage({ text: m.helper_booking_submit_success(), ok: true });
         setStep(3);
       } else {
@@ -159,5 +205,8 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     chosenInspectorName,
     handleSubmit,
     tenant,
+    prefilledFromDevice,
+    clearRememberedContact,
+    rememberContact,
   };
 }
