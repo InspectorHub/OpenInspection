@@ -152,9 +152,14 @@ export function ServiceFields({
                 ...templates.map((t) => ({ value: t.id, label: t.name })),
               ]}
             />
-            {!templateId && (
-              <p className="mt-1 text-[11px] text-ih-watch-fg">{m.settings_services_template_consequence()}</p>
-            )}
+            {/* Reserved, not conditional: appearing and disappearing moved the
+                form's Save button by two lines, under whatever the cursor was
+                already aiming at. */}
+            <div className="mt-1 min-h-[30px]">
+              {!templateId && (
+                <p className="text-[11px] text-ih-watch-fg">{m.settings_services_template_consequence()}</p>
+              )}
+            </div>
           </>
         )}
       </div>

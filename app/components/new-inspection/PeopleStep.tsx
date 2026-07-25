@@ -96,19 +96,24 @@ export function PeopleStep({
           {clientNameMissing && (
             <p className="text-[12px] text-ih-danger mt-1">{m.newinsp_people_name_required()}</p>
           )}
-          {/* Picking an existing client and typing a new one left the three
-              fields looking identical, and they mean different things: one joins
-              a contact's history, the other starts one. */}
-          {clientIsExistingContact && (
-            <p className="text-[12px] text-ih-ok-fg mt-1">{m.newinsp_people_client_linked()}</p>
-          )}
-          {nameTouched
-            && !clientSearch.dropdownOpen
-            && !clientNameMissing
-            && clientName.trim().length > 0
-            && clientEmail.trim().length === 0 && (
-              <p className="text-[12px] text-ih-fg-4 mt-1">{m.newinsp_people_email_hint()}</p>
-            )}
+          {/* One slot, always occupying its line, for whatever this field has to
+              say. Reserved rather than conditional: as an in-flow paragraph it
+              moved every field below it the moment it appeared — and it appears
+              exactly when the reader is about to aim at the next one. */}
+          <div className="min-h-[20px] mt-1">
+            {/* Picking an existing client and typing a new one left the three
+                fields looking identical, and they mean different things: one joins
+                a contact's history, the other starts one. */}
+            {clientIsExistingContact ? (
+              <p className="text-[12px] text-ih-ok-fg">{m.newinsp_people_client_linked()}</p>
+            ) : nameTouched
+              && !clientSearch.dropdownOpen
+              && !clientNameMissing
+              && clientName.trim().length > 0
+              && clientEmail.trim().length === 0 ? (
+                <p className="text-[12px] text-ih-fg-4">{m.newinsp_people_email_hint()}</p>
+              ) : null}
+          </div>
         </div>
         <div>
           <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_people_email_label()}</label>
