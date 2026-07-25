@@ -1,15 +1,24 @@
-import type { useFetcher } from "react-router";
-import type { AgentResult } from "../NewInspectionWizard";
+import type { useContactSearch } from "~/hooks/useContactSearch";
+import type { AgentResult, ClientResult } from "../NewInspectionWizard";
+import { ContactSuggestions } from "./ContactSuggestions";
 import { m } from "~/paraglide/messages";
+
+type ClientSearch = ReturnType<
+  typeof useContactSearch<{ intent: "search-clients"; clients: ClientResult[] }>
+>;
+type AgentSearch = ReturnType<
+  typeof useContactSearch<{ intent: "search-agents"; agents: AgentResult[] }>
+>;
 
 export function PeopleStep({
   clientName,
-  setClientName,
   clientEmail,
   setClientEmail,
   clientPhone,
   setClientPhone,
   clientNameMissing,
+  clientSearch,
+  selectClient,
   selectedAgent,
   newAgentMode,
   setNewAgentMode,
@@ -18,21 +27,19 @@ export function PeopleStep({
   newAgentEmail,
   setNewAgentEmail,
   agentSearch,
-  agentDropdownOpen,
-  setAgentDropdownOpen,
-  agentFetcher,
-  handleAgentSearchChange,
+  agentSearchCtl,
   selectAgent,
   clearAgent,
   enableNewAgentMode,
 }: {
   clientName: string;
-  setClientName: (v: string) => void;
   clientEmail: string;
   setClientEmail: (v: string) => void;
   clientPhone: string;
   setClientPhone: (v: string) => void;
   clientNameMissing: boolean;
+  clientSearch: ClientSearch;
+  selectClient: (client: ClientResult) => void;
   selectedAgent: AgentResult | null;
   newAgentMode: boolean;
   setNewAgentMode: (v: boolean) => void;
@@ -41,10 +48,7 @@ export function PeopleStep({
   newAgentEmail: string;
   setNewAgentEmail: (v: string) => void;
   agentSearch: string;
-  agentDropdownOpen: boolean;
-  setAgentDropdownOpen: (v: boolean) => void;
-  agentFetcher: ReturnType<typeof useFetcher<{ intent: "search-agents"; agents: AgentResult[] }>>;
-  handleAgentSearchChange: (value: string) => void;
+  agentSearchCtl: AgentSearch;
   selectAgent: (agent: AgentResult) => void;
   clearAgent: () => void;
   enableNewAgentMode: () => void;
@@ -54,13 +58,28 @@ export function PeopleStep({
       {/* CLIENT section */}
       <div className="space-y-3">
         <p className="text-[12px] font-bold text-ih-fg-3 uppercase tracking-wide">{m.newinsp_people_client_section()}</p>
-        <div>
+        {/* The client is searched from Contacts as it is typed — the agent field
+            always was, and a repeat client had to be re-typed by hand (email and
+            phone included) beside a field that could have found them. Picking a
+            contact fills all three fields; typing a new name is still fine. */}
+        <div className="relative">
           <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_people_name_label()}</label>
           <input
             value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            placeholder={m.newinsp_people_client_name_ph()}
+            onChange={(e) => clientSearch.onQueryChange(e.target.value)}
+            onBlur={() => {
+              // Delay so a click on a suggestion lands before the list closes.
+              setTimeout(() => clientSearch.setDropdownOpen(false), 150);
+            }}
+            placeholder={m.newinsp_people_client_search_ph()}
             className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
+          />
+          <ContactSuggestions
+            open={clientSearch.dropdownOpen}
+            loading={clientSearch.fetcher.state === "submitting" || clientSearch.fetcher.state === "loading"}
+            contacts={clientSearch.fetcher.data?.clients}
+            emptyLabel={m.newinsp_people_no_clients()}
+            onPick={selectClient}
           />
           {clientNameMissing && (
             <p className="text-[12px] text-ih-danger mt-1">{m.newinsp_people_name_required()}</p>
@@ -145,35 +164,21 @@ export function PeopleStep({
           <div className="relative">
             <input
               value={agentSearch}
-              onChange={(e) => handleAgentSearchChange(e.target.value)}
+              onChange={(e) => agentSearchCtl.onQueryChange(e.target.value)}
               onBlur={() => {
                 // Small delay so click on dropdown item fires first.
-                setTimeout(() => setAgentDropdownOpen(false), 150);
+                setTimeout(() => agentSearchCtl.setDropdownOpen(false), 150);
               }}
               placeholder={m.newinsp_people_search_ph()}
               className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
             />
-            {agentDropdownOpen && (
-              <div className="absolute z-10 w-full mt-1 rounded-md border border-ih-border bg-ih-bg-card shadow-ih-popover overflow-hidden">
-                {agentFetcher.state === "submitting" || agentFetcher.state === "loading" ? (
-                  <p className="px-3 py-2 text-[12px] text-ih-fg-4">{m.newinsp_people_searching()}</p>
-                ) : agentFetcher.data?.agents && agentFetcher.data.agents.length > 0 ? (
-                  agentFetcher.data.agents.map((a) => (
-                    <button
-                      key={a.id}
-                      type="button"
-                      onMouseDown={() => selectAgent(a)}
-                      className="w-full text-left px-3 py-2 text-[13px] hover:bg-ih-bg-muted border-b border-ih-border last:border-b-0"
-                    >
-                      <span className="font-medium">{a.name}</span>
-                      {a.email ? <span className="ml-2 text-ih-fg-4 text-[12px]">{a.email}</span> : null}
-                    </button>
-                  ))
-                ) : agentFetcher.data ? (
-                  <p className="px-3 py-2 text-[12px] text-ih-fg-4">{m.newinsp_people_no_agents()}</p>
-                ) : null}
-              </div>
-            )}
+            <ContactSuggestions
+              open={agentSearchCtl.dropdownOpen}
+              loading={agentSearchCtl.fetcher.state === "submitting" || agentSearchCtl.fetcher.state === "loading"}
+              contacts={agentSearchCtl.fetcher.data?.agents}
+              emptyLabel={m.newinsp_people_no_agents()}
+              onPick={selectAgent}
+            />
           </div>
         )}
 

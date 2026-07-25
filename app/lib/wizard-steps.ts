@@ -3,24 +3,28 @@
  *
  * Steps with nothing to decide are skipped instead of rendered as empty
  * placeholders the inspector has to click through: Services disappears when
- * the tenant has no service catalog, Team disappears when there is nobody to
- * pick (solo workspace). The Schedule date defaults to "today" in the
- * inspector's local timezone — on-site creation is overwhelmingly same-day.
+ * the tenant has no service catalog. The Schedule date defaults to "today" in
+ * the inspector's local timezone — on-site creation is overwhelmingly same-day.
+ *
+ * Batch D — Schedule and Team were each one decision on a step of their own (a
+ * date field; a two-way radio), and whichever came last was where "Create"
+ * lived, so the wizard ended without ever stating what it was about to create.
+ * They are now one `confirm` step: both controls, plus a review of every earlier
+ * answer. An empty team hides a control inside that step rather than removing a
+ * step, which is why `hasTeamChoices` is gone.
  */
 
-export type WizardStepId = 'property' | 'people' | 'services' | 'schedule' | 'team';
+export type WizardStepId = 'property' | 'people' | 'services' | 'confirm';
 
 export function buildWizardSteps(opts: {
   hasServiceCatalog: boolean;
-  hasTeamChoices: boolean;
 }): WizardStepId[] {
   const steps: WizardStepId[] = ['property'];
   // IA-1 — People (client + agent) is always present: capturing who is
   // involved is useful for any inspection regardless of catalog or team size.
   steps.push('people');
   if (opts.hasServiceCatalog) steps.push('services');
-  steps.push('schedule');
-  if (opts.hasTeamChoices) steps.push('team');
+  steps.push('confirm');
   return steps;
 }
 

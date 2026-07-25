@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
+import { useContactSearch } from "~/hooks/useContactSearch";
 import { buildWizardSteps, todayLocalISO, type WizardStepId } from "~/lib/wizard-steps";
+import { summariseNewInspection } from "~/lib/wizard-review";
 import { PropertyStep } from "./new-inspection/PropertyStep";
 import { PeopleStep } from "./new-inspection/PeopleStep";
 import { ServicesStep } from "./new-inspection/ServicesStep";
-import { ScheduleStep } from "./new-inspection/ScheduleStep";
+import { ConfirmStep } from "./new-inspection/ConfirmStep";
 import { civilToInstantISO } from "~/lib/civil-time";
 import { useDisplayTimeZone } from "~/hooks/useSessionContext";
-import { TeamStep } from "./new-inspection/TeamStep";
 import { QuotaExceededPanel } from "./new-inspection/QuotaExceededPanel";
 import type { AddressSelection } from "~/routes/resources/places";
 import { m } from "~/paraglide/messages";
@@ -17,8 +18,7 @@ function stepLabel(id: WizardStepId): string {
     case "property": return m.new_inspection_step_property();
     case "people": return m.new_inspection_step_people();
     case "services": return m.new_inspection_step_services();
-    case "schedule": return m.new_inspection_step_schedule();
-    case "team": return m.new_inspection_step_team();
+    case "confirm": return m.new_inspection_step_confirm();
   }
 }
 
@@ -44,6 +44,14 @@ export interface AgentResult {
   id: string;
   name: string;
   email: string | null;
+}
+
+/** Client row returned by the search-clients action intent. Carries a phone the agent search has no use for. */
+export interface ClientResult {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -84,10 +92,20 @@ export function NewInspectionWizard({
   // Both must be the same value or the inspector is told one thing and the
   // booking stores another.
   const displayTz = useDisplayTimeZone();
-  // IA-1 — dedicated fetcher for agent typeahead (B-17: per-intent convention,
-  // separate fetcher prevents competing mutations from cancelling each other).
-  const agentFetcher = useFetcher<{ intent: "search-agents"; agents: AgentResult[] }>();
-  const agentDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // IA-1 agent typeahead, and (Batch D) the same search for the client — one
+  // hook, two instances, each with its own fetcher.
+  const [agentSearch, setAgentSearch] = useState("");
+  const agentSearchCtl = useContactSearch<{ intent: "search-agents"; agents: AgentResult[] }>(
+    "search-agents",
+    setAgentSearch,
+  );
+  const [clientName, setClientName] = useState("");
+  // The client's search box IS the name field — there is no separate query to
+  // keep, and typing a name nobody has on file is still a valid answer.
+  const clientSearchCtl = useContactSearch<{ intent: "search-clients"; clients: ClientResult[] }>(
+    "search-clients",
+    setClientName,
+  );
   // IA-6 — advisory schedule conflict detection (separate fetcher to avoid
   // cancelling the submit fetcher; B-17 convention).
   const conflictFetcher = useFetcher<{
@@ -117,13 +135,10 @@ export function NewInspectionWizard({
   const [soloMode, setSoloMode] = useState(true);
   const [inspectorId, setInspectorId] = useState("");
 
-  // IA-1 People step state
-  const [clientName, setClientName] = useState("");
+  // IA-1 People step state (clientName lives with its search hook above)
   const [clientEmail, setClientEmail] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   // Agent: either a selected existing contact or inline-new mode.
-  const [agentSearch, setAgentSearch] = useState("");
-  const [agentDropdownOpen, setAgentDropdownOpen] = useState(false);
   const [selectedAgent, setSelectedAgent] = useState<AgentResult | null>(null);
   const [newAgentMode, setNewAgentMode] = useState(false);
   const [newAgentName, setNewAgentName] = useState("");
@@ -148,35 +163,32 @@ export function NewInspectionWizard({
 
   // B-21 — steps with nothing to decide are skipped instead of rendered as
   // empty placeholders ("No services configured" + a mandatory Next click).
-  const steps = useMemo(
-    () =>
-      buildWizardSteps({
-        hasServiceCatalog,
-        hasTeamChoices: teamMembers.length > 0,
-      }),
-    [hasServiceCatalog, teamMembers.length],
-  );
+  // Batch D — Schedule and Team merged into `confirm`, which also reviews.
+  const steps = useMemo(() => buildWizardSteps({ hasServiceCatalog }), [hasServiceCatalog]);
   const step: WizardStepId = steps[Math.min(stepIdx, steps.length - 1)];
 
-  // Typeahead filter for the template picker (B-6).
-  const [templateQuery, setTemplateQuery] = useState("");
-  const filteredTemplates = useMemo(() => {
-    const q = templateQuery.trim().toLowerCase();
-    if (!q) return templates;
-    return templates.filter((t) => t.name.toLowerCase().includes(q));
-  }, [templates, templateQuery]);
-  const selectedTemplate = useMemo(
-    () => templates.find((t) => t.id === templateId),
-    [templates, templateId],
+  // What the final step states back before Create is pressed.
+  const summary = useMemo(
+    () =>
+      summariseNewInspection({
+        address,
+        templates,
+        templateId,
+        clientName,
+        clientEmail,
+        clientPhone,
+        selectedAgent,
+        newAgentName,
+        serviceCatalog,
+        selectedServiceIds: [...services],
+        priceOverrides,
+        soloMode,
+        inspectorId,
+        teamMembers,
+      }),
+    [address, templates, templateId, clientName, clientEmail, clientPhone, selectedAgent,
+      newAgentName, serviceCatalog, services, priceOverrides, soloMode, inspectorId, teamMembers],
   );
-
-  // B-21 — when the search narrows to exactly one template, select it; the
-  // search box and dropdown previously acted as two disconnected controls.
-  useEffect(() => {
-    if (templateQuery.trim() && filteredTemplates.length === 1) {
-      setTemplateId(filteredTemplates[0].id);
-    }
-  }, [templateQuery, filteredTemplates]);
 
   useEffect(() => {
     if (!open) {
@@ -185,7 +197,6 @@ export function NewInspectionWizard({
       setAddress("");
       setAddressSel(null);
       setTemplateId("");
-      setTemplateQuery("");
       setServices(new Set());
       setPriceOverrides(new Map());
       setDate(todayLocalISO());
@@ -196,8 +207,9 @@ export function NewInspectionWizard({
       setClientName("");
       setClientEmail("");
       setClientPhone("");
+      clientSearchCtl.setDropdownOpen(false);
       setAgentSearch("");
-      setAgentDropdownOpen(false);
+      agentSearchCtl.setDropdownOpen(false);
       setSelectedAgent(null);
       setNewAgentMode(false);
       setNewAgentName("");
@@ -266,26 +278,20 @@ export function NewInspectionWizard({
     return () => clearTimeout(t);
   }, [date]);
 
-  // IA-1 — agent typeahead: debounce ~300 ms, then POST search-agents intent
-  // via the dedicated agentFetcher (BFF pattern, no direct client fetch).
-  function handleAgentSearchChange(value: string) {
-    setAgentSearch(value);
-    setAgentDropdownOpen(value.trim().length >= 2);
-    if (agentDebounceRef.current) clearTimeout(agentDebounceRef.current);
-    if (value.trim().length >= 2) {
-      agentDebounceRef.current = setTimeout(() => {
-        agentFetcher.submit(
-          { intent: "search-agents", search: value.trim() },
-          { method: "post", action: "/inspections" },
-        );
-      }, 300);
-    }
+  function selectClient(client: ClientResult) {
+    // Fill all three fields: the create endpoint deduplicates the contact by
+    // email, so carrying it over is what links this inspection to the existing
+    // client instead of making a second row with the same name.
+    setClientName(client.name);
+    setClientEmail(client.email ?? "");
+    setClientPhone(client.phone ?? "");
+    clientSearchCtl.setDropdownOpen(false);
   }
 
   function selectAgent(agent: AgentResult) {
     setSelectedAgent(agent);
     setAgentSearch("");
-    setAgentDropdownOpen(false);
+    agentSearchCtl.setDropdownOpen(false);
     setNewAgentMode(false);
     setNewAgentName("");
     setNewAgentEmail("");
@@ -294,14 +300,14 @@ export function NewInspectionWizard({
   function clearAgent() {
     setSelectedAgent(null);
     setAgentSearch("");
-    setAgentDropdownOpen(false);
+    agentSearchCtl.setDropdownOpen(false);
   }
 
   function enableNewAgentMode() {
     setNewAgentMode(true);
     setSelectedAgent(null);
     setAgentSearch("");
-    setAgentDropdownOpen(false);
+    agentSearchCtl.setDropdownOpen(false);
   }
 
   // #198 — editing the address text by hand invalidates any previously picked
@@ -365,10 +371,8 @@ export function NewInspectionWizard({
         return !clientNameMissing;
       case "services":
         return services.size > 0;
-      case "schedule":
+      case "confirm":
         return date.length > 0 && holidayFetcher.data?.effect !== "block";
-      default:
-        return true;
     }
   }
   const canNext = canAdvanceFromStep();
@@ -462,17 +466,14 @@ export function NewInspectionWizard({
               templates={templates}
               templateId={templateId}
               setTemplateId={setTemplateId}
-              templateQuery={templateQuery}
-              setTemplateQuery={setTemplateQuery}
-              filteredTemplates={filteredTemplates}
-              selectedTemplate={selectedTemplate}
             />
           )}
 
           {step === "people" && (
             <PeopleStep
               clientName={clientName}
-              setClientName={setClientName}
+              clientSearch={clientSearchCtl}
+              selectClient={selectClient}
               clientEmail={clientEmail}
               setClientEmail={setClientEmail}
               clientPhone={clientPhone}
@@ -486,10 +487,7 @@ export function NewInspectionWizard({
               newAgentEmail={newAgentEmail}
               setNewAgentEmail={setNewAgentEmail}
               agentSearch={agentSearch}
-              agentDropdownOpen={agentDropdownOpen}
-              setAgentDropdownOpen={setAgentDropdownOpen}
-              agentFetcher={agentFetcher}
-              handleAgentSearchChange={handleAgentSearchChange}
+              agentSearchCtl={agentSearchCtl}
               selectAgent={selectAgent}
               clearAgent={clearAgent}
               enableNewAgentMode={enableNewAgentMode}
@@ -506,26 +504,22 @@ export function NewInspectionWizard({
             />
           )}
 
-          {step === "schedule" && (
-            <ScheduleStep
+          {step === "confirm" && (
+            <ConfirmStep
               date={date}
               setDate={setDate}
               time={time}
               setTime={setTime}
+              timeZone={displayTz}
               conflictFetcher={conflictFetcher}
               holidayFetcher={holidayFetcher}
-              timeZone={displayTz}
-            />
-          )}
-
-          {step === "team" && (
-            <TeamStep
+              showTeam={teamMembers.length > 0}
               soloMode={soloMode}
               setSoloMode={setSoloMode}
               inspectorId={inspectorId}
               setInspectorId={setInspectorId}
               teamMembers={teamMembers}
-              conflictFetcher={conflictFetcher}
+              summary={summary}
             />
           )}
         </div>

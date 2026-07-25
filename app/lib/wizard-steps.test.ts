@@ -28,34 +28,28 @@ describe('formatPriceCents', () => {
  *
  * IA-1 — People step inserted unconditionally after Property so client + agent
  * capture is always reachable regardless of catalog or team configuration.
+ *
+ * Batch D — Schedule and Team were each ONE decision on a step of their own (a
+ * date field; a two-way radio), and whichever came last was where "Create"
+ * lived, so the wizard ended without ever showing what it was about to create.
+ * They are now one final `confirm` step: both controls plus a review of every
+ * earlier answer. That also removes the `hasTeamChoices` input — an empty team
+ * hides a control inside the step now, it does not remove a step.
  */
 describe('buildWizardSteps', () => {
   it('always includes people as the second step', () => {
-    // People is unconditional — all four combinations below confirm it.
-    expect(buildWizardSteps({ hasServiceCatalog: true,  hasTeamChoices: true  })[1]).toBe('people');
-    expect(buildWizardSteps({ hasServiceCatalog: false, hasTeamChoices: true  })[1]).toBe('people');
-    expect(buildWizardSteps({ hasServiceCatalog: true,  hasTeamChoices: false })[1]).toBe('people');
-    expect(buildWizardSteps({ hasServiceCatalog: false, hasTeamChoices: false })[1]).toBe('people');
+    expect(buildWizardSteps({ hasServiceCatalog: true })[1]).toBe('people');
+    expect(buildWizardSteps({ hasServiceCatalog: false })[1]).toBe('people');
   });
 
-  it('keeps all five steps when services + team choices exist', () => {
-    expect(buildWizardSteps({ hasServiceCatalog: true, hasTeamChoices: true }))
-      .toEqual(['property', 'people', 'services', 'schedule', 'team']);
+  it('ends on confirm, which carries the schedule, the assignee and the review', () => {
+    expect(buildWizardSteps({ hasServiceCatalog: true }))
+      .toEqual(['property', 'people', 'services', 'confirm']);
   });
 
   it('skips Services when the tenant has no service catalog', () => {
-    expect(buildWizardSteps({ hasServiceCatalog: false, hasTeamChoices: true }))
-      .toEqual(['property', 'people', 'schedule', 'team']);
-  });
-
-  it('skips Team when there is nobody to choose (solo workspace)', () => {
-    expect(buildWizardSteps({ hasServiceCatalog: true, hasTeamChoices: false }))
-      .toEqual(['property', 'people', 'services', 'schedule']);
-  });
-
-  it('collapses to Property → People → Schedule for the common solo/no-services tenant', () => {
-    expect(buildWizardSteps({ hasServiceCatalog: false, hasTeamChoices: false }))
-      .toEqual(['property', 'people', 'schedule']);
+    expect(buildWizardSteps({ hasServiceCatalog: false }))
+      .toEqual(['property', 'people', 'confirm']);
   });
 });
 

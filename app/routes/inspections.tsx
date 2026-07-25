@@ -5,6 +5,7 @@ import type { Route } from "./+types/inspections";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { buildCreateInspectionJson } from "~/lib/inspection-create";
+import { searchContactsForTypeahead } from "~/lib/contact-search.server";
 import type { WizardTeamMember } from "~/components/NewInspectionWizard";
 import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist";
 import { SeatBanner } from "~/components/SeatBanner";
@@ -221,26 +222,18 @@ export async function action({ request, context }: Route.ActionArgs) {
     console.error("[create] POST /api/inspections failed", res.status, errBody);
     return { ok: false, intent: "create", error: errBody.error };
   }
+  // People-step typeaheads (BFF pattern — no client-side fetch, C-12 rule).
+  // Agents have searched Contacts since IA-1; Batch D gives the client the same
+  // search, because a repeat client had to be re-typed by hand — name, email and
+  // phone — beside a table that already held all three. The create endpoint
+  // deduplicates the contact by email, which is why the email comes back too.
   if (intent === "search-agents") {
-    // IA-1 People step — agent typeahead. Posted by a dedicated useFetcher in
-    // NewInspectionWizard with { intent:"search-agents", search }. Returns up
-    // to 8 contacts of type=agent matching the query. BFF pattern: no
-    // client-side fetch (C-12 rule).
     const search = String(formData.get("search") || "").trim();
-    if (search.length < 2) {
-      return { intent: "search-agents" as const, agents: [] };
-    }
-    const res = await api.contacts.index.$get({
-      query: { type: "agent", search, limit: "8" },
-    }).catch(() => null);
-    if (res && res.ok) {
-      const body = (await res.json().catch(() => ({ data: [] }))) as { data?: { id: string; name: string; email: string | null }[] };
-      return {
-        intent: "search-agents" as const,
-        agents: (body.data ?? []).map((c) => ({ id: c.id, name: c.name, email: c.email })),
-      };
-    }
-    return { intent: "search-agents" as const, agents: [] };
+    return { intent: "search-agents" as const, agents: await searchContactsForTypeahead(api, "agent", search) };
+  }
+  if (intent === "search-clients") {
+    const search = String(formData.get("search") || "").trim();
+    return { intent: "search-clients" as const, clients: await searchContactsForTypeahead(api, "client", search) };
   }
   if (intent === "dismiss-checklist") {
     // IA-12: write checklistDismissed: true into onboardingState.
