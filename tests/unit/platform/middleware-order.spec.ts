@@ -13,7 +13,8 @@
  * behavior.
  */
 import { describe, it, expect } from 'vitest';
-import { app, jwtAuthMiddleware } from '../../../server/index';
+import { app } from '../../../server/index';
+import { jwtAuthMiddleware } from '../../../server/lib/middleware/jwt-auth';
 import { contextBootstrap } from '../../../server/lib/middleware/context-bootstrap';
 import { diMiddleware } from '../../../server/lib/middleware/di';
 import { integrationSecretsMiddleware } from '../../../server/lib/middleware/integration-secrets';

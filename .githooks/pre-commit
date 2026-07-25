@@ -117,12 +117,12 @@ fi
 #    eslint's cost here is the type-information program, not the file count:
 #    `parserOptions.project` names both tsconfigs, so any invocation builds the app
 #    program AND the api program before it checks a single line. Four parallel
-#    groups paid for that four times over. The heap below is per-process and
-#    therefore now the whole step's ceiling — 4GB (the global default above) is not
-#    enough for `server/index.ts`, whose accumulated Hono route type died with
-#    SIGABRT after ~91s; at 8GB the same file passes in ~28s.
+#    groups paid for that four times over, and quadrupled peak memory on a 16GB
+#    box. One process runs inside the 4GB ceiling set above — including commits
+#    that stage server/index.ts, which is exempt from type-aware rules precisely
+#    because no heap this machine can spare was enough (see eslint.config.js).
 step "Lint & Fix"
-if NODE_OPTIONS="--max-old-space-size=8192" npx lint-staged; then
+if npx lint-staged; then
     pass "Lint & Fix passed"
 else
     fail "Lint failed  →  npx lint-staged"

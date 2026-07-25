@@ -1,11 +1,9 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import type { Context, MiddlewareHandler } from 'hono';
+import type { Context } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/cloudflare-workers';
-import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
+import { setCookie } from 'hono/cookie';
 import { signObserverCookie } from './lib/observer-cookie';
-import { verifyJwt } from './lib/jwt-keyring';
-import { classifyJwtPayload } from './lib/auth/jwt-claims';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import * as schema from './lib/db/schema';
@@ -20,17 +18,16 @@ import { tenantRouter } from './features/tenant-routing';
 import { diMiddleware } from './lib/middleware/di';
 import { requireActiveSubscription } from './lib/middleware/tier-guard';
 import { securityHeaders } from './lib/middleware/security-headers';
-import { AppError, ErrorCode, Errors } from './lib/errors';
+import { AppError, ErrorCode } from './lib/errors';
 import { sendError } from './lib/response';
 import type { HonoConfig } from './types/hono';
-import type { UserRole } from './types/auth';
 import { logger } from './lib/logger';
 import { BUILD } from './generated/version';
 import { r2Keys } from './lib/r2-keys';
 
 import { setupWizardRoutes } from './features/setup-wizard';
 
-import { OBSERVER_EXPIRED_PATH } from './lib/middleware/observer-cookie';
+import { jwtAuthMiddleware } from './lib/middleware/jwt-auth';
 import { agreementSignPath } from './lib/public-urls';
 import { loadVerifyData } from './lib/verify-data';
 
@@ -245,164 +242,12 @@ app.use('*', tenantRouter);
 app.use('*', brandingMiddleware);
 app.use('*', enforceTenantActive);
 
-// Static asset extensions — these bypass JWT verification. We use a strict allowlist
-// rather than path.includes('.') so a dot inside a path segment (e.g. "/inspections/foo.bar")
-// can't trick the middleware into treating a protected route as public.
-const STATIC_ASSET_EXT = /\.(css|js|mjs|map|png|jpe?g|gif|svg|ico|webp|woff2?|ttf|otf|json|txt|pdf)$/i;
-
-// Global JWT Middleware — extracts tenantId / userRole from Bearer token or cookie.
-// Named + exported so the middleware-order regression test can pin its position
-// relative to the tenant-scoped middlewares that must run after it (A-16).
-export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) => {
-    const path = c.req.path;
-    const isAuthPublic = path === '/api/auth/login' || path === '/api/auth/register' || path === '/api/auth/setup' || path === '/api/auth/login/2fa';
-    // Agent Accounts A1 + the agent unified link (Spec 3 — report token or one-time KV code, never a session).
-    // Spec 3 Task 5 — core /agent-login dual-mode front door (password +
-    // magic-link request); both are unauthenticated by design (the caller
-    // holds neither a session nor a report token yet).
-    const isAgentPublic = path.startsWith('/agent-invite/') || path === '/api/agents/accept' || path === '/agent-signup' || path === '/api/agent-signup' || path === '/agent/magic-login' || path === '/api/agent/magic-login/request' || path === '/api/agent/report-context' || path === '/api/agent/login' || path === '/api/agent/login-link';
-    // Agent Accounts A3 — concierge magic-link entry points (client-facing,
-    // no JWT). The token in the URL is the secret.
-    const isConciergePublic =
-        path.startsWith('/confirm/') ||
-        path === '/api/concierge/confirm' ||
-        path === '/api/concierge/book-info' ||
-        path === '/api/concierge/book' ||
-        path === '/api/concierge/confirm-info';
-    const isPublic = path.startsWith('/api/__test__/') || path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
-
-    // Design System 0520 subsystem D P5 — observer surfaces are gated by
-    // the dedicated observer-cookie middleware, not JWT.
-    const isObserverPublic = path.startsWith('/observe/') || path === OBSERVER_EXPIRED_PATH;
-
-    if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || isObserverPublic || path === '/setup' || path === '/login' || path === '/join') return next();
-
-    // First-time setup is gated solely by the SETUP_CODE secret, validated in
-    // POST /api/auth/setup. No KV bootstrap code is generated here.
-
-    const authHeader = c.req.header('Authorization');
-    const token = authHeader?.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : getCookie(c, '__Host-inspector_token');
-
-    if (!token) return next();
-
-    // Resolve the per-request keyring (built lazily in diMiddleware). If the
-    // worker is misconfigured (no JWT_CURRENT_KID or no matching keypair),
-    // buildKeyring rejects — surface as 500 so the request fails closed.
-    let keyring;
-    try {
-        keyring = await c.var.keyringPromise!;
-    } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        logger.error('JWT keyring failed to build', { message: msg });
-        throw Errors.Internal('Server configuration error');
-    }
-
-    try {
-        // Decode header first so we can reject non-JWT-typed tokens before spending CPU on
-        // signature verification.
-        const headerPart = token.split('.')[0];
-        if (headerPart) {
-            try {
-                const header = JSON.parse(atob(headerPart.replace(/-/g, '+').replace(/_/g, '/')));
-                if (header.typ && header.typ !== 'JWT') {
-                    throw Errors.Unauthorized('Unsupported token type');
-                }
-            } catch (err) {
-                if (err instanceof AppError) throw err;
-                // Malformed header — fall through to verify() which will reject.
-            }
-        }
-
-        const payload = await verifyJwt(token, keyring);
-        const classification = classifyJwtPayload(payload);
-        const userId = payload.sub as string | undefined;
-        const tokenIat = payload.iat as number | undefined;
-
-        // Reject tokens issued before the user's last password change / reset.
-        if (userId && c.env.TENANT_CACHE) {
-            const invalidatedAt = await c.env.TENANT_CACHE.get(`pwchanged:${userId}`);
-            if (invalidatedAt) {
-                const invalidatedTs = parseInt(invalidatedAt, 10);
-                if (!tokenIat || tokenIat < invalidatedTs) {
-                    throw Errors.Unauthorized('Token has been invalidated');
-                }
-            }
-        }
-
-        // Agent Accounts A1 — JWTs minted for global agent accounts intentionally
-        // carry no `tenantId` claim. Set `agentUserId` instead so per-route
-        // handlers can resolve a tenant via resolveAgentTenant() and confirm the
-        // active link before any tenant-scoped query runs.
-        if (classification?.kind === 'agent') {
-            c.set('userRole', 'agent' as UserRole);
-            c.set('agentUserId', classification.userId);
-            c.set('user', {
-                sub: classification.userId,
-                role: 'agent',
-                // tenantId intentionally undefined — per-route resolution required.
-            });
-        } else if (classification?.kind === 'tenant') {
-            c.set('tenantId', classification.tenantId);
-            c.set('userRole', classification.role);
-            // Populate the per-request user context. Email is intentionally not carried in the JWT
-            // anymore — routes that need it (e.g. /me) look it up from the DB.
-            c.set('user', {
-                sub: classification.userId,
-                role: classification.role,
-                tenantId: classification.tenantId,
-            });
-        } else if (classification?.kind === 'unscoped') {
-            // Inspector-class role without a tenantId claim — historically this branch
-            // was tolerated. Preserve behavior for backwards-safety on existing tokens.
-            c.set('userRole', classification.role);
-            c.set('user', {
-                sub: classification.userId,
-                role: classification.role,
-                tenantId: '' as string,
-            });
-        }
-
-    } catch (err: unknown) {
-        // Clear the bad cookie so the browser stops re-sending it on every request.
-        deleteCookie(c, '__Host-inspector_token', { path: '/', secure: true, sameSite: 'Strict' });
-        if (err instanceof AppError) throw err;
-        const message = err instanceof Error ? err.message : String(err);
-        logger.info(`[JWT] Token verification failed: ${message}`);
-        throw Errors.Unauthorized('Invalid or expired token');
-    }
-
-    // --- Tenant Isolation Guard (Fail-Fast) ---
-    // In SaaS mode, strictly verify that the token's tenant matches the requested slug's tenant.
-    if (c.var.profile.mode === 'saas') {
-        const tokenTenantId = c.get('tenantId');
-        const resolvedTenantId = c.get('resolvedTenantId');
-
-        // If both are present and they DON'T match, it's a cross-tenant breach attempt.
-        if (tokenTenantId && resolvedTenantId && tokenTenantId !== resolvedTenantId) {
-            logger.warn(`[Guard] BLOCKING cross-tenant access: Token(${tokenTenantId}) -> Host(${resolvedTenantId})`);
-            logger.error('Cross-tenant access attempt blocked', {
-                tokenTenantId,
-                requestedTenantId: resolvedTenantId,
-                path: c.req.path
-            });
-            throw Errors.Forbidden('Access denied: cross-tenant authorization failure.');
-        }
-    }
-
-
-    // --- Scoped DB Injection ---
-    const tenantIdForDb = c.get('tenantId') || c.get('resolvedTenantId');
-    if (tenantIdForDb) {
-        const { createScopedDb } = await import('./lib/db/scoped');
-        const db = drizzle(c.env.DB);
-        c.set('sdb', createScopedDb(db as unknown as ReturnType<typeof drizzle<typeof schema>>, tenantIdForDb));
-    }
-
-    return next();
-};
+// Global JWT Middleware — extracts tenantId / userRole from Bearer token or
+// cookie. Defined in server/lib/middleware/jwt-auth.ts, not here: this file is
+// exempt from type-aware linting (its import fan-in blows the heap — see
+// eslint.config.js), and authentication code must not be.
 app.use('*', jwtAuthMiddleware);
+
 
 // Secret UI化 — load encrypted integration secrets from DB and merge into
 // c.env. Tenant comes from the JWT (authed API) or tenantRouter (standalone /
