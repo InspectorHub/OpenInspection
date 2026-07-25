@@ -274,6 +274,27 @@ Migration sequence numbers are an unstable, positional ordering token — squash
 - **For traceability, cite a stable id** — PR# / issue# (`see #144`) or a feature name — never a migration number. These never renumber and link to full context.
 - **"Must stay in sync with X" coupling → make it executable, not prose.** A comment that says "must match the inline DDL / the backfill list" is a latent bug; people forget. Prefer a shared constant both sides import, or a test that asserts the equality. Example: `tests/unit/inline-ddl-schema-sync.spec.ts` asserts the workers specs' hand-maintained `tenant_configs` DDL covers every Drizzle schema column — replacing the old "remember to sync this DDL" comment that blocked #164.
 
+## Cross-Portal Reuse
+
+The client portal (token track: `/checkout`, `/agreements/sign`, `/invoice`,
+`/repair-builder`, Hub `?section=`) and the agent portal (account track,
+`/agent-*`) show many of the same entities. They are ONE product surface with
+two audiences, not two products.
+
+- **Same entity in both portals ⇒ same component.** Render the client component
+  and express the difference as a prop. A parallel component drifts, and only
+  one of the two gets the next fix — that is how the agent repair-items page
+  ended up dropping photos and the item label that were already in its payload.
+- **A deliberate fork must say why, in a code comment at the fork.** State the
+  invariant that makes the two genuinely different (not the history of how it
+  happened). "Agent view is read-only" is a prop; "the agent's list spans
+  inspections while the client's is one inspection" is a reason.
+- **Capabilities come from one function, not from a page.** Whether an actor may
+  do something is decided where it is ENFORCED (server) and read by the UI, so
+  a page can never offer an action the API refuses.
+- Guarded by `app/components/agent/cross-portal-reuse.test.tsx`, which renders
+  one defect through both portals and compares what a reader sees.
+
 ## Product Terminology (canonical)
 
 User-facing copy and NEW code identifiers use these terms. (Existing surfaces are renamed in a dedicated terminology pass — don't mix renames into feature work.)
