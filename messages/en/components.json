@@ -76,6 +76,7 @@
   "newinsp_review_services": "Services",
   "newinsp_review_assignee": "Inspector",
   "newinsp_review_assignee_you": "You",
+  "newinsp_review_empty_hint": "Fills in as you go.",
   "newinsp_team_mode_label": "Team Mode",
   "newinsp_team_solo": "Solo",
   "newinsp_team_team": "Team",
@@ -125,5 +126,13 @@
   "hub_agreement_email_label": "Client email",
   "hub_agreement_email_ph": "client@example.com",
   "hub_agreement_template_label": "Agreement",
-  "hub_agreement_no_template": "No agreement template available"
+  "hub_agreement_no_template": "No agreement template available",
+  "newinsp_gate_address": "Enter the property address to continue",
+  "newinsp_gate_template": "Pick a template to continue",
+  "newinsp_gate_client_name": "Add the client's name, or clear their email and phone",
+  "newinsp_gate_service": "Select at least one service",
+  "newinsp_gate_date": "Pick a date to continue",
+  "newinsp_gate_holiday": "Pick another date — this one is blocked",
+  "newinsp_people_client_linked": "Existing contact — this inspection joins their history.",
+  "newinsp_property_clear_template": "Clear template"
 }

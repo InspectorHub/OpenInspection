@@ -14,7 +14,51 @@
  * step, which is why `hasTeamChoices` is gone.
  */
 
+import { m } from '~/paraglide/messages';
+
 export type WizardStepId = 'property' | 'people' | 'services' | 'confirm';
+
+/** Everything the step gate reads, flattened so the rule is pure. */
+export interface StepGateState {
+  address: string;
+  templateId: string;
+  clientNameMissing: boolean;
+  serviceCount: number;
+  date: string;
+  holidayBlocked: boolean;
+}
+
+/**
+ * Why the wizard will not move on — or null when it will.
+ *
+ * `Next` used to be disabled with nothing said. On Property it greys out until
+ * BOTH an address and a template are set, and on Services until a service is
+ * ticked, so the inspector is left comparing a dead button against a form that
+ * looks filled in. A disabled control has to name its own condition; that is the
+ * whole reason this returns a sentence instead of a boolean.
+ *
+ * Order matters: the reason names the FIRST thing to fix, reading down the step.
+ */
+export function stepBlockedReason(step: WizardStepId, s: StepGateState): string | null {
+  switch (step) {
+    case 'property':
+      // propertyAddress has a min(5) server constraint — enforce it here so the
+      // wizard cannot advance into an inevitable 400.
+      if (s.address.trim().length < 5) return m.newinsp_gate_address();
+      if (s.templateId.length === 0) return m.newinsp_gate_template();
+      return null;
+    case 'people':
+      // People is optional as a whole, but a contact detail with no name is not
+      // a person.
+      return s.clientNameMissing ? m.newinsp_gate_client_name() : null;
+    case 'services':
+      return s.serviceCount === 0 ? m.newinsp_gate_service() : null;
+    case 'confirm':
+      if (s.date.length === 0) return m.newinsp_gate_date();
+      if (s.holidayBlocked) return m.newinsp_gate_holiday();
+      return null;
+  }
+}
 
 export function buildWizardSteps(opts: {
   hasServiceCatalog: boolean;

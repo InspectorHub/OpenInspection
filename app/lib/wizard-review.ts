@@ -44,6 +44,8 @@ export interface NewInspectionSummaryInput {
     soloMode: boolean;
     inspectorId: string;
     teamMembers: Array<{ id: string; name: string }>;
+    /** The viewer's own name, for the case where the inspection is theirs. */
+    selfName: string | null;
 }
 
 export interface NewInspectionSummary {
@@ -86,9 +88,13 @@ export function summariseNewInspection(input: NewInspectionSummaryInput): NewIns
         }
         : null;
 
+    // Whoever will carry this out. When that is the viewer, use their name rather
+    // than "You": every other row of the review is a proper noun, and the name is
+    // also what the report will carry — worth seeing before pressing Create.
+    // Null only when we do not know it, which is what the caller's fallback is for.
     const assignee = !input.soloMode && input.inspectorId
         ? input.teamMembers.find((mem) => mem.id === input.inspectorId)?.name ?? null
-        : null;
+        : input.selfName?.trim() || null;
 
     return { address: input.address, template, client, agent, services, assignee };
 }

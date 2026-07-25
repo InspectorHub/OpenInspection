@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { useContactSearch } from "~/hooks/useContactSearch";
 import type { AgentResult, ClientResult } from "../NewInspectionWizard";
 import { ContactSuggestions } from "./ContactSuggestions";
@@ -17,6 +18,7 @@ export function PeopleStep({
   clientPhone,
   setClientPhone,
   clientNameMissing,
+  clientIsExistingContact,
   clientSearch,
   selectClient,
   selectedAgent,
@@ -38,6 +40,8 @@ export function PeopleStep({
   clientPhone: string;
   setClientPhone: (v: string) => void;
   clientNameMissing: boolean;
+  /** The three client fields came from a Contacts hit, not from typing. */
+  clientIsExistingContact: boolean;
   clientSearch: ClientSearch;
   selectClient: (client: ClientResult) => void;
   selectedAgent: AgentResult | null;
@@ -53,6 +57,11 @@ export function PeopleStep({
   clearAgent: () => void;
   enableNewAgentMode: () => void;
 }) {
+  // The email hint renders in flow, so it appeared on the first keystroke and
+  // pushed every field below it down — while the suggestion list was open over
+  // the very spot it lands in. What it says is worth saying; it just cannot say
+  // it while the name is still being typed.
+  const [nameTouched, setNameTouched] = useState(false);
   return (
     <div className="space-y-5">
       {/* CLIENT section */}
@@ -69,6 +78,7 @@ export function PeopleStep({
             value={clientName}
             onChange={(e) => clientSearch.onQueryChange(e.target.value)}
             onBlur={() => {
+              setNameTouched(true);
               // Delay so a click on a suggestion lands before the list closes.
               setTimeout(() => clientSearch.setDropdownOpen(false), 150);
             }}
@@ -86,9 +96,19 @@ export function PeopleStep({
           {clientNameMissing && (
             <p className="text-[12px] text-ih-danger mt-1">{m.newinsp_people_name_required()}</p>
           )}
-          {!clientNameMissing && clientName.trim().length > 0 && clientEmail.trim().length === 0 && (
-            <p className="text-[12px] text-ih-fg-4 mt-1">{m.newinsp_people_email_hint()}</p>
+          {/* Picking an existing client and typing a new one left the three
+              fields looking identical, and they mean different things: one joins
+              a contact's history, the other starts one. */}
+          {clientIsExistingContact && (
+            <p className="text-[12px] text-ih-ok-fg mt-1">{m.newinsp_people_client_linked()}</p>
           )}
+          {nameTouched
+            && !clientSearch.dropdownOpen
+            && !clientNameMissing
+            && clientName.trim().length > 0
+            && clientEmail.trim().length === 0 && (
+              <p className="text-[12px] text-ih-fg-4 mt-1">{m.newinsp_people_email_hint()}</p>
+            )}
         </div>
         <div>
           <label className="block text-[12px] font-bold text-ih-fg-3 mb-1.5">{m.newinsp_people_email_label()}</label>
@@ -182,6 +202,20 @@ export function PeopleStep({
               emptyLabel={m.newinsp_people_no_agents()}
               onPick={selectAgent}
               style={agentSearchCtl.dropdownStyle}
+              // "No agents found." was a dead end: the list covers the
+              // "+ New agent" link beneath it, so the moment the inspector
+              // learns nobody matches is the moment the way to add them
+              // disappears. mouseDown, like the suggestions, because the
+              // input's blur closes this list before a click would land.
+              emptyAction={
+                <button
+                  type="button"
+                  onMouseDown={enableNewAgentMode}
+                  className="text-[12px] font-semibold text-ih-primary hover:underline"
+                >
+                  {m.newinsp_people_add_agent()}
+                </button>
+              }
             />
           </div>
         )}

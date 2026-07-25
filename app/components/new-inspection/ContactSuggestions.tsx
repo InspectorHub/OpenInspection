@@ -17,6 +17,7 @@ export function ContactSuggestions<T extends SuggestedContact>({
     loading,
     contacts,
     emptyLabel,
+    emptyAction,
     onPick,
     style,
 }: {
@@ -25,6 +26,8 @@ export function ContactSuggestions<T extends SuggestedContact>({
     /** Undefined = no search has answered yet (so: no "none found" message). */
     contacts: T[] | undefined;
     emptyLabel: string;
+    /** Offered when nothing matched — a no-results list has to leave a way on. */
+    emptyAction?: React.ReactNode;
     onPick: (contact: T) => void;
     /** Fixed-position placement from `useContactSearch` — see useAnchoredDropdown. */
     style: React.CSSProperties | null;
@@ -54,7 +57,10 @@ export function ContactSuggestions<T extends SuggestedContact>({
                     </button>
                 ))
             ) : contacts ? (
-                <p className="px-3 py-2 text-[12px] text-ih-fg-4">{emptyLabel}</p>
+                <div className="px-3 py-2">
+                    <p className="text-[12px] text-ih-fg-4">{emptyLabel}</p>
+                    {emptyAction}
+                </div>
             ) : null}
         </div>,
         document.body,

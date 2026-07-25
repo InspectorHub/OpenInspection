@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { Icon } from "@core/shared-ui";
 import type { WizardTemplate } from "../NewInspectionWizard";
 import { matchTemplates } from "~/lib/wizard-review";
 import { useAnchoredDropdown } from "~/hooks/useAnchoredDropdown";
@@ -115,8 +116,30 @@ export function TemplateCombobox({
                     }, 150);
                 }}
                 onKeyDown={onKeyDown}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
+                className="w-full h-9 pl-3 pr-9 rounded-md border border-ih-border bg-ih-bg-card text-[13px] focus:shadow-ih-focus outline-none placeholder:text-ih-fg-4"
             />
+            {/* A chosen template and a half-typed word looked the same: plain
+                text in a plain box. The magnifier says "type to search", and
+                once something is selected it becomes the way to unselect it —
+                which is also the only signal that the field holds a real
+                choice rather than whatever was last typed into it. */}
+            <span className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center">
+                {selected && !open ? (
+                    <button
+                        type="button"
+                        aria-label={m.newinsp_property_clear_template()}
+                        onClick={() => {
+                            setTemplateId("");
+                            setQuery("");
+                        }}
+                        className="p-1 rounded text-ih-fg-4 hover:text-ih-fg-2"
+                    >
+                        <Icon name="x" size={14} />
+                    </button>
+                ) : (
+                    <Icon name="search" size={14} className="text-ih-fg-4" />
+                )}
+            </span>
             {open && style && createPortal(
                 <ul
                     id="template-combobox-list"

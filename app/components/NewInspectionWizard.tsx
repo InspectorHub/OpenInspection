@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
 import { useContactSearch } from "~/hooks/useContactSearch";
-import { buildWizardSteps, todayLocalISO, type WizardStepId } from "~/lib/wizard-steps";
+import { buildWizardSteps, stepBlockedReason, todayLocalISO, type WizardStepId } from "~/lib/wizard-steps";
 import { summariseNewInspection } from "~/lib/wizard-review";
+import { buildWizardCreatePayload } from "~/lib/wizard-submit";
 import { PropertyStep } from "./new-inspection/PropertyStep";
 import { PeopleStep } from "./new-inspection/PeopleStep";
 import { ServicesStep } from "./new-inspection/ServicesStep";
 import { ConfirmStep } from "./new-inspection/ConfirmStep";
+import { ReviewPanel } from "./new-inspection/ReviewPanel";
+import { WizardLayout } from "./new-inspection/WizardLayout";
+import { Breadcrumb } from "./Breadcrumb";
+import { PageHeader } from "@core/shared-ui";
 import { civilToInstantISO } from "~/lib/civil-time";
-import { useDisplayTimeZone } from "~/hooks/useSessionContext";
+import { useDisplayTimeZone, useSessionContext } from "~/hooks/useSessionContext";
 import { QuotaExceededPanel } from "./new-inspection/QuotaExceededPanel";
 import type { AddressSelection } from "~/routes/resources/places";
 import { m } from "~/paraglide/messages";
@@ -92,6 +97,7 @@ export function NewInspectionWizard({
   // Both must be the same value or the inspector is told one thing and the
   // booking stores another.
   const displayTz = useDisplayTimeZone();
+  const sessionCtx = useSessionContext();
   // IA-1 agent typeahead, and (Batch D) the same search for the client — one
   // hook, two instances, each with its own fetcher.
   const [agentSearch, setAgentSearch] = useState("");
@@ -100,11 +106,17 @@ export function NewInspectionWizard({
     setAgentSearch,
   );
   const [clientName, setClientName] = useState("");
+  /** Set when the client fields were filled from a Contacts hit; cleared on any
+   *  hand edit, since the values are then no longer that contact's. */
+  const [pickedClientId, setPickedClientId] = useState<string | null>(null);
   // The client's search box IS the name field — there is no separate query to
   // keep, and typing a name nobody has on file is still a valid answer.
   const clientSearchCtl = useContactSearch<{ intent: "search-clients"; clients: ClientResult[] }>(
     "search-clients",
-    setClientName,
+    (value) => {
+      setClientName(value);
+      setPickedClientId(null);
+    },
   );
   // IA-6 — advisory schedule conflict detection (separate fetcher to avoid
   // cancelling the submit fetcher; B-17 convention).
@@ -185,9 +197,11 @@ export function NewInspectionWizard({
         soloMode,
         inspectorId,
         teamMembers,
+        selfName: sessionCtx?.user.name ?? null,
       }),
     [address, templates, templateId, clientName, clientEmail, clientPhone, selectedAgent,
-      newAgentName, serviceCatalog, services, priceOverrides, soloMode, inspectorId, teamMembers],
+      newAgentName, serviceCatalog, services, priceOverrides, soloMode, inspectorId, teamMembers,
+      sessionCtx],
   );
 
   useEffect(() => {
@@ -285,6 +299,10 @@ export function NewInspectionWizard({
     setClientName(client.name);
     setClientEmail(client.email ?? "");
     setClientPhone(client.phone ?? "");
+    // Remember that these three values came from a contact. Picking an existing
+    // client and typing a new one left the fields looking identical, and they
+    // mean different things — one joins a history, the other starts one.
+    setPickedClientId(client.id);
     clientSearchCtl.setDropdownOpen(false);
   }
 
@@ -360,68 +378,38 @@ export function NewInspectionWizard({
   const clientHasContact = clientEmail.trim().length > 0 || clientPhone.trim().length > 0;
   const clientNameMissing = clientHasContact && clientName.trim().length === 0;
 
-  function canAdvanceFromStep(): boolean {
-    switch (step) {
-      case "property":
-        // propertyAddress has a min(5) server constraint — enforce it here so the
-        // wizard cannot advance into an inevitable 400.
-        return address.trim().length >= 5 && templateId.length > 0;
-      case "people":
-        // People: optional, but name is required when email or phone are filled.
-        return !clientNameMissing;
-      case "services":
-        return services.size > 0;
-      case "confirm":
-        return date.length > 0 && holidayFetcher.data?.effect !== "block";
-    }
-  }
-  const canNext = canAdvanceFromStep();
+  // A single source for both "may we advance" and "why not" — the button was
+  // disabled with no explanation, twice in one wizard.
+  const blockedReason = stepBlockedReason(step, {
+    address,
+    templateId,
+    clientNameMissing,
+    serviceCount: services.size,
+    date,
+    holidayBlocked: holidayFetcher.data?.effect === "block",
+  });
 
   function handleSubmit() {
-    // P-4: Build serviceSelections with optional per-row price overrides.
-    // Also keep legacy serviceIds for backward compat (the server uses
-    // serviceSelections as the authoritative source when both are present).
-    const serviceSelectionsJson = JSON.stringify(
-      [...services].map((id) => {
-        const override = priceOverrides.get(id);
-        return override !== undefined
-          ? { serviceId: id, priceOverrideCents: override }
-          : { serviceId: id };
-      }),
-    );
-
     fetcher.submit(
-      {
-        intent: "create",
+      buildWizardCreatePayload({
         propertyType,
         address,
-        // #198 — structured geocoded address (empty strings when the inspector
-        // typed a free-form address the API couldn't match; the server stamps
-        // addressGeocodedAt itself).
-        addressPlaceId: addressSel?.placeId ?? "",
-        addressStreet: addressSel?.street ?? "",
-        addressCity: addressSel?.city ?? "",
-        addressState: addressSel?.state ?? "",
-        addressZip: addressSel?.zip ?? "",
-        addressCounty: addressSel?.county ?? "",
-        addressLat: addressSel?.lat != null ? String(addressSel.lat) : "",
-        addressLng: addressSel?.lng != null ? String(addressSel.lng) : "",
+        addressSel,
         templateId,
-        serviceIds: [...services].join(","),
-        serviceSelectionsJson,
+        serviceIds: [...services],
+        priceOverrides,
         date,
         time,
         timeZone: displayTz,
-        soloMode: String(soloMode),
+        soloMode,
         inspectorId,
-        // IA-1 People step fields
         clientName,
         clientEmail,
         clientPhone,
-        agentContactId: selectedAgent?.id ?? "",
-        newAgentName: !selectedAgent ? newAgentName : "",
-        newAgentEmail: !selectedAgent ? newAgentEmail : "",
-      },
+        selectedAgentId: selectedAgent?.id ?? null,
+        newAgentName,
+        newAgentEmail,
+      }),
       { method: "post", action: "/inspections" },
     );
     // Closing happens once the fetcher settles (see the effect above) — a
@@ -429,31 +417,41 @@ export function NewInspectionWizard({
     // panel instead of closing immediately on submit.
   }
 
-  return (
-    <div className="w-full max-w-[720px] mx-auto flex flex-col bg-ih-bg-card rounded-xl border border-ih-border shadow-ih-popover">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-ih-border">
-          <h2 className="text-[16px] font-bold">{m.new_inspection_title()}</h2>
-          <button onClick={onClose} className="text-ih-fg-4 hover:text-ih-fg-2 text-lg leading-none">&times;</button>
-        </div>
-
-        {quotaExceeded !== undefined ? (
+  if (quotaExceeded !== undefined) {
+    return (
+      <div className="w-full">
+        <Breadcrumb items={[{ label: m.nav_item_inspections(), href: "/inspections" }, { label: m.new_inspection_title() }]} />
+        <div className="mt-1"><PageHeader title={m.new_inspection_title()} /></div>
+        <div className="mt-ih-list max-w-[720px] bg-ih-bg-card rounded-xl border border-ih-border">
           <QuotaExceededPanel billingPortalUrl={quotaExceeded} onClose={onClose} />
-        ) : (
-        <>
-        {/* Step indicator */}
-        <div className="flex items-center gap-1 px-6 pt-4">
-          {steps.map((s, i) => (
-            <div key={s} className="flex items-center gap-1 flex-1">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold ${i <= stepIdx ? "bg-ih-primary text-white" : "bg-ih-bg-muted text-ih-fg-4"}`}>{i + 1}</div>
-              <span className={`text-[11px] font-medium hidden sm:inline ${i <= stepIdx ? "text-ih-primary" : "text-ih-fg-4"}`}>{stepLabel(s)}</span>
-              {i < steps.length - 1 && <div className={`flex-1 h-px mx-1 ${i < stepIdx ? "bg-ih-primary" : "bg-ih-bg-muted"}`} />}
-            </div>
-          ))}
         </div>
+      </div>
+    );
+  }
 
-        {/* Body — flex-1 + scroll so a tall step never pushes the footer off-screen (card capped at max-h-[90vh]) */}
-        <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5">
+  return (
+    <WizardLayout
+      steps={steps}
+      stepIdx={stepIdx}
+      stepLabel={stepLabel}
+      blockedReason={blockedReason}
+      isLastStep={stepIdx === steps.length - 1}
+      onBack={() => (stepIdx > 0 ? setStepIdx(stepIdx - 1) : onClose())}
+      onNext={() => (stepIdx < steps.length - 1 ? setStepIdx(stepIdx + 1) : handleSubmit())}
+      review={
+        <ReviewPanel
+          summary={summary}
+          scheduledIso={civilToInstantISO(date, time, displayTz)}
+          timeZone={displayTz}
+          currentStep={step}
+          onJump={(target) => {
+            const idx = steps.indexOf(target);
+            if (idx >= 0) setStepIdx(idx);
+          }}
+        />
+      }
+    >
+        <div>
           {step === "property" && (
             <PropertyStep
               propertyType={propertyType}
@@ -475,7 +473,11 @@ export function NewInspectionWizard({
               clientSearch={clientSearchCtl}
               selectClient={selectClient}
               clientEmail={clientEmail}
-              setClientEmail={setClientEmail}
+              setClientEmail={(v) => {
+                setClientEmail(v);
+                setPickedClientId(null);
+              }}
+              clientIsExistingContact={pickedClientId !== null}
               clientPhone={clientPhone}
               setClientPhone={setClientPhone}
               clientNameMissing={clientNameMissing}
@@ -519,28 +521,9 @@ export function NewInspectionWizard({
               inspectorId={inspectorId}
               setInspectorId={setInspectorId}
               teamMembers={teamMembers}
-              summary={summary}
             />
           )}
         </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-ih-border">
-          <button onClick={() => stepIdx > 0 ? setStepIdx(stepIdx - 1) : onClose()} className="h-8 px-4 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-3 hover:bg-ih-bg-muted">
-            {stepIdx > 0 ? m.common_back() : m.common_cancel()}
-          </button>
-          {stepIdx < steps.length - 1 ? (
-            <button disabled={!canNext} onClick={() => setStepIdx(stepIdx + 1)} className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed">
-              {m.common_next()}
-            </button>
-          ) : (
-            <button disabled={!canNext} onClick={handleSubmit} className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 disabled:opacity-40 disabled:cursor-not-allowed">
-              {m.new_inspection_create()}
-            </button>
-          )}
-        </div>
-        </>
-        )}
-    </div>
+    </WizardLayout>
   );
 }

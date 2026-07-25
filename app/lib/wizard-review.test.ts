@@ -60,6 +60,7 @@ describe("summariseNewInspection", () => {
         soloMode: true,
         inspectorId: "",
         teamMembers: [{ id: "u-1", name: "Dana Inspector" }],
+        selfName: "Sam Owner" as string | null,
     };
 
     it("names the template rather than echoing its id", () => {
@@ -122,13 +123,21 @@ describe("summariseNewInspection", () => {
         expect(s.services?.totalCents).toBe(35000);
     });
 
-    it("names the assignee only when someone else was chosen", () => {
-        // Solo mode assigns the caller; naming them adds nothing.
-        expect(summariseNewInspection(base).assignee).toBeNull();
+    it("names whoever will carry it out, including the viewer", () => {
+        // "Inspector: You" was the one row of the review that was not a name,
+        // and the name is what the report will carry.
+        expect(summariseNewInspection(base).assignee).toBe("Sam Owner");
         expect(
             summariseNewInspection({ ...base, soloMode: false, inspectorId: "u-1" }).assignee,
         ).toBe("Dana Inspector");
-        // Not-solo but nobody picked yet — still the caller.
-        expect(summariseNewInspection({ ...base, soloMode: false }).assignee).toBeNull();
+        // Not-solo but nobody picked yet — still the viewer's job.
+        expect(summariseNewInspection({ ...base, soloMode: false }).assignee).toBe("Sam Owner");
+    });
+
+    it("falls back to null when the viewer's own name is unknown", () => {
+        // The caller renders "You" for this; a blank row would be worse, and
+        // inventing a name would be a lie.
+        expect(summariseNewInspection({ ...base, selfName: null }).assignee).toBeNull();
+        expect(summariseNewInspection({ ...base, selfName: "   " }).assignee).toBeNull();
     });
 });
