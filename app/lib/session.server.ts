@@ -68,9 +68,36 @@ export async function getToken(context: AppLoadContext, request: Request): Promi
   return readRawCookie(request, "__Host-inspector_token");
 }
 
+/**
+ * Whether a session token is past its `exp`, read from the JWT payload.
+ *
+ * This is NOT verification — the API verifies the signature through the ES256
+ * keyring, and nothing here may be trusted for authorization. It answers one
+ * cheaper question: is it even worth sending? A token whose payload cannot be
+ * read counts as expired, so an unreadable value can never be passed on.
+ */
+function isTokenExpired(token: string, nowMs: number): boolean {
+  const payload = token.split(".")[1];
+  if (!payload) return true;
+  try {
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const exp = (JSON.parse(json) as { exp?: unknown }).exp;
+    if (typeof exp !== "number") return true;
+    return exp * 1000 <= nowMs;
+  } catch {
+    return true;
+  }
+}
+
 export async function requireToken(context: AppLoadContext, request: Request): Promise<string> {
   const token = await getToken(context, request);
   if (!token) throw redirect("/login");
+  // An expired session is the ordinary end of a session, not a failure. Without
+  // this, the cookie still EXISTS so the loader proceeded, every API call
+  // answered 401, and the page fell into its error boundary — the visitor saw
+  // "something went wrong" when all that happened is that they need to log in
+  // again. Clear the dead cookies on the way out so the next request is clean.
+  if (isTokenExpired(token, Date.now())) throw await destroyUserSession(context, request);
   return token;
 }
 
