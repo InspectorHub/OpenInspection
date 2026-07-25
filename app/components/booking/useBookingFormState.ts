@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useFetcher } from "react-router";
 import type { CompanyProfile } from "./booking-constants";
 import { m } from "~/paraglide/messages";
 
@@ -7,9 +8,11 @@ interface UseBookingFormStateArgs {
   preselected: { id: string; name: string } | null;
   tenant: string | undefined;
   agentRefSlug: string | null;
+  /** Set when a signed-in agent is booking on behalf of a client. */
+  agentBooking?: { agentName: string; tenantId: string } | null;
 }
 
-export function useBookingFormState({ profile, preselected, tenant, agentRefSlug }: UseBookingFormStateArgs) {
+export function useBookingFormState({ profile, preselected, tenant, agentRefSlug, agentBooking }: UseBookingFormStateArgs) {
   const [step, setStep] = useState(0);
 
   // Form state
@@ -42,7 +45,9 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
       .reduce((sum, s) => sum + s.price / 100, 0);
   }, [selectedServices, profile]);
 
-  const needsTurnstile = !!profile?.turnstileSiteKey;
+  // An authenticated agent is not an anonymous visitor, so the bot challenge
+  // does not apply to them; every anonymous submit still faces it.
+  const needsTurnstile = !!profile?.turnstileSiteKey && !agentBooking;
   const canNext =
     step === 0 ? address.length > 2 :
     step === 1 ? selectedServices.size > 0 :
@@ -64,7 +69,38 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     return m.helper_booking_inspector_default();
   }, [chosenInspectorId, inspectorOptions]);
 
+  // The agent branch submits through the route action: the hold endpoint is
+  // authenticated and the session token never leaves the server side of this
+  // app. The anonymous branch keeps posting to the public endpoint directly.
+  const agentFetcher = useFetcher<{ ok?: boolean; error?: string }>();
+  useEffect(() => {
+    if (agentFetcher.state !== "idle" || !agentFetcher.data) return;
+    if (agentFetcher.data.ok) {
+      setMessage({ text: m.helper_booking_submit_success(), ok: true });
+      setStep(3);
+    } else {
+      setMessage({ text: agentFetcher.data.error || m.helper_booking_submit_error(), ok: false });
+    }
+  }, [agentFetcher.state, agentFetcher.data]);
+
+  function submitAgentHold() {
+    const fd = new FormData();
+    fd.append("_intent", "agent-book");
+    fd.append("address", address);
+    fd.append("date", inspectionDate);
+    fd.append("timeSlot", timeWindow === "custom" ? customTime : timeWindow);
+    if (chosenInspectorId) fd.append("inspectorId", chosenInspectorId);
+    for (const id of selectedServices) fd.append("serviceId", id);
+    fd.append("clientName", clientName);
+    fd.append("clientEmail", clientEmail);
+    agentFetcher.submit(fd, { method: "post" });
+  }
+
   async function handleSubmit() {
+    if (agentBooking) {
+      submitAgentHold();
+      return;
+    }
     setSubmitting(true);
     setMessage(null);
     try {
@@ -111,7 +147,7 @@ export function useBookingFormState({ profile, preselected, tenant, agentRefSlug
     clientEmail, setClientEmail,
     smsOptin, setSmsOptin,
     chosenInspectorId, setChosenInspectorId,
-    submitting,
+    submitting: submitting || agentFetcher.state === "submitting",
     message,
     turnstileToken, setTurnstileToken,
     turnstileRef,

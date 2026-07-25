@@ -11,6 +11,8 @@ import {
     contactRoleProfiles,
 } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
+import { resolveHoldInspector, resolveInvitingUser, attachHoldServices } from './concierge/hold-inputs';
+import { INSPECTION_STATUS } from '../lib/status/inspection-status';
 import { logger } from '../lib/logger';
 import { syncInspectionAssignments } from '../lib/db/assignment-links';
 import { hashToken, deadTokenSentinel, resolveTokenRow } from '../lib/token-hash';
@@ -39,13 +41,23 @@ const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export interface ConciergeBookParams {
     tenantId: string;
     agentUserId: string;
-    inspectorContactId: string;
+    /**
+     * Naming the inspector is OPTIONAL — a hold with nobody assigned is the
+     * normal case when the agent takes whoever is free. Two forms are accepted
+     * because two callers know two different things: a booking form knows the
+     * inspector's user id (what the company profile publishes), while the
+     * contact id is the identifier the tenant's own contact list uses.
+     */
+    inspectorUserId?: string;
+    inspectorContactId?: string;
     date: string;
     timeSlot: string;
     propertyAddress: string;
     clientName: string;
     clientEmail: string;
     clientPhone?: string;
+    /** Services the agent picked; snapshotted onto the hold for pricing. */
+    services?: { serviceId: string }[];
     agreementRequired: boolean;
     paymentRequired: boolean;
 }
@@ -111,11 +123,11 @@ export class ConciergeService {
 
     /**
      * Step 1 of the concierge flow. Verifies the agent ↔ tenant link is active,
-     * resolves the inspector user from the inspector-contact id (via email
-     * match), reads tenant.concierge_review_required, and creates an
-     * inspection in the appropriate state. Mints a magic-link token + sends
-     * the client confirm email when the tenant is in auto-confirm mode;
-     * otherwise sends the inspector-review notification.
+     * resolves the inspector (when one was named), reads
+     * tenant.concierge_review_required, and creates the hold in the
+     * appropriate state. Mints a magic-link token + sends the client confirm
+     * email when the tenant is in auto-confirm mode; otherwise sends the
+     * inspector-review notification.
      */
     async createBooking(params: ConciergeBookParams): Promise<ConciergeBookResult> {
         const db = this.getDrizzle();
@@ -126,6 +138,7 @@ export class ConciergeService {
                 id: agentTenantLinks.id,
                 status: agentTenantLinks.status,
                 inspectorContactId: agentTenantLinks.inspectorContactId,
+                invitedByUserId: agentTenantLinks.invitedByUserId,
             })
             .from(agentTenantLinks)
             .where(
@@ -139,31 +152,10 @@ export class ConciergeService {
             throw Errors.Forbidden('Agent not linked to this tenant');
         }
 
-        // 2. Resolve the inspector contact + tenant-scoped inspector user.
-        const inspectorContact = await db
-            .select()
-            .from(contacts)
-            .where(
-                and(
-                    eq(contacts.id, params.inspectorContactId),
-                    eq(contacts.tenantId, params.tenantId),
-                ),
-            )
-            .get();
-        if (!inspectorContact) {
-            throw Errors.NotFound('Inspector contact not found');
-        }
-        const inspectorEmail = inspectorContact.email ?? '';
-        const inspector = inspectorEmail
-            ? await db
-                  .select()
-                  .from(users)
-                  .where(and(eq(users.email, inspectorEmail), eq(users.tenantId, params.tenantId)))
-                  .get()
-            : undefined;
-        if (!inspector) {
-            throw Errors.NotFound('Inspector user not resolved from contact');
-        }
+        // 2. Resolve the inspector, when one was named at all. Either form must
+        //    land on a user inside THIS tenant — an id from elsewhere is a
+        //    rejection, never a silent unassigned hold.
+        const inspector = await resolveHoldInspector(db, params);
 
         // 3. Read tenant config to decide which mode to enter.
         const cfg = await db
@@ -186,10 +178,13 @@ export class ConciergeService {
         await db.insert(inspections).values({
             id: inspectionId,
             tenantId: params.tenantId,
-            inspectorId: inspector.id,
+            inspectorId: inspector?.id ?? null,
             propertyAddress: params.propertyAddress,
             date: params.date,
-            status: 'scheduled',
+            // A booking someone else placed for the client is a HOLD: it wants
+            // an inspection, it does not settle one. The office (or the client's
+            // own confirmation) moves it on from here.
+            status: INSPECTION_STATUS.REQUESTED,
             paymentStatus: 'unpaid',
             paymentRequired: params.paymentRequired,
             agreementRequired: params.agreementRequired,
@@ -198,7 +193,14 @@ export class ConciergeService {
             createdAt: new Date(),
         });
         // DB-8: mirror assignment into inspection_inspectors link table.
-        await syncInspectionAssignments(db, params.tenantId, inspectionId, { inspectorId: inspector.id });
+        if (inspector) {
+            await syncInspectionAssignments(db, params.tenantId, inspectionId, { inspectorId: inspector.id });
+        }
+
+        if (params.services?.length) {
+            const total = await attachHoldServices(db, params.tenantId, inspectionId, params.services);
+            await db.update(inspections).set({ price: total }).where(eq(inspections.id, inspectionId));
+        }
 
         // Task 7b (people-role-profiles), FIXED (Task 9b regression) — mirror
         // both the client and the referring agent into inspection_people
@@ -257,13 +259,20 @@ export class ConciergeService {
                 {
                     propertyAddress: params.propertyAddress,
                     date: params.date,
-                    inspectorName: inspector.name ?? inspector.email ?? 'your inspector',
+                    inspectorName: inspector?.name ?? inspector?.email ?? 'your inspector',
                 },
             );
             return { inspectionId, status: 'awaiting_client' };
         }
+        // Reviewer mode needs somebody to review it. The named inspector when
+        // there is one, else the inspector who brought this agent in — an
+        // unassigned hold still has to reach a human.
+        const reviewer = inspector ?? (await resolveInvitingUser(db, params.tenantId, link.invitedByUserId));
+        if (!reviewer) {
+            throw Errors.BadRequest('Choose an inspector — this company reviews agent bookings.');
+        }
         try {
-            await this.email.sendConciergeInspectorReview(inspector.email, {
+            await this.email.sendConciergeInspectorReview(reviewer.email, {
                 inspectionId,
                 clientName: params.clientName,
                 propertyAddress: params.propertyAddress,

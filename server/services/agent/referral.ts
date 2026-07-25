@@ -47,6 +47,8 @@ export interface AgentInspectorRow {
     tenantName: string;
     tenantSlug: string;
     contactId: string | null;
+    /** The id a booking form names when the agent picks this inspector. */
+    inspectorUserId: string | null;
     inspectorName: string | null;
     inspectorPhotoUrl: string | null;
     inspectorSlug: string | null;
@@ -415,6 +417,7 @@ export async function listInspectors(
             tenantName:        tenants.name,
             tenantSlug:   tenants.slug,
             contactId:         agentTenantLinks.inspectorContactId,
+            inspectorUserId:   users.id,
             inspectorName:     users.name,
             inspectorPhotoUrl: users.photoUrl,
             inspectorSlug:     users.slug,
@@ -434,6 +437,7 @@ export async function listInspectors(
         tenantName:        r.tenantName,
         tenantSlug:   r.tenantSlug,
         contactId:         r.contactId ?? null,
+        inspectorUserId:   r.inspectorUserId ?? null,
         inspectorName:     r.inspectorName ?? null,
         inspectorPhotoUrl: r.inspectorPhotoUrl ?? null,
         inspectorSlug:     r.inspectorSlug ?? null,
