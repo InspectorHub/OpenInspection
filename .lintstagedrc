@@ -1,14 +1,5 @@
 {
-  "server/**/*.{ts,tsx}": [
-    "eslint --fix --cache"
-  ],
-  "app/**/*.{ts,tsx}": [
-    "eslint --fix --cache"
-  ],
-  "workers/**/*.ts": [
-    "eslint --fix --cache"
-  ],
-  "packages/**/*.{ts,tsx}": [
-    "eslint --fix --cache"
+  "{server,app,workers,packages}/**/*.{ts,tsx}": [
+    "eslint --fix --cache --cache-strategy content"
   ]
 }

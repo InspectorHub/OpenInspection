@@ -1,5 +1,5 @@
 import { OpenAPIHono } from '@hono/zod-openapi';
-import { Context, MiddlewareHandler } from 'hono';
+import type { Context, MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/cloudflare-workers';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
@@ -22,8 +22,8 @@ import { requireActiveSubscription } from './lib/middleware/tier-guard';
 import { securityHeaders } from './lib/middleware/security-headers';
 import { AppError, ErrorCode, Errors } from './lib/errors';
 import { sendError } from './lib/response';
-import { HonoConfig } from './types/hono';
-import { UserRole } from './types/auth';
+import type { HonoConfig } from './types/hono';
+import type { UserRole } from './types/auth';
 import { logger } from './lib/logger';
 import { BUILD } from './generated/version';
 import { r2Keys } from './lib/r2-keys';

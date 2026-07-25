@@ -49,8 +49,34 @@ printf '%b\n' "${BOLD}── OpenInspection (Pre-commit Checks) ─────�
 #      - staged TS confined to server/          → api pass only (type-check:api)
 #      - anything touching app/ workers/ packages/ or ts-config files → full (type-check)
 STAGED=$(git diff --cached --name-only --diff-filter=ACMRD)
+STAGED_TREE=$(git diff --cached --name-only --diff-filter=ADR)
 TS_STAGED=$(echo "$STAGED" | grep -E '\.(ts|tsx)$' || true)
 CONFIG_STAGED=$(echo "$STAGED" | grep -E '^(tsconfig|package\.json|package-lock\.json|vite\.config|react-router\.config|worker-configuration)' || true)
+
+#    The full tier used to shell out to `npm run type-check`, which regenerates
+#    two type artifacts before compiling. Measured on this repo, warm:
+#      paraglide compile   ~27s   ← app/paraglide/, from messages/ + project.inlang/
+#      react-router typegen ~30s  ← .react-router/types/, from the route TREE
+#      tsc app + tsc api    ~14s
+#    So three quarters of a ~76s "type check" was generating inputs, not checking
+#    types. They are pure functions of their own inputs: an edit that cannot reach
+#    a generator's input cannot change its output. Regenerate one only when the
+#    staged changes do reach it, or when its output is missing (fresh clone, after
+#    a clean). `npm run type-check` still runs both unconditionally — that is what
+#    CI's verify gate uses, and what the failure messages below point developers at.
+#    (The api tier never needed either: tsconfig.api.json includes server/** alone.)
+needs_paraglide() {
+    [ -d app/paraglide ] || return 0
+    echo "$STAGED" | grep -qE '^(messages/|project\.inlang/)'
+}
+needs_typegen() {
+    [ -d .react-router/types ] || return 0
+    echo "$STAGED" | grep -qE '^(app/routes\.ts|react-router\.config\.ts)$' && return 0
+    # Editing a route module's body does not change its generated types — those
+    # infer from `typeof loader` when tsc runs. A route file APPEARING or
+    # DISAPPEARING changes the tree, and that does.
+    echo "$STAGED_TREE" | grep -qE '^app/routes/'
+}
 
 step "Type check"
 if [ -z "$TS_STAGED" ] && [ -z "$CONFIG_STAGED" ]; then
@@ -62,16 +88,41 @@ elif [ -z "$CONFIG_STAGED" ] && [ -z "$(echo "$TS_STAGED" | grep -vE '^(server|t
         fail "Type check failed  →  npm run type-check:api"
     fi
 else
-    if npm run type-check > /dev/null 2>&1; then
-        pass "Type check passed (tsc)"
+    GEN_OK=1
+    GEN_NOTE=""
+    if needs_paraglide; then
+        if npm run i18n:compile > /dev/null 2>&1; then
+            GEN_NOTE="${GEN_NOTE}, regenerated messages"
+        else
+            GEN_OK=0
+        fi
+    fi
+    if [ "$GEN_OK" -eq 1 ] && needs_typegen; then
+        if npx react-router typegen > /dev/null 2>&1; then
+            GEN_NOTE="${GEN_NOTE}, regenerated route types"
+        else
+            GEN_OK=0
+        fi
+    fi
+    if [ "$GEN_OK" -eq 0 ]; then
+        fail "Type generation failed  →  npm run type-check"
+    elif npm run type-check:app > /dev/null 2>&1 && npm run type-check:api > /dev/null 2>&1; then
+        pass "Type check passed (tsc${GEN_NOTE})"
     else
         fail "Type check failed  →  npm run type-check"
     fi
 fi
 
-# 2. Lint & Fix
+# 2. Lint & Fix — ONE eslint process over every staged file (see .lintstagedrc).
+#    eslint's cost here is the type-information program, not the file count:
+#    `parserOptions.project` names both tsconfigs, so any invocation builds the app
+#    program AND the api program before it checks a single line. Four parallel
+#    groups paid for that four times over. The heap below is per-process and
+#    therefore now the whole step's ceiling — 4GB (the global default above) is not
+#    enough for `server/index.ts`, whose accumulated Hono route type died with
+#    SIGABRT after ~91s; at 8GB the same file passes in ~28s.
 step "Lint & Fix"
-if npx lint-staged; then
+if NODE_OPTIONS="--max-old-space-size=8192" npx lint-staged; then
     pass "Lint & Fix passed"
 else
     fail "Lint failed  →  npx lint-staged"
