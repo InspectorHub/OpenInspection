@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredText } from "~/lib/forms/required-text";
 // i18n — locale-aware validation messages. `m.*()` resolves to the active locale
 // via paraglide's ALS (server) / cookie (client), so schemas carrying user-facing
 // messages are built by a FACTORY called per validation (never a module-level
@@ -27,8 +28,7 @@ import { m } from "~/paraglide/messages";
  */
 export function makeStripeConnectSchema() {
   return z.object({
-    stripeAccountId: z
-      .string()
+    stripeAccountId: requiredText(m.validation_stripe_account_id_required())
       .min(1, m.validation_stripe_account_id_required())
       .regex(
         /^acct_[a-zA-Z0-9]{10,}$/,

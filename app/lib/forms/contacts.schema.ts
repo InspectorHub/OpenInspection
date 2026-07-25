@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredText } from "~/lib/forms/required-text";
 // i18n — locale-aware validation messages. `m.*()` resolves to the active locale
 // via paraglide's ALS (server) / cookie (client), so schemas carrying user-facing
 // messages are built by a FACTORY called per validation (never a module-level
@@ -22,7 +23,7 @@ import { m } from "~/paraglide/messages";
 export function makeAddContactSchema() {
   return z.object({
     type: z.enum(["client", "agent"]).default("client"),
-    name: z.string().min(1, m.validation_contact_name_required()),
+    name: requiredText(m.validation_contact_name_required()).min(1, m.validation_contact_name_required()),
     email: z
       .string()
       .email(m.validation_contact_email_invalid())

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { requiredText } from "~/lib/forms/required-text";
 // i18n — locale-aware validation messages. `m.*()` resolves to the active locale
 // via paraglide's ALS (server) / cookie (client), so schemas carrying user-facing
 // messages are built by a FACTORY called per validation (never a module-level
@@ -22,8 +23,7 @@ import { m } from "~/paraglide/messages";
 /* ------------------------------------------------------------------ */
 
 function makeStrongPassword() {
-  return z
-    .string()
+  return requiredText(m.validation_password_min8())
     .min(8, m.validation_password_min8())
     .regex(/[A-Z]/, m.validation_password_uppercase())
     .regex(/[0-9]/, m.validation_password_number())
@@ -41,8 +41,7 @@ function makeStrongPassword() {
  */
 export function makeDeleteAccountSchema() {
   return z.object({
-    confirmEmail: z
-      .string()
+    confirmEmail: requiredText(m.validation_delete_account_email_required())
       .min(1, m.validation_delete_account_email_required())
       .email(m.validation_delete_account_email_invalid()),
   });
@@ -61,9 +60,9 @@ export function makeDeleteAccountSchema() {
 export function makeChangePasswordSchema() {
   return z
     .object({
-      currentPassword: z.string().min(1, m.validation_change_password_current_required()),
+      currentPassword: requiredText(m.validation_change_password_current_required()).min(1, m.validation_change_password_current_required()),
       newPassword: makeStrongPassword(),
-      confirmPassword: z.string().min(1, m.validation_change_password_confirm_required()),
+      confirmPassword: requiredText(m.validation_change_password_confirm_required()).min(1, m.validation_change_password_confirm_required()),
     })
     .refine((d) => d.newPassword === d.confirmPassword, {
       message: m.validation_change_password_mismatch(),
@@ -113,8 +112,7 @@ export function makeProfileSchema() {
  */
 export function makeWorkspaceSchema() {
   return z.object({
-    companyName: z
-      .string()
+    companyName: requiredText(m.validation_workspace_name_required())
       .min(1, m.validation_workspace_name_required())
       .max(50, m.validation_workspace_name_too_long()),
     primaryColor: z
@@ -166,8 +164,7 @@ export function makeWorkspaceSchema() {
  */
 export function makeCreateServiceSchema() {
   return z.object({
-    name: z
-      .string()
+    name: requiredText(m.validation_service_name_required())
       .min(1, m.validation_service_name_required())
       .max(200, m.validation_service_name_too_long()),
     description: z.string().max(1000, m.validation_service_description_too_long()).optional(),
@@ -202,7 +199,7 @@ export function makeCreateServiceSchema() {
  */
 export function makeUpdateServiceSchema() {
   return makeCreateServiceSchema().extend({
-    id: z.string().min(1, m.validation_service_id_required()),
+    id: requiredText(m.validation_service_id_required()).min(1, m.validation_service_id_required()),
   });
 }
 
