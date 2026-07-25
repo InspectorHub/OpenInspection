@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import { useLoaderData, Form, useActionData } from "react-router";
-import { Select } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
-import { didCreateService } from "~/lib/settings-services";
+import { didSaveService } from "~/lib/settings-services";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-services";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { makeCreateServiceSchema } from "~/lib/forms/settings.schema";
-import { MoneyInput } from "~/components/MoneyInput";
+import { makeCreateServiceSchema, makeUpdateServiceSchema } from "~/lib/forms/settings.schema";
 import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { SCHEDULING_ROLES_SET } from "~/lib/settings/constants";
 import { ServicesCatalogPanel } from "~/components/settings/services/ServicesCatalogPanel";
+import { ServiceFields } from "~/components/settings/services/ServiceFields";
+import { ServiceEditForm } from "~/components/settings/services/ServiceEditForm";
 import { DiscountCodesPanel } from "~/components/settings/services/DiscountCodesPanel";
 import { m } from "~/paraglide/messages";
 
@@ -163,6 +163,35 @@ export async function action({ request, context }: Route.ActionArgs) {
     // { ok: true } is also what toggle-service answers, and closing on that
     // would discard whatever was typed in an open create form.
     return { ok: true, intent: "create-service" as const };
+  } else if (intent === "update-service") {
+    // The same fields the create form writes, on a service that already exists.
+    // `PUT /api/services/:id` has always accepted them; until now nothing sent
+    // them, so a service created without a template stayed unbookable forever.
+    const submission = parseWithZod(form, { schema: makeUpdateServiceSchema() });
+    if (submission.status !== "success") {
+      return submission.reply();
+    }
+    const { id, name, description, price, durationMinutes, templateId } = submission.value;
+    const res = await api.services[":id"].$put({
+      param: { id },
+      json: {
+        name,
+        // Absent-means-omitted for optionals (sending null fails validation),
+        // except that clearing a template must be expressible: an empty string
+        // is how the API records "no template" on an existing row.
+        description: description ?? "",
+        price: Number(price) * 100 || 0,
+        ...(durationMinutes ? { durationMinutes: Number(durationMinutes) } : { durationMinutes: 0 }),
+        templateId: templateId ?? "",
+      },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return submission.reply({
+        formErrors: [(err as Record<string, string>)?.message || m.settings_services_error_update_failed()],
+      });
+    }
+    return { ok: true, intent: "update-service" as const };
   } else if (intent === "toggle-service") {
     const id = String(form.get("id") ?? "");
     const active = form.get("active") === "true";
@@ -201,21 +230,23 @@ export default function SettingsServices() {
   const data = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const [showForm, setShowForm] = useState(false);
-  // Price stays in integer cents; a hidden `price` field carries dollars so
-  // Conform's zod schema (which multiplies by 100) sees the same contract.
-  const [priceCents, setPriceCents] = useState<number | null>(null);
+  /** Which row is open for editing — at most one, so its form owns its defaults. */
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   // Saving used to leave the form open with every value still in it, and the
   // new row appeared in the table below — so the panel looked like it had not
   // submitted, and a second Save created a duplicate service. Closing on
-  // success unmounts the form, which is also what clears the uncontrolled
-  // inputs; the new row in the table is the confirmation.
-  const created = didCreateService(actionData);
+  // success unmounts the form, which is also what clears the inputs; the new
+  // (or changed) row in the table is the confirmation.
+  const created = didSaveService(actionData, "create-service");
   useEffect(() => {
-    if (!created) return;
-    setShowForm(false);
-    setPriceCents(null);
+    if (created) setShowForm(false);
   }, [created]);
+
+  const updated = didSaveService(actionData, "update-service");
+  useEffect(() => {
+    if (updated) setEditingId(null);
+  }, [updated]);
 
   // Conform owns only the create-service form. The toggle-service form posts
   // hidden fields only (no text validation), so it stays a plain <Form>. Guard
@@ -231,6 +262,7 @@ export default function SettingsServices() {
 
   if ("forbidden" in data) return <AccessDenied />;
   const { services, discounts, restrictionMap, members, templates } = data;
+  const editingService = services.find((s) => s.id === editingId) ?? null;
 
   return (
     <div className="space-y-ih-list">
@@ -258,88 +290,14 @@ export default function SettingsServices() {
           className="bg-ih-bg-card border border-ih-border rounded-lg p-4 space-y-3"
         >
           <input type="hidden" name="intent" value="create-service" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label htmlFor={fields.name.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_name_label()}</label>
-              <input
-                type="text" id={fields.name.id} name={fields.name.name}
-                placeholder={m.settings_services_name_placeholder()}
-                aria-invalid={fields.name.errors ? true : undefined}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-              />
-              {fields.name.errors && (
-                <p className="mt-1 text-xs text-ih-bad-fg">{fields.name.errors[0]}</p>
-              )}
-            </div>
-            <div>
-              <label htmlFor={fields.description.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_description_label()}</label>
-              <input
-                type="text" id={fields.description.id} name={fields.description.name}
-                placeholder={m.settings_services_description_placeholder()}
-                aria-invalid={fields.description.errors ? true : undefined}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-              />
-              {fields.description.errors && (
-                <p className="mt-1 text-xs text-ih-bad-fg">{fields.description.errors[0]}</p>
-              )}
-            </div>
-            <div>
-              <label htmlFor={fields.price.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_price_label()}</label>
-              <MoneyInput
-                id={fields.price.id}
-                cents={priceCents}
-                onChange={setPriceCents}
-                ariaLabel={m.settings_services_price_label()}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-              />
-              <input type="hidden" name={fields.price.name} value={priceCents == null ? "" : String(priceCents / 100)} />
-              {fields.price.errors && (
-                <p className="mt-1 text-xs text-ih-bad-fg">{fields.price.errors[0]}</p>
-              )}
-            </div>
-            {/* Duration — the catalog table has a column for it and public
-                booking sums it across the chosen services to size the
-                appointment. Nothing could set it before, so every row read
-                "Not set" and every booking used the generic slot length. */}
-            <div>
-              <label htmlFor={fields.durationMinutes.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_duration_label()}</label>
-              <input
-                type="number" min={5} step={5} inputMode="numeric"
-                id={fields.durationMinutes.id} name={fields.durationMinutes.name}
-                placeholder={m.settings_services_duration_placeholder()}
-                aria-invalid={fields.durationMinutes.errors ? true : undefined}
-                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
-              />
-              {fields.durationMinutes.errors && (
-                <p className="mt-1 text-xs text-ih-bad-fg">{fields.durationMinutes.errors[0]}</p>
-              )}
-            </div>
-            {/* Report template — a booking that selects services builds one
-                inspection per service from that service's template, so a blank
-                one fails the whole booking with "Service 'X' has no template
-                configured." The picker is the only way to prevent that. */}
-            <div>
-              <label htmlFor={fields.templateId.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_template_label()}</label>
-              <Select
-                bare
-                id={fields.templateId.id}
-                name={fields.templateId.name}
-                defaultValue=""
-                aria-label={m.settings_services_template_label()}
-                options={[
-                  { value: "", label: m.settings_services_template_none() },
-                  ...templates.map((t) => ({ value: t.id, label: t.name })),
-                ]}
-              />
-            </div>
-          </div>
+          <ServiceFields fields={fields} templates={templates} />
           {form.errors && (
             <div className="px-3 py-2 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg">
               {form.errors[0]}
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => { setShowForm(false); setPriceCents(null); }} className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
+            <button type="button" onClick={() => setShowForm(false)} className="h-8 px-3 rounded-md border border-ih-border text-[13px] font-medium text-ih-fg-2 hover:bg-ih-bg-muted transition-colors">
               {m.common_cancel()}
             </button>
             <button type="submit" className="h-8 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 transition-colors">
@@ -349,12 +307,25 @@ export default function SettingsServices() {
         </Form>
       )}
 
+      {/* Editing an existing service — mounted for one row at a time, above the
+          table, in the same slot as the create form so both saves land in the
+          same place on screen. */}
+      {editingService && (
+        <ServiceEditForm
+          service={editingService}
+          templates={templates}
+          onCancel={() => setEditingId(null)}
+        />
+      )}
+
       {/* Services table */}
       <ServicesCatalogPanel
         services={services}
         restrictionMap={restrictionMap}
         members={members}
         templateNames={Object.fromEntries(templates.map((t) => [t.id, t.name]))}
+        editingId={editingId}
+        onEdit={setEditingId}
       />
 
       {/* Discount codes */}

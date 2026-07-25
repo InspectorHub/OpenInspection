@@ -192,3 +192,17 @@ export function makeCreateServiceSchema() {
   });
 }
 
+/**
+ * Editing an existing service: the same fields, plus which service.
+ *
+ * Extended rather than restated so the two forms cannot drift into disagreeing
+ * about what a valid duration is — the create form gained that bound because a
+ * slipped decimal point sizes a booking window absurdly, and the edit form is
+ * where an existing bad value would be corrected.
+ */
+export function makeUpdateServiceSchema() {
+  return makeCreateServiceSchema().extend({
+    id: z.string().min(1, m.validation_service_id_required()),
+  });
+}
+

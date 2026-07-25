@@ -27,6 +27,9 @@ interface ServicesCatalogPanelProps {
   members: Member[];
   /** templateId → template name, for naming the template each service builds from. */
   templateNames: Record<string, string>;
+  /** The row whose edit form is open, so its own Edit reads as the way back. */
+  editingId?: string | null;
+  onEdit?: (id: string | null) => void;
 }
 
 /** "1 hr 30 min" / "1 hr" / "45 min", or "Not set" when the service carries none. */
@@ -38,7 +41,14 @@ function durationLabel(minutes: number | null): string {
   return m.settings_services_duration_m({ minutes: split.minutes });
 }
 
-export function ServicesCatalogPanel({ services, restrictionMap, members, templateNames }: ServicesCatalogPanelProps) {
+export function ServicesCatalogPanel({
+  services,
+  restrictionMap,
+  members,
+  templateNames,
+  editingId = null,
+  onEdit,
+}: ServicesCatalogPanelProps) {
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
       <Table<Service>
@@ -106,15 +116,29 @@ export function ServicesCatalogPanel({ services, restrictionMap, members, templa
           {
             label: m.settings_services_col_actions(),
             align: "right",
+            // Both of a row's actions live in the ACTIONS column. Edit used to
+            // sit inside the NAME cell — and edited only the qualified-inspector
+            // list, which is now labelled for what it does.
             cell: (svc) => (
-              <Form method="post" className="inline">
-                <input type="hidden" name="intent" value="toggle-service" />
-                <input type="hidden" name="id" value={svc.id} />
-                <input type="hidden" name="active" value={String(svc.active)} />
-                <button type="submit" className="text-[12px] font-semibold text-ih-primary hover:underline">
-                  {svc.active ? m.settings_services_deactivate() : m.settings_services_activate()}
-                </button>
-              </Form>
+              <div className="flex items-center justify-end gap-3">
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(editingId === svc.id ? null : svc.id)}
+                    className="text-[12px] font-semibold text-ih-primary hover:underline"
+                  >
+                    {editingId === svc.id ? m.common_cancel() : m.settings_services_edit()}
+                  </button>
+                )}
+                <Form method="post" className="inline">
+                  <input type="hidden" name="intent" value="toggle-service" />
+                  <input type="hidden" name="id" value={svc.id} />
+                  <input type="hidden" name="active" value={String(svc.active)} />
+                  <button type="submit" className="text-[12px] font-semibold text-ih-primary hover:underline">
+                    {svc.active ? m.settings_services_deactivate() : m.settings_services_activate()}
+                  </button>
+                </Form>
+              </div>
             ),
           },
         ]}

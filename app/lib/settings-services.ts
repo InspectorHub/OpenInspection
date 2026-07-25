@@ -45,16 +45,20 @@ export function serviceIsBookable(svc: TemplateBearing): boolean {
 }
 
 /**
- * Did THIS action result come from a successful create-service?
+ * Did THIS action result come from the named save succeeding?
  *
  * The route's action answers `{ ok: true }` from the toggle-service branch and
  * from its fallback, and a Conform validation failure replies with a `status`
- * field instead. The create form closes and clears on success, so it has to
- * recognise its own result specifically: closing on a bare `{ ok: true }` would
- * throw away whatever the admin had typed the moment they toggled another row.
+ * field instead. Each form closes on success, so it has to recognise its OWN
+ * result: closing on a bare `{ ok: true }` would throw away whatever the admin
+ * had typed the moment they toggled another row, and a create form that closed
+ * on an update's result (or the reverse) would do the same.
  */
-export function didCreateService(actionData: unknown): boolean {
+export function didSaveService(
+    actionData: unknown,
+    intent: "create-service" | "update-service",
+): boolean {
     if (!actionData || typeof actionData !== "object") return false;
     const d = actionData as { ok?: unknown; intent?: unknown };
-    return d.ok === true && d.intent === "create-service";
+    return d.ok === true && d.intent === intent;
 }

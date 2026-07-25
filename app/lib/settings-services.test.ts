@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { splitDurationMinutes, serviceIsBookable, didCreateService } from "~/lib/settings-services";
-import { makeCreateServiceSchema } from "~/lib/forms/settings.schema";
+import { splitDurationMinutes, serviceIsBookable, didSaveService } from "~/lib/settings-services";
+import { makeCreateServiceSchema, makeUpdateServiceSchema } from "~/lib/forms/settings.schema";
 
 /**
  * The services catalog asks for three things the product actually consumes, and
@@ -47,18 +47,53 @@ describe("serviceIsBookable", () => {
     });
 });
 
-describe("didCreateService", () => {
+describe("didSaveService", () => {
     it("recognises its own create result and nothing else", () => {
-        expect(didCreateService({ ok: true, intent: "create-service" })).toBe(true);
+        expect(didSaveService({ ok: true, intent: "create-service" }, "create-service")).toBe(true);
         // The toggle-service branch and the action's fallback both answer
         // { ok: true }. Closing the open create form on either of those would
         // discard whatever the admin had typed.
-        expect(didCreateService({ ok: true })).toBe(false);
-        expect(didCreateService({ ok: true, intent: "qualification-save" })).toBe(false);
-        expect(didCreateService({ ok: false, intent: "create-service" })).toBe(false);
+        expect(didSaveService({ ok: true }, "create-service")).toBe(false);
+        expect(didSaveService({ ok: true, intent: "qualification-save" }, "create-service")).toBe(false);
+        expect(didSaveService({ ok: false, intent: "create-service" }, "create-service")).toBe(false);
         // A Conform failure reply, and no submission at all.
-        expect(didCreateService({ status: "error" })).toBe(false);
-        expect(didCreateService(undefined)).toBe(false);
+        expect(didSaveService({ status: "error" }, "create-service")).toBe(false);
+        expect(didSaveService(undefined, "create-service")).toBe(false);
+    });
+
+    // Two forms can be on screen at once (create above the table, edit for one
+    // row). Each must close on its own result only, or saving a row would
+    // discard a half-typed new service.
+    it("does not confuse the two saves for each other", () => {
+        expect(didSaveService({ ok: true, intent: "update-service" }, "update-service")).toBe(true);
+        expect(didSaveService({ ok: true, intent: "update-service" }, "create-service")).toBe(false);
+        expect(didSaveService({ ok: true, intent: "create-service" }, "update-service")).toBe(false);
+    });
+});
+
+describe("makeUpdateServiceSchema", () => {
+    const parse = (input: Record<string, unknown>) => makeUpdateServiceSchema().safeParse(input);
+
+    it("carries which service is being saved", () => {
+        const r = parse({ id: "svc-1", name: "Roof", price: "350", durationMinutes: "90", templateId: "tpl-1" });
+        expect(r.success).toBe(true);
+        if (r.success) expect(r.data.id).toBe("svc-1");
+    });
+
+    it("refuses a save with no service id, rather than creating something", () => {
+        expect(parse({ name: "Roof", price: "350" }).success).toBe(false);
+        expect(parse({ id: "", name: "Roof", price: "350" }).success).toBe(false);
+    });
+
+    it("holds every field the create form validates, so the two cannot drift", () => {
+        // An out-of-range duration is exactly the value an edit would be fixing.
+        expect(parse({ id: "svc-1", name: "Roof", durationMinutes: "1800" }).success).toBe(false);
+        expect(parse({ id: "svc-1", name: "", price: "350" }).success).toBe(false);
+    });
+
+    it("accepts clearing the template, which is a real intent", () => {
+        const r = parse({ id: "svc-1", name: "Roof", price: "350", templateId: "" });
+        expect(r.success).toBe(true);
     });
 });
 
