@@ -9,31 +9,12 @@
  */
 import type { Defect } from "../RepairBuilderSection";
 import { MoneyInput } from "~/components/MoneyInput";
+import { RepairDefectRowView } from "./RepairDefectRowView";
 import { m } from "~/paraglide/messages";
 
 interface ItemDraft {
   requestedCreditCents: number | null;
   note: string;
-}
-
-// IA-60 — the category pill was hardcoded English on a client-facing surface.
-// Resolved at call time (not module load) so paraglide's ALS locale scope is
-// active, matching recommendations.tsx groupLabel().
-function categoryLabel(cat: Defect["category"]): string {
-  switch (cat) {
-    case "safety":
-      return m.portal_repair_category_safety();
-    case "recommendation":
-      return m.portal_repair_category_recommendation();
-    default:
-      return m.portal_repair_category_maintenance();
-  }
-}
-
-function categoryClass(cat: Defect["category"]): string {
-  if (cat === "safety") return "bg-ih-bad-bg text-ih-bad-fg";
-  if (cat === "recommendation") return "bg-ih-info-bg text-ih-info-fg";
-  return "bg-ih-bg-muted text-ih-fg-3";
 }
 
 interface RepairDefectRowProps {
@@ -80,32 +61,14 @@ export function RepairDefectRow({
             </svg>
           )}
         </span>
-        <span className="flex-1 min-w-0">
-          {/* IA-55 — the defect's own title distinguishes two defects on one
-              item; the item + section give context, and location helps a
-              contractor find it. */}
-          <span className="block text-[13px] font-semibold text-ih-fg-1">
-            {defect.defectTitle || defect.itemLabel}
-          </span>
-          <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-            {defect.itemLabel} &middot; {defect.sectionTitle}
-          </span>
-          {defect.location && (
-            <span className="block text-[12px] text-ih-fg-4 mt-0.5">
-              {m.repair_defect_location_prefix()} {defect.location}
-            </span>
-          )}
-          {defect.comment && (
-            <span className="block text-[12px] text-ih-fg-4 mt-0.5 line-clamp-2">
-              {defect.comment}
-            </span>
-          )}
-        </span>
-        <span
-          className={`inline-flex items-center h-5 px-2 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 ml-2 ${categoryClass(defect.category)}`}
-        >
-          {categoryLabel(defect.category)}
-        </span>
+        <RepairDefectRowView
+          sectionTitle={defect.sectionTitle}
+          itemLabel={defect.itemLabel}
+          defectTitle={defect.defectTitle}
+          location={defect.location}
+          comment={defect.comment}
+          category={defect.category}
+        />
       </button>
 
       {/* Expanded credit + note */}

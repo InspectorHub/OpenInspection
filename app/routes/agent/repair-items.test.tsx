@@ -108,3 +108,33 @@ describe("AgentRepairItemsPage property grouping", () => {
     expect(await findByText(/no repair items/i)).toBeTruthy();
   });
 });
+
+describe("AgentRepairItemsPage renders the shared client row", () => {
+  it("shows the item label and the defect photos the API already returns", async () => {
+    const { findByTestId } = renderPage([
+      {
+        ...BASE,
+        inspectionId: "i1",
+        photos: ["t/inspections/i1/photos/a.jpg", "t/inspections/i1/photos/b.jpg"],
+      },
+    ]);
+
+    const block = await findByTestId("repair-inspection-i1");
+    // itemLabel reaches the screen (it was in the payload but never rendered).
+    expect(block.textContent).toContain("Shingles");
+
+    const imgs = block.querySelectorAll("img");
+    expect(imgs).toHaveLength(2);
+    // Photos resolve through the AGENT auth path — never the client cookie or
+    // portal-token photo routes, which reject an agent session.
+    expect(imgs[0].getAttribute("src")).toContain("/api/agent/inspections/i1/photo");
+    expect(imgs[0].getAttribute("src")).toContain(encodeURIComponent("t/inspections/i1/photos/a.jpg"));
+  });
+
+  it("shows no credit input — the agent view is read-only", async () => {
+    const { findByTestId } = renderPage([{ ...BASE, inspectionId: "i1" }]);
+    const block = await findByTestId("repair-inspection-i1");
+    expect(block.querySelectorAll("input")).toHaveLength(0);
+    expect(block.querySelectorAll("textarea")).toHaveLength(0);
+  });
+});

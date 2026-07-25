@@ -5,6 +5,10 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader } from "@core/shared-ui";
 import { propertyGroupKey, inspectionDateValue } from "~/lib/property-groups";
+import {
+  RepairDefectRowView,
+  type RepairDefectPhoto,
+} from "~/components/portal/sections/repair/RepairDefectRowView";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -56,24 +60,16 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 }
 
-function categoryLabel(category: string): string {
-  switch (category) {
-    case "safety":
-      return m.agent_portal_repair_group_safety();
-    case "maintenance":
-      return m.agent_portal_repair_group_maintenance();
-    case "recommendation":
-      return m.agent_portal_repair_group_recommendation();
-    default:
-      // A tenant custom category: show the tenant's own word, not a bucket name.
-      return category;
-  }
-}
-
-function categoryClass(category: string): string {
-  if (category === "safety") return "bg-ih-bad-bg text-ih-bad-fg";
-  if (category === "maintenance") return "bg-ih-bg-muted text-ih-fg-3";
-  return "bg-ih-info-bg text-ih-info-fg";
+/**
+ * Defect photo keys resolve through the AGENT photo route. The editor route is
+ * tenant-staff-only and the public one wants a portal token — an agent session
+ * satisfies neither, so pointing at either silently renders broken images.
+ */
+function agentPhotos(row: RepairItemRow): RepairDefectPhoto[] {
+  return (row.photos ?? []).map((key) => ({
+    key,
+    url: `/api/agent/inspections/${row.inspectionId}/photo?key=${encodeURIComponent(key)}&w=320`,
+  }));
 }
 
 interface InspectionBlock {
@@ -191,38 +187,18 @@ export default function AgentRepairItemsPage() {
                   {block.rows.map((row, i) => (
                     <div
                       key={`${row.inspectionId}-${row.defectTitle}-${i}`}
-                      className="p-4 border border-ih-border rounded-md bg-ih-bg-app/30"
+                      className="flex items-start gap-3 p-4 border border-ih-border rounded-md bg-ih-bg-app/30"
                     >
-                      <div className="flex items-start gap-2">
-                        <span className="flex-1 min-w-0">
-                          <span className="block text-[13px] font-semibold text-ih-fg-1">
-                            {row.defectTitle}
-                          </span>
-                          <span className="block text-[12px] text-ih-fg-3 mt-0.5">
-                            {row.itemLabel} &middot; {row.sectionTitle}
-                          </span>
-                          {row.location && (
-                            <span className="block text-[12px] text-ih-fg-4 mt-0.5">{row.location}</span>
-                          )}
-                          {row.comment && (
-                            <span className="block text-[12px] text-ih-fg-4 mt-1 leading-relaxed">
-                              {row.comment}
-                            </span>
-                          )}
-                        </span>
-                        <span className="flex items-center gap-1.5 shrink-0">
-                          {row.isCustom && (
-                            <span className="text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5 bg-ih-bg-muted text-ih-fg-3">
-                              {m.agent_portal_repair_inspector_added()}
-                            </span>
-                          )}
-                          <span
-                            className={`inline-flex items-center h-5 px-2 rounded text-[10px] font-bold uppercase tracking-wider ${categoryClass(row.category)}`}
-                          >
-                            {categoryLabel(row.category)}
-                          </span>
-                        </span>
-                      </div>
+                      <RepairDefectRowView
+                        sectionTitle={row.sectionTitle}
+                        itemLabel={row.itemLabel}
+                        defectTitle={row.defectTitle}
+                        location={row.location}
+                        comment={row.comment}
+                        category={row.category}
+                        isCustom={row.isCustom}
+                        photos={agentPhotos(row)}
+                      />
                     </div>
                   ))}
                 </div>

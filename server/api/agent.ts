@@ -24,6 +24,7 @@ import {
 } from '../lib/validations/agent.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
+import agentPhotoRoutes from './agent/photo';
 
 /**
  * GET /api/agents/my-reports
@@ -233,6 +234,8 @@ const inspectorsRoute = createRoute(withMcpMetadata({
 }, { scopes: ['agent'], tier: 'extended' }));
 
 const agentRoutes = createApiRouter()
+    // Byte-serving lives in its own module (file-size ratchet on this one).
+    .route('/', agentPhotoRoutes)
     .openapi(getReportsRoute, async (c) => {
         // Move RBAC check inside to fix OpenAPIHono type inference issues with context
         await requireRole('manager')(c, async () => {});

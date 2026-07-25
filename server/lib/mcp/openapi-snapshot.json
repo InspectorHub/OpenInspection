@@ -15559,6 +15559,63 @@
     "description": "Auto-generated placeholder for sendTenant (POST /agreements/send, admin domain). TODO: replace with a real description sourced from the handler."
   },
   {
+    "operationId": "serveAgentInspectionPhoto",
+    "method": "GET",
+    "pathTemplate": "/api/agent/inspections/{id}/photo",
+    "scopes": [
+      "agent"
+    ],
+    "tag": "agents",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the agent was referred on.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id the agent was referred on."
+          }
+        },
+        {
+          "name": "key",
+          "in": "query",
+          "required": true,
+          "description": "R2 object key (`${tenantId}/inspections/${inspectionId}/...`).",
+          "schema": {
+            "type": "string",
+            "description": "R2 object key (`${tenantId}/inspections/${inspectionId}/...`)."
+          }
+        },
+        {
+          "name": "w",
+          "in": "query",
+          "required": false,
+          "description": "Optional max width in px for an on-the-fly thumbnail.",
+          "schema": {
+            "type": "string",
+            "description": "Optional max width in px for an on-the-fly thumbnail."
+          }
+        },
+        {
+          "name": "download",
+          "in": "query",
+          "required": false,
+          "description": "Set to \"1\" to force an attachment download.",
+          "schema": {
+            "type": "string",
+            "description": "Set to \"1\" to force an attachment download."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Serve a defect photo to an associated agent",
+    "description": "Streams a defect photo from R2 to an agent associated with the inspection. 404 when the agent has no association or the key falls outside that tenant + inspection."
+  },
+  {
     "operationId": "serveInspectionPhoto",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}/photo",
