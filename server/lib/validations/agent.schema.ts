@@ -113,6 +113,8 @@ const RecommendationRowSchema = z.object({
     // addresses that inspection's repair share channel.
     tenantName:      z.string().describe('Owning inspection company name.'),
     tenantSlug:      z.string().describe('Owning inspection company slug (addresses the repair share channel).'),
+    // The portal offers only what the API would allow (IA-35).
+    repairAccess:    z.enum(['off', 'read', 'readwrite']).describe("This company's policy for agents on its repair list."),
     propertyAddress: z.string().describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
     inspectionDate:  z.string().describe('TODO describe inspectionDate field for the OpenInspection MCP integration'),
     sectionTitle:    z.string().describe('TODO describe sectionTitle field for the OpenInspection MCP integration'),
@@ -151,6 +153,8 @@ export const AgentReferralRowSchema = z.object({
     status:          z.string().describe('Inspection lifecycle status.'),
     reportStatus:    z.string().nullable().describe('Report lifecycle status (published = repair builder available).'),
     inspectorName:   z.string().nullable().describe('Assigned inspector name.'),
+    // The portal offers only what the API would allow (IA-35).
+    repairAccess:    z.enum(['off', 'read', 'readwrite']).describe("This company's policy for agents on its repair list."),
 });
 
 // C-10 ③-C — row shape for GET /api/agent/inspectors.

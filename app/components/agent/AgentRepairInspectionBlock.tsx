@@ -17,10 +17,13 @@ import { useState } from "react";
 import { useFetcher } from "react-router";
 import { RepairDefectRowView, type RepairDefectPhoto } from "~/components/portal/sections/repair/RepairDefectRowView";
 import { RepairSharePanel } from "~/components/portal/sections/repair/RepairSharePanel";
+import { agentMayWriteRepairList, type AgentRepairAccess } from "~/lib/agent-repair-access";
 import { m } from "~/paraglide/messages";
 
 export interface AgentRepairRow {
   inspectionId: string;
+  /** This company's policy for agents on its repair list (IA-35). */
+  repairAccess: AgentRepairAccess;
   sectionTitle: string;
   itemLabel: string;
   defectTitle: string;
@@ -41,6 +44,8 @@ export interface AgentRepairInspectionBlockProps {
   inspectionId: string;
   tenantName: string;
   tenantSlug: string;
+  /** This company's policy for agents on its repair list (IA-35). */
+  repairAccess: AgentRepairAccess;
   rows: AgentRepairRow[];
   photosFor: (row: AgentRepairRow) => RepairDefectPhoto[];
 }
@@ -49,6 +54,7 @@ export function AgentRepairInspectionBlock({
   inspectionId,
   tenantName,
   tenantSlug,
+  repairAccess,
   rows,
   photosFor,
 }: AgentRepairInspectionBlockProps) {
@@ -96,7 +102,9 @@ export function AgentRepairInspectionBlock({
     <div data-testid={`repair-inspection-${inspectionId}`} className="p-5 space-y-3">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] font-bold text-ih-fg-4 uppercase tracking-widest">{tenantName}</p>
-        {!shareToken && (
+        {/* Sharing creates a repair_requests row, which the API refuses under
+            `read` and `off` — so the action only exists where it can succeed. */}
+        {!shareToken && agentMayWriteRepairList(repairAccess) && (
           <button
             type="button"
             data-testid={`repair-share-${inspectionId}`}

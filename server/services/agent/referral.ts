@@ -9,6 +9,7 @@ import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { REPORT_STATUS } from '../../lib/status/report-status';
+import { resolveAgentRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
 
 // Task 9c — the CLIENT role join, aliased so it can coexist in the same query
 // as the buyer_agent join (contactRoleProfiles/inspectionPeople/contacts,
@@ -40,6 +41,8 @@ export interface AgentReferralRow {
     reportStatus: string | null;
     paymentStatus: string;
     inspectorName: string | null;
+    /** This company's policy for agents on its repair list. */
+    repairAccess: AgentRepairAccess;
 }
 
 export interface AgentInspectorRow {
@@ -105,6 +108,9 @@ export async function listReferrals(
             tenantName:      tenants.name,
             tenantSlug: tenants.slug,
             tenantTimezone:  tenantConfigs.defaultTimezone,
+            // Whether this company lets agents open / build its repair list;
+            // the portal offers only what the API would allow (IA-35).
+            inspectionPrefs: tenantConfigs.inspectionPrefs,
             propertyAddress: inspections.propertyAddress,
             // Task 9c — sourced via the client-role inspection_people join
             // below, NOT the legacy inspections.client_name column (which
@@ -220,6 +226,7 @@ export async function listReferrals(
         tenantName:      r.tenantName,
         tenantSlug: r.tenantSlug,
         tenantTimezone:  r.tenantTimezone ?? 'UTC',
+        repairAccess:    resolveAgentRepairAccess(r.inspectionPrefs),
         propertyAddress: r.propertyAddress,
         clientName:      r.clientName ?? null,
         date:            r.date,
@@ -328,6 +335,7 @@ export async function listRecommendationsForAgent(
             tenantId:          inspections.tenantId,
             tenantName:        tenants.name,
             tenantSlug:        tenants.slug,
+            inspectionPrefs:   tenantConfigs.inspectionPrefs,
             propertyAddress:   inspections.propertyAddress,
             date:              inspections.date,
             templateSnapshot:  inspections.templateSnapshot,
@@ -346,6 +354,9 @@ export async function listRecommendationsForAgent(
             ),
         )
         .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
+        // Left join: a company with no config row falls back to the policy
+        // default in resolveAgentRepairAccess.
+        .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, inspections.tenantId))
         // Buyer's-agent attribution via inspection_people — see listReferrals
         // above for why contact_role_profiles is joined before
         // inspection_people (avoids fanning out over every role).
@@ -392,6 +403,7 @@ export async function listRecommendationsForAgent(
         id:               r.id,
         tenantName:       r.tenantName,
         tenantSlug:       r.tenantSlug,
+        repairAccess:     resolveAgentRepairAccess(r.inspectionPrefs),
         propertyAddress:  r.propertyAddress,
         date:             r.date,
         templateSnapshot: r.templateSnapshot,

@@ -18,6 +18,7 @@ interface Row {
   inspectionId: string;
   tenantName: string;
   tenantSlug: string;
+  repairAccess: "off" | "read" | "readwrite";
   propertyAddress: string | null;
   inspectionDate: string | null;
   sectionTitle: string;
@@ -34,6 +35,7 @@ const BASE: Row = {
   inspectionId: "i1",
   tenantName: "Acme Inspections",
   tenantSlug: "acme",
+  repairAccess: "readwrite",
   propertyAddress: "123 Main St",
   inspectionDate: "2026-07-18",
   sectionTitle: "Roof",
@@ -192,6 +194,16 @@ describe("AgentRepairItemsPage delivery outlet", () => {
   it("keeps print as a secondary outlet", async () => {
     const { findByText } = renderPage([{ ...BASE }]);
     expect(await findByText(/print/i)).toBeTruthy();
+  });
+
+  it("offers no share action when the company forbids agents from building lists", async () => {
+    // The share action creates a repair_requests row, which read-only and off
+    // both refuse server-side — offering the button would only produce a 403.
+    const { findByTestId } = renderPage([{ ...BASE, inspectionId: "i1", repairAccess: "read" }]);
+    const block = await findByTestId("repair-inspection-i1");
+    expect(block.querySelector("[data-testid='repair-share-i1']")).toBeNull();
+    // The items themselves are still readable.
+    expect(block.textContent).toContain("Missing shingles");
   });
 });
 

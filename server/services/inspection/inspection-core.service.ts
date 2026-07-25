@@ -1,5 +1,6 @@
 import { eq, and, or, lt, gte, lte, sql, inArray, desc } from 'drizzle-orm';
 import { inspections, inspectionResults, templates, users, services, inspectionServices, tenantConfigs, agreementRequests, reportVersions, contactRoleProfiles, inspectionPeople } from '../../lib/db/schema';
+import { resolveAgentRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
 import { contacts } from '../../lib/db/schema/contact';
 import { PeopleService } from '../people.service';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
@@ -86,13 +87,15 @@ export class InspectionCoreService extends InspectionSubService {
      * repair request list (`off` / `read` / `readwrite`). Stored in the
      * inspectionPrefs JSON; absent → `readwrite` (see the schema default).
      */
-    async getAgentRepairAccess(tenantId: string): Promise<'off' | 'read' | 'readwrite'> {
+    async getAgentRepairAccess(tenantId: string): Promise<AgentRepairAccess> {
         const db = this.getDrizzle();
         const row = await db.select({ prefs: tenantConfigs.inspectionPrefs })
             .from(tenantConfigs)
             .where(eq(tenantConfigs.tenantId, tenantId))
             .get();
-        return row?.prefs?.agentRepairAccess ?? 'readwrite';
+        // Shared with the agent portal, which decides what to OFFER from the
+        // same answer this enforces.
+        return resolveAgentRepairAccess(row?.prefs);
     }
 
     /**

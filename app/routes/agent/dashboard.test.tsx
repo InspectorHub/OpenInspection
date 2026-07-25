@@ -19,6 +19,7 @@ import AgentDashboardPage from "~/routes/agent/dashboard";
 
 const REFERRAL_I1 = {
   id: "i1",
+  repairAccess: "readwrite" as const,
   tenantName: "Acme Inspections",
   tenantSlug: "acme",
   tenantTimezone: "UTC",
@@ -32,6 +33,7 @@ const REFERRAL_I1 = {
 
 const REFERRAL_I2 = {
   id: "i2",
+  repairAccess: "readwrite" as const,
   tenantName: "Acme Inspections",
   tenantSlug: "acme",
   tenantTimezone: "UTC",
@@ -258,5 +260,31 @@ describe("AgentDashboardPage property/transaction grouping (IA-51)", () => {
     });
     await findByTestId("referral-row-a");
     expect(queryByLabelText("Filter referrals by company")).toBeNull();
+  });
+});
+
+describe("AgentDashboardPage respects the company's agent repair policy (IA-35)", () => {
+  it("offers the repair builder when the company allows agents to build lists", async () => {
+    const { findByTestId } = renderDashboard({
+      referrals: [{ ...REFERRAL_I1, repairAccess: "readwrite" }],
+    });
+    const row = await findByTestId("referral-row-i1");
+    expect(row.textContent).toContain("Build repair request");
+  });
+
+  it("hides it when the company turned agent access off — the API would refuse anyway", async () => {
+    const { findByTestId } = renderDashboard({
+      referrals: [{ ...REFERRAL_I1, repairAccess: "off" }],
+    });
+    const row = await findByTestId("referral-row-i1");
+    expect(row.textContent).not.toContain("Build repair request");
+  });
+
+  it("still links a read-only agent to the list they may open", async () => {
+    const { findByTestId } = renderDashboard({
+      referrals: [{ ...REFERRAL_I1, repairAccess: "read" }],
+    });
+    const row = await findByTestId("referral-row-i1");
+    expect(row.textContent).toContain("Build repair request");
   });
 });

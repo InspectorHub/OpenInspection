@@ -6,6 +6,7 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, Banner, Select } from "@core/shared-ui";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { propertyGroupKey, inspectionDateValue } from "~/lib/property-groups";
+import { agentMayReadRepairList, type AgentRepairAccess } from "~/lib/agent-repair-access";
 import { useAgentTimeZoneOverride } from "~/routes/agent-layout";
 import { m } from "~/paraglide/messages";
 
@@ -25,6 +26,8 @@ interface Referral {
  status: string;
  reportStatus: string | null;
  inspectorName: string | null;
+ /** This company's policy for agents on its repair list (IA-35). */
+ repairAccess: AgentRepairAccess;
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -218,7 +221,9 @@ export default function AgentDashboardPage() {
  </p>
  </div>
  <div className="flex items-center gap-2 shrink-0">
- {r.reportStatus === "published" && r.tenantSlug && (
+ {/* Offer the builder only when this company lets agents in: the
+ same policy the API enforces, so the link cannot lead to a 403. */}
+ {r.reportStatus === "published" && r.tenantSlug && agentMayReadRepairList(r.repairAccess) && (
  <Link
  to={`/repair-builder/${r.tenantSlug}/${r.id}`}
  className="inline-flex items-center h-6 px-2 rounded border border-ih-border text-[11px] font-semibold text-ih-fg-3 hover:bg-ih-bg-muted transition-colors"

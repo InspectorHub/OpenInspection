@@ -9,6 +9,7 @@
 // override the canned default; same for photos.
 
 import type { DefectCategory } from '../types/template-schema';
+import type { AgentRepairAccess } from '../lib/people/agent-repair-access';
 import { readItemDefectStates, readItemEntry } from '../lib/read-item-defects';
 import type { ResultsProjection, DefectState } from '../lib/collab/results-doc.types';
 
@@ -18,6 +19,8 @@ export interface AgentRecommendationRow {
     // inline; the slug also addresses the per-inspection repair share channel.
     tenantName:      string;
     tenantSlug:      string;
+    /** This company's policy for agents on its repair list (IA-35). */
+    repairAccess:    AgentRepairAccess;
     propertyAddress: string;
     inspectionDate:  string;
     sectionTitle:    string;
@@ -56,6 +59,7 @@ export interface RawInspectionForRecommendations {
     id:               string;
     tenantName:       string;
     tenantSlug:       string;
+    repairAccess:     AgentRepairAccess;
     propertyAddress:  string;
     date:             string;
     templateSnapshot: unknown;
@@ -114,6 +118,7 @@ export function flattenInspectionToRecommendations(
                     inspectionId:    insp.id,
                     tenantName:      insp.tenantName,
                     tenantSlug:      insp.tenantSlug,
+                    repairAccess:    insp.repairAccess,
                     propertyAddress: insp.propertyAddress,
                     inspectionDate:  insp.date,
                     sectionTitle:    section.title,
@@ -138,6 +143,7 @@ export function flattenInspectionToRecommendations(
                     inspectionId:    insp.id,
                     tenantName:      insp.tenantName,
                     tenantSlug:      insp.tenantSlug,
+                    repairAccess:    insp.repairAccess,
                     propertyAddress: insp.propertyAddress,
                     inspectionDate:  insp.date,
                     sectionTitle:    section.title,

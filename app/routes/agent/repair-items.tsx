@@ -206,6 +206,7 @@ interface InspectionBlock {
   inspectionId: string;
   tenantName: string;
   tenantSlug: string;
+  repairAccess: AgentRepairRow["repairAccess"];
   date: string | null;
   rows: RepairItemRow[];
 }
@@ -238,6 +239,7 @@ export function groupByProperty(items: RepairItemRow[]): PropertySection[] {
         inspectionId: row.inspectionId,
         tenantName: row.tenantName,
         tenantSlug: row.tenantSlug,
+        repairAccess: row.repairAccess,
         date: row.inspectionDate,
         rows: [],
       };
@@ -315,6 +317,7 @@ export default function AgentRepairItemsPage() {
                   inspectionId={block.inspectionId}
                   tenantName={block.tenantName}
                   tenantSlug={block.tenantSlug}
+                  repairAccess={block.repairAccess}
                   rows={block.rows}
                   photosFor={agentPhotos}
                 />

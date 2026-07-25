@@ -26,6 +26,7 @@ function raw(resultsData: unknown): RawInspectionForRecommendations {
         id: 'insp-1',
         tenantName: 'Acme Inspections',
         tenantSlug: 'acme',
+        repairAccess: 'readwrite',
         propertyAddress: '1 Main St',
         date: '2026-06-01',
         templateSnapshot: snapshot,
@@ -81,7 +82,7 @@ const snap2 = {
     }],
 };
 const raw2 = (resultsData: unknown): RawInspectionForRecommendations =>
-    ({ id: 'i', tenantName: 'Acme Inspections', tenantSlug: 'acme', propertyAddress: 'A', date: 'd', templateSnapshot: snap2, resultsData });
+    ({ id: 'i', tenantName: 'Acme Inspections', tenantSlug: 'acme', repairAccess: 'readwrite', propertyAddress: 'A', date: 'd', templateSnapshot: snap2, resultsData });
 
 describe('flattenInspectionToRecommendations — custom defects + tenant categories (IA-41)', () => {
     it('surfaces field-added custom defects with isCustom=true', () => {
@@ -115,7 +116,7 @@ describe('flattenInspectionToRecommendations — custom defects + tenant categor
 describe('groupRecommendations — custom categories merge into recommendation (IA-41)', () => {
     const row = (category: string, isCustom = false): AgentRecommendationRow => ({
         inspectionId: 'i', tenantName: 'Acme Inspections', tenantSlug: 'acme',
-        propertyAddress: 'A', inspectionDate: 'd', sectionTitle: 'S',
+        repairAccess: 'readwrite', propertyAddress: 'A', inspectionDate: 'd', sectionTitle: 'S',
         itemLabel: 'I', defectTitle: 'D', category, comment: '', location: null, photos: [], isCustom,
     });
     it('files safety and maintenance directly; recommendation + any custom category merge into recommendation', () => {
