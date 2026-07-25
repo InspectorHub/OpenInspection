@@ -118,11 +118,18 @@ fi
 #    `parserOptions.project` names both tsconfigs, so any invocation builds the app
 #    program AND the api program before it checks a single line. Four parallel
 #    groups paid for that four times over, and quadrupled peak memory on a 16GB
-#    box. One process runs inside the 4GB ceiling set above — including commits
-#    that stage server/index.ts, which is exempt from type-aware rules precisely
-#    because no heap this machine can spare was enough (see eslint.config.js).
+#    box. `server/index.ts` is exempt from type-aware rules entirely, because no
+#    heap this machine can spare was enough for it (see eslint.config.js).
+#
+#    The heap below is the step's whole ceiling now that it is one process, and it
+#    has to be bigger than the global 4GB: the program build is a fixed cost, but
+#    each additional file's type instantiation is retained on top of it. A 4-file
+#    commit finishes in ~9s inside 4GB; a 17-file commit exhausted it after 103s
+#    and needed 6GB, where it takes ~147s. That is slower than four parallel groups
+#    would be on a large commit and faster on a small one — and it cannot die from
+#    one group happening to contain a big file, which the old shape did.
 step "Lint & Fix"
-if npx lint-staged; then
+if NODE_OPTIONS="--max-old-space-size=6144" npx lint-staged; then
     pass "Lint & Fix passed"
 else
     fail "Lint failed  →  npx lint-staged"

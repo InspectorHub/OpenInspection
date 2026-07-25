@@ -77,6 +77,7 @@
   "newinsp_conflict_suffix": "in this time slot. You can still schedule it.",
   "newinsp_schedule_date_label": "Date",
   "newinsp_schedule_time_label": "Time",
+  "newinsp_schedule_time_zone_hint": "Times are in {zone}, the workspace timezone.",
   "newinsp_schedule_holiday_advisory": "Scheduling on {name}. You can still save this inspection.",
   "newinsp_schedule_holiday_block": "Cannot schedule on {name} — company holidays are blocked.",
   "newinsp_schedule_holiday_block_generic": "Cannot schedule on a company closed day.",

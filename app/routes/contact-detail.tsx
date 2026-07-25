@@ -1,5 +1,6 @@
 import { useLoaderData, Link, isRouteErrorResponse, useRouteError } from "react-router";
 import type { Route } from "./+types/contact-detail";
+import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
@@ -73,6 +74,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 export default function ContactDetailPage() {
   const { detail } = useLoaderData<typeof loader>();
   const { contact, inspections, stats } = detail;
+  const displayTz = useDisplayTimeZone();
   const archived = !!contact.archivedAt;
 
   return (
@@ -206,7 +208,7 @@ export default function ContactDetailPage() {
                     {insp.propertyAddress || m.contacts_detail_untitled_inspection()}
                   </p>
                   <p className="text-[12px] text-ih-fg-3">
-                    {formatInspectionDateTime(insp.date)} &middot; {humanizeStatus(insp.status)}
+                    {formatInspectionDateTime(insp.date, undefined, displayTz)} &middot; {humanizeStatus(insp.status)}
                   </p>
                 </div>
                 <div className="text-right shrink-0">

@@ -5,6 +5,8 @@ import { PropertyStep } from "./new-inspection/PropertyStep";
 import { PeopleStep } from "./new-inspection/PeopleStep";
 import { ServicesStep } from "./new-inspection/ServicesStep";
 import { ScheduleStep } from "./new-inspection/ScheduleStep";
+import { civilToInstantISO } from "~/lib/civil-time";
+import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { TeamStep } from "./new-inspection/TeamStep";
 import { QuotaExceededPanel } from "./new-inspection/QuotaExceededPanel";
 import type { AddressSelection } from "~/routes/resources/places";
@@ -78,6 +80,10 @@ export function NewInspectionWizard({
   quotaExceededAtOpen?: string | null;
 }) {
   const fetcher = useFetcher();
+  // The zone the Schedule step names, and the zone the typed time is read in.
+  // Both must be the same value or the inspector is told one thing and the
+  // booking stores another.
+  const displayTz = useDisplayTimeZone();
   // IA-1 — dedicated fetcher for agent typeahead (B-17: per-intent convention,
   // separate fetcher prevents competing mutations from cancelling each other).
   const agentFetcher = useFetcher<{ intent: "search-agents"; agents: AgentResult[] }>();
@@ -241,7 +247,7 @@ export function NewInspectionWizard({
   // will be assigned to. Advisory only — never blocks.
   useEffect(() => {
     if (!date) return;
-    const combinedDate = `${date}T${time}:00Z`;
+    const combinedDate = civilToInstantISO(date, time, displayTz);
     const params = new URLSearchParams({ date: combinedDate });
     if (inspectorId) params.set("inspectorId", inspectorId);
     const t = setTimeout(() => {
@@ -401,6 +407,7 @@ export function NewInspectionWizard({
         serviceSelectionsJson,
         date,
         time,
+        timeZone: displayTz,
         soloMode: String(soloMode),
         inspectorId,
         // IA-1 People step fields
@@ -507,6 +514,7 @@ export function NewInspectionWizard({
               setTime={setTime}
               conflictFetcher={conflictFetcher}
               holidayFetcher={holidayFetcher}
+              timeZone={displayTz}
             />
           )}
 

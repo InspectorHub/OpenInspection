@@ -9,7 +9,7 @@ import type { WizardTeamMember } from "~/components/NewInspectionWizard";
 import { OnboardingChecklist } from "~/components/dashboard/OnboardingChecklist";
 import { SeatBanner } from "~/components/SeatBanner";
 import { QuotaBanner } from "~/components/QuotaBanner";
-import { useSessionContext } from "~/hooks/useSessionContext";
+import { useSessionContext, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { computeOnboardingSteps } from "~/lib/onboarding-progress";
 import { getScheduleSet } from "~/lib/schedule-onboarding.server";
 import { INSPECTION_STATUS, isReportPublished } from "~/lib/status";
@@ -274,6 +274,9 @@ export async function action({ request, context }: Route.ActionArgs) {
 export default function InspectionsPage() {
   const { buckets, conciergePending, greeting: _ssrGreeting, tags, checklistDismissed: loaderDismissed, templateCount, serviceCount, scheduleSet, quotaCaps, quotaUsage } = useLoaderData<typeof loader>();
   const sessionCtx = useSessionContext();
+  // Scheduled times render in the viewer's effective zone, resolved once here
+  // rather than per row (and never left to the browser — see format-date).
+  const displayTz = useDisplayTimeZone();
   const [greeting, setGreeting] = useState(_ssrGreeting);
   useEffect(() => { setGreeting(getGreeting()); }, []);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -604,6 +607,7 @@ export default function InspectionsPage() {
       isColumnVisible={isColumnVisible}
       toggleSelect={toggleSelect}
       transitionStatus={transitionStatus}
+      timeZone={displayTz}
     />
   );
 

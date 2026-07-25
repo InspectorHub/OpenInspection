@@ -39,6 +39,8 @@ interface ServiceSelection {
   priceOverrideCents?: number;
 }
 
+import { civilToInstantISO } from "./civil-time";
+
 export interface CreateInspectionJson {
   propertyAddress: string;
   templateId: string;
@@ -96,6 +98,10 @@ export function buildCreateInspectionJson(formData: FormData): CreateInspectionJ
 
   const dateStr = String(formData.get("date") || "");
   const time = String(formData.get("time") || "") || "09:00";
+  // The zone the wizard displayed while the inspector typed that time. Combining
+  // the pair with a bare `Z` declared the typed hour to be UTC, so every
+  // workspace outside UTC stored its bookings off by the zone's offset.
+  const timeZone = String(formData.get("timeZone") || "") || "UTC";
   const inspectorId = String(formData.get("inspectorId") || "");
 
   // P-4: prefer the richer serviceSelectionsJson when present; fall back to
@@ -164,7 +170,7 @@ export function buildCreateInspectionJson(formData: FormData): CreateInspectionJ
     ...(addressCounty ? { addressCounty } : {}),
     ...(addressLat != null && Number.isFinite(addressLat) ? { addressLat } : {}),
     ...(addressLng != null && Number.isFinite(addressLng) ? { addressLng } : {}),
-    ...(dateStr ? { date: `${dateStr}T${time}:00Z` } : {}),
+    ...(dateStr ? { date: civilToInstantISO(dateStr, time, timeZone) } : {}),
     ...(inspectorId && UUID_RE.test(inspectorId) ? { inspectorId } : {}),
     ...(serviceIds ? { serviceIds } : {}),
     ...(serviceSelections ? { serviceSelections } : {}),

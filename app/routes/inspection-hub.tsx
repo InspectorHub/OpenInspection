@@ -576,7 +576,7 @@ export default function InspectionHubPage() {
               {humanizeStatus(inspection.status)}
             </Pill>
             <span className="text-ih-fg-3">
-              {formatInspectionDateTime(inspection.date)}
+              {formatInspectionDateTime(inspection.date, undefined, displayTz)}
             </span>
             {peopleCard.inspector?.name && (
               <span className="text-ih-fg-3">&middot; {peopleCard.inspector.name}</span>
@@ -638,7 +638,7 @@ export default function InspectionHubPage() {
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_schedule()} />
           <p className="text-[15px] font-medium text-ih-fg-1">
-            {formatInspectionDateTime(inspection.date)}
+            {formatInspectionDateTime(inspection.date, undefined, displayTz)}
           </p>
           <Link
             to={`/inspections/${inspection.id}/edit`}
