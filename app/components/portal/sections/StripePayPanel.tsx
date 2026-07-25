@@ -10,6 +10,8 @@
 import { useState } from "react";
 import { loadStripe, type Stripe as StripeJs } from "@stripe/stripe-js";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
+import { useDisplayLocale } from "~/hooks/useSessionContext";
+import { buildStripeElementsOptions } from "~/lib/stripe-elements-options";
 import { m } from "~/paraglide/messages";
 import { money } from "./payment-helpers";
 
@@ -18,6 +20,9 @@ type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
 export function StripePayPanel({ id, balanceDue, inspectorName, brandColor, currency }: { id: string; balanceDue: number; inspectorName: string; brandColor: string | null; currency?: string }) {
   // Phase B — amounts render in the invoice's snapshot currency (USD fallback).
   const cur = { currency };
+  // Stripe renders its own copy inside the Elements iframe; without this it picks
+  // the browser's language while the page around it uses the workspace's.
+  const locale = useDisplayLocale();
   const [phase, setPhase] = useState<PayPhase>("idle");
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<StripeJs | null> | null>(null);
@@ -82,15 +87,7 @@ export function StripePayPanel({ id, balanceDue, inspectorName, brandColor, curr
       {phase === "ready" && clientSecret && stripePromise && (
         <Elements
           stripe={stripePromise}
-          options={{
-            clientSecret,
-            appearance: {
-              theme: "flat",
-              // Stripe Elements render in an iframe — CSS vars don't reach it,
-              // so the resolved brand hex (or the platform token default) goes in.
-              variables: { colorPrimary: brandColor ?? "#6366f1", fontFamily: "inherit", borderRadius: "8px" },
-            },
-          }}
+          options={buildStripeElementsOptions({ clientSecret, brandColor, displayLocale: locale })}
         >
           <CheckoutForm balanceDue={balanceDue} returnUrl={returnUrl} currency={currency} />
         </Elements>

@@ -4,6 +4,7 @@ import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-
 import type { StepState } from "~/lib/checkout-steps";
 import { formatCurrency } from "~/lib/format";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
+import { buildStripeElementsOptions } from "~/lib/stripe-elements-options";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -144,13 +145,7 @@ function PayPanel({
             {phase === "ready" && clientSecret && stripePromise && (
                 <Elements
                     stripe={stripePromise}
-                    options={{
-                        clientSecret,
-                        appearance: {
-                            theme: "flat",
-                            variables: { colorPrimary: brandColor ?? "#6366f1", fontFamily: "inherit", borderRadius: "8px" },
-                        },
-                    }}
+                    options={buildStripeElementsOptions({ clientSecret, brandColor, displayLocale: locale })}
                 >
                     <CheckoutPayForm amountCents={amountCents} returnUrl={returnUrl} currency={currency} />
                 </Elements>
