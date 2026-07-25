@@ -5,9 +5,11 @@
  *   app/lib/collab/media-pending-store.ts
  *   app/lib/collab/media-upload-queue.ts
  *
- * Uses fake-indexeddb (wired in tests/unit/setup-client.ts) — no server.
+ * Uses fake-indexeddb — no server. Imported here rather than through a global
+ * setup file, which would load the polyfill for all 561 specs to serve three.
  */
 
+import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
     putPendingMedia,
