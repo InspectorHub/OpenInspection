@@ -25,6 +25,7 @@
   "scripts": {
     "dev": "npm run build && wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state",
     "dev:hmr": "npm run vendor:copy && react-router dev",
+    "dev:tunnel": "npm run build && wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state --tunnel",
     "build": "npm run vendor:copy && node scripts/gen-version.js && react-router build",
     "preview": "npm run build && wrangler dev -c build/server/wrangler.json --persist-to .wrangler/state",
     "deploy": "npm run build && npm run db:migrate:remote && wrangler deploy -c build/server/wrangler.json && npm run jwt:ensure && npm run setup-code:ensure",

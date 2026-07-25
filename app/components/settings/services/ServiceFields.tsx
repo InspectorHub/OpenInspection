@@ -4,11 +4,25 @@ import { Select } from "@core/shared-ui";
 import { MoneyInput } from "~/components/MoneyInput";
 import { m } from "~/paraglide/messages";
 
-/** The parts of a Conform field this component reads. */
+/**
+ * The parts of a Conform field this component reads.
+ *
+ * `initialValue` matters as much as the other two: without it the edit form
+ * rendered empty inputs over a service that HAS a name, a description and a
+ * duration — the form said the fields were blank, and saving would have made
+ * that true. Conform's `defaultValue` on `useForm` only reaches an input that
+ * asks for it.
+ */
 interface FieldBits {
   id: string;
   name: string;
   errors?: string[] | undefined;
+  initialValue?: unknown;
+}
+
+/** Conform models a field's value as string | string[] | nested; only text here. */
+function initialText(field: FieldBits): string | undefined {
+  return typeof field.initialValue === "string" ? field.initialValue : undefined;
 }
 
 export interface ServiceFieldMetas {
@@ -68,6 +82,7 @@ export function ServiceFields({
         <label htmlFor={fields.name.id} className={LABEL_CLS}>{m.settings_services_name_label()}</label>
         <input
           type="text" id={fields.name.id} name={fields.name.name}
+          defaultValue={initialText(fields.name)}
           placeholder={m.settings_services_name_placeholder()}
           aria-invalid={fields.name.errors ? true : undefined}
           className={INPUT_CLS}
@@ -78,6 +93,7 @@ export function ServiceFields({
         <label htmlFor={fields.description.id} className={LABEL_CLS}>{m.settings_services_description_label()}</label>
         <input
           type="text" id={fields.description.id} name={fields.description.name}
+          defaultValue={initialText(fields.description)}
           placeholder={m.settings_services_description_placeholder()}
           aria-invalid={fields.description.errors ? true : undefined}
           className={INPUT_CLS}
@@ -103,6 +119,7 @@ export function ServiceFields({
         <input
           type="number" min={5} step={5} inputMode="numeric"
           id={fields.durationMinutes.id} name={fields.durationMinutes.name}
+          defaultValue={initialText(fields.durationMinutes)}
           placeholder={m.settings_services_duration_placeholder()}
           aria-invalid={fields.durationMinutes.errors ? true : undefined}
           className={INPUT_CLS}

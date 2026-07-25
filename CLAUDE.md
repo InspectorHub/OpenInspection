@@ -16,6 +16,15 @@ npm run dev          # Build + run the worker locally (react-router build + wran
 npm run dev:hmr      # Vite dev server with HMR (react-router dev). The fast iteration loop.
                      # Works since the lazy-API entry refactor (workers/app.ts) — the entry
                      # must keep its top-level import graph tiny; see the comment there.
+npm run dev:tunnel   # Like `dev`, but also exposed over a Cloudflare Quick Tunnel (https).
+                     # REQUIRED to exercise the collab/presence WebSockets: the session
+                     # cookie is `Secure`, and a page served over http://localhost opens
+                     # `ws://` — which browsers do not treat as a secure scheme, so the
+                     # cookie is withheld and the handshake 401s. Over the tunnel the same
+                     # endpoints upgrade (wss://) and both presence and Y.Doc sync work.
+                     # The tunnel URL is a new origin: log in again there. It is PUBLIC
+                     # while running — stop it when finished. (A self-signed
+                     # `--local-protocol https` is not a substitute: Chrome refuses it.)
 npm run build        # react-router build — bundles server/ (API) + app/ (RR SSR) into one worker
 npm run deploy       # standalone: build + wrangler deploy (real ids via wrangler.local.jsonc)
 npm run deploy:saas  # saas: build + wrangler deploy with wrangler.saas.jsonc
