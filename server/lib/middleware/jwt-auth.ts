@@ -86,8 +86,12 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
         const headerPart = token.split('.')[0];
         if (headerPart) {
             try {
-                const header = JSON.parse(atob(headerPart.replace(/-/g, '+').replace(/_/g, '/')));
-                if (header.typ && header.typ !== 'JWT') {
+                // JSON.parse returns `any`, and this value came off the wire: an
+                // attacker picks its shape. Read it as unknown so the `typ`
+                // comparison below is the only thing we ever do with it.
+                const header = JSON.parse(atob(headerPart.replace(/-/g, '+').replace(/_/g, '/'))) as { typ?: unknown } | null;
+                const typ = header?.typ;
+                if (typ && typ !== 'JWT') {
                     throw Errors.Unauthorized('Unsupported token type');
                 }
             } catch (err) {
@@ -102,8 +106,16 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
         const tokenIat = payload.iat as number | undefined;
 
         // Reject tokens issued before the user's last password change / reset.
-        if (userId && c.env.TENANT_CACHE) {
-            const invalidatedAt = await c.env.TENANT_CACHE.get(`pwchanged:${userId}`);
+        //
+        // TENANT_CACHE is declared as a required binding, so the type says this
+        // guard can never fail; it is annotated as optional here because a
+        // misconfigured deploy is exactly the case it exists for. Note what that
+        // means: with no KV bound, session invalidation is SKIPPED rather than
+        // enforced, so a token issued before a password reset keeps working.
+        // Making it fail closed instead is a deliberate change, not a cleanup.
+        const cache = c.env.TENANT_CACHE as KVNamespace | undefined;
+        if (userId && cache) {
+            const invalidatedAt = await cache.get(`pwchanged:${userId}`);
             if (invalidatedAt) {
                 const invalidatedTs = parseInt(invalidatedAt, 10);
                 if (!tokenIat || tokenIat < invalidatedTs) {
