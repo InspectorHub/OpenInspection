@@ -156,6 +156,13 @@ export function makeWorkspaceSchema() {
  * description max 1000 optional, price >= 0). The price is entered in dollars
  * and converted to integer cents in the action, so we validate the raw dollar
  * input as a non-negative number string.
+ *
+ * `durationMinutes` and `templateId` are optional here for the same reason they
+ * are optional on the API: a service is a nameable, priceable thing before it is
+ * a schedulable one. But both are consumed downstream — the catalog table shows
+ * the duration and public booking sums it to size the appointment, and a booking
+ * that selects a service builds its inspection from that service's template.
+ * Until this form carried them, neither could ever be set.
  */
 export function makeCreateServiceSchema() {
   return z.object({
@@ -171,6 +178,17 @@ export function makeCreateServiceSchema() {
         (v) => v == null || v === "" || (!Number.isNaN(Number(v)) && Number(v) >= 0),
         m.validation_service_price_invalid(),
       ),
+    // Whole minutes. The upper bound rejects a slipped decimal point ("1800"
+    // meant as 18:00), which would otherwise size a booking window absurdly.
+    durationMinutes: z
+      .string()
+      .optional()
+      .refine((v) => {
+        if (v == null || v === "") return true;
+        const n = Number(v);
+        return Number.isInteger(n) && n > 0 && n < 1440;
+      }, m.validation_service_duration_invalid()),
+    templateId: z.string().optional(),
   });
 }
 

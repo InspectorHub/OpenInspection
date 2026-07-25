@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLoaderData, Form, useActionData } from "react-router";
+import { Select } from "@core/shared-ui";
 import { SettingsCrumb } from "~/components/SettingsCrumb";
+import { didCreateService } from "~/lib/settings-services";
 import { useForm } from "@conform-to/react";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/settings-services";
@@ -25,6 +27,16 @@ interface Service {
   description: string | null;
   price: number | null;
   active: boolean;
+  /** Minutes. Public booking sums these to size the appointment window. */
+  durationMinutes: number | null;
+  /** The template a booking builds this service's inspection from. */
+  templateId: string | null;
+}
+
+/** Template choices for the service's report-template picker. */
+interface TemplateOption {
+  id: string;
+  name: string;
 }
 
 interface Discount {
@@ -47,10 +59,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   if (forbidden) return { forbidden: true as const };
   try {
     const api = createApi(context, { token });
-    const [svcRes, discountRes, membersRes] = await Promise.all([
+    const [svcRes, discountRes, membersRes, templatesRes] = await Promise.all([
       api.services.index.$get({}),
       api.services["discount-codes"].$get().catch(() => null),
       api.admin.members.$get().catch(() => null),
+      // Needed to offer (and to name) the template a service builds its
+      // inspection from — without it the create form cannot set templateId and
+      // multi-service booking fails at request time.
+      api.inspections.templates.$get({ query: { page: "1", pageSize: "100" } }).catch(() => null),
     ]);
     // GET /api/services returns { success, data: Service[] } — data IS the
     // array (the pre-C-10 admin endpoint wrapped it in { services, discounts },
@@ -85,11 +101,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       members = raw.filter((m) => SCHEDULING_ROLES_SET.has(m.role));
     }
 
+    let templates: TemplateOption[] = [];
+    if (templatesRes?.ok) {
+      const tb = (await templatesRes.json()) as { data?: TemplateOption[] };
+      templates = (tb.data ?? []).map((t) => ({ id: t.id, name: t.name }));
+    }
+
     return {
       services: rawServices,
       discounts: rawDiscounts,
       restrictionMap,
       members,
+      templates,
     };
   } catch {
     return {
@@ -97,6 +120,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       discounts: [] as Discount[],
       restrictionMap: {} as Record<string, string[]>,
       members: [] as Member[],
+      templates: [] as TemplateOption[],
     };
   }
 }
@@ -112,7 +136,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     if (submission.status !== "success") {
       return submission.reply();
     }
-    const { name, description, price } = submission.value;
+    const { name, description, price, durationMinutes, templateId } = submission.value;
     // TODO(C-10 collapse): hono/client collapses api.services.index.$post to a non-callable
     // union; localized assertion until the typed-hono spike resolves it. Binding preserved.
     const res = await (api.services.index.$post as unknown as (args: { json: Record<string, unknown> }) => Promise<Response>)({
@@ -122,6 +146,11 @@ export async function action({ request, context }: Route.ActionArgs) {
         // only valid "absent" encoding; sending null fails validation (400).
         ...(description ? { description } : {}),
         price: Number(price) * 100 || 0,
+        // Same "absent means omitted" rule for both optional fields. A blank
+        // duration leaves booking on the time-slot window; a blank template
+        // leaves the service unbookable, which the catalog table now says.
+        ...(durationMinutes ? { durationMinutes: Number(durationMinutes) } : {}),
+        ...(templateId ? { templateId } : {}),
       },
     });
     if (!res.ok) {
@@ -130,7 +159,10 @@ export async function action({ request, context }: Route.ActionArgs) {
         formErrors: [(err as Record<string, string>)?.message || m.settings_services_error_create_failed()],
       });
     }
-    return { ok: true };
+    // Tagged so the form can recognise ITS success and close+clear. A bare
+    // { ok: true } is also what toggle-service answers, and closing on that
+    // would discard whatever was typed in an open create form.
+    return { ok: true, intent: "create-service" as const };
   } else if (intent === "toggle-service") {
     const id = String(form.get("id") ?? "");
     const active = form.get("active") === "true";
@@ -173,6 +205,18 @@ export default function SettingsServices() {
   // Conform's zod schema (which multiplies by 100) sees the same contract.
   const [priceCents, setPriceCents] = useState<number | null>(null);
 
+  // Saving used to leave the form open with every value still in it, and the
+  // new row appeared in the table below — so the panel looked like it had not
+  // submitted, and a second Save created a duplicate service. Closing on
+  // success unmounts the form, which is also what clears the uncontrolled
+  // inputs; the new row in the table is the confirmation.
+  const created = didCreateService(actionData);
+  useEffect(() => {
+    if (!created) return;
+    setShowForm(false);
+    setPriceCents(null);
+  }, [created]);
+
   // Conform owns only the create-service form. The toggle-service form posts
   // hidden fields only (no text validation), so it stays a plain <Form>. Guard
   // against feeding a non-Conform actionData ({ ok: true }) into useForm.
@@ -186,7 +230,7 @@ export default function SettingsServices() {
   });
 
   if ("forbidden" in data) return <AccessDenied />;
-  const { services, discounts, restrictionMap, members } = data;
+  const { services, discounts, restrictionMap, members, templates } = data;
 
   return (
     <div className="space-y-ih-list">
@@ -253,6 +297,41 @@ export default function SettingsServices() {
                 <p className="mt-1 text-xs text-ih-bad-fg">{fields.price.errors[0]}</p>
               )}
             </div>
+            {/* Duration — the catalog table has a column for it and public
+                booking sums it across the chosen services to size the
+                appointment. Nothing could set it before, so every row read
+                "Not set" and every booking used the generic slot length. */}
+            <div>
+              <label htmlFor={fields.durationMinutes.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_duration_label()}</label>
+              <input
+                type="number" min={5} step={5} inputMode="numeric"
+                id={fields.durationMinutes.id} name={fields.durationMinutes.name}
+                placeholder={m.settings_services_duration_placeholder()}
+                aria-invalid={fields.durationMinutes.errors ? true : undefined}
+                className="w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none"
+              />
+              {fields.durationMinutes.errors && (
+                <p className="mt-1 text-xs text-ih-bad-fg">{fields.durationMinutes.errors[0]}</p>
+              )}
+            </div>
+            {/* Report template — a booking that selects services builds one
+                inspection per service from that service's template, so a blank
+                one fails the whole booking with "Service 'X' has no template
+                configured." The picker is the only way to prevent that. */}
+            <div>
+              <label htmlFor={fields.templateId.id} className="block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1">{m.settings_services_template_label()}</label>
+              <Select
+                bare
+                id={fields.templateId.id}
+                name={fields.templateId.name}
+                defaultValue=""
+                aria-label={m.settings_services_template_label()}
+                options={[
+                  { value: "", label: m.settings_services_template_none() },
+                  ...templates.map((t) => ({ value: t.id, label: t.name })),
+                ]}
+              />
+            </div>
           </div>
           {form.errors && (
             <div className="px-3 py-2 rounded-md bg-ih-bad-bg border border-ih-bad text-[13px] text-ih-bad-fg">
@@ -271,7 +350,12 @@ export default function SettingsServices() {
       )}
 
       {/* Services table */}
-      <ServicesCatalogPanel services={services} restrictionMap={restrictionMap} members={members} />
+      <ServicesCatalogPanel
+        services={services}
+        restrictionMap={restrictionMap}
+        members={members}
+        templateNames={Object.fromEntries(templates.map((t) => [t.id, t.name]))}
+      />
 
       {/* Discount codes */}
       <DiscountCodesPanel discounts={discounts} />

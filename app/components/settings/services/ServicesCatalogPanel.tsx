@@ -1,6 +1,7 @@
 import { Form } from "react-router";
 import { Table } from "@core/shared-ui";
 import { QualificationWidget } from "./QualificationWidget";
+import { splitDurationMinutes, serviceIsBookable } from "~/lib/settings-services";
 import { m } from "~/paraglide/messages";
 
 interface Service {
@@ -9,6 +10,8 @@ interface Service {
   description: string | null;
   price: number | null;
   active: boolean;
+  durationMinutes: number | null;
+  templateId: string | null;
 }
 
 interface Member {
@@ -22,9 +25,20 @@ interface ServicesCatalogPanelProps {
   services: Service[];
   restrictionMap: Record<string, string[]>;
   members: Member[];
+  /** templateId → template name, for naming the template each service builds from. */
+  templateNames: Record<string, string>;
 }
 
-export function ServicesCatalogPanel({ services, restrictionMap, members }: ServicesCatalogPanelProps) {
+/** "1 hr 30 min" / "1 hr" / "45 min", or "Not set" when the service carries none. */
+function durationLabel(minutes: number | null): string {
+  const split = splitDurationMinutes(minutes);
+  if (!split) return m.settings_services_duration_unset();
+  if (split.hours && split.minutes) return m.settings_services_duration_hm(split);
+  if (split.hours) return m.settings_services_duration_h({ hours: split.hours });
+  return m.settings_services_duration_m({ minutes: split.minutes });
+}
+
+export function ServicesCatalogPanel({ services, restrictionMap, members, templateNames }: ServicesCatalogPanelProps) {
   return (
     <div className="bg-ih-bg-card border border-ih-border rounded-lg overflow-hidden">
       <Table<Service>
@@ -44,6 +58,19 @@ export function ServicesCatalogPanel({ services, restrictionMap, members }: Serv
                 {svc.description && (
                   <p className="text-[11px] text-ih-fg-3 mt-0.5 line-clamp-1">{svc.description}</p>
                 )}
+                {/* A service with no template takes down any booking that picks
+                    it (BadRequest from the multi-service branch, shown to the
+                    customer). Say so here, where it can be fixed. */}
+                {serviceIsBookable(svc) ? (
+                  <p className="text-[11px] text-ih-fg-3 mt-0.5">
+                    {m.settings_services_template_prefix()}{" "}
+                    {templateNames[svc.templateId ?? ""] ?? svc.templateId}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-ih-bad-fg mt-0.5">
+                    {m.settings_services_no_template_warning()}
+                  </p>
+                )}
                 <QualificationWidget
                   service={svc}
                   initialUserIds={restrictionMap[svc.id] ?? []}
@@ -52,7 +79,14 @@ export function ServicesCatalogPanel({ services, restrictionMap, members }: Serv
               </>
             ),
           },
-          { label: m.settings_services_col_duration(), cell: () => <span className="text-ih-fg-3">&mdash;</span> },
+          {
+            label: m.settings_services_col_duration(),
+            cell: (svc) => (
+              <span className={svc.durationMinutes ? "text-ih-fg-2" : "text-ih-fg-3"}>
+                {durationLabel(svc.durationMinutes)}
+              </span>
+            ),
+          },
           {
             label: m.settings_services_col_price(),
             cell: (svc) => <span className="font-bold text-ih-ok-fg">${((svc.price || 0) / 100).toFixed(2)}</span>,
