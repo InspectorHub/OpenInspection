@@ -3,10 +3,10 @@ import type { Route } from "./+types/legal";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { m } from "~/paraglide/messages";
 
-export function meta({ data }: Route.MetaArgs) {
-  if (!data) return [{ title: m.public_legal_meta_default() }];
-  const company = data.companyName ?? "OpenInspection";
-  const docTitle = data.doc === "privacy" ? m.public_legal_doc_privacy() : m.public_legal_doc_terms();
+export function meta({ loaderData }: Route.MetaArgs) {
+  if (!loaderData) return [{ title: m.public_legal_meta_default() }];
+  const company = loaderData.companyName ?? "OpenInspection";
+  const docTitle = loaderData.doc === "privacy" ? m.public_legal_doc_privacy() : m.public_legal_doc_terms();
   return [{ title: m.public_legal_title({ doc: docTitle, company }) }];
 }
 

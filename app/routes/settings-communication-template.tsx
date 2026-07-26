@@ -11,8 +11,8 @@ import { m } from "~/paraglide/messages";
 interface BlockField { key: string; label: string; multiline: boolean; value: string; }
 interface Detail { trigger: string; name: string; required: boolean; enabled: boolean; subject: string; blocks: BlockField[]; variables: { name: string; desc: string }[]; }
 
-export function meta({ data }: Route.MetaArgs) {
-  return [{ title: m.settings_comms_template_meta_title({ name: data?.detail?.name ?? m.settings_comms_template_meta_fallback() }) }];
+export function meta({ loaderData }: Route.MetaArgs) {
+  return [{ title: m.settings_comms_template_meta_title({ name: loaderData?.detail?.name ?? m.settings_comms_template_meta_fallback() }) }];
 }
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
