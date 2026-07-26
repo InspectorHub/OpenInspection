@@ -1,6 +1,7 @@
 import type { AppLoadContext } from "react-router";
 import { createApi } from "~/lib/api-client.server";
 import { EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 /**
  * A-10 — the one loader-side brand resolver every public surface uses.
@@ -12,8 +13,7 @@ export async function resolveTenantBrand(
   context: AppLoadContext,
   tenantSlug: string | null | undefined,
 ): Promise<TenantBrand> {
-  const fallbackName =
-    ((context.cloudflare?.env as { APP_NAME?: string } | undefined)?.APP_NAME ?? null);
+  const fallbackName = getCloudflareEnv(context).APP_NAME ?? null;
   if (!tenantSlug) return { ...EMPTY_BRAND, companyName: fallbackName };
   try {
     const api = createApi(context);

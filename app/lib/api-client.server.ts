@@ -69,14 +69,11 @@ import type {
 } from "../../packages/api-types";
 import { getApiUrl } from "./api.server";
 import { makeCsrfPair } from "./csrf";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 export interface CreateApiOptions {
     /** Session JWT — attached as `Authorization: Bearer <token>` when present. */
     token?: string;
-}
-
-interface BffEnv {
-    API_WORKER?: { fetch: typeof fetch };
 }
 
 const NON_GET = new Set(["POST", "PUT", "PATCH", "DELETE"]);
@@ -88,7 +85,7 @@ const NON_GET = new Set(["POST", "PUT", "PATCH", "DELETE"]);
  *   - Service Binding (`env.API_WORKER.fetch`) when available; falls back to global fetch
  */
 function buildFetch(context: AppLoadContext, token?: string): typeof fetch {
-    const env = (context.cloudflare?.env ?? {}) as BffEnv;
+    const env = getCloudflareEnv(context);
 
     return (async (input: Request | string | URL, init?: RequestInit) => {
         const req = input instanceof Request ? input : new Request(input, init);

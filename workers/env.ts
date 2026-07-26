@@ -41,4 +41,19 @@ export type WorkerEnv = Env & {
    * configs, so typegen against the placeholder never sees it.
    */
   API_URL?: string;
+  /**
+   * `standalone` (default) or `saas`. Declared only in the gitignored SaaS
+   * config, so typegen against the committed placeholder never emits it.
+   */
+  APP_MODE?: string;
+  /**
+   * Portal URL for browser redirects (login bounce, billing, workspace switch).
+   * SaaS-only, and therefore absent from the placeholder config typegen reads.
+   */
+  PORTAL_API_URL?: string;
+  /**
+   * Optional Google Maps JS key for the client-side map. A plaintext var set
+   * per deployment rather than in the committed config.
+   */
+  GOOGLE_MAPS_JS_API_KEY?: string;
 };

@@ -57,6 +57,7 @@ import { resolvePortalSession } from "~/lib/portal-exchange";
 import { HubSectionSlot } from "~/components/portal/hub/HubSectionSlot";
 import type { TenantBrand } from "~/lib/brand";
 import { m } from "~/paraglide/messages";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 export function meta() {
   return [{ title: m.portal_inspection_meta_title() }];
@@ -126,7 +127,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     // value used for the overview call. Best-effort: a non-OK response → empty.
     documents = [];
     try {
-      const apiWorker = context.cloudflare.env.API_WORKER;
+      const apiWorker = getCloudflareEnv(context).API_WORKER;
       const docsRes = await (apiWorker?.fetch ?? fetch)(
         new Request(`https://internal/api/public/inspections/${inspectionId}/documents`, {
           headers: { cookie: cookieForApi },

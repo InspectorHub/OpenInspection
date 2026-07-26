@@ -1,7 +1,9 @@
 import type { AppLoadContext } from "react-router";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 export function getApiUrl(context?: AppLoadContext): string {
-  if (context?.cloudflare?.env?.API_URL) return context.cloudflare.env.API_URL as string;
+  const apiUrl = getCloudflareEnv(context as AppLoadContext).API_URL;
+  if (apiUrl) return apiUrl;
   // Dev / CI: process.env is available
   try {
     if (typeof process !== "undefined" && process?.env?.API_URL) {

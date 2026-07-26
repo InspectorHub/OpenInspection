@@ -16,23 +16,22 @@ import {
   type ModuleGroup,
 } from "../../../server/lib/mcp/tag-catalog";
 import { m } from "~/paraglide/messages";
+import { getCloudflareEnv } from "~/lib/load-context";
+import type { WorkerEnv } from "../../../workers/env";
 
 export function meta() {
   return [{ title: m.oauth_authorize_meta_title() }];
 }
 
 /**
- * Env subset this route reads. `context.cloudflare.env` is typed by the minimal
- * worker-entry `Env` interface (workers/app.ts) that omits plaintext vars and
- * the OAuthProvider-injected helper, so — like login.tsx with APP_MODE /
- * PORTAL_API_URL — we cast to the shape we actually consume. OAUTH_PROVIDER is
- * injected by the OAuthProvider wrapper for requests that reach the
- * defaultHandler (it flows into context.cloudflare.env via the SSR handler).
+ * OAUTH_PROVIDER is injected by the OAuthProvider wrapper for requests that
+ * reach the defaultHandler, so it rides the load context without ever being a
+ * wrangler binding. It is declared here rather than on `WorkerEnv` because this
+ * route is its only consumer; APP_MODE and PORTAL_API_URL, which this route
+ * also reads, are on `WorkerEnv` since the rest of the app reads them too.
  */
 interface AuthorizeEnv {
   OAUTH_PROVIDER?: OAuthHelpers;
-  APP_MODE?: string;
-  PORTAL_API_URL?: string;
 }
 
 /** Resolved end-user identity backing an OAuth grant. */
@@ -112,7 +111,7 @@ export function isRegisteredRedirectUri(
 }
 
 /** Build the login redirect that preserves the in-flight authorize request. */
-function loginRedirect(env: AuthorizeEnv, request: Request): Response {
+function loginRedirect(env: WorkerEnv & AuthorizeEnv, request: Request): Response {
   const url = new URL(request.url);
   if (env.APP_MODE === "saas" && env.PORTAL_API_URL) {
     // Cross-origin bounce to the portal — send the absolute authorize URL.
@@ -125,7 +124,7 @@ function loginRedirect(env: AuthorizeEnv, request: Request): Response {
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
-  const env = context.cloudflare.env as unknown as AuthorizeEnv;
+  const env = getCloudflareEnv(context) as WorkerEnv & AuthorizeEnv;
   // The OAuthProvider only injects OAUTH_PROVIDER when MCP is enabled and the
   // request flowed through the provider wrapper. Absent => this endpoint is not
   // live; 404 rather than render a dead consent page.
@@ -156,7 +155,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
-  const env = context.cloudflare.env as unknown as AuthorizeEnv;
+  const env = getCloudflareEnv(context) as WorkerEnv & AuthorizeEnv;
   if (!env.OAUTH_PROVIDER) {
     throw new Response("Not Found", { status: 404 });
   }

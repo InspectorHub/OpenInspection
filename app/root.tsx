@@ -31,6 +31,7 @@ import { ToastPortal } from "~/components/Toast";
 // (RR client router + fetcher actions stop working). Server-side getLocale()
 // returns from the ALS store with no side effect.
 import { getLocale } from "~/paraglide/runtime";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 export function loader({
   request,
@@ -44,10 +45,7 @@ export function loader({
   // (the SDK runs in the browser), so it is surfaced here for GoogleMap to read
   // via useRouteLoaderData("root"). It is an HTTP-referrer-restricted platform
   // key; null when unset → the map fails closed and renders nothing.
-  // GOOGLE_MAPS_JS_API_KEY is an optional runtime var not present in the
-  // wrangler-generated `Env` type, so read it through a narrow cast (the same
-  // approach oauth/authorize.tsx uses for its env subset).
-  const env = context.cloudflare.env as unknown as { GOOGLE_MAPS_JS_API_KEY?: string };
+  const env = getCloudflareEnv(context);
   return {
     ...parseUiPrefs(request.headers.get("Cookie")),
     locale: getLocale(),

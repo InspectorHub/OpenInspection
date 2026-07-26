@@ -1,5 +1,6 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 import type { AppLoadContext, SessionStorage } from "react-router";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 /** Fields stored in the React Router `__session` cookie. */
 type AppSessionData = { token: string };
@@ -32,7 +33,7 @@ async function deriveSessionSecret(jwtSecret: string): Promise<string> {
 let _derived: { from: string; value: Promise<string> } | null = null;
 
 function readEnvVar(context: AppLoadContext | undefined, name: "SESSION_SECRET" | "JWT_SECRET"): string | undefined {
-  const fromBinding = context?.cloudflare?.env?.[name];
+  const fromBinding = getCloudflareEnv(context as AppLoadContext)[name];
   if (fromBinding) return fromBinding;
   // Node-only path: the vitest suites run these helpers outside workerd, where
   // there is no binding to read from.

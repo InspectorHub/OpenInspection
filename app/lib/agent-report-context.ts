@@ -11,6 +11,7 @@
  * same host/consumer, no behavioral split.
  */
 import type { AppLoadContext } from "react-router";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 /**
  * Non-null only when ctx.token's recipient is agent-kind; null covers every
@@ -38,7 +39,7 @@ export async function loadAgentReportContext(
 ): Promise<AgentReportContext | null> {
   if (!token) return null;
   try {
-    const apiWorker = context.cloudflare.env.API_WORKER;
+    const apiWorker = getCloudflareEnv(context).API_WORKER;
     const res = await (apiWorker?.fetch ?? fetch)(
       new Request("https://internal/api/agent/report-context", {
         method: "POST",
