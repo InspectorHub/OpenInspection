@@ -7,6 +7,8 @@ import { createApi } from "~/lib/api-client.server";
 import { makeResetPasswordSchema, makePasswordHint } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
 import { m } from "~/paraglide/messages";
+import { getCloudflareEnv } from "~/lib/load-context";
+import type { WorkerEnv } from "../../workers/env";
 
 export function meta() {
   return [{ title: m.auth_reset_meta_title() }];
@@ -14,8 +16,10 @@ export function meta() {
 
 export async function loader({ request, context }: Route.LoaderArgs) {
   // SaaS deploys reset via the portal — start them over there. Mirrors login.tsx.
-  const env = (context as { cloudflare?: { env?: { APP_MODE?: string; PORTAL_API_URL?: string } } })
-    ?.cloudflare?.env;
+  // PORTAL_API_URL stays a local declaration rather than moving onto
+  // WorkerEnv: the SaaS-portal isolation gate confines that name to
+  // integration-boundary files, so it must not sit on the shared env.
+  const env = getCloudflareEnv(context) as WorkerEnv & { PORTAL_API_URL?: string };
   if (env?.APP_MODE === "saas" && env.PORTAL_API_URL) {
     return redirect(`${env.PORTAL_API_URL.replace(/\/$/, "")}/forgot-password`);
   }

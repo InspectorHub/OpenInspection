@@ -7,6 +7,7 @@
 // (the OAuth consent loader bounces unauthenticated users here with it).
 import { describe, it, expect } from 'vitest';
 import { loader } from '~/routes/login';
+import { createLoadContext } from "~/lib/load-context";
 
 type LoaderArgs = Parameters<typeof loader>[0];
 
@@ -26,7 +27,13 @@ function args(env: Record<string, string>, opts: { cookie?: string; returnTo?: s
     };
     return {
         request,
-        context: { cloudflare: { env } },
+        // Built through the real accessor rather than a `{ cloudflare: { env } }`
+        // literal. That literal is what let this spec keep passing after the
+        // load context became a RouterContextProvider: the loader read it
+        // through a cast that matched the old shape, so the mock satisfied the
+        // cast while production silently returned undefined and the bounce
+        // stopped firing. A mock that does not match production is not a test.
+        context: createLoadContext(env),
         params: {},
     } as unknown as LoaderArgs;
 }

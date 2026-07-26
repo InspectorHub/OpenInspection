@@ -54,7 +54,14 @@ describe("load-context access is centralized", () => {
         const code = source
           .replace(/\/\*[\s\S]*?\*\//g, "")
           .replace(/^\s*\/\/.*$/gm, "");
-        return /context\??\.cloudflare/.test(code);
+        // Matches the access, not the receiver: `(context as {...}).cloudflare`
+        // slipped past an earlier `context\??\.cloudflare` pattern and six such
+        // reads survived the RouterContextProvider migration silently — they
+        // type-check against their own cast and evaluate to undefined at
+        // runtime, which is how the SaaS login redirect stopped firing in
+        // production. The second alternative catches the cast that declares the
+        // shape even when the read is on another line.
+        return /cloudflare\??\.env|cloudflare\?:\s*\{/.test(code);
       })
       .map((file) => file.slice(APP_DIR.length + 1));
 

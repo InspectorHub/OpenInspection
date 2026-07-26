@@ -19,6 +19,7 @@ import { IntegrationCardsGrid } from "~/components/settings/integrations/Integra
 import { parseTestResults } from "~/lib/connection-test";
 import { SaveVideoSchema } from "../../server/lib/validations/video.schema";
 import { m } from "~/paraglide/messages";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 export function meta() {
   return [{ title: m.settings_integrations_meta_title() }];
@@ -122,7 +123,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 
   if (intent === "save-video") {
     // SaaS guard: video backend is plan-managed in hosted mode.
-    const bffEnv = (context as { cloudflare?: { env?: { APP_MODE?: string } } })?.cloudflare?.env;
+    const bffEnv = getCloudflareEnv(context);
     if (bffEnv?.APP_MODE === "saas") {
       return {
         intent,

@@ -69,6 +69,7 @@ vi.mock('~/lib/api-client.server', () => ({
 }));
 
 import { loader, action } from '~/routes/settings-communication';
+import { createLoadContext } from "~/lib/load-context";
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -80,7 +81,7 @@ function jsonRes(body: unknown, ok = true) {
 function loaderArgs(): LoaderArgs {
     return {
         request: new Request('http://app.example.com/settings/communication'),
-        context: {} as never,
+        context: createLoadContext() as never,
         params: {},
     } as unknown as LoaderArgs;
 }
@@ -91,7 +92,7 @@ function actionArgs(form: Record<string, string>, appMode: 'saas' | 'standalone'
     return {
         request: new Request('http://app.example.com/settings/communication', { method: 'POST', body: fd }),
         // The managed-compliance action gates on SaaS via context.cloudflare.env.APP_MODE.
-        context: { cloudflare: { env: { APP_MODE: appMode } } } as never,
+        context: createLoadContext({ APP_MODE: appMode }) as never,
         params: {},
     } as unknown as ActionArgs;
 }

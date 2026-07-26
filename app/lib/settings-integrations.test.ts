@@ -45,6 +45,7 @@ vi.mock('~/lib/api-client.server', () => ({
 }));
 
 import { loader, action } from '~/routes/settings-integrations';
+import { createLoadContext } from "~/lib/load-context";
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -56,7 +57,7 @@ function jsonRes(body: unknown, ok = true) {
 function loaderArgs(): LoaderArgs {
     return {
         request: new Request('http://app.example.com/settings/integrations'),
-        context: {} as never,
+        context: createLoadContext() as never,
         params: {},
     } as unknown as LoaderArgs;
 }
@@ -69,7 +70,7 @@ function actionArgs(form: Record<string, string>): ActionArgs {
             method: 'POST',
             body: fd,
         }),
-        context: {} as never,
+        context: createLoadContext() as never,
         params: {},
     } as unknown as ActionArgs;
 }
@@ -222,7 +223,7 @@ describe('settings-integrations action — save-video intent', () => {
                 method: 'POST',
                 body: (() => { const fd = new FormData(); fd.set('intent', 'save-video'); fd.set('videoMode', 'r2'); return fd; })(),
             }),
-            context: { cloudflare: { env: { APP_MODE: 'saas' } } } as never,
+            context: createLoadContext({ APP_MODE: 'saas' }) as never,
             params: {},
         } as unknown as Parameters<typeof action>[0];
         const res = await action(sasArgs);
