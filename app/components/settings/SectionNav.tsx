@@ -33,7 +33,9 @@ export function SectionNav({
 }: {
   sections: NavSection[];
   className?: string;
-}): JSX.Element | null {
+  // React 19's types no longer publish a global `JSX` namespace; it lives under
+  // the React namespace now.
+}): React.JSX.Element | null {
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const visible = sections.filter((s) => s.visible !== false);
   const ids = visible.map((s) => s.id);
