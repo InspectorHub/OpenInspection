@@ -110,20 +110,28 @@ export function isRegisteredRedirectUri(
   );
 }
 
-/** Build the login redirect that preserves the in-flight authorize request. */
-function loginRedirect(env: WorkerEnv & AuthorizeEnv, request: Request): Response {
-  const url = new URL(request.url);
+/**
+ * Build the login redirect that preserves the in-flight authorize request.
+ *
+ * Takes the normalized `url` rather than deriving one from `request.url`: under
+ * v8_passThroughRequests the raw request URL carries React Router's own
+ * implementation details (a `.data` suffix), which would be baked into the
+ * returnTo and bounce the user to a non-page after logging in. The action path
+ * is the one that matters here — a form POST from a client-side navigation is
+ * exactly when the suffix appears.
+ */
+function loginRedirect(env: WorkerEnv & AuthorizeEnv, url: URL): Response {
   if (env.APP_MODE === "saas" && env.PORTAL_API_URL) {
     // Cross-origin bounce to the portal — send the absolute authorize URL.
     const base = env.PORTAL_API_URL.replace(/\/$/, "");
-    return redirect(`${base}/login?returnTo=${encodeURIComponent(request.url)}`);
+    return redirect(`${base}/login?returnTo=${encodeURIComponent(url.href)}`);
   }
   // Standalone: relative path back to this same authorize URL (incl. query).
   const here = `${url.pathname}${url.search}`;
   return redirect(`/login?returnTo=${encodeURIComponent(here)}`);
 }
 
-export async function loader({ request, context }: Route.LoaderArgs) {
+export async function loader({ request, url, context }: Route.LoaderArgs) {
   const env = getCloudflareEnv(context) as WorkerEnv & AuthorizeEnv;
   // The OAuthProvider only injects OAUTH_PROVIDER when MCP is enabled and the
   // request flowed through the provider wrapper. Absent => this endpoint is not
@@ -133,10 +141,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   const token = await getToken(context, request);
-  if (!token) throw loginRedirect(env, request);
+  if (!token) throw loginRedirect(env, url);
 
   const identity = await resolveIdentity(context, token);
-  if (!identity) throw loginRedirect(env, request);
+  if (!identity) throw loginRedirect(env, url);
 
   // parseAuthRequest reads the OAuth params from THIS request's query string;
   // it only works on the initial GET. We serialize the result into a hidden
@@ -154,17 +162,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   };
 }
 
-export async function action({ request, context }: Route.ActionArgs) {
+export async function action({ request, url, context }: Route.ActionArgs) {
   const env = getCloudflareEnv(context) as WorkerEnv & AuthorizeEnv;
   if (!env.OAUTH_PROVIDER) {
     throw new Response("Not Found", { status: 404 });
   }
 
   const token = await getToken(context, request);
-  if (!token) throw loginRedirect(env, request);
+  if (!token) throw loginRedirect(env, url);
 
   const identity = await resolveIdentity(context, token);
-  if (!identity) throw loginRedirect(env, request);
+  if (!identity) throw loginRedirect(env, url);
 
   const formData = await request.formData();
   let authReq: AuthRequest;
