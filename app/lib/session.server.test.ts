@@ -13,7 +13,7 @@
  * ordinary thing a session does, which is end.
  */
 import { describe, it, expect } from "vitest";
-import type { AppLoadContext } from "react-router";
+import { createLoadContext, type LoadContext } from "~/lib/load-context";
 import {
   requireToken,
   browserJwtCookie,
@@ -21,7 +21,7 @@ import {
   getToken,
 } from "./session.server";
 
-const CONTEXT = {} as AppLoadContext;
+const CONTEXT = createLoadContext();
 
 function b64url(obj: unknown): string {
   return Buffer.from(JSON.stringify(obj))
@@ -156,16 +156,14 @@ describe("browserJwtCookie", () => {
 describe("session cookie secret", () => {
   const TOKEN = jwt({ exp: Math.floor(Date.now() / 1000) + 3600 });
 
-  function contextWith(env: Record<string, string>): AppLoadContext {
-    return { cloudflare: { env, ctx: {} } } as unknown as AppLoadContext;
-  }
+  const contextWith = (env: Record<string, string>) => createLoadContext(env);
 
   /**
    * The signed `__session` value, which encodes the secret it was signed with.
    * Read via `get()` rather than `getSetCookie()` — the latter is not
    * implemented in this test environment's Headers.
    */
-  async function sessionCookieFor(context: AppLoadContext): Promise<string> {
+  async function sessionCookieFor(context: LoadContext): Promise<string> {
     const response = await createSessionWithToken(context, TOKEN, "/");
     const raw = response.headers.get("Set-Cookie") ?? "";
     const match = /__session=([^;,]+)/.exec(raw);

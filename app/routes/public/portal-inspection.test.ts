@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import type { AppLoadContext } from "react-router";
 import { loader } from "~/routes/public/portal-inspection";
+import { createLoadContext } from "~/lib/load-context";
 
 /**
  * Spec 3 Task 6, Part B — the portal-inspection Hub loader must route an
@@ -19,10 +19,8 @@ import { loader } from "~/routes/public/portal-inspection";
 
 const API_URL = "https://mock-api.test";
 
-function makeContext(): AppLoadContext {
-  return {
-    cloudflare: { env: { API_URL } },
-  } as unknown as AppLoadContext;
+function makeContext() {
+  return createLoadContext({ API_URL });
 }
 
 /**

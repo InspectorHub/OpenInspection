@@ -19,8 +19,12 @@ export type WorkerEnv = Env & {
    * In-process self-binding injected by the worker entry so RR loaders call the
    * API app directly (no network hop). Set on the load context; never declared
    * in any wrangler config, so typegen cannot emit it.
+   *
+   * Typed as the contract its single caller actually uses — a prepared Request
+   * in, a Response out — rather than the full `typeof fetch`, whose (input,
+   * init) overloads nothing here supplies.
    */
-  API_WORKER?: { fetch: typeof fetch };
+  API_WORKER?: { fetch: (request: Request) => Promise<Response> };
   /**
    * Static-assets fetcher. Declared in wrangler as an `assets` block rather
    * than a `services`/`bindings` entry, and `wrangler types` does not emit an

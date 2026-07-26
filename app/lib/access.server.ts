@@ -1,4 +1,4 @@
-import type { AppLoadContext } from "react-router";
+import type { LoadContext } from "~/lib/load-context";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { assertAdminOrForbidden } from "~/lib/access";
@@ -18,7 +18,7 @@ import { assertAdminOrForbidden } from "~/lib/access";
  * by every guarded loader (DRY) — no per-route copy-paste.
  */
 export async function requireAdminLoader(
-  context: AppLoadContext,
+  context: LoadContext,
   request: Request,
 ): Promise<{ forbidden: boolean; token: string }> {
   const token = await requireToken(context, request);

@@ -1,16 +1,16 @@
 /**
  * BFF resource for internal holiday advisory/block in NewInspectionWizard.
  */
-import type { AppLoadContext } from "react-router";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
+import type { LoadContext } from "~/lib/load-context";
 
 export async function loader({
   request,
   context,
 }: {
   request: Request;
-  context: AppLoadContext;
+  context: LoadContext;
 }) {
   const token = await requireToken(context, request);
   const api = createApi(context, { token });

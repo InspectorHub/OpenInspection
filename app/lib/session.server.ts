@@ -1,6 +1,6 @@
 import { createCookieSessionStorage, redirect } from "react-router";
-import type { AppLoadContext, SessionStorage } from "react-router";
-import { getCloudflareEnv } from "~/lib/load-context";
+import type { SessionStorage } from "react-router";
+import { getCloudflareEnv, type LoadContext } from "~/lib/load-context";
 
 /** Fields stored in the React Router `__session` cookie. */
 type AppSessionData = { token: string };
@@ -32,8 +32,8 @@ async function deriveSessionSecret(jwtSecret: string): Promise<string> {
 /** Cached derivation — PBKDF2 at 100k iterations is too costly per request. */
 let _derived: { from: string; value: Promise<string> } | null = null;
 
-function readEnvVar(context: AppLoadContext | undefined, name: "SESSION_SECRET" | "JWT_SECRET"): string | undefined {
-  const fromBinding = getCloudflareEnv(context as AppLoadContext)[name];
+function readEnvVar(context: LoadContext | undefined, name: "SESSION_SECRET" | "JWT_SECRET"): string | undefined {
+  const fromBinding = getCloudflareEnv(context as LoadContext)[name];
   if (fromBinding) return fromBinding;
   // Node-only path: the vitest suites run these helpers outside workerd, where
   // there is no binding to read from.
@@ -59,7 +59,7 @@ function readEnvVar(context: AppLoadContext | undefined, name: "SESSION_SECRET" 
  * JWT_SECRET is required for the app to function at all, so that can only
  * happen on a genuinely unconfigured deployment.
  */
-async function getSessionSecret(context?: AppLoadContext): Promise<string> {
+async function getSessionSecret(context?: LoadContext): Promise<string> {
   const explicit = readEnvVar(context, "SESSION_SECRET");
   if (explicit) return explicit;
 
@@ -78,7 +78,7 @@ async function getSessionSecret(context?: AppLoadContext): Promise<string> {
 let _storage: SessionStorage<AppSessionData> | null = null;
 let _storageSecret: string | null = null;
 
-async function getStorage(context?: AppLoadContext) {
+async function getStorage(context?: LoadContext) {
   const secret = await getSessionSecret(context);
   if (!_storage || secret !== _storageSecret) {
     _storageSecret = secret;
@@ -107,7 +107,7 @@ async function getStorage(context?: AppLoadContext) {
  * The WRITE path deliberately does not do this: `createSessionWithToken` lets
  * the error propagate rather than issue an unprotected cookie.
  */
-async function getSession(context: AppLoadContext, request: Request) {
+async function getSession(context: LoadContext, request: Request) {
   try {
     return await (await getStorage(context)).getSession(request.headers.get("Cookie"));
   } catch {
@@ -128,7 +128,7 @@ function readRawCookie(request: Request, name: string): string | null {
   return null;
 }
 
-export async function getToken(context: AppLoadContext, request: Request): Promise<string | null> {
+export async function getToken(context: LoadContext, request: Request): Promise<string | null> {
   const session = await getSession(context, request);
   const fromSession = session?.get("token");
   if (fromSession) return fromSession;
@@ -162,7 +162,7 @@ function isTokenExpired(token: string, nowMs: number): boolean {
   }
 }
 
-export async function requireToken(context: AppLoadContext, request: Request): Promise<string> {
+export async function requireToken(context: LoadContext, request: Request): Promise<string> {
   const token = await getToken(context, request);
   if (!token) throw redirect("/login");
   // An expired session is the ordinary end of a session, not a failure. Without
@@ -201,7 +201,7 @@ export function browserJwtCookie(token: string): string {
 }
 
 export async function createSessionWithToken(
-  context: AppLoadContext,
+  context: LoadContext,
   token: string,
   redirectTo: string,
 ) {
@@ -214,7 +214,7 @@ export async function createSessionWithToken(
   return redirect(redirectTo, { headers });
 }
 
-export async function destroyUserSession(context: AppLoadContext, request: Request) {
+export async function destroyUserSession(context: LoadContext, request: Request) {
   const session = await getSession(context, request);
   const headers = new Headers();
   // Logging out must work even when no signing secret is configured — the point

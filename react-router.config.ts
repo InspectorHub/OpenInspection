@@ -17,5 +17,9 @@ export default {
     // pathname off it was moved to the normalized `url` arg beforehand, and no
     // code iterates searchParams (which is where the internal entries surface).
     v8_passThroughRequests: true,
+    // The load context becomes a RouterContextProvider addressed by typed keys
+    // instead of a plain object. Every read already goes through
+    // app/lib/load-context.ts, so this is one edit rather than forty.
+    v8_middleware: true,
   },
 } satisfies Config;

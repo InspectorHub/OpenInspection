@@ -13,7 +13,8 @@
  * to a token-scoped, session-independent report view INSTEAD of the client
  * hub, never bounced to the client login page by the overview's normal 401.
  */
-import { redirect, type AppLoadContext } from "react-router";
+import { redirect } from "react-router";
+import type { LoadContext } from "~/lib/load-context";
 import type { Api } from "~/lib/api-client.server";
 import type { StatusOverview } from "~/components/portal/InspectionStatusCards";
 import { loadAgentReportContext } from "~/lib/agent-report-context";
@@ -60,7 +61,7 @@ export interface PortalSessionResolution {
  * circuits the session-gated overview call entirely.
  */
 export async function resolvePortalSession(
-  context: AppLoadContext,
+  context: LoadContext,
   api: Api,
   tenant: string,
   inspectionId: string,

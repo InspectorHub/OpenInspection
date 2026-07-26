@@ -1,27 +1,23 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { AppLoadContext } from "react-router";
-import { getCloudflareEnv } from "./load-context";
-
-function contextWith(env: unknown): AppLoadContext {
-  return { cloudflare: { env, ctx: {} } } as unknown as AppLoadContext;
-}
+import { RouterContextProvider } from "react-router";
+import { getCloudflareEnv, createLoadContext, type LoadContext } from "./load-context";
 
 describe("getCloudflareEnv", () => {
   it("returns the env the worker put on the load context", () => {
-    const env = { APP_MODE: "saas" };
-    expect(getCloudflareEnv(contextWith(env))).toBe(env);
+    expect(getCloudflareEnv(createLoadContext({ APP_MODE: "saas" })).APP_MODE).toBe("saas");
   });
 
-  it("returns an empty env when the context carries none", () => {
-    // Unit tests build bare `{}` contexts deliberately; a loader reading an
-    // optional var must stay exercisable without a worker behind it.
-    expect(getCloudflareEnv({} as AppLoadContext)).toEqual({});
+  it("returns an empty env when the context was never seeded", () => {
+    // The context key carries a default, so a provider nobody seeded reads as
+    // an empty env. Unit tests build bare contexts deliberately; a loader
+    // reading an optional var must stay exercisable without a worker behind it.
+    expect(getCloudflareEnv(new RouterContextProvider())).toEqual({});
   });
 
   it("does not throw on an undefined context", () => {
-    expect(() => getCloudflareEnv(undefined as unknown as AppLoadContext)).not.toThrow();
+    expect(() => getCloudflareEnv(undefined as unknown as LoadContext)).not.toThrow();
   });
 });
 
