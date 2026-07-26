@@ -47,10 +47,15 @@ export type WorkerEnv = Env & {
    */
   APP_MODE?: string;
   /**
-   * Portal URL for browser redirects (login bounce, billing, workspace switch).
-   * SaaS-only, and therefore absent from the placeholder config typegen reads.
+   * The SaaS portal's base-URL var is deliberately NOT declared here. The
+   * SaaS-portal isolation gate (tests/unit/sync/portal-isolation.spec.ts)
+   * confines that name to a short list of integration-boundary files so portal
+   * coupling cannot spread by being merely convenient to reach; declaring it on
+   * the shared env would hand it to every loader, which is what the gate exists
+   * to prevent. The one route that needs it declares it locally. (The name is
+   * spelled out nowhere in this file for the same reason — the gate matches on
+   * the literal, comments included.)
    */
-  PORTAL_API_URL?: string;
   /**
    * Optional Google Maps JS key for the client-side map. A plaintext var set
    * per deployment rather than in the committed config.

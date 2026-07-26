@@ -24,14 +24,13 @@ export function meta() {
 }
 
 /**
- * OAUTH_PROVIDER is injected by the OAuthProvider wrapper for requests that
- * reach the defaultHandler, so it rides the load context without ever being a
- * wrangler binding. It is declared here rather than on `WorkerEnv` because this
- * route is its only consumer; APP_MODE and PORTAL_API_URL, which this route
- * also reads, are on `WorkerEnv` since the rest of the app reads them too.
+ * Env the shared `WorkerEnv` omits on purpose. OAUTH_PROVIDER: wrapper-injected,
+ * never a binding, sole consumer. PORTAL_API_URL: the SaaS-portal isolation gate
+ * confines it to integration-boundary files, so it must not sit on a shared env.
  */
 interface AuthorizeEnv {
   OAUTH_PROVIDER?: OAuthHelpers;
+  PORTAL_API_URL?: string;
 }
 
 /** Resolved end-user identity backing an OAuth grant. */
@@ -111,14 +110,10 @@ export function isRegisteredRedirectUri(
 }
 
 /**
- * Build the login redirect that preserves the in-flight authorize request.
- *
- * Takes the normalized `url` rather than deriving one from `request.url`: under
- * v8_passThroughRequests the raw request URL carries React Router's own
- * implementation details (a `.data` suffix), which would be baked into the
- * returnTo and bounce the user to a non-page after logging in. The action path
- * is the one that matters here — a form POST from a client-side navigation is
- * exactly when the suffix appears.
+ * Login redirect preserving the in-flight authorize request. Takes the
+ * normalized `url`, not `request.url`, whose `.data` suffix under
+ * v8_passThroughRequests would be baked into the returnTo (bites on the action
+ * path: a form POST from a client-side navigation).
  */
 function loginRedirect(env: WorkerEnv & AuthorizeEnv, url: URL): Response {
   if (env.APP_MODE === "saas" && env.PORTAL_API_URL) {
