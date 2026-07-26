@@ -35,10 +35,21 @@ function jsonRes(body: unknown, ok = true) {
     return { ok, status: ok ? 200 : 404, json: async () => body } as unknown as Response;
 }
 
+/**
+ * The loader also pulls documents through the in-process API binding, so the
+ * context must carry one. A bare `{}` used to work only by accident: reading
+ * `context.cloudflare.env` threw, and the loader's try/catch swallowed it, so
+ * the documents fetch never ran. Reading the env through an accessor no longer
+ * throws, which would leave the call falling through to global fetch.
+ */
 function loaderArgs(): LoaderArgs {
     return {
         request: new Request('http://app.example.com/inspections/insp-1'),
-        context: {} as never,
+        context: {
+            cloudflare: {
+                env: { API_WORKER: { fetch: async () => jsonRes({ data: [] }) } },
+            },
+        } as never,
         params: { id: 'insp-1' },
     } as unknown as LoaderArgs;
 }

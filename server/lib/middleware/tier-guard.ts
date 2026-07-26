@@ -1,5 +1,5 @@
-import { MiddlewareHandler } from 'hono';
-import { HonoConfig } from '../../types/hono';
+import type { MiddlewareHandler } from 'hono';
+import type { HonoConfig } from '../../types/hono';
 
 /**
  * Middleware: block non-GET API mutations when tenant subscription is not active.

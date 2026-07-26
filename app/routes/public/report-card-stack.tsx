@@ -43,8 +43,8 @@ export {
 // Loader-local alias for the shared payload type.
 type LoaderResult = ReportLoaderResult;
 
-export function meta({ data }: Route.MetaArgs) {
- const d = data as LoaderResult | undefined;
+export function meta({ loaderData }: Route.MetaArgs) {
+ const d = loaderData as LoaderResult | undefined;
  return [{ title: m.report_meta_title({ name: d?.address ?? m.report_meta_title_fallback() }) }];
 }
 

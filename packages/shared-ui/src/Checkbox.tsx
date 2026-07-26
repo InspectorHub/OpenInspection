@@ -14,8 +14,10 @@ interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
  * parent (e.g. FormField) can supply its own label/error. Uses the DS
  * `accent-ih-primary` token for the check fill.
  */
-export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ label, error, bare = false, className = "", id, ...props }, ref) => {
+// React 19: `ref` is a plain prop, so no forwardRef wrapper.
+export function Checkbox({
+  label, error, bare = false, className = "", id, ref, ...props
+}: CheckboxProps & { ref?: React.Ref<HTMLInputElement> }) {
     const input = (
       <input
         ref={ref}
@@ -37,6 +39,4 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         {error && <p className="text-[11px] text-ih-bad-fg mt-1">{error}</p>}
       </div>
     );
-  },
-);
-Checkbox.displayName = "Checkbox";
+}

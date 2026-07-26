@@ -20,7 +20,7 @@ import { Errors } from '../lib/errors';
 import { runErasure } from '../lib/compliance/erasure-orchestrator';
 import type { Role } from '../lib/auth/roles';
 
-import { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
+import type { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { safeTimestamp } from '../lib/date';
 
 /** A workspace member plus the freshness of their Google calendar sync. */

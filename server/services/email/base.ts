@@ -3,7 +3,7 @@ import { logger } from '../../lib/logger';
 import { buildIcs, type IcsEvent } from '../../lib/ics';
 import { inspectorSignature, type SignatureUser } from '../../lib/inspector-signature';
 import { resolveSenderIdentity, type EmailIdentityConfig, type SenderInspector } from '../../lib/email/sender-identity';
-import { EmailTemplateRenderer } from '../../lib/email-templates/renderer';
+import type { EmailTemplateRenderer } from '../../lib/email-templates/renderer';
 import type { RenderResult } from '../../lib/email-templates/types';
 import { ResendProvider } from '../../lib/email/providers/resend';
 import type { EmailProvider } from '../../lib/email/provider';

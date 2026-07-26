@@ -2,32 +2,23 @@
 // Hono is the worker entry; it mounts the full OpenInspection API and delegates
 // every other path to the React Router SSR handler. Replaces the dual-worker
 // (API worker + web worker + Service Binding) topology with one deployable.
-import { Hono } from "hono";
-import { createRequestHandler } from "react-router";
+import { Hono, type Context } from "hono";
+import { createRequestHandler, RouterContextProvider } from "react-router";
 import { buildOAuthHandler } from "../server/lib/mcp/oauth-provider";
 // i18n Phase C — request-scoped locale. paraglideMiddleware establishes an
 // AsyncLocalStorage scope so getLocale()/m.*() resolve per-request (never a
 // module-global) across the multi-tenant Worker. Generated (git-ignored); the
 // paraglide vite plugin + the prebuild `i18n:compile` step keep it present.
 import { paraglideMiddleware } from "../app/paraglide/server.js";
+import type { WorkerEnv } from "./env";
+import { cloudflareContext } from "../app/lib/load-context";
 
-declare module "react-router" {
-  export interface AppLoadContext {
-    cloudflare: {
-      env: Env;
-      ctx: ExecutionContext;
-    };
-  }
-}
+/** Hono context for this worker, so handlers need no `any`. */
+type Ctx = Context<{ Bindings: WorkerEnv }>;
 
-interface Env {
-  ASSETS?: Fetcher;
-  API_URL?: string;
-  SESSION_SECRET?: string;
-  /** In-process self-binding injected by the worker so RR loaders can call the
-   *  API directly (no network hop). Set on the load context; never in wrangler. */
-  API_WORKER?: { fetch: typeof fetch };
-}
+// The load context is a RouterContextProvider seeded per request in `ssr()`
+// below; `cloudflareContext` is its only key. No `AppLoadContext` module
+// augmentation any more — that interface is unused once middleware is on.
 
 // The API graph (server/index → every route/service/dep) is imported LAZILY.
 // Evaluating it at module top-level breaks `react-router dev`: the
@@ -50,21 +41,27 @@ const requestHandler = createRequestHandler(
 // loaders/actions' `createApi()` call the API app DIRECTLY (its createApi prefers
 // env.API_WORKER.fetch) instead of an HTTP loopback to this same worker — no
 // extra network hop, no API_URL needed.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const ssr = (c: any) => {
-  const env = {
+const ssr = (c: Ctx) => {
+  const env: WorkerEnv = {
     ...c.env,
     API_WORKER: {
       fetch: async (req: Request) =>
         (await getApi()).app.fetch(req, c.env, c.executionCtx),
     },
   };
+  const context = new RouterContextProvider();
+  context.set(cloudflareContext, { env, ctx: c.executionCtx });
   // Run the whole RR pipeline (loaders → actions → render) INSIDE the paraglide
   // ALS scope, so getLocale()/m.*() resolve to this request's locale in server
   // loaders/actions AND during SSR. cookie strategy ⇒ no URL rewrite/redirect,
   // so the callback's request is the original.
+  //
+  // This stays wrapped AROUND requestHandler rather than becoming a route
+  // middleware: it has to cover loaders, actions, AND the render pass, and only
+  // the outer position does. Moving it inside would narrow the scope silently —
+  // locale would fall back to baseLocale with nothing raising an error.
   return paraglideMiddleware(c.req.raw, ({ request }) =>
-    requestHandler(request, { cloudflare: { env, ctx: c.executionCtx } }),
+    requestHandler(request, context),
   );
 };
 

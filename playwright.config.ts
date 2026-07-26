@@ -63,6 +63,13 @@ export default defineConfig({
             testMatch: 'frontend-browser.spec.ts',
         },
         {
+            // Anonymous requests only — asserts the guard boundary between the
+            // auth-layout branch and the public routes. No seeded workspace
+            // needed, hence no dependency on `api`.
+            name: 'route-auth-boundary',
+            testMatch: 'route-auth-boundary.spec.ts',
+        },
+        {
             name: 'inspection-hub',
             testMatch: 'inspection-hub.spec.ts',
         },

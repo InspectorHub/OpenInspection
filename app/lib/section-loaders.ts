@@ -10,26 +10,26 @@
  * recipient's email-matched signer token, or the forwarded portal-session cookie,
  * exactly as documented per-section below.
  */
-import type { AppLoadContext } from "react-router";
 import { createApi } from "~/lib/api-client.server";
 import { m } from "~/paraglide/messages";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { formatDate } from "~/lib/format";
 import { EMPTY_BRAND } from "~/lib/brand";
 import type { HubSection } from "~/components/portal/InspectionHub";
-import {
-  type ReportLoaderResult,
-  type FilterKey,
+import type {
+  ReportLoaderResult,
+  FilterKey,
 } from "~/components/portal/sections/ReportView";
-import { type ProgressSection } from "~/components/portal/sections/ProgressView";
-import {
-  type LoaderResult as RepairLoaderResult,
-  type Defect as RepairDefect,
-  type RepairRequest,
+import type { ProgressSection } from "~/components/portal/sections/ProgressView";
+import type {
+  LoaderResult as RepairLoaderResult,
+  Defect as RepairDefect,
+  RepairRequest,
 } from "~/components/portal/sections/RepairBuilderSection";
-import { type AgreementData } from "~/components/portal/sections/AgreementSection";
-import { type InvoiceData } from "~/components/portal/sections/PaymentSection";
+import type { AgreementData } from "~/components/portal/sections/AgreementSection";
+import type { InvoiceData } from "~/components/portal/sections/PaymentSection";
 import type { TenantBrand } from "~/lib/brand";
+import type { LoadContext } from "~/lib/load-context";
 
 /* ------------------------------------------------------------------ */
 /* Section validation */
@@ -62,7 +62,7 @@ export function isJumpSection(v: string | null): v is HubSection {
 /* ------------------------------------------------------------------ */
 
 export async function loadReportSection(
-  context: AppLoadContext,
+  context: LoadContext,
   request: Request,
   tenant: string,
   inspectionId: string,
@@ -199,7 +199,7 @@ export interface ProgressLoaderResult {
 }
 
 export async function loadProgressSection(
-  context: AppLoadContext,
+  context: LoadContext,
   tenant: string,
   inspectionId: string,
   cookieForApi: string,
@@ -239,7 +239,7 @@ export async function loadProgressSection(
 /* ------------------------------------------------------------------ */
 
 export async function loadRepairSection(
-  context: AppLoadContext,
+  context: LoadContext,
   tenant: string,
   inspectionId: string,
   token: string,
@@ -304,7 +304,7 @@ interface RawInvoice {
 }
 
 export async function loadInvoiceSection(
-  context: AppLoadContext,
+  context: LoadContext,
   inspectionId: string,
 ): Promise<InvoiceLoaderResult> {
   try {
@@ -352,7 +352,7 @@ export interface AgreementLoaderResult {
 }
 
 export async function loadAgreementSection(
-  context: AppLoadContext,
+  context: LoadContext,
   signerToken: string | null,
 ): Promise<AgreementLoaderResult> {
   if (!signerToken) return { agreement: null, error: null };

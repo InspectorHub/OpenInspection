@@ -1,6 +1,6 @@
-import { type IcsEvent } from '../../lib/ics';
-import { type SignatureUser } from '../../lib/inspector-signature';
-import { type Constructor } from './base';
+import type { IcsEvent } from '../../lib/ics';
+import type { SignatureUser } from '../../lib/inspector-signature';
+import type { Constructor } from './base';
 
 /**
  * Inspection-lifecycle email methods: report-ready (link + PDF variants) and

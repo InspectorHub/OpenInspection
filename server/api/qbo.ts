@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { HonoConfig } from '../types/hono';
+import type { HonoConfig } from '../types/hono';
 import { getCookie } from 'hono/cookie';
 import { verifyJwt } from '../lib/jwt-keyring';
 import { QBOTokenResponseSchema, QBOCompanyInfoResponseSchema, QBOLinkCustomerBodySchema } from '../lib/validations/qbo.schema';

@@ -47,7 +47,7 @@ export interface BrandingConfig {
     tenantStatus?: string | undefined;
 }
 
-import { ScopedDB } from '../lib/db/scoped';
+import type { ScopedDB } from '../lib/db/scoped';
 import type { JwtKeyring } from '../lib/jwt-keyring';
 
 export interface AuthVariables {

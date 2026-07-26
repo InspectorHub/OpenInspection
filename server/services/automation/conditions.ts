@@ -1,11 +1,12 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
-import { automations, agreementRequests, inspectionServices } from '../../lib/db/schema';
+import type { automations} from '../../lib/db/schema';
+import { agreementRequests, inspectionServices } from '../../lib/db/schema';
 import { logger } from '../../lib/logger';
 import { isReportPublished } from '../../lib/status/report-status';
 import { evaluateConditions as coreEvaluate } from '../../lib/automation-core';
 import type { CoreCondition } from '../../lib/automation-core';
-import { type Constructor, type FlushInspection } from './shared';
+import type { Constructor, FlushInspection } from './shared';
 import type { AutomationBase } from './shared';
 
 /**

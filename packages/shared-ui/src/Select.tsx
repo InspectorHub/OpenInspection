@@ -24,8 +24,10 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
  * (RatingSystemEditor). `multiple` keeps native rendering (a listbox) and drops
  * the chevron affordance.
  */
-export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ label, error, hint, bare = false, options, className = "", multiple, children, id, ...props }, ref) => {
+// React 19: `ref` is a plain prop, so no forwardRef wrapper.
+export function Select({
+  label, error, hint, bare = false, options, className = "", multiple, children, id, ref, ...props
+}: SelectProps & { ref?: React.Ref<HTMLSelectElement> }) {
     const generatedId = React.useId();
     const controlId = id ?? generatedId;
 
@@ -77,6 +79,4 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         {!error && hint && <p className="text-[11px] text-ih-fg-4 mt-1">{hint}</p>}
       </div>
     );
-  },
-);
-Select.displayName = "Select";
+}

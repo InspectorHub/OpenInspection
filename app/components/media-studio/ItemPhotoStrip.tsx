@@ -108,7 +108,8 @@ export function ItemPhotoStrip({
   const [sel, setSel] = useState<Set<number>>(new Set());
   // Long-press timer: 450ms — DELIBERATELY longer than SortableJS's 180ms drag
   // delay so a held-and-moved press = drag, a held-and-still press = select.
-  const lp = useRef<ReturnType<typeof setTimeout>>();
+  // React 19 requires an explicit initial value; an unset timer is `undefined`.
+  const lp = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const toggle = (i: number) =>
     setSel((prev) => {

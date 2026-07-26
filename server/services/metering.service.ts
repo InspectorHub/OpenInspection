@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { sql, eq, and } from 'drizzle-orm';
 import { usageCounters } from '../lib/db/schema/usage';
-import { type UsageMetric } from '../lib/usage/period';
+import type { UsageMetric } from '../lib/usage/period';
 
 /**
  * Usage meter. Takes a raw D1Database and creates a drizzle handle per call

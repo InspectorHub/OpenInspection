@@ -1,8 +1,8 @@
-import { MiddlewareHandler } from 'hono';
+import type { MiddlewareHandler } from 'hono';
 import { eq, and } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { users, tenants } from '../db/schema';
-import { HonoConfig } from '../../types/hono';
+import type { HonoConfig } from '../../types/hono';
 import { getBookingHost } from '../url';
 import { logger } from '../logger';
 

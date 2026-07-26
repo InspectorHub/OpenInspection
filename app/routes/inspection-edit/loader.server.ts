@@ -7,6 +7,7 @@ import { resolvePcaNarrative } from "../../../server/lib/pca-narrative";
 import { RELIANCE_TEMPLATES } from "../../../server/lib/pca-reliance-text";
 import { METADATA_PRESETS, type PropertyMetaField } from "../../../server/lib/commercial-subtypes";
 import type { CompliancePanelData } from "~/components/inspection-edit/CompliancePanel";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 export async function loader({ request, params, context }: Route.LoaderArgs) {
  const token = await requireToken(context, request);
@@ -128,8 +129,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
  // Plan 7 — the Stream customer subdomain (env) drives video poster thumbnails
  // + the player iframe. Absent ⇒ null; the viewer/strip fail closed gracefully
  // (no fabricated subdomain).
- const streamCustomerSubdomain =
-   ((context.cloudflare?.env as { STREAM_CUSTOMER_SUBDOMAIN?: string } | undefined)?.STREAM_CUSTOMER_SUBDOMAIN) ?? null;
+ const streamCustomerSubdomain = getCloudflareEnv(context).STREAM_CUSTOMER_SUBDOMAIN ?? null;
 
  // D8 — expose the RAW (un-normalized) snapshot so structural ops (addSection /
  // duplicateSection / deleteSection / moveSection) can operate on a clean

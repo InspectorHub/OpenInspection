@@ -7,6 +7,7 @@ import { createApi } from "~/lib/api-client.server";
 import { getApiUrl } from "~/lib/api.server";
 import { SecretField } from "~/components/SecretField";
 import { m } from "~/paraglide/messages";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 interface QboStatus {
   connected: boolean;
@@ -21,8 +22,6 @@ export function meta() {
   return [{ title: m.settings_qbo_meta_title() }];
 }
 
-type BffEnv = { API_WORKER?: { fetch: typeof fetch } };
-
 async function qboApiFetch(
   context: Route.LoaderArgs["context"],
   cookie: string,
@@ -30,7 +29,7 @@ async function qboApiFetch(
   method = "GET",
 ): Promise<Response | null> {
   try {
-    const env = (context.cloudflare?.env ?? {}) as BffEnv;
+    const env = getCloudflareEnv(context);
     const apiBase = getApiUrl(context);
     const req = new Request(`${apiBase}/settings/integrations/qbo${path}`, {
       method,

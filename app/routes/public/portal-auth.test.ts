@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import type { AppLoadContext } from "react-router";
 import { loader } from "~/routes/public/portal-auth";
+import { createLoadContext } from "~/lib/load-context";
 
 /**
  * Spec 3 Task 7 — the portal-auth loader (BFF for GET /portal/:tenant/auth)
@@ -19,10 +19,8 @@ import { loader } from "~/routes/public/portal-auth";
 
 const API_URL = "https://mock-api.test";
 
-function makeContext(): AppLoadContext {
-  return {
-    cloudflare: { env: { API_URL } },
-  } as unknown as AppLoadContext;
+function makeContext() {
+  return createLoadContext({ API_URL });
 }
 
 function fakeResponse(status: number, body: unknown, headers: Record<string, string> = {}): Response {

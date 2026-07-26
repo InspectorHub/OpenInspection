@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFetcher } from "react-router";
+import type { useFetcher } from "react-router";
 import { Modal, Button, Checkbox, Input, Select } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
 import type { PersonRow } from "./PeopleEditor";

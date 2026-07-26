@@ -14,15 +14,17 @@ interface RadioProps extends React.InputHTMLAttributes<HTMLInputElement> {
  * A single Design System radio, wrapped in its own <label> for native
  * association. Exported for custom layouts; for the common case use RadioGroup.
  */
-export const Radio = React.forwardRef<HTMLInputElement, RadioProps>(
-  ({ label, className = "", ...props }, ref) => (
+// React 19: `ref` is a plain prop, so no forwardRef wrapper.
+export function Radio({
+  label, className = "", ref, ...props
+}: RadioProps & { ref?: React.Ref<HTMLInputElement> }) {
+  return (
     <label className="flex items-center gap-2 cursor-pointer">
       <input ref={ref} type="radio" className={`accent-ih-primary h-4 w-4 ${className}`} {...props} />
       {label && <span className="text-[13px] text-ih-fg-2">{label}</span>}
     </label>
-  ),
-);
-Radio.displayName = "Radio";
+  );
+}
 
 interface RadioGroupProps {
   name: string;

@@ -42,6 +42,7 @@ import {
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspection-hub-helpers";
 import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 export function meta() {
   return [{ title: m.inspections_hub_meta_title() }];
@@ -177,7 +178,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // a non-OK response degrades to an empty list.
   let documents: DocumentItem[] = [];
   try {
-    const apiWorker = context.cloudflare.env.API_WORKER;
+    const apiWorker = getCloudflareEnv(context).API_WORKER;
     const docsRes = await (apiWorker?.fetch ?? fetch)(
       new Request(`https://internal/api/inspections/${id}/documents`, {
         headers: { cookie: request.headers.get("cookie") ?? "" },

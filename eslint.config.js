@@ -96,7 +96,7 @@ export default tseslint.config(
             //   - a753af5 (login 2fa form)
             // Rule: x-cloak ONLY on the outermost x-data element. For nested
             // hide-on-load, use style="display:none" + x-show.
-            'no-restricted-syntax': ['warn',
+            'no-restricted-syntax': ['error',
                 {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
@@ -193,7 +193,7 @@ export default tseslint.config(
         ],
         rules: {
             // Turn off ONLY the role-literal restriction for these files; all other rules still apply.
-            'no-restricted-syntax': ['warn',
+            'no-restricted-syntax': ['error',
                 {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
@@ -209,13 +209,19 @@ export default tseslint.config(
         // Scoped to routes/** so browser-side component fetches aren't false-flagged.
         files: ['app/routes/**/*.ts', 'app/routes/**/*.tsx'],
         rules: {
-            'no-restricted-syntax': ['warn',
+            'no-restricted-syntax': ['error',
                 {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
                 },
                 {
-                    selector: "CallExpression[callee.name='fetch'][arguments.0.type='Literal'][arguments.0.value=/^\\u002Fapi\\u002F/]",
+                    // `/api/public/*` is exempt: those endpoints are unauthenticated
+                    // by design, so a browser calling them directly is correct. The
+                    // rule exists because a client fetch of a GUARDED route carries
+                    // no session cookie and 401s — see the BFF note in CLAUDE.md.
+                    // The embed widget posts a booking from a third-party page and
+                    // has no loader to route through.
+                    selector: "CallExpression[callee.name='fetch'][arguments.0.type='Literal'][arguments.0.value=/^\\u002Fapi\\u002F(?!public\\u002F)/]",
                     message: 'Do not call fetch("/api/...") with a string literal. Use createApi(context) from ~/lib/api-client.server for typed access.',
                 },
                 {

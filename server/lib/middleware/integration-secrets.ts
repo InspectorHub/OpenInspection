@@ -17,9 +17,9 @@
  * request context so multiple accesses to c.env.RESEND_API_KEY etc.
  * don't re-decrypt.
  */
-import { MiddlewareHandler } from 'hono';
+import type { MiddlewareHandler } from 'hono';
 import { loadTenantSecrets } from '../secrets-cache';
-import { HonoConfig } from '../../types/hono';
+import type { HonoConfig } from '../../types/hono';
 import { logger } from '../logger';
 import { INTEGRATION_SECRET_KEYS } from '../../api/secrets';
 

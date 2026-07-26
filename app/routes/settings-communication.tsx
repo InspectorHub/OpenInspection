@@ -22,6 +22,7 @@ import { ManagedComplianceWizard, type ManagedComplianceData } from "~/component
 import { SectionNav } from "~/components/settings/SectionNav";
 import { parseTestResults } from "~/lib/connection-test";
 import { m } from "~/paraglide/messages";
+import { getCloudflareEnv } from "~/lib/load-context";
 
 export function meta() {
   return [{ title: m.settings_comms_meta_title() }];
@@ -381,7 +382,7 @@ export async function action({ request, context }: Route.ActionArgs) {
     // Gate: SaaS only. The API endpoint also enforces this (403 in standalone),
     // but we short-circuit a direct POST here so standalone never reaches the API.
     const isSaasAction =
-      (context as { cloudflare?: { env?: { APP_MODE?: string } } }).cloudflare?.env?.APP_MODE === "saas";
+      getCloudflareEnv(context)?.APP_MODE === "saas";
     if (!isSaasAction) {
       return { intent, ok: false as const, error: m.settings_comms_managed_saas_only(), field: null, test: null };
     }

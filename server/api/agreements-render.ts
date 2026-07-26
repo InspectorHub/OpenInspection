@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { HonoConfig } from '../types/hono';
+import type { HonoConfig } from '../types/hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc } from 'drizzle-orm';
 import * as schema from '../lib/db/schema';
