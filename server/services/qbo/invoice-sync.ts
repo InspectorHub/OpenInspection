@@ -2,12 +2,12 @@ import { eq, and } from 'drizzle-orm';
 import { qboConnections, qboEntityMap } from '../../lib/db/schema/qbo';
 import { invoices } from '../../lib/db/schema/invoice';
 import { logger } from '../../lib/logger';
-import {
-    type Constructor,
-    type InvoiceSummary,
-    type MarkPaidFn,
-    type MarkPartialFn,
-    type QBOServiceBase,
+import type {
+    Constructor,
+    InvoiceSummary,
+    MarkPaidFn,
+    MarkPartialFn,
+    QBOServiceBase,
 } from './api-base';
 
 export function withInvoiceSync<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {

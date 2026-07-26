@@ -26,10 +26,10 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: "h-11 px-5 text-sm gap-2",
 };
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = "secondary", size = "md", icon, children, className = "", selected, ...props },
-  ref,
-) {
+// React 19: `ref` is a plain prop, so no forwardRef wrapper.
+export function Button({
+  variant = "secondary", size = "md", icon, children, className = "", selected, ref, ...props
+}: ButtonProps & { ref?: React.Ref<HTMLButtonElement> }) {
   const selectedClass = selected ? "ring-2 ring-ih-primary ring-inset" : "";
   return (
     <button
@@ -49,4 +49,4 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function 
       {children}
     </button>
   );
-});
+}

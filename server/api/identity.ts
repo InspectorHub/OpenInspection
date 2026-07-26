@@ -7,7 +7,7 @@
 import { createRoute } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { createApiRouter } from '../lib/openapi-router';
-import { HonoConfig } from '../types/hono';
+import type { HonoConfig } from '../types/hono';
 import type { Context } from 'hono';
 import { Errors } from '../lib/errors';
 import { withMcpMetadata } from '../lib/route-metadata-standards';

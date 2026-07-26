@@ -16,7 +16,8 @@ import { requireRole } from '../../lib/middleware/rbac';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
-import { inspections, reportSignoff, psqResponses } from '../../lib/db/schema';
+import type { reportSignoff, psqResponses } from '../../lib/db/schema';
+import { inspections } from '../../lib/db/schema';
 import { resolveReportTier } from '../../lib/report-tier';
 import { computeConformance, deriveConformanceInput } from '../../lib/pca-conformance';
 import {

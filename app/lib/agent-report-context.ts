@@ -10,7 +10,7 @@
  * alongside it) purely to keep that file under the repo's file-size ratchet —
  * same host/consumer, no behavioral split.
  */
-import type { AppLoadContext } from "react-router";
+import { getCloudflareEnv, type LoadContext } from "~/lib/load-context";
 
 /**
  * Non-null only when ctx.token's recipient is agent-kind; null covers every
@@ -31,14 +31,14 @@ export interface AgentReportContext {
  * `section === "documents"` branch).
  */
 export async function loadAgentReportContext(
-  context: AppLoadContext,
+  context: LoadContext,
   tenant: string,
   inspectionId: string,
   token: string,
 ): Promise<AgentReportContext | null> {
   if (!token) return null;
   try {
-    const apiWorker = context.cloudflare.env.API_WORKER;
+    const apiWorker = getCloudflareEnv(context).API_WORKER;
     const res = await (apiWorker?.fetch ?? fetch)(
       new Request("https://internal/api/agent/report-context", {
         method: "POST",

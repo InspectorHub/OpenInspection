@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import { tenants, tenantConfigs } from '../lib/db/schema';
-import { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
+import type { IntegrationProvider, TenantUpdateParams } from '../lib/integration';
 import { logger } from '../lib/logger';
 import { applyAdminCredential } from './admin-credential';
 

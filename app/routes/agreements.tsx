@@ -6,9 +6,9 @@ import { createApi } from "~/lib/api-client.server";
 import { PageHeader, TabStrip, Card, Button, EmptyState, Modal } from "@core/shared-ui";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { SignaturePad } from "~/components/SignaturePad";
-import { type SignerRow } from "~/components/agreements/SignerList";
+import type { SignerRow } from "~/components/agreements/SignerList";
 import { SendAgreementModal, type SendAgreementPayload } from "~/components/agreements/SendAgreementModal";
-import { type RequestRow as RequestRowData, type InspectionOption } from "~/components/agreements/agreements-helpers";
+import type { RequestRow as RequestRowData, InspectionOption } from "~/components/agreements/agreements-helpers";
 import { TemplateRow, RequestRow } from "~/components/agreements/AgreementRows";
 import { m } from "~/paraglide/messages";
 

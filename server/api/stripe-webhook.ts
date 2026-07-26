@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { HonoConfig } from '../types/hono';
+import type { HonoConfig } from '../types/hono';
 import { logger } from '../lib/logger';
 import { extractSettledPayment } from '../lib/stripe-helpers';
 import { appendWebhookLogEntry } from '../lib/stripe-webhook-log';

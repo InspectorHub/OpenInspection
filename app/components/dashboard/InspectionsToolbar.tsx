@@ -7,7 +7,9 @@ interface InspectionsToolbarProps {
   setSearchQuery: (v: string) => void;
   onOpenFilters: () => void;
   onToggleColumns: () => void;
-  columnsBtnRef: RefObject<HTMLButtonElement>;
+  // React 19's `useRef<T>(null)` returns `RefObject<T | null>` — the type now
+  // states what was always true, that the ref is null before the element mounts.
+  columnsBtnRef: RefObject<HTMLButtonElement | null>;
 }
 
 /**

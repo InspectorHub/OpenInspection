@@ -1,4 +1,4 @@
-import { type usageCounters } from '../db/schema/usage';
+import type { usageCounters } from '../db/schema/usage';
 export interface TenantUsage {
   tenantId: string;
   sms: number;

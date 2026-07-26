@@ -1,6 +1,6 @@
-import { Context } from 'hono';
-import { ContentfulStatusCode } from 'hono/utils/http-status';
-import { ErrorCode } from './errors';
+import type { Context } from 'hono';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
+import type { ErrorCode } from './errors';
 
 /**
  * Standard API response structure.

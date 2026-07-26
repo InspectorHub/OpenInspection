@@ -8,6 +8,8 @@ import { makeLoginSchema } from "~/lib/forms/auth.schema";
 import { AuthShell } from "~/components/AuthShell";
 import { safeReturnTo } from "../../server/lib/mcp/safe-return-to";
 import { m } from "~/paraglide/messages";
+import { getCloudflareEnv } from "~/lib/load-context";
+import type { WorkerEnv } from "../../workers/env";
 
 export function meta() {
   return [{ title: m.auth_login_meta_title() }];
@@ -18,8 +20,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   // (POST /api/auth/login already answers 410 LOGIN_MOVED_TO_PORTAL there).
   // Bounce the PAGE too, so app.<domain>/login never renders a dead form.
   // Mirrors getDeploymentProfile(): saas mode + PORTAL_API_URL as the base.
-  const env = (context as { cloudflare?: { env?: { APP_MODE?: string; PORTAL_API_URL?: string } } })
-    ?.cloudflare?.env;
+  // PORTAL_API_URL stays a local declaration rather than moving onto
+  // WorkerEnv: the SaaS-portal isolation gate confines that name to
+  // integration-boundary files, so it must not sit on the shared env.
+  const env = getCloudflareEnv(context) as WorkerEnv & { PORTAL_API_URL?: string };
   if (env?.APP_MODE === "saas" && env.PORTAL_API_URL) {
     return redirect(`${env.PORTAL_API_URL.replace(/\/$/, "")}/login`);
   }

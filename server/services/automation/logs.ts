@@ -1,6 +1,6 @@
 import { eq, and, sql, desc } from 'drizzle-orm';
 import { automationLogs } from '../../lib/db/schema';
-import { type Constructor } from './shared';
+import type { Constructor } from './shared';
 import type { AutomationBase } from './shared';
 
 /**

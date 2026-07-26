@@ -1,6 +1,7 @@
-import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, SQL } from 'drizzle-orm';
-import * as schema from './schema';
+import type { drizzle } from 'drizzle-orm/d1';
+import type { SQL } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
+import type * as schema from './schema';
 
 export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
 

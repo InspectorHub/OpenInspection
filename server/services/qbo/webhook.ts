@@ -2,12 +2,12 @@ import { eq } from 'drizzle-orm';
 import { qboConnections } from '../../lib/db/schema/qbo';
 import { logger } from '../../lib/logger';
 import { QBOCloudEventSchema, type QBOCloudEvent } from '../../lib/validations/qbo.schema';
-import {
-    type Constructor,
-    type InvoiceSummary,
-    type MarkPaidFn,
-    type MarkPartialFn,
-    type QBOServiceBase,
+import type {
+    Constructor,
+    InvoiceSummary,
+    MarkPaidFn,
+    MarkPartialFn,
+    QBOServiceBase,
 } from './api-base';
 import { withInvoiceSync } from './invoice-sync';
 

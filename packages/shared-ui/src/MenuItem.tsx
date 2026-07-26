@@ -6,8 +6,10 @@ interface MenuItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: "default" | "danger";
 }
 
-export const MenuItem = React.forwardRef<HTMLButtonElement, MenuItemProps>(
-  function MenuItem({ icon, tone = "default", className = "", children, ...props }, ref) {
+// React 19: `ref` is a plain prop, so no forwardRef wrapper.
+export function MenuItem({
+  icon, tone = "default", className = "", children, ref, ...props
+}: MenuItemProps & { ref?: React.Ref<HTMLButtonElement> }) {
     const toneClass = tone === "danger" ? "text-ih-bad-fg" : "text-ih-fg-2";
     return (
       <button
@@ -25,5 +27,4 @@ export const MenuItem = React.forwardRef<HTMLButtonElement, MenuItemProps>(
         {children}
       </button>
     );
-  },
-);
+}

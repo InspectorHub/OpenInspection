@@ -88,7 +88,7 @@ export default function SettingsBillingPage() {
                   <p className="text-[13px] text-ih-fg-2 mt-1.5 leading-relaxed">
                     {m.settings_billing_selfhost_desc()}
                   </p>
-                  <a href="https://github.com/InspectorHub/OpenInspection" target="_blank" rel="noopener"
+                  <a href="https://github.com/InspectorHub/OpenInspection" target="_blank" rel="noopener noreferrer"
                     className="mt-3 inline-flex items-center gap-1 text-[13px] font-bold text-ih-ok-fg hover:underline">
                     {m.settings_billing_github_link()}
                     <ArrowIcon />
@@ -107,7 +107,7 @@ export default function SettingsBillingPage() {
                   <div className="text-2xl font-bold capitalize text-ih-fg-1 mt-1">{tier}</div>
                 </div>
                 {portalUrl && (
-                  <a href={portalUrl} target="_blank" rel="noopener"
+                  <a href={portalUrl} target="_blank" rel="noopener noreferrer"
                     className="px-4 py-2 rounded-md bg-ih-primary hover:bg-ih-primary-600 text-white text-[12px] font-bold inline-flex items-center gap-1.5 transition-colors">
                     {m.settings_billing_open_portal()}
                     <ArrowIcon />
@@ -199,7 +199,7 @@ export default function SettingsBillingPage() {
                 {m.settings_billing_invoices_desc({ kind: hasSeatQuota ? m.settings_billing_seat_cycle() : m.settings_billing_plan_tier() })}
               </p>
               {portalUrl ? (
-                <a href={portalUrl} target="_blank" rel="noopener"
+                <a href={portalUrl} target="_blank" rel="noopener noreferrer"
                   className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-bold text-ih-primary hover:underline">
                   {m.settings_billing_manage_portal()}
                   <ArrowIcon />
@@ -221,7 +221,7 @@ export default function SettingsBillingPage() {
               <p className="text-[12px] text-ih-fg-2 mt-2 leading-relaxed">
                 {m.settings_billing_hosted_pitch()}
               </p>
-              <a href="https://inspectorhub.io/" target="_blank" rel="noopener"
+              <a href="https://inspectorhub.io/" target="_blank" rel="noopener noreferrer"
                 className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-ih-primary hover:underline">
                 {m.settings_billing_try_hosted()} <ArrowIcon />
               </a>
@@ -233,7 +233,7 @@ export default function SettingsBillingPage() {
               <p className="text-[12px] text-ih-fg-2 mt-2 leading-relaxed">
                 {m.settings_billing_selfhost_pitch()}
               </p>
-              <a href="https://github.com/InspectorHub/OpenInspection" target="_blank" rel="noopener"
+              <a href="https://github.com/InspectorHub/OpenInspection" target="_blank" rel="noopener noreferrer"
                 className="mt-3 inline-flex items-center gap-1 text-[11px] font-bold text-ih-primary hover:underline">
                 {m.settings_billing_selfhost_docs()} <ArrowIcon />
               </a>

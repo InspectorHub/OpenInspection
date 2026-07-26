@@ -6,8 +6,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   hint?: string;
 }
 
-export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, className = "", ...props }, ref) => (
+// React 19: `ref` is a plain prop, so no forwardRef wrapper.
+export function Input({
+  label, error, hint, className = "", ref, ...props
+}: InputProps & { ref?: React.Ref<HTMLInputElement> }) {
+  return (
     <div>
       {label && <label className="block text-xs font-bold text-ih-fg-2 mb-1">{label}</label>}
       <input
@@ -20,6 +23,5 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
       {error && <p className="text-[11px] text-ih-bad-fg mt-1">{error}</p>}
       {!error && hint && <p className="text-[11px] text-ih-fg-4 mt-1">{hint}</p>}
     </div>
-  )
-);
-Input.displayName = "Input";
+  );
+}
