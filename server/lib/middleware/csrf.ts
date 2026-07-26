@@ -1,6 +1,6 @@
-import { MiddlewareHandler } from 'hono';
+import type { MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
-import { HonoConfig } from '../../types/hono';
+import type { HonoConfig } from '../../types/hono';
 import { Errors } from '../errors';
 import { timingSafeEqual } from '../password';
 

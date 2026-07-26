@@ -1,11 +1,11 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import type * as Y from "yjs";
 import { resolvePhotoDisplayKey, clearAnnotationOnRecrop } from "~/components/media-studio/photo-display-key";
-import { type MediaAction } from "~/components/media-studio/MediaViewer";
+import type { MediaAction } from "~/components/media-studio/MediaViewer";
 import { streamThumbUrl } from "~/components/media-studio/PosterPicker";
 import type { GalleryPhoto } from "~/lib/inspection-media";
 import { findingKey } from "~/hooks/findings/shared";
-import { type PhotoCrop } from "~/components/media-studio/PhotoCropper";
+import type { PhotoCrop } from "~/components/media-studio/PhotoCropper";
 import type { useInspectionState } from "~/hooks/useInspection";
 import type { useFindings } from "~/hooks/useFindings";
 import {

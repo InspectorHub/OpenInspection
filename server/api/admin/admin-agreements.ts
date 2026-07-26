@@ -6,7 +6,7 @@
 // aggregator, preserving the original paths.
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
-import * as schema from '../../lib/db/schema';
+import type * as schema from '../../lib/db/schema';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, resolveTenantSlug } from '../../lib/url';

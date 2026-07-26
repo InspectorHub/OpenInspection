@@ -1,5 +1,5 @@
 import { STOCK_PERIOD } from '../lib/usage/period';
-import { type MeteringService } from './metering.service';
+import type { MeteringService } from './metering.service';
 
 /**
  * Daily SaaS-only R2 measurement. All tenant assets — inspection photos,

@@ -1,7 +1,7 @@
 import { eq, and } from 'drizzle-orm';
 import { qboEntityMap } from '../../lib/db/schema/qbo';
 import { logger } from '../../lib/logger';
-import { type Constructor, type QBOServiceBase } from './api-base';
+import type { Constructor, QBOServiceBase } from './api-base';
 
 export function withCustomerSync<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends Base {

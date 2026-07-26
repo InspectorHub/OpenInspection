@@ -10,7 +10,7 @@
  * `detail` MUST stay non-sensitive (a success blurb or the provider's rejection
  * message) — never a key, token, or raw response body.
  */
-import { drizzle } from 'drizzle-orm/d1';
+import type { drizzle } from 'drizzle-orm/d1';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { integrationTestResults } from './db/schema';
 

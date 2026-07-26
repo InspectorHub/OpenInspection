@@ -2,7 +2,7 @@ import { eq, and } from 'drizzle-orm';
 import { inspections, inspectionResults, inspectionMediaPool } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { findingKey, DEFAULT_UNIT } from '../../lib/finding-key';
-import { type CoverCrop, type PhotoCrop } from '../../lib/validations/inspection.schema';
+import type { CoverCrop, PhotoCrop } from '../../lib/validations/inspection.schema';
 import type { PhotoEntry } from '../../lib/media/collect-attached';
 import type { ScopedDB } from '../../lib/db/scoped';
 import type { ImagesBinding } from '../../lib/media/strip-exif';

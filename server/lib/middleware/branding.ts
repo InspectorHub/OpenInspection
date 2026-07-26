@@ -1,9 +1,9 @@
-import { MiddlewareHandler } from 'hono';
-import { BrandingConfig } from '../../types/auth';
+import type { MiddlewareHandler } from 'hono';
+import type { BrandingConfig } from '../../types/auth';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { tenantConfigs } from '../db/schema';
-import { HonoConfig } from '../../types/hono';
+import type { HonoConfig } from '../../types/hono';
 import { logger } from '../logger';
 
 /**

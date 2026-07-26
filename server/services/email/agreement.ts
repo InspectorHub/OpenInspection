@@ -1,4 +1,4 @@
-import { type SignatureUser } from '../../lib/inspector-signature';
+import type { SignatureUser } from '../../lib/inspector-signature';
 import { escapeHtml, type Constructor } from './base';
 
 /**

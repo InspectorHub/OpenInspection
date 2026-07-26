@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { qboConnections } from '../../lib/db/schema/qbo';
 import { logger } from '../../lib/logger';
-import { type Constructor, type QBOServiceBase } from './api-base';
+import type { Constructor, QBOServiceBase } from './api-base';
 
 export function withBootstrap<TBase extends Constructor<QBOServiceBase>>(Base: TBase) {
     return class extends Base {

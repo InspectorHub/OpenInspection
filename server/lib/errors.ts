@@ -1,4 +1,4 @@
-import { ContentfulStatusCode } from 'hono/utils/http-status';
+import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 /**
  * Standard error codes for consistent API responses.

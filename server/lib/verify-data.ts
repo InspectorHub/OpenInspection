@@ -1,8 +1,8 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc } from 'drizzle-orm';
-import { Context } from 'hono';
+import type { Context } from 'hono';
 import * as schema from './db/schema';
-import { HonoConfig } from '../types/hono';
+import type { HonoConfig } from '../types/hono';
 import { isReportPublished } from './status/report-status';
 
 /**

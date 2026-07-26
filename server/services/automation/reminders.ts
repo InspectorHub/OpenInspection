@@ -3,7 +3,7 @@ import { automations, automationLogs, inspections, tenantConfigs } from '../../l
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../../lib/tz';
 import { nanoid } from 'nanoid';
 import { REPORT_STATUS } from '../../lib/status/report-status';
-import { type Constructor } from './shared';
+import type { Constructor } from './shared';
 import type { AutomationBase, HasParseChannels, HasResolveAddress } from './shared';
 
 /**

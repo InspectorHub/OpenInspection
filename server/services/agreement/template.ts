@@ -2,7 +2,7 @@ import { eq, and } from 'drizzle-orm';
 import { agreements } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { sanitizeAgreementHtml } from './sanitizer';
-import { type Constructor } from './base';
+import type { Constructor } from './base';
 import type { AgreementServiceBase } from './base';
 
 /**

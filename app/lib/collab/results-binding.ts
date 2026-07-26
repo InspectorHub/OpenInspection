@@ -6,7 +6,7 @@
  * NO React import. NO import of app/hooks/useInspection.ts (React-heavy).
  */
 
-import * as Y from 'yjs';
+import type * as Y from 'yjs';
 import { findingKey, parseFindingKey } from '../../../server/lib/finding-key';
 import {
     projectResults,
