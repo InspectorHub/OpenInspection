@@ -2,7 +2,7 @@
 
 The open-source inspection engine. A single Cloudflare Worker (the
 cloudflare/react-router-hono-fullstack-template shape): a Hono entry that mounts the full
-API in-process and delegates page routes to React Router v7 SSR.
+API in-process and delegates page routes to React Router v8 SSR.
 
 **Docs**: `docs/developers/` (architecture, deploy, testing, API ref) · `docs/getting-started.md` (user guide)
 
@@ -72,7 +72,7 @@ applies the same config resolution to direct wrangler commands (db:migrate).
 | `server/services/` | Business logic, DB queries (Drizzle) |
 | `migrations/` | D1 migration SQL (drizzle-kit schema-first: `0000_baseline.sql` + forward) |
 | `tests/` | See "Test Layout" below |
-| `app/routes/` | React Router v7 route files |
+| `app/routes/` | React Router v8 route files |
 | `app/components/` | React components |
 | `app/hooks/` | React hooks (useInspection, useFindings, useKeyboard, etc.) |
 | `app/lib/` | API client (hono/client over the in-process binding), session management, helpers |
@@ -126,13 +126,13 @@ initialization: `docs/developers/05_testing.md`.
 ### Single-Worker Architecture
 OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fullstack-template shape):
 
-- **`workers/app.ts`** — a Hono app is the worker entry. It mounts the full API (`server/`) for API-owned paths and delegates everything else to the React Router v7 SSR handler. It injects an **in-process `API_WORKER` self-binding** so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding).
+- **`workers/app.ts`** — a Hono app is the worker entry. It mounts the full API (`server/`) for API-owned paths and delegates everything else to the React Router v8 SSR handler. It injects an **in-process `API_WORKER` self-binding** so React Router loaders/actions call the API app DIRECTLY (no network hop, no second worker, no Service Binding).
 - **`server/`** — Hono + Drizzle + D1. All business logic, authentication, and data access. Typed JSON API.
-- **`app/`** — React Router v7 + React 18 + Tailwind v4. Server-side renders the React UI on the edge.
+- **`app/`** — React Router v8 + React 19 + Tailwind v4. Server-side renders the React UI on the edge.
 - **`packages/shared-ui/`** — Design System 0523 token-based React components.
 - **`packages/api-types/`** — Re-exports the Hono app type so `hono/client` gets full end-to-end type safety.
 
-**Token Relay BFF** pattern: the React Router v7 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token.
+**Token Relay BFF** pattern: the React Router v8 server holds the JWT cookie and forwards it to the in-process API on every request, so the browser never sees the token.
 
 ### Authentication
 - JWT-based (ES256 / ECDSA P-256, HttpOnly cookie `__Host-inspector_token`). Multi-version keyring with `kid` header for safe rotation — see `server/lib/jwt-keyring.ts`.
@@ -155,10 +155,10 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 
 ## Frontend Architecture
 
-- **Framework**: React Router v7 on Cloudflare Workers with Vite.
-- **Rendering**: Full SSR — RR v7 server renders on the edge, hydrates on the client.
+- **Framework**: React Router v8 on Cloudflare Workers with Vite.
+- **Rendering**: Full SSR — RR v8 server renders on the edge, hydrates on the client.
 - **Styling**: Tailwind CSS v4 with Design System 0523 tokens (`app/styles/tailwind.css`). Tailwind is v4-only (via `@tailwindcss/vite`); no separate server-side CSS build.
-- **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. RR v7 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
+- **API calls**: `hono/client` with end-to-end type safety via `packages/api-types/`. RR v8 loader/action functions call the in-process API through the injected `API_WORKER` binding (`createApi(context)` in `app/lib/api-client.server.ts`) — no network hop.
 - **State management**: React hooks — `useInspection` (~900 LOC), `useFindings`, `useKeyboard`, `useCannedComments`, `useOfflineQueue`, `usePresence`, `useTheme`, `useUnsavedChanges`.
 - **Component library**: `packages/shared-ui/` provides 25 design-system components consumed by the frontend — Button, Pill, StatCard, Icon, Eyebrow, PageHeader, TabStrip, Input, Select, Textarea, Checkbox, Radio, RadioGroup, EmptyState, Skeleton, Card, Banner, Modal, Drawer, Popover, Pagination, FileDropzone, Table, SegmentedControl, Avatar. See `docs/developers/11_design_system.md`.
 - **Dark mode**: `data-color-scheme` attribute on `<html>`, managed by `useTheme` hook (auto/light/dark).
@@ -199,7 +199,7 @@ OpenInspection runs as ONE Cloudflare Worker (cloudflare/react-router-hono-fulls
 ---
 
 - **API Framework**: [Hono](https://hono.dev/) with Zod OpenAPI.
-- **Frontend Framework**: [React Router v7](https://reactrouter.com/) + React 18.
+- **Frontend Framework**: [React Router v8](https://reactrouter.com/) + React 19.
 - **ORM**: [Drizzle ORM](https://orm.drizzle.team/) with D1.
 - **CSS**: [Tailwind CSS v4](https://tailwindcss.com/) with Design System 0523 tokens.
 - **Testing**: Vitest for unit tests; Playwright for E2E.
