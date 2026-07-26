@@ -13,8 +13,6 @@
   "report_word_export_error_missing_id": "Missing exportId",
   "report_word_export_error_not_found": "Export not found",
   "report_gate_meta_title": "Report access - OpenInspection",
-  "report_gate_notfound_title": "Report not found",
-  "report_gate_notfound_message": "This report link is invalid or has expired. Please contact your inspector for an up-to-date link.",
   "report_gate_status_payment": "Pending payment",
   "report_gate_status_agreement": "Pending agreement signature",
   "report_gate_message_payment": "Your inspection report is ready, but the invoice has not been paid yet. Please complete payment to view the report -- your inspector's contact details are listed below.",
@@ -257,7 +255,7 @@
   "repair_share_email_msg_placeholder": "Optional message…",
   "repair_share_email_submit": "Send email",
   "repair_share_email_sent": "Email sent.",
-  "report_link_inactive_title": "This report link is no longer active",
-  "report_link_inactive_message": "Ask your inspector to send you the report again — they can issue a new link straight away.",
-  "report_link_inactive_message_company": "Ask {company} to send you the report again — they can issue a new link straight away."
+  "report_link_inactive_title": "This report link isn't working",
+  "report_link_inactive_message": "Double-check the web address you opened. If it is correct, the link may have expired or been replaced with a newer one — your inspector can send you a fresh link.",
+  "report_link_inactive_message_company": "Double-check the web address you opened. If it is correct, the link may have expired or been replaced with a newer one — {company} can send you a fresh link."
 }

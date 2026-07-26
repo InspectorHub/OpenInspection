@@ -12,9 +12,21 @@ export interface TenantBrand {
   /** Tenant display timezone (IANA; 'UTC' when unset). Public/report surfaces
    *  anchor displayed inspection dates to this zone. */
   defaultTimezone: string;
+  /** IA-36 ⑨ — client-facing recovery channels, null until the tenant sets
+   *  them. A dead-link page needs somewhere to send the reader; naming the
+   *  company without a way to reach it only says who to blame. */
+  supportEmail: string | null;
+  companyPhone: string | null;
 }
 
-export const EMPTY_BRAND: TenantBrand = { companyName: null, primaryColor: null, logoUrl: null, defaultTimezone: "UTC" };
+export const EMPTY_BRAND: TenantBrand = {
+  companyName: null,
+  primaryColor: null,
+  logoUrl: null,
+  defaultTimezone: "UTC",
+  supportEmail: null,
+  companyPhone: null,
+};
 
 /**
  * Pick a readable text color for content sitting ON the brand primary color.

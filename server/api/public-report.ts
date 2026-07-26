@@ -479,16 +479,29 @@ const publicReportRoutes = createApiRouter()
         // `clientEmail`. Parsing here makes the declaration load-bearing —
         // zod strips anything undeclared, so a column added later cannot leak by
         // default. Same failure IA-33 fixed on the report endpoint.
-        // Line items are normalized first: a legacy/imported row with a missing
-        // description would make `.parse()` THROW, and trading an information
-        // leak for a 500 on the pay page is not a fix. Every other declared
-        // field is already a plain string/number from the service (createdAt
-        // goes through safeISODate) so it cannot fail this parse.
+        // The two nested shapes are normalized first. A legacy/imported line
+        // item with a missing description, or a brand that gains a field the
+        // branding service does not yet return, would make `.parse()` THROW —
+        // and trading an information leak for a 500 on the pay page is not a
+        // fix. Every other declared field is a plain string/number from the
+        // invoice row (createdAt goes through safeISODate).
+        //
+        // `brand` in particular crosses a service boundary, so its shape is not
+        // this file's to guarantee: name the fields the payer's page needs and
+        // let anything else fall away, rather than trusting the whole object.
         const lineItems = (inv.lineItems ?? []).map((li) => ({
             description: String(li?.description ?? ''),
             amountCents: Number(li?.amountCents ?? 0),
         }));
-        const view = PublicInvoiceBodySchema.parse({ ...inv, lineItems, brand, tenantSlug: tenantRow?.slug ?? null });
+        const brandView = {
+            companyName: brand?.companyName ?? null,
+            primaryColor: brand?.primaryColor ?? null,
+            logoUrl: brand?.logoUrl ?? null,
+            defaultTimezone: brand?.defaultTimezone ?? 'UTC',
+            supportEmail: brand?.supportEmail ?? null,
+            companyPhone: brand?.companyPhone ?? null,
+        };
+        const view = PublicInvoiceBodySchema.parse({ ...inv, lineItems, brand: brandView, tenantSlug: tenantRow?.slug ?? null });
         return c.json({ success: true as const, data: view }, 200);
     })
     .openapi(payIntentRoute, async (c) => {

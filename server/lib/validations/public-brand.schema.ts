@@ -18,4 +18,16 @@ export const PublicBrandSchema = z.object({
     // Tenant display timezone (IANA; 'UTC' when unset). Public/report surfaces
     // anchor displayed inspection dates to this zone.
     defaultTimezone: z.string().default('UTC'),
+    // IA-36 ⑨ — how a client reaches the company when a link stops working.
+    // A dead-link page that names the company but gives no way to contact it
+    // tells the reader who failed them, not how to recover.
+    //
+    // These are business contact details, already the tenant's client-facing
+    // channels (`companyPhone` is interpolated into client SMS, `supportEmail`
+    // is the address transactional mail tells clients to reply to), so serving
+    // them on a slug-addressable public endpoint exposes nothing the tenant
+    // was not already handing to every client. Both stay null until set —
+    // the UI degrades to "contact the company" rather than inventing a channel.
+    supportEmail: z.string().nullable(),
+    companyPhone: z.string().nullable(),
 });

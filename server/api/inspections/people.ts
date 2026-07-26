@@ -24,7 +24,8 @@ import { contacts, contactRoleProfiles, inspections } from '../../lib/db/schema'
 import { AddPersonSchema } from '../../lib/validations/role-profile.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { isSoleClient } from '../../lib/people/primary-client';
-import { reportLinkExpiresAt, REPORT_LINK_TTL_MAX_COUNT } from '../../lib/report-link-ttl';
+import { reportLinkExpiresAt } from '../../lib/report-link-ttl';
+import { ReportLinkTtlSchema } from '../../lib/validations/report-link-ttl.schema';
 import { auditFromContext } from '../../lib/audit';
 import type { PersonRow as PersonServiceRow } from '../../services/people.service';
 import type { PortalLinkState } from '../../lib/portal-link-state';
@@ -163,14 +164,6 @@ const makePrimaryRoute = createRoute(withMcpMetadata({
     operationId: 'makeInspectionPersonPrimary',
     description: 'Atomically swaps the primary-client role onto this person; the previous primary client becomes a co-client and stays on the inspection with their access intact. "Exactly one primary client" is upheld by this swap rather than by refusing a second add.',
 }, { scopes: ['write'], tier: 'extended' }));
-
-const ReportLinkTtlSchema = z.union([
-    z.literal('never'),
-    z.object({
-        count: z.number().int().min(1).max(REPORT_LINK_TTL_MAX_COUNT).describe('How many units from now the links stop working.'),
-        unit: z.enum(['days', 'months', 'years']).describe('Unit the count is expressed in: days, months or years.'),
-    }),
-]).describe('A DURATION from now, or "never". Deliberately not an absolute date — only an absolute date can be set in the past.');
 
 const reportLinkExpiryRoute = createRoute(withMcpMetadata({
     method: 'put',

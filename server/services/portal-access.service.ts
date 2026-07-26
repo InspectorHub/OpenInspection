@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, or, gt, isNull, count } from 'drizzle-orm';
 import { inspectionAccessTokens } from '../lib/db/schema/portal-access';
 import { contactRoleProfiles, tenantConfigs } from '../lib/db/schema';
 import { resolveReportLinkTtl, reportLinkExpiresAt } from '../lib/report-link-ttl';
@@ -316,6 +316,67 @@ export class PortalAccessService {
             ))
             .run();
         return { token, previousTokenHash: existing.tokenHash };
+    }
+
+    /**
+     * IA-36 ⑥ — the tenant-wide backlog a policy change deliberately does NOT
+     * touch: links that are alive RIGHT NOW.
+     *
+     * "Alive" means not revoked and not already past its expiry. Both
+     * exclusions are load-bearing, and this predicate is shared with
+     * `setExpiryForTenant` on purpose: the count is rendered INTO the button
+     * ("Expire 47 links"), so if the two ever disagreed the button would be
+     * lying about its own blast radius — which is the exact failure ⑥ exists
+     * to prevent.
+     *
+     * Excluding already-expired rows also means a bulk apply can never
+     * resurrect a link that has already died. Handing a dead URL back to
+     * whoever still has it in an inbox is not a side effect anyone asked for.
+     */
+    private liveLinkFilter(tenantId: string, now: number) {
+        return and(
+            eq(inspectionAccessTokens.tenantId, tenantId),
+            isNull(inspectionAccessTokens.revokedAt),
+            or(
+                isNull(inspectionAccessTokens.expiresAt),
+                gt(inspectionAccessTokens.expiresAt, new Date(now)),
+            ),
+        );
+    }
+
+    /** How many report links across the whole tenant are usable right now. */
+    async countLiveLinksForTenant(tenantId: string, now: number = Date.now()): Promise<number> {
+        const db = this.getDrizzle();
+        const row = await db
+            .select({ n: count() })
+            .from(inspectionAccessTokens)
+            .where(this.liveLinkFilter(tenantId, now))
+            .get();
+        return row?.n ?? 0;
+    }
+
+    /**
+     * IA-36 ⑥ — apply an expiry to the tenant's EXISTING live links.
+     *
+     * Never called as a side effect of saving the tenant policy: changing
+     * `reportLinkTtl` only governs links minted afterwards. Retroactively
+     * re-dating links already sitting in customers' inboxes would silently
+     * kill them in bulk, which is the accident IA-36 was opened about — so
+     * acting on the backlog is a separate, explicitly confirmed verb.
+     *
+     * Returns the number of rows changed so the caller can report what it
+     * actually did rather than what it intended to do.
+     */
+    async setExpiryForTenant(tenantId: string, expiresAt: number | null, now: number = Date.now()): Promise<number> {
+        const db = this.getDrizzle();
+        // Count first, under the same predicate, in the same logical step:
+        // D1 does not report an affected-row count we can trust across drivers.
+        const affected = await this.countLiveLinksForTenant(tenantId, now);
+        await db.update(inspectionAccessTokens)
+            .set({ expiresAt: expiresAt == null ? null : new Date(expiresAt) })
+            .where(this.liveLinkFilter(tenantId, now))
+            .run();
+        return affected;
     }
 
     /** Lifecycle: set an expiry on all of an order's tokens; null lifts it again. */

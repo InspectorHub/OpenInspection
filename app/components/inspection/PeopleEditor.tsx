@@ -224,17 +224,28 @@ export function PeopleEditor({
                         </p>
                         {person.agency && <p className="text-ih-fg-3 text-[12px]">{person.agency}</p>}
                         {person.email && (
-                          // IA-36 ⑭ — kept, but labelled. It leaves the product
-                          // for a local mail app, bypassing templates, delivery
-                          // records and the tokenized link; the in-product path
-                          // for anything about the report is Send report / Reset.
-                          <a
-                            href={`mailto:${person.email}`}
-                            title={m.inspections_hub_people_mailto_hint()}
-                            className="text-ih-primary hover:underline block"
-                          >
-                            {person.email}
-                          </a>
+                          // IA-36 ⑭ — mailto: is kept and labelled (it leaves the
+                          // product for a local mail app, bypassing templates,
+                          // delivery records and the tokenized link — the
+                          // in-product path is Send report / Reset), but it is no
+                          // longer the ONLY way to get the address out.
+                          //
+                          // On a machine with no mail client registered, clicking
+                          // mailto: does nothing at all: no error, no new window.
+                          // That is the same failure mode this batch removed from
+                          // "Reset access link" — a control whose only outcome is
+                          // silence. Copy always works, so the address is always
+                          // obtainable regardless of desktop configuration.
+                          <span className="flex items-center gap-1.5">
+                            <a
+                              href={`mailto:${person.email}`}
+                              title={m.inspections_hub_people_mailto_hint()}
+                              className="text-ih-primary hover:underline"
+                            >
+                              {person.email}
+                            </a>
+                            <CopyEmailButton email={person.email} />
+                          </span>
                         )}
                         {person.phone && (
                           <a href={`tel:${person.phone}`} className="text-ih-primary hover:underline block">
@@ -384,5 +395,39 @@ export function PeopleEditor({
         </p>
       </Modal>
     </Card>
+  );
+}
+
+/**
+ * IA-36 ⑭ — copy a contact's address to the clipboard.
+ *
+ * Sits beside the `mailto:` link rather than replacing it. Both are wanted:
+ * `mailto:` is one click for the (many) inspectors who do have a mail client
+ * wired up, and copy is the fallback that cannot silently do nothing.
+ *
+ * Deliberately quiet — an icon-sized text button, not a second primary action.
+ * The contact card is a reference surface; the actions that matter (Send
+ * report, Reset access link) live in the right-hand column and must stay
+ * visually louder than "copy an email address".
+ */
+function CopyEmailButton({ email }: { email: string }) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = () => {
+    void navigator.clipboard?.writeText(email).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      type="button"
+      onClick={onCopy}
+      // Announce the address so screen-reader users get "Copy amy@realty.com"
+      // rather than a row of identical unlabelled "Copy" buttons.
+      aria-label={m.inspections_hub_people_copy_email_aria({ email })}
+      className="text-[11px] font-bold text-ih-fg-3 hover:text-ih-primary shrink-0"
+    >
+      {copied ? m.inspections_hub_copied() : m.inspections_hub_people_copy_email()}
+    </button>
   );
 }

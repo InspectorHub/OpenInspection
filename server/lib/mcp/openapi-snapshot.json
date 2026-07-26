@@ -239,6 +239,64 @@
     "description": "Public, unauthenticated endpoint. ALWAYS returns 200 { sent: true } regardless of whether the email has a global agent account, to prevent account enumeration. When it does, an email with a one-time sign-in link (900 second TTL) is sent — the send itself is deferred so the response is timing-identical either way."
   },
   {
+    "operationId": "applyTenantReportLinkExpiry",
+    "method": "POST",
+    "pathTemplate": "/api/tenant/inspection-prefs/report-link-expiry",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "never"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999,
+                    "description": "How many units from now the links stop working."
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "days",
+                      "months",
+                      "years"
+                    ],
+                    "description": "Unit the count is expressed in: days, months or years."
+                  }
+                },
+                "required": [
+                  "count",
+                  "unit"
+                ]
+              }
+            ],
+            "description": "A DURATION from now, or \"never\". Deliberately not an absolute date — only an absolute date can be set in the past."
+          }
+        },
+        "required": [
+          "ttl"
+        ]
+      }
+    },
+    "summary": "Apply an expiry to the report links that already exist",
+    "description": "Applies an expiry, expressed as a duration from now, to every report link across the tenant that is usable right now (not revoked, not already expired). The tenant reportLinkTtl policy alone only affects links minted after it changes; this is the explicit, count-reporting way to act on the existing backlog. Already-dead links are left dead — a bulk apply never resurrects one."
+  },
+  {
     "operationId": "approveInspection",
     "method": "POST",
     "pathTemplate": "/api/inspections/{id}/concierge/approve",
@@ -8331,6 +8389,22 @@
     },
     "summary": "Get tenant configuration flags",
     "description": "Returns booking-related tenant configuration flags (conciergeReviewRequired, blockUnsignedAgreement)."
+  },
+  {
+    "operationId": "getTenantLiveReportLinkCount",
+    "method": "GET",
+    "pathTemplate": "/api/tenant/inspection-prefs/report-link-expiry",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "How many report links are usable right now",
+    "description": "Counts the report links across the tenant that would be affected by applying an expiry to the existing backlog. Rendered into the confirm control so the operator sees the blast radius before acting, not after."
   },
   {
     "operationId": "getUsageSummary",

@@ -25,9 +25,15 @@ export interface ErrorStateProps {
   /** Optional primary CTA. Rendered as a plain anchor so it works even when the
    *  router context is unavailable (e.g. inside the root error boundary). */
   action?: ErrorStateAction;
+  /** IA-36 ⑨ — who to contact when the page itself cannot fix the problem.
+   *  Either field may be null; the block is omitted entirely when both are. */
+  contacts?: { email?: string | null; phone?: string | null };
 }
 
-export function ErrorState({ code, title, message, action }: ErrorStateProps) {
+export function ErrorState({ code, title, message, action, contacts }: ErrorStateProps) {
+  const email = contacts?.email?.trim() || null;
+  const phone = contacts?.phone?.trim() || null;
+  const hasContacts = Boolean(email || phone);
   return (
     <div className="min-h-screen flex items-center justify-center bg-ih-bg-app px-6 py-12">
       <div className="w-full max-w-md text-center bg-ih-bg-card border border-ih-border rounded-2xl shadow-ih-card p-10">
@@ -65,6 +71,29 @@ export function ErrorState({ code, title, message, action }: ErrorStateProps) {
           >
             {action.label}
           </a>
+        )}
+        {hasContacts && (
+          <div className="mt-6 pt-5 border-t border-ih-border flex flex-col items-center gap-1.5">
+            {email && (
+              <a
+                href={`mailto:${email}`}
+                className="text-[14px] font-medium text-ih-primary hover:underline break-all"
+              >
+                {email}
+              </a>
+            )}
+            {phone && (
+              /* tel: is the one deep-link that is reliably handled everywhere —
+                 every phone dials it and desktop browsers degrade to showing
+                 the number as text. */
+              <a
+                href={`tel:${phone.replace(/[^\d+]/g, "")}`}
+                className="text-[14px] font-medium text-ih-primary hover:underline"
+              >
+                {phone}
+              </a>
+            )}
+          </div>
         )}
       </div>
     </div>

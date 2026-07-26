@@ -178,5 +178,7 @@
   "inspections_hub_error_link_expiry": "Could not update the report link expiry.",
   "inspections_hub_people_link_expiry_apply_one": "Expire the 1 link already sent",
   "inspections_hub_people_link_expiry_lift_one": "Remove the expiry from the 1 sent link",
-  "inspections_hub_people_link_expiry_noop": "Every link already matches this — nothing to change."
+  "inspections_hub_people_link_expiry_noop": "Every link already matches this — nothing to change.",
+  "inspections_hub_people_copy_email": "Copy",
+  "inspections_hub_people_copy_email_aria": "Copy email address {email}"
 }
