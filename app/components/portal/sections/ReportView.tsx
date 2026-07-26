@@ -137,6 +137,7 @@ export function reportViewProps(
     brand: data.brand,
     error: data.error ?? null,
     notPublished: data.notPublished ?? false,
+    linkInactive: data.linkInactive ?? false,
     styleProfile: data.styleProfile,
     inspectorCredentials: data.inspectorCredentials,
     initialFilter: data.initialFilter ?? "all",
@@ -297,6 +298,24 @@ export function ReportView(props: ReportViewProps) {
   };
 
   if (data.error) {
+    // IA-36 ⑨ — a link WE took offline. The reader was invited legitimately;
+    // answering "not found" blames them for our policy. Say what happened and
+    // give them the one action that works: ask for the report again.
+    if (data.linkInactive) {
+      // Name the company. "Ask your inspector" is not actionable to someone who
+      // received one email months ago and no longer remembers who sent it.
+      const company = data.brand?.companyName;
+      return (
+        <ErrorState
+          title={m.report_link_inactive_title()}
+          message={
+            company
+              ? m.report_link_inactive_message_company({ company })
+              : m.report_link_inactive_message()
+          }
+        />
+      );
+    }
     if (data.notPublished) {
       return (
         <ErrorState

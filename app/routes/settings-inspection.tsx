@@ -5,6 +5,7 @@ import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
 import { createApi } from '~/lib/api-client.server';
 import { useInspectionPrefs } from '~/hooks/useInspectionPrefs';
+import { LinkExpiryControl } from '~/components/inspection/LinkExpiryControl';
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -109,6 +110,21 @@ export default function SettingsInspectionPage() {
                         { value: 'readwrite', label: m.settings_inspection_agent_repair_readwrite() },
                     ]}
                 />
+            </section>
+
+            {/* IA-36 ⑤⑥ — how long a report link stays usable. Applies to links
+                minted from here on; links already in customers' inboxes are never
+                re-dated by changing this. To act on an inspection's existing
+                links, use the same control on its People card. */}
+            <section>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_report_link_heading()}</h2>
+                <p className="text-[12px] text-ih-fg-3 mb-2">{m.settings_inspection_report_link_help()}</p>
+                <LinkExpiryControl
+                    value={prefs.reportLinkTtl}
+                    onChange={ttl => patch({ reportLinkTtl: ttl })}
+                    idPrefix="tenant-link-expiry"
+                />
+                <p className="text-[12px] text-ih-fg-3 mt-2">{m.settings_inspection_report_link_future_only()}</p>
             </section>
 
             <section>

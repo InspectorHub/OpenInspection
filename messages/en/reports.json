@@ -256,5 +256,8 @@
   "repair_share_email_placeholder": "contractor@example.com",
   "repair_share_email_msg_placeholder": "Optional message…",
   "repair_share_email_submit": "Send email",
-  "repair_share_email_sent": "Email sent."
+  "repair_share_email_sent": "Email sent.",
+  "report_link_inactive_title": "This report link is no longer active",
+  "report_link_inactive_message": "Ask your inspector to send you the report again — they can issue a new link straight away.",
+  "report_link_inactive_message_company": "Ask {company} to send you the report again — they can issue a new link straight away."
 }

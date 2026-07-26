@@ -107,5 +107,8 @@
   "settings_schedule_myself": "Myself",
   "settings_booking_meta_title": "Online Booking - Settings - OpenInspection",
   "settings_booking_crumb": "Online Booking",
-  "settings_booking_intro": "Company booking policies and the embeddable widget."
+  "settings_booking_intro": "Company booking policies and the embeddable widget.",
+  "settings_inspection_report_link_heading": "Report link expiry",
+  "settings_inspection_report_link_help": "How long a client can open the report link you send them.",
+  "settings_inspection_report_link_future_only": "Changing this only affects links sent from now on. To change links already sent for one inspection, use the same control on its People card."
 }

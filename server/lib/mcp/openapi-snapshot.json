@@ -90,7 +90,7 @@
       }
     },
     "summary": "Add a person to an inspection",
-    "description": "Assigns a contact to the inspection under a role profile. Rejects with 409 when roleProfileId is the primary \"client\" role and one is already assigned to this inspection — co_client and every other role are unrestricted."
+    "description": "Assigns a contact to the inspection under a role profile. Adding a second person under the primary \"client\" role HANDS THE SEAT OVER (IA-36 ⑬): the newcomer becomes the primary client and the incumbent stays on the inspection as co-client, with their report access untouched. \"Exactly one primary client\" is upheld by that swap rather than by refusing the add."
   },
   {
     "operationId": "addRepairItem",
@@ -7476,7 +7476,7 @@
       "body": null
     },
     "summary": "Public token-gated inspection report data",
-    "description": "Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing/expired/revoked or does not match the requested inspection."
+    "description": "Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing or names nothing; 410 when a real link has expired or been revoked, so the page can explain what happened instead of showing a not-found."
   },
   {
     "operationId": "getPublicReportGate",
@@ -11284,6 +11284,43 @@
     "description": "Clears the HttpOnly auth cookie and revokes all outstanding session JWTs for this user via the password-changed KV invalidation channel."
   },
   {
+    "operationId": "makeInspectionPersonPrimary",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/people/{personId}/make-primary",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "personId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_people row identifier",
+          "schema": {
+            "type": "string",
+            "description": "inspection_people row identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Move the primary-client seat to this person",
+    "description": "Atomically swaps the primary-client role onto this person; the previous primary client becomes a co-client and stays on the inspection with their access intact. \"Exactly one primary client\" is upheld by this swap rather than by refusing a second add."
+  },
+  {
     "operationId": "markAllReadNotification",
     "method": "POST",
     "pathTemplate": "/api/notifications/mark-all-read",
@@ -14692,7 +14729,7 @@
       "body": null
     },
     "summary": "Remove a person from an inspection",
-    "description": "Removes an inspection_people row, tenant-scoped. A no-op (still 200) if personId does not exist under this tenant."
+    "description": "Removes an inspection_people row, tenant-scoped, and revokes that person's report link. A no-op (still 200) if personId does not exist under this tenant. Refuses with 409 when they are the only client-side person on the inspection."
   },
   {
     "operationId": "removeRepairItem",
@@ -15251,6 +15288,43 @@
     "description": "Removes the tenant override for a template, reverting it to registry defaults."
   },
   {
+    "operationId": "resetInspectionPersonAccess",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/people/{personId}/reset-access",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "personId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_people row identifier",
+          "schema": {
+            "type": "string",
+            "description": "inspection_people row identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Reset a person's report access link",
+    "description": "Rotates the persistent report-access token for one recipient IN PLACE (a second row for the same (inspection, recipient) pair is forbidden by a unique index). The old URL dies immediately; the new one is delivered by re-sending the report. Use when a link reached the wrong person. Writes a portal_access.rotated audit event referencing the previous token by hash."
+  },
+  {
     "operationId": "resetPasswordWithToken",
     "method": "POST",
     "pathTemplate": "/api/auth/reset-password",
@@ -15771,6 +15845,75 @@
     },
     "summary": "Set cropped report cover (baked JPEG derivative + crop transform)",
     "description": "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain)."
+  },
+  {
+    "operationId": "setInspectionReportLinkExpiry",
+    "method": "PUT",
+    "pathTemplate": "/api/inspections/{id}/report-link-expiry",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "never"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999,
+                    "description": "How many units from now the links stop working."
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "days",
+                      "months",
+                      "years"
+                    ],
+                    "description": "Unit the count is expressed in: days, months or years."
+                  }
+                },
+                "required": [
+                  "count",
+                  "unit"
+                ]
+              }
+            ],
+            "description": "A DURATION from now, or \"never\". Deliberately not an absolute date — only an absolute date can be set in the past."
+          }
+        },
+        "required": [
+          "ttl"
+        ]
+      }
+    },
+    "summary": "Set when this inspection's report links stop working",
+    "description": "Applies an expiry to every report link already issued for THIS inspection, expressed as a duration from now. The tenant-wide reportLinkTtl policy only ever affects links minted after it changes; this endpoint is the explicit, per-inspection way to act on links that already exist."
   },
   {
     "operationId": "setInspectionVideoPoster",

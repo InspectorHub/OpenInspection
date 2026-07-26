@@ -4,6 +4,12 @@ import { Card, Pill, Button, EmptyState, Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { AddPersonModal } from "./AddPersonModal";
+import { LinkExpiryControl } from "./LinkExpiryControl";
+import { PRIMARY_CLIENT_KEY } from "../../../server/lib/people/default-role-profiles";
+import { isSoleClient } from "../../../server/lib/people/primary-client";
+import type { ReportLinkTtl } from "../../../server/lib/report-link-ttl";
+import { formatDate } from "~/lib/format";
+import { useDisplayLocale, useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
 
 /**
@@ -21,14 +27,14 @@ export interface PersonRow {
   email: string | null;
   phone: string | null;
   agency: string | null;
+  /** IA-36 ⑪ — state of this person's report link. Optional so a stale/partial
+   *  payload degrades to "no link" instead of crashing the card. */
+  access?: {
+    status: "not_sent" | "active" | "expired" | "revoked";
+    sentAt: number | null;
+    expiresAt: number | null;
+  };
 }
-
-// The primary-client role's stable machine key — mirrors PRIMARY_CLIENT_KEY
-// in server/lib/people/default-role-profiles.ts. A role profile's `key` and
-// `kind` are immutable once created (server/lib/validations/role-profile.schema.ts),
-// so this string is a safe cross-layer constant rather than a duplicated import
-// of server-only code into the client bundle.
-const PRIMARY_CLIENT_ROLE_KEY = "client";
 
 const GROUP_ORDER = ["client", "agent", "other"] as const;
 
@@ -44,13 +50,56 @@ function groupLabel(kind: PersonRow["kind"]): string {
 }
 
 /**
- * Editable replacement for the read-only People card (Plan 1B Task 5). Lists
- * every contact/role pairing recorded on the inspection via `inspection_people`
- * (Task 3's `/api/inspections/:id/people`), grouped by the role's capability
- * `kind` (Client / Agents / Other). The primary client (roleKey === "client")
- * is a fixed seat — it shows a "Primary" pill and has no remove control,
- * mirroring the 409 the server itself returns for a second primary client
- * (PeopleService.addPerson).
+ * The report link's state, in words (IA-36 ⑪). The card offers link actions per
+ * row, so each row has to say what the current link IS — otherwise "reset this
+ * link" is a decision made blind.
+ */
+function AccessLine({
+  access,
+  locale,
+  timeZone,
+}: {
+  access: PersonRow["access"];
+  locale: string;
+  timeZone: string;
+}) {
+  const status = access?.status ?? "not_sent";
+  const tone = status === "revoked" || status === "expired" ? "text-ih-bad-fg" : "text-ih-fg-4";
+  const sent = access?.sentAt ? formatDate(access.sentAt, { locale, timeZone }) : "";
+  const label =
+    status === "not_sent"
+      ? m.inspections_hub_people_access_not_sent()
+      : status === "revoked"
+        ? m.inspections_hub_people_access_revoked()
+        : status === "expired"
+          ? m.inspections_hub_people_access_expired({ date: sent })
+          : access?.expiresAt
+            ? m.inspections_hub_people_access_active_until({
+                date: sent,
+                expiry: formatDate(access.expiresAt, { locale, timeZone }),
+              })
+            : m.inspections_hub_people_access_active({ date: sent });
+  return (
+    <p className={`text-[11px] mt-0.5 ${tone}`} data-testid={`people-access-${status}`}>
+      {label}
+    </p>
+  );
+}
+
+/**
+ * Editable People card. Lists every contact/role pairing on the inspection
+ * (`inspection_people`), grouped by the role's capability kind.
+ *
+ * IA-36 shaped the row actions. There are three verbs, not five: Resend (the
+ * existing Send report flow — same URL), Reset (rotate this recipient's link),
+ * Remove (they left the inspection; the link dies with them). A standalone
+ * "revoke but keep them listed" was deliberately not built — nobody stays on an
+ * inspection while being forbidden to read its report.
+ *
+ * The primary client is NOT a fixed seat any more. It is an assignment that
+ * moves (`Make primary`), so the row is removable like any other; the only
+ * genuine limit — an inspection cannot end up with nobody on the client side —
+ * is stated on a disabled button rather than expressed by hiding it.
  */
 export function PeopleEditor({
   inspectionId,
@@ -64,13 +113,17 @@ export function PeopleEditor({
   isAdmin: boolean;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const locale = useDisplayLocale();
+  const timeZone = useDisplayTimeZone();
 
-  // Independent, dedicated fetchers for the two people mutations — neither is
-  // shared with any OTHER mutation on the hub page (send-agreement /
-  // request-payment / publish / submit / ...). Reusing one fetcher across
-  // concurrent mutations cancels the in-flight one (RR shared-fetcher-abort).
+  // Independent, dedicated fetchers per mutation. Reusing one fetcher across
+  // concurrent mutations cancels the in-flight one (RR shared-fetcher-abort),
+  // and these are genuinely separate user actions on the same card.
   const addFetcher = useFetcher<typeof action>();
   const removeFetcher = useFetcher<typeof action>();
+  const resetFetcher = useFetcher<typeof action>();
+  const primaryFetcher = useFetcher<typeof action>();
+  const expiryFetcher = useFetcher<typeof action>();
 
   const addSucceeded =
     addFetcher.state === "idle" && addFetcher.data?.intent === "person-add" && addFetcher.data.ok;
@@ -78,20 +131,50 @@ export function PeopleEditor({
     if (modalOpen && addSucceeded) setModalOpen(false);
   }, [modalOpen, addSucceeded]);
 
-  // Removing a person also revokes their report-access link (IA-36), so the
-  // action is confirmed — a silent side effect on an already-ambiguous button
-  // is exactly what the audit flagged.
+  // Removing a person also revokes their report-access link (IA-36 ①), and
+  // resetting kills the URL the customer already has. Both are confirmed — a
+  // silent side effect on an already-ambiguous button is exactly what the audit
+  // flagged.
   const [removeTarget, setRemoveTarget] = useState<PersonRow | null>(null);
+  const [resetTarget, setResetTarget] = useState<PersonRow | null>(null);
+  const [ttl, setTtl] = useState<ReportLinkTtl>("never");
 
   function handleRemove(personId: string) {
     removeFetcher.submit({ intent: "person-remove", personId }, { method: "post" });
     setRemoveTarget(null);
   }
 
+  function handleReset(personId: string) {
+    resetFetcher.submit({ intent: "person-reset-access", personId }, { method: "post" });
+    setResetTarget(null);
+  }
+
+  const busy =
+    removeFetcher.state !== "idle" ||
+    resetFetcher.state !== "idle" ||
+    primaryFetcher.state !== "idle";
+
   const groups = GROUP_ORDER.map((kind) => ({
     kind,
     rows: people.filter((p) => p.kind === kind),
   })).filter((g) => g.rows.length > 0);
+
+  // The expiry control acts on links that ALREADY exist, so it says how many —
+  // "Apply" would hide the consequence behind a harmless word.
+  const issued = people.filter((p) => (p.access?.status ?? "not_sent") !== "not_sent");
+  const issuedCount = issued.length;
+  // Applying "never" when nothing has an expiry (or vice-versa) changes
+  // nothing. Offering a live button for a no-op teaches people that the button
+  // does not mean what it says.
+  const expiryWouldChangeNothing = ttl === "never" && issued.every((p) => p.access?.expiresAt == null);
+  const expiryLabel =
+    ttl === "never"
+      ? issuedCount === 1
+        ? m.inspections_hub_people_link_expiry_lift_one()
+        : m.inspections_hub_people_link_expiry_lift({ count: issuedCount })
+      : issuedCount === 1
+        ? m.inspections_hub_people_link_expiry_apply_one()
+        : m.inspections_hub_people_link_expiry_apply({ count: issuedCount });
 
   return (
     <Card className="p-5" data-inspection-id={inspectionId}>
@@ -119,13 +202,14 @@ export function PeopleEditor({
               >
                 {groupLabel(group.kind)}
               </p>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {group.rows.map((person) => {
-                  const isPrimary = person.roleKey === PRIMARY_CLIENT_ROLE_KEY;
+                  const isPrimary = person.roleKey === PRIMARY_CLIENT_KEY;
+                  const sole = isSoleClient(people, person.id);
                   return (
+                    <div key={person.id} className="text-[13px] text-ih-fg-1">
                     <div
-                      key={person.id}
-                      className="flex items-start justify-between gap-2 text-[13px] text-ih-fg-1"
+                      className="flex items-start justify-between gap-2"
                     >
                       <div>
                         <p className="font-medium inline-flex items-center gap-2 flex-wrap">
@@ -140,7 +224,15 @@ export function PeopleEditor({
                         </p>
                         {person.agency && <p className="text-ih-fg-3 text-[12px]">{person.agency}</p>}
                         {person.email && (
-                          <a href={`mailto:${person.email}`} className="text-ih-primary hover:underline block">
+                          // IA-36 ⑭ — kept, but labelled. It leaves the product
+                          // for a local mail app, bypassing templates, delivery
+                          // records and the tokenized link; the in-product path
+                          // for anything about the report is Send report / Reset.
+                          <a
+                            href={`mailto:${person.email}`}
+                            title={m.inspections_hub_people_mailto_hint()}
+                            className="text-ih-primary hover:underline block"
+                          >
                             {person.email}
                           </a>
                         )}
@@ -149,23 +241,98 @@ export function PeopleEditor({
                             {person.phone}
                           </a>
                         )}
+                        <AccessLine access={person.access} locale={locale} timeZone={timeZone} />
                       </div>
-                      {!isPrimary && (
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {person.kind === "client" && !isPrimary && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              primaryFetcher.submit(
+                                { intent: "person-make-primary", personId: person.id },
+                                { method: "post" },
+                              )
+                            }
+                            disabled={busy}
+                            className="text-[11px] font-bold text-ih-primary hover:underline disabled:opacity-60"
+                          >
+                            {m.inspections_hub_people_make_primary()}
+                          </button>
+                        )}
+                        {/* Only offered once a link EXISTS. Reviewing the real
+                            card caught this: a person who has never been sent
+                            anything was still offered "Reset access link", and
+                            the endpoint answers 404 — a control that can only
+                            fail is worse than no control. */}
+                        {person.email && (person.access?.status ?? "not_sent") !== "not_sent" && (
+                          <button
+                            type="button"
+                            onClick={() => setResetTarget(person)}
+                            disabled={busy}
+                            className="text-[11px] font-bold text-ih-fg-2 hover:underline disabled:opacity-60"
+                          >
+                            {m.inspections_hub_people_reset()}
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => setRemoveTarget(person)}
-                          disabled={removeFetcher.state !== "idle"}
-                          className="text-[11px] font-bold text-ih-bad-fg hover:underline disabled:opacity-60 shrink-0"
+                          disabled={busy || sole}
+                          title={sole ? m.inspections_hub_people_remove_sole_reason() : undefined}
+                          className={`text-[11px] font-bold disabled:opacity-50 disabled:cursor-not-allowed ${
+                            sole ? "text-ih-fg-4" : "text-ih-bad-fg hover:underline"
+                          }`}
                         >
                           {m.inspections_hub_people_remove()}
                         </button>
-                      )}
+                      </div>
+                    </div>
+                    {/* Why the action above is unavailable, on its own line
+                        rather than wrapped into the action column — a reason
+                        crammed under a red button reads as a validation error
+                        about something the operator just did wrong. */}
+                    {sole && (
+                      <p className="text-[11px] text-ih-fg-4 mt-1">
+                        {m.inspections_hub_people_remove_sole_reason()}
+                      </p>
+                    )}
                     </div>
                   );
                 })}
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* IA-36 ⑦ — the same control as Settings → Inspection, applied here to the
+          links this inspection has already sent. The company-wide policy only
+          ever governs links minted after it changes; this is the deliberate,
+          self-describing way to act on the ones already out there. */}
+      {issuedCount > 0 && (
+        <div className="mt-5 pt-4 border-t border-ih-line">
+          <h3 className="text-[11px] font-extrabold uppercase tracking-[0.12em] text-ih-fg-4 mb-1">
+            {m.inspections_hub_people_link_expiry_heading()}
+          </h3>
+          <p className="text-[12px] text-ih-fg-3 mb-2">{m.inspections_hub_people_link_expiry_help()}</p>
+          <LinkExpiryControl value={ttl} onChange={setTtl} idPrefix="inspection-link-expiry" />
+          <Button
+            variant="secondary"
+            size="sm"
+            className="mt-2"
+            disabled={expiryFetcher.state !== "idle" || expiryWouldChangeNothing}
+            onClick={() =>
+              expiryFetcher.submit(
+                { intent: "report-link-expiry", ttl: JSON.stringify(ttl) },
+                { method: "post" },
+              )
+            }
+          >
+            {expiryLabel}
+          </Button>
+          {expiryWouldChangeNothing && (
+            <p className="text-[11px] text-ih-fg-4 mt-1">{m.inspections_hub_people_link_expiry_noop()}</p>
+          )}
         </div>
       )}
 
@@ -194,6 +361,26 @@ export function PeopleEditor({
       >
         <p className="text-[13px] text-ih-fg-3">
           {m.inspections_hub_people_remove_confirm({ name: removeTarget?.name ?? "" })}
+        </p>
+      </Modal>
+
+      <Modal
+        open={resetTarget !== null}
+        onClose={() => setResetTarget(null)}
+        title={m.inspections_hub_people_reset_title()}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setResetTarget(null)}>{m.common_cancel()}</Button>
+            <Button
+              variant="danger"
+              disabled={resetFetcher.state !== "idle"}
+              onClick={() => resetTarget && handleReset(resetTarget.id)}
+            >{m.inspections_hub_people_reset_cta()}</Button>
+          </>
+        }
+      >
+        <p className="text-[13px] text-ih-fg-3">
+          {m.inspections_hub_people_reset_confirm({ name: resetTarget?.name ?? "" })}
         </p>
       </Modal>
     </Card>

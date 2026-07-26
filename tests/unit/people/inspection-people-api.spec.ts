@@ -39,8 +39,12 @@ function buildApp(userRole: string = 'owner') {
         c.set('tenantId', TENANT_ID);
         c.set('services', {
             people: new PeopleService({ DB: {} as D1Database } as unknown as { DB: D1Database }),
-            // IA-36 — removePerson now cascades to revoke the report link.
-            portalAccess: { revokeForRecipient: async () => undefined },
+            // IA-36 — removePerson cascades to revoke the report link, and the
+            // list route joins each recipient's link state onto their row.
+            portalAccess: {
+                revokeForRecipient: async () => ({ previousTokenHash: null }),
+                listAccessForInspection: async () => [],
+            },
         } as unknown as HonoConfig['Variables']['services']);
         await next();
     });
@@ -116,7 +120,10 @@ describe('/api/inspections/:id/people', () => {
         expect(body.data.some(p => p.contactId === buyerContactId && p.roleKey === 'client')).toBe(true);
     });
 
-    it('POST a second client-role person returns 409', async () => {
+    // IA-36 ⑬ — this used to answer 409, which left a wizard mis-pick with no
+    // in-product fix. The seat now hands over: the newcomer becomes the primary
+    // client and the incumbent stays on the inspection as co-client.
+    it('POST a second client-role person hands the seat over instead of 409ing', async () => {
         const app = buildApp();
         await app.request(`/api/inspections/${INSPECTION_ID}/people`, {
             method: 'POST',
@@ -129,10 +136,12 @@ describe('/api/inspections/:id/people', () => {
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ contactId: coBuyerContactId, roleProfileId: clientRoleProfileId }),
         }, { DB: {} });
-        expect(secondRes.status).toBe(409);
-        const body = await secondRes.json() as { success: boolean; error: { code: string } };
-        expect(body.success).toBe(false);
-        expect(body.error.code).toBe('conflict');
+        expect(secondRes.status).toBe(201);
+
+        const getRes = await app.request(`/api/inspections/${INSPECTION_ID}/people`, {}, { DB: {} });
+        const body = await getRes.json() as { data: Array<{ contactId: string; roleKey: string }> };
+        expect(body.data.filter(p => p.roleKey === 'client').map(p => p.contactId)).toEqual([coBuyerContactId]);
+        expect(body.data.filter(p => p.roleKey === 'co_client').map(p => p.contactId)).toEqual([buyerContactId]);
     });
 
     it('POST a co_client person returns 200/201 (unrestricted alongside a primary client)', async () => {
@@ -162,6 +171,13 @@ describe('/api/inspections/:id/people', () => {
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ contactId: buyerContactId, roleProfileId: clientRoleProfileId }),
         }, { DB: {} });
+        // IA-36 ⑬ — the inspection must keep at least one client-side person,
+        // so seat a co-client before removing the primary one.
+        await app.request(`/api/inspections/${INSPECTION_ID}/people`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ contactId: coBuyerContactId, roleProfileId: coClientRoleProfileId }),
+        }, { DB: {} });
 
         const listRes = await app.request(`/api/inspections/${INSPECTION_ID}/people`, {}, { DB: {} });
         const listBody = await listRes.json() as { data: Array<{ id: string; contactId: string }> };
@@ -174,6 +190,21 @@ describe('/api/inspections/:id/people', () => {
         const afterRes = await app.request(`/api/inspections/${INSPECTION_ID}/people`, {}, { DB: {} });
         const afterBody = await afterRes.json() as { data: Array<{ id: string }> };
         expect(afterBody.data.find(p => p.id === row!.id)).toBeUndefined();
+    });
+
+    it('DELETE refuses to remove the last client-side person, and says why', async () => {
+        const app = buildApp();
+        await app.request(`/api/inspections/${INSPECTION_ID}/people`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ contactId: buyerContactId, roleProfileId: clientRoleProfileId }),
+        }, { DB: {} });
+        const listBody = await (await app.request(`/api/inspections/${INSPECTION_ID}/people`, {}, { DB: {} })).json() as { data: Array<{ id: string }> };
+
+        const delRes = await app.request(`/api/inspections/${INSPECTION_ID}/people/${listBody.data[0].id}`, { method: 'DELETE' }, { DB: {} });
+        expect(delRes.status).toBe(409);
+        const body = await delRes.json() as { error: { message: string } };
+        expect(body.error.message).toMatch(/only client/i);
     });
 
     it('POST with a cross-tenant contactId returns 404 (tenant-ownership gap closed)', async () => {

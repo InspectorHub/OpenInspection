@@ -6,6 +6,7 @@
  * or any field is missing.
  */
 import { z } from '@hono/zod-openapi';
+import { REPORT_LINK_TTL_MAX_COUNT } from '../report-link-ttl';
 
 export const InspectionPrefsSchema = z.object({
     cloneDefault:       z.enum(['rating', 'rating_notes', 'all']),
@@ -26,6 +27,19 @@ export const InspectionPrefsSchema = z.object({
      *  get a builder link, so defaulting off would remove a shipped ability —
      *  the fix here is stopping the identity impersonation, not the access. */
     agentRepairAccess: z.enum(['off', 'read', 'readwrite']).default('readwrite'),
+    /** IA-36 ⑤ — how long a report link stays usable, as a DURATION (an
+     *  absolute date is the only shape that can land in the past). Applied when
+     *  a link is MINTED; changing it never touches links already issued.
+     *  Default `never` — the shipped behaviour, and what migrated customers'
+     *  saved links assume. Rides this prefs blob (no migration), same as
+     *  `agentRepairAccess`. */
+    reportLinkTtl: z.union([
+        z.literal('never'),
+        z.object({
+            count: z.number().int().min(1).max(REPORT_LINK_TTL_MAX_COUNT),
+            unit: z.enum(['days', 'months', 'years']),
+        }),
+    ]).default('never'),
 }).openapi('InspectionPrefs');
 
 export type InspectionPrefs = z.infer<typeof InspectionPrefsSchema>;
@@ -40,6 +54,7 @@ export const DEFAULT_INSPECTION_PREFS: InspectionPrefs = {
     pinnedTagIds:       [],
     requireDefectFields: 'none',
     agentRepairAccess:  'readwrite',
+    reportLinkTtl:      'never',
 };
 
 /** Merge a possibly-partial DB row with the defaults. */

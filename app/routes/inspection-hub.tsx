@@ -37,6 +37,9 @@ import {
   toActionResult,
   handlePersonAdd,
   handlePersonRemove,
+  handlePersonResetAccess,
+  handlePersonMakePrimary,
+  handleReportLinkExpiry,
   handleSearchContacts,
 } from "~/lib/inspection-hub-actions";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspection-hub-helpers";
@@ -356,6 +359,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   // response mapping are long enough to keep this dispatcher scannable.
   if (intent === "person-add") return handlePersonAdd(api, id, formData);
   if (intent === "person-remove") return handlePersonRemove(api, id, formData);
+  // IA-36 — the report-link verbs that live on the People card.
+  if (intent === "person-reset-access") return handlePersonResetAccess(api, id, formData);
+  if (intent === "person-make-primary") return handlePersonMakePrimary(api, id, formData);
+  if (intent === "report-link-expiry") return handleReportLinkExpiry(api, id, formData);
   if (intent === "search-contacts") return handleSearchContacts(api, formData);
 
   // Spec 2 Task 7 — "Send report" modal. Recipients/channels arrive as JSON

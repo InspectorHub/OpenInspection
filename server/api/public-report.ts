@@ -9,7 +9,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
-import { resolvePortalAccess, resolveObserverAccess, resolveOwnerPreview } from '../lib/public-access';
+import { resolvePortalAccess, resolveObserverAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
 import { resolveClientActor } from '../lib/portal-client-actor';
 // Re-export so existing callers that import resolveOwnerPreviewToken from this
 // module (e.g. tests) continue to work without changes.
@@ -86,10 +86,11 @@ const reportRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(ReportDataResponseSchema) } }, description: 'Report data' },
-        404: { description: 'Not found or token invalid/expired' },
+        404: { description: 'Not found, or the token names nothing' },
+        410: { description: 'The link was valid but has expired or been revoked (IA-36 ⑨) — code REPORT_LINK_EXPIRED / REPORT_LINK_REVOKED' },
     },
     operationId: 'getPublicReport',
-    description: 'Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing/expired/revoked or does not match the requested inspection.',
+    description: 'Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing or names nothing; 410 when a real link has expired or been revoked, so the page can explain what happened instead of showing a not-found.',
 }, { scopes: [], tier: 'extended' }));
 
 // A-9 — Public token-scoped photo serve for the no-login report viewer. Mirrors
@@ -315,6 +316,22 @@ const publicReportRoutes = createApiRouter()
         let ownerPreview = false;
         if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
         if (!tenantId) {
+            // IA-36 ⑨ — distinguish "this link was taken offline" from "this link
+            // never existed". The recipient was invited by us and the link died by
+            // our policy, so they get a page that says so instead of a 404 that
+            // implies they mistyped something. Only reached AFTER access was
+            // already refused, and only for a token whose secret the caller is
+            // already holding — a guessed token still gets the flat 404.
+            const state = await classifyPortalAccess(c.var.services.portalAccess, token, id);
+            if (state === 'expired' || state === 'revoked') {
+                return c.json({
+                    success: false as const,
+                    error: {
+                        code: state === 'expired' ? 'REPORT_LINK_EXPIRED' : 'REPORT_LINK_REVOKED',
+                        message: 'This report link is no longer active.',
+                    },
+                }, 410);
+            }
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
         }
         // Publish gate: client/token access is revoked while the report is not
@@ -454,7 +471,25 @@ const publicReportRoutes = createApiRouter()
         // once payment succeeds.
         const tenantRow = await drizzle(c.env.DB).select({ slug: tenants.slug })
             .from(tenants).where(eq(tenants.id, tenantId)).get();
-        return c.json({ success: true as const, data: { ...inv, brand, tenantSlug: tenantRow?.slug ?? null } }, 200);
+        // IA-86 — project through the declared shape instead of spreading the
+        // row. `PublicInvoiceBodySchema` always described what a payer may see,
+        // but hono/zod-openapi does not validate or trim RESPONSES, so the
+        // declaration was decorative and the row shipped whole: `notes` (the
+        // inspector's private remark), `qboSyncStatus`, `tenantId`, `contactId`,
+        // `clientEmail`. Parsing here makes the declaration load-bearing —
+        // zod strips anything undeclared, so a column added later cannot leak by
+        // default. Same failure IA-33 fixed on the report endpoint.
+        // Line items are normalized first: a legacy/imported row with a missing
+        // description would make `.parse()` THROW, and trading an information
+        // leak for a 500 on the pay page is not a fix. Every other declared
+        // field is already a plain string/number from the service (createdAt
+        // goes through safeISODate) so it cannot fail this parse.
+        const lineItems = (inv.lineItems ?? []).map((li) => ({
+            description: String(li?.description ?? ''),
+            amountCents: Number(li?.amountCents ?? 0),
+        }));
+        const view = PublicInvoiceBodySchema.parse({ ...inv, lineItems, brand, tenantSlug: tenantRow?.slug ?? null });
+        return c.json({ success: true as const, data: view }, 200);
     })
     .openapi(payIntentRoute, async (c) => {
         const { id } = c.req.valid('param');

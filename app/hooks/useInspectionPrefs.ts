@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFetcher } from 'react-router';
 import type { AutoAdvanceMode } from '~/lib/rating-levels';
+import type { ReportLinkTtl } from '../../server/lib/report-link-ttl';
 
 type RequireDefectFields = 'none' | 'location' | 'trade' | 'both';
 
@@ -19,6 +20,10 @@ export interface InspectionPrefs {
     /** IA-35 / IA-73 — tenant policy for agent access to the repair list.
      *  'readwrite' (default) = agents may view and edit. */
     agentRepairAccess: 'off' | 'read' | 'readwrite';
+    /** IA-36 ⑤ — how long a newly minted report link stays usable.
+     *  'never' (default) = open-ended, the shipped behaviour. Mirrors
+     *  `InspectionPrefsSchema` (server/lib/validations/inspection-prefs.schema.ts). */
+    reportLinkTtl: ReportLinkTtl;
 }
 
 const DEFAULTS: InspectionPrefs = {
@@ -28,6 +33,7 @@ const DEFAULTS: InspectionPrefs = {
     pinnedTagIds:       [],
     requireDefectFields: 'none',
     agentRepairAccess: 'readwrite',
+    reportLinkTtl: 'never',
 };
 
 /**
