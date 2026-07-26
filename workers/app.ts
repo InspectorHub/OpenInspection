@@ -10,23 +10,15 @@ import { buildOAuthHandler } from "../server/lib/mcp/oauth-provider";
 // module-global) across the multi-tenant Worker. Generated (git-ignored); the
 // paraglide vite plugin + the prebuild `i18n:compile` step keep it present.
 import { paraglideMiddleware } from "../app/paraglide/server.js";
+import type { WorkerEnv } from "./env";
 
 declare module "react-router" {
   export interface AppLoadContext {
     cloudflare: {
-      env: Env;
+      env: WorkerEnv;
       ctx: ExecutionContext;
     };
   }
-}
-
-interface Env {
-  ASSETS?: Fetcher;
-  API_URL?: string;
-  SESSION_SECRET?: string;
-  /** In-process self-binding injected by the worker so RR loaders can call the
-   *  API directly (no network hop). Set on the load context; never in wrangler. */
-  API_WORKER?: { fetch: typeof fetch };
 }
 
 // The API graph (server/index → every route/service/dep) is imported LAZILY.
