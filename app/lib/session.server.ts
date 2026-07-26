@@ -1,26 +1,84 @@
 import { createCookieSessionStorage, redirect } from "react-router";
 import type { AppLoadContext, SessionStorage } from "react-router";
 
-const DEV_SECRET = "standalone-demo-session-secret-change-me";
-
 /** Fields stored in the React Router `__session` cookie. */
 type AppSessionData = { token: string };
 
-function getSessionSecret(context?: AppLoadContext): string {
-  if (context?.cloudflare?.env?.SESSION_SECRET) return context.cloudflare.env.SESSION_SECRET as string;
+/**
+ * Domain-separation salt for the derived session secret. Distinct from
+ * config-crypto's salt on purpose: the same JWT_SECRET feeds both, and they
+ * must not produce the same derived key.
+ */
+const SESSION_SECRET_SALT = new TextEncoder().encode("openinspection:session-cookie:v1");
+
+/** PBKDF2 over JWT_SECRET — same shape config-crypto already uses. */
+async function deriveSessionSecret(jwtSecret: string): Promise<string> {
+  const material = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(jwtSecret),
+    "PBKDF2",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", salt: SESSION_SECRET_SALT, iterations: 100_000, hash: "SHA-256" },
+    material,
+    256,
+  );
+  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/** Cached derivation — PBKDF2 at 100k iterations is too costly per request. */
+let _derived: { from: string; value: Promise<string> } | null = null;
+
+function readEnvVar(context: AppLoadContext | undefined, name: "SESSION_SECRET" | "JWT_SECRET"): string | undefined {
+  const fromBinding = context?.cloudflare?.env?.[name];
+  if (fromBinding) return fromBinding;
+  // Node-only path: the vitest suites run these helpers outside workerd, where
+  // there is no binding to read from.
   try {
-    if (typeof process !== "undefined" && process?.env?.SESSION_SECRET) {
-      return process.env.SESSION_SECRET;
-    }
+    if (typeof process !== "undefined" && process?.env?.[name]) return process.env[name];
   } catch { /* env not available in this runtime */ }
-  return DEV_SECRET;
+  return undefined;
+}
+
+/**
+ * Signing secret for the `__session` cookie.
+ *
+ * `SESSION_SECRET` when provisioned; otherwise DERIVED from `JWT_SECRET`. There
+ * is deliberately no constant default: a fallback literal means every
+ * deployment that never set the variable signs its cookies with a value
+ * published in this repository, which is the same as not signing them.
+ *
+ * Derivation rather than reuse keeps the two credentials separate — JWT_SECRET
+ * is also the KDF input for config-crypto and the audit signing keys, so
+ * disclosing the cookie secret must not hand over those as well.
+ *
+ * Both unset is a configuration error, not a degraded mode, so this throws.
+ * JWT_SECRET is required for the app to function at all, so that can only
+ * happen on a genuinely unconfigured deployment.
+ */
+async function getSessionSecret(context?: AppLoadContext): Promise<string> {
+  const explicit = readEnvVar(context, "SESSION_SECRET");
+  if (explicit) return explicit;
+
+  const jwtSecret = readEnvVar(context, "JWT_SECRET");
+  if (!jwtSecret) {
+    throw new Error(
+      "Cannot sign session cookies: neither SESSION_SECRET nor JWT_SECRET is configured.",
+    );
+  }
+  if (_derived?.from !== jwtSecret) {
+    _derived = { from: jwtSecret, value: deriveSessionSecret(jwtSecret) };
+  }
+  return _derived.value;
 }
 
 let _storage: SessionStorage<AppSessionData> | null = null;
 let _storageSecret: string | null = null;
 
-function getStorage(context?: AppLoadContext) {
-  const secret = getSessionSecret(context);
+async function getStorage(context?: AppLoadContext) {
+  const secret = await getSessionSecret(context);
   if (!_storage || secret !== _storageSecret) {
     _storageSecret = secret;
     _storage = createCookieSessionStorage<AppSessionData>({
@@ -38,8 +96,22 @@ function getStorage(context?: AppLoadContext) {
   return _storage;
 }
 
+/**
+ * Read path. An unverifiable `__session` is treated as ABSENT, not as a failure:
+ * when no signing secret is configured we cannot vouch for the cookie, and the
+ * fail-closed response to "this credential can't be verified" is to ignore it —
+ * not to fault the request. Callers fall through to the raw JWT cookie, which
+ * carries its own ES256 signature and needs no secret to be read.
+ *
+ * The WRITE path deliberately does not do this: `createSessionWithToken` lets
+ * the error propagate rather than issue an unprotected cookie.
+ */
 async function getSession(context: AppLoadContext, request: Request) {
-  return getStorage(context).getSession(request.headers.get("Cookie"));
+  try {
+    return await (await getStorage(context)).getSession(request.headers.get("Cookie"));
+  } catch {
+    return null;
+  }
 }
 
 /** Read a single raw cookie value from the request's Cookie header. */
@@ -57,7 +129,7 @@ function readRawCookie(request: Request, name: string): string | null {
 
 export async function getToken(context: AppLoadContext, request: Request): Promise<string | null> {
   const session = await getSession(context, request);
-  const fromSession = session.get("token");
+  const fromSession = session?.get("token");
   if (fromSession) return fromSession;
   // Fallback: the SSO handoff consume (GET /sso, server/api/auth.ts) sets the
   // JWT only in the raw `__Host-inspector_token` cookie and never writes the
@@ -132,10 +204,11 @@ export async function createSessionWithToken(
   token: string,
   redirectTo: string,
 ) {
-  const session = await getStorage(context).getSession();
+  const storage = await getStorage(context);
+  const session = await storage.getSession();
   session.set("token", token);
   const headers = new Headers();
-  headers.append("Set-Cookie", await getStorage(context).commitSession(session));
+  headers.append("Set-Cookie", await storage.commitSession(session));
   headers.append("Set-Cookie", browserJwtCookie(token));
   return redirect(redirectTo, { headers });
 }
@@ -143,7 +216,15 @@ export async function createSessionWithToken(
 export async function destroyUserSession(context: AppLoadContext, request: Request) {
   const session = await getSession(context, request);
   const headers = new Headers();
-  headers.append("Set-Cookie", await getStorage(context).destroySession(session));
+  // Logging out must work even when no signing secret is configured — the point
+  // of this call is to REMOVE credentials, so being unable to verify the one
+  // being removed is no reason to leave the visitor logged in. The raw JWT
+  // cookie below is expired unconditionally.
+  if (session) {
+    try {
+      headers.append("Set-Cookie", await (await getStorage(context)).destroySession(session));
+    } catch { /* no secret to sign the expiry with; the raw cookie still clears */ }
+  }
   // Also expire the raw JWT cookie the API sets (and that getToken() falls back
   // to). Without this, logout would clear only the RR `__session` cookie and the
   // getToken fallback would keep the user authenticated via __Host-inspector_token.

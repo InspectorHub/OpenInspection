@@ -1,3 +1,8 @@
+// @vitest-environment node
+//
+// Server-only module: nothing here touches the DOM, and the default happy-dom
+// environment strips `Set-Cookie` from Response headers, which the secret specs
+// below need to read back.
 /**
  * A session that has EXPIRED must land the visitor on the login page, not on an
  * error page.
@@ -9,7 +14,12 @@
  */
 import { describe, it, expect } from "vitest";
 import type { AppLoadContext } from "react-router";
-import { requireToken, browserJwtCookie } from "./session.server";
+import {
+  requireToken,
+  browserJwtCookie,
+  createSessionWithToken,
+  getToken,
+} from "./session.server";
 
 const CONTEXT = {} as AppLoadContext;
 
@@ -130,5 +140,77 @@ describe("browserJwtCookie", () => {
     // The token itself is a 24h JWT; a longer-lived cookie would just carry a
     // dead credential the API rejects.
     expect(browserJwtCookie(TOKEN)).toContain(`Max-Age=${60 * 60 * 24}`);
+  });
+});
+
+/**
+ * The `__session` signing secret used to fall back to a constant literal. Since
+ * SESSION_SECRET was in fact never provisioned in any config, `.dev.vars`, or
+ * setup script, that fallback was not a dev convenience — it was the value every
+ * deployment actually signed with, published in this repository.
+ *
+ * The replacement derives from JWT_SECRET (required anyway) rather than
+ * introducing a new mandatory variable, which would have broken the one-click
+ * deploy path. These specs pin all three behaviors.
+ */
+describe("session cookie secret", () => {
+  const TOKEN = jwt({ exp: Math.floor(Date.now() / 1000) + 3600 });
+
+  function contextWith(env: Record<string, string>): AppLoadContext {
+    return { cloudflare: { env, ctx: {} } } as unknown as AppLoadContext;
+  }
+
+  /**
+   * The signed `__session` value, which encodes the secret it was signed with.
+   * Read via `get()` rather than `getSetCookie()` — the latter is not
+   * implemented in this test environment's Headers.
+   */
+  async function sessionCookieFor(context: AppLoadContext): Promise<string> {
+    const response = await createSessionWithToken(context, TOKEN, "/");
+    const raw = response.headers.get("Set-Cookie") ?? "";
+    const match = /__session=([^;,]+)/.exec(raw);
+    if (!match) throw new Error(`no __session cookie was set (got: ${raw})`);
+    return match[1];
+  }
+
+  it("refuses to sign when neither SESSION_SECRET nor JWT_SECRET is available", async () => {
+    // Fail closed on the WRITE path: issuing a cookie nobody can verify is
+    // worse than refusing to issue one.
+    await expect(sessionCookieFor(contextWith({}))).rejects.toThrow(
+      /neither SESSION_SECRET nor JWT_SECRET/,
+    );
+  });
+
+  it("derives a secret from JWT_SECRET when SESSION_SECRET is unset", async () => {
+    // Succeeding at all is the assertion — without a derivation path this
+    // would throw per the spec above. Keeps one-click deploys working without
+    // a hardcoded default.
+    expect(await sessionCookieFor(contextWith({ JWT_SECRET: "jwt-secret-value" }))).not.toEqual(
+      "",
+    );
+  });
+
+  it("prefers an explicit SESSION_SECRET over deriving one", async () => {
+    const derived = await sessionCookieFor(contextWith({ JWT_SECRET: "shared" }));
+    const explicit = await sessionCookieFor(
+      contextWith({ JWT_SECRET: "shared", SESSION_SECRET: "explicit" }),
+    );
+    expect(explicit).not.toEqual(derived);
+  });
+
+  it("never uses JWT_SECRET verbatim as the cookie secret", async () => {
+    // Domain separation: JWT_SECRET is also the KDF input for config-crypto and
+    // the audit signing keys, so disclosing the cookie secret must not disclose
+    // those. Signing with the raw value would collapse that separation.
+    const derived = await sessionCookieFor(contextWith({ JWT_SECRET: "shared" }));
+    const verbatim = await sessionCookieFor(contextWith({ SESSION_SECRET: "shared" }));
+    expect(derived).not.toEqual(verbatim);
+  });
+
+  it("reads an unverifiable session as absent instead of faulting the request", async () => {
+    // The READ path must not fail closed by crashing: SSO arrivals carry only
+    // the raw JWT cookie and never touch __session, so an unconfigured secret
+    // must not take them down.
+    await expect(getToken(contextWith({}), requestWithToken(TOKEN))).resolves.toEqual(TOKEN);
   });
 });

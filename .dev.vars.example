@@ -12,6 +12,14 @@ SETUP_CODE=change-me-6-chars-min
 # (scripts/ensure-jwt-secrets.mjs); set this only to pin a specific value.
 JWT_SECRET=your-jwt-secret-here
 
+# Optional: signing secret for the React Router `__session` cookie. Left unset,
+# it is DERIVED from JWT_SECRET (PBKDF2, distinct salt), so there is nothing to
+# configure for a normal deploy. Set it only to rotate the cookie secret
+# independently of JWT_SECRET. There is no default value: if neither this nor
+# JWT_SECRET is available, signing a session cookie is refused rather than
+# falling back to a constant.
+# SESSION_SECRET=
+
 # Optional: Resend API key for sending report emails to clients
 RESEND_API_KEY=re_your_api_key_here
 
