@@ -3,9 +3,11 @@
  * <PaymentSection>. Client-only: rendered after a click. Owns its own <Elements>
  * provider and lazy-loads `loadStripe` only after the client clicks "Pay".
  *
- * Payment-intent / clientSecret / confirmPayment logic is byte-identical to the
- * original inline implementation — keyed by INSPECTION ID, POSTing
- * `/api/public/inspections/:id/pay-intent`. lint:ds — only `ih-*` tokens.
+ * Payment-intent / clientSecret / confirmPayment logic is keyed by INSPECTION
+ * ID, POSTing `/api/public/inspections/:id/pay-intent`. That endpoint requires
+ * a live client/co_client grant (IA-34), presented either as the `?token=` this
+ * panel is handed or as the same-origin `__Host-portal_session` cookie.
+ * lint:ds — only `ih-*` tokens.
  */
 import { useState } from "react";
 import { loadStripe, type Stripe as StripeJs } from "@stripe/stripe-js";
@@ -17,7 +19,7 @@ import { money } from "./payment-helpers";
 
 type PayPhase = "idle" | "loading" | "ready" | "unavailable" | "paid_already";
 
-export function StripePayPanel({ id, balanceDue, inspectorName, brandColor, currency }: { id: string; balanceDue: number; inspectorName: string; brandColor: string | null; currency?: string }) {
+export function StripePayPanel({ id, portalToken, balanceDue, inspectorName, brandColor, currency }: { id: string; portalToken?: string | null; balanceDue: number; inspectorName: string; brandColor: string | null; currency?: string }) {
   // Phase B — amounts render in the invoice's snapshot currency (USD fallback).
   const cur = { currency };
   // Stripe renders its own copy inside the Elements iframe; without this it picks
@@ -36,7 +38,12 @@ export function StripePayPanel({ id, balanceDue, inspectorName, brandColor, curr
     setReturnUrl(typeof window !== "undefined" ? window.location.href : "");
     setPhase("loading");
     try {
-      const res = await fetch(`/api/public/inspections/${id}/pay-intent`, {
+      // IA-34 — the pay-intent endpoint requires a live client/co_client grant.
+      // Standalone `/invoice/:id` has only the link's token; inside the Hub the
+      // same-origin `__Host-portal_session` cookie rides along automatically, so
+      // an absent token is not an error there.
+      const qs = portalToken ? `?token=${encodeURIComponent(portalToken)}` : "";
+      const res = await fetch(`/api/public/inspections/${id}/pay-intent${qs}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: "{}",

@@ -10,6 +10,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import invoiceRoutes from '../../../server/api/invoices';
 import { InvoiceService } from '../../../server/services/invoice.service';
 import { PeopleService } from '../../../server/services/people.service';
+import { PortalAccessService } from '../../../server/services/portal-access.service';
 import { seedRoleProfiles } from '../../../server/services/seed/seed-role-profiles';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
@@ -35,6 +36,7 @@ const OTHER_INSP_ID = '550e8400-e29b-41d4-a716-4466554400ff';
 const SVC_ID = '660e8400-e29b-41d4-a716-446655440000';
 const SLUG = 'acme';
 const CLIENT = 'contact-client-1';
+const JWT_SECRET = 'test-jwt-secret';
 const roleProfileId = (key: string) => `crp_${TENANT}_${key}`;
 
 let db: BetterSQLite3Database<typeof schema>;
@@ -51,6 +53,7 @@ function buildApp(role = 'manager') {
         c.set('services', {
             invoice: new InvoiceService({} as D1Database),
             people: new PeopleService({ DB: {} as D1Database }),
+            portalAccess: new PortalAccessService({} as D1Database, { jwtSecret: JWT_SECRET }),
             email: { sendInvoiceRequest } as never,
             qbo: { upsertInvoice: vi.fn() } as never,
         } as never);
@@ -67,7 +70,7 @@ function buildApp(role = 'manager') {
     return app;
 }
 
-const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com' } as never;
+const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET } as never;
 const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
 
 function post(body: unknown, role = 'manager') {
@@ -138,6 +141,32 @@ describe('POST /api/invoices/request-payment (Task 8, #111)', () => {
         expect(sendInvoiceRequest.mock.calls[0][0]).toBe('jane@example.com');
         const payUrl = sendInvoiceRequest.mock.calls.flat().find((a) => typeof a === 'string' && a.includes('/invoice/'));
         expect(payUrl).toContain(`/invoice/${INSP_ID}`);
+    });
+
+    // IA-34 — the public invoice endpoint is now gated by resolveClientActor, so
+    // the emailed link must carry the primary client's per-inspection portal
+    // token. Without this the pay page 401s for every recipient.
+    it('emailed pay URL carries a portal token that resolves to the primary client', async () => {
+        const res = await post({ inspectionId: INSP_ID });
+        expect(res.status).toBe(200);
+        const payUrl = sendInvoiceRequest.mock.calls[0][3] as string;
+        const token = new URL(payUrl).searchParams.get('token');
+        expect(token).toBeTruthy();
+        const grant = await new PortalAccessService({} as D1Database, { jwtSecret: JWT_SECRET }).resolveToken(token!);
+        expect(grant).not.toBeNull();
+        expect(grant!.inspectionId).toBe(INSP_ID);
+        expect(grant!.tenantId).toBe(TENANT);
+        expect(grant!.recipientEmail).toBe('jane@example.com');
+        expect(grant!.role).toBe('client');
+        expect(grant!.revokedAt).toBeNull();
+    });
+
+    it('re-sending the same invoice reuses the SAME portal token (idempotent issuance)', async () => {
+        await post({ inspectionId: INSP_ID });
+        const first = new URL(sendInvoiceRequest.mock.calls[0][3] as string).searchParams.get('token');
+        await post({ inspectionId: INSP_ID });
+        const second = new URL(sendInvoiceRequest.mock.calls[0][3] as string).searchParams.get('token');
+        expect(second).toBe(first);
     });
 
     it('formats the email amount label in the recipient (tenant) locale/currency', async () => {

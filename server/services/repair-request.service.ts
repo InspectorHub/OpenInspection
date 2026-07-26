@@ -14,6 +14,8 @@ type ItemInput = {
     defectTitle?: string | null;
     location?: string | null;
     category?: string | null;
+    // IA-57 — resolved trade label ("licensed roofer"), snapshotted at add time.
+    trade?: string | null;
     commentSnapshot?: string | null;
     requestedCreditCents?: number | null;
     note?: string | null;
@@ -179,6 +181,7 @@ export class RepairRequestService {
                 defectTitleSnapshot:  input.defectTitle ?? null,
                 locationSnapshot:     input.location ?? null,
                 categorySnapshot:     input.category ?? null,
+                tradeSnapshot:        input.trade ?? null,
                 commentSnapshot:      input.commentSnapshot ?? null,
                 requestedCreditCents: input.requestedCreditCents ?? null,
                 note:                 input.note ?? null,
@@ -206,6 +209,7 @@ export class RepairRequestService {
             defectTitleSnapshot: input.defectTitle ?? null,
             locationSnapshot: input.location ?? null,
             categorySnapshot: input.category ?? null,
+            tradeSnapshot: input.trade ?? null,
             commentSnapshot: input.commentSnapshot ?? null,
             requestedCreditCents: input.requestedCreditCents ?? null,
             note: input.note ?? null,

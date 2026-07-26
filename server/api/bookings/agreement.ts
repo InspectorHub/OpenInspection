@@ -11,6 +11,7 @@ import { agreements, tenantConfigs, invoices, inspections } from '../../lib/db/s
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
+import { PublicAgreementBodySchema } from '../../lib/validations/agreement-public.schema';
 import { runEnvelopeCompletionPipeline, runSignerReceiptEffects } from '../../lib/sign-effects';
 
 // Local aliases for the literal unions the DB columns are narrowed to in the
@@ -32,26 +33,11 @@ const getAgreementByTokenRoute = createRoute(withMcpMetadata({
         200: {
             content: {
                 'application/json': {
+                    // Track I-a — shape lives in validations so the public sign
+                    // page can derive its type from it instead of hand-copying.
                     schema: z.object({
-                        success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'),
-                        data: z.object({
-                            status: z.enum(['pending', 'sent', 'viewed', 'signed', 'declined', 'expired']).describe('Envelope aggregate status'),
-                            envelopeId: z.string().describe('Stable envelope id — the public /verify/:envelopeId page identifier surfaced to signers after signing'),
-                            clientName: z.string().nullable().describe('TODO describe clientName field for the OpenInspection MCP integration'),
-                            agreementName: z.string().describe('TODO describe agreementName field for the OpenInspection MCP integration'),
-                            agreementContent: z.string().describe('Pinned content snapshot served to the signer (never the live template)'),
-                            // Track I-a — per-signer context for the public sign page.
-                            signer: z.object({
-                                name: z.string(),
-                                role: z.enum(['client', 'co_client', 'agent', 'other']),
-                                status: z.enum(['pending', 'sent', 'viewed', 'signed', 'declined', 'expired']),
-                            }).describe('The signer resolved from the presented token'),
-                            progress: z.object({
-                                signed: z.number().int(),
-                                total: z.number().int(),
-                            }).describe('Signature progress across the envelope'),
-                            completionPolicy: z.enum(['all', 'one']).describe('Envelope completion policy'),
-                        }).describe('TODO describe data field for the OpenInspection MCP integration'),
+                        success: z.literal(true).describe('Always true on a 200'),
+                        data: PublicAgreementBodySchema.describe('Agreement + signer context for the presented token'),
                     }),
                 },
             },
@@ -118,6 +104,7 @@ const getCheckoutByTokenRoute = createRoute(withMcpMetadata({
                                 companyName: z.string(),
                                 primaryColor: z.string().nullable(),
                             }).describe('Tenant branding for the page chrome'),
+                            portalToken: z.string().nullable().describe("IA-44 — the signer's own per-inspection portal token, so the completed checkout can hand off to the client Hub. Null for non-client signers."),
                         }).describe('Combined checkout context'),
                     }),
                 },
@@ -305,6 +292,33 @@ const agreementRoutes = createApiRouter()
             ? (invoiceRow.paidAt ? 'paid' : invoiceRow.partialPaidAt ? 'partial' : 'unpaid')
             : null;
 
+        // IA-44 — hand the signer the per-inspection PORTAL token for their OWN
+        // email, so the completed checkout can bounce them into the client Hub
+        // (app/lib/portal-exchange.ts needs a portal token; checkout only ever
+        // held a signer token). This lives INSIDE the endpoint that already
+        // verified the signer — an independently-callable exchange route would
+        // be an unauthenticated token vending machine.
+        //
+        // Only client / co_client signers: those are the roles the Hub session
+        // and the client-actor gate (server/lib/portal-client-actor.ts) accept.
+        // An agent signer has no client hub, so minting one would be a grant
+        // they must not have. Issuance is idempotent per (inspection, recipient),
+        // so reloading checkout never rotates a link already sent by email.
+        let portalToken: string | null = null;
+        if (signer.role === 'client' || signer.role === 'co_client') {
+            try {
+                portalToken = await c.var.services.portalAccess.issueToken({
+                    tenantId, inspectionId, recipientEmail: signer.email, role: signer.role,
+                });
+            } catch (e) {
+                // Never let a token-issuance problem block signing or paying —
+                // the page degrades to "no hub hand-off", not to a dead end.
+                logger.warn('checkout.portal-token.issue.failed', {
+                    requestId: envelope.id, signerId: signer.id, error: (e as Error).message,
+                });
+            }
+        }
+
         return c.json({
             success: true as const,
             data: {
@@ -338,6 +352,7 @@ const agreementRoutes = createApiRouter()
                     companyName: branding?.companyName ?? 'OpenInspection',
                     primaryColor: branding?.primaryColor ?? null,
                 },
+                portalToken,
             },
         }, 200);
     })

@@ -202,8 +202,36 @@ describe('Track E1 — InspectionService.getRepairList', () => {
         expect(custom).toBeDefined();
         expect(custom!.itemLabel).toBe('Loose flashing');
         expect(custom!.category).toBe('safety');
+        // IA-57 — custom defects carry no structured trade field today.
+        expect(custom!.trade).toBeNull();
         expect(result.totals.safety).toBe(1);
         expect(result.totals.maintenance).toBe(1);
+    });
+
+    // IA-57 — `trade` ("who should fix this") was only ever Mustache-interpolated
+    // into the comment, so it vanished whenever the canned prose lacked the
+    // {{trade}} placeholder. The repair list must carry the resolved label so the
+    // public repair-request page can snapshot and show it.
+    it('carries the resolved trade label onto the repair-list entry', async () => {
+        await svc.updateResults(INSPECTION_ID, TENANT, {
+            'roof-shingles': {
+                tabs: {
+                    defects: [
+                        { cannedId: 'def-default-on', included: true, trade: 'licensed-roofer' },
+                    ],
+                },
+            },
+        });
+        const result = await svc.getRepairList(INSPECTION_ID, TENANT);
+        const shingles = result.defects.find(d => d.itemLabel === 'Shingles');
+        expect(shingles).toBeDefined();
+        // The label, not the slug — same resolution the report card renders.
+        expect(shingles!.trade).toBe('licensed roofer');
+    });
+
+    it('leaves trade null when the inspector picked none', async () => {
+        const result = await svc.getRepairList(INSPECTION_ID, TENANT);
+        expect(result.defects[0]!.trade).toBeNull();
     });
 
     it('reflects showEstimates from tenant_configs', async () => {

@@ -27,6 +27,7 @@ function makeEntry(
         comment:        string;
         category:       'safety' | 'recommendation' | 'maintenance';
         severityBucket: 'satisfactory' | 'monitor' | 'defect' | 'other';
+        trade:          string | null;
     }> = {},
 ) {
     return {
@@ -41,6 +42,8 @@ function makeEntry(
         // Repair-list entries come off defect-rated items; the pipeline always
         // stamps a bucket. Default to 'defect' so the fixture mirrors production.
         severityBucket: overrides.severityBucket ?? ('defect' as const),
+        // IA-57 — resolved trade label ("licensed roofer"), null when unset.
+        trade:        overrides.trade ?? null,
         estimateLow:  null,
         estimateHigh: null,
         source,
@@ -155,5 +158,20 @@ describe('flattenReportDefects — findingKey uniqueness', () => {
         expect(defect.itemLabel).toBe('Panel');
         expect(defect.comment).toBe('Double-tapped breaker');
         expect(defect.category).toBe('safety');
+    });
+
+    // IA-57 — the flatten step is the second of the six layers that carry the
+    // defect's trade to the public repair-request page; dropping it here would
+    // make the field invisible downstream no matter what the report resolved.
+    it('carries the resolved trade label through to the flattened defect', async () => {
+        const svc = fakeSvc([
+            makeEntry('s6', 'item6', 'canned', 'roof', { trade: 'licensed roofer' }),
+            makeEntry('s6', 'item7', 'custom', null),
+        ]);
+
+        const result = await flattenReportDefects(svc, 'insp1', 't1');
+
+        expect(result[0].trade).toBe('licensed roofer');
+        expect(result[1].trade).toBeNull();
     });
 });

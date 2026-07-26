@@ -46,6 +46,9 @@ export interface Defect {
   // IA-42 — the rating-axis severity of the parent item (getRatingBucket
   // domain). Distinct from `category`; drives the real "Severity" sort.
   severityBucket: "satisfactory" | "monitor" | "defect" | "other";
+  // IA-57 — the recommended trade as a resolved label ("licensed roofer"),
+  // snapshotted onto the item so the shared list names the trade to send.
+  trade: string | null;
   // IA-56 — the report's Est. Cost, shown only as a credit-input hint.
   estimateLow: number | null;
   estimateHigh: number | null;
@@ -383,6 +386,7 @@ function RepairBuilderUI({ defects, mine, token, actionPath }: RepairBuilderUIPr
         fd.append("defectTitle", defect.defectTitle);
         if (defect.location) fd.append("location", defect.location);
         fd.append("category", defect.category);
+        if (defect.trade) fd.append("trade", defect.trade);
         fd.append("commentSnapshot", defect.comment);
         const draft = drafts[key];
         if (draft?.requestedCreditCents != null) {

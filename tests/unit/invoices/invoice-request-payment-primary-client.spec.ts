@@ -19,6 +19,7 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import invoiceRoutes from '../../../server/api/invoices';
 import { InvoiceService } from '../../../server/services/invoice.service';
 import { PeopleService } from '../../../server/services/people.service';
+import { PortalAccessService } from '../../../server/services/portal-access.service';
 import { AppError } from '../../../server/lib/errors';
 import type { HonoConfig } from '../../../server/types/hono';
 
@@ -44,6 +45,9 @@ function buildApp(role = 'manager') {
         c.set('services', {
             invoice: new InvoiceService({} as D1Database),
             people: new PeopleService({ DB: {} as D1Database }),
+            // IA-34 — the send path mints the recipient's portal token so the
+            // emailed /invoice/:id link authenticates itself.
+            portalAccess: new PortalAccessService({} as D1Database, { jwtSecret: 'test-jwt-secret' }),
             email: { sendInvoiceRequest } as never,
             qbo: { upsertInvoice: vi.fn() } as never,
         } as never);
@@ -59,7 +63,7 @@ function buildApp(role = 'manager') {
     return app;
 }
 
-const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com' } as never;
+const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET: 'test-jwt-secret' } as never;
 const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
 
 function post(body: unknown, role = 'manager') {

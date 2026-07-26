@@ -20,6 +20,9 @@ interface ShareItem {
   defectTitleSnapshot?: string | null;
   locationSnapshot?: string | null;
   categorySnapshot?: string | null;
+  // IA-57 — the recommended trade, so a contractor reading the shared list can
+  // see which trade the inspector called for instead of inferring it from prose.
+  tradeSnapshot?: string | null;
   commentSnapshot: string | null;
   requestedCreditCents: number | null;
   note: string | null;
@@ -39,6 +42,7 @@ export interface ShareViewRow {
   defectTitle: string | null;
   location: string | null;
   category: string | null;
+  trade: string | null;
   comment: string;
   note: string | null;
   creditDisplay: string;
@@ -63,6 +67,7 @@ export function shareViewModel(data: ShareApiData): ShareViewModel {
     defectTitle: item.defectTitleSnapshot ?? null,
     location: item.locationSnapshot ?? null,
     category: item.categorySnapshot ?? null,
+    trade: item.tradeSnapshot ?? null,
     comment: item.commentSnapshot ?? "",
     note: item.note ?? null,
     creditDisplay:
@@ -225,6 +230,20 @@ export default function RepairRequestSharePage() {
                   </span>
                 )}
                 {row.comment && <span className="block text-ih-fg-2">{row.comment}</span>}
+                {/* IA-57 — the recommended trade gets its own labelled line so
+                    the contractor sees who to send even when the canned prose
+                    never mentioned it. */}
+                {row.trade && (
+                  <span
+                    data-testid="share-row-trade"
+                    className="block text-[11px] text-ih-fg-4"
+                  >
+                    <span className="font-bold uppercase tracking-wider">
+                      {m.repair_request_col_trade_prefix()}
+                    </span>{" "}
+                    {row.trade}
+                  </span>
+                )}
               </span>
               <span className="pr-3">
                 {row.category && (

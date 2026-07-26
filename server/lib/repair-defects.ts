@@ -25,6 +25,10 @@ export type RepairDefect = {
     // IA-42 — the parent item's rating-axis severity (getRatingBucket domain),
     // distinct from `category`. Drives the builder's real "Severity" sort.
     severityBucket: 'satisfactory' | 'monitor' | 'defect' | 'other';
+    // IA-57 — the recommended trade, as the resolved label ("licensed roofer").
+    // Snapshotted onto the item when added so the shared list tells a contractor
+    // which trade to send; null when the inspector left it blank.
+    trade:        string | null;
     // IA-56 — the report's Est. Cost, carried ONLY as a credit-input hint in the
     // builder (placeholder / "use estimate"). Never written to the credit value
     // and never snapshotted to the public share page — RRB stays pure-credit.
@@ -53,6 +57,7 @@ export interface InspectionSvcForDefects {
             location:         string | null;
             category:         'safety' | 'recommendation' | 'maintenance';
             severityBucket:   'satisfactory' | 'monitor' | 'defect' | 'other';
+            trade:            string | null;
             estimateLow:      number | null;
             estimateHigh:     number | null;
             source:           'canned' | 'custom';
@@ -100,6 +105,7 @@ export async function flattenReportDefects(
             location:     d.location,
             category:     d.category,
             severityBucket: d.severityBucket,
+            trade:        d.trade,
             estimateLow:  d.estimateLow,
             estimateHigh: d.estimateHigh,
         };

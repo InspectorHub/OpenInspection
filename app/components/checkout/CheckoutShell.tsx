@@ -1,4 +1,5 @@
 import type { StepState } from "~/lib/checkout-steps";
+import { portalHubUrl } from "~/lib/portal-hub-url";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */
@@ -67,11 +68,29 @@ export function StepPill({ index, label, state }: { index: number; label: string
 /*  Completion card                                                    */
 /* ------------------------------------------------------------------ */
 
-export function CompleteCard({ tenant, inspectionId }: { tenant: string; inspectionId: string }) {
-    // Report URL is constructed from the path tenant slug + inspection id
-    // (matches the /report/:tenant/:id public route). The report itself is
-    // still gated server-side, so this is a convenience link, not a bypass.
-    const reportHref = tenant ? `/report/${tenant}/${inspectionId}` : null;
+export function CompleteCard({
+    tenant,
+    inspectionId,
+    portalToken,
+}: {
+    tenant: string;
+    inspectionId: string;
+    /** The signer's own per-inspection portal token (IA-44); null → no CTA. */
+    portalToken: string | null;
+}) {
+    // IA-44 — this used to point at `/report/${tenant}/${inspectionId}` with NO
+    // token. A visitor who arrived through a checkout link holds an agreement
+    // SIGNER token and does not necessarily hold `__Host-portal_session`, so
+    // that link was an auth failure at the highest-trust moment of the journey.
+    // It now targets the Hub carrying the recipient's PORTAL token, which the
+    // Hub exchanges for the session. No token → no CTA (never a token-less link).
+    //
+    // The loader already 302s here once the server considers everything
+    // settled; this card is what the optimistic window (Stripe redirected back,
+    // webhook has not landed yet) still needs.
+    const reportHref = tenant && portalToken
+        ? portalHubUrl({ tenant, inspectionId, token: portalToken, section: "report" })
+        : null;
     return (
         <div className="px-6 py-6 sm:px-8 bg-ih-ok-bg border-b border-ih-ok">
             <div className="flex items-center gap-3">

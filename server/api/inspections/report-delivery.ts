@@ -10,7 +10,7 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../../lib/url';
-import { reportUrl as buildReportUrl, buildRenderReportUrl } from '../../lib/public-urls';
+import { reportUrl as buildReportUrl, buildRenderReportUrl, paymentUrl } from '../../lib/public-urls';
 import { buildPortalUrl } from '../../lib/portal-urls';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
@@ -438,7 +438,26 @@ const reportDeliveryRoutes = createApiRouter()
 
         const data = await c.var.services.inspection.getInspectionHub(id, tenantId, tenantSlug);
         if (!data) return c.json({ success: false, error: 'Inspection not found' }, 404);
-        return c.json({ success: true, data }, 200);
+
+        // IA-34 — the public pay page now refuses a bare `/invoice/:id`, so the hub's
+        // "copy pay link" action must hand out the SAME tokenized URL the send path
+        // emails. Minted here (route layer) rather than in the service so the
+        // aggregate query stays free of the portal-access dependency; `issueToken`
+        // is idempotent and reconstructs the existing plaintext instead of rotating,
+        // so re-reading the hub never invalidates a link already in a client's inbox.
+        // Only for a SENT invoice: a draft has no recipient bound yet.
+        let payUrl: string | null = null;
+        if (data.invoice && (data.invoice.status === 'sent' || data.invoice.status === 'partial')) {
+            const primaryClient = await c.var.services.people.getPrimaryClient(tenantId, id);
+            if (primaryClient?.email) {
+                const payToken = await c.var.services.portalAccess.issueToken({
+                    tenantId, inspectionId: id, recipientEmail: primaryClient.email,
+                });
+                payUrl = paymentUrl(getBookingHost(c), id, payToken);
+            }
+        }
+        const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl } : null };
+        return c.json({ success: true, data: hub }, 200);
     })
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/agent-token',

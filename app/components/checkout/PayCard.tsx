@@ -18,6 +18,7 @@ export function PayCard({
     brandColor,
     justPaid,
     companyName,
+    portalToken,
 }: {
     state: StepState;
     invoice: { id: string; amountCents: number; currency?: string; status: "paid" | "partial" | "unpaid" } | null;
@@ -25,6 +26,14 @@ export function PayCard({
     brandColor: string | null;
     justPaid: boolean;
     companyName: string;
+    /**
+     * IA-34 — the pay-intent endpoint requires a live client/co_client grant.
+     * Checkout's own credential is a SIGNER token, so the endpoint that verified
+     * it hands back this per-inspection PORTAL token for the same recipient.
+     * Null (agent / other signer) → the pay panel degrades to "contact your
+     * inspector" rather than issuing a call that will be refused.
+     */
+    portalToken: string | null;
 }) {
     return (
         <section className="px-6 py-5 sm:px-8">
@@ -56,6 +65,7 @@ export function PayCard({
                     currency={invoice.currency}
                     brandColor={brandColor}
                     companyName={companyName}
+                    portalToken={portalToken}
                 />
             )}
         </section>
@@ -70,6 +80,7 @@ function PayPanel({
     currency: invoiceCurrency,
     brandColor,
     companyName,
+    portalToken,
 }: {
     /** Inspection id — the pay-intent endpoint is inspection-keyed (/api/public/inspections/:id/pay-intent), NOT invoice-keyed. */
     inspectionId: string;
@@ -78,6 +89,8 @@ function PayPanel({
     currency?: string;
     brandColor: string | null;
     companyName: string;
+    /** IA-34 — authenticates the pay-intent call; null → unavailable. */
+    portalToken: string | null;
 }) {
     const [phase, setPhase] = useState<PayPhase>("idle");
     const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -87,9 +100,14 @@ function PayPanel({
     const currency = invoiceCurrency || sessionCurrency;
 
     async function startPayment() {
+        if (!portalToken) {
+            setPhase("unavailable");
+            return;
+        }
         setPhase("loading");
         try {
-            const res = await fetch(`/api/public/inspections/${inspectionId}/pay-intent`, {
+            const qs = `?token=${encodeURIComponent(portalToken)}`;
+            const res = await fetch(`/api/public/inspections/${inspectionId}/pay-intent${qs}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: "{}",

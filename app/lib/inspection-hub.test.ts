@@ -109,22 +109,22 @@ describe('deriveBlockStates — invoice block', () => {
     });
 
     it('draft invoice → neutral / Draft', () => {
-        const s = deriveBlockStates(hub({ invoice: { id: 'i', status: 'draft', amountCents: 1000, sentAt: null, paidAt: null } }));
+        const s = deriveBlockStates(hub({ invoice: { id: 'i', status: 'draft', amountCents: 1000, sentAt: null, paidAt: null, payUrl: null } }));
         expect(s.invoice).toEqual({ tone: 'neutral', label: 'Draft' });
     });
 
     it('sent invoice → monitor / Awaiting payment', () => {
-        const s = deriveBlockStates(hub({ invoice: { id: 'i', status: 'sent', amountCents: 1000, sentAt: '2026-01-01', paidAt: null } }));
+        const s = deriveBlockStates(hub({ invoice: { id: 'i', status: 'sent', amountCents: 1000, sentAt: '2026-01-01', paidAt: null, payUrl: null } }));
         expect(s.invoice).toEqual({ tone: 'monitor', label: 'Awaiting payment' });
     });
 
     it('partial invoice → warning / Partially paid', () => {
-        const s = deriveBlockStates(hub({ invoice: { id: 'i', status: 'partial', amountCents: 1000, sentAt: '2026-01-01', paidAt: null } }));
+        const s = deriveBlockStates(hub({ invoice: { id: 'i', status: 'partial', amountCents: 1000, sentAt: '2026-01-01', paidAt: null, payUrl: null } }));
         expect(s.invoice).toEqual({ tone: 'warning', label: 'Partially paid' });
     });
 
     it('paid invoice → sat / Paid', () => {
-        const s = deriveBlockStates(hub({ invoice: { id: 'i', status: 'paid', amountCents: 1000, sentAt: '2026-01-01', paidAt: '2026-01-02' } }));
+        const s = deriveBlockStates(hub({ invoice: { id: 'i', status: 'paid', amountCents: 1000, sentAt: '2026-01-01', paidAt: '2026-01-02', payUrl: null } }));
         expect(s.invoice).toEqual({ tone: 'sat', label: 'Paid' });
     });
 });

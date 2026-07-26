@@ -724,7 +724,10 @@ export default function InspectionHubPage() {
               >
                 {m.inspections_hub_invoice_resend()}
               </Button>
-              <CopyLinkButton url={`/invoice/${inspection.id}`} />
+              {/* IA-34 — the pay page is token-gated; copy the tokenized link the
+                  server built, never a bare `/invoice/:id` (which now 401s). No
+                  link when no primary client email exists to bind a token to. */}
+              {hub.invoice?.payUrl && <CopyLinkButton url={hub.invoice.payUrl} />}
             </div>
           ) : (
             <Button

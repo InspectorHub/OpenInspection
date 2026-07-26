@@ -108,7 +108,14 @@ const InspectionPeopleSchema = z.object({
 // Issue #111 — single aggregate payload for the `/inspections/:id` hub page.
 // One round trip drives six blocks (People / Schedule / Services / Agreement /
 // Invoice / Report status). Every field is explicit (no z.any()).
-const InspectionHubSchema = z.object({
+/**
+ * Exported so the hub page's helpers can DERIVE their payload type from this
+ * schema (`z.infer`) instead of hand-copying its fields. A hand-written mirror
+ * silently rots: adding `invoice.payUrl` here left the frontend copy behind
+ * until tsc happened to catch it, and an optional field would not have been
+ * caught at all. One schema, one type.
+ */
+export const InspectionHubSchema = z.object({
   inspection: z.object({
     id:                z.string().describe('Inspection identifier'),
     propertyAddress:   z.string().describe('Subject property address'),
@@ -117,6 +124,11 @@ const InspectionHubSchema = z.object({
     clientPhone:       z.string().nullable().describe('Denormalized client phone cache'),
     clientContactId:   z.string().nullable().describe('contacts.id of the client, when linked'),
     status:            z.string().describe('Inspection lifecycle status'),
+    // The service has always returned this (it drives the hub's report pill),
+    // but the schema omitted it — so the published OpenAPI/MCP contract
+    // under-described the payload. Deriving the frontend type from this schema
+    // is what surfaced the gap.
+    reportStatus:      z.string().describe('Report lifecycle status: in_progress | submitted | published'),
     date:              z.string().nullable().describe('Scheduled inspection date (YYYY-MM-DD)'),
     inspectorId:       z.string().nullable().describe('Assigned inspector users.id'),
     templateId:        z.string().nullable().describe('Selected template id'),
@@ -153,6 +165,11 @@ const InspectionHubSchema = z.object({
     amountCents: z.number().describe('Invoice total in cents'),
     sentAt:     z.string().nullable().describe('ISO sent timestamp'),
     paidAt:     z.string().nullable().describe('ISO paid timestamp'),
+    // IA-34 — the public pay page is token-gated, so a bare `/invoice/:id` is
+    // refused. The inspector's "copy pay link" must hand out the SAME tokenized
+    // URL the emailed link carries; null when no primary client email exists to
+    // bind a token to (the UI hides the action rather than copy a dead link).
+    payUrl:     z.string().nullable().describe('Tokenized public pay link, or null when unavailable'),
   }).nullable().describe('Most recent invoice for the inspection, or null'),
   publishReadiness: z.object({
     ready:         z.boolean().describe('True when every required defect field is filled'),

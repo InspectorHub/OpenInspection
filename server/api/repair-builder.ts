@@ -46,6 +46,7 @@ const SourceResponseSchema = z.object({
             location:     z.string().nullable(),
             category:     z.enum(['safety', 'recommendation', 'maintenance']),
             severityBucket: z.enum(['satisfactory', 'monitor', 'defect', 'other']),
+            trade:        z.string().nullable(),
             estimateLow:  z.number().nullable(),
             estimateHigh: z.number().nullable(),
         })).describe('Flattened repair-rated defects from the published report.'),
@@ -112,6 +113,9 @@ const ItemBodySchema = z.object({
     defectTitle:          z.string().nullable().optional().describe('Defect title snapshot at add time.'),
     location:             z.string().nullable().optional().describe('Defect location snapshot at add time.'),
     category:             z.string().nullable().optional().describe('Defect category snapshot at add time.'),
+    // IA-57 — the recommended trade, so the shared list tells a contractor which
+    // trade to send instead of hiding it inside the comment prose.
+    trade:                z.string().nullable().optional().describe('Recommended trade snapshot at add time.'),
     commentSnapshot:      z.string().nullable().optional().describe('Defect comment text snapshot at add time.'),
     requestedCreditCents: z.number().int().min(0).nullable().optional().describe('Requested repair credit in integer cents.'),
     note:                 z.string().nullable().optional().describe('Buyer note explaining the requested credit.'),
@@ -341,6 +345,7 @@ const repairBuilderRoutes = createApiRouter()
             defectTitle:          body.defectTitle ?? null,
             location:             body.location ?? null,
             category:             body.category ?? null,
+            trade:                body.trade ?? null,
             commentSnapshot:      body.commentSnapshot ?? null,
             requestedCreditCents: body.requestedCreditCents ?? null,
             note:                 body.note ?? null,

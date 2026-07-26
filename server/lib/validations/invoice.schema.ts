@@ -1,4 +1,5 @@
 import { z } from '@hono/zod-openapi';
+import { PublicBrandSchema } from './public-brand.schema';
 
 const LineItemSchema = z.object({
     description: z.string().min(1).max(200).describe('TODO describe description field for the OpenInspection MCP integration'),
@@ -53,3 +54,34 @@ export const InvoiceResponseSchema = z.object({
     status: z.enum(['draft', 'sent', 'paid', 'partial', 'void']).describe('TODO describe status field for the OpenInspection MCP integration'),
     currency: z.string().describe('ISO 4217 currency this invoice was created in (snapshot from tenant at creation).'),
 }).openapi('Invoice');
+
+/**
+ * Body of GET /api/public/inspections/:id/invoice — the token-gated public pay
+ * page payload (standalone `/invoice/:id` and the Hub's `?section=payment`).
+ *
+ * The route wraps this in `.nullable()` (no invoice yet ⇒ null data). Kept here,
+ * not inline in the route, because BOTH frontend callers derive their wire type
+ * from it via `z.infer`, and `app/` imports from `server/lib/**` only — a
+ * schema any client type depends on must not live in `server/api/**`.
+ * Previously each caller hand-copied these fields and the copies drifted
+ * (`tenantSlug` landed in one of them).
+ */
+export const PublicInvoiceBodySchema = z.object({
+    id: z.string(),
+    amountCents: z.number(),
+    // Phase B — the invoice's snapshot currency (ISO 4217); the pay page renders
+    // this, not the tenant's live setting, so history stays self-describing.
+    currency: z.string().optional(),
+    status: z.string(),
+    createdAt: z.string().nullable().optional(),
+    dueDate: z.string().nullable().optional(),
+    clientName: z.string().nullable().optional(),
+    // Deliberately NOT `LineItemSchema` — that one carries create-time input
+    // constraints (min/max). This is an output shape; keep it unconstrained.
+    lineItems: z.array(z.object({ description: z.string(), amountCents: z.number() })).optional(),
+    brand: PublicBrandSchema.optional(),
+    // IA-44 — the Hub route is slug-keyed (/portal/:tenant/i/:id) but this page
+    // is not, so the payload carries the slug the post-payment hand-off needs.
+    // Resolved from the GRANT's tenantId, never from anything the caller sent.
+    tenantSlug: z.string().nullable().optional(),
+});

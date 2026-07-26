@@ -7,9 +7,13 @@ import type { HonoConfig } from '../../types/hono';
 /**
  * Tenant resolution for the public client chain keyed by inspection id:
  * `/invoice/:id` (invoice page) and `/api/public/inspections/:id/...`
- * (invoice data, pay-intent). The unguessable inspection UUID is
- * already the capability these endpoints trust; resolving tenancy from it is
- * equivalent to the portal-token → tenantId pattern.
+ * (invoice data, pay-intent).
+ *
+ * This is ROUTING, not access control (IA-34): the inspection id names which
+ * tenant's config + integration secrets to load into `c.env` before the handler
+ * runs. The handlers themselves authenticate the caller with
+ * `resolveClientActor` and take their authoritative tenantId from the resolved
+ * grant, then refuse if the two disagree. Never treat the id as a credential.
  */
 const R_PREFIXES = ['/invoice/', '/api/public/inspections/'];
 
