@@ -13,8 +13,10 @@ interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement
  * (DS border/radius/background/color/focus) but overrides the fixed 36px height
  * to grow with `rows`, adds vertical padding, and allows vertical resize only.
  */
-export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ label, error, hint, bare = false, rows = 3, className = "", id, ...props }, ref) => {
+// React 19: `ref` is a plain prop, so no forwardRef wrapper.
+export function Textarea({
+  label, error, hint, bare = false, rows = 3, className = "", id, ref, ...props
+}: TextareaProps & { ref?: React.Ref<HTMLTextAreaElement> }) {
     const generatedId = React.useId();
     const controlId = id ?? generatedId;
 
@@ -44,6 +46,4 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         {!error && hint && <p className="text-[11px] text-ih-fg-4 mt-1">{hint}</p>}
       </div>
     );
-  },
-);
-Textarea.displayName = "Textarea";
+}
