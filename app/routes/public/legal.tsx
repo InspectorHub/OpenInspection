@@ -4,10 +4,17 @@ import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { m } from "~/paraglide/messages";
 
 export function meta({ loaderData }: Route.MetaArgs) {
-  if (!loaderData) return [{ title: m.public_legal_meta_default() }];
-  const company = loaderData.companyName ?? "OpenInspection";
-  const docTitle = loaderData.doc === "privacy" ? m.public_legal_doc_privacy() : m.public_legal_doc_terms();
-  return [{ title: m.public_legal_title({ doc: docTitle, company }) }];
+  // This route's loader throws a 404 Response for an unknown doc type or an
+  // unresolvable tenant, and meta still runs on that path with nothing loaded.
+  // The generated MetaArgs types loaderData as always-present, so the guard
+  // below reads as unnecessary to the linter — widen it back to what actually
+  // arrives rather than dropping a live check.
+  const data = loaderData as typeof loaderData | undefined;
+  if (!data) return [{ title: m.public_legal_meta_default() }];
+  // companyName is non-null on the success path: the loader 404s when brand
+  // resolution yields null, so no fallback is reachable here.
+  const docTitle = data.doc === "privacy" ? m.public_legal_doc_privacy() : m.public_legal_doc_terms();
+  return [{ title: m.public_legal_title({ doc: docTitle, company: data.companyName }) }];
 }
 
 // ---------------------------------------------------------------------------
