@@ -26,6 +26,26 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: "h-11 px-5 text-sm gap-2",
 };
 
+/**
+ * The button's visual recipe, for the cases where the control has to be a real
+ * `<a>`: a card action that navigates is a link — it must right-click,
+ * middle-click and open in a new tab — but it should not therefore *look* like
+ * a different rank of control than the buttons beside it. Hand-copying these
+ * classes into an anchor is how a page ends up with three weights for one rank.
+ */
+export function buttonClasses({
+  variant = "secondary",
+  size = "md",
+  className = "",
+}: { variant?: ButtonVariant; size?: ButtonSize; className?: string } = {}): string {
+  return cn(
+    "inline-flex items-center justify-center font-bold rounded-ih-button transition-all focus:outline-none focus:shadow-ih-focus disabled:opacity-50 disabled:cursor-not-allowed",
+    variantClasses[variant],
+    sizeClasses[size],
+    className,
+  );
+}
+
 // React 19: `ref` is a plain prop, so no forwardRef wrapper.
 export function Button({
   variant = "secondary", size = "md", icon, children, className = "", selected, ref, ...props

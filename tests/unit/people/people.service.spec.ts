@@ -30,12 +30,14 @@ describe('PeopleService', () => {
     expect(pc).toMatchObject({ contactId: 'c1', email: 'b1@x.com' });
   });
 
-  it('rejects a second primary client, but allows co_client', async () => {
+  // IA-36 ⑬ — exactly one primary client is still the invariant; it is now kept
+  // by handing the seat over rather than by refusing the add.
+  it('keeps exactly one primary client when a second client is added', async () => {
     await svc.addPerson('t1', 'i1', 'c1', rp('client'));
-    await expect(svc.addPerson('t1', 'i1', 'c2', rp('client'))).rejects.toThrow();
-    await svc.addPerson('t1', 'i1', 'c2', rp('co_client')); // ok
+    await svc.addPerson('t1', 'i1', 'c2', rp('client'));
     const people = await svc.listPeople('t1', 'i1');
     expect(people.map(p => p.roleKey).sort()).toEqual(['client', 'co_client']);
+    expect(await svc.getPrimaryClient('t1', 'i1')).toMatchObject({ contactId: 'c2' });
   });
 
   it('roleKeysWithCapability(selfRetrieveReport) = client + co_client + agent-kind keys (Spec 3 flip)', async () => {

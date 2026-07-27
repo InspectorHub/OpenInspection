@@ -25,13 +25,20 @@ const PERSON = 'ip-1';
 let revokeForRecipient: ReturnType<typeof vi.fn>;
 let setExpiryForInspection: ReturnType<typeof vi.fn>;
 let removePerson: ReturnType<typeof vi.fn>;
+let listPeople: ReturnType<typeof vi.fn>;
 let unpublishReport: ReturnType<typeof vi.fn>;
 
 function buildApp() {
-    revokeForRecipient = vi.fn().mockResolvedValue(undefined);
+    revokeForRecipient = vi.fn().mockResolvedValue({ previousTokenHash: null });
     setExpiryForInspection = vi.fn().mockResolvedValue(undefined);
     removePerson = vi.fn().mockResolvedValue({ email: 'buyer@example.com' });
     unpublishReport = vi.fn().mockResolvedValue(undefined);
+    // IA-36 ⑬ — DELETE now reads the roster first to refuse removing the last
+    // client-side person. Two client rows here, so removal is allowed.
+    listPeople = vi.fn().mockResolvedValue([
+        { id: PERSON, contactId: 'c1', roleProfileId: 'rp1', roleKey: 'client', roleLabel: 'Client', kind: 'client', name: 'Buyer', email: 'buyer@example.com', phone: null, agency: null },
+        { id: 'ip-2', contactId: 'c2', roleProfileId: 'rp2', roleKey: 'co_client', roleLabel: 'Co-Client', kind: 'client', name: 'Co', email: 'co@example.com', phone: null, agency: null },
+    ]);
 
     // assertInspectionOwned selects the inspection row — return one so the
     // route treats it as owned by this tenant.
@@ -45,7 +52,7 @@ function buildApp() {
         c.set('tenantId', TENANT);
         c.set('user', { sub: 'user-1' } as never);
         c.set('services', {
-            people: { removePerson },
+            people: { removePerson, listPeople },
             portalAccess: { revokeForRecipient, setExpiryForInspection },
             inspection: { unpublishReport },
         } as never);

@@ -1,10 +1,13 @@
-import { useLoaderData } from 'react-router';
-import { Icon, RadioGroup } from "@core/shared-ui";
+import { useState } from 'react';
+import { useLoaderData, useFetcher } from 'react-router';
+import { Icon, RadioGroup, Button, Modal } from "@core/shared-ui";
 import { SettingsCrumb } from '~/components/SettingsCrumb';
 import type { Route } from './+types/settings-inspection';
 import { requireToken } from '~/lib/session.server';
 import { createApi } from '~/lib/api-client.server';
 import { useInspectionPrefs } from '~/hooks/useInspectionPrefs';
+import { LinkExpiryControl } from '~/components/inspection/LinkExpiryControl';
+import type { ReportLinkTtl } from '../../server/lib/report-link-ttl';
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -17,19 +20,58 @@ interface TagRow { id: string; name: string; color: string }
 // (unauthenticated — BFF rule) into the loader with Token-Relay.
 export async function loader({ request, context }: Route.LoaderArgs) {
     const token = await requireToken(context, request);
+    const api = createApi(context, { token });
+    let tags: TagRow[] = [];
     try {
-        const api = createApi(context, { token });
         const res = await api.tags.index.$get();
         const body = res.ok ? ((await res.json()) as { data?: TagRow[] }) : { data: [] };
-        return { tags: body.data ?? [] };
+        tags = body.data ?? [];
     } catch {
-        return { tags: [] };
+        tags = [];
+    }
+    // IA-36 ⑥ — the blast radius of the bulk-expiry action, resolved before the
+    // operator can press it. Its own try//catch: a tags outage must not take the
+    // link controls down with it, and vice versa.
+    let liveLinks: number | null = null;
+    try {
+        const res = await api.inspectionPrefs['report-link-expiry'].$get();
+        if (res.ok) liveLinks = ((await res.json()) as { liveLinks: number }).liveLinks;
+    } catch {
+        // Unknown count. The UI hides the action rather than guessing a number —
+        // a button that says "Expire 0 links" and then expires 47 is worse than
+        // no button.
+        liveLinks = null;
+    }
+    return { tags, liveLinks };
+}
+
+export async function action({ request, context }: Route.ActionArgs) {
+    const token = await requireToken(context, request);
+    const form = await request.formData();
+    // Narrowed to the real type rather than cast through `never`: the server
+    // re-validates with ReportLinkTtlSchema regardless, but a blind cast here
+    // would let a shape change compile silently on this side — the same
+    // failure mode as the RR v8 `(context as {...}).cloudflare` regression.
+    let ttl: ReportLinkTtl;
+    try {
+        ttl = JSON.parse(String(form.get('ttl') ?? '"never"')) as ReportLinkTtl;
+    } catch {
+        return { ok: false as const, affected: 0 };
+    }
+    try {
+        const api = createApi(context, { token });
+        const res = await api.inspectionPrefs['report-link-expiry'].$post({ json: { ttl } });
+        if (!res.ok) return { ok: false as const, affected: 0 };
+        const body = (await res.json()) as { affected: number };
+        return { ok: true as const, affected: body.affected };
+    } catch {
+        return { ok: false as const, affected: 0 };
     }
 }
 
 export default function SettingsInspectionPage() {
     const { prefs, loaded, patch } = useInspectionPrefs();
-    const { tags } = useLoaderData<typeof loader>();
+    const { tags, liveLinks } = useLoaderData<typeof loader>();
 
     if (!loaded) return <div className="p-6 text-[13px] text-ih-fg-3">{m.settings_inspection_loading()}</div>;
 
@@ -111,6 +153,22 @@ export default function SettingsInspectionPage() {
                 />
             </section>
 
+            {/* IA-36 ⑤⑥ — how long a report link stays usable. Applies to links
+                minted from here on; links already in customers' inboxes are never
+                re-dated by changing this. To act on an inspection's existing
+                links, use the same control on its People card. */}
+            <section>
+                <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_report_link_heading()}</h2>
+                <p className="text-[12px] text-ih-fg-3 mb-2">{m.settings_inspection_report_link_help()}</p>
+                <LinkExpiryControl
+                    value={prefs.reportLinkTtl}
+                    onChange={ttl => patch({ reportLinkTtl: ttl })}
+                    idPrefix="tenant-link-expiry"
+                />
+                <p className="text-[12px] text-ih-fg-3 mt-2">{m.settings_inspection_report_link_future_only()}</p>
+                <BulkLinkExpiry ttl={prefs.reportLinkTtl} liveLinks={liveLinks} />
+            </section>
+
             <section>
                 <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-ih-fg-4 mb-3">{m.settings_inspection_pinned_heading({ count: prefs.pinnedTagIds.length })}</h2>
                 <p className="text-[12px] text-ih-fg-3 mb-3">{m.settings_inspection_pinned_help()}</p>
@@ -139,6 +197,84 @@ export default function SettingsInspectionPage() {
                 </ul>
                 <a href="/library/tags" className="text-[12px] text-ih-primary hover:underline mt-3 inline-flex items-center gap-1">{m.settings_inspection_manage_tags()} <Icon name="arrowR" size={12} /></a>
             </section>
+        </div>
+    );
+}
+
+/**
+ * IA-36 ⑥ — the only way to act on report links that already exist.
+ *
+ * Saving the policy above is future-only and stays that way. Retroactively
+ * re-dating links already sitting in customers' inboxes, as a silent
+ * consequence of changing a setting, would kill them in bulk the moment
+ * "never" became "90 days" — the exact accident IA-36 was opened about.
+ *
+ * So this is a separate verb, and its button states its own consequence with
+ * the real number ("Expire 47 links"), never a harmless "Apply". The count
+ * comes from the same predicate the server updates by, so it cannot understate
+ * what is about to happen.
+ */
+export function BulkLinkExpiry({ ttl, liveLinks }: { ttl: ReportLinkTtl; liveLinks: number | null }) {
+    const fetcher = useFetcher<typeof action>();
+    const [confirming, setConfirming] = useState(false);
+
+    // Unknown count (the lookup failed) → no control at all. A bulk destructive
+    // action whose scope we cannot state is not one worth offering.
+    if (liveLinks === null) return null;
+
+    const lifting = ttl === 'never';
+    const label = lifting
+        ? liveLinks === 1 ? m.settings_inspection_report_link_bulk_lift_one() : m.settings_inspection_report_link_bulk_lift({ count: liveLinks })
+        : liveLinks === 1 ? m.settings_inspection_report_link_bulk_expire_one() : m.settings_inspection_report_link_bulk_expire({ count: liveLinks });
+    const busy = fetcher.state !== 'idle';
+    const done = fetcher.state === 'idle' && fetcher.data?.ok === true;
+
+    return (
+        <div className="mt-4 pt-4 border-t border-ih-border">
+            <p className="text-[12px] text-ih-fg-3 mb-2">{m.settings_inspection_report_link_bulk_help()}</p>
+            <Button
+                variant="secondary"
+                size="sm"
+                // Nothing live to act on. Kept visible and disabled rather than
+                // hidden, so the absence reads as "none right now" instead of
+                // "this product cannot do that".
+                disabled={liveLinks === 0 || busy}
+                onClick={() => setConfirming(true)}
+            >
+                {label}
+            </Button>
+            {done && (
+                <p className="text-[12px] text-ih-fg-3 mt-2" role="status">
+                    {m.settings_inspection_report_link_bulk_done({ count: fetcher.data?.affected ?? 0 })}
+                </p>
+            )}
+
+            <Modal
+                open={confirming}
+                onClose={() => setConfirming(false)}
+                title={label}
+                footer={
+                    <>
+                        <Button variant="ghost" onClick={() => setConfirming(false)}>{m.common_cancel()}</Button>
+                        <Button
+                            variant="danger"
+                            disabled={busy}
+                            onClick={() => {
+                                fetcher.submit({ ttl: JSON.stringify(ttl) }, { method: 'post' });
+                                setConfirming(false);
+                            }}
+                        >
+                            {label}
+                        </Button>
+                    </>
+                }
+            >
+                <p className="text-[13px] text-ih-fg-3">
+                    {lifting
+                        ? m.settings_inspection_report_link_bulk_lift_confirm({ count: liveLinks })
+                        : m.settings_inspection_report_link_bulk_expire_confirm({ count: liveLinks })}
+                </p>
+            </Modal>
         </div>
     );
 }

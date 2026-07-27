@@ -147,6 +147,10 @@ export class InspectionAnalyticsService extends InspectionSubService {
             // safety/recommendation/maintenance category. Lets the repair builder
             // offer a real "worst first" sort.
             severityBucket:      'satisfactory' | 'monitor' | 'defect' | 'other';
+            // IA-57 — the resolved trade label ("licensed roofer"). Same
+            // resolution the report card renders, so the repair surfaces and
+            // the report surface never disagree about who should fix this.
+            trade:               string | null;
             recommendationId:    string | null;
             recommendationLabel: string | null;
             estimateLow:         number | null;
@@ -182,6 +186,7 @@ export class InspectionAnalyticsService extends InspectionSubService {
                             : null,
                         category:            cat,
                         severityBucket:      item.severityBucket,
+                        trade:               ('effectiveTrade' in d ? d.effectiveTrade : null) ?? null,
                         recommendationId:    slug,
                         recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
                         estimateLow:         d.estimateLow ?? null,
@@ -208,6 +213,9 @@ export class InspectionAnalyticsService extends InspectionSubService {
                             : null,
                         category:            cat,
                         severityBucket:      item.severityBucket,
+                        // Custom defects carry no structured trade field today
+                        // (CustomCommentEntry has none) — always null.
+                        trade:               null,
                         recommendationId:    slug,
                         recommendationLabel: slug ? (labelBySlug.get(slug) ?? slug) : null,
                         estimateLow:         c.estimateLow ?? null,

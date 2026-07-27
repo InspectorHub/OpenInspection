@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { useLoaderData, useSearchParams } from "react-router";
+import { redirect, useLoaderData, useSearchParams } from "react-router";
 import type { Route } from "./+types/checkout";
 import { createApi } from "~/lib/api-client.server";
 import { brandTokens } from "~/lib/brand";
+import { portalHubUrl } from "~/lib/portal-hub-url";
 import {
     deriveCheckoutState,
     type SignerStatus,
@@ -28,6 +29,12 @@ interface CheckoutData {
     payment: { required: boolean; paid: boolean };
     inspection: { id: string; propertyAddress: string | null };
     branding: { companyName: string; primaryColor: string | null };
+    /**
+     * IA-44 — the signer's OWN per-inspection portal token, minted server-side
+     * inside the (signer-verified) checkout endpoint. Null for signers who have
+     * no client hub (agent / other roles).
+     */
+    portalToken: string | null;
 }
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -47,7 +54,30 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     const body = (await res.json()) as { data?: CheckoutData };
     const data = body.data;
     if (!data) throw new Response("Not found", { status: 404 });
-    return { checkout: data, token: params.token ?? "", tenant: params.tenant ?? "" };
+
+    const tenant = params.tenant ?? "";
+    const portalToken = data.portalToken ?? null;
+
+    // IA-44 — a settled checkout hands off to the Hub instead of maintaining a
+    // completion state of its own. Derived from SERVER truth only: the Stripe
+    // `?redirect_status=succeeded` hint is deliberately NOT fed in here, because
+    // the webhook settles the invoice asynchronously and the Hub's report
+    // section is itself payment-gated. That optimistic window keeps rendering
+    // the completion card (whose CTA is the same tokenized Hub URL).
+    const settled = deriveCheckoutState({
+        signerStatus: data.signer.status,
+        progress: data.envelope.progress,
+        completionPolicy: data.envelope.completionPolicy,
+        payment: data.payment,
+        invoice: data.invoice ? { status: data.invoice.status } : null,
+    });
+    if (settled.allComplete && portalToken && tenant) {
+        throw redirect(
+            portalHubUrl({ tenant, inspectionId: data.inspection.id, token: portalToken, section: "report" }),
+        );
+    }
+
+    return { checkout: data, token: params.token ?? "", tenant, portalToken };
 }
 
 /* ------------------------------------------------------------------ */
@@ -86,7 +116,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function CheckoutPage() {
-    const { checkout, tenant } = useLoaderData<typeof loader>();
+    const { checkout, tenant, portalToken } = useLoaderData<typeof loader>();
     const [searchParams] = useSearchParams();
     // After Stripe's confirmPayment redirect the page reloads with
     // ?redirect_status=succeeded; the webhook settles the invoice async.
@@ -149,7 +179,11 @@ export default function CheckoutPage() {
 
             {/* Completion banner */}
             {state.allComplete && (
-                <CompleteCard tenant={tenant} inspectionId={checkout.inspection.id} />
+                <CompleteCard
+                    tenant={tenant}
+                    inspectionId={checkout.inspection.id}
+                    portalToken={portalToken}
+                />
             )}
 
             {/* Step 1 — Sign */}
@@ -170,6 +204,7 @@ export default function CheckoutPage() {
                 brandColor={checkout.branding.primaryColor}
                 justPaid={justPaid}
                 companyName={checkout.branding.companyName}
+                portalToken={portalToken}
             />
         </CheckoutShell>
     );

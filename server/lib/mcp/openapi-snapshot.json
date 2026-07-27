@@ -90,7 +90,36 @@
       }
     },
     "summary": "Add a person to an inspection",
-    "description": "Assigns a contact to the inspection under a role profile. Rejects with 409 when roleProfileId is the primary \"client\" role and one is already assigned to this inspection — co_client and every other role are unrestricted."
+    "description": "Assigns a contact to the inspection under a role profile. Adding a second person under the primary \"client\" role HANDS THE SEAT OVER (IA-36 ⑬): the newcomer becomes the primary client and the incumbent stays on the inspection as co-client, with their report access untouched. \"Exactly one primary client\" is upheld by that swap rather than by refusing the add."
+  },
+  {
+    "operationId": "addInspectionService",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/services",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the service line belongs to.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id the service line belongs to."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/AddInspectionService"
+      }
+    },
+    "summary": "Add a catalog service to an inspection",
+    "description": "Adds a service from the tenant catalog to an existing inspection, snapshotting its name and price. Optionally charges a per-inspection override price. Adding a service the inspection already has returns the existing line unchanged."
   },
   {
     "operationId": "addRepairItem",
@@ -174,6 +203,11 @@
             "nullable": true,
             "description": "Defect category snapshot at add time."
           },
+          "trade": {
+            "type": "string",
+            "nullable": true,
+            "description": "Recommended trade snapshot at add time."
+          },
           "commentSnapshot": {
             "type": "string",
             "nullable": true,
@@ -232,6 +266,64 @@
     },
     "summary": "Request an agent magic sign-in link by email",
     "description": "Public, unauthenticated endpoint. ALWAYS returns 200 { sent: true } regardless of whether the email has a global agent account, to prevent account enumeration. When it does, an email with a one-time sign-in link (900 second TTL) is sent — the send itself is deferred so the response is timing-identical either way."
+  },
+  {
+    "operationId": "applyTenantReportLinkExpiry",
+    "method": "POST",
+    "pathTemplate": "/api/tenant/inspection-prefs/report-link-expiry",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "never"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999,
+                    "description": "How many units from now the links stop working."
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "days",
+                      "months",
+                      "years"
+                    ],
+                    "description": "Unit the count is expressed in: days, months or years."
+                  }
+                },
+                "required": [
+                  "count",
+                  "unit"
+                ]
+              }
+            ],
+            "description": "A DURATION from now, or \"never\". Deliberately not an absolute date — only an absolute date can be set in the past."
+          }
+        },
+        "required": [
+          "ttl"
+        ]
+      }
+    },
+    "summary": "Apply an expiry to the report links that already exist",
+    "description": "Applies an expiry, expressed as a duration from now, to every report link across the tenant that is usable right now (not revoked, not already expired). The tenant reportLinkTtl policy alone only affects links minted after it changes; this is the explicit, count-reporting way to act on the existing backlog. Already-dead links are left dead — a bulk apply never resurrects one."
   },
   {
     "operationId": "approveInspection",
@@ -4343,12 +4435,22 @@
             "type": "string",
             "description": "Inspection id the invoice belongs to."
           }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead).",
+          "schema": {
+            "type": "string",
+            "description": "Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead)."
+          }
         }
       ],
       "body": null
     },
     "summary": "Start a Stripe card payment for an inspection invoice",
-    "description": "Mints a Stripe PaymentIntent for the inspection's invoice using the tenant's own Stripe keys. Public — the unguessable inspection id is the key; tenant resolved from slug."
+    "description": "Mints a Stripe PaymentIntent for the inspection's invoice using the tenant's own Stripe keys. Gated by the recipient's portal token (?token=) or the unified-portal session cookie — client/co_client grants only."
   },
   {
     "operationId": "createPublicShareInspectionsShareToken",
@@ -7356,12 +7458,22 @@
             "type": "string",
             "description": "Inspection id the invoice belongs to."
           }
+        },
+        {
+          "name": "token",
+          "in": "query",
+          "required": false,
+          "description": "Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead).",
+          "schema": {
+            "type": "string",
+            "description": "Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead)."
+          }
         }
       ],
       "body": null
     },
     "summary": "Public invoice for an inspection (pay-link landing)",
-    "description": "Public, no-login invoice for an inspection (the unguessable id is the key). Tenant resolved from slug; tenant-scoped query."
+    "description": "Public, no-login invoice for an inspection, gated by the recipient's portal token (?token=) or the unified-portal session cookie. Only client/co_client grants are accepted; tenantId comes from the resolved grant, never the URL."
   },
   {
     "operationId": "getPublicObserve",
@@ -7451,7 +7563,7 @@
       "body": null
     },
     "summary": "Public token-gated inspection report data",
-    "description": "Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing/expired/revoked or does not match the requested inspection."
+    "description": "Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing or names nothing; 410 when a real link has expired or been revoked, so the page can explain what happened instead of showing a not-found."
   },
   {
     "operationId": "getPublicReportGate",
@@ -8306,6 +8418,22 @@
     },
     "summary": "Get tenant configuration flags",
     "description": "Returns booking-related tenant configuration flags (conciergeReviewRequired, blockUnsignedAgreement)."
+  },
+  {
+    "operationId": "getTenantLiveReportLinkCount",
+    "method": "GET",
+    "pathTemplate": "/api/tenant/inspection-prefs/report-link-expiry",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "How many report links are usable right now",
+    "description": "Counts the report links across the tenant that would be affected by applying an expiry to the existing backlog. Rendered into the confirm control so the operator sees the blast radius before acting, not after."
   },
   {
     "operationId": "getUsageSummary",
@@ -11257,6 +11385,43 @@
     },
     "summary": "Log out the current user",
     "description": "Clears the HttpOnly auth cookie and revokes all outstanding session JWTs for this user via the password-changed KV invalidation channel."
+  },
+  {
+    "operationId": "makeInspectionPersonPrimary",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/people/{personId}/make-primary",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "personId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_people row identifier",
+          "schema": {
+            "type": "string",
+            "description": "inspection_people row identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Move the primary-client seat to this person",
+    "description": "Atomically swaps the primary-client role onto this person; the previous primary client becomes a co-client and stays on the inspection with their access intact. \"Exactly one primary client\" is upheld by this swap rather than by refusing a second add."
   },
   {
     "operationId": "markAllReadNotification",
@@ -14667,7 +14832,44 @@
       "body": null
     },
     "summary": "Remove a person from an inspection",
-    "description": "Removes an inspection_people row, tenant-scoped. A no-op (still 200) if personId does not exist under this tenant."
+    "description": "Removes an inspection_people row, tenant-scoped, and revokes that person's report link. A no-op (still 200) if personId does not exist under this tenant. Refuses with 409 when they are the only client-side person on the inspection."
+  },
+  {
+    "operationId": "removeInspectionService",
+    "method": "DELETE",
+    "pathTemplate": "/api/inspections/{id}/services/{lineId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the service line belongs to.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id the service line belongs to."
+          }
+        },
+        {
+          "name": "lineId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_services row id.",
+          "schema": {
+            "type": "string",
+            "description": "inspection_services row id."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Remove a service line from an inspection",
+    "description": "Removes one booked service line from an inspection. Does not touch the tenant service catalog."
   },
   {
     "operationId": "removeRepairItem",
@@ -15226,6 +15428,43 @@
     "description": "Removes the tenant override for a template, reverting it to registry defaults."
   },
   {
+    "operationId": "resetInspectionPersonAccess",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/people/{personId}/reset-access",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        },
+        {
+          "name": "personId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_people row identifier",
+          "schema": {
+            "type": "string",
+            "description": "inspection_people row identifier"
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Reset a person's report access link",
+    "description": "Rotates the persistent report-access token for one recipient IN PLACE (a second row for the same (inspection, recipient) pair is forbidden by a unique index). The old URL dies immediately; the new one is delivered by re-sending the report. Use when a link reached the wrong person. Writes a portal_access.rotated audit event referencing the previous token by hash."
+  },
+  {
     "operationId": "resetPasswordWithToken",
     "method": "POST",
     "pathTemplate": "/api/auth/reset-password",
@@ -15746,6 +15985,75 @@
     },
     "summary": "Set cropped report cover (baked JPEG derivative + crop transform)",
     "description": "Bake and store a cropped report-cover JPEG derivative for an inspection and record its re-editable crop transform (POST /{id}/cover, inspections domain)."
+  },
+  {
+    "operationId": "setInspectionReportLinkExpiry",
+    "method": "PUT",
+    "pathTemplate": "/api/inspections/{id}/report-link-expiry",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier",
+          "schema": {
+            "type": "string",
+            "description": "Inspection identifier"
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "ttl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "never"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 999,
+                    "description": "How many units from now the links stop working."
+                  },
+                  "unit": {
+                    "type": "string",
+                    "enum": [
+                      "days",
+                      "months",
+                      "years"
+                    ],
+                    "description": "Unit the count is expressed in: days, months or years."
+                  }
+                },
+                "required": [
+                  "count",
+                  "unit"
+                ]
+              }
+            ],
+            "description": "A DURATION from now, or \"never\". Deliberately not an absolute date — only an absolute date can be set in the past."
+          }
+        },
+        "required": [
+          "ttl"
+        ]
+      }
+    },
+    "summary": "Set when this inspection's report links stop working",
+    "description": "Applies an expiry to every report link already issued for THIS inspection, expressed as a duration from now. The tenant-wide reportLinkTtl policy only ever affects links minted after it changes; this endpoint is the explicit, per-inspection way to act on links that already exist."
   },
   {
     "operationId": "setInspectionVideoPoster",
@@ -16762,6 +17070,45 @@
     },
     "summary": "Update tenant inspection editor preferences",
     "description": "Partially update the tenant-level inspection editor preferences. Supplied fields are merged with existing values and the result is re-validated before persisting to the tenant config."
+  },
+  {
+    "operationId": "updateInspectionService",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/services/{lineId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the service line belongs to.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id the service line belongs to."
+          }
+        },
+        {
+          "name": "lineId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_services row id.",
+          "schema": {
+            "type": "string",
+            "description": "inspection_services row id."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/UpdateInspectionService"
+      }
+    },
+    "summary": "Reprice one service line on an inspection",
+    "description": "Sets the per-inspection price override on one service line. Passing null clears the override so the line reverts to the catalog price snapshotted when it was added."
   },
   {
     "operationId": "updateInspectionTemplate",

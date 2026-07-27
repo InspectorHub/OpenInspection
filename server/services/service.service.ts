@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, asc, isNull, ne, inArray, sql } from 'drizzle-orm';
-import { services, inspectionServices, discountCodes, serviceInspectors, users } from '../lib/db/schema';
+import { services, inspectionServices, discountCodes, serviceInspectors, users, inspections } from '../lib/db/schema';
 import { Errors } from '../lib/errors';
 import { nanoid } from 'nanoid';
 import type { z } from 'zod';
@@ -73,6 +73,105 @@ export class ServiceService {
                 eq(inspectionServices.inspectionId, inspectionId),
                 eq(inspectionServices.tenantId, tenantId)
             ));
+    }
+
+    /* -------------------------------------------------------------- */
+    /*  Service lines on an inspection (IA-87)                         */
+    /* -------------------------------------------------------------- */
+
+    /**
+     * IA-87 — add a catalog service to an existing inspection.
+     *
+     * Name and price are SNAPSHOTTED at add time, the same way the create
+     * paths do it: repricing the catalog tomorrow must not silently change
+     * what an inspection already booked. `priceOverrideCents` charges this one
+     * inspection something else without touching the catalog.
+     *
+     * Both the service and the inspection are re-resolved inside the caller's
+     * tenant first, so a cross-tenant id pairing can never produce a row.
+     * Adding a service the inspection already carries is a no-op that returns
+     * the existing line — a double-submitted "Add service" must not bill twice.
+     *
+     * Deliberately does NOT write back to `inspections.price`: the sum of the
+     * lines is authoritative over that column, which is a denormalized cache
+     * only (see the money authority chain in the schema rules).
+     */
+    async addInspectionService(
+        tenantId: string,
+        inspectionId: string,
+        serviceId: string,
+        priceOverrideCents?: number | null,
+    ) {
+        const db = this.getDrizzle();
+
+        const inspection = await db.select({ id: inspections.id }).from(inspections)
+            .where(and(eq(inspections.id, inspectionId), eq(inspections.tenantId, tenantId)))
+            .limit(1).get();
+        if (!inspection) throw Errors.NotFound('Inspection not found');
+
+        const svc = await db.select().from(services)
+            .where(and(eq(services.id, serviceId), eq(services.tenantId, tenantId)))
+            .limit(1).get();
+        if (!svc) throw Errors.NotFound('Service not found');
+
+        const existing = await db.select().from(inspectionServices)
+            .where(and(
+                eq(inspectionServices.tenantId, tenantId),
+                eq(inspectionServices.inspectionId, inspectionId),
+                eq(inspectionServices.serviceId, serviceId),
+            ))
+            .limit(1).get();
+        if (existing) return existing;
+
+        const id = nanoid();
+        await db.insert(inspectionServices).values({
+            id,
+            tenantId,
+            inspectionId,
+            serviceId,
+            priceOverride: priceOverrideCents ?? null,
+            nameSnapshot: svc.name,
+            priceSnapshot: svc.price,
+        });
+        const rows = await db.select().from(inspectionServices)
+            .where(and(eq(inspectionServices.id, id), eq(inspectionServices.tenantId, tenantId)));
+        return rows[0];
+    }
+
+    /**
+     * IA-87 — reprice one line on one inspection. `priceOverrideCents: null`
+     * clears the override so the line falls back to its catalog snapshot.
+     */
+    async setInspectionServicePrice(
+        tenantId: string,
+        inspectionId: string,
+        lineId: string,
+        priceOverrideCents: number | null,
+    ) {
+        const db = this.getDrizzle();
+        const updated = await db.update(inspectionServices)
+            .set({ priceOverride: priceOverrideCents })
+            .where(and(
+                eq(inspectionServices.id, lineId),
+                eq(inspectionServices.tenantId, tenantId),
+                eq(inspectionServices.inspectionId, inspectionId),
+            ))
+            .returning();
+        if (updated.length === 0) throw Errors.NotFound('Service line not found');
+        return updated[0];
+    }
+
+    /** IA-87 — drop a service line from an inspection. */
+    async removeInspectionService(tenantId: string, inspectionId: string, lineId: string) {
+        const db = this.getDrizzle();
+        const removed = await db.delete(inspectionServices)
+            .where(and(
+                eq(inspectionServices.id, lineId),
+                eq(inspectionServices.tenantId, tenantId),
+                eq(inspectionServices.inspectionId, inspectionId),
+            ))
+            .returning({ id: inspectionServices.id });
+        if (removed.length === 0) throw Errors.NotFound('Service line not found');
     }
 
     async listDiscountCodes(tenantId: string) {

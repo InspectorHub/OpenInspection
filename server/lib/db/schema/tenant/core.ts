@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
+import type { ReportLinkTtl } from '../../../report-link-ttl';
 
 export const tenants = sqliteTable('tenants', {
     id: text('id').primaryKey(),
@@ -96,7 +97,7 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Workflow shortcuts PR — { cloneDefault, autoAdvanceDelayMs, pinnedTagIds }
     // Nullable; server applies hard-coded defaults when NULL.
     inspectionPrefs: text('inspection_prefs', { mode: 'json' })
-        .$type<{ cloneDefault: 'rating' | 'rating_notes' | 'all'; autoAdvanceDelayMs: number; pinnedTagIds: string[]; agentRepairAccess?: 'off' | 'read' | 'readwrite' }>(),
+        .$type<{ cloneDefault: 'rating' | 'rating_notes' | 'all'; autoAdvanceDelayMs: number; pinnedTagIds: string[]; agentRepairAccess?: 'off' | 'read' | 'readwrite'; reportLinkTtl?: ReportLinkTtl }>(),
     // Sprint 2 S2-4 — when true, published reports render the per-defect
     // "Estimated cost: $X – $Y" badge.
     showEstimates: integer('is_estimates_shown', { mode: 'boolean' }).notNull().default(false),

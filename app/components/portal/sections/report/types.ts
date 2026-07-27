@@ -317,6 +317,8 @@ export interface ReportLoaderResult {
   brand: TenantBrand;
   error: string | null;
   notPublished: boolean;
+  /** IA-36 ⑨ — the link was real but has expired or been revoked (API 410). */
+  linkInactive?: boolean;
   styleProfile?: StyleProfileClient;
   inspectorCredentials?: Array<{ label: string; memberNumber: string | null; imageUrl: string | null }>;
   initialFilter: FilterKey;

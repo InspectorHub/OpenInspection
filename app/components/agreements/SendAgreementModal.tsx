@@ -3,11 +3,18 @@ import { Modal, Button } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
 /**
- * Track I-a Task 9 — shared multi-signer send modal. Self-contained (no route
- * coupling): the parent owns submission via `onSend`, so the same modal mounts
- * on the admin Signing tab and (later) the #111 inspection hub. Collects N
- * signer rows (name + email + role) and a completion policy. Admin surface →
- * DS tokens, light/dark via data-color-scheme. No native confirm/alert.
+ * Shared multi-signer send modal. Self-contained (no route coupling): the
+ * parent owns submission via `onSend`. Collects N signer rows (name + email +
+ * role), which agreement template to send, and a completion policy. Admin
+ * surface → DS tokens, light/dark via data-color-scheme. No native
+ * confirm/alert.
+ *
+ * IA-65 — this is now the ONLY send-agreement modal. The inspection workspace
+ * had grown a second one (single email field, no roles, no policy), so which
+ * capabilities an operator got depended on which page they happened to start
+ * from: sending from the inspection — the natural place — was the one that
+ * could not add a co-signer. The template picker, which the Library page kept
+ * outside the modal, folded in here so the whole decision lives in one place.
  */
 
 type SignerRole = "client" | "co_client" | "agent" | "other";
@@ -21,6 +28,13 @@ export interface SignerDraft {
 export interface SendAgreementPayload {
     signers: SignerDraft[];
     completionPolicy: "all" | "one";
+    /** Chosen agreement template; empty when the caller supplies no templates. */
+    agreementId: string;
+}
+
+export interface AgreementTemplateOption {
+    id: string;
+    name: string;
 }
 
 const ROLE_OPTIONS: Array<{ value: SignerRole; label: string }> = [
@@ -70,11 +84,13 @@ export function validateSigners(signers: SignerDraft[]): string | null {
 export function buildSendPayload(
     signers: SignerDraft[] | SignerDraftRow[],
     completionPolicy: "all" | "one",
+    agreementId = "",
 ): SendAgreementPayload {
     return {
         // Destructure to drop any `key` field that may be present on SignerDraftRow.
         signers: signers.map(({ name, email, role }) => ({ name: name.trim(), email: email.trim(), role })),
         completionPolicy,
+        agreementId,
     };
 }
 
@@ -84,12 +100,15 @@ export function SendAgreementModal({
     onClose,
     busy,
     initialSigners,
+    templates,
 }: {
     open: boolean;
     onSend: (payload: SendAgreementPayload) => void;
     onClose: () => void;
     busy?: boolean;
     initialSigners?: SignerDraft[];
+    /** Agreement templates to choose from. Omit to hide the picker entirely. */
+    templates?: AgreementTemplateOption[];
 }) {
     const seed = (): SignerDraftRow[] => {
         if (initialSigners && initialSigners.length > 0) {
@@ -101,7 +120,9 @@ export function SendAgreementModal({
 
     const [signers, setSigners] = useState<SignerDraftRow[]>(seed);
     const [completionPolicy, setCompletionPolicy] = useState<"all" | "one">("all");
+    const [agreementId, setAgreementId] = useState(templates?.[0]?.id ?? "");
     const [error, setError] = useState<string | null>(null);
+    const noTemplates = templates !== undefined && templates.length === 0;
 
     // The modal stays mounted (Modal renders null when closed), so reseed the
     // draft each time it opens — a reopened modal must start fresh, not resume
@@ -110,6 +131,7 @@ export function SendAgreementModal({
         if (!open) return;
         setSigners(seed());
         setCompletionPolicy("all");
+        setAgreementId(templates?.[0]?.id ?? "");
         setError(null);
     }, [open]);
 
@@ -122,7 +144,7 @@ export function SendAgreementModal({
         const problem = validateSigners(signers);
         if (problem) { setError(problem); return; }
         setError(null);
-        onSend(buildSendPayload(signers, completionPolicy));
+        onSend(buildSendPayload(signers, completionPolicy, agreementId));
     };
 
     return (
@@ -134,7 +156,7 @@ export function SendAgreementModal({
             footer={
                 <>
                     <Button variant="secondary" onClick={onClose} disabled={busy}>{m.common_cancel()}</Button>
-                    <Button variant="primary" onClick={submit} disabled={busy}>
+                    <Button variant="primary" onClick={submit} disabled={busy || noTemplates}>
                         {busy ? m.agreement_send_pending() : m.agreement_send_submit()}
                     </Button>
                 </>
@@ -143,6 +165,28 @@ export function SendAgreementModal({
             <p className="text-[13px] text-ih-fg-3 mb-4">
                 {m.agreement_send_intro()}
             </p>
+
+            {templates !== undefined && (
+                <label className="flex flex-col gap-1 mb-4">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-ih-fg-4">
+                        {m.library_agreements_field_agreement()}
+                    </span>
+                    <select
+                        value={agreementId}
+                        disabled={busy || noTemplates}
+                        onChange={(e) => setAgreementId(e.target.value)}
+                        className="px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1 focus:ring-2 focus:ring-ih-primary/30 outline-none disabled:opacity-60"
+                    >
+                        {noTemplates ? (
+                            <option value="">{m.hub_agreement_no_template()}</option>
+                        ) : (
+                            templates.map((t) => (
+                                <option key={t.id} value={t.id}>{t.name || m.library_agreements_untitled()}</option>
+                            ))
+                        )}
+                    </select>
+                </label>
+            )}
 
             <div className="space-y-3">
                 {signers.map((s, i) => (

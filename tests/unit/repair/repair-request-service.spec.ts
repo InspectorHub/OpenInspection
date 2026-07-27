@@ -93,6 +93,33 @@ describe('RepairRequestService', () => {
         expect(got?.items).toHaveLength(1);
     });
 
+    // IA-57 — the share page is a snapshot document: the trade must be frozen
+    // onto the item row at add time, not re-joined from the (mutable) report.
+    it('addItem persists the trade snapshot and getByShareToken returns it', async () => {
+        const rr = await svc.create(TENANT, INSP, { kind: 'client', ref: 'r1' });
+        await svc.addItem(TENANT, rr.id, {
+            findingKey: 'k-trade', sectionTitle: 'Roof', itemLabel: 'Shingles',
+            trade: 'licensed roofer',
+        });
+        const got = await svc.getByShareToken(rr.shareToken);
+        expect(got?.items[0]!.tradeSnapshot).toBe('licensed roofer');
+    });
+
+    it('addItem re-add updates the trade snapshot in place', async () => {
+        const rr = await svc.create(TENANT, INSP, { kind: 'client', ref: 'r1' });
+        await svc.addItem(TENANT, rr.id, {
+            findingKey: 'k-trade', sectionTitle: 'Roof', itemLabel: 'Shingles',
+            trade: 'licensed roofer',
+        });
+        await svc.addItem(TENANT, rr.id, {
+            findingKey: 'k-trade', sectionTitle: 'Roof', itemLabel: 'Shingles',
+            trade: 'general contractor',
+        });
+        const got = await svc.get(TENANT, INSP, rr.id);
+        expect(got?.items).toHaveLength(1);
+        expect(got?.items[0]!.tradeSnapshot).toBe('general contractor');
+    });
+
     it('getByShareToken returns null for unknown token', async () => {
         const got = await svc.getByShareToken('nonexistent-token');
         expect(got).toBeNull();

@@ -148,8 +148,10 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   } else if (section === "repair") {
     repair = await loadRepairSection(context, tenant, inspectionId, ctxToken);
   } else if (section === "payment") {
-    // Pay flow is keyed by inspection id (pay-intent + invoice) — no token.
-    invoice = await loadInvoiceSection(context, inspectionId);
+    // IA-34 — the invoice + pay-intent endpoints now require a live
+    // client/co_client grant, so the pay flow travels with the same
+    // per-inspection token every other Hub section uses.
+    invoice = await loadInvoiceSection(context, inspectionId, ctxToken, cookieForApi);
   } else if (section === "agreement") {
     // Uses the recipient's OWN email-matched signer token (from the overview).
     agreement = await loadAgreementSection(context, signerToken);

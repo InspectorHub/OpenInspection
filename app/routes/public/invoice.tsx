@@ -1,8 +1,12 @@
-import { useLoaderData, useSearchParams } from "react-router";
+import { redirect, useLoaderData, useSearchParams } from "react-router";
 import type { Route } from "./+types/invoice";
 import { createApi } from "~/lib/api-client.server";
-import { brandTokens, EMPTY_BRAND, type TenantBrand } from "~/lib/brand";
+import { brandTokens, EMPTY_BRAND } from "~/lib/brand";
+// Shared with the Hub's payment section — one declaration of this wire shape,
+// so the two callers cannot drift apart again.
+import type { RawInvoice } from "~/lib/section-loaders";
 import { formatDate } from "~/lib/format";
+import { portalHubUrl } from "~/lib/portal-hub-url";
 import { readLegalLinks } from "~/lib/legal-links.server";
 import { PaymentSection, type InvoiceData } from "~/components/portal/sections/PaymentSection";
 import { m } from "~/paraglide/messages";
@@ -11,26 +15,34 @@ export function meta() {
   return [{ title: m.invoice_meta_title() }];
 }
 
-/** Wire shape of GET /api/public/inspections/:id/invoice (cents + ISO dates + brand). */
-interface RawInvoice {
-  id: string;
-  amountCents: number;
-  currency?: string;
-  status: string;
-  createdAt?: string | null;
-  dueDate?: string | null;
-  clientName?: string | null;
-  lineItems?: { description: string; amountCents: number }[];
-  brand?: TenantBrand;
-}
-
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
   const privacyUrl = readLegalLinks(context)?.privacyUrl ?? null;
+  const url = new URL(request.url);
+  // IA-34 — the invoice endpoint is gated by resolveClientActor; the emailed
+  // pay link carries the recipient's portal token, which we forward verbatim.
+  const token = url.searchParams.get("token") ?? "";
+  const justPaidParam = url.searchParams.get("redirect_status") === "succeeded";
+  const id = params.id ?? "";
   try {
     const api = createApi(context);
-    const res = await api.publicReport.inspections[":id"].invoice.$get({ param: { id: params.id ?? "" } });
+    const res = await api.publicReport.inspections[":id"].invoice.$get({
+      param: { id },
+      query: token ? { token } : {},
+    });
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? null) as RawInvoice | null;
+
+    // IA-44 — Stripe returns here with ?redirect_status=succeeded. Rather than
+    // reload this standalone page (a third, isolated payment surface), hand off
+    // to the Hub carrying the same token + optimistic marker, so all three
+    // payment entrances converge on one place. Requires the slug (the Hub route
+    // is slug-keyed) and the token (the Hub exchanges it for the session).
+    if (justPaidParam && token && d?.tenantSlug) {
+      throw redirect(
+        portalHubUrl({ tenant: d.tenantSlug, inspectionId: id, token, section: "payment", justPaid: true }),
+      );
+    }
+
     const invoice: InvoiceData | null = d
       ? {
           number: `INV-${d.id.slice(0, 8).toUpperCase()}`,
@@ -47,15 +59,26 @@ export async function loader({ params, context }: Route.LoaderArgs) {
           currency: d.currency,
         }
       : null;
+    // IA-34 — a 401 means "this link does not authenticate you", which is a
+    // different remedy from "no such invoice": use the link from your
+    // inspector's email, or ask them to resend it.
+    const error = res.ok
+      ? null
+      : res.status === 401
+        ? m.invoice_error_link_invalid()
+        : m.invoice_error_not_found();
     return {
       invoice,
       brand: d?.brand ?? EMPTY_BRAND,
-      error: res.ok ? null : m.invoice_error_not_found(),
-      id: params.id ?? "",
+      error,
+      id,
+      token,
       privacyUrl,
     };
-  } catch {
-    return { invoice: null, brand: EMPTY_BRAND, error: m.invoice_error_service_unavailable(), id: params.id ?? "", privacyUrl };
+  } catch (err) {
+    // A thrown `redirect()` is a Response — never swallow it as a fetch failure.
+    if (err instanceof Response) throw err;
+    return { invoice: null, brand: EMPTY_BRAND, error: m.invoice_error_service_unavailable(), id, token, privacyUrl };
   }
 }
 
@@ -65,7 +88,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function InvoicePage() {
-  const { invoice, brand, error, id, privacyUrl } = useLoaderData<typeof loader>();
+  const { invoice, brand, error, id, token, privacyUrl } = useLoaderData<typeof loader>();
   const [searchParams] = useSearchParams();
   // After Stripe's confirmPayment redirect the page reloads with
   // ?redirect_status=succeeded. The webhook flips the invoice to paid
@@ -101,6 +124,7 @@ export default function InvoicePage() {
           invoice={invoice}
           brand={brand}
           inspectionId={id}
+          portalToken={token}
           privacyUrl={privacyUrl}
           justPaid={justPaid}
           showStandaloneChrome

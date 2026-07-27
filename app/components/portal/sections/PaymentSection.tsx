@@ -6,7 +6,10 @@
  *
  * Data-source-agnostic: receives everything via props (no `useLoaderData`). The
  * pay flow is keyed by INSPECTION ID — it POSTs `/api/public/inspections/:id/pay-intent`
- * and reads `/api/public/inspections/:id/invoice` upstream; no signer token is required.
+ * and reads `/api/public/inspections/:id/invoice` upstream. Both endpoints
+ * require a live client/co_client grant (IA-34), so the host passes the
+ * recipient's PORTAL token via `portalToken` (never the agreement signer token,
+ * which those endpoints do not understand).
  *
  * Bare-content convention — it renders the invoice card + pay form ONLY; the page
  * chrome (max-width container, padding, page background) is supplied by the host
@@ -40,6 +43,13 @@ export interface PaymentSectionProps {
   brand: TenantBrand;
   /** Inspection id — keys the pay-intent + invoice fetch. */
   inspectionId: string;
+  /**
+   * IA-34 — the per-recipient portal token that authenticates the pay-intent
+   * call. Standalone `/invoice/:id` reads it off the emailed link; the Hub
+   * passes its own per-inspection token. Null/empty is still valid inside the
+   * Hub, where the `__Host-portal_session` cookie authenticates instead.
+   */
+  portalToken?: string | null;
   /** Tenant privacy policy link (standalone footer only). */
   privacyUrl?: string | null;
   /** After Stripe redirect with ?redirect_status=succeeded (optimistic state). */
@@ -54,6 +64,7 @@ export function PaymentSection({
   invoice,
   brand,
   inspectionId,
+  portalToken,
   privacyUrl,
   justPaid = false,
   error,
@@ -71,7 +82,7 @@ export function PaymentSection({
   return (
     <div style={brandTokens(brand.primaryColor)}>
       {/* Document */}
-      <InvoiceDisplay invoice={invoice} brand={brand} inspectionId={inspectionId} justPaid={justPaid} />
+      <InvoiceDisplay invoice={invoice} brand={brand} inspectionId={inspectionId} portalToken={portalToken} justPaid={justPaid} />
 
       {/* Actions + footer (standalone page only; outside the document, not printed) */}
       {showStandaloneChrome && (

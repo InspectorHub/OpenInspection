@@ -15,10 +15,12 @@ interface InvoiceDisplayProps {
   invoice: InvoiceData;
   brand: TenantBrand;
   inspectionId: string;
+  /** IA-34 — authenticates the pay-intent call (see <PaymentSection>). */
+  portalToken?: string | null;
   justPaid: boolean;
 }
 
-export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: InvoiceDisplayProps) {
+export function InvoiceDisplay({ invoice, brand, inspectionId, portalToken, justPaid }: InvoiceDisplayProps) {
   // Derive the totals block from the available data (Subtotal · Discount · Total ·
   // Amount Paid · Balance Due). Negative line items are discounts.
   const items = invoice.lineItems ?? [];
@@ -103,7 +105,7 @@ export function InvoiceDisplay({ invoice, brand, inspectionId, justPaid }: Invoi
       {/* Pay panel — Stripe Payment Element (bring-your-own-keys) */}
       {payable && !justPaid && (
         <div className="px-7 pb-7 print:hidden">
-          <StripePayPanel id={inspectionId} balanceDue={balanceDue} inspectorName={invoice.inspectorName} brandColor={brand.primaryColor} currency={invoice.currency} />
+          <StripePayPanel id={inspectionId} portalToken={portalToken} balanceDue={balanceDue} inspectorName={invoice.inspectorName} brandColor={brand.primaryColor} currency={invoice.currency} />
         </div>
       )}
 

@@ -2,7 +2,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, sql } from 'drizzle-orm';
 import { contacts, contactRoleProfiles, inspectionPeople, messageTemplates } from '../lib/db/schema';
 import { capabilitiesForKind, type RoleCapabilities, type RoleKind } from '../lib/people/capabilities';
-import { PRIMARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
+import { PRIMARY_CLIENT_KEY, SECONDARY_CLIENT_KEY } from '../lib/people/default-role-profiles';
 import { Errors } from '../lib/errors';
 
 export interface PersonRow {
@@ -42,8 +42,11 @@ export class PeopleService {
                 )
                 ON CONFLICT (inspection_id, contact_id, role_profile_id) DO NOTHING
             `);
-            // Verify our contact now holds the client role; if a different contact
-            // won the race (or was already the client), surface the friendly 409.
+            // Did our contact take the seat? If someone else holds it, the seat
+            // HANDS OVER rather than the add failing (IA-36 ⑬): the incumbent
+            // stays on the inspection as co-client and the caller's pick becomes
+            // primary. Refusing here is what left a mis-picked wizard client with
+            // no way out except editing the shared contact record.
             const winner = await this.db.select({ contactId: inspectionPeople.contactId }).from(inspectionPeople)
                 .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
                 .where(and(
@@ -51,14 +54,100 @@ export class PeopleService {
                     eq(inspectionPeople.inspectionId, inspectionId),
                     eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
                 )).get();
-            if (!winner || winner.contactId !== contactId) {
-                throw Errors.Conflict('An inspection already has a primary client; use co_client for a second buyer.');
-            }
+            if (winner && winner.contactId === contactId) return;
+            await this.handOverPrimary(tenantId, inspectionId, contactId, roleProfileId);
             return;
         }
         await this.db.insert(inspectionPeople).values({
             id: crypto.randomUUID(), tenantId, inspectionId, contactId, roleProfileId, createdAt: new Date(),
         }).onConflictDoNothing();
+    }
+
+    /**
+     * Seat the contact (adding them as co-client first if they are not on the
+     * inspection yet), then run the same atomic swap `makePrimary` uses. The
+     * insert is idempotent and benign on its own — if the swap fails the worst
+     * outcome is a visible extra co-client row, never a client-less inspection.
+     */
+    private async handOverPrimary(tenantId: string, inspectionId: string, contactId: string, primaryProfileId: string): Promise<void> {
+        const coClientProfileId = await this.profileIdForKey(tenantId, SECONDARY_CLIENT_KEY);
+        if (!coClientProfileId) {
+            // The co-client seat is a system profile and cannot be deleted, so
+            // this is unreachable in practice — but demoting someone into a role
+            // that does not exist would drop them off the inspection entirely.
+            throw Errors.Conflict('An inspection already has a primary client, and this company has no co-client role to move them to.');
+        }
+        await this.db.insert(inspectionPeople).values({
+            id: crypto.randomUUID(), tenantId, inspectionId, contactId,
+            roleProfileId: coClientProfileId, createdAt: new Date(),
+        }).onConflictDoNothing();
+        const seated = await this.db.select({ id: inspectionPeople.id }).from(inspectionPeople)
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.inspectionId, inspectionId),
+                eq(inspectionPeople.contactId, contactId),
+                eq(inspectionPeople.roleProfileId, coClientProfileId),
+            )).get();
+        if (!seated) throw Errors.Conflict('Could not seat the new primary client on this inspection.');
+        await this.swapPrimary(tenantId, inspectionId, seated.id, primaryProfileId, coClientProfileId);
+    }
+
+    /**
+     * Move the primary-client seat onto `inspectionPersonId` (IA-36 ⑫⑬).
+     *
+     * "Primary" is the role key, so moving it is a swap of two role_profile_id
+     * values — no new column, no second source of truth, and `getPrimaryClient`
+     * and every existing query keep working untouched.
+     *
+     * The demoted incumbent is NOT revoked: they are still on the inspection as
+     * a co-client, so their report link is still legitimately theirs. Only
+     * leaving the inspection (remove) takes access away.
+     */
+    async makePrimary(tenantId: string, inspectionId: string, inspectionPersonId: string): Promise<void> {
+        const target = await this.db.select({
+            id: inspectionPeople.id, key: contactRoleProfiles.key, kind: contactRoleProfiles.kind,
+        }).from(inspectionPeople)
+            .innerJoin(contactRoleProfiles, eq(inspectionPeople.roleProfileId, contactRoleProfiles.id))
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.inspectionId, inspectionId),
+                eq(inspectionPeople.id, inspectionPersonId),
+            )).get();
+        if (!target) throw Errors.NotFound('Person not found on this inspection');
+        if (target.key === PRIMARY_CLIENT_KEY) return; // already the primary client
+        // An agent or attorney is not a buyer. Offering "make primary" on those
+        // rows would hand them the client's capabilities (agreements, payment,
+        // report delivery) purely by relabelling.
+        if (target.kind !== 'client') throw Errors.BadRequest('Only a client-type person can become the primary client');
+
+        const primaryProfileId = await this.profileIdForKey(tenantId, PRIMARY_CLIENT_KEY);
+        const coClientProfileId = await this.profileIdForKey(tenantId, SECONDARY_CLIENT_KEY);
+        if (!primaryProfileId || !coClientProfileId) throw Errors.Conflict('This company has no client / co-client role to move the seat between.');
+        await this.swapPrimary(tenantId, inspectionId, inspectionPersonId, primaryProfileId, coClientProfileId);
+    }
+
+    /**
+     * The swap itself: ONE statement, so the inspection is never observed with
+     * two primary clients or none. The CASE promotes the target row and demotes
+     * whoever currently holds the primary profile; the WHERE limits it to
+     * exactly those two rows of this tenant's inspection.
+     */
+    private async swapPrimary(
+        tenantId: string, inspectionId: string, targetPersonId: string,
+        primaryProfileId: string, coClientProfileId: string,
+    ): Promise<void> {
+        try {
+            await this.db.run(sql`
+                UPDATE inspection_people
+                SET role_profile_id = CASE WHEN id = ${targetPersonId} THEN ${primaryProfileId} ELSE ${coClientProfileId} END
+                WHERE tenant_id = ${tenantId} AND inspection_id = ${inspectionId}
+                  AND (id = ${targetPersonId} OR role_profile_id = ${primaryProfileId})
+            `);
+        } catch {
+            // uq (inspection_id, contact_id, role_profile_id): the incumbent
+            // already occupies the co-client seat on this inspection too.
+            throw Errors.Conflict('That person already holds the co-client role on this inspection; remove the duplicate first.');
+        }
     }
 
     async removePerson(tenantId: string, inspectionId: string, inspectionPersonId: string): Promise<{ email: string | null }> {

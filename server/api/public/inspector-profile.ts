@@ -5,19 +5,8 @@ import { tenants } from '../../lib/db/schema';
 import { createApiRouter } from '../../lib/openapi-router';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../../lib/validations/shared.schema';
+import { PublicBrandSchema } from '../../lib/validations/public-brand.schema';
 import { isServableBrandAsset } from '../../lib/report-style/brand-asset-key';
-
-// A-10 — the canonical tenant brand every public surface paints with.
-// Fields are nullable verbatim from tenant_configs; null primaryColor means
-// "keep the platform design tokens" (no per-surface fallback drift).
-export const PublicBrandSchema = z.object({
-    companyName: z.string().nullable(),
-    primaryColor: z.string().nullable(),
-    logoUrl: z.string().nullable(),
-    // Tenant display timezone (IANA; 'UTC' when unset). Public/report surfaces
-    // anchor displayed inspection dates to this zone.
-    defaultTimezone: z.string().default('UTC'),
-});
 
 const brandRoute = createRoute(withMcpMetadata({
     method: 'get',

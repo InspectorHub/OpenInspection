@@ -108,7 +108,14 @@ const InspectionPeopleSchema = z.object({
 // Issue #111 — single aggregate payload for the `/inspections/:id` hub page.
 // One round trip drives six blocks (People / Schedule / Services / Agreement /
 // Invoice / Report status). Every field is explicit (no z.any()).
-const InspectionHubSchema = z.object({
+/**
+ * Exported so the hub page's helpers can DERIVE their payload type from this
+ * schema (`z.infer`) instead of hand-copying its fields. A hand-written mirror
+ * silently rots: adding `invoice.payUrl` here left the frontend copy behind
+ * until tsc happened to catch it, and an optional field would not have been
+ * caught at all. One schema, one type.
+ */
+export const InspectionHubSchema = z.object({
   inspection: z.object({
     id:                z.string().describe('Inspection identifier'),
     propertyAddress:   z.string().describe('Subject property address'),
@@ -117,6 +124,11 @@ const InspectionHubSchema = z.object({
     clientPhone:       z.string().nullable().describe('Denormalized client phone cache'),
     clientContactId:   z.string().nullable().describe('contacts.id of the client, when linked'),
     status:            z.string().describe('Inspection lifecycle status'),
+    // The service has always returned this (it drives the hub's report pill),
+    // but the schema omitted it — so the published OpenAPI/MCP contract
+    // under-described the payload. Deriving the frontend type from this schema
+    // is what surfaced the gap.
+    reportStatus:      z.string().describe('Report lifecycle status: in_progress | submitted | published'),
     date:              z.string().nullable().describe('Scheduled inspection date (YYYY-MM-DD)'),
     inspectorId:       z.string().nullable().describe('Assigned inspector users.id'),
     templateId:        z.string().nullable().describe('Selected template id'),
@@ -128,24 +140,33 @@ const InspectionHubSchema = z.object({
     referredByAgentId: z.string().nullable().describe('Buyer agent contacts.id'),
     sellingAgentId:    z.string().nullable().describe('Listing agent contacts.id'),
     createdAt:         z.string().nullable().describe('ISO creation timestamp'),
+    closingDate:       z.string().nullable().describe('Buyer closing date (YYYY-MM-DD), null when unset'),
+    referenceNumber:   z.string().nullable().describe('Operator-facing order reference, null when unset'),
+    referralSource:    z.string().nullable().describe('Where the order came from, null when unset'),
   }).describe('Core inspection fields for the hub header'),
   tenantSlug: z.string().describe('Tenant slug, for building /report/:tenantSlug/:id links'),
   people: InspectionPeopleSchema.describe('Inspector + client + agents (reuses the people-card aggregation)'),
   services: z.array(z.object({
     id:        z.string().describe('inspection_services row id'),
+    serviceId: z.string().describe('Catalog service this line came from — lets a picker mark what is already booked'),
     name:      z.string().describe('Service name snapshot'),
     priceCents: z.number().describe('Effective line price (priceOverride ?? priceSnapshot)'),
+    priceSnapshot: z.number().describe('Catalog price in cents when the line was added'),
+    priceOverride: z.number().nullable().describe('Per-inspection price override in cents, or null'),
   })).describe('Booked service lines'),
   agreements: z.array(z.object({
     id:   z.string().describe('Agreement template id'),
     name: z.string().describe('Agreement template name'),
   })).describe("Tenant's agreement templates (for a send-agreement dropdown)"),
   agreementRequests: z.array(z.object({
-    id:          z.string().describe('agreement_requests row id'),
-    status:      z.string().describe('pending | sent | viewed | signed | declined | expired'),
-    clientEmail: z.string().describe('Recipient email'),
-    signedAt:    z.string().nullable().describe('ISO sign timestamp, null until signed'),
-    createdAt:   z.string().nullable().describe('ISO creation timestamp'),
+    id:            z.string().describe('agreement_requests row id'),
+    status:        z.string().describe('pending | sent | viewed | signed | declined | expired'),
+    clientEmail:   z.string().describe('Recipient email'),
+    signedAt:      z.string().nullable().describe('ISO sign timestamp, null until signed'),
+    createdAt:     z.string().nullable().describe('ISO creation timestamp'),
+    agreementName: z.string().nullable().describe('Name of the agreement template this envelope was sent from'),
+    signersTotal:  z.number().describe('How many signers the envelope has'),
+    signersSigned: z.number().describe('How many of them have signed'),
   })).describe('Agreement requests for this inspection, newest first'),
   invoice: z.object({
     id:         z.string().describe('Invoice id'),
@@ -153,6 +174,11 @@ const InspectionHubSchema = z.object({
     amountCents: z.number().describe('Invoice total in cents'),
     sentAt:     z.string().nullable().describe('ISO sent timestamp'),
     paidAt:     z.string().nullable().describe('ISO paid timestamp'),
+    // IA-34 — the public pay page is token-gated, so a bare `/invoice/:id` is
+    // refused. The inspector's "copy pay link" must hand out the SAME tokenized
+    // URL the emailed link carries; null when no primary client email exists to
+    // bind a token to (the UI hides the action rather than copy a dead link).
+    payUrl:     z.string().nullable().describe('Tokenized public pay link, or null when unavailable'),
   }).nullable().describe('Most recent invoice for the inspection, or null'),
   publishReadiness: z.object({
     ready:         z.boolean().describe('True when every required defect field is filled'),
@@ -164,8 +190,15 @@ export const InspectionHubResponseSchema = createApiResponseSchema(InspectionHub
 
 /**
  * Task 7 (Issue #111) — body for POST /api/inspections/:id/agreement-requests.
- * Both fields optional: agreementId defaults to the tenant's first agreement
- * template, email defaults to the inspection's clientEmail.
+ * Every field optional: agreementId defaults to the tenant's first agreement
+ * template, and the recipient defaults to the inspection's primary client.
+ *
+ * IA-65 — `signers` carries the multi-party set the inspection workspace now
+ * sends (name + email + role, plus a completion policy). `email` is the older
+ * single-recipient shorthand and is still accepted; when both are given the
+ * explicit signer list wins. Multi-signer sending used to be reachable only
+ * from the tenant-wide Library page, which meant an inspector — who may send
+ * agreements but is not an admin — could only ever send to one person.
  */
 export const SendAgreementRequestSchema = z.object({
   // Canonical UUID: agreements.id is always crypto.randomUUID() in production
@@ -173,15 +206,25 @@ export const SendAgreementRequestSchema = z.object({
   // never as the agreements PK). Pre-launch we enforce the canonical format rather
   // than tolerate non-UUID ids — only test seeds were ever non-UUID.
   agreementId: z.string().uuid().optional().describe('Agreement template id; defaults to the tenant first agreement'),
-  email: z.string().email().optional().describe('Recipient email; defaults to inspection.clientEmail'),
+  email: z.string().email().optional().describe('Single recipient email; defaults to the inspection primary client. Ignored when `signers` is present.'),
+  signers: z.array(z.object({
+    name: z.string().min(1).max(200).describe('Signer display name'),
+    email: z.string().email().describe('Signer email; each signer gets their own private signing link'),
+    role: z.enum(['client', 'co_client', 'agent', 'other']).optional().describe('Signer role on this inspection; defaults to client'),
+  })).min(1).max(10).optional().describe('Multi-party signer set. Signers already on the live envelope are left untouched; new ones are added to it.'),
+  completionPolicy: z.enum(['all', 'one']).optional().describe("'all' = every signer must sign; 'one' = the first signature completes the envelope"),
 }).openapi('SendAgreementRequest');
 
 export const AgreementRequestCreatedSchema = createApiResponseSchema(
   z.object({
     id:          z.string().describe('agreement_requests row id'),
     status:      z.string().describe('Request status (sent)'),
-    clientEmail: z.string().describe('Recipient email'),
+    clientEmail: z.string().describe('First signer email (the envelope recipient)'),
     createdAt:   z.string().nullable().describe('ISO creation timestamp'),
+    // IA-65 — a send against a live envelope reports what it actually changed,
+    // so a caller can tell "added two co-signers" from "re-sent to the same one".
+    signerCount:  z.number().describe('Total signers on the envelope after this send'),
+    addedSigners: z.number().describe('How many signers this send added to an existing envelope (0 for a fresh envelope)'),
   }),
 ).openapi('AgreementRequestCreatedResponse');
 

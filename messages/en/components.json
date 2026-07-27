@@ -134,5 +134,15 @@
   "newinsp_gate_date": "Pick a date to continue",
   "newinsp_gate_holiday": "Pick another date — this one is blocked",
   "newinsp_people_client_linked": "Existing contact — this inspection joins their history.",
-  "newinsp_property_clear_template": "Clear template"
+  "newinsp_property_clear_template": "Clear template",
+  "link_expiry_never": "Never expires",
+  "link_expiry_after": "Expires after",
+  "link_expiry_mode_label": "Whether report links expire",
+  "link_expiry_count_label": "How long report links last",
+  "link_expiry_unit_label": "Time unit",
+  "link_expiry_unit_days": "days",
+  "link_expiry_unit_months": "months",
+  "link_expiry_unit_years": "years",
+  "link_expiry_preview_never": "Report links keep working until you reset or remove them.",
+  "link_expiry_preview_date": "A link created today would stop working on {date}."
 }

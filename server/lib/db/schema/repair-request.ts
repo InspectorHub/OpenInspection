@@ -40,6 +40,13 @@ export const repairRequestItems = sqliteTable('repair_request_items', {
   defectTitleSnapshot: text('defect_title_snapshot'),
   locationSnapshot: text('location_snapshot'),
   categorySnapshot: text('category_snapshot'),
+  // IA-57 — the recommended trade ("who fixes this"), snapshotted at add time
+  // so the contractor reading the shared list knows which trade to send. Stores
+  // the RESOLVED LABEL ("licensed roofer"), not the DEFECT_TRADES slug: the
+  // label is what the report card shows, so both surfaces read identically, and
+  // a snapshot must not depend on a lookup table that can change under it.
+  // Appended at the table end (reference_d1_add_column_at_end).
+  tradeSnapshot: text('trade_snapshot'),
 }, (t) => ({
   idxRr: index('idx_repair_request_items_rr').on(t.repairRequestId),
 }));

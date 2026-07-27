@@ -2,6 +2,13 @@ import type { RoleKind } from './capabilities';
 
 export const PRIMARY_CLIENT_KEY = 'client';
 
+/**
+ * Where the primary-client seat's previous holder lands when it moves
+ * (IA-36 ⑬). They stay on the inspection with their access intact — being
+ * demoted is not leaving.
+ */
+export const SECONDARY_CLIENT_KEY = 'co_client';
+
 // Seeded per tenant. Aligned with Spectora's default people set so migrated
 // users keep their mental model. kind drives capabilities; label is editable.
 export const DEFAULT_ROLE_PROFILES: Array<{

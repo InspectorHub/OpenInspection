@@ -105,6 +105,118 @@ export async function handlePersonRemove(
 }
 
 /**
+ * `person-reset-access` — IA-36 ② "Reset access link". Rotates this recipient's
+ * report link IN PLACE; the URL they hold stops working immediately. The new
+ * token is deliberately not returned to the browser — it reaches the recipient
+ * the same way the first one did, by sending the report.
+ */
+export async function handlePersonResetAccess(
+  api: Api,
+  inspectionId: string,
+  formData: FormData,
+): Promise<{ ok: boolean; intent: "person-reset-access"; error: string | undefined }> {
+  const personId = String(formData.get("personId") || "").trim();
+  const reset = api.inspections[":id"].people[":personId"]["reset-access"].$post as unknown as
+    (args: { param: { id: string; personId: string } }) => Promise<Response>;
+  const res = await reset({ param: { id: inspectionId, personId } });
+  return toActionResult(res, "person-reset-access", m.inspections_hub_error_person_reset());
+}
+
+/** `person-make-primary` — IA-36 ⑫⑬. Moves the primary-client seat. */
+export async function handlePersonMakePrimary(
+  api: Api,
+  inspectionId: string,
+  formData: FormData,
+): Promise<{ ok: boolean; intent: "person-make-primary"; error: string | undefined }> {
+  const personId = String(formData.get("personId") || "").trim();
+  const makePrimary = api.inspections[":id"].people[":personId"]["make-primary"].$post as unknown as
+    (args: { param: { id: string; personId: string } }) => Promise<Response>;
+  const res = await makePrimary({ param: { id: inspectionId, personId } });
+  return toActionResult(res, "person-make-primary", m.inspections_hub_error_person_make_primary());
+}
+
+/**
+ * `report-link-expiry` — IA-36 ⑥⑦. Applies a DURATION to the links this
+ * inspection has already issued. Deliberately separate from the company-wide
+ * policy, which never reaches back to links already in customers' inboxes.
+ */
+export async function handleReportLinkExpiry(
+  api: Api,
+  inspectionId: string,
+  formData: FormData,
+): Promise<{ ok: boolean; intent: "report-link-expiry"; error: string | undefined }> {
+  let ttl: unknown;
+  try {
+    ttl = JSON.parse(String(formData.get("ttl") ?? '"never"'));
+  } catch {
+    return { ok: false, intent: "report-link-expiry", error: m.inspections_hub_error_link_expiry() };
+  }
+  const put = api.inspections[":id"]["report-link-expiry"].$put as unknown as
+    (args: { param: { id: string }; json: { ttl: unknown } }) => Promise<Response>;
+  const res = await put({ param: { id: inspectionId }, json: { ttl } });
+  return toActionResult(res, "report-link-expiry", m.inspections_hub_error_link_expiry());
+}
+
+/* ------------------------------------------------------------------ */
+/*  IA-65 — signing-request intents                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * `send-agreement` — send this inspection's agreement to one or more parties.
+ *
+ * Malformed signer JSON is rejected here rather than posted: the endpoint reads
+ * an absent list as "no signers given" and falls back to the primary client, so
+ * a serialization bug would silently mail the wrong (smaller) set of people
+ * while reporting success.
+ */
+export async function handleSendAgreement(
+  api: Api,
+  inspectionId: string,
+  formData: FormData,
+): Promise<{ ok: boolean; intent: "send-agreement"; error: string | undefined }> {
+  const agreementId = String(formData.get("agreementId") || "").trim();
+  const rawSigners = String(formData.get("signers") || "").trim();
+  let signers: Array<{ name: string; email: string; role?: "client" | "co_client" | "agent" | "other" }> = [];
+  if (rawSigners) {
+    try {
+      signers = JSON.parse(rawSigners) as typeof signers;
+    } catch {
+      return { ok: false, intent: "send-agreement", error: m.inspections_hub_error_send_agreement() };
+    }
+  }
+  const completionPolicy = formData.get("completionPolicy") === "one" ? "one" : "all";
+  const res = await api.inspections[":id"]["agreement-requests"].$post({
+    param: { id: inspectionId },
+    json: {
+      ...(agreementId ? { agreementId } : {}),
+      ...(signers.length > 0 ? { signers, completionPolicy } : {}),
+    },
+  });
+  return toActionResult(res, "send-agreement", m.inspections_hub_error_send_agreement());
+}
+
+/**
+ * `inspector-sign` — the envelope-level signature an inspector applies before
+ * the client sees the agreement. Moved onto the inspection with the rest of
+ * signer management (IA-65); the endpoint admits inspectors, not just admins.
+ */
+export async function handleInspectorSign(
+  api: Api,
+  formData: FormData,
+): Promise<{ ok: boolean; intent: "inspector-sign"; error: string | undefined }> {
+  const envelopeId = String(formData.get("envelopeId") || "").trim();
+  const signatureBase64 = String(formData.get("signatureBase64") || "").trim();
+  if (!envelopeId || !signatureBase64) {
+    return { ok: false, intent: "inspector-sign", error: m.inspections_hub_error_inspector_sign() };
+  }
+  const res = await api.admin["agreement-requests"][":id"]["inspector-sign"].$post({
+    param: { id: envelopeId },
+    json: { signatureBase64 },
+  });
+  return toActionResult(res, "inspector-sign", m.inspections_hub_error_inspector_sign());
+}
+
+/**
  * `search-contacts` — AddPersonModal's contact typeahead, mirroring
  * "search-agents" in inspections.tsx (BFF pattern: no client-side fetch).
  */

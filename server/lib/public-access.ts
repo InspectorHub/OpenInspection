@@ -14,6 +14,7 @@ import type { Context } from 'hono';
 import { verifyJwt, type JwtKeyring } from './jwt-keyring';
 import { classifyJwtPayload } from './auth/jwt-claims';
 import type { HonoConfig } from '../types/hono';
+import { portalLinkState, type PortalLinkState } from './portal-link-state';
 
 // A role-profile KEY (tenant.contact_role_profiles.key) — free-form, not a
 // fixed set. `client` remains the seeded default; validation against the
@@ -49,9 +50,31 @@ export async function resolvePortalAccess(
     const row = await svc.resolveToken(token);
     if (!row) return null;
     if (row.inspectionId !== requestedInspectionId) return null;
-    if (row.revokedAt != null) return null;
-    if (row.expiresAt != null && row.expiresAt <= now) return null;
+    if (portalLinkState(row, now) !== 'active') return null;
     return { tenantId: row.tenantId, role: row.role, recipientEmail: row.recipientEmail };
+}
+
+/**
+ * Why a link was refused, for the landing page (IA-36 ⑨). A recipient who was
+ * legitimately invited and whose link we then took offline — by our own policy —
+ * must not be answered with a bare 404; they need to be told what happened and
+ * what to do. Callers turn `expired`/`revoked` into that page and everything
+ * else into the ordinary not-found.
+ *
+ * Only ever consulted AFTER access was refused, so it costs a lookup on the
+ * failure path only. It reveals nothing the token holder did not already have:
+ * they are presenting the secret itself.
+ */
+export async function classifyPortalAccess(
+    svc: PortalAccessResolver,
+    token: string | undefined,
+    requestedInspectionId: string,
+    now: number = Date.now(),
+): Promise<PortalLinkState> {
+    if (!token) return 'unknown';
+    const row = await svc.resolveToken(token);
+    if (!row || row.inspectionId !== requestedInspectionId) return 'unknown';
+    return portalLinkState(row, now);
 }
 
 /**
