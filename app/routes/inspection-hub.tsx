@@ -16,7 +16,7 @@ import {
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, Card, Pill, Button, EmptyState, Modal } from "@core/shared-ui";
+import { PageHeader, Card, Pill, Button, Modal, buttonClasses } from "@core/shared-ui";
 import type { PillTone } from "~/lib/hub-blocks";
 import DocumentsSection, {
   type DocumentItem,
@@ -638,9 +638,36 @@ export default function InspectionHubPage() {
 
       <PublishNotice notified={publishNotice} />
 
-      {/* Six blocks — responsive 2-col grid (1-col on mobile) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 1. People — editable (Plan 1B Task 5): PeopleEditor sources rows
+      {/* Six blocks — responsive 2-col grid (1-col on mobile).
+          `items-start`: grid rows stretch their items to equal height by
+          default, so a three-line Schedule card was inflated to match whatever
+          sat beside it and rendered as mostly blank. Cards size to their own
+          content; the columns no longer have to agree. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+        {/* Cards follow the job, not the schema: everything you settle BEFORE
+            the visit, then the visit, then what happens after it. The old order
+            interleaved them (status before services and agreement; invoice
+            before the report it bills for), so the page had no through-line to
+            read down.
+
+            1. Schedule — when ------------------------------------------ */}
+        <Card className="p-5">
+          <BlockHeading title={m.inspections_hub_block_schedule()} />
+          <p className="text-[15px] font-medium text-ih-fg-1 mb-4">
+            {formatInspectionDateTime(inspection.date, undefined, displayTz)}
+          </p>
+          {/* A real anchor — it navigates, so it must right-click, middle-click
+              and open in a new tab — carrying the button recipe so it reads as
+              the same rank of control as every other card's action. */}
+          <Link
+            to={`/inspections/${inspection.id}/edit`}
+            className={buttonClasses({ variant: "secondary", size: "sm" })}
+          >
+            {m.inspections_hub_schedule_reschedule()}
+          </Link>
+        </Card>
+
+        {/* 2. People — who. Editable (Plan 1B Task 5): PeopleEditor sources rows
             from inspection_people (the `people` loader array) grouped by role
             kind, replacing the old read-only client/agents/inspector text
             block. Client SMS consent (Track L (E)) stays a small addendum
@@ -664,28 +691,14 @@ export default function InspectionHubPage() {
           )}
         </div>
 
-        {/* 2. Schedule ---------------------------------------------- */}
-        <Card className="p-5">
-          <BlockHeading title={m.inspections_hub_block_schedule()} />
-          <p className="text-[15px] font-medium text-ih-fg-1">
-            {formatInspectionDateTime(inspection.date, undefined, displayTz)}
-          </p>
-          <Link
-            to={`/inspections/${inspection.id}/edit`}
-            className="text-[12px] font-bold text-ih-primary hover:underline mt-3 inline-block"
-          >
-            {m.inspections_hub_schedule_reschedule()}
-          </Link>
-        </Card>
-
-        {/* 2b. Order lifecycle — independent of report publishing. */}
-        <LifecycleCard status={inspection.status} fetcher={completeInspection} />
-
-        {/* 3. Services ---------------------------------------------- */}
+        {/* 3. Services — what was sold ------------------------------- */}
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_services()} />
           {services.length === 0 ? (
-            <EmptyState title={m.inspections_hub_services_empty_title()} description={m.inspections_hub_services_empty_desc()} />
+            // Compact, like every other card's empty case — a full EmptyState in
+            // a half-width card is a tall pane of whitespace beside neighbours
+            // that are three lines high.
+            <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_services_empty_desc()}</p>
           ) : (
             <div className="divide-y divide-ih-border">
               {services.map((svc) => (
@@ -704,7 +717,7 @@ export default function InspectionHubPage() {
           )}
         </Card>
 
-        {/* 4. Signing requests -------------------------------------- */}
+        {/* 4. Signing requests — the paperwork the visit needs -------- */}
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_agreement()} pill={blocks.agreement} />
           <SigningRequests
@@ -716,41 +729,11 @@ export default function InspectionHubPage() {
           />
         </Card>
 
-        {/* 5. Invoice ----------------------------------------------- */}
-        <Card className="p-5">
-          <BlockHeading title={m.inspections_hub_block_invoice()} pill={blocks.invoice} />
-          <p className="text-[15px] font-medium text-ih-fg-1 mb-3">
-            {formatCents(invoiceAmountCents)}
-          </p>
-          {invoicePaid ? (
-            // Paid is terminal — read-only (the pill already shows "Paid").
-            <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_invoice_paid()}</p>
-          ) : invoiceSent ? (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => paymentModal.setOpen(true)}
-              >
-                {m.inspections_hub_invoice_resend()}
-              </Button>
-              {/* IA-34 — the pay page is token-gated; copy the tokenized link the
-                  server built, never a bare `/invoice/:id` (which now 401s). No
-                  link when no primary client email exists to bind a token to. */}
-              {hub.invoice?.payUrl && <CopyLinkButton url={hub.invoice.payUrl} />}
-            </div>
-          ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => paymentModal.setOpen(true)}
-            >
-              {m.inspections_hub_invoice_request()}
-            </Button>
-          )}
-        </Card>
+        {/* 5. Inspection status — the visit itself. Independent of report
+            publishing. */}
+        <LifecycleCard status={inspection.status} fetcher={completeInspection} />
 
-        {/* 6. Report ------------------------------------------------ */}
+        {/* 6. Report — the deliverable ------------------------------- */}
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_report()} pill={blocks.report} />
           {reportShipped ? (
@@ -913,6 +896,40 @@ export default function InspectionHubPage() {
             </div>
           )}
         </Card>
+        {/* 7. Invoice — getting paid for it -------------------------- */}
+        <Card className="p-5">
+          <BlockHeading title={m.inspections_hub_block_invoice()} pill={blocks.invoice} />
+          <p className="text-[15px] font-medium text-ih-fg-1 mb-3">
+            {formatCents(invoiceAmountCents)}
+          </p>
+          {invoicePaid ? (
+            // Paid is terminal — read-only (the pill already shows "Paid").
+            <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_invoice_paid()}</p>
+          ) : invoiceSent ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => paymentModal.setOpen(true)}
+              >
+                {m.inspections_hub_invoice_resend()}
+              </Button>
+              {/* IA-34 — the pay page is token-gated; copy the tokenized link the
+                  server built, never a bare `/invoice/:id` (which now 401s). No
+                  link when no primary client email exists to bind a token to. */}
+              {hub.invoice?.payUrl && <CopyLinkButton url={hub.invoice.payUrl} />}
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => paymentModal.setOpen(true)}
+            >
+              {m.inspections_hub_invoice_request()}
+            </Button>
+          )}
+        </Card>
+
       </div>
 
       {/* Documents — shared section (unified portal ⑦). Renders regardless of

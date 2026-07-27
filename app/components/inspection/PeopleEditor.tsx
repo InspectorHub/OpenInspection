@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useFetcher } from "react-router";
-import { Card, Pill, Button, EmptyState, Modal } from "@core/shared-ui";
+import { Card, Pill, Button, Modal } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { AddPersonModal } from "./AddPersonModal";
+import { BlockHeading } from "~/components/inspection-hub/BlockHeading";
 import { LinkExpiryControl } from "./LinkExpiryControl";
 import { PRIMARY_CLIENT_KEY } from "../../../server/lib/people/default-role-profiles";
 import { isSoleClient } from "../../../server/lib/people/primary-client";
@@ -178,20 +179,17 @@ export function PeopleEditor({
 
   return (
     <Card className="p-5" data-inspection-id={inspectionId}>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[13px] font-extrabold uppercase tracking-[0.15em] text-ih-fg-3">
-          {m.inspections_hub_block_people()}
-        </h2>
-        <Button variant="secondary" size="sm" onClick={() => setModalOpen(true)}>
-          {m.inspections_hub_people_add()}
-        </Button>
-      </div>
+      {/* Shared heading, not a hand-copy of its markup — the duplicate is how
+          this card's header came to hold a button while every neighbour's held
+          a status pill. "Add person" now sits at the bottom with every other
+          card's actions, which is also where you add to the end of a list. */}
+      <BlockHeading title={m.inspections_hub_block_people()} />
 
       {groups.length === 0 ? (
-        <EmptyState
-          title={m.inspections_hub_people_empty_title()}
-          description={m.inspections_hub_people_empty_desc()}
-        />
+        // A half-width card is not a page: the full EmptyState's centred
+        // title-over-description block turned an empty card into a tall pane of
+        // whitespace beside compact neighbours, and the grid read as broken.
+        <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_people_empty_desc()}</p>
       ) : (
         <div className="space-y-4">
           {groups.map((group) => (
@@ -315,6 +313,13 @@ export function PeopleEditor({
           ))}
         </div>
       )}
+
+      {/* This card's action, in the one place every hub card puts its actions. */}
+      <div className="mt-4">
+        <Button variant="secondary" size="sm" onClick={() => setModalOpen(true)}>
+          {m.inspections_hub_people_add()}
+        </Button>
+      </div>
 
       {/* IA-36 ⑦ — the same control as Settings → Inspection, applied here to the
           links this inspection has already sent. The company-wide policy only
