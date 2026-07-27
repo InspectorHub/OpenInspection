@@ -137,6 +137,7 @@ export function reportViewProps(
     brand: data.brand,
     error: data.error ?? null,
     notPublished: data.notPublished ?? false,
+    linkInactive: data.linkInactive ?? false,
     styleProfile: data.styleProfile,
     inspectorCredentials: data.inspectorCredentials,
     initialFilter: data.initialFilter ?? "all",
@@ -305,15 +306,44 @@ export function ReportView(props: ReportViewProps) {
         />
       );
     }
+    // IA-36 ⑨ — "we took this link offline" (410) and "this link names nothing"
+    // (404) render the SAME page on purpose.
+    //
+    // The reader cannot act on the difference and we cannot always tell them
+    // the truth anyway: rotating a link overwrites its row in place, so a
+    // recipient holding the superseded URL is indistinguishable from someone
+    // who mistyped one — both arrive as 404. Splitting the copy would mean
+    // confidently telling a legitimate client "no such report" when we in fact
+    // replaced their link ten minutes ago.
+    //
+    // So the page states both possibilities and names the recovery path. The
+    // wire keeps 410 and 404 distinct — support and the audit trail need to
+    // know which happened even when the reader doesn't.
     const notFound = data.error === "Report not found";
+    if (notFound || data.linkInactive) {
+      // Name the company and give a channel. "Ask your inspector" is not
+      // actionable to someone who received one email months ago and no longer
+      // remembers who sent it.
+      const company = data.brand?.companyName;
+      return (
+        <ErrorState
+          title={m.report_link_inactive_title()}
+          message={
+            company
+              ? m.report_link_inactive_message_company({ company })
+              : m.report_link_inactive_message()
+          }
+          contacts={{
+            email: data.brand?.supportEmail,
+            phone: data.brand?.companyPhone,
+          }}
+        />
+      );
+    }
     return (
       <ErrorState
-        title={notFound ? m.report_gate_notfound_title() : m.report_view_unavailable_title()}
-        message={
-          notFound
-            ? m.report_gate_notfound_message()
-            : m.report_view_load_error()
-        }
+        title={m.report_view_unavailable_title()}
+        message={m.report_view_load_error()}
       />
     );
   }

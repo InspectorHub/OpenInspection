@@ -129,6 +129,8 @@ export async function action({
       const defectTitle = (form.get("defectTitle") as string | null) ?? null;
       const location = (form.get("location") as string | null) ?? null;
       const category = (form.get("category") as string | null) ?? null;
+      // IA-57 — snapshot the recommended trade alongside the IA-55 snapshots.
+      const trade = (form.get("trade") as string | null) ?? null;
       const commentSnapshot = (form.get("commentSnapshot") as string | null) ?? null;
       const creditRaw = form.get("requestedCreditCents");
       const requestedCreditCents = creditRaw !== null && creditRaw !== "" ? Number(creditRaw) : null;
@@ -144,6 +146,7 @@ export async function action({
           defectTitle,
           location,
           category,
+          trade,
           commentSnapshot,
           requestedCreditCents,
           note,

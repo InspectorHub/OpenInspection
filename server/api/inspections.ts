@@ -35,6 +35,7 @@ import costExportRoutes from './inspections/cost-export';
 import costItemRoutes from './inspections/cost-items';
 import complianceRoutes from './inspections/compliance';
 import peopleRoutes from './inspections/people';
+import inspectionServiceRoutes from './inspections/services';
 
 export const inspectionsRoutes = createApiRouter()
     .route('/', bulkRoutes)
@@ -57,6 +58,9 @@ export const inspectionsRoutes = createApiRouter()
     // Auth + forward to INSPECTION_DOC DO; mirrors the presence WS pattern.
     .route('/', collabRoutes)
     // Plan 1B Task 3 (people-role-profiles) — GET/POST/DELETE /:id/people.
-    .route('/', peopleRoutes);
+    .route('/', peopleRoutes)
+    // IA-87 — POST/PATCH/DELETE /:id/services: the service lines on an
+    // inspection were write-once at creation until this router existed.
+    .route('/', inspectionServiceRoutes);
 
 export type InspectionsApi = typeof inspectionsRoutes;

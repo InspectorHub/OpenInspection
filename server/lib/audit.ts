@@ -100,7 +100,14 @@ export type AuditAction =
     | 'inspection.compliance.psq_updated'
     | 'inspection.compliance.psq_status_changed'
     // Agent unified link (Spec 3, Task 2) — single-use magic-login code issue.
-    | 'agent.magic_login.issued';
+    | 'agent.magic_login.issued'
+    // IA-36 ④ — report-delivery credential lifecycle. Rotation destroys the old
+    // secret in place (the (inspection, recipient) unique index leaves no dead
+    // row behind), so these events are the ONLY durable answer to "the customer
+    // says their old link still opens / stopped opening — what happened?".
+    // Metadata carries the previous token's HASH; the plaintext is never logged.
+    | 'portal_access.rotated'
+    | 'portal_access.revoked';
 
 interface AuditParams {
     db: D1Database;
@@ -123,17 +130,26 @@ interface AuditParams {
  */
 function writeAuditLog(params: AuditParams): void {
     const { db, executionCtx, ...rest } = params;
-    const write = drizzle(db).insert(auditLogs).values({
-        id: crypto.randomUUID(),
-        tenantId: rest.tenantId,
-        userId: rest.userId ?? null,
-        action: rest.action,
-        entityType: rest.entityType,
-        entityId: rest.entityId ?? null,
-        metadata: rest.metadata ?? null,
-        ipAddress: rest.ipAddress ?? null,
-        createdAt: new Date(),
-    }).then(() => {}).catch((e) => logger.error('[audit] write failed', {}, e instanceof Error ? e : undefined));
+    // Fire-and-forget by contract: recording that something happened must never
+    // turn a request that DID happen into a 500. The async rejection path was
+    // already swallowed; the query construction itself is wrapped too.
+    let write: Promise<void>;
+    try {
+        write = drizzle(db).insert(auditLogs).values({
+            id: crypto.randomUUID(),
+            tenantId: rest.tenantId,
+            userId: rest.userId ?? null,
+            action: rest.action,
+            entityType: rest.entityType,
+            entityId: rest.entityId ?? null,
+            metadata: rest.metadata ?? null,
+            ipAddress: rest.ipAddress ?? null,
+            createdAt: new Date(),
+        }).then(() => {}).catch((e) => logger.error('[audit] write failed', {}, e instanceof Error ? e : undefined));
+    } catch (e) {
+        logger.error('[audit] write failed', {}, e instanceof Error ? e : undefined);
+        return;
+    }
 
     if (executionCtx) {
         try { executionCtx.waitUntil(write); } catch { /* swallow if ctx unavailable */ }
@@ -151,6 +167,12 @@ export function auditFromContext(
     options?: { entityId?: string; metadata?: Record<string, unknown> }
 ): void {
     const user = c.get('user');
+    // `c.executionCtx` THROWS when the context was created without one (any
+    // non-Workers invocation path). Recording an audit event must never be the
+    // thing that fails a request that otherwise succeeded, so read it defensively
+    // — writeAuditLog already treats it as optional and just awaits inline.
+    let executionCtx: Pick<ExecutionContext, 'waitUntil'> | undefined;
+    try { executionCtx = c.executionCtx; } catch { executionCtx = undefined; }
     writeAuditLog({
         db: c.env.DB,
         tenantId: c.get('tenantId') as string,
@@ -160,7 +182,7 @@ export function auditFromContext(
         entityId: options?.entityId,
         metadata: options?.metadata,
         ipAddress: c.req.header('CF-Connecting-IP'),
-        executionCtx: c.executionCtx,
+        executionCtx,
     });
 }
 

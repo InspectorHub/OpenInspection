@@ -1,4 +1,4 @@
-export { Button } from "./Button";
+export { Button, buttonClasses } from "./Button";
 export { IconButton } from "./IconButton";
 export { Pill, type PillTone } from "./Pill";
 export { StatCard } from "./StatCard";

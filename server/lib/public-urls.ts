@@ -51,9 +51,16 @@ export async function buildRenderReportUrl(
  * Public invoice payment page (Task 8 / #111). Unlike report/sign links this
  * route is keyed only by inspection id (`/invoice/:id`) — the public payment
  * page resolves the tenant itself — so no slug segment is required.
+ *
+ * IA-34 — the id is an identifier, not a credential: the invoice + pay-intent
+ * endpoints behind this page require a live client/co_client grant. Callers
+ * MUST pass the recipient's persistent portal token (PortalAccessService
+ * .issueToken, idempotent per (inspection, recipient)) so the emailed link
+ * authenticates its own recipient.
  */
-export function paymentUrl(host: string, inspectionId: string): string {
-    return joinUrl(host, `/invoice/${inspectionId}`);
+export function paymentUrl(host: string, inspectionId: string, token?: string): string {
+    const query = token ? `?token=${encodeURIComponent(token)}` : '';
+    return joinUrl(host, `/invoice/${inspectionId}${query}`);
 }
 
 export function signUrl(host: string, tenantSlug: string, inspectionId: string): string {

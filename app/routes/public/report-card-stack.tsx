@@ -124,6 +124,11 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  brand,
  error: res.ok ? null : "Report not found",
  notPublished: (res.status as number) === 403,
+ // IA-36 ⑨ — the API answers 410 when a REAL link has expired or been
+ // revoked. That is a different message from "not found": the recipient was
+ // invited by us and the link died by our policy, so the page says what
+ // happened and how to get a new one instead of implying they mistyped.
+ linkInactive: (res.status as number) === 410,
  styleProfile: raw?.styleProfile as ReportLoaderResult["styleProfile"],
  inspectorCredentials: raw?.inspectorCredentials as ReportLoaderResult["inspectorCredentials"],
  initialFilter,
@@ -170,6 +175,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
  coverPhotoUrl: null,
  error: "Service unavailable",
  notPublished: false,
+ linkInactive: false,
  initialFilter,
  printMode,
  tocPages,

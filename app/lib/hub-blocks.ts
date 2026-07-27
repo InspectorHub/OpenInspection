@@ -14,6 +14,10 @@
 import { isReportPublished, INSPECTION_STATUS } from '~/lib/status';
 import { formatCurrency } from '~/lib/format';
 import { m } from '~/paraglide/messages';
+// Type-only — erased at build, so the API's zod module never reaches the client
+// bundle. This is the single source of truth for the hub payload's shape.
+import type { z } from '@hono/zod-openapi';
+import type { InspectionHubSchema } from '../../server/lib/validations/inspection/read';
 
 /**
  * Pill tone union — kept in sync with packages/shared-ui/src/Pill.tsx.
@@ -45,37 +49,28 @@ export interface BlockStates {
     report: BlockState;
 }
 
+/** The wire payload of `GET /api/inspections/{id}/hub`, from its own schema. */
+type Hub = z.infer<typeof InspectionHubSchema>;
+
 /**
- * The subset of the `/api/inspections/{id}/hub` payload that block derivation
- * reads. The full payload (people, services, agreements, tenantSlug, …) is
- * typed by the loader; this slice is all `deriveBlockStates` needs, which keeps
- * the helper — and its tests — decoupled from the wider schema.
+ * The subset of the hub payload that block derivation reads.
+ *
+ * DERIVED, never hand-copied: every block below is indexed out of the server
+ * schema, so a field added or renamed there is a compile error here instead of
+ * a silent divergence. (It used to be a hand-written mirror; adding
+ * `invoice.payUrl` server-side left this copy stale until tsc caught it, and an
+ * OPTIONAL field would have slipped through entirely.)
+ *
+ * `inspection` stays a deliberate narrow slice — `deriveBlockStates` reads four
+ * fields and its fixtures should not have to build the whole inspection row.
+ * `Pick` keeps that decoupling while still failing the build if one of those
+ * four is renamed. The other three blocks track the schema exactly.
  */
 export interface HubPayload {
-    inspection: {
-        status: string;
-        reportStatus: string;
-        paymentRequired: boolean;
-        agreementRequired: boolean;
-    };
-    agreementRequests: Array<{
-        id: string;
-        status: string;
-        clientEmail: string;
-        signedAt: string | null;
-        createdAt: string | null;
-    }>;
-    invoice: {
-        id: string;
-        status: string;
-        amountCents: number;
-        sentAt: string | null;
-        paidAt: string | null;
-    } | null;
-    publishReadiness: {
-        ready: boolean;
-        blockingCount: number;
-    };
+    inspection: Pick<Hub['inspection'], 'status' | 'reportStatus' | 'paymentRequired' | 'agreementRequired'>;
+    agreementRequests: Hub['agreementRequests'];
+    invoice: Hub['invoice'];
+    publishReadiness: Hub['publishReadiness'];
 }
 
 /* ------------------------------------------------------------------ */

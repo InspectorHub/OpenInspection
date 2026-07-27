@@ -4,6 +4,8 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { PageHeader } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+// Type-only — erased at build, so no server module reaches the client bundle.
+import type { DiffPayload } from "../../server/lib/version-diff";
 
 export function meta() {
  return [{ title: m.misc_version_diff_meta_title() }];
@@ -22,19 +24,16 @@ export interface DiffRow {
  after: string | null; // present only for `changed`
 }
 
-/** The `{ items, units }` payload the diff API actually returns (see
- *  server/lib/version-diff.ts computeDiff). */
-interface RawItemDiff {
- itemId: string;
- kind: 'added' | 'removed' | 'changed';
- field?: string;
- from?: unknown;
- to?: unknown;
-}
-interface RawDiffPayload {
- items?: RawItemDiff[];
- units?: { added?: Array<{ id: string }>; removed?: Array<{ id: string }> };
-}
+/**
+ * The `{ items, units }` payload the diff API returns, DERIVED from `computeDiff`
+ * (`server/lib/version-diff.ts`) rather than hand-copied — this page already
+ * shipped one bug from mis-guessing the payload shape (IA-40), so the shape is
+ * taken from the producer.
+ *
+ * Both keys are widened to optional: the loader parses an untrusted JSON body,
+ * and `flattenVersionDiff` is written to tolerate a payload missing either half.
+ */
+type RawDiffPayload = Partial<DiffPayload>;
 
 function fmtValue(v: unknown): string | null {
  if (v === null || v === undefined || v === '') return null;

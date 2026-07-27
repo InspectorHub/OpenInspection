@@ -82,6 +82,33 @@ describe('shareViewModel', () => {
     expect(m.customIntro).toBe('Fix these:');
     expect(m.creditTotalDisplay).toBe('$125.00');
   });
+
+  // IA-57 — the snapshotted trade is the sixth and last hop; if the view model
+  // drops it the column can never render no matter what the DB stored.
+  it('maps the trade snapshot onto the row, defaulting to null', () => {
+    const m = shareViewModel({
+      creditTotal: 0,
+      items: [
+        {
+          sectionTitle: 'Roof',
+          itemLabel: 'Shingles',
+          tradeSnapshot: 'licensed roofer',
+          commentSnapshot: 'worn',
+          requestedCreditCents: null,
+          note: null,
+        },
+        {
+          sectionTitle: 'Attic',
+          itemLabel: 'Insulation',
+          commentSnapshot: 'thin',
+          requestedCreditCents: null,
+          note: null,
+        },
+      ],
+    });
+    expect(m.rows[0].trade).toBe('licensed roofer');
+    expect(m.rows[1].trade).toBeNull();
+  });
 });
 
 describe('repair-builder helpers', () => {

@@ -529,6 +529,9 @@ export class InspectionService {
             clientEmail: string;
             signedAt: string | null;
             createdAt: string | null;
+            agreementName: string | null;
+            signersTotal: number;
+            signersSigned: number;
         }>;
         invoice: { id: string; status: string; amountCents: number; sentAt: string | null; paidAt: string | null } | null;
         publishReadiness: { ready: boolean; blockingCount: number };

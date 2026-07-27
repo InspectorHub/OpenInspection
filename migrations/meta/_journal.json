@@ -22,6 +22,13 @@
       "when": 1784876433223,
       "tag": "0002_stale_clint_barton",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785063877876,
+      "tag": "0003_flashy_black_bird",
+      "breakpoints": true
     }
   ]
 }

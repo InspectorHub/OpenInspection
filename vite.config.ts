@@ -4,7 +4,7 @@ import { reactRouter } from "@react-router/dev/vite";
 import { cloudflare } from "@cloudflare/vite-plugin";
 import { paraglideVitePlugin } from "@inlang/paraglide-js";
 import tailwindcss from "@tailwindcss/vite";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 // Which wrangler config the cloudflare plugin bakes into the build:
 //   WRANGLER_CONFIG env wins (e.g. deploy:saas sets wrangler.saas.jsonc);
@@ -14,6 +14,38 @@ const wranglerConfig =
   process.env.WRANGLER_CONFIG ||
   (existsSync("wrangler.local.jsonc") ? "wrangler.local.jsonc" : "wrangler.jsonc");
 
+/**
+ * Keep the canvas stack out of the WORKER bundle.
+ *
+ * `react-konva` drags konva, react-reconciler and normalize-wheel behind it,
+ * and all four were landing in the server build even though `PhotoAnnotator` —
+ * their only consumer — gates every render behind a client-only `mounted` flag
+ * because konva touches the DOM. None of it can execute on the server; it was
+ * pure freight.
+ *
+ * That matters because OpenInspection promises one-click deploys on Workers
+ * Free, whose script limit is 3 MiB gzipped, and the worker had drifted to the
+ * ceiling. `React.lazy` does NOT fix this — every emitted chunk still counts
+ * toward the upload, so the module has to leave the server graph entirely.
+ *
+ * A `resolve.alias` under `environments.ssr` is the tidier-looking spelling and
+ * it silently does nothing here (the build output was byte-identical, same
+ * chunk hash) — the framework plugins own that config. Resolving by hand is
+ * explicit and verifiable: `grep -c node_modules/konva build/server/assets/*.js`
+ * must find nothing.
+ */
+function konvaSsrStub(): Plugin {
+  return {
+    name: "oi:konva-ssr-stub",
+    enforce: "pre",
+    resolveId(source) {
+      if (source !== "react-konva") return null;
+      if (this.environment?.name !== "ssr") return null;
+      return path.resolve(__dirname, "app/components/media-studio/react-konva.ssr-stub.tsx");
+    },
+  };
+}
+
 export default defineConfig({
   resolve: {
     alias: {
@@ -22,6 +54,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    konvaSsrStub(),
     // i18n — compile inlang messages to app/paraglide before RR resolves imports.
     // Strategy cookie→baseLocale ONLY: the framework ships DORMANT (nothing sets
     // the PARAGLIDE_LOCALE cookie yet), so every request resolves to baseLocale

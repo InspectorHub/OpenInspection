@@ -16,16 +16,18 @@ import {
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
-import type { PillTone } from "~/lib/hub-blocks";
+import { PageHeader, Card, Pill, Button, Modal } from "@core/shared-ui";
 import DocumentsSection, {
   type DocumentItem,
   type DocumentCategory,
   type DocumentVisibility,
 } from "~/components/DocumentsSection";
 import { BlockHeading } from "~/components/inspection-hub/BlockHeading";
+import { ClientSmsConsent } from "~/components/inspection-hub/ClientSmsConsent";
 import { LifecycleCard } from "~/components/inspection-hub/LifecycleCard";
-import { SendAgreementModal } from "~/components/inspection-hub/SendAgreementModal";
+import { SendAgreementModal, type SendAgreementPayload } from "~/components/agreements/SendAgreementModal";
+import { SigningRequests } from "~/components/inspection-hub/SigningRequests";
+import { SignaturePad } from "~/components/SignaturePad";
 import { RequestPaymentModal } from "~/components/inspection-hub/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspection-hub/PublishReportModal";
 import { CreateReinspectionModal } from "~/components/inspection-hub/CreateReinspectionModal";
@@ -37,12 +39,30 @@ import {
   toActionResult,
   handlePersonAdd,
   handlePersonRemove,
+  handlePersonResetAccess,
+  handlePersonMakePrimary,
+  handleReportLinkExpiry,
   handleSearchContacts,
+  handleSendAgreement,
+  handleInspectorSign,
 } from "~/lib/inspection-hub-actions";
+import {
+  handleSaveOrder,
+  handleServiceAdd,
+  handleServicePrice,
+  handleServiceRemove,
+} from "~/lib/inspection-order-actions";
+import { ScheduleCard, type TeamMember } from "~/components/inspection-hub/ScheduleCard";
+import { ServicesCard, type CatalogService } from "~/components/inspection-hub/ServicesCard";
+import { OrderDetailsCard } from "~/components/inspection-hub/OrderDetailsCard";
+import { InvoiceCard } from "~/components/inspection-hub/InvoiceCard";
+import { GateToggle } from "~/components/inspection-hub/GateToggle";
+import { resolveReferralSources } from "../../server/lib/referral-sources";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspection-hub-helpers";
 import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { useModalFetcher } from "~/hooks/useModalFetcher";
 
 export function meta() {
   return [{ title: m.inspections_hub_meta_title() }];
@@ -69,6 +89,11 @@ interface HubData extends HubPayload {
     paymentStatus: string;
     coverPhoto: string | null;
     createdAt: string | null;
+    // Order facts the hub owns since the settings merge — they describe the
+    // order, not the report, and used to be reachable only from the editor.
+    closingDate: string | null;
+    referenceNumber: string | null;
+    referralSource: string | null;
     // reportStatus is inherited from HubPayload["inspection"] but listed here for clarity
   };
   tenantSlug: string;
@@ -78,7 +103,14 @@ interface HubData extends HubPayload {
     buyerAgents: PeopleAgent[];
     listingAgents: PeopleAgent[];
   };
-  services: Array<{ id: string; name: string; priceCents: number }>;
+  services: Array<{
+    id: string;
+    serviceId: string;
+    name: string;
+    priceCents: number;
+    priceSnapshot: number;
+    priceOverride: number | null;
+  }>;
   agreements: Array<{ id: string; name: string }>;
 }
 
@@ -191,6 +223,41 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     // Best-effort: fail open to empty list
   }
 
+  // Order-fact editors on the hub (IA-87 + the settings merge). All three are
+  // best-effort: each degrades to an empty list, which disables the affected
+  // picker rather than breaking the page.
+  //  - `members`  → the Schedule card's inspector picker
+  //  - `catalog`  → the Services card's "Add service" picker
+  //  - `referralSources` → the Order-details referral dropdown, which the
+  //    editor's settings sheet rendered but never populated (its own caller
+  //    never passed the prop), so the field was unsettable from anywhere.
+  // Optional-chained like the `meGet` / `peopleGet` lookups below: a narrower
+  // mocked api-client in a unit test degrades to an empty list instead of
+  // throwing on a missing property.
+  const membersGet = api.team?.members?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+  const membersRes = membersGet ? await membersGet({}).catch(() => null) : null;
+  const members: TeamMember[] = membersRes && membersRes.ok
+    ? (((await membersRes.json()) as { data?: { members?: Array<{ id: string; name?: string | null; email?: string | null }> } })
+        .data?.members ?? []).map((u) => ({ id: u.id, name: u.name ?? "", email: u.email ?? "" }))
+    : [];
+
+  const catalogGet = api.services?.index?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+  const catalogRes = catalogGet ? await catalogGet({}).catch(() => null) : null;
+  const serviceCatalog: CatalogService[] = catalogRes && catalogRes.ok
+    ? (((await catalogRes.json()) as { data?: Array<{ id: string; name: string; price: number; active?: boolean }> }).data ?? [])
+        .filter((s) => s.active !== false)
+        .map((s) => ({ id: s.id, name: s.name, price: s.price }))
+    : [];
+
+  const brandingGet = api.adminBranding?.branding?.$get as unknown as ((args?: unknown) => Promise<Response>) | undefined;
+  const brandingRes = brandingGet ? await brandingGet({}).catch(() => null) : null;
+  let customReferralSources: string[] = [];
+  if (brandingRes && brandingRes.ok) {
+    const body = (await brandingRes.json().catch(() => ({}))) as { data?: { branding?: { customReferralSources?: string[] } } };
+    customReferralSources = body.data?.branding?.customReferralSources ?? [];
+  }
+  const referralSources = resolveReferralSources(customReferralSources);
+
   // IA-40 — published report versions for the Report card's Versions list.
   // Best-effort and unconditional (mirrors the people/consent fetches above): an
   // inspection that was published then unpublished still carries its version
@@ -205,7 +272,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
       ? (((await versionsRes.json()) as { data?: { versions?: ReportVersionRow[] } }).data?.versions ?? [])
       : [];
 
-  return { hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin, versions };
+  return {
+    hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin, versions,
+    members, serviceCatalog, referralSources,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -219,22 +289,18 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const intent = formData.get("intent");
   const api = createApi(context, { token });
 
-  if (intent === "send-agreement") {
-    // Empty strings → omit, so the endpoint falls back to its defaults
-    // (tenant's first agreement template / the inspection's primary client
-    // email, resolved via inspection_people — see PeopleService.getPrimaryClient).
-    const agreementId = String(formData.get("agreementId") || "").trim();
-    const email = String(formData.get("email") || "").trim();
-    const res = await api.inspections[":id"]["agreement-requests"].$post({
-      param: { id },
-      json: {
-        ...(agreementId ? { agreementId } : {}),
-        ...(email ? { email } : {}),
-      },
-    });
-    // Surface the API rejection (B-4: never unconditional ok:true).
-    return toActionResult(res, "send-agreement", m.inspections_hub_error_send_agreement());
-  }
+  // IA-65 — signing requests live on the inspection now; both intents keep
+  // their bodies in inspection-hub-actions beside the People intents.
+  if (intent === "send-agreement") return handleSendAgreement(api, id, formData);
+  if (intent === "inspector-sign") return handleInspectorSign(api, formData);
+
+  // IA-87 + settings merge — the order facts. `save-order` is one intent behind
+  // the schedule modal, the order-details modal, the base-price modal and the
+  // two delivery-gate switches: they all PATCH the same row.
+  if (intent === "save-order") return handleSaveOrder(api, id, formData);
+  if (intent === "service-add") return handleServiceAdd(api, id, formData);
+  if (intent === "service-price") return handleServicePrice(api, id, formData);
+  if (intent === "service-remove") return handleServiceRemove(api, id, formData);
 
   if (intent === "request-payment") {
     const res = await api.invoices["request-payment"].$post({
@@ -356,6 +422,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   // response mapping are long enough to keep this dispatcher scannable.
   if (intent === "person-add") return handlePersonAdd(api, id, formData);
   if (intent === "person-remove") return handlePersonRemove(api, id, formData);
+  // IA-36 — the report-link verbs that live on the People card.
+  if (intent === "person-reset-access") return handlePersonResetAccess(api, id, formData);
+  if (intent === "person-make-primary") return handlePersonMakePrimary(api, id, formData);
+  if (intent === "report-link-expiry") return handleReportLinkExpiry(api, id, formData);
   if (intent === "search-contacts") return handleSearchContacts(api, formData);
 
   // Spec 2 Task 7 — "Send report" modal. Recipients/channels arrive as JSON
@@ -398,8 +468,10 @@ export function reportActions(
 /* ------------------------------------------------------------------ */
 
 export default function InspectionHubPage() {
-  const { hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin, versions } =
-    useLoaderData<typeof loader>();
+  const {
+    hub, smsConsent, reinspectCandidates, canPublishCap, documents, people, roleProfiles, isAdmin, versions,
+    members, serviceCatalog, referralSources,
+  } = useLoaderData<typeof loader>();
   // `peopleCard` is the read-only getPeopleCard() projection (client/agents/
   // inspector — still used for the header meta line + modal default emails);
   // `people` (destructured above) is the Task 3 editable inspection_people
@@ -476,9 +548,36 @@ export default function InspectionHubPage() {
   //  - send-agreement → refreshes agreementRequests
   //  - request-payment → refreshes the invoice block
   //  - publish → flips the Report card to Published + reveals the header link
-  const agreementModal = useModalFetcher("send-agreement");
-  const paymentModal = useModalFetcher("request-payment");
-  const publishModal = useModalFetcher("publish");
+  const agreementModal = useModalFetcher<typeof action>("send-agreement");
+  const paymentModal = useModalFetcher<typeof action>("request-payment");
+  const publishModal = useModalFetcher<typeof action>("publish");
+
+  // IA-65 — signer management on the inspection. The send modal serializes its
+  // signer rows into the action; the pre-sign modal is keyed by envelope id
+  // (which row's "Sign now" was pressed) and closes itself on success.
+  const submitSendAgreement = (payload: SendAgreementPayload) => {
+    agreementModal.fetcher.submit(
+      {
+        intent: "send-agreement",
+        agreementId: payload.agreementId,
+        completionPolicy: payload.completionPolicy,
+        signers: JSON.stringify(payload.signers),
+      },
+      { method: "post" },
+    );
+  };
+
+  const [preSigningId, setPreSigningId] = useState<string | null>(null);
+  const preSignModal = useModalFetcher<typeof action>("inspector-sign");
+  const submitPreSignature = (dataUri: string) => {
+    preSignModal.fetcher.submit(
+      { intent: "inspector-sign", envelopeId: preSigningId ?? "", signatureBase64: dataUri },
+      { method: "post" },
+    );
+  };
+  useEffect(() => {
+    if (preSignModal.succeeded) setPreSigningId(null);
+  }, [preSignModal.succeeded]);
 
   // Submit / return / unpublish — dedicated fetchers (B-17: never share).
   const submitReport = useFetcher<typeof action>();
@@ -499,7 +598,7 @@ export default function InspectionHubPage() {
   const [sendReportOpen, setSendReportOpen] = useState(false);
   const sendReportFetcher = useFetcher<typeof action>();
 
-  const reinspectModal = useModalFetcher("create-reinspection", { closeOnSuccess: false });
+  const reinspectModal = useModalFetcher<typeof action>("create-reinspection", { closeOnSuccess: false });
   const createReinspection = reinspectModal.fetcher;
   useEffect(() => {
     if (
@@ -543,8 +642,6 @@ export default function InspectionHubPage() {
     inspection.reportStatus === REPORT_STATUS.IN_PROGRESS &&
     !hub.publishReadiness.ready &&
     hub.publishReadiness.blockingCount > 0;
-
-  const servicesTotalCents = services.reduce((sum, s) => sum + s.priceCents, 0);
 
   // Invoice amount the SERVER will request — same money authority chain as the
   // endpoint (invoice > Σ services > inspections.price). Drives the modal amount
@@ -611,9 +708,31 @@ export default function InspectionHubPage() {
 
       <PublishNotice notified={publishNotice} />
 
-      {/* Six blocks — responsive 2-col grid (1-col on mobile) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 1. People — editable (Plan 1B Task 5): PeopleEditor sources rows
+      {/* Six blocks — responsive 2-col grid (1-col on mobile).
+          `items-start`: grid rows stretch their items to equal height by
+          default, so a three-line Schedule card was inflated to match whatever
+          sat beside it and rendered as mostly blank. Cards size to their own
+          content; the columns no longer have to agree. */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+        {/* Cards follow the job, not the schema: everything you settle BEFORE
+            the visit, then the visit, then what happens after it. The old order
+            interleaved them (status before services and agreement; invoice
+            before the report it bills for), so the page had no through-line to
+            read down.
+
+            1. Schedule — when and who. Editable here: both facts describe the
+            order, and the card that showed them used to send you into the
+            report editor to change them. ------------------------------ */}
+        <ScheduleCard
+          inspectionId={inspection.id}
+          date={inspection.date}
+          inspectorId={inspection.inspectorId}
+          inspectorName={peopleCard.inspector?.name ?? peopleCard.inspector?.email ?? null}
+          members={members}
+          displayTz={displayTz}
+        />
+
+        {/* 2. People — who. Editable (Plan 1B Task 5): PeopleEditor sources rows
             from inspection_people (the `people` loader array) grouped by role
             kind, replacing the old read-only client/agents/inspector text
             block. Client SMS consent (Track L (E)) stays a small addendum
@@ -637,107 +756,38 @@ export default function InspectionHubPage() {
           )}
         </div>
 
-        {/* 2. Schedule ---------------------------------------------- */}
-        <Card className="p-5">
-          <BlockHeading title={m.inspections_hub_block_schedule()} />
-          <p className="text-[15px] font-medium text-ih-fg-1">
-            {formatInspectionDateTime(inspection.date, undefined, displayTz)}
-          </p>
-          <Link
-            to={`/inspections/${inspection.id}/edit`}
-            className="text-[12px] font-bold text-ih-primary hover:underline mt-3 inline-block"
-          >
-            {m.inspections_hub_schedule_reschedule()}
-          </Link>
-        </Card>
+        {/* 3. Services — what was sold. IA-87: the lines are editable now;
+            until this card had verbs, an inspection created without services
+            could never be made billable from anywhere but the report editor's
+            price box. ------------------------------------------------- */}
+        <ServicesCard services={services} catalog={serviceCatalog} canManage={isAdmin} />
 
-        {/* 2b. Order lifecycle — independent of report publishing. */}
-        <LifecycleCard status={inspection.status} fetcher={completeInspection} />
-
-        {/* 3. Services ---------------------------------------------- */}
-        <Card className="p-5">
-          <BlockHeading title={m.inspections_hub_block_services()} />
-          {services.length === 0 ? (
-            <EmptyState title={m.inspections_hub_services_empty_title()} description={m.inspections_hub_services_empty_desc()} />
-          ) : (
-            <div className="divide-y divide-ih-border">
-              {services.map((svc) => (
-                <div key={svc.id} className="flex items-center justify-between py-2 text-[13px]">
-                  <span className="text-ih-fg-1">{svc.name}</span>
-                  <span className="text-ih-fg-2 font-medium tabular-nums">
-                    {formatCents(svc.priceCents)}
-                  </span>
-                </div>
-              ))}
-              <div className="flex items-center justify-between py-2 text-[13px] font-bold">
-                <span className="text-ih-fg-1">{m.inspections_hub_services_total()}</span>
-                <span className="text-ih-fg-1 tabular-nums">{formatCents(servicesTotalCents)}</span>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        {/* 4. Agreement --------------------------------------------- */}
+        {/* 4. Signing requests — the paperwork the visit needs -------- */}
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_agreement()} pill={blocks.agreement} />
-          {hub.agreementRequests.length > 0 ? (
-            <div className="divide-y divide-ih-border mb-3">
-              {hub.agreementRequests.map((req) => (
-                <div key={req.id} className="flex items-center justify-between py-2 text-[12px]">
-                  <span className="text-ih-fg-2 truncate mr-2">{req.clientEmail}</span>
-                  <span className="text-ih-fg-4 shrink-0">
-                    {humanizeStatus(req.status)}
-                    {(req.signedAt || req.createdAt) && (
-                      <> &middot; {formatInspectionDateTime(req.signedAt || req.createdAt, undefined, displayTz)}</>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_agreement_empty()}</p>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => agreementModal.setOpen(true)}
-          >
-            {m.inspections_hub_agreement_send()}
-          </Button>
+          <SigningRequests
+            requests={hub.agreementRequests}
+            canManageSigners={isAdmin}
+            displayTz={displayTz}
+            onSend={() => agreementModal.setOpen(true)}
+            onPreSign={setPreSigningId}
+          />
+          {/* The gate that decides whether a signature is required at all. It
+              was a checkbox in the report editor's settings sheet; it belongs
+              with the agreements it gates. */}
+          <GateToggle
+            field="agreementRequired"
+            checked={inspection.agreementRequired}
+            label={m.inspections_hub_gate_agreement()}
+            testId="hub-gate-agreement"
+          />
         </Card>
 
-        {/* 5. Invoice ----------------------------------------------- */}
-        <Card className="p-5">
-          <BlockHeading title={m.inspections_hub_block_invoice()} pill={blocks.invoice} />
-          <p className="text-[15px] font-medium text-ih-fg-1 mb-3">
-            {formatCents(invoiceAmountCents)}
-          </p>
-          {invoicePaid ? (
-            // Paid is terminal — read-only (the pill already shows "Paid").
-            <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_invoice_paid()}</p>
-          ) : invoiceSent ? (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => paymentModal.setOpen(true)}
-              >
-                {m.inspections_hub_invoice_resend()}
-              </Button>
-              <CopyLinkButton url={`/invoice/${inspection.id}`} />
-            </div>
-          ) : (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => paymentModal.setOpen(true)}
-            >
-              {m.inspections_hub_invoice_request()}
-            </Button>
-          )}
-        </Card>
+        {/* 5. Inspection status — the visit itself. Independent of report
+            publishing. */}
+        <LifecycleCard status={inspection.status} fetcher={completeInspection} />
 
-        {/* 6. Report ------------------------------------------------ */}
+        {/* 6. Report — the deliverable ------------------------------- */}
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_report()} pill={blocks.report} />
           {reportShipped ? (
@@ -791,12 +841,12 @@ export default function InspectionHubPage() {
             // Not shipped yet: the status line always applies, the action row
             // only for roles that have an action to take.
             <>
-              {inspection.reportStatus === 'submitted' && (
+              {inspection.reportStatus === REPORT_STATUS.SUBMITTED && (
                 <p className="text-[12px] text-ih-fg-3 mb-3">
                   {m.inspections_hub_report_submitted()}
                 </p>
               )}
-              {inspection.reportStatus === 'in_progress' && hub.publishReadiness.ready && (
+              {inspection.reportStatus === REPORT_STATUS.IN_PROGRESS && hub.publishReadiness.ready && (
                 <p className="text-[12px] text-ih-fg-3 mb-3">
                   {m.inspections_hub_report_ready()}
                 </p>
@@ -900,6 +950,30 @@ export default function InspectionHubPage() {
             </div>
           )}
         </Card>
+        {/* 7. Invoice — getting paid for it. IA-87 ②: the amount was display
+            only; the base price is editable here when nothing outranks it. */}
+        <InvoiceCard
+          pill={blocks.invoice}
+          amountCents={invoiceAmountCents}
+          paid={invoicePaid}
+          sent={invoiceSent}
+          payUrl={hub.invoice?.payUrl}
+          hasServiceLines={services.length > 0}
+          paymentRequired={inspection.paymentRequired}
+          basePriceCents={inspection.price}
+          canManagePrice={isAdmin}
+          onRequestPayment={() => paymentModal.setOpen(true)}
+        />
+
+        {/* 8. Order details — the back-office facts. Last on purpose: nobody
+            opens the hub to read a referral source. --------------------- */}
+        <OrderDetailsCard
+          closingDate={inspection.closingDate}
+          referenceNumber={inspection.referenceNumber}
+          referralSource={inspection.referralSource}
+          referralSources={referralSources}
+        />
+
       </div>
 
       {/* Documents — shared section (unified portal ⑦). Renders regardless of
@@ -917,16 +991,41 @@ export default function InspectionHubPage() {
         error={docError}
       />
 
-      {/* Send-agreement modal — shared Modal primitive (no window.confirm) */}
+      {/* Send-agreement modal — the shared multi-signer modal (IA-65). Seeded
+          with the inspection's primary client so the single-signer case stays
+          one click, but a co-client or agent can be added without leaving. */}
       <SendAgreementModal
         open={agreementModal.open}
-        agreements={hub.agreements}
-        defaultEmail={peopleCard.client?.email ?? ""}
-        fetcher={agreementModal.fetcher}
-        submitting={agreementModal.busy}
-        error={agreementModal.error}
+        templates={hub.agreements}
+        initialSigners={
+          peopleCard.client?.email
+            ? [{ name: peopleCard.client.name || peopleCard.client.email, email: peopleCard.client.email, role: "client" }]
+            : undefined
+        }
+        busy={agreementModal.busy}
+        onSend={submitSendAgreement}
         onClose={() => agreementModal.setOpen(false)}
       />
+      {agreementModal.error && (
+        <p className="text-[12px] font-medium text-ih-bad-fg">{agreementModal.error}</p>
+      )}
+
+      {/* Inspector pre-sign — the envelope-level signature an inspector applies
+          before the client sees it. Moved off the Library page with the rest of
+          signer management (IA-65). */}
+      <Modal
+        open={!!preSigningId}
+        onClose={() => setPreSigningId(null)}
+        title={m.library_agreements_sign_title()}
+      >
+        <p className="text-sm text-ih-fg-3 mb-4">{m.library_agreements_sign_desc()}</p>
+        <SignaturePad
+          onSubmit={submitPreSignature}
+          onCancel={() => setPreSigningId(null)}
+          label={m.library_agreements_save_signature()}
+        />
+        {preSignModal.error && <p className="text-sm text-ih-bad-fg mt-3">{preSignModal.error}</p>}
+      </Modal>
 
       {/* Request-payment modal — shared Modal primitive (no window.confirm) */}
       <RequestPaymentModal
@@ -974,115 +1073,6 @@ export default function InspectionHubPage() {
         onClose={() => reinspectModal.setOpen(false)}
       />
     </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Modal + fetcher pairing hook                                       */
-/* ------------------------------------------------------------------ */
-
-/**
- * Pairs a modal's open-state with its own dedicated action fetcher (B-17: never
- * share fetchers between mutations). Derives the busy flag, the intent-matched
- * error, and (by default) closes the modal once the action succeeds. Pass
- * `closeOnSuccess: false` when the caller drives its own post-success effect
- * (e.g. the re-inspection flow navigates instead of closing).
- */
-function useModalFetcher<I extends string>(
-  intent: I,
-  opts?: { closeOnSuccess?: boolean },
-) {
-  const closeOnSuccess = opts?.closeOnSuccess ?? true;
-  const [open, setOpen] = useState(false);
-  const fetcher = useFetcher<typeof action>();
-  const busy = fetcher.state !== "idle";
-  // "ok" in fetcher.data narrows away the People-editor intents (person-add /
-  // person-remove use their own dedicated fetchers, never this hook) and
-  // search-contacts, whose result shape carries no ok/error — those would
-  // otherwise widen the union `fetcher.data.ok` is read from.
-  const succeeded =
-    fetcher.state === "idle" &&
-    fetcher.data?.intent === intent &&
-    "ok" in fetcher.data &&
-    fetcher.data.ok;
-  const error =
-    fetcher.data?.intent === intent && "ok" in fetcher.data && !fetcher.data.ok
-      ? fetcher.data.error
-      : undefined;
-
-  useEffect(() => {
-    if (closeOnSuccess && open && succeeded) setOpen(false);
-  }, [closeOnSuccess, open, succeeded]);
-
-  return { open, setOpen, fetcher, busy, error, succeeded };
-}
-
-/* ------------------------------------------------------------------ */
-/*  Client SMS consent status + attestation (Track L)                 */
-/* ------------------------------------------------------------------ */
-
-function ClientSmsConsent({
-  consent,
-  fetcher,
-  attesting,
-}: {
-  consent: "granted" | "revoked" | "none";
-  fetcher: ReturnType<typeof useFetcher<typeof action>>;
-  attesting: boolean;
-}) {
-  const error =
-    fetcher.data?.intent === "attest-sms" && !fetcher.data.ok
-      ? fetcher.data.error
-      : undefined;
-
-  const label =
-    consent === "granted" ? m.inspections_hub_sms_granted() : consent === "revoked" ? m.inspections_hub_sms_revoked() : m.inspections_hub_sms_not_recorded();
-  const tone: PillTone =
-    consent === "granted" ? "sat" : consent === "revoked" ? "defect" : "neutral";
-
-  // A heading, because every other card on this page has one and without it this
-  // card read as a divider between two others. And a button rather than an 11px
-  // text link, because recording that a client agreed to be texted is a claim the
-  // operator stands behind — the weakest control on the page was carrying the
-  // page's only legal attestation.
-  return (
-    <div className="space-y-2">
-      <BlockHeading title={m.inspections_hub_sms_heading()} pill={{ tone, label }} />
-      {consent !== "granted" && (
-        <>
-          <p className="text-[12px] text-ih-fg-3">{m.inspections_hub_sms_explainer()}</p>
-          <fetcher.Form method="post">
-            <input type="hidden" name="intent" value="attest-sms" />
-            <Button type="submit" variant="secondary" size="sm" disabled={attesting}>
-              {attesting ? m.inspections_hub_sms_recording() : m.inspections_hub_sms_confirm()}
-            </Button>
-          </fetcher.Form>
-        </>
-      )}
-      {error && <p className="text-[12px] text-ih-bad-fg">{error}</p>}
-    </div>
-  );
-}
-
-/** Copies a public link to the clipboard with a transient "Copied" state. */
-function CopyLinkButton({ url }: { url: string }) {
-  const [copied, setCopied] = useState(false);
-  const onCopy = () => {
-    const absolute =
-      typeof window !== "undefined" ? `${window.location.origin}${url}` : url;
-    void navigator.clipboard?.writeText(absolute).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-  return (
-    <button
-      type="button"
-      onClick={onCopy}
-      className="inline-flex items-center justify-center font-bold rounded-md transition-all h-9 px-4 text-[13px] gap-2 bg-ih-bg-card border border-ih-border text-ih-fg-2 hover:bg-ih-bg-muted"
-    >
-      {copied ? m.inspections_hub_copied() : m.inspections_hub_copy_link()}
-    </button>
   );
 }
 

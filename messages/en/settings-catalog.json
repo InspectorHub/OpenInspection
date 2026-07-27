@@ -107,5 +107,16 @@
   "settings_schedule_myself": "Myself",
   "settings_booking_meta_title": "Online Booking - Settings - OpenInspection",
   "settings_booking_crumb": "Online Booking",
-  "settings_booking_intro": "Company booking policies and the embeddable widget."
+  "settings_booking_intro": "Company booking policies and the embeddable widget.",
+  "settings_inspection_report_link_heading": "Report link expiry",
+  "settings_inspection_report_link_help": "How long a client can open the report link you send them.",
+  "settings_inspection_report_link_future_only": "Changing this only affects links sent from now on. To change links already sent for one inspection, use the same control on its People card.",
+  "settings_inspection_report_link_bulk_help": "Changing the policy above only affects links issued from now on. To apply it to links that are already out there, use the action below — it names how many it will change.",
+  "settings_inspection_report_link_bulk_expire": "Expire {count} links",
+  "settings_inspection_report_link_bulk_expire_one": "Expire 1 link",
+  "settings_inspection_report_link_bulk_lift": "Lift expiry on {count} links",
+  "settings_inspection_report_link_bulk_lift_one": "Lift expiry on 1 link",
+  "settings_inspection_report_link_bulk_expire_confirm": "This re-dates {count} report links that work today. Anyone holding one keeps access only until the new expiry. Links that have already expired or been revoked stay closed.",
+  "settings_inspection_report_link_bulk_lift_confirm": "This removes the expiry from {count} report links that work today, so they stay open indefinitely. Links that have already expired or been revoked stay closed.",
+  "settings_inspection_report_link_bulk_done": "Updated {count} links."
 }

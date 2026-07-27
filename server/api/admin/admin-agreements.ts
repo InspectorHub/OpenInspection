@@ -9,8 +9,8 @@ import { createApiRouter } from '../../lib/openapi-router';
 import type * as schema from '../../lib/db/schema';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
-import { getBookingHost, resolveTenantSlug } from '../../lib/url';
-import { lookupSenderSignature, buildSignUrl } from '../../lib/signature-helpers';
+import { resolveTenantSlug } from '../../lib/url';
+import { lookupSenderSignature } from '../../lib/signature-helpers';
 import { getTenantId } from '../../lib/route-helpers';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
@@ -26,6 +26,7 @@ import { SigningKeyService } from '../../services/signing-key.service';
 import { AuditLogService } from '../../services/audit-log.service';
 import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from "../../lib/route-metadata-standards";
+import { emailSignersTheirLinks } from '../../lib/agreement-send';
 
 
 /**
@@ -264,20 +265,18 @@ const adminAgreementsRoutes = createApiRouter()
             logger.warn('audit.append.created.failed', { requestId: env.requestId, error: (e as Error).message });
         }
 
-        // Email each signer their own persistent link (per-signer token → per-signer URL).
-        for (const s of signerRows) {
-            let signUrl: string;
-            try {
-                const token = await svc.getSignerLink(tenantId, env.requestId, s.id);
-                signUrl = await buildSignUrl(c, tenantId, inspectionId, tenantSlug, token);
-            } catch (e) {
-                logger.warn('agreement.signer.link.failed', { signerId: s.id, error: (e as Error).message });
-                continue;
-            }
-            await c.var.services.email
-                .sendAgreementRequest(s.email, s.name, 'Agreement', signUrl, sigInspector, getBookingHost(c))
-                .catch((e: unknown) => logger.error('Failed to send agreement email', {}, e instanceof Error ? e : undefined));
-        }
+        // Email each signer their own persistent link (per-signer token →
+        // per-signer URL). Shared with the inspection-workspace send (IA-65) so
+        // the two cannot drift into mailing different links again.
+        await emailSignersTheirLinks(c, {
+            tenantId,
+            inspectionId,
+            tenantSlug,
+            requestId: env.requestId,
+            agreementName: 'Agreement',
+            senderSignature: sigInspector,
+            signers: signerRows,
+        });
 
         try {
             await c.var.services.auditLog.append(tenantId, env.requestId, 'request.sent', {

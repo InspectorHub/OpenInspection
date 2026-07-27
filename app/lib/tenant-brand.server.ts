@@ -25,6 +25,8 @@ export async function resolveTenantBrand(
       primaryColor: d?.primaryColor ?? null,
       logoUrl: d?.logoUrl ?? null,
       defaultTimezone: d?.defaultTimezone ?? "UTC",
+      supportEmail: d?.supportEmail ?? null,
+      companyPhone: d?.companyPhone ?? null,
     };
   } catch {
     return { ...EMPTY_BRAND, companyName: fallbackName };

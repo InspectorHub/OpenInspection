@@ -138,8 +138,31 @@ describe('POST .../lists/:rrId/items — add item', () => {
             defectTitle: null,
             location: null,
             category: null,
+            trade: null,
             commentSnapshot: null,
         });
+    });
+
+    // IA-57 — the trade snapshot must survive the add-item hop; without it the
+    // public share page has no "who fixes this" column to render.
+    it('forwards the trade snapshot to the service when the body carries one', async () => {
+        const addItem = vi.fn().mockResolvedValue({ id: 'item-new' });
+        const assertCanEdit = vi.fn().mockResolvedValue(undefined);
+        const { app } = buildApp({
+            portalTokenRow: VALID_TOKEN_ROW,
+            services: makeServices({ portalAccessResolveToken: vi.fn().mockResolvedValue(VALID_TOKEN_ROW), addItem, assertCanEdit }),
+            dbFactory: makeGatePassDb,
+        });
+
+        const res = await app.request('/api/public/repair-builder/t1/insp1/lists/rr1/items?token=tok1', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...ITEM_BODY, trade: 'licensed roofer' }),
+        });
+        expect(res.status).toBe(200);
+        expect(addItem).toHaveBeenCalledWith('t1', 'rr1', expect.objectContaining({
+            trade: 'licensed roofer',
+        }));
     });
 
     it('403 FORBIDDEN when assertCanEdit throws (not the creator)', async () => {

@@ -1,5 +1,5 @@
 import type { useFetcher } from "react-router";
-import { Card } from "@core/shared-ui";
+import { Card, Button } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { lifecycleState } from "~/lib/hub-blocks";
 import { humanizeStatus, statusTone } from "~/lib/status";
@@ -36,15 +36,16 @@ export function LifecycleCard({
             {state === "actionable" ? (
                 <>
                     <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_lifecycle_hint()}</p>
+                    {/* Secondary, and the shared Button rather than a hand-rolled
+                        one. As a solid primary it was the loudest control on the
+                        page while being, by its own contract above, advisory and
+                        never a precondition — it outranked Publish report, which
+                        is the irreversible one. */}
                     <fetcher.Form method="post">
                         <input type="hidden" name="intent" value="complete" />
-                        <button
-                            type="submit"
-                            disabled={marking}
-                            className="px-3 py-1.5 rounded-md bg-ih-primary text-ih-fg-inverse text-[12px] font-bold hover:bg-ih-primary-600 disabled:opacity-60"
-                        >
+                        <Button type="submit" variant="secondary" size="sm" disabled={marking}>
                             {marking ? m.inspections_hub_lifecycle_marking() : m.inspections_hub_lifecycle_mark_complete()}
-                        </button>
+                        </Button>
                     </fetcher.Form>
                 </>
             ) : (

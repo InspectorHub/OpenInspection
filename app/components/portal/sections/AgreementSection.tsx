@@ -33,22 +33,22 @@ import {
   EMPTY_ON_BEHALF,
   type OnBehalfValue,
 } from "~/components/agreements/OnBehalfFields";
+// Type-only — erased at build, so no server module reaches the client bundle.
+import type { z } from "@hono/zod-openapi";
+import type { PublicAgreementBodySchema } from "../../../../server/lib/validations/agreement-public.schema";
 
-type SignerStatus = "pending" | "sent" | "viewed" | "signed" | "declined" | "expired";
-
-/** Wire shape of GET /api/public/agreements/:token (Track I-a multi-signer). */
-export interface AgreementData {
-  status: SignerStatus;
-  /** Stable envelope id — the public `/verify/:envelopeId` page identifier.
-   *  Surfaced as the tamper-evident receipt link once this signer has signed. */
-  envelopeId?: string | null;
-  clientName: string | null;
-  agreementName: string;
-  agreementContent: string;
-  signer: { name: string; role: "client" | "co_client" | "agent" | "other"; status: SignerStatus };
-  progress: { signed: number; total: number };
-  completionPolicy: "all" | "one";
-}
+/**
+ * Wire shape of GET /api/public/agreements/:token (Track I-a multi-signer),
+ * DERIVED from the route's own schema rather than hand-copied — a mirror of a
+ * wire payload sits on a boundary nothing type-checks, so it rots silently.
+ *
+ * `envelopeId` is widened to optional/nullable here on purpose: the section is
+ * also fed by cached/partial loader payloads that predate the field, and the
+ * component already renders the receipt link only when it is present.
+ */
+export type AgreementData =
+  Omit<z.infer<typeof PublicAgreementBodySchema>, "envelopeId">
+  & { envelopeId?: string | null };
 
 type ActionResult = { ok?: boolean; intent?: string; error?: string };
 

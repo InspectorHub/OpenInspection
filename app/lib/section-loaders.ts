@@ -29,6 +29,9 @@ import type {
 import type { AgreementData } from "~/components/portal/sections/AgreementSection";
 import type { InvoiceData } from "~/components/portal/sections/PaymentSection";
 import type { TenantBrand } from "~/lib/brand";
+// Type-only — erased at build, so no server module reaches the client bundle.
+import type { z } from "@hono/zod-openapi";
+import type { PublicInvoiceBodySchema } from "../../server/lib/validations/invoice.schema";
 import type { LoadContext } from "~/lib/load-context";
 
 /* ------------------------------------------------------------------ */
@@ -108,6 +111,7 @@ export async function loadReportSection(
       brand,
       error: res.ok ? null : m.helper_section_report_not_found(),
       notPublished: (res.status as number) === 403,
+      linkInactive: (res.status as number) === 410,
       styleProfile: raw?.styleProfile as ReportLoaderResult["styleProfile"],
       inspectorCredentials: raw?.inspectorCredentials as ReportLoaderResult["inspectorCredentials"],
       initialFilter,
@@ -154,6 +158,7 @@ export async function loadReportSection(
       brand: EMPTY_BRAND,
       error: m.helper_section_service_unavailable(),
       notPublished: false,
+      linkInactive: false,
       initialFilter,
       printMode,
       tocPages: undefined,
@@ -280,8 +285,12 @@ export async function loadRepairSection(
 
 /* ------------------------------------------------------------------ */
 /* Payment section data — mirrors the standalone invoice loader mapping.
- * The pay flow is keyed by INSPECTION ID (pay-intent + invoice both by id),
- * so no per-inspection token is required here. */
+ * IA-34: the invoice endpoint is gated by resolveClientActor, so this forwards
+ * the Hub's per-inspection portal token (ctx.token — the server-issued
+ * persistent token, or the email-CTA ?token=). The token is also handed to
+ * <PaymentSection> so the browser's pay-intent call authenticates the same way.
+ * Agent-kind tokens never reach here: the Hub loader forces section="report"
+ * for them, and the endpoint would refuse an agent grant anyway. */
 /* ------------------------------------------------------------------ */
 
 export interface InvoiceLoaderResult {
@@ -290,26 +299,35 @@ export interface InvoiceLoaderResult {
   error: string | null;
 }
 
-/** Wire shape of GET /api/public/inspections/:id/invoice (cents + ISO dates + brand). */
-interface RawInvoice {
-  id: string;
-  amountCents: number;
-  currency?: string;
-  status: string;
-  createdAt?: string | null;
-  dueDate?: string | null;
-  clientName?: string | null;
-  lineItems?: { description: string; amountCents: number }[];
-  brand?: TenantBrand;
-}
+/**
+ * Wire shape of GET /api/public/inspections/:id/invoice, DERIVED from the route's
+ * own schema — one declaration, shared by both callers (the Hub's payment section
+ * below and the standalone `/invoice/:id` page).
+ *
+ * It used to be two hand-written copies, and they had already drifted:
+ * `tenantSlug` was added to the server schema and to the standalone page's copy
+ * but not to this one. Nothing catches that — a hand-written mirror of a wire
+ * payload sits on a boundary no type-checker spans. Now it does.
+ */
+export type RawInvoice = z.infer<typeof PublicInvoiceBodySchema>;
 
 export async function loadInvoiceSection(
   context: LoadContext,
   inspectionId: string,
+  token: string,
+  cookie: string,
 ): Promise<InvoiceLoaderResult> {
   try {
     const api = createApi(context);
-    const res = await api.publicReport.inspections[":id"].invoice.$get({ param: { id: inspectionId } });
+    // BOTH credentials the gate accepts. The per-inspection token is normally
+    // present, but the overview endpoint issues it best-effort, so a
+    // magic-link session that momentarily has no token still authenticates via
+    // the forwarded portal-session cookie (the typed client does not forward
+    // the browser cookie on its own — mirrors the documents section).
+    const res = await api.publicReport.inspections[":id"].invoice.$get(
+      { param: { id: inspectionId }, query: token ? { token } : {} },
+      { headers: { Cookie: cookie } },
+    );
     const body = res.ok ? await res.json() : {};
     const d = ((body as Record<string, unknown>).data ?? null) as RawInvoice | null;
     const invoice: InvoiceData | null = d

@@ -214,14 +214,22 @@ export function EditorHeader({
      widths reach it through the mobile Theme drawer. */}
  <ThemeSegmentControl className="hidden xl:flex" />
 
- {/* Settings button */}
- <IconButton
+ {/* Report settings — a labelled button, not a bare gear.
+     IA-87 ③ / IA-88 ⑤: this was the only unlabelled icon in a row of text
+     buttons, and it was the sole entry point to per-inspection report
+     settings, so the most important control in the header was also the
+     least discoverable. The label collapses on narrow widths (where its
+     text-button neighbours hide entirely) but the button itself never
+     does — nothing else opens this sheet. */}
+ <Button
+  variant="secondary"
+  size="md"
   aria-label={m.editor_header_settings()}
   onClick={() => state.setSettingsOpen(true)}
   title={m.editor_header_settings()}
- >
+  icon={
   <svg
-  className="w-4 h-4"
+  className="w-3.5 h-3.5"
   fill="none"
   stroke="currentColor"
   viewBox="0 0 24 24"
@@ -239,7 +247,10 @@ export function EditorHeader({
    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
   />
   </svg>
- </IconButton>
+  }
+ >
+  <span className="hidden lg:inline">{m.editor_header_settings()}</span>
+ </Button>
 
  {/* Template menu [config] — global template actions consolidated here
      (swap template · save as new · update source), replacing the buttons

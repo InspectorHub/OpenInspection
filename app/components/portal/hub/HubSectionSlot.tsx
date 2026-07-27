@@ -143,6 +143,11 @@ export function HubSectionSlot({
         invoice={invoice.invoice}
         brand={invoice.brand}
         inspectionId={inspectionId}
+        // IA-34 — the browser's pay-intent call is gated the same way the
+        // loader's invoice fetch is. Inside the Hub the portal-session cookie
+        // would also do, but the token keeps the email-CTA arrival (which has
+        // no cookie yet on a first paint) working identically.
+        portalToken={token}
         error={invoice.error}
         justPaid={justPaid}
       />

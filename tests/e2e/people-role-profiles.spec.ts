@@ -141,7 +141,7 @@ test.describe.serial('People / Role Profiles (Plan 1B)', () => {
     await expect(page.getByText(SEARCH_CONTACT_OTHER.name)).toBeVisible();
   });
 
-  test('Step 4: a second Client-role add is blocked by the primary-client conflict', async ({ page }) => {
+  test('Step 4: a second Client-role add hands the primary seat over instead of refusing', async ({ page }) => {
     await page.goto(`/inspections/${inspectionId}`);
     await expect(page.getByRole('heading', { name: 'People', exact: true })).toBeVisible();
 
@@ -153,23 +153,28 @@ test.describe.serial('People / Role Profiles (Plan 1B)', () => {
     await expect(page.getByText('Editor Seed Client')).toBeVisible();
     await expect(page.getByText('Primary', { exact: true })).toBeVisible();
 
-    // Adding ANOTHER contact under "Client" is therefore already the SECOND
-    // primary-client add — the server's single-primary-client guard
-    // (PeopleService.addPerson) 409s; the modal surfaces the message and
-    // stays open (no silent success).
+    // IA-36 ⑬ — this used to 409 ("an inspection already has a primary
+    // client"). It no longer does. "Exactly one primary client" is now upheld
+    // by MOVING the seat rather than by refusing the add: the incumbent is not
+    // wrong to be there, they are simply no longer the primary contact, and a
+    // refusal made the operator delete-and-re-add to express that.
     await page.getByRole('button', { name: 'Add person', exact: true }).click();
     await selectContactInAddPersonModal(page, SEARCH_CONTACT_CLIENT.name, 'Client');
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('button', { name: 'Add', exact: true }).click();
 
-    await expect(
-      dialog.getByText('An inspection already has a primary client; use co_client for a second buyer.'),
-    ).toBeVisible({ timeout: 10000 });
-    // Blocked, not silently accepted: the modal is still open (its own
-    // "selected contact" chip is plain text, not a link) and the rejected
-    // contact never joins the people list — PeopleEditor only renders an
-    // ADDED person's name as a link to /contacts/:id.
-    await expect(dialog).toBeVisible();
-    await expect(page.getByRole('link', { name: SEARCH_CONTACT_CLIENT.name })).toHaveCount(0);
+    // Accepted: the modal closes and the new contact joins the list. (Only an
+    // ADDED person's name renders as a link to /contacts/:id, so the link is
+    // the proof they are really on the inspection.)
+    await expect(dialog).toBeHidden({ timeout: 10000 });
+    await expect(page.getByRole('link', { name: SEARCH_CONTACT_CLIENT.name })).toBeVisible();
+
+    // The seat moved rather than duplicating: exactly one Primary badge, and
+    // it is not on the incumbent any more.
+    await expect(page.getByText('Primary', { exact: true })).toHaveCount(1);
+    // The incumbent stayed on the inspection, demoted to the company's
+    // co-client role — losing the seat must not mean losing access.
+    await expect(page.getByText('Editor Seed Client')).toBeVisible();
+    await expect(page.getByText('Co-Client', { exact: true })).toBeVisible();
   });
 });

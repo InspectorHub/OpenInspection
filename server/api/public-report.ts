@@ -3,13 +3,14 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import type { HonoConfig } from '../types/hono';
-import { inspections } from '../lib/db/schema';
+import { inspections, tenants } from '../lib/db/schema';
 import { verifyRenderToken } from '../lib/render-token';
 import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
-import { resolvePortalAccess, resolveObserverAccess, resolveOwnerPreview } from '../lib/public-access';
+import { resolvePortalAccess, resolveObserverAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
+import { resolveClientActor } from '../lib/portal-client-actor';
 // Re-export so existing callers that import resolveOwnerPreviewToken from this
 // module (e.g. tests) continue to work without changes.
 export { resolveOwnerPreviewToken } from '../lib/public-access';
@@ -20,7 +21,8 @@ import { buildRenderReportUrl } from '../lib/public-urls';
 import { getBookingHost } from '../lib/url';
 import { publicReportAccessAllowed } from '../lib/report-access';
 import publicVerifyRoutes from './public/verify';
-import publicInspectorProfileRoutes, { PublicBrandSchema } from './public/inspector-profile';
+import publicInspectorProfileRoutes from './public/inspector-profile';
+import { PublicInvoiceBodySchema } from '../lib/validations/invoice.schema';
 
 /**
  * Render-token access path for headless PDF generation. The Cloudflare Browser
@@ -84,10 +86,11 @@ const reportRoute = createRoute(withMcpMetadata({
     },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(ReportDataResponseSchema) } }, description: 'Report data' },
-        404: { description: 'Not found or token invalid/expired' },
+        404: { description: 'Not found, or the token names nothing' },
+        410: { description: 'The link was valid but has expired or been revoked (IA-36 ⑨) — code REPORT_LINK_EXPIRED / REPORT_LINK_REVOKED' },
     },
     operationId: 'getPublicReport',
-    description: 'Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing/expired/revoked or does not match the requested inspection.',
+    description: 'Public, no-login report data resolved via a persistent portal token (Spectora-style tokenized link). 404 when the token is missing or names nothing; 410 when a real link has expired or been revoked, so the page can explain what happened instead of showing a not-found.',
 }, { scopes: [], tier: 'extended' }));
 
 // A-9 — Public token-scoped photo serve for the no-login report viewer. Mirrors
@@ -149,34 +152,39 @@ const reportPdfDownloadRoute = createRoute(withMcpMetadata({
     description: 'Public, no-login report PDF resolved via a persistent portal token. Renders on demand and caches by version (published reports = immutable archive). 404 when the token is missing/expired/revoked or does not match the inspection.',
 }, { scopes: [], tier: 'extended' }));
 
-// Public invoice for the report-gate "Pay invoice" CTA (by inspection id;
-// tenant resolves from slug). The id is unguessable; tenant-scoped query.
-const PublicInvoiceSchema = z.object({
-    id: z.string(),
-    amountCents: z.number(),
-    // Phase B — the invoice's snapshot currency (ISO 4217); the pay page renders
-    // this, not the tenant's live setting, so history stays self-describing.
-    currency: z.string().optional(),
-    status: z.string(),
-    createdAt: z.string().nullable().optional(),
-    dueDate: z.string().nullable().optional(),
-    clientName: z.string().nullable().optional(),
-    lineItems: z.array(z.object({ description: z.string(), amountCents: z.number() })).optional(),
-    brand: PublicBrandSchema.optional(),
-}).nullable();
+/**
+ * IA-34 — the invoice + pay-intent pair is gated by `resolveClientActor`, the
+ * SAME guard the client documents/messages routes use: a live per-recipient
+ * portal `?token=` for THIS inspection, or the `__Host-portal_session` cookie,
+ * and only for `client` / `co_client` role kinds. The inspection id is an
+ * identifier, never a credential — a bare id now 401s on both routes.
+ *
+ * The actor's tenantId is AUTHORITATIVE (it comes off the token/grant row).
+ * The tenant-by-inspection-id router still resolves a tenant for these paths
+ * (that is what loads the tenant's own Stripe keys into `c.env`), so the
+ * pay-intent handler asserts the two agree before charging anything.
+ */
+// Shape lives in validations/invoice.schema.ts — both public pay surfaces in
+// `app/` derive their wire type from it, and `app/` may only import server/lib.
+const PublicInvoiceSchema = PublicInvoiceBodySchema.nullable();
 
 const invoiceRoute = createRoute(withMcpMetadata({
     method: 'get',
     path: '/inspections/{id}/invoice',
     tags: ['public'],
     summary: 'Public invoice for an inspection (pay-link landing)',
-    request: { params: z.object({ id: z.string().describe('Inspection id the invoice belongs to.') }) },
+    request: {
+        params: z.object({ id: z.string().describe('Inspection id the invoice belongs to.') }),
+        query: z.object({
+            token: z.string().optional().describe('Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead).'),
+        }),
+    },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(PublicInvoiceSchema) } }, description: 'Invoice (or null if none)' },
-        404: { description: 'Tenant not resolved' },
+        401: { description: 'No live client/co_client grant for this inspection' },
     },
     operationId: 'getPublicInvoice',
-    description: 'Public, no-login invoice for an inspection (the unguessable id is the key). Tenant resolved from slug; tenant-scoped query.',
+    description: "Public, no-login invoice for an inspection, gated by the recipient's portal token (?token=) or the unified-portal session cookie. Only client/co_client grants are accepted; tenantId comes from the resolved grant, never the URL.",
 }, { scopes: [], tier: 'extended' }));
 
 // Public Stripe PaymentIntent mint for the invoice pay-panel (bring-your-own-keys:
@@ -194,15 +202,21 @@ const payIntentRoute = createRoute(withMcpMetadata({
     path: '/inspections/{id}/pay-intent',
     tags: ['public'],
     summary: 'Start a Stripe card payment for an inspection invoice',
-    request: { params: z.object({ id: z.string().describe('Inspection id the invoice belongs to.') }) },
+    request: {
+        params: z.object({ id: z.string().describe('Inspection id the invoice belongs to.') }),
+        query: z.object({
+            token: z.string().optional().describe('Persistent per-recipient portal access token (or present the __Host-portal_session cookie instead).'),
+        }),
+    },
     responses: {
         200: { content: { 'application/json': { schema: createApiResponseSchema(PayIntentSchema) } }, description: 'PaymentIntent client secret + publishable key' },
-        404: { description: 'Tenant or invoice not found' },
+        401: { description: 'No live client/co_client grant for this inspection' },
+        404: { description: 'Invoice not found' },
         409: { description: 'Invoice is not payable (already paid / $0)' },
         503: { description: 'Stripe is not configured for this tenant, or the charge could not be started' },
     },
     operationId: 'createPublicPayIntent',
-    description: "Mints a Stripe PaymentIntent for the inspection's invoice using the tenant's own Stripe keys. Public — the unguessable inspection id is the key; tenant resolved from slug.",
+    description: "Mints a Stripe PaymentIntent for the inspection's invoice using the tenant's own Stripe keys. Gated by the recipient's portal token (?token=) or the unified-portal session cookie — client/co_client grants only.",
 }, { scopes: [], tier: 'extended' }));
 
 // Public live-observer view (③-A.4). Gated by an OBSERVER-link token (distinct
@@ -302,6 +316,22 @@ const publicReportRoutes = createApiRouter()
         let ownerPreview = false;
         if (!tenantId) { tenantId = await resolveOwnerPreview(c); ownerPreview = !!tenantId; }
         if (!tenantId) {
+            // IA-36 ⑨ — distinguish "this link was taken offline" from "this link
+            // never existed". The recipient was invited by us and the link died by
+            // our policy, so they get a page that says so instead of a 404 that
+            // implies they mistyped something. Only reached AFTER access was
+            // already refused, and only for a token whose secret the caller is
+            // already holding — a guessed token still gets the flat 404.
+            const state = await classifyPortalAccess(c.var.services.portalAccess, token, id);
+            if (state === 'expired' || state === 'revoked') {
+                return c.json({
+                    success: false as const,
+                    error: {
+                        code: state === 'expired' ? 'REPORT_LINK_EXPIRED' : 'REPORT_LINK_REVOKED',
+                        message: 'This report link is no longer active.',
+                    },
+                }, 410);
+            }
             return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Report not found' } }, 404);
         }
         // Publish gate: client/token access is revoked while the report is not
@@ -428,19 +458,65 @@ const publicReportRoutes = createApiRouter()
     .route('/', publicInspectorProfileRoutes)
     .openapi(invoiceRoute, async (c) => {
         const { id } = c.req.valid('param');
-        const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
-        if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+        // IA-34 — client/co_client grant required (?token= or portal session).
+        const actor = await resolveClientActor(c, id);
+        if (!actor) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'Not authorized for this inspection' } }, 401);
+        const tenantId = actor.tenantId;
         const inv = await c.var.services.invoice.findByInspectionId(tenantId, id);
         if (!inv) return c.json({ success: true as const, data: null }, 200);
         // A-10 — ship the tenant brand with the invoice so the public pay page
         // renders the inspector's branding (no tenant slug in /invoice/:id URLs).
         const brand = await c.var.services.branding.getBrand(tenantId);
-        return c.json({ success: true as const, data: { ...inv, brand } }, 200);
+        // IA-44 — and the slug, so the page can hand off to the slug-keyed Hub
+        // once payment succeeds.
+        const tenantRow = await drizzle(c.env.DB).select({ slug: tenants.slug })
+            .from(tenants).where(eq(tenants.id, tenantId)).get();
+        // IA-86 — project through the declared shape instead of spreading the
+        // row. `PublicInvoiceBodySchema` always described what a payer may see,
+        // but hono/zod-openapi does not validate or trim RESPONSES, so the
+        // declaration was decorative and the row shipped whole: `notes` (the
+        // inspector's private remark), `qboSyncStatus`, `tenantId`, `contactId`,
+        // `clientEmail`. Parsing here makes the declaration load-bearing —
+        // zod strips anything undeclared, so a column added later cannot leak by
+        // default. Same failure IA-33 fixed on the report endpoint.
+        // The two nested shapes are normalized first. A legacy/imported line
+        // item with a missing description, or a brand that gains a field the
+        // branding service does not yet return, would make `.parse()` THROW —
+        // and trading an information leak for a 500 on the pay page is not a
+        // fix. Every other declared field is a plain string/number from the
+        // invoice row (createdAt goes through safeISODate).
+        //
+        // `brand` in particular crosses a service boundary, so its shape is not
+        // this file's to guarantee: name the fields the payer's page needs and
+        // let anything else fall away, rather than trusting the whole object.
+        const lineItems = (inv.lineItems ?? []).map((li) => ({
+            description: String(li?.description ?? ''),
+            amountCents: Number(li?.amountCents ?? 0),
+        }));
+        const brandView = {
+            companyName: brand?.companyName ?? null,
+            primaryColor: brand?.primaryColor ?? null,
+            logoUrl: brand?.logoUrl ?? null,
+            defaultTimezone: brand?.defaultTimezone ?? 'UTC',
+            supportEmail: brand?.supportEmail ?? null,
+            companyPhone: brand?.companyPhone ?? null,
+        };
+        const view = PublicInvoiceBodySchema.parse({ ...inv, lineItems, brand: brandView, tenantSlug: tenantRow?.slug ?? null });
+        return c.json({ success: true as const, data: view }, 200);
     })
     .openapi(payIntentRoute, async (c) => {
         const { id } = c.req.valid('param');
-        const tenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
-        if (!tenantId) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Not found' } }, 404);
+        // IA-34 — client/co_client grant required (?token= or portal session).
+        const actor = await resolveClientActor(c, id);
+        if (!actor) return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'Not authorized for this inspection' } }, 401);
+        const tenantId = actor.tenantId;
+        // The Stripe keys in c.env were injected for the ROUTED tenant. Both
+        // resolve from the same inspection, so a mismatch means the routing and
+        // the grant disagree — refuse rather than charge with foreign keys.
+        const routedTenantId = (c.get('resolvedTenantId') || c.get('tenantId')) as string | null;
+        if (routedTenantId && routedTenantId !== tenantId) {
+            return c.json({ success: false as const, error: { code: 'UNAUTHORIZED', message: 'Not authorized for this inspection' } }, 401);
+        }
 
         // Bring-your-own-keys: the tenant's Stripe secret + publishable key are
         // merged into c.env from their encrypted secrets. No keys → graceful 503

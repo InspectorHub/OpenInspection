@@ -278,7 +278,14 @@ const invoiceRoutes = createApiRouter()
 
         // Build the public pay URL exactly like the agreement send path's host
         // resolution; `/invoice/:id` is keyed by inspection id (no slug).
-        const payUrl = paymentUrl(getBookingHost(c), inspectionId);
+        // IA-34 — the pay page and its pay-intent endpoint require a live
+        // client grant, so mint (idempotently) the recipient's persistent
+        // portal token and carry it on the link. Re-sends reuse the same token,
+        // so older copies of the email keep working.
+        const payToken = await c.var.services.portalAccess.issueToken({
+            tenantId, inspectionId, recipientEmail: clientEmail, role: 'client',
+        });
+        const payUrl = paymentUrl(getBookingHost(c), inspectionId, payToken);
         // Format the amount in the RECIPIENT's locale (external client, no user row,
         // so the tenant default locale) but in the INVOICE's snapshot currency (Phase B).
         const cfg = await db.select({ defaultLocale: tenantConfigs.defaultLocale })
