@@ -153,11 +153,14 @@ export const InspectionHubSchema = z.object({
     name: z.string().describe('Agreement template name'),
   })).describe("Tenant's agreement templates (for a send-agreement dropdown)"),
   agreementRequests: z.array(z.object({
-    id:          z.string().describe('agreement_requests row id'),
-    status:      z.string().describe('pending | sent | viewed | signed | declined | expired'),
-    clientEmail: z.string().describe('Recipient email'),
-    signedAt:    z.string().nullable().describe('ISO sign timestamp, null until signed'),
-    createdAt:   z.string().nullable().describe('ISO creation timestamp'),
+    id:            z.string().describe('agreement_requests row id'),
+    status:        z.string().describe('pending | sent | viewed | signed | declined | expired'),
+    clientEmail:   z.string().describe('Recipient email'),
+    signedAt:      z.string().nullable().describe('ISO sign timestamp, null until signed'),
+    createdAt:     z.string().nullable().describe('ISO creation timestamp'),
+    agreementName: z.string().nullable().describe('Name of the agreement template this envelope was sent from'),
+    signersTotal:  z.number().describe('How many signers the envelope has'),
+    signersSigned: z.number().describe('How many of them have signed'),
   })).describe('Agreement requests for this inspection, newest first'),
   invoice: z.object({
     id:         z.string().describe('Invoice id'),
@@ -181,8 +184,15 @@ export const InspectionHubResponseSchema = createApiResponseSchema(InspectionHub
 
 /**
  * Task 7 (Issue #111) — body for POST /api/inspections/:id/agreement-requests.
- * Both fields optional: agreementId defaults to the tenant's first agreement
- * template, email defaults to the inspection's clientEmail.
+ * Every field optional: agreementId defaults to the tenant's first agreement
+ * template, and the recipient defaults to the inspection's primary client.
+ *
+ * IA-65 — `signers` carries the multi-party set the inspection workspace now
+ * sends (name + email + role, plus a completion policy). `email` is the older
+ * single-recipient shorthand and is still accepted; when both are given the
+ * explicit signer list wins. Multi-signer sending used to be reachable only
+ * from the tenant-wide Library page, which meant an inspector — who may send
+ * agreements but is not an admin — could only ever send to one person.
  */
 export const SendAgreementRequestSchema = z.object({
   // Canonical UUID: agreements.id is always crypto.randomUUID() in production
@@ -190,15 +200,25 @@ export const SendAgreementRequestSchema = z.object({
   // never as the agreements PK). Pre-launch we enforce the canonical format rather
   // than tolerate non-UUID ids — only test seeds were ever non-UUID.
   agreementId: z.string().uuid().optional().describe('Agreement template id; defaults to the tenant first agreement'),
-  email: z.string().email().optional().describe('Recipient email; defaults to inspection.clientEmail'),
+  email: z.string().email().optional().describe('Single recipient email; defaults to the inspection primary client. Ignored when `signers` is present.'),
+  signers: z.array(z.object({
+    name: z.string().min(1).max(200).describe('Signer display name'),
+    email: z.string().email().describe('Signer email; each signer gets their own private signing link'),
+    role: z.enum(['client', 'co_client', 'agent', 'other']).optional().describe('Signer role on this inspection; defaults to client'),
+  })).min(1).max(10).optional().describe('Multi-party signer set. Signers already on the live envelope are left untouched; new ones are added to it.'),
+  completionPolicy: z.enum(['all', 'one']).optional().describe("'all' = every signer must sign; 'one' = the first signature completes the envelope"),
 }).openapi('SendAgreementRequest');
 
 export const AgreementRequestCreatedSchema = createApiResponseSchema(
   z.object({
     id:          z.string().describe('agreement_requests row id'),
     status:      z.string().describe('Request status (sent)'),
-    clientEmail: z.string().describe('Recipient email'),
+    clientEmail: z.string().describe('First signer email (the envelope recipient)'),
     createdAt:   z.string().nullable().describe('ISO creation timestamp'),
+    // IA-65 — a send against a live envelope reports what it actually changed,
+    // so a caller can tell "added two co-signers" from "re-sent to the same one".
+    signerCount:  z.number().describe('Total signers on the envelope after this send'),
+    addedSigners: z.number().describe('How many signers this send added to an existing envelope (0 for a fresh envelope)'),
   }),
 ).openapi('AgreementRequestCreatedResponse');
 

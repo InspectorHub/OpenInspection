@@ -32,6 +32,7 @@
   "inspections_list_load_more": "Load more",
   "inspections_hub_meta_title": "Inspection - OpenInspection",
   "inspections_hub_error_send_agreement": "Could not send the agreement. Please try again.",
+  "inspections_hub_error_inspector_sign": "Could not save your signature. Please try again.",
   "inspections_hub_error_request_payment": "Could not request payment. Please try again.",
   "inspections_hub_error_attest_sms": "Could not record consent. Please try again.",
   "inspections_hub_error_publish": "Could not publish the report. Please try again.",

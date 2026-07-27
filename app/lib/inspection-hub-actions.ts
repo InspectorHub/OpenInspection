@@ -157,6 +157,65 @@ export async function handleReportLinkExpiry(
   return toActionResult(res, "report-link-expiry", m.inspections_hub_error_link_expiry());
 }
 
+/* ------------------------------------------------------------------ */
+/*  IA-65 — signing-request intents                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * `send-agreement` — send this inspection's agreement to one or more parties.
+ *
+ * Malformed signer JSON is rejected here rather than posted: the endpoint reads
+ * an absent list as "no signers given" and falls back to the primary client, so
+ * a serialization bug would silently mail the wrong (smaller) set of people
+ * while reporting success.
+ */
+export async function handleSendAgreement(
+  api: Api,
+  inspectionId: string,
+  formData: FormData,
+): Promise<{ ok: boolean; intent: "send-agreement"; error: string | undefined }> {
+  const agreementId = String(formData.get("agreementId") || "").trim();
+  const rawSigners = String(formData.get("signers") || "").trim();
+  let signers: Array<{ name: string; email: string; role?: "client" | "co_client" | "agent" | "other" }> = [];
+  if (rawSigners) {
+    try {
+      signers = JSON.parse(rawSigners) as typeof signers;
+    } catch {
+      return { ok: false, intent: "send-agreement", error: m.inspections_hub_error_send_agreement() };
+    }
+  }
+  const completionPolicy = formData.get("completionPolicy") === "one" ? "one" : "all";
+  const res = await api.inspections[":id"]["agreement-requests"].$post({
+    param: { id: inspectionId },
+    json: {
+      ...(agreementId ? { agreementId } : {}),
+      ...(signers.length > 0 ? { signers, completionPolicy } : {}),
+    },
+  });
+  return toActionResult(res, "send-agreement", m.inspections_hub_error_send_agreement());
+}
+
+/**
+ * `inspector-sign` — the envelope-level signature an inspector applies before
+ * the client sees the agreement. Moved onto the inspection with the rest of
+ * signer management (IA-65); the endpoint admits inspectors, not just admins.
+ */
+export async function handleInspectorSign(
+  api: Api,
+  formData: FormData,
+): Promise<{ ok: boolean; intent: "inspector-sign"; error: string | undefined }> {
+  const envelopeId = String(formData.get("envelopeId") || "").trim();
+  const signatureBase64 = String(formData.get("signatureBase64") || "").trim();
+  if (!envelopeId || !signatureBase64) {
+    return { ok: false, intent: "inspector-sign", error: m.inspections_hub_error_inspector_sign() };
+  }
+  const res = await api.admin["agreement-requests"][":id"]["inspector-sign"].$post({
+    param: { id: envelopeId },
+    json: { signatureBase64 },
+  });
+  return toActionResult(res, "inspector-sign", m.inspections_hub_error_inspector_sign());
+}
+
 /**
  * `search-contacts` — AddPersonModal's contact typeahead, mirroring
  * "search-agents" in inspections.tsx (BFF pattern: no client-side fetch).

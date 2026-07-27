@@ -48,7 +48,7 @@
   "library_tags_col_actions": "Actions",
   "library_agreements_meta_title": "Agreements - OpenInspection",
   "library_agreements_heading": "Agreements",
-  "library_agreements_meta": "{templates} templates · {requests} requests",
+  "library_agreements_meta_templates": "{templates} templates",
   "library_agreements_new": "+ New agreement",
   "library_agreements_tab_templates": "Templates",
   "library_agreements_tab_signing": "Signing",

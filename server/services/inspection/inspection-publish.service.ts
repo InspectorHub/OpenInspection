@@ -1,5 +1,5 @@
-import { eq, and, desc } from 'drizzle-orm';
-import { inspections, inspectionResults, templates, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, invoices } from '../../lib/db/schema';
+import { eq, and, desc, inArray } from 'drizzle-orm';
+import { inspections, inspectionResults, templates, users, tenantConfigs, tenants, inspectionServices, agreements, agreementRequests, agreementSigners, invoices } from '../../lib/db/schema';
 import { Errors } from '../../lib/errors';
 import { safeISODate } from '../../lib/date';
 import { resolveLocale } from '../../lib/locale';
@@ -266,6 +266,9 @@ export class InspectionPublishService extends InspectionSubService {
             clientEmail: string;
             signedAt: string | null;
             createdAt: string | null;
+            agreementName: string | null;
+            signersTotal: number;
+            signersSigned: number;
         }>;
         invoice: { id: string; status: string; amountCents: number; sentAt: string | null; paidAt: string | null } | null;
         publishReadiness: { ready: boolean; blockingCount: number };
@@ -299,20 +302,45 @@ export class InspectionPublishService extends InspectionSubService {
             .orderBy(desc(agreements.createdAt))
             .all();
 
-        // Agreement requests for this inspection, newest first.
+        // Agreement requests for this inspection, newest first. IA-65 — the hub
+        // now owns signer management, so each envelope arrives with the template
+        // name it was sent from and its signing progress. Both were previously
+        // reachable only from the tenant-wide Library page.
         const requestRows = await db.select({
-            id:          agreementRequests.id,
-            status:      agreementRequests.status,
-            clientEmail: agreementRequests.clientEmail,
-            signedAt:    agreementRequests.signedAt,
-            createdAt:   agreementRequests.createdAt,
+            id:            agreementRequests.id,
+            status:        agreementRequests.status,
+            clientEmail:   agreementRequests.clientEmail,
+            signedAt:      agreementRequests.signedAt,
+            createdAt:     agreementRequests.createdAt,
+            agreementName: agreements.name,
         }).from(agreementRequests)
+            .leftJoin(agreements, eq(agreementRequests.agreementId, agreements.id))
             .where(and(
                 eq(agreementRequests.tenantId, tenantId),
                 eq(agreementRequests.inspectionId, inspectionId),
             ))
             .orderBy(desc(agreementRequests.createdAt))
             .all();
+
+        // Signer tallies for those envelopes. One extra round trip over the
+        // whole set rather than one per row — an inspection carries a handful of
+        // envelopes at most, and the per-row shape is what invites an N+1.
+        const signerRows = requestRows.length > 0
+            ? await db.select({ requestId: agreementSigners.requestId, status: agreementSigners.status })
+                .from(agreementSigners)
+                .where(and(
+                    eq(agreementSigners.tenantId, tenantId),
+                    inArray(agreementSigners.requestId, requestRows.map((r) => r.id)),
+                ))
+                .all()
+            : [];
+        const signerTally = new Map<string, { total: number; signed: number }>();
+        for (const s of signerRows) {
+            const cur = signerTally.get(s.requestId) ?? { total: 0, signed: 0 };
+            cur.total += 1;
+            if (s.status === 'signed') cur.signed += 1;
+            signerTally.set(s.requestId, cur);
+        }
 
         // Reused primitives. getPeopleCard/computePublishReadiness throw NotFound
         // when the row is absent — but we already confirmed it exists above, so
@@ -370,11 +398,14 @@ export class InspectionPublishService extends InspectionSubService {
             })),
             agreements: agreementRows.map(a => ({ id: a.id, name: a.name })),
             agreementRequests: requestRows.map(r => ({
-                id:          r.id,
-                status:      r.status,
-                clientEmail: r.clientEmail,
-                signedAt:    r.signedAt ? safeISODate(r.signedAt) : null,
-                createdAt:   safeISODate(r.createdAt),
+                id:            r.id,
+                status:        r.status,
+                clientEmail:   r.clientEmail,
+                signedAt:      r.signedAt ? safeISODate(r.signedAt) : null,
+                createdAt:     safeISODate(r.createdAt),
+                agreementName: r.agreementName ?? null,
+                signersTotal:  signerTally.get(r.id)?.total ?? 0,
+                signersSigned: signerTally.get(r.id)?.signed ?? 0,
             })),
             invoice: invoice
                 ? {

@@ -48,11 +48,11 @@ describe("emptySigner", () => {
     });
 });
 
-// The Signing-tab wiring submits `buildSendPayload(...)` under intent 'send'.
-// happy-dom has no render harness (see signer-list.spec header), so the
-// submit-payload builder is unit-tested directly; the modal open / select
-// gating is Chrome-verified.
-describe("buildSendPayload — Signing tab 'send' intent body", () => {
+// The inspection workspace submits `buildSendPayload(...)` under intent
+// 'send-agreement'. happy-dom has no render harness (see signer-list.spec
+// header), so the submit-payload builder is unit-tested directly; the modal
+// open / select gating is Chrome-verified.
+describe("buildSendPayload — 'send-agreement' intent body", () => {
     it("trims name/email, preserves role, and carries the completion policy", () => {
         const payload = buildSendPayload(
             [
@@ -60,14 +60,23 @@ describe("buildSendPayload — Signing tab 'send' intent body", () => {
                 { name: "John", email: "john@test.com", role: "co_client" },
             ],
             "one",
+            "agr-1",
         );
         expect(payload).toEqual({
             completionPolicy: "one",
+            agreementId: "agr-1",
             signers: [
                 { name: "Jane", email: "jane@test.com", role: "client" },
                 { name: "John", email: "john@test.com", role: "co_client" },
             ],
         });
+    });
+
+    // IA-65 folded the template picker into the modal. A caller that renders no
+    // picker still gets a well-formed payload; the endpoint then falls back to
+    // the tenant's first template, exactly as the old single-email send did.
+    it("defaults agreementId to empty when the caller renders no template picker", () => {
+        expect(buildSendPayload([{ name: "Jane", email: "jane@test.com", role: "client" }], "one").agreementId).toBe("");
     });
 
     it("round-trips through JSON.stringify as the route serializes it", () => {

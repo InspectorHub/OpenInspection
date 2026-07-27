@@ -16,7 +16,7 @@ import {
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
 import { getEffectivePriceCents } from "~/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
-import { PageHeader, Card, Pill, Button, EmptyState } from "@core/shared-ui";
+import { PageHeader, Card, Pill, Button, EmptyState, Modal } from "@core/shared-ui";
 import type { PillTone } from "~/lib/hub-blocks";
 import DocumentsSection, {
   type DocumentItem,
@@ -25,7 +25,9 @@ import DocumentsSection, {
 } from "~/components/DocumentsSection";
 import { BlockHeading } from "~/components/inspection-hub/BlockHeading";
 import { LifecycleCard } from "~/components/inspection-hub/LifecycleCard";
-import { SendAgreementModal } from "~/components/inspection-hub/SendAgreementModal";
+import { SendAgreementModal, type SendAgreementPayload } from "~/components/agreements/SendAgreementModal";
+import { SigningRequests } from "~/components/inspection-hub/SigningRequests";
+import { SignaturePad } from "~/components/SignaturePad";
 import { RequestPaymentModal } from "~/components/inspection-hub/RequestPaymentModal";
 import { PublishReportModal } from "~/components/inspection-hub/PublishReportModal";
 import { CreateReinspectionModal } from "~/components/inspection-hub/CreateReinspectionModal";
@@ -41,11 +43,14 @@ import {
   handlePersonMakePrimary,
   handleReportLinkExpiry,
   handleSearchContacts,
+  handleSendAgreement,
+  handleInspectorSign,
 } from "~/lib/inspection-hub-actions";
 import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspection-hub-helpers";
 import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
+import { useModalFetcher } from "~/hooks/useModalFetcher";
 
 export function meta() {
   return [{ title: m.inspections_hub_meta_title() }];
@@ -222,22 +227,10 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const intent = formData.get("intent");
   const api = createApi(context, { token });
 
-  if (intent === "send-agreement") {
-    // Empty strings → omit, so the endpoint falls back to its defaults
-    // (tenant's first agreement template / the inspection's primary client
-    // email, resolved via inspection_people — see PeopleService.getPrimaryClient).
-    const agreementId = String(formData.get("agreementId") || "").trim();
-    const email = String(formData.get("email") || "").trim();
-    const res = await api.inspections[":id"]["agreement-requests"].$post({
-      param: { id },
-      json: {
-        ...(agreementId ? { agreementId } : {}),
-        ...(email ? { email } : {}),
-      },
-    });
-    // Surface the API rejection (B-4: never unconditional ok:true).
-    return toActionResult(res, "send-agreement", m.inspections_hub_error_send_agreement());
-  }
+  // IA-65 — signing requests live on the inspection now; both intents keep
+  // their bodies in inspection-hub-actions beside the People intents.
+  if (intent === "send-agreement") return handleSendAgreement(api, id, formData);
+  if (intent === "inspector-sign") return handleInspectorSign(api, formData);
 
   if (intent === "request-payment") {
     const res = await api.invoices["request-payment"].$post({
@@ -483,9 +476,36 @@ export default function InspectionHubPage() {
   //  - send-agreement → refreshes agreementRequests
   //  - request-payment → refreshes the invoice block
   //  - publish → flips the Report card to Published + reveals the header link
-  const agreementModal = useModalFetcher("send-agreement");
-  const paymentModal = useModalFetcher("request-payment");
-  const publishModal = useModalFetcher("publish");
+  const agreementModal = useModalFetcher<typeof action>("send-agreement");
+  const paymentModal = useModalFetcher<typeof action>("request-payment");
+  const publishModal = useModalFetcher<typeof action>("publish");
+
+  // IA-65 — signer management on the inspection. The send modal serializes its
+  // signer rows into the action; the pre-sign modal is keyed by envelope id
+  // (which row's "Sign now" was pressed) and closes itself on success.
+  const submitSendAgreement = (payload: SendAgreementPayload) => {
+    agreementModal.fetcher.submit(
+      {
+        intent: "send-agreement",
+        agreementId: payload.agreementId,
+        completionPolicy: payload.completionPolicy,
+        signers: JSON.stringify(payload.signers),
+      },
+      { method: "post" },
+    );
+  };
+
+  const [preSigningId, setPreSigningId] = useState<string | null>(null);
+  const preSignModal = useModalFetcher<typeof action>("inspector-sign");
+  const submitPreSignature = (dataUri: string) => {
+    preSignModal.fetcher.submit(
+      { intent: "inspector-sign", envelopeId: preSigningId ?? "", signatureBase64: dataUri },
+      { method: "post" },
+    );
+  };
+  useEffect(() => {
+    if (preSignModal.succeeded) setPreSigningId(null);
+  }, [preSignModal.succeeded]);
 
   // Submit / return / unpublish — dedicated fetchers (B-17: never share).
   const submitReport = useFetcher<typeof action>();
@@ -506,7 +526,7 @@ export default function InspectionHubPage() {
   const [sendReportOpen, setSendReportOpen] = useState(false);
   const sendReportFetcher = useFetcher<typeof action>();
 
-  const reinspectModal = useModalFetcher("create-reinspection", { closeOnSuccess: false });
+  const reinspectModal = useModalFetcher<typeof action>("create-reinspection", { closeOnSuccess: false });
   const createReinspection = reinspectModal.fetcher;
   useEffect(() => {
     if (
@@ -684,33 +704,16 @@ export default function InspectionHubPage() {
           )}
         </Card>
 
-        {/* 4. Agreement --------------------------------------------- */}
+        {/* 4. Signing requests -------------------------------------- */}
         <Card className="p-5">
           <BlockHeading title={m.inspections_hub_block_agreement()} pill={blocks.agreement} />
-          {hub.agreementRequests.length > 0 ? (
-            <div className="divide-y divide-ih-border mb-3">
-              {hub.agreementRequests.map((req) => (
-                <div key={req.id} className="flex items-center justify-between py-2 text-[12px]">
-                  <span className="text-ih-fg-2 truncate mr-2">{req.clientEmail}</span>
-                  <span className="text-ih-fg-4 shrink-0">
-                    {humanizeStatus(req.status)}
-                    {(req.signedAt || req.createdAt) && (
-                      <> &middot; {formatInspectionDateTime(req.signedAt || req.createdAt, undefined, displayTz)}</>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-[12px] text-ih-fg-3 mb-3">{m.inspections_hub_agreement_empty()}</p>
-          )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => agreementModal.setOpen(true)}
-          >
-            {m.inspections_hub_agreement_send()}
-          </Button>
+          <SigningRequests
+            requests={hub.agreementRequests}
+            canManageSigners={isAdmin}
+            displayTz={displayTz}
+            onSend={() => agreementModal.setOpen(true)}
+            onPreSign={setPreSigningId}
+          />
         </Card>
 
         {/* 5. Invoice ----------------------------------------------- */}
@@ -801,12 +804,12 @@ export default function InspectionHubPage() {
             // Not shipped yet: the status line always applies, the action row
             // only for roles that have an action to take.
             <>
-              {inspection.reportStatus === 'submitted' && (
+              {inspection.reportStatus === REPORT_STATUS.SUBMITTED && (
                 <p className="text-[12px] text-ih-fg-3 mb-3">
                   {m.inspections_hub_report_submitted()}
                 </p>
               )}
-              {inspection.reportStatus === 'in_progress' && hub.publishReadiness.ready && (
+              {inspection.reportStatus === REPORT_STATUS.IN_PROGRESS && hub.publishReadiness.ready && (
                 <p className="text-[12px] text-ih-fg-3 mb-3">
                   {m.inspections_hub_report_ready()}
                 </p>
@@ -927,16 +930,41 @@ export default function InspectionHubPage() {
         error={docError}
       />
 
-      {/* Send-agreement modal — shared Modal primitive (no window.confirm) */}
+      {/* Send-agreement modal — the shared multi-signer modal (IA-65). Seeded
+          with the inspection's primary client so the single-signer case stays
+          one click, but a co-client or agent can be added without leaving. */}
       <SendAgreementModal
         open={agreementModal.open}
-        agreements={hub.agreements}
-        defaultEmail={peopleCard.client?.email ?? ""}
-        fetcher={agreementModal.fetcher}
-        submitting={agreementModal.busy}
-        error={agreementModal.error}
+        templates={hub.agreements}
+        initialSigners={
+          peopleCard.client?.email
+            ? [{ name: peopleCard.client.name || peopleCard.client.email, email: peopleCard.client.email, role: "client" }]
+            : undefined
+        }
+        busy={agreementModal.busy}
+        onSend={submitSendAgreement}
         onClose={() => agreementModal.setOpen(false)}
       />
+      {agreementModal.error && (
+        <p className="text-[12px] font-medium text-ih-bad-fg">{agreementModal.error}</p>
+      )}
+
+      {/* Inspector pre-sign — the envelope-level signature an inspector applies
+          before the client sees it. Moved off the Library page with the rest of
+          signer management (IA-65). */}
+      <Modal
+        open={!!preSigningId}
+        onClose={() => setPreSigningId(null)}
+        title={m.library_agreements_sign_title()}
+      >
+        <p className="text-sm text-ih-fg-3 mb-4">{m.library_agreements_sign_desc()}</p>
+        <SignaturePad
+          onSubmit={submitPreSignature}
+          onCancel={() => setPreSigningId(null)}
+          label={m.library_agreements_save_signature()}
+        />
+        {preSignModal.error && <p className="text-sm text-ih-bad-fg mt-3">{preSignModal.error}</p>}
+      </Modal>
 
       {/* Request-payment modal — shared Modal primitive (no window.confirm) */}
       <RequestPaymentModal
@@ -985,46 +1013,6 @@ export default function InspectionHubPage() {
       />
     </div>
   );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Modal + fetcher pairing hook                                       */
-/* ------------------------------------------------------------------ */
-
-/**
- * Pairs a modal's open-state with its own dedicated action fetcher (B-17: never
- * share fetchers between mutations). Derives the busy flag, the intent-matched
- * error, and (by default) closes the modal once the action succeeds. Pass
- * `closeOnSuccess: false` when the caller drives its own post-success effect
- * (e.g. the re-inspection flow navigates instead of closing).
- */
-function useModalFetcher<I extends string>(
-  intent: I,
-  opts?: { closeOnSuccess?: boolean },
-) {
-  const closeOnSuccess = opts?.closeOnSuccess ?? true;
-  const [open, setOpen] = useState(false);
-  const fetcher = useFetcher<typeof action>();
-  const busy = fetcher.state !== "idle";
-  // "ok" in fetcher.data narrows away the People-editor intents (person-add /
-  // person-remove use their own dedicated fetchers, never this hook) and
-  // search-contacts, whose result shape carries no ok/error — those would
-  // otherwise widen the union `fetcher.data.ok` is read from.
-  const succeeded =
-    fetcher.state === "idle" &&
-    fetcher.data?.intent === intent &&
-    "ok" in fetcher.data &&
-    fetcher.data.ok;
-  const error =
-    fetcher.data?.intent === intent && "ok" in fetcher.data && !fetcher.data.ok
-      ? fetcher.data.error
-      : undefined;
-
-  useEffect(() => {
-    if (closeOnSuccess && open && succeeded) setOpen(false);
-  }, [closeOnSuccess, open, succeeded]);
-
-  return { open, setOpen, fetcher, busy, error, succeeded };
 }
 
 /* ------------------------------------------------------------------ */

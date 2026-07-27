@@ -7,8 +7,8 @@ import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
-import { getBookingHost, resolveTenantSlug } from '../../lib/url';
-import { agreementSignUrl } from '../../lib/public-urls';
+import { resolveTenantSlug } from '../../lib/url';
+import { emailSignersTheirLinks } from '../../lib/agreement-send';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { safeISODate } from '../../lib/date';
@@ -78,35 +78,47 @@ const agreementsRoutes = createApiRouter()
             if (!agreement) throw Errors.UnprocessableEntity('No agreement template exists yet. Create one in Settings before sending.');
         }
 
-        // Resolve the recipient: explicit email or the inspection's primary
-        // client (Task 9b — inspection_people join via PeopleService, not the
-        // legacy inspection.clientEmail column, which is being dropped, Task 13).
+        // Resolve the recipient set. IA-65 — an explicit multi-party `signers`
+        // list wins; otherwise fall back to the single `email` shorthand or the
+        // inspection's primary client (Task 9b — inspection_people join via
+        // PeopleService, not the legacy inspection.clientEmail column, which is
+        // being dropped, Task 13).
         const client = await c.var.services.people.getPrimaryClient(tenantId, id);
-        const clientEmail = body.email ?? client?.email ?? null;
-        if (!clientEmail) throw Errors.UnprocessableEntity('No client email on this inspection. Add a client email or enter one to send.');
+        const requested = body.signers && body.signers.length > 0
+            ? body.signers.map((s) => ({ name: s.name, email: s.email, role: s.role ?? ('client' as const) }))
+            : (() => {
+                const email = body.email ?? client?.email ?? null;
+                if (!email) return [];
+                return [{ name: client?.name ?? email, email, role: 'client' as const }];
+            })();
+        if (requested.length === 0) throw Errors.UnprocessableEntity('No client email on this inspection. Add a client email or enter one to send.');
 
-        // One send model: create (or reuse) the inspection's envelope with the
-        // client as a single signer, then email that signer their persistent link.
+        // One send model: create (or reuse) the inspection's envelope with this
+        // signer set, then email every signer their own persistent link. A lone
+        // signer defaults to 'one' (nobody else can complete it); a multi-party
+        // send defaults to 'all' unless the caller says otherwise.
+        const completionPolicy = body.completionPolicy ?? (requested.length === 1 ? 'one' : 'all');
         const env = await c.var.services.agreement.findOrCreate(tenantId, id, {
             agreementId: agreement.id,
-            signers: [{ name: client?.name ?? clientEmail, email: clientEmail, role: 'client' }],
-            completionPolicy: 'one',
+            signers: requested,
+            completionPolicy,
         });
 
         const signers = await c.var.services.agreement.listSigners(tenantId, env.requestId);
-        const signer = signers[0];
-        const token = await c.var.services.agreement.getSignerLink(tenantId, env.requestId, signer.id);
+        const clientEmail = signers[0]?.email ?? requested[0].email;
 
-        // Build the public sign URL. Use the saas-aware resolver
-        // (requestedTenantSlug is empty in saas → DB fallback).
-        const slug = await resolveTenantSlug(c, tenantId);
-        const signUrl = agreementSignUrl(getBookingHost(c), slug, token);
-
-        // Sign the email with the assigned inspector's rebooking footer (B-4a).
-        const sigInspector = await resolveSignatureInspector(c, inspection.inspectorId, tenantId);
-        await c.var.services.email.sendAgreementRequest(
-            clientEmail, client?.name ?? null, agreement.name, signUrl, sigInspector, getBookingHost(c),
-        );
+        // Email each signer their own link. Uses the saas-aware slug resolver
+        // (requestedTenantSlug is empty in saas → DB fallback) and signs with
+        // the assigned inspector's rebooking footer (B-4a).
+        await emailSignersTheirLinks(c, {
+            tenantId,
+            inspectionId: id,
+            tenantSlug: await resolveTenantSlug(c, tenantId),
+            requestId: env.requestId,
+            agreementName: agreement.name,
+            senderSignature: await resolveSignatureInspector(c, inspection.inspectorId, tenantId),
+            signers,
+        });
 
         // findOrCreate already sets status: 'sent' — no manual update needed.
 
@@ -125,7 +137,16 @@ const agreementsRoutes = createApiRouter()
 
         auditFromContext(c, 'agreement.send', 'agreement_request', {
             entityId: env.requestId,
-            metadata: { agreementId: agreement.id, clientEmail, inspectionId: id },
+            metadata: {
+                agreementId: agreement.id,
+                clientEmail,
+                inspectionId: id,
+                signerCount: signers.length,
+                // Reads back as "this send added N parties to a live envelope"
+                // rather than "an envelope was sent" — the two are different
+                // events to anyone reconstructing who was asked to sign, when.
+                addedSigners: env.addedSignerIds.length,
+            },
         });
 
         return c.json({
@@ -135,6 +156,8 @@ const agreementsRoutes = createApiRouter()
                 status:      'sent',
                 clientEmail,
                 createdAt:   safeISODate(envelopeRow.createdAt),
+                signerCount: signers.length,
+                addedSigners: env.addedSignerIds.length,
             },
         }, 200);
     })

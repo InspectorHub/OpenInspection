@@ -78,12 +78,21 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
          * Idempotent — returns existing non-terminal request for the inspection,
          * or creates a new row with status='sent'. Throws if the tenant has no
          * agreement template at all (admin must create one in /agreements first).
+         *
+         * IA-65 — when an envelope already exists, explicitly-supplied `signers`
+         * are MERGED into it rather than discarded. Before this, a send that
+         * named three signers against an inspection whose envelope was already
+         * out returned that envelope untouched: the operator got a success
+         * response, the two people they had just added were never created, and
+         * nothing said so. One inspection holds one live envelope, so "send this
+         * agreement to these people" has to converge on that envelope's signer
+         * set — the alternative is a caller-visible refusal, never a silent drop.
          */
         async findOrCreate(
             tenantId: string,
             inspectionId: string,
             opts?: { signers?: SignerInput[]; completionPolicy?: 'all' | 'one'; agreementId?: string },
-        ): Promise<{ token: string; status: string; alreadyExists: boolean; requestId: string }> {
+        ): Promise<{ token: string; status: string; alreadyExists: boolean; requestId: string; addedSignerIds: string[] }> {
             const db = this.getDrizzle();
             // Look for an existing non-terminal request
             const existing = await db.select().from(agreementRequests)
@@ -108,12 +117,13 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
                 if (!firstSigner) {
                     firstSigner = await this.synthesizeDefaultSigner(env);
                 }
+                const addedSignerIds = await this.mergeSignersIntoEnvelope(env, opts?.signers ?? [], opts?.completionPolicy);
                 try {
                     token = await this.getSignerLink(env.tenantId, env.id, firstSigner.id);
                 } catch (e) {
                     logger.warn('AgreementService.findOrCreate reuse-link failed', { requestId: env.id, error: e instanceof Error ? e.message : String(e) });
                 }
-                return { token, status: env.status, alreadyExists: true, requestId: env.id };
+                return { token, status: env.status, alreadyExists: true, requestId: env.id, addedSignerIds };
             }
             // Verify the inspection exists in this tenant.
             const inspRows = await db.select({ id: inspections.id }).from(inspections)
@@ -208,7 +218,74 @@ export function EnvelopeLegacyMixin<TBase extends Constructor<AgreementServiceBa
             }
 
             logger.info('AgreementService.findOrCreate created', { tenantId, inspectionId, requestId, signers: signerInputs.length, completionPolicy });
-            return { token: firstPlaintext, status: 'sent', alreadyExists: false, requestId };
+            return { token: firstPlaintext, status: 'sent', alreadyExists: false, requestId, addedSignerIds: [] };
+        }
+
+        /**
+         * IA-65 — reconcile an explicit signer set against an envelope that is
+         * already out. Inserts the signers this envelope does not have yet
+         * (matched case-insensitively on email, the same key the UNIQUE index
+         * enforces) and returns their ids so the caller can email exactly the
+         * people who were just added.
+         *
+         * Completion policy: only applied when NOTHING has been signed yet.
+         * Relaxing 'all' to 'one' after a signature would complete the envelope
+         * on the spot — firing the completion pipeline for parties who never
+         * signed — so a partially-signed envelope keeps the policy it was sent
+         * under and the new signer simply joins it.
+         */
+        protected async mergeSignersIntoEnvelope(
+            envelope: typeof agreementRequests.$inferSelect,
+            signers: SignerInput[],
+            completionPolicy?: 'all' | 'one',
+        ): Promise<string[]> {
+            if (signers.length === 0) return [];
+            const db = this.getDrizzle();
+            const current = await db.select().from(agreementSigners)
+                .where(eq(agreementSigners.requestId, envelope.id)).all();
+            const have = new Set(current.map((s) => s.email.trim().toLowerCase()));
+
+            const now = new Date();
+            const added: string[] = [];
+            for (const s of signers) {
+                const key = s.email.trim().toLowerCase();
+                if (!key || have.has(key)) continue;
+                have.add(key);
+                const id = crypto.randomUUID();
+                const plaintext = mintToken();
+                await db.insert(agreementSigners).values({
+                    id,
+                    tenantId: envelope.tenantId,
+                    requestId: envelope.id,
+                    name: s.name,
+                    email: s.email,
+                    role: s.role ?? 'client',
+                    contactId: s.contactId ?? null,
+                    tokenHash: await hashToken(plaintext),
+                    tokenEnc: this.secrets ? await sealToken(plaintext, envelope.tenantId, this.secrets.jwtSecret) : null,
+                    status: 'sent',
+                    createdAt: now,
+                    expiresAt: new Date(now.getTime() + SIGNER_TOKEN_TTL_MS),
+                });
+                added.push(id);
+            }
+
+            const nothingSigned = current.every((s) => s.status !== 'signed');
+            if (completionPolicy && completionPolicy !== envelope.completionPolicy && nothingSigned) {
+                await db.update(agreementRequests)
+                    .set({ completionPolicy })
+                    .where(and(
+                        eq(agreementRequests.id, envelope.id),
+                        eq(agreementRequests.tenantId, envelope.tenantId),
+                    ));
+            }
+
+            if (added.length > 0) {
+                logger.info('AgreementService.findOrCreate merged signers', {
+                    requestId: envelope.id, tenantId: envelope.tenantId, added: added.length,
+                });
+            }
+            return added;
         }
 
         /**
