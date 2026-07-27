@@ -19,10 +19,10 @@ import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/valida
 import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
 import { CreateInspectionFromWizardSchema } from '../../lib/validations/wizard.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections as inspectionTable, inspectionResults } from '../../lib/db/schema';
+import { inspections as inspectionTable, inspectionResults, users } from '../../lib/db/schema';
 import { deleteInspectionCascade } from '../../services/inspection/inspection-cascade';
 import { syncInspectionAssignments } from '../../lib/db/assignment-links';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
 import type { HonoConfig } from '../../types/hono';
 import { logger } from '../../lib/logger';
@@ -307,6 +307,25 @@ const coreRoutes = createApiRouter()
             const ok = await c.var.services.inspection.isInspectionPhotoKey(id, tenantId, body.coverPhotoId);
             if (!ok) {
                 return c.json({ success: false as const, error: { code: 'INVALID_COVER_PHOTO', message: 'coverPhotoId does not reference a photo of this inspection' } }, 400);
+            }
+        }
+
+        // `inspectorId` names a row in `users`, and nothing downstream re-checks
+        // it: the value is written straight onto the inspection and mirrored
+        // into the assignment link table. A format check can't stand in for a
+        // membership check — a UUID from another tenant is still a UUID — so
+        // resolve it inside the caller's tenant, exactly as the sibling people
+        // route re-resolves contactId and roleProfileId before linking them.
+        if (typeof body.inspectorId === 'string') {
+            const member = await db.select({ id: users.id }).from(users)
+                .where(and(
+                    eq(users.id, body.inspectorId),
+                    eq(users.tenantId, tenantId),
+                    isNull(users.deletedAt),
+                ))
+                .limit(1).get();
+            if (!member) {
+                return c.json({ success: false as const, error: { code: 'INVALID_INSPECTOR', message: 'inspectorId is not a member of this tenant' } }, 400);
             }
         }
 

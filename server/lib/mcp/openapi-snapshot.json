@@ -93,6 +93,35 @@
     "description": "Assigns a contact to the inspection under a role profile. Adding a second person under the primary \"client\" role HANDS THE SEAT OVER (IA-36 ⑬): the newcomer becomes the primary client and the incumbent stays on the inspection as co-client, with their report access untouched. \"Exactly one primary client\" is upheld by that swap rather than by refusing the add."
   },
   {
+    "operationId": "addInspectionService",
+    "method": "POST",
+    "pathTemplate": "/api/inspections/{id}/services",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the service line belongs to.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id the service line belongs to."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/AddInspectionService"
+      }
+    },
+    "summary": "Add a catalog service to an inspection",
+    "description": "Adds a service from the tenant catalog to an existing inspection, snapshotting its name and price. Optionally charges a per-inspection override price. Adding a service the inspection already has returns the existing line unchanged."
+  },
+  {
     "operationId": "addRepairItem",
     "method": "POST",
     "pathTemplate": "/api/public/repair-builder/{tenant}/{id}/lists/{rrId}/items",
@@ -14806,6 +14835,43 @@
     "description": "Removes an inspection_people row, tenant-scoped, and revokes that person's report link. A no-op (still 200) if personId does not exist under this tenant. Refuses with 409 when they are the only client-side person on the inspection."
   },
   {
+    "operationId": "removeInspectionService",
+    "method": "DELETE",
+    "pathTemplate": "/api/inspections/{id}/services/{lineId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the service line belongs to.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id the service line belongs to."
+          }
+        },
+        {
+          "name": "lineId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_services row id.",
+          "schema": {
+            "type": "string",
+            "description": "inspection_services row id."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Remove a service line from an inspection",
+    "description": "Removes one booked service line from an inspection. Does not touch the tenant service catalog."
+  },
+  {
     "operationId": "removeRepairItem",
     "method": "DELETE",
     "pathTemplate": "/api/public/repair-builder/{tenant}/{id}/lists/{rrId}/items/{itemId}",
@@ -17004,6 +17070,45 @@
     },
     "summary": "Update tenant inspection editor preferences",
     "description": "Partially update the tenant-level inspection editor preferences. Supplied fields are merged with existing values and the result is re-validated before persisting to the tenant config."
+  },
+  {
+    "operationId": "updateInspectionService",
+    "method": "PATCH",
+    "pathTemplate": "/api/inspections/{id}/services/{lineId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "inspections",
+    "tier": "primary",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection id the service line belongs to.",
+          "schema": {
+            "type": "string",
+            "description": "Inspection id the service line belongs to."
+          }
+        },
+        {
+          "name": "lineId",
+          "in": "path",
+          "required": true,
+          "description": "inspection_services row id.",
+          "schema": {
+            "type": "string",
+            "description": "inspection_services row id."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/UpdateInspectionService"
+      }
+    },
+    "summary": "Reprice one service line on an inspection",
+    "description": "Sets the per-inspection price override on one service line. Passing null clears the override so the line reverts to the catalog price snapshotted when it was added."
   },
   {
     "operationId": "updateInspectionTemplate",

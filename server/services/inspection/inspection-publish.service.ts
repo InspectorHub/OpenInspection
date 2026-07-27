@@ -255,10 +255,13 @@ export class InspectionPublishService extends InspectionSubService {
             referredByAgentId: string | null;
             sellingAgentId: string | null;
             createdAt: string | null;
+            closingDate: string | null;
+            referenceNumber: string | null;
+            referralSource: string | null;
         };
         tenantSlug: string;
         people: Awaited<ReturnType<InspectionService['getPeopleCard']>>;
-        services: Array<{ id: string; name: string; priceCents: number }>;
+        services: Array<{ id: string; serviceId: string; name: string; priceCents: number; priceSnapshot: number; priceOverride: number | null }>;
         agreements: Array<{ id: string; name: string }>;
         agreementRequests: Array<{
             id: string;
@@ -285,6 +288,7 @@ export class InspectionPublishService extends InspectionSubService {
         // (P-4 authority chain, tier 2). Tenant-scoped on both columns.
         const serviceRows = await db.select({
             id:            inspectionServices.id,
+            serviceId:     inspectionServices.serviceId,
             nameSnapshot:  inspectionServices.nameSnapshot,
             priceSnapshot: inspectionServices.priceSnapshot,
             priceOverride: inspectionServices.priceOverride,
@@ -388,13 +392,25 @@ export class InspectionPublishService extends InspectionSubService {
                 referredByAgentId: buyerAgentId,
                 sellingAgentId:    listingAgentId,
                 createdAt:         safeISODate(insp.createdAt),
+                // IA-87 / settings-merge — the order facts that used to be
+                // editable ONLY from the report editor's settings sheet. They
+                // describe the order, not the report, so the hub owns them now
+                // and needs them in its own payload.
+                closingDate:       insp.closingDate ?? null,
+                referenceNumber:   insp.referenceNumber ?? null,
+                referralSource:    insp.referralSource ?? null,
             },
             tenantSlug,
             people,
             services: serviceRows.map(s => ({
                 id:        s.id,
+                serviceId: s.serviceId,
                 name:      s.nameSnapshot,
                 priceCents: s.priceOverride ?? s.priceSnapshot,
+                // The two components of the effective price, so the hub can
+                // show "was $X, charging $Y" and offer a revert.
+                priceSnapshot: s.priceSnapshot,
+                priceOverride: s.priceOverride ?? null,
             })),
             agreements: agreementRows.map(a => ({ id: a.id, name: a.name })),
             agreementRequests: requestRows.map(r => ({

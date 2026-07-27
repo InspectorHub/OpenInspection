@@ -110,7 +110,20 @@ export const UpdateInspectionSchema = z.object({
     // any legacy caller still posting these two fields degrades to a no-op on
     // them (same "unrecognised field" no-op as templateId used to before B-22).
     date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
-    inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    // A plain string, and nullable — for the same two reasons `templateId`
+    // below is:
+    //   - `users.id` is a `text` column. Freshly registered users get a
+    //     `crypto.randomUUID()`, but seeded, imported and portal-synced rows
+    //     need not, and a `.uuid()` here rejected the WHOLE patch when one of
+    //     them was picked — so changing the date in the same modal silently
+    //     failed too. Format was never the safety property anyway: a UUID
+    //     belonging to another tenant passes `.uuid()` just fine. Tenant
+    //     membership is enforced in the handler, where it can be checked.
+    //   - null is "Unassigned". The handler already syncs `?? null` into the
+    //     assignment link table; without null in the schema the empty option
+    //     was dropped before it ever reached the API, so an assignment could
+    //     be changed but never cleared.
+    inspectorId: z.string().min(1).nullable().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('Assigned inspector (users.id) — must be a member of the caller\'s tenant; null unassigns.'),
     price: z.number().int().min(0).optional().openapi({ example: 450 }).describe('TODO describe price field for the OpenInspection MCP integration'),
     status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     paymentRequired:   z.boolean().optional().openapi({ example: false }).describe('TODO describe paymentRequired field for the OpenInspection MCP integration'),
