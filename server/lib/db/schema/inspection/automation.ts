@@ -79,6 +79,20 @@ export const automationLogs = sqliteTable('automation_logs', {
     status: text('status', { enum: ['pending', 'sent', 'failed', 'skipped'] }).notNull().default('pending'),
     error: text('error'),
     eventId: text('event_id'),
+    // IA-109 — the contact this log is addressed to, stamped at enqueue.
+    //
+    // resolveRecipients already knows it; the log used to drop it and keep only
+    // the phone/email plus the role KEY. The SMS consent gate then had no way
+    // to look up the right person and fell back to `inspections.client_contact_
+    // id`, which is correct for the primary client and WRONG for every other
+    // consumer on the job — so a co-client was texted against the primary
+    // client's consent record, or none at all.
+    //
+    // Nullable: legacy rows predate it, and the inspector recipient is a user
+    // rather than a contact. A client-KIND recipient with no contact id fails
+    // the gate closed (see automation/sms.ts) rather than sending.
+    // Appended at table end for D1 rebuild safety.
+    recipientContactId: text('recipient_contact_id'),
 }, (t) => [
     index('idx_automation_logs_pending').on(t.tenantId, t.status, t.sendAt),
     index('idx_automation_logs_insp').on(t.inspectionId),
