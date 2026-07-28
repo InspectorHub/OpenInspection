@@ -1,4 +1,4 @@
-import { ROLE } from '../auth/roles';
+import { ROLE, isAdminRole } from '../auth/roles';
 
 /**
  * Design System 0520 subsystem C phase 4 — canEdit permission matrix.
@@ -49,7 +49,7 @@ export function canEdit(
 ): boolean {
     const role = user.role;
 
-    if (role === ROLE.OWNER || role === ROLE.MANAGER) return true;
+    if (isAdminRole(role)) return true;
     if (role === ROLE.AGENT)  return false;
 
     const helpers = safeJsonArray(inspection.helperInspectorIds);

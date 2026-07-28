@@ -101,6 +101,22 @@ export default tseslint.config(
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
                 },
+                // Admin-tier guard (IA-94 / PR 1) — "is this an owner or a manager"
+                // must go through isAdminRole() in server/lib/auth/roles.ts. It was
+                // re-derived in SEVEN places before this rule existed, including a
+                // same-named local const with its own logic, and a comment reading
+                // "Keep in sync with isAdminRole" — a note asking a human to do what
+                // a rule can. The role-literal guard does not catch these: its
+                // override block exempts server/lib, server/api, server/services and
+                // app — i.e. everywhere they lived.
+                {
+                    selector: "LogicalExpression[operator='||']:has(Literal[value='owner']):has(Literal[value='manager'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to owner/manager inline.',
+                },
+                {
+                    selector: "LogicalExpression[operator='||']:has(MemberExpression[property.name='OWNER']):has(MemberExpression[property.name='MANAGER'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to ROLE.OWNER/ROLE.MANAGER inline.',
+                },
                 // Role taxonomy guard — all RBAC role string literals must derive from
                 // ROLES / Role in server/lib/auth/roles.ts (the single source of truth).
                 // This prevents typos and stale literals surviving a role rename.
@@ -198,6 +214,22 @@ export default tseslint.config(
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
                 },
+                // Admin-tier guard (IA-94 / PR 1) — "is this an owner or a manager"
+                // must go through isAdminRole() in server/lib/auth/roles.ts. It was
+                // re-derived in SEVEN places before this rule existed, including a
+                // same-named local const with its own logic, and a comment reading
+                // "Keep in sync with isAdminRole" — a note asking a human to do what
+                // a rule can. The role-literal guard does not catch these: its
+                // override block exempts server/lib, server/api, server/services and
+                // app — i.e. everywhere they lived.
+                {
+                    selector: "LogicalExpression[operator='||']:has(Literal[value='owner']):has(Literal[value='manager'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to owner/manager inline.',
+                },
+                {
+                    selector: "LogicalExpression[operator='||']:has(MemberExpression[property.name='OWNER']):has(MemberExpression[property.name='MANAGER'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to ROLE.OWNER/ROLE.MANAGER inline.',
+                },
             ],
         },
     },
@@ -213,6 +245,22 @@ export default tseslint.config(
                 {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
+                },
+                // Admin-tier guard (IA-94 / PR 1) — "is this an owner or a manager"
+                // must go through isAdminRole() in server/lib/auth/roles.ts. It was
+                // re-derived in SEVEN places before this rule existed, including a
+                // same-named local const with its own logic, and a comment reading
+                // "Keep in sync with isAdminRole" — a note asking a human to do what
+                // a rule can. The role-literal guard does not catch these: its
+                // override block exempts server/lib, server/api, server/services and
+                // app — i.e. everywhere they lived.
+                {
+                    selector: "LogicalExpression[operator='||']:has(Literal[value='owner']):has(Literal[value='manager'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to owner/manager inline.',
+                },
+                {
+                    selector: "LogicalExpression[operator='||']:has(MemberExpression[property.name='OWNER']):has(MemberExpression[property.name='MANAGER'])",
+                    message: 'Use isAdminRole() from server/lib/auth/roles.ts instead of comparing to ROLE.OWNER/ROLE.MANAGER inline.',
                 },
                 {
                     // `/api/public/*` is exempt: those endpoints are unauthenticated

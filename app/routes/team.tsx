@@ -10,6 +10,7 @@ import { useSessionContext } from "~/hooks/useSessionContext";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, TabStrip, Card, Pill, Button, EmptyState, Table } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { isAdminRole } from "~/lib/access";
 
 export function meta() {
   return [{ title: m.settings_team_meta_title() }];
@@ -61,7 +62,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       id: i.id, name: null, email: i.email, role: i.role,
       status: "pending", lastActiveAt: null, token: i.id, expiresAt: i.expiresAt,
     }));
-    return { members: [...active, ...pending], canManage: role === "owner" || role === "manager" };
+    return { members: [...active, ...pending], canManage: isAdminRole(role) };
   } catch {
     return { members: [] as Member[], canManage: false };
   }

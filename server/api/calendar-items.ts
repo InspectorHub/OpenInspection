@@ -12,6 +12,7 @@ import {
     ListCalendarItemsQuerySchema,
 } from '../lib/validations/calendar-items.schema';
 import { listCalendarItems } from '../services/calendar-items.service';
+import { isAdminRole } from '../lib/auth/roles';
 
 /** Viewer's calendar display tz: their own override, else the tenant default. */
 async function resolveEffectiveTz(database: D1Database, tenantId: string, userId: string): Promise<string> {
@@ -62,7 +63,7 @@ function errorResponse(message: string, code: 'FORBIDDEN') {
 }
 
 function isAdmin(role: string | undefined): boolean {
-    return role === 'owner' || role === 'manager';
+    return isAdminRole(role);
 }
 
 const calendarItemsRoutes = createApiRouter()
