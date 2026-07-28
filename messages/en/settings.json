@@ -219,7 +219,7 @@
   "settings_team_role_inspector_name": "Inspector",
   "settings_team_role_inspector_desc": "Conducts inspections; edits and publishes reports.",
   "settings_team_role_agent_name": "Agent",
-  "settings_team_role_agent_desc": "External agent. Read-only access to their own orders.",
+  "settings_team_role_agent_desc": "Not a team member and not a seat. Agents are given access to individual inspections from that inspection’s People section, and read the report through a link that needs no account.",
   "settings_team_cancel_invite": "Cancel invite",
   "settings_team_resend_invite": "Resend",
   "settings_team_invite_expires_in": "Expires in {days}d",

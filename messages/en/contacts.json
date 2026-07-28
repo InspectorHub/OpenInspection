@@ -99,5 +99,6 @@
   "contacts_detail_access_none": "This contact cannot open any reports.",
   "contacts_detail_access_explainer": "These links work without an account. Revoking one takes effect immediately.",
   "contacts_detail_access_revoke": "Revoke",
-  "contacts_detail_access_revoke_all": "Revoke all"
+  "contacts_detail_access_revoke_all": "Revoke all",
+  "contacts_roles_modal_email_template_hint": "Used when you send the report by hand. Leave as None to use the standard report email. Automatic messages are configured under Settings → Automations."
 }

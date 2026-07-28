@@ -27,7 +27,13 @@ export function Sidebar() {
 
   const companyName = ctx?.branding?.companyName || "OpenInspection";
   const logoUrl = ctx?.branding?.logoUrl || "/logo.svg";
-  const userName = ctx?.user?.name || "Inspector";
+  // Falls back to the email, then to a neutral word — never to a ROLE name.
+  // This used to read `|| "Inspector"`, so an owner or manager who had not set
+  // a display name was labelled Inspector in their own sidebar: the app
+  // asserting a role they do not hold, in the one place they look to confirm
+  // who they are signed in as. "Unnamed" matches what the Team page already
+  // shows for the same user.
+  const userName = ctx?.user?.name || ctx?.user?.email || m.settings_team_member_unnamed();
   const userSubline = ctx?.branding?.tenantSlug || "openinspection.dev";
   const userRole = ctx?.user?.role || null;
   const showSwitchWorkspace = ctx?.branding?.isSaas && ctx?.branding?.portalBaseUrl;

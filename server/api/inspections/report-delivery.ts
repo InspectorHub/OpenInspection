@@ -29,6 +29,8 @@ import { eq, and } from 'drizzle-orm';
 import { resolveSignatureInspector } from '../../lib/signature-helpers';
 import { getTenantId, getDrizzle } from '../../lib/route-helpers';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
+import { resolveRoleEmailTemplate } from '../../lib/people/role-template';
+import { interpolate } from '../../services/automation/shared';
 import { resolveReportTier } from '../../lib/report-tier';
 
 const sendReportPdfRoute = createRoute(withMcpMetadata({
@@ -384,7 +386,26 @@ const reportDeliveryRoutes = createApiRouter()
                 // portal hub (overview) carrying the persistent portalAccess token.
                 const linkUrl = buildPortalUrl(getBaseUrl(c), tenantSlug, id, reportToken);
 
-                if (pdf) {
+                // The role's own email template, when it names one. Every
+                // recipient of a manual send used to get identical copy — see
+                // resolveRoleEmailTemplate for why this is scoped to the manual
+                // path and not offered as a general mechanism.
+                const roleTemplate = await resolveRoleEmailTemplate(db, c.env.DB, tenantId, recipient.roleKey);
+                if (roleTemplate) {
+                    const vars: Record<string, string> = {
+                        client_name:      (inspection.clientName as string | null) ?? '',
+                        property_address: address,
+                        scheduled_date:   (inspection.date as string | null) ?? '',
+                        report_url:       linkUrl,
+                        company_name:     tenantSlug,
+                        role_label:       roleTemplate.roleLabel,
+                    };
+                    await c.var.services.email.sendEmail(
+                        [recipientEmail],
+                        interpolate(roleTemplate.subject, vars),
+                        interpolate(roleTemplate.body, vars),
+                    );
+                } else if (pdf) {
                     await c.var.services.email.sendInspectionReportPdf(recipientEmail, address, linkUrl, pdf, sigInspector, sigHost);
                 } else {
                     await c.var.services.email.sendReportReady(recipientEmail, address, linkUrl, sigInspector, sigHost);

@@ -244,9 +244,16 @@ export default function TeamPage() {
                         </>
                       )}
                     </div>
-                  ) : member.status === "active" ? (
+                  ) : member.status === "active" && canManage ? (
                     // IA-101 — this button existed with no onClick. The only
                     // way to fix a role was to remove the member and re-invite.
+                    //
+                    // `canManage` matters MORE now than it did before. While the
+                    // button was inert it was merely decorative for everyone;
+                    // wiring it up without this gate would walk an inspector
+                    // through a whole drawer and then 403 on save. The API
+                    // enforces owner/manager regardless — this stops us
+                    // offering an action we know will be refused.
                     <button
                       type="button"
                       onClick={() => setEditMember({

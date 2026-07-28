@@ -65,7 +65,76 @@ async function hasHorizontalScroll(page: Page): Promise<boolean> {
     );
 }
 
+/**
+ * Which elements actually stick out, ignoring ones an ancestor already clips.
+ *
+ * A bare "the page scrolls sideways" failure sends the next person hunting
+ * with devtools; naming the element turns a 20-minute bisect into a glance.
+ * Elements inside a scroll container are skipped on purpose — a wide table in
+ * an `overflow-x-auto` wrapper still reports a bounding box past the viewport
+ * but costs the PAGE nothing, and reporting it would be a false lead.
+ */
+async function overflowCulprits(page: Page): Promise<string[]> {
+    return page.evaluate(() => {
+        const limit = document.documentElement.clientWidth;
+        const clipped = (el: Element) => {
+            for (let n = el.parentElement; n; n = n.parentElement) {
+                const ox = getComputedStyle(n).overflowX;
+                if (ox === 'auto' || ox === 'scroll' || ox === 'hidden') return true;
+            }
+            return false;
+        };
+        const out: string[] = [];
+        for (const el of document.querySelectorAll('body *')) {
+            const r = el.getBoundingClientRect();
+            if (r.width > 0 && r.right > limit + 1) {
+                out.push(
+                    `${clipped(el) ? '[clipped] ' : '[LOOSE]   '}` +
+                    `<${el.tagName.toLowerCase()} class="${String((el as HTMLElement).className).slice(0, 60)}"> ` +
+                    `right=${Math.round(r.right)} w=${Math.round(r.width)}`,
+                );
+            }
+        }
+        // LOOSE entries first — those are the ones actually costing the page
+        // width. Clipped ones are listed too, because "everything is clipped"
+        // is itself a diagnosis (it means an ancestor is over-wide, not the
+        // element).
+        return out.sort((a, b) => (a.startsWith('[LOOSE') ? -1 : 1) - (b.startsWith('[LOOSE') ? -1 : 1)).slice(0, 8);
+    });
+}
+
 test.describe('Workspace pages — responsive smoke', () => {
+    // Seed enough contacts to force a VERTICAL scrollbar. That matters: a
+    // vertical scrollbar takes ~15px off clientWidth, and a layout with no
+    // margin to spare tips into horizontal overflow the moment it appears.
+    // Without this the spec passes in isolation and fails in the full suite —
+    // which is not flake, it is the suite happening to have more data. Seeding
+    // our own makes the result depend on this file alone.
+    test.beforeAll(async ({ request }) => {
+        const seed = readEditorSeed();
+        if (!seed) return;
+        const login = await request.post(`${BASE_URL}/api/auth/login`, {
+            data: { email: seed.email, password: seed.password },
+        });
+        const token = (login.headers()['set-cookie'] ?? '').match(/__Host-inspector_token=([^;]+)/)?.[1] ?? '';
+        if (!token) return;
+        const auth = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+        // Long, unbreakable names and emails on purpose. Other suites seed
+        // rows like `rae.listing.1785234284269@example.com`, and it was those —
+        // not the row COUNT — that pushed the page out. A fixture with tidy
+        // short strings would let the regression back in.
+        for (let i = 0; i < 25; i++) {
+            await request.post(`${BASE_URL}/api/contacts`, {
+                data: {
+                    type: 'client',
+                    name: `Responsive LongNameFixture ${1785234284269 + i}`,
+                    email: `responsive.longfixture.${1785234284269 + i}@example.com`,
+                },
+                headers: auth,
+            });
+        }
+    });
+
     test.beforeEach(async ({ page }) => {
         const seed = readEditorSeed();
         test.skip(!seed, 'editor-seed fixture unavailable');
@@ -87,9 +156,17 @@ test.describe('Workspace pages — responsive smoke', () => {
                 // asserting mid-reflow produces a flake, not a finding.
                 await page.waitForTimeout(150);
 
+                const scrolls = await hasHorizontalScroll(page);
+                const culprits = scrolls ? await overflowCulprits(page) : [];
+                const delta = await page.evaluate(() => {
+                    const de = document.documentElement;
+                    return { over: de.scrollWidth - de.clientWidth, sw: de.scrollWidth, cw: de.clientWidth };
+                });
                 expect(
-                    await hasHorizontalScroll(page),
-                    `${p.key} scrolls horizontally at ${vp.w}px — the page must fit; wide tables scroll inside their own container`,
+                    scrolls,
+                    `${p.key} scrolls horizontally at ${vp.w}px by ${delta.over}px ` +
+                    `(scrollWidth ${delta.sw} vs clientWidth ${delta.cw}).\n` +
+                    `Sticking out:\n  ${culprits.join('\n  ') || '(nothing unclipped — a vertical scrollbar is tipping a zero-margin layout)'}`,
                 ).toBe(false);
             });
         }
