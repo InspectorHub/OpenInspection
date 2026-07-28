@@ -152,7 +152,12 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={role} onChange={(e) => setRole(e.target.value as Role)}>
  <option value="manager">{m.modal_invite_role_manager()}</option>
  <option value="inspector">{m.modal_invite_role_inspector()}</option>
- <option value="agent">{m.modal_invite_role_agent()}</option>
+ {/* IA-101 — no agent option. An agent reaches an inspection through a
+ per-inspection access token that works with no account at all, so
+ inviting one to a SEAT was a second, contradictory way to become an
+ agent — and it put them on the seat count, which is not how the
+ industry bills. Agents are granted access from the inspection's
+ People section; the API refuses the role here too. */}
  </select>
  </label>
  <p className="text-xs text-ih-fg-3">{ROLE_DESC[role]()}</p>

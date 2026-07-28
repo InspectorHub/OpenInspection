@@ -22,6 +22,27 @@ export const InviteMemberSchema = z.object({
 }).openapi('InviteMember');
 
 /**
+ * Validation schema for editing an existing team member (IA-101).
+ *
+ * Both fields are optional so the caller can move a role without restating
+ * every capability, or flip a capability without touching the role. Sending
+ * neither is a no-op rather than an error — a form that submits unchanged is
+ * not a client mistake.
+ *
+ * `permissionOverrides` is REPLACE, not merge: the drawer always submits the
+ * full set of four, and a merge would make un-ticking a box unexpressible.
+ */
+export const UpdateMemberSchema = z.object({
+    role: z.enum(ROLES).optional().openapi({ example: 'manager' }).describe('New role for this member. Omit to leave unchanged.'),
+    permissionOverrides: z.object({
+        publish: z.boolean().optional(),
+        scheduleOthers: z.boolean().optional(),
+        financial: z.boolean().optional(),
+        manageContacts: z.boolean().optional(),
+    }).partial().nullable().optional().openapi({ example: { financial: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
+}).openapi('UpdateMember');
+
+/**
  * Validation schema for the GDPA data erasure request.
  */
 export const DataErasureSchema = z.object({
@@ -114,6 +135,8 @@ export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
         name: z.string().nullable().describe("The member's display name; null when never set (renders as 'Unnamed')."),
         email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
         role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
+        permissionOverrides: z.record(z.string(), z.boolean()).nullable().optional()
+            .describe("Capability toggles that differ from this member's role template, or null when they match it exactly."),
         createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
     })).describe('TODO describe members field for the OpenInspection MCP integration'),
     invites: z.array(z.object({

@@ -5,6 +5,7 @@ import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { SeatBanner } from "~/components/SeatBanner";
 import { InviteSeatDrawer } from "~/components/modals/InviteSeatDrawer";
+import { EditMemberDrawer, type EditableMember } from "~/components/modals/EditMemberDrawer";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
 import { useSessionContext } from "~/hooks/useSessionContext";
 import { Breadcrumb } from "~/components/Breadcrumb";
@@ -27,9 +28,11 @@ interface Member {
   token: string | null;
   /** Present only on pending rows — ISO expiry for the "expires in Nd" label. */
   expiresAt: string | null;
+  /** Capability toggles differing from the role template; seeds the edit drawer (IA-101). */
+  permissionOverrides: Record<string, boolean> | null;
 }
 
-interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null }
+interface LoaderActiveUser { id: string; email: string; role: string; name?: string | null; permissionOverrides?: Record<string, boolean> | null }
 interface LoaderInvite { id: string; email: string; role: string; expiresAt: string }
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -57,10 +60,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const active: Member[] = (body.data?.members ?? []).map((u) => ({
       id: u.id, name: u.name ?? null, email: u.email, role: u.role,
       status: "active", lastActiveAt: null, token: null, expiresAt: null,
+      permissionOverrides: u.permissionOverrides ?? null,
     }));
     const pending: Member[] = (body.data?.invites ?? []).map((i) => ({
       id: i.id, name: null, email: i.email, role: i.role,
       status: "pending", lastActiveAt: null, token: i.id, expiresAt: i.expiresAt,
+      // A pending invite's overrides live on tenant_invites and are replayed
+      // at accept time; there is no member row to edit yet.
+      permissionOverrides: null,
     }));
     return { members: [...active, ...pending], canManage: isAdminRole(role) };
   } catch {
@@ -105,6 +112,7 @@ export default function TeamPage() {
   const sessionCtx = useSessionContext();
   const [activeTab, setActiveTab] = useState("active");
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [editMember, setEditMember] = useState<EditableMember | null>(null);
 
   // Human "expires in Nd" / "expired Nd ago" from an ISO expiry. Whole-day
   // granularity is enough for a 7-day invite window.
@@ -166,6 +174,7 @@ export default function TeamPage() {
       />
 
       <InviteSeatDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} seatLimitAtOpen={atCapSeatUsage} />
+      <EditMemberDrawer open={editMember !== null} onClose={() => setEditMember(null)} member={editMember} />
 
       <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
 
@@ -236,7 +245,19 @@ export default function TeamPage() {
                       )}
                     </div>
                   ) : member.status === "active" ? (
-                    <button className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1">
+                    // IA-101 — this button existed with no onClick. The only
+                    // way to fix a role was to remove the member and re-invite.
+                    <button
+                      type="button"
+                      onClick={() => setEditMember({
+                        id: member.id as string,
+                        name: member.name as string | null,
+                        email: member.email,
+                        role: member.role as string,
+                        permissionOverrides: (member.permissionOverrides ?? null) as Record<string, boolean> | null,
+                      })}
+                      className="text-[12px] font-medium text-ih-fg-3 hover:text-ih-fg-1"
+                    >
                       {m.common_edit()}
                     </button>
                   ) : null,

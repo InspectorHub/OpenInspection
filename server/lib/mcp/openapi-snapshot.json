@@ -19454,6 +19454,36 @@
     "description": "Patches any subset of the team-page toggles (teamModeDefault). Missing keys leave existing values unchanged."
   },
   {
+    "operationId": "updateTeamMember",
+    "method": "PATCH",
+    "pathTemplate": "/api/team/members/{id}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "team",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "The member's user id.",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The member's user id."
+          }
+        }
+      ],
+      "body": {
+        "$ref": "#/components/schemas/UpdateMember"
+      }
+    },
+    "summary": "Update a team member's role or permissions",
+    "description": "Changes role and/or capability overrides for an active member. A role change also invalidates the member's sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats)."
+  },
+  {
     "operationId": "updateTenantAgreement",
     "method": "PUT",
     "pathTemplate": "/api/admin/agreements/{id}",

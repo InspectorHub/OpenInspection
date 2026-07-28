@@ -9,6 +9,7 @@ import { getBaseUrl } from '../lib/url';
 import { tenantConfigs } from '../lib/db/schema';
 import {
     InviteMemberSchema,
+    UpdateMemberSchema,
     InviteResponseSchema,
     TeamMembersResponseSchema
 } from '../lib/validations/admin.schema';
@@ -70,6 +71,33 @@ const inviteTeamMemberRoute = createRoute(withMcpMetadata({
     },
     operationId: "inviteTeam",
     description: "Auto-generated placeholder for inviteTeam (POST /invite, team domain). TODO: replace with a real description sourced from the handler."
+}, { scopes: ['write'], tier: 'extended' }));
+
+/**
+ * PATCH /api/team/members/:id
+ * Changes a member's role and/or capability overrides (IA-101). owner/manager
+ * only, same tier as invite/remove — this grants and revokes power.
+ */
+const updateTeamMemberRoute = createRoute(withMcpMetadata({
+    method: 'patch',
+    path: '/members/{id}',
+    tags: ["team"],
+    summary: 'Update a team member\'s role or permissions',
+    description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats).',
+    middleware: [requireRole('manager', 'owner')],
+    request: {
+        params: z.object({ id: z.string().uuid().describe('The member\'s user id.') }),
+        body: { content: { 'application/json': { schema: UpdateMemberSchema } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ updated: z.boolean() })) } },
+            description: 'Member updated',
+        },
+        400: { description: 'Last owner, self role-change, or agent role requested' },
+        404: { description: 'Member not found in this tenant' },
+    },
+    operationId: "updateTeamMember",
 }, { scopes: ['write'], tier: 'extended' }));
 
 /**
@@ -194,6 +222,22 @@ const teamRoutes = createApiRouter()
                 expiresAt: expiresAt.toISOString()
             }
         }, 201);
+    })
+    .openapi(updateTeamMemberRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const user = c.get('user');
+        const { id: memberId } = c.req.valid('param');
+        const body = c.req.valid('json');
+
+        await c.var.services.team.updateMember({
+            tenantId,
+            userId: memberId,
+            requesterId: user?.sub as string,
+            ...(body.role ? { role: body.role } : {}),
+            ...(body.permissionOverrides !== undefined ? { permissionOverrides: body.permissionOverrides } : {}),
+        });
+
+        return c.json({ success: true as const, data: { updated: true as const } }, 200);
     })
     .openapi(removeTeamMemberRoute, async (c) => {
         const tenantId = c.get('tenantId');
