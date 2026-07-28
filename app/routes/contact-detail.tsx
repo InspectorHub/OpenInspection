@@ -79,18 +79,27 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   // works with no account, so it outlives archiving and was previously
   // invisible everywhere. Fetched alongside rather than blocking the page: a
   // failure here should cost the access panel, not the whole record.
+  //
+  // A failure must NOT collapse into the empty list. "This contact cannot open
+  // any reports" is an assertion about access control, and rendering it because
+  // the request failed tells the operator the opposite of what may be true —
+  // the dangerous direction on this particular panel. Empty and unknown are
+  // different answers and the page says which one it has.
   let access: AccessRow[] = [];
+  let accessFailed = false;
   try {
     const accessRes = await api.contacts[":id"].access.$get({ param: { id } });
     if (accessRes.ok) {
       const ab = (await accessRes.json()) as { data?: { access?: AccessRow[] } };
       access = ab.data?.access ?? [];
+    } else {
+      accessFailed = true;
     }
   } catch {
-    access = [];
+    accessFailed = true;
   }
 
-  return { detail, access };
+  return { detail, access, accessFailed };
 }
 
 export async function action({ request, params, context }: Route.ActionArgs) {
@@ -120,7 +129,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function ContactDetailPage() {
-  const { detail, access } = useLoaderData<typeof loader>();
+  const { detail, access, accessFailed } = useLoaderData<typeof loader>();
   const revokeFetcher = useFetcher<typeof action>();
   const revoking = revokeFetcher.state !== "idle";
   const { contact, inspections, stats } = detail;
@@ -259,7 +268,11 @@ export default function ContactDetailPage() {
           )}
         </div>
 
-        {access.length === 0 ? (
+        {accessFailed ? (
+          <p className="text-[13px] text-ih-bad-fg">
+            {m.contacts_detail_access_unavailable()}
+          </p>
+        ) : access.length === 0 ? (
           <p className="text-[13px] text-ih-fg-3">{m.contacts_detail_access_none()}</p>
         ) : (
           <>

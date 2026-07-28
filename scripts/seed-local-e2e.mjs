@@ -103,7 +103,23 @@ if (!has('--no-restore')) {
     }
     // Destructive, and the only destructive step — say so before doing it.
     console.log(`→ restoring ${snapshot} → .wrangler/state (replaces local D1)`);
-    rmSync(STATE_DIR, { recursive: true, force: true });
+    try {
+        rmSync(STATE_DIR, { recursive: true, force: true });
+    } catch (err) {
+        // On Windows a running `npm run dev` keeps handles open under
+        // .wrangler/state, so the delete fails with EBUSY and Node prints a
+        // rimraf stack that says nothing about the actual cause.
+        if (err?.code === 'EBUSY' || err?.code === 'EPERM') {
+            console.error(`\n✘ cannot replace .wrangler/state — a process is holding it (${err.code}).`);
+            console.error('  A dev server is almost certainly running. Either:');
+            console.error('    • stop it and re-run, or');
+            console.error('    • run with --no-restore to seed fixtures over the current database.');
+            console.error('  If nothing is running, clear an orphaned lock:');
+            console.error('    Get-Process workerd,esbuild -ErrorAction SilentlyContinue | Stop-Process -Force');
+            process.exit(1);
+        }
+        throw err;
+    }
     cpSync(join(src, 'v3'), join(STATE_DIR, 'v3'), { recursive: true });
 }
 
@@ -154,12 +170,20 @@ try {
 }
 
 // ── 5. Report what the reviewer actually has ──────────────────────────────
+// Every count is scoped to the review tenant. The restored snapshot carries a
+// second tenant, so an unscoped COUNT reports rows the reviewer cannot see:
+// it said "contacts 8" while the Contacts page correctly listed 6, which reads
+// as a missing-rows bug in the product. The summary has to answer "what is in
+// front of me", not "what is in the file".
+const T = `'${tenant.id}'`;
 const counts = queryOne(`SELECT
-  (SELECT COUNT(*) FROM users WHERE tenant_id IS NOT NULL) members,
-  (SELECT COUNT(*) FROM contacts) contacts,
-  (SELECT COUNT(*) FROM inspection_access_tokens WHERE revoked_at IS NULL) live_links,
-  (SELECT COUNT(*) FROM invoices) invoices,
-  (SELECT COUNT(*) FROM tenant_configs WHERE secrets_enc IS NOT NULL) stripe_configured`);
+  (SELECT COUNT(*) FROM users WHERE tenant_id = ${T}) members,
+  (SELECT COUNT(*) FROM contacts WHERE tenant_id = ${T} AND archived_at IS NULL) contacts,
+  (SELECT COUNT(*) FROM contacts WHERE tenant_id = ${T} AND archived_at IS NOT NULL) archived_contacts,
+  (SELECT COUNT(*) FROM inspection_access_tokens WHERE tenant_id = ${T} AND revoked_at IS NULL) live_links,
+  (SELECT COUNT(*) FROM invoices WHERE tenant_id = ${T}) invoices,
+  (SELECT COUNT(*) FROM tenant_configs WHERE tenant_id = ${T} AND secrets_enc IS NOT NULL) stripe_configured,
+  (SELECT COUNT(*) FROM tenants) tenants`);
 
 console.log('\n✓ local D1 ready for review');
 console.log(`  tenant           ${tenant.id}`);
@@ -168,6 +192,16 @@ console.log(`  contacts         ${counts?.contacts ?? '?'}  (client / agent / ot
 console.log(`  live report links${String(counts?.live_links ?? '?').padStart(2)}`);
 console.log(`  invoices         ${counts?.invoices ?? '?'}  (paid / unpaid / no-inspection)`);
 console.log(`  stripe           ${counts?.stripe_configured ? 'configured' : 'NOT configured'}`);
+if (counts?.archived_contacts) {
+    // Archived contacts have no UI surface at all — listContacts filters them
+    // out and the type dropdown has no "Archived" option. Say so here, or the
+    // reviewer counts rows on screen and concludes the list is dropping them.
+    console.log(`  (+${counts.archived_contacts} archived contacts — no UI surface lists these)`);
+}
+if ((counts?.tenants ?? 0) > 1) {
+    console.log(`  (+${counts.tenants - 1} other tenant(s) in this DB — useful for isolation checks;`);
+    console.log('   their rows must never appear in the workspace above)');
+}
 if (!counts?.stripe_configured) {
     console.log('\n  ⚠ Stripe is not configured in this database. Payment flows will not work.');
     console.log('    Restore a snapshot that has it (--list), or configure it via Settings once');

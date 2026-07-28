@@ -12,7 +12,7 @@ export const invoices = sqliteTable('invoices', {
     clientEmail: text('client_email'),
     // P-4 authority chain (tier 1): when an invoice exists its amountCents is
     // authoritative over service-snapshot sums and inspections.price. See
-    // getEffectivePriceCents() in app/lib/effective-price.ts.
+    // getEffectivePriceCents() in server/lib/effective-price.ts.
     amountCents: integer('amount_cents').notNull().default(0),
     lineItems: text('line_items', { mode: 'json' }).notNull().$type<Array<{ description: string; amountCents: number; quantity?: number; unitAmountCents?: number }>>().default([]),
     // Calendar-semantic YYYY-MM-DD (invoice due date, no time component) — intentionally

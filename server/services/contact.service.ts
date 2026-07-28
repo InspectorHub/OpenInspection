@@ -1,5 +1,5 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, like, sql, isNull, inArray, isNotNull } from 'drizzle-orm';
+import { eq, and, like, sql, isNull, inArray } from 'drizzle-orm';
 import { contacts, type ContactType } from '../lib/db/schema/contact';
 import { inspections } from '../lib/db/schema/inspection';
 import { invoices } from '../lib/db/schema/invoice';
@@ -9,6 +9,7 @@ import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
 import { tenantConfigs } from '../lib/db/schema';
 import { logger } from '../lib/logger';
+import { getEffectivePriceCents } from '../lib/effective-price';
 
 export class ContactService {
     /**
@@ -109,22 +110,44 @@ export class ContactService {
 
         const inspectionIds = inspectionRows.map(r => r.id);
 
-        // Revenue = Σ amountCents of PAID invoices on those inspections.
+        // One pass over the invoices on these inspections, serving two readers.
+        //
+        // Revenue counts PAID ones only. The per-row price needs EVERY live one,
+        // because an invoice is tier 1 of the P-4 authority chain whether or not
+        // it has been paid — `inspections.price` is a denormalized cache and its
+        // own schema comment says to read through getEffectivePriceCents().
+        // Reading the cache directly is how this card came to state
+        // "TOTAL REVENUE $450.00" beside that same inspection listed at "$0.00".
+        //
         // Chunk the inArray to stay under D1's 100-bind-param ceiling.
         let totalRevenueCents = 0;
+        const invoiceByInspection = new Map<string, number>();
+        const paidInspectionIds = new Set<string>();
         const CHUNK = 90;
         for (let i = 0; i < inspectionIds.length; i += CHUNK) {
             const chunk = inspectionIds.slice(i, i + CHUNK);
-            const res = await db.select({ total: sql<number>`coalesce(sum(${invoices.amountCents}), 0)` })
+            const rows = await db.select({
+                inspectionId: invoices.inspectionId,
+                amountCents:  invoices.amountCents,
+                paidAt:       invoices.paidAt,
+            })
                 .from(invoices)
                 .where(and(
                     eq(invoices.tenantId, tenantId),
                     inArray(invoices.inspectionId, chunk),
-                    isNotNull(invoices.paidAt),
                     isNull(invoices.voidedAt),
                 ))
-                .get();
-            totalRevenueCents += res?.total ?? 0;
+                .all();
+            for (const inv of rows) {
+                if (!inv.inspectionId) continue;
+                if (inv.paidAt) {
+                    totalRevenueCents += inv.amountCents ?? 0;
+                    paidInspectionIds.add(inv.inspectionId);
+                }
+                if (!invoiceByInspection.has(inv.inspectionId)) {
+                    invoiceByInspection.set(inv.inspectionId, inv.amountCents ?? 0);
+                }
+            }
         }
 
         return {
@@ -144,8 +167,19 @@ export class ContactService {
                 propertyAddress: r.propertyAddress,
                 date:            r.date,
                 status:          r.status,
-                price:           r.price,
-                paymentStatus:   r.paymentStatus,
+                // Service lines are deliberately not loaded here, so tier 2 is
+                // skipped: the helper treats undefined as "not loaded" and falls
+                // through, which is the correct behaviour rather than a gap.
+                price:           getEffectivePriceCents({
+                    invoiceAmountCents:   invoiceByInspection.get(r.id) ?? null,
+                    inspectionPriceCents: r.price,
+                }),
+                // A paid invoice settles the question, and saying otherwise
+                // beside a corrected amount reads worse than the old all-wrong
+                // row did. Deliberately one-directional: a paid invoice can
+                // promote the row, nothing here demotes it, so `partial` —
+                // which only the inspection models, via markPartial — survives.
+                paymentStatus:   paidInspectionIds.has(r.id) ? 'paid' as const : r.paymentStatus,
             })),
             stats: {
                 inspectionCount:   inspectionRows.length,

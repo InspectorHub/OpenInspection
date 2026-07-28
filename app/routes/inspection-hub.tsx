@@ -14,7 +14,7 @@ import {
   type HubPayload,
 } from "~/lib/hub-blocks";
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
-import { getEffectivePriceCents } from "~/lib/effective-price";
+import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, Modal } from "@core/shared-ui";
 import DocumentsSection, {

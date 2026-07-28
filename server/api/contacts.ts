@@ -11,6 +11,21 @@ import {
 } from '../lib/validations/contact.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
+/**
+ * `contacts.id` is a TEXT column holding an opaque identifier. Every writer
+ * happens to mint `crypto.randomUUID()` today, but the COLUMN does not promise
+ * that and the API must not either: pinning the param to `.uuid()` rejects a
+ * perfectly valid id at the edge, and does so with a 400 that reads like bad
+ * input rather than an unsupported id format. Same defect as the `inspectorId`
+ * `.uuid()` that rejected an entire patch against a text column (IA-87).
+ *
+ * It also has to be ONE rule. This resource previously validated `.min(1)` on
+ * GET and `.uuid()` on update/delete/access, so the same id could be readable
+ * and un-revokable — and the access panel rendered that 400 as "this contact
+ * cannot open any reports".
+ */
+const CONTACT_ID = z.string().trim().min(1);
+
 const listContactsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["contacts"], summary: "List contacts for current tenant",
@@ -31,7 +46,7 @@ const getContactDetailRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["contacts"], summary: "Contact detail: record + inspection history + stats",
     middleware: [requireRole('owner', 'manager', 'inspector')],
-    request: { params: z.object({ id: z.string().min(1).describe('Contact identifier') }) },
+    request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: ContactDetailResponseSchema } },
@@ -67,7 +82,7 @@ const updateContactRoute = createRoute(withMcpMetadata({
     // Task 10 — manageContacts capability gates contact CREATE/UPDATE/DELETE.
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: CONTACT_ID.describe('Contact id.') }),
         body: { content: { 'application/json': { schema: UpdateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
@@ -86,7 +101,7 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     tags: ["contacts"], summary: "Delete contact for current tenant",
     // Task 10 — manageContacts capability gates contact CREATE/UPDATE/DELETE.
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
-    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
@@ -112,7 +127,7 @@ const listContactAccessRoute = createRoute(withMcpMetadata({
     summary: "List the live report links a contact still holds",
     description: 'Every inspection this contact can still open, by way of a live (unrevoked, unexpired) access token addressed to their email. Empty for a contact with no email.',
     middleware: [requireRole('owner', 'manager', 'inspector')],
-    request: { params: z.object({ id: z.string().uuid().describe('Contact id.') }) },
+    request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: createApiResponseSchema(z.object({
@@ -147,7 +162,7 @@ const revokeContactAccessRoute = createRoute(withMcpMetadata({
     description: 'Revokes the named inspections\' links for this contact, or every live link when inspectionIds is omitted. Returns the number actually revoked, which can be lower than requested if some were already gone.',
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
     request: {
-        params: z.object({ id: z.string().uuid().describe('Contact id.') }),
+        params: z.object({ id: CONTACT_ID.describe('Contact id.') }),
         body: { content: { 'application/json': { schema: z.object({
             inspectionIds: z.array(z.string()).optional()
                 .describe('Inspections to revoke. Omit to revoke every live link this contact holds.'),

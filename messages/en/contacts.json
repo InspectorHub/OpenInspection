@@ -97,6 +97,7 @@
   "contacts_type_other": "Other",
   "contacts_detail_access_heading": "Report access",
   "contacts_detail_access_none": "This contact cannot open any reports.",
+  "contacts_detail_access_unavailable": "Report access could not be loaded, so this list may be incomplete. Reload before assuming this contact has no access.",
   "contacts_detail_access_explainer": "These links work without an account. Revoking one takes effect immediately.",
   "contacts_detail_access_revoke": "Revoke",
   "contacts_detail_access_revoke_all": "Revoke all",
