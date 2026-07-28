@@ -1,7 +1,7 @@
 // server/lib/render-token.ts
 /**
  * Headless-render access token. Short-TTL, single-inspection-scoped,
- * HMAC-SHA-256 over a base64url JSON body — same shape as observer-cookie.ts.
+ * HMAC-SHA-256 over a base64url JSON body.
  *
  * Minted ONLY server-side by trusted flows (publish archive, report email,
  * authed/token download) and appended to the report URL the Cloudflare

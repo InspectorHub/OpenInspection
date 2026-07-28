@@ -43,7 +43,7 @@ describe('GET /api/portal/:tenant/redeem — find-my-report agent destination', 
     let sqlite: ReturnType<typeof createTestDb>['sqlite'];
 
     function buildApp() {
-        const portalSvc = new PortalService({} as D1Database, { getObserveProgress: async () => { throw new Error('unused in this suite'); } });
+        const portalSvc = new PortalService({} as D1Database, { getSectionProgress: async () => { throw new Error('unused in this suite'); } });
         const app = new OpenAPIHono<HonoConfig>();
         app.use('*', async (c, next) => {
             c.set('tenantId', TENANT);

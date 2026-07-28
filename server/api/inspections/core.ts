@@ -11,9 +11,6 @@ import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
 import { auditFromContext } from '../../lib/audit';
 import { Errors } from '../../lib/errors';
-import { getCookie } from 'hono/cookie';
-import { verifyObserverCookie } from '../../lib/observer-cookie';
-import { OBSERVER_COOKIE_NAME } from '../../lib/middleware/observer-cookie';
 import { canAccessInspectionCollab } from '../../lib/collab/can-access';
 import { createApiResponseSchema, SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { InspectionSchema, CreateInspectionSchema, UpdateInspectionSchema } from '../../lib/validations/inspection.schema';
@@ -501,44 +498,27 @@ const coreRoutes = createApiRouter()
         const user     = c.get('user') as { sub?: string } | undefined;
         const userId   = user?.sub;
 
-        // Design System 0520 subsystem D phase 6 — observer fallback.
-        // Inspector path uses JWT; observers carry the dedicated
-        // __Host-observer_session cookie. We try JWT first (the common
-        // case) then degrade to the observer cookie. Both produce a DO
-        // attach request with `x-user-role: inspector` or `observer`
-        // respectively — the DO already routes the two roles correctly
-        // (observers are read-only in the roster snapshot).
-        let attachUserId: string;
-        let attachName:   string;
-        let attachRole:   'inspector' | 'observer';
+        // Presence is staff-only: attaching requires a JWT identity that
+        // passes the collab access check. (This branch used to fall back to a
+        // no-account observer-link cookie; that capability was retired along
+        // with its landing page, so there is no second identity to try.)
+        if (!userId || !tenantId) return new Response('unauthorized', { status: 401 });
 
-        if (userId && tenantId) {
-            let ins;
-            try {
-                const out = await c.var.services.inspection.getInspection(id, tenantId);
-                ins = out.inspection;
-            } catch {
-                return new Response('not found', { status: 404 });
-            }
-
-            const userRole = c.get('userRole') as string | undefined;
-            const allowed = canAccessInspectionCollab(ins, { id: userId, role: userRole ?? '' });
-            if (!allowed) return new Response('forbidden', { status: 403 });
-
-            attachUserId = userId;
-            attachName   = ins.inspectorId === userId ? 'Inspector' : 'Helper';
-            attachRole   = 'inspector';
-        } else {
-            const cookie = getCookie(c, OBSERVER_COOKIE_NAME);
-            if (!cookie) return new Response('unauthorized', { status: 401 });
-            const payload = await verifyObserverCookie(cookie, c.env.JWT_SECRET);
-            if (!payload || payload.inspectionId !== id) {
-                return new Response('forbidden', { status: 403 });
-            }
-            attachUserId = `observer-${payload.linkId}`;
-            attachName   = 'Observer';
-            attachRole   = 'observer';
+        let ins;
+        try {
+            const out = await c.var.services.inspection.getInspection(id, tenantId);
+            ins = out.inspection;
+        } catch {
+            return new Response('not found', { status: 404 });
         }
+
+        const userRole = c.get('userRole') as string | undefined;
+        if (!canAccessInspectionCollab(ins, { id: userId, role: userRole ?? '' })) {
+            return new Response('forbidden', { status: 403 });
+        }
+
+        const attachUserId = userId;
+        const attachName   = ins.inspectorId === userId ? 'Inspector' : 'Helper';
 
         const doId = c.env.INSPECTION_PRESENCE.idFromName(id);
         const stub = c.env.INSPECTION_PRESENCE.get(doId);
@@ -550,7 +530,7 @@ const coreRoutes = createApiRouter()
                 'x-user-id':        attachUserId,
                 'x-user-name':      attachName,
                 'x-user-photo-url': '',
-                'x-user-role':      attachRole,
+                'x-user-role':      'inspector',
             },
         });
         return stub.fetch(fwd);

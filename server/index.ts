@@ -2,8 +2,6 @@ import { OpenAPIHono } from '@hono/zod-openapi';
 import type { Context } from 'hono';
 import { cors } from 'hono/cors';
 import { serveStatic } from 'hono/cloudflare-workers';
-import { setCookie } from 'hono/cookie';
-import { signObserverCookie } from './lib/observer-cookie';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq } from 'drizzle-orm';
 import * as schema from './lib/db/schema';
@@ -446,37 +444,6 @@ const routes = app
 // No-op surface for standalone. The worker entry 404s these in standalone
 // (APP_MODE ≠ saas).
 registerPortalIntegration(app);
-
-// Design System 0520 subsystem D phase 4/5 — anonymous observer claim.
-// Public route — exchanges a one-time token for a __Host-observer_session
-// cookie (HMAC-signed scope = inspection id + expiresAt). Subsequent
-// /observe/inspections/:id loads carry the cookie; the middleware in
-// server/lib/middleware/observer-cookie.ts verifies + scopes per-request.
-app.get('/observe/:token', async (c) => {
-    const token = c.req.param('token');
-    if (!token) return c.text('Missing token', 400);
-
-    const out = await c.var.services.observerLink.claim(token);
-    if (out.kind === 'not_found' || out.kind === 'revoked') {
-        return c.redirect('/not-found?reason=observer-invalid', 302);
-    }
-    if (out.kind === 'expired') {
-        return c.redirect('/not-found?reason=observer-expired', 302);
-    }
-
-    const cookie = await signObserverCookie(
-        { linkId: out.linkId, inspectionId: out.inspectionId, exp: out.exp },
-        c.env.JWT_SECRET,
-    );
-    setCookie(c, '__Host-observer_session', cookie, {
-        httpOnly: true,
-        secure:   true,
-        sameSite: 'Strict',
-        path:     '/observe',
-        maxAge:   Math.max(out.exp - Math.floor(Date.now() / 1000), 60),
-    });
-    return c.redirect(`/observe/inspections/${out.inspectionId}`);
-});
 
 // OpenAPI Documentation
 app.doc('/doc', {

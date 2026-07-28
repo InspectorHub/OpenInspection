@@ -78,34 +78,6 @@ export async function classifyPortalAccess(
 }
 
 /**
- * Guard for the public live-observer view (`/observe/inspections/:id`). The
- * OBSERVER link is a DISTINCT capability from the portal token — it is resolved
- * via ObserverLinkService.claim(), which short-circuits on revoked/expired and
- * returns the row's tenantId. We return the AUTHORITATIVE tenantId (from the
- * claimed link, never the URL) only when the link grants access to exactly the
- * requested inspection; otherwise null (→ caller 404s).
- */
-type ObserverClaim =
-    | { kind: 'ok'; inspectionId: string; tenantId: string }
-    | { kind: 'expired' | 'revoked' | 'not_found' };
-
-export interface ObserverAccessResolver {
-    claim(token: string): Promise<ObserverClaim>;
-}
-
-export async function resolveObserverAccess(
-    svc: ObserverAccessResolver,
-    token: string | undefined,
-    requestedInspectionId: string,
-): Promise<{ tenantId: string } | null> {
-    if (!token) return null;
-    const claim = await svc.claim(token);
-    if (claim.kind !== 'ok') return null;
-    if (claim.inspectionId !== requestedInspectionId) return null;
-    return { tenantId: claim.tenantId };
-}
-
-/**
  * Testable core of the owner-session preview fallback. Given a raw session JWT
  * (Bearer value, already stripped of the "Bearer " prefix), the per-request
  * keyring, and an optional KV getter for password-change invalidation, returns

@@ -1,4 +1,4 @@
-// Units tree, observer links, and report versions sub-router.
+// Units tree and report versions sub-router.
 // Behavior-preserving extraction from inspections.ts — handler bodies + route
 // definitions are byte-identical to the original (only their location changed).
 import { createRoute, z } from '@hono/zod-openapi';
@@ -175,54 +175,6 @@ const moveUnitRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'extended' }));
 
 // -----------------------------------------------------------------------------
-// Design System 0520 subsystem D phase 4 task 4.3 — ObserverLink routes.
-// -----------------------------------------------------------------------------
-// Mint / list / revoke for the no-account read-only viewer flow. The
-// anonymous /observe/:token claim handler is mounted at the top level
-// in server/index.ts because it does not sit under /api/inspections/:id.
-
-const mintObserverLinkRoute = createRoute(withMcpMetadata({
-    method:     'post',
-    path:       '/{id}/observer-links',
-    tags: ["inspections"],
-    summary:    'Mint a no-account read-only viewer link',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
-        body: { content: { 'application/json': { schema: z.object({
-            durationSeconds: z.number().int().min(60).max(30 * 86400).optional().describe('TODO describe durationSeconds field for the OpenInspection MCP integration'),
-        }).describe('TODO describe schema field for the OpenInspection MCP integration') } } },
-    },
-    responses: { 200: { description: 'ok' } },
-    operationId: "createInspectionObserverLinks",
-    description: "Auto-generated placeholder for createInspectionObserverLinks (POST /{id}/observer-links, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
-
-const listObserverLinksRoute = createRoute(withMcpMetadata({
-    method:     'get',
-    path:       '/{id}/observer-links',
-    tags: ["inspections"],
-    summary:    'List active observer links for an inspection',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request:    { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-    responses:  { 200: { description: 'ok' } },
-    operationId: "listInspectionObserverLinks",
-    description: "Auto-generated placeholder for listInspectionObserverLinks (GET /{id}/observer-links, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['read'], tier: 'extended' }));
-
-const revokeObserverLinkRoute = createRoute(withMcpMetadata({
-    method:     'delete',
-    path:       '/{id}/observer-links/{linkId}',
-    tags: ["inspections"],
-    summary:    'Revoke an observer link',
-    middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request:    { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'), linkId: z.string().min(1).describe('TODO describe linkId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
-    responses:  { 200: { description: 'ok', content: { 'application/json': { schema: SuccessResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } } },
-    operationId: "deleteInspectionObserverLink",
-    description: "Auto-generated placeholder for deleteInspectionObserverLink (DELETE /{id}/observer-links/{linkId}, inspections domain). TODO: replace with a real description sourced from the handler."
-}, { scopes: ['write'], tier: 'extended' }));
-
-// -----------------------------------------------------------------------------
 // Design System 0520 subsystem D phase 7 task 7.3 — ReportVersions routes.
 // -----------------------------------------------------------------------------
 // List + get-snapshot + diff. snapshotOnPublish is invoked from the
@@ -372,35 +324,6 @@ const hierarchyRoutes = createApiRouter()
         } catch (err) {
             throw Errors.BadRequest((err as Error).message);
         }
-    })
-    .openapi(mintObserverLinkRoute, async (c) => {
-        const { id }   = c.req.valid('param');
-        const { durationSeconds } = c.req.valid('json');
-        const createdBy = (c.get('user') as { sub?: string } | undefined)?.sub;
-        if (!createdBy) throw Errors.Unauthorized('Missing user identity');
-
-        const out = await c.var.services.observerLink.mint(c.get('tenantId'), {
-            inspectionId: id,
-            createdBy,
-            ...(durationSeconds !== undefined ? { durationSeconds } : {}),
-        });
-
-        // Augment the bare service output with a fully-qualified claim URL
-        // so the InspectorToolsDock modal can render a copy-and-paste field
-        // without re-deriving the host or token path on the client.
-        const baseUrl = c.env.APP_BASE_URL || `https://${c.req.header('host') ?? ''}`;
-        const url     = `${baseUrl}/observe/${out.token}`;
-        return c.json({ success: true as const, data: { ...out, url } }, 200);
-    })
-    .openapi(listObserverLinksRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const links  = await c.var.services.observerLink.list(c.get('tenantId'), id);
-        return c.json({ success: true as const, data: { links } }, 200);
-    })
-    .openapi(revokeObserverLinkRoute, async (c) => {
-        const { linkId } = c.req.valid('param');
-        await c.var.services.observerLink.revoke(c.get('tenantId'), linkId);
-        return c.json({ success: true as const }, 200);
     })
     .openapi(listVersionsRoute, async (c) => {
         const { id } = c.req.valid('param');

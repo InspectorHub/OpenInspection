@@ -294,7 +294,7 @@ const observeRoute = createRoute(withMcpMetadata({
     description:
         'Returns per-section observation progress (section name + total/completed items, plus ' +
         'address / date / inspector / status) for one inspection. Authenticated by the portal ' +
-        'session — NOT the separate observer-link token. Asserts the inspection is in the ' +
+        'session. Asserts the inspection is in the ' +
         "recipient's accessible set for this tenant+email before returning data (403 otherwise). " +
         'Mirrors the overview endpoint so the Hub Progress section reads progress via the ' +
         'membership-checked portal session.',
@@ -539,7 +539,7 @@ const portalRoutes = portalRouter
             return c.json({ error: 'Not accessible' }, 403);
         }
 
-        // Tenant + inspection scoped server-side; NO observer-link token needed.
+        // Tenant + inspection scoped server-side; the portal session is the only gate.
         const observe = await c.var.services.portal.observeProgress(tenantId, inspectionId);
         if (!observe) return c.json({ error: 'Inspection not found' }, 404);
         return c.json({ data: observe }, 200);

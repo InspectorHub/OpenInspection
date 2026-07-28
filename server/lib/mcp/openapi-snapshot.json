@@ -1658,45 +1658,6 @@
     "description": "Auto-generated placeholder for createInspectionItemsPhotosAnnotation (POST /{id}/items/{itemId}/photos/{photoIndex}/annotation, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
-    "operationId": "createInspectionObserverLinks",
-    "method": "POST",
-    "pathTemplate": "/api/inspections/{id}/observer-links",
-    "scopes": [
-      "write"
-    ],
-    "tag": "inspections",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "format": "uuid",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
-          }
-        }
-      ],
-      "body": {
-        "type": "object",
-        "properties": {
-          "durationSeconds": {
-            "type": "integer",
-            "minimum": 60,
-            "maximum": 2592000,
-            "description": "TODO describe durationSeconds field for the OpenInspection MCP integration"
-          }
-        },
-        "description": "TODO describe schema field for the OpenInspection MCP integration"
-      }
-    },
-    "summary": "Mint a no-account read-only viewer link",
-    "description": "Auto-generated placeholder for createInspectionObserverLinks (POST /{id}/observer-links, inspections domain). TODO: replace with a real description sourced from the handler."
-  },
-  {
     "operationId": "createInspectionRequest",
     "method": "POST",
     "pathTemplate": "/api/inspection-requests",
@@ -5585,45 +5546,6 @@
     "description": "Auto-generated placeholder for deleteInspectionMediaPool (DELETE /{id}/media/pool/{poolId}, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
-    "operationId": "deleteInspectionObserverLink",
-    "method": "DELETE",
-    "pathTemplate": "/api/inspections/{id}/observer-links/{linkId}",
-    "scopes": [
-      "write"
-    ],
-    "tag": "inspections",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "format": "uuid",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
-          }
-        },
-        {
-          "name": "linkId",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe linkId field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "minLength": 1,
-            "description": "TODO describe linkId field for the OpenInspection MCP integration"
-          }
-        }
-      ],
-      "body": null
-    },
-    "summary": "Revoke an observer link",
-    "description": "Auto-generated placeholder for deleteInspectionObserverLink (DELETE /{id}/observer-links/{linkId}, inspections domain). TODO: replace with a real description sourced from the handler."
-  },
-  {
     "operationId": "deleteInspectionTemplate",
     "method": "DELETE",
     "pathTemplate": "/api/inspections/templates/{id}",
@@ -7474,41 +7396,6 @@
     },
     "summary": "Public invoice for an inspection (pay-link landing)",
     "description": "Public, no-login invoice for an inspection, gated by the recipient's portal token (?token=) or the unified-portal session cookie. Only client/co_client grants are accepted; tenantId comes from the resolved grant, never the URL."
-  },
-  {
-    "operationId": "getPublicObserve",
-    "method": "GET",
-    "pathTemplate": "/api/public/observe/inspections/{id}",
-    "scopes": [],
-    "tag": "public",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "description": "Inspection id.",
-          "schema": {
-            "type": "string",
-            "description": "Inspection id."
-          }
-        },
-        {
-          "name": "token",
-          "in": "query",
-          "required": false,
-          "description": "Observer-link token.",
-          "schema": {
-            "type": "string",
-            "description": "Observer-link token."
-          }
-        }
-      ],
-      "body": null
-    },
-    "summary": "Public live observer progress (token-gated)",
-    "description": "Public, no-login live progress for an in-flight inspection, gated by an observer-link token. 404 when the link is invalid/expired/revoked or does not grant access to the requested inspection."
   },
   {
     "operationId": "getPublicReport",
@@ -9477,34 +9364,6 @@
     },
     "summary": "Media Center — all attached + pool photos",
     "description": "Auto-generated placeholder for listInspectionMedia (GET /{id}/media, inspections domain). TODO: replace with a real description sourced from the handler."
-  },
-  {
-    "operationId": "listInspectionObserverLinks",
-    "method": "GET",
-    "pathTemplate": "/api/inspections/{id}/observer-links",
-    "scopes": [
-      "read"
-    ],
-    "tag": "inspections",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "id",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "format": "uuid",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
-          }
-        }
-      ],
-      "body": null
-    },
-    "summary": "List active observer links for an inspection",
-    "description": "Auto-generated placeholder for listInspectionObserverLinks (GET /{id}/observer-links, inspections domain). TODO: replace with a real description sourced from the handler."
   },
   {
     "operationId": "listInspectionPdf",
@@ -14263,7 +14122,7 @@
       "body": null
     },
     "summary": "Per-section observe progress for an accessible inspection",
-    "description": "Returns per-section observation progress (section name + total/completed items, plus address / date / inspector / status) for one inspection. Authenticated by the portal session — NOT the separate observer-link token. Asserts the inspection is in the recipient's accessible set for this tenant+email before returning data (403 otherwise). Mirrors the overview endpoint so the Hub Progress section reads progress via the membership-checked portal session."
+    "description": "Returns per-section observation progress (section name + total/completed items, plus address / date / inspector / status) for one inspection. Authenticated by the portal session. Asserts the inspection is in the recipient's accessible set for this tenant+email before returning data (403 otherwise). Mirrors the overview endpoint so the Hub Progress section reads progress via the membership-checked portal session."
   },
   {
     "operationId": "portalInspectionOverview",

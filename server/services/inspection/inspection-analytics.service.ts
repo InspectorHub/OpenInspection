@@ -36,7 +36,7 @@ function countCustomDefects(
 
 /**
  * Dashboard + report analytics aggregation. Defect stats, repair list,
- * counts, dashboard buckets, observer progress. Extracted verbatim from
+ * counts, dashboard buckets, section progress. Extracted verbatim from
  * InspectionService. Methods that need the full resolved report call back
  * through the facade's getReportData (cross-service dependency made explicit).
  */
@@ -53,13 +53,13 @@ export class InspectionAnalyticsService extends InspectionSubService {
     }
 
     /**
-     * C-10 ③-A.4 — live progress for the public observer view
+     * Live per-section progress (client portal progress section)
      * (`/observe/inspections/:id`). Derives per-section completion from the same
      * resolved report shape getReportData builds, so the section/item structure
      * (templateSnapshot-aware) stays in one place. An item counts as "done" once
      * the inspector has captured a rating (rich items) or a value (data points).
      */
-    async getObserveProgress(inspectionId: string, tenantId: string) {
+    async getSectionProgress(inspectionId: string, tenantId: string) {
         const report = await this.facade.getReportData(inspectionId, tenantId);
         const insp = report.inspection;
         return {

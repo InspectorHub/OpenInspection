@@ -28,7 +28,7 @@ interface RosterMsg { type: 'roster'; users: Array<{ userId: string; role: strin
 interface PresenceInternals { snapshotRoster(): Array<{ userId: string }> }
 
 /** Build a `/ws` upgrade request with the identity headers the worker stamps. */
-function wsUpgrade(userId: string, name: string, role: 'inspector' | 'observer' = 'inspector'): Request {
+function wsUpgrade(userId: string, name: string, role: 'inspector' = 'inspector'): Request {
     return new Request('https://do.local/api/inspections/x/presence/ws', {
         headers: {
             Upgrade: 'websocket',

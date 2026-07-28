@@ -31,7 +31,6 @@ export default [
     route("verify/:envelopeId", "routes/public/verify.tsx"),
     route("verify", "routes/public/verify-offline.tsx"),
     route("v/:token", "routes/public/v.$token.tsx"),
-    route("observe/inspections/:id", "routes/public/observe.tsx"),
     // Flow A — client redeems the agent-concierge magic link emailed as
     // ${APP_BASE_URL}/confirm/<token>. Shows booking details then POSTs the
     // confirm and follows the server-chosen redirect (agreement / report).
