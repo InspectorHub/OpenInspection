@@ -66,6 +66,7 @@
     "test:types": "cross-env NODE_OPTIONS=--max-old-space-size=8192 vitest run --typecheck --config vitest.typecheck.config.ts",
     "test:e2e": "playwright test",
     "db:migrate": "node scripts/wrangler.mjs d1 migrations apply DB --local",
+    "seed:local": "node scripts/seed-local-e2e.mjs",
     "db:migrate:remote": "node scripts/wrangler.mjs d1 migrations apply DB --remote",
     "db:migrate:saas:remote": "cross-env WRANGLER_CONFIG=wrangler.saas.jsonc node scripts/wrangler.mjs d1 migrations apply DB --remote",
     "db:check": "node scripts/verify-migration-equivalence.mjs",
