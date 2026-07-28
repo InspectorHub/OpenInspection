@@ -1,7 +1,7 @@
 import type { Context } from 'hono';
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, gte, lte, sql, inArray, isNull, ne, asc } from 'drizzle-orm';
-import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, tenantConfigs, users, services as servicesTable, agentTenantLinks, contactRoleProfiles, inspectorCredentials } from '../lib/db/schema';
+import { availability, availabilityOverrides, calendarBlocks, inspections, inspectionInspectors, inspectionRequests, serviceInspectors, tenantConfigs, users, services as servicesTable, contactRoleProfiles, inspectorCredentials, contacts } from '../lib/db/schema';
 import { wallClockToEpochMs, resolveTenantTimeZone } from '../lib/tz';
 import { Errors } from '../lib/errors';
 import { safeISODate } from '../lib/date';
@@ -426,12 +426,14 @@ export class BookingService {
                     ))
                     .get();
                 if (agent) {
-                    const link = await db.select({ contactId: agentTenantLinks.inspectorContactId })
-                        .from(agentTenantLinks)
+                    // IA-104 — the agent's contact in THIS tenant is the row
+                    // bound to their account; no link hop.
+                    const link = await db.select({ contactId: contacts.id })
+                        .from(contacts)
                         .where(and(
-                            eq(agentTenantLinks.agentUserId, agent.id),
-                            eq(agentTenantLinks.tenantId, tenantId),
-                            eq(agentTenantLinks.status, 'active'),
+                            eq(contacts.agentUserId, agent.id),
+                            eq(contacts.tenantId, tenantId),
+                            isNull(contacts.agentRevokedAt),
                         ))
                         .get();
                     resolvedAgentContactId = link?.contactId ?? null;

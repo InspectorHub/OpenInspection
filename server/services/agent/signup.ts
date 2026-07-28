@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { and, eq, isNull } from 'drizzle-orm';
-import { agentTenantLinks, users } from '../../lib/db/schema/tenant';
+import { users } from '../../lib/db/schema/tenant';
 import { contacts } from '../../lib/db/schema/contact';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
@@ -53,14 +53,14 @@ export async function signup(
 /**
  * Same-email auto-link: when an agent account is created at signup, find every
  * ACTIVE `contacts` row in any tenant where `type='agent'` and `email` matches
- * the agent's email, and create an `active` agent_tenant_links row for each.
- * Skips existing links thanks to the unique (agent_user_id, tenant_id) index.
+ * the agent's email, and bind the account to it (IA-104: a column on the
+ * contact, not a row in a join table).
  *
- * This is now the ONLY producer of agent_tenant_links rows (the invite-accept
- * path is gone), and it always sets `inspectorContactId` — which is what lets
- * that column be NOT NULL.
+ * Idempotent twice over — the `agent_user_id IS NULL` guard means an already
+ * bound contact is not re-stamped, and uq_contacts_tenant_agent_user stops a
+ * second contact in the same tenant claiming the same account.
  *
- * Returns the count of new links created (idempotent — second call returns 0).
+ * Returns the count of contacts newly bound (second call returns 0).
  */
 export async function autoLinkSameEmail(
     rawDb: D1Database,
@@ -69,57 +69,58 @@ export async function autoLinkSameEmail(
 ): Promise<number> {
     const db = drizzle(rawDb);
     const normalized = normalizeEmail(email);
-    // ARCHIVED CONTACTS MUST NOT WIN THE LINK. `contacts` allows one ACTIVE
-    // row per (tenant, email) but any number of archived ones, and
-    // agent_tenant_links allows only one row per (agent, tenant) — so without
-    // this filter a tenant that had archived an old contact and made a fresh
-    // one could get a link pointing at the dead record, while every inspection
-    // referenced the live one. The insert below would then silently skip the
-    // correct contact on the unique-index catch, and the agent's referral list
-    // would be empty for reasons nothing surfaced.
+    // Archived contacts must not be bound: binding a retired record would
+    // consume this tenant's one slot for the account (see the partial unique
+    // index) while every inspection names the live row.
+    //
+    // `agent_user_id IS NULL` is part of the QUERY, not just the update's
+    // where-clause, so the count below is derived from rows we selected rather
+    // than from a driver's changes counter — D1 reports that as
+    // `res.meta.changes` and better-sqlite3 as `res.changes`, so reading
+    // either one is silently zero under the other.
     const matches = await db
-        .select({
-            id: contacts.id,
-            tenantId: contacts.tenantId,
-            createdByUserId: contacts.createdByUserId,
-        })
+        .select({ id: contacts.id, tenantId: contacts.tenantId })
         .from(contacts)
         .where(and(
             eq(contacts.email, normalized),
             eq(contacts.type, 'agent'),
             isNull(contacts.archivedAt),
+            isNull(contacts.agentUserId),
         ))
         .all();
 
     let created = 0;
     for (const row of matches) {
         try {
-            // Use contact.createdByUserId as the inviting inspector when present
-            // so /agent-inspectors can render the inspector's name + slug. When
-            // the contact predates this column or was imported in bulk, fall
-            // back to the tenant owner so the auto-linked card still shows a
-            // real person instead of a generic tenant-only stub.
-            let invitedByUserId: string | null = row.createdByUserId ?? null;
-            if (!invitedByUserId) {
-                const owner = await db
-                    .select({ id: users.id })
-                    .from(users)
-                    .where(and(eq(users.tenantId, row.tenantId), eq(users.role, 'owner')))
-                    .get();
-                invitedByUserId = owner?.id ?? null;
-            }
-            await db.insert(agentTenantLinks).values({
-                id: crypto.randomUUID(),
-                agentUserId: userId,
-                tenantId: row.tenantId,
-                inspectorContactId: row.id,
-                status: 'active',
-                invitedByUserId,
-                createdAt: new Date(),
-            });
+            // IA-104 — binding is now an UPDATE on the contact rather than an
+            // insert into a join table. The contact already carries the tenant
+            // and is the row every inspection names, so there is nothing left
+            // for a link row to add: it existed only to point at this record.
+            //
+            // `invitedByUserId` is gone with it. It duplicated
+            // `contacts.createdByUserId`, which is the same fact (who brought
+            // this person into the workspace) already on the row — and the old
+            // owner-fallback existed only because the link could be created
+            // for a contact that did not exist yet. That case is impossible
+            // now: we are here BECAUSE the contact exists.
+            // Scoped by tenantId as well as id. This function is deliberately
+            // cross-tenant (it binds the account in EVERY workspace holding
+            // this email), so there is no single ambient tenant to filter on —
+            // but each write still names the one tenant it belongs to, taken
+            // from the row just read. An id-only update here would be the
+            // shape that leaks across tenants when a caller is less careful.
+            await db
+                .update(contacts)
+                .set({ agentUserId: userId, agentLinkedAt: new Date() })
+                .where(and(
+                    eq(contacts.id, row.id),
+                    eq(contacts.tenantId, row.tenantId),
+                    isNull(contacts.agentUserId),
+                ));
             created++;
         } catch {
-            // unique-index violation (already linked) — skip silently.
+            // uq_contacts_tenant_agent_user violation — this tenant already
+            // has a live contact bound to this account. Skip, as before.
         }
     }
     logger.info('agent.autolink', { userId, email: normalized, count: created });

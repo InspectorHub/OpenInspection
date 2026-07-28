@@ -62,11 +62,11 @@ describe('AgentService.listReferrals — A2', () => {
             { id: 'client-i1', tenantId: T1, type: 'client', name: 'Sarah', email: 'sarah@example.com', createdAt: new Date() },
         ]);
 
-        await testDb.insert(schema.agentTenantLinks).values([
-            { id: 'l1', agentUserId: AGENT_USER, tenantId: T1, inspectorContactId: 'jane-c1', status: 'active', createdAt: new Date() },
-            { id: 'l2', agentUserId: AGENT_USER, tenantId: T2, inspectorContactId: 'jane-c2', status: 'active', createdAt: new Date() },
-            { id: 'l3', agentUserId: OTHER_AGENT_USER, tenantId: T1, inspectorContactId: 'other-c1', status: 'active', createdAt: new Date() },
-        ]);
+        // IA-104 — bind each account to its contact. Note OTHER_AGENT_USER
+        // shares tenant T1 with AGENT_USER: that is the isolation case.
+        await testDb.update(schema.contacts).set({ agentUserId: AGENT_USER, agentLinkedAt: new Date() }).where(eq(schema.contacts.id, 'jane-c1'));
+        await testDb.update(schema.contacts).set({ agentUserId: AGENT_USER, agentLinkedAt: new Date() }).where(eq(schema.contacts.id, 'jane-c2'));
+        await testDb.update(schema.contacts).set({ agentUserId: OTHER_AGENT_USER, agentLinkedAt: new Date() }).where(eq(schema.contacts.id, 'other-c1'));
 
         await testDb.insert(schema.inspections).values([
             { id: 'i-1', tenantId: T1, inspectorId: INSPECTOR_T1, propertyAddress: '1 Main', clientName: 'Sarah', date: '2026-06-01', status: 'confirmed', paymentStatus: 'paid', referredByAgentId: 'jane-c1', price: 0, createdAt: new Date() },
@@ -109,10 +109,10 @@ describe('AgentService.listReferrals — A2', () => {
         expect(refs.find((r) => r.id === 'no-referral-inspection')).toBeUndefined();
     });
 
-    it('respects status="revoked" — agent loses access after revoke', async () => {
-        await testDb.update(schema.agentTenantLinks)
-            .set({ status: 'revoked' })
-            .where(eq(schema.agentTenantLinks.id, 'l1'));
+    it('revoking the binding removes that tenant from the agent view', async () => {
+        await testDb.update(schema.contacts)
+            .set({ agentRevokedAt: new Date() })
+            .where(eq(schema.contacts.id, 'jane-c1'));
         const refs = await svc.listReferrals(AGENT_USER, { limit: 50 });
         expect(refs.find((r) => r.tenantId === T1)).toBeUndefined();
         expect(refs.length).toBe(1);
@@ -201,10 +201,10 @@ describe('AgentService.listInspectors — A2', () => {
             { id: 'jane-c2', tenantId: T2, type: 'agent', name: 'Jane', email: 'jane@realty.com', createdByUserId: INSPECTOR_T2, createdAt: new Date() },
         ]);
 
-        await testDb.insert(schema.agentTenantLinks).values([
-            { id: 'l1', agentUserId: AGENT_USER, tenantId: T1, inspectorContactId: 'jane-c1', invitedByUserId: INSPECTOR_T1, status: 'active', createdAt: new Date() },
-            { id: 'l2', agentUserId: AGENT_USER, tenantId: T2, inspectorContactId: 'jane-c2', invitedByUserId: INSPECTOR_T2, status: 'active', createdAt: new Date() },
-        ]);
+        // IA-104 — the inviting inspector now comes from contacts.createdByUserId,
+        // which the contact fixtures above already set.
+        await testDb.update(schema.contacts).set({ agentUserId: AGENT_USER, agentLinkedAt: new Date() }).where(eq(schema.contacts.id, 'jane-c1'));
+        await testDb.update(schema.contacts).set({ agentUserId: AGENT_USER, agentLinkedAt: new Date() }).where(eq(schema.contacts.id, 'jane-c2'));
 
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
@@ -221,9 +221,9 @@ describe('AgentService.listInspectors — A2', () => {
     });
 
     it('omits revoked links', async () => {
-        await testDb.update(schema.agentTenantLinks)
-            .set({ status: 'revoked' })
-            .where(eq(schema.agentTenantLinks.id, 'l1'));
+        await testDb.update(schema.contacts)
+            .set({ agentRevokedAt: new Date() })
+            .where(eq(schema.contacts.id, 'jane-c1'));
         const rows = await svc.listInspectors(AGENT_USER);
         expect(rows.length).toBe(1);
         expect(rows[0]?.tenantId).toBe(T2);
@@ -243,10 +243,12 @@ describe('AgentService.listInspectors — A2', () => {
         await testDb.insert(schema.tenants).values({
             id: 'T3', name: 'NoInspector', slug: 'no', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
-        await testDb.insert(schema.agentTenantLinks).values({
-            // No contact fixture for T3 — this case is about a MISSING inviter, not a
-            // missing contact, so the id can be any live value.
-            id: 'l3', agentUserId: AGENT_USER, tenantId: 'T3', inspectorContactId: 'jane-c3', status: 'active', createdAt: new Date(),
+        // IA-104 — a contact with NO createdByUserId is the auto-link shape
+        // this case is about: bound to the account, but with no inspector
+        // recorded as having brought them in.
+        await testDb.insert(schema.contacts).values({
+            id: 'jane-c3', tenantId: 'T3', type: 'agent', name: 'Jane', email: 'jane@realty.com',
+            agentUserId: AGENT_USER, agentLinkedAt: new Date(), createdAt: new Date(),
         });
         const rows = await svc.listInspectors(AGENT_USER);
         const noRow = rows.find((r) => r.tenantId === 'T3');
@@ -271,8 +273,9 @@ describe('AgentService.revokeLink — A2', () => {
         await testDb.insert(schema.users).values({
             id: AGENT_USER, tenantId: null, email: 'jane@realty.com', role: 'agent', name: 'Jane', createdAt: new Date(), passwordHash: 'h',
         });
-        await testDb.insert(schema.agentTenantLinks).values({
-            id: 'l1', agentUserId: AGENT_USER, tenantId: T1, inspectorContactId: 'jane-c1', status: 'active', createdAt: new Date(),
+        await testDb.insert(schema.contacts).values({
+            id: 'jane-c1', tenantId: T1, type: 'agent', name: 'Jane', email: 'jane@realty.com',
+            agentUserId: AGENT_USER, agentLinkedAt: new Date(), createdAt: new Date(),
         });
 
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
@@ -282,19 +285,22 @@ describe('AgentService.revokeLink — A2', () => {
         svc = new AgentService({} as D1Database);
     });
 
-    it('flips link status to revoked + sets revokedAt', async () => {
-        await svc.revokeLink('l1', T1);
-        const row = await testDb.select().from(schema.agentTenantLinks)
-            .where(eq(schema.agentTenantLinks.id, 'l1')).get();
-        expect(row?.status).toBe('revoked');
-        expect(row?.revokedAt).toBeTruthy();
+    it('stamps agentRevokedAt without archiving the contact', async () => {
+        await svc.revokeLink('jane-c1', T1);
+        const row = await testDb.select().from(schema.contacts)
+            .where(eq(schema.contacts.id, 'jane-c1')).get();
+        expect(row?.agentRevokedAt).toBeTruthy();
+        // The person is still a real buyer agent on real inspections — only
+        // the cross-inspector portal view is withdrawn.
+        expect(row?.archivedAt).toBeNull();
+        expect(row?.agentUserId).toBe(AGENT_USER);
     });
 
-    it('rejects revoke when link belongs to a different tenant', async () => {
-        await expect(svc.revokeLink('l1', 'wrong-tenant')).rejects.toThrow();
-        const row = await testDb.select().from(schema.agentTenantLinks)
-            .where(eq(schema.agentTenantLinks.id, 'l1')).get();
-        expect(row?.status).toBe('active');
+    it('rejects revoke when the contact belongs to a different tenant', async () => {
+        await expect(svc.revokeLink('jane-c1', 'wrong-tenant')).rejects.toThrow();
+        const row = await testDb.select().from(schema.contacts)
+            .where(eq(schema.contacts.id, 'jane-c1')).get();
+        expect(row?.agentRevokedAt).toBeNull();
     });
 });
 

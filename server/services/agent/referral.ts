@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
-import { agentTenantLinks, tenants, tenantConfigs, users } from '../../lib/db/schema/tenant';
+import { tenants, tenantConfigs, users } from '../../lib/db/schema/tenant';
 import { contacts } from '../../lib/db/schema/contact';
 import { inspections, inspectionResults } from '../../lib/db/schema/inspection';
 import { inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
@@ -57,38 +57,23 @@ export interface AgentInspectorRow {
     inspectorSlug: string | null;
 }
 
-/**
- * The agent↔inspection association predicate, shared verbatim by listReferrals,
- * accessToInspection, and listRecommendationsForAgent. An agent is associated
- * with a referral row when either:
- *   1. the inspection's buyer_agent `inspection_people` contactId equals the
- *      active link's `inspectorContactId` (canonical link), OR
- *   2. the referred contact's email matches the agent's email.
+/*
+ * There is no agent↔inspection predicate here any more (IA-104).
  *
- * DO NOT DELETE BRANCH 2. It was labelled "legacy pre-A1" and slated for
- * removal once `inspectorContactId` became NOT NULL (IA-103); it is neither
- * legacy nor dead. One link per (agent, tenant) meets one ACTIVE contact per
- * (tenant, email) plus unlimited archived ones, so contact churn leaves the
- * link addressing a superseded row — branch 1 then misses every inspection on
- * the live contact and branch 2 is all that keeps the agent's own referrals
- * visible. Pinned by archived-contact-referral-visibility.spec. The durable
- * fix is re-pointing the link on archive (the archive-revokes-access work).
- * Not an escalation vector: agents cannot edit their account email.
+ * There used to be: a two-branch filter run in JS after the fetch, comparing
+ * the inspection's buyer_agent contact against a pointer on agent_tenant_links
+ * and — when that pointer had gone stale — against the agent's email as a
+ * string. Both branches existed only because the account binding lived in a
+ * separate table that could disagree with the contact it named.
  *
- * Returns a predicate bound to the agent's email so the three call sites stay
- * byte-identical (and the where-condition / row filter stays the same SQL +
- * post-fetch logic across all of them).
+ * The binding is now a column on the contact, so "is this my referral" is
+ * answered by the join itself and cannot be skipped, mis-ordered, or applied
+ * to one call site and forgotten at another. The email fallback went with it:
+ * with nothing to go stale there is nothing for it to rescue. The scenario it
+ * covered (a tenant re-adding an archived agent contact) is now handled by the
+ * partial unique index, which frees the slot on archive so the new contact can
+ * simply be bound.
  */
-function getAgentReferralFilter(
-    agentEmail: string | null,
-): (r: { referredById: string | null; linkContactId: string | null; contactEmail: string | null }) => boolean {
-    return (r) => {
-        if (r.referredById && r.linkContactId && r.referredById === r.linkContactId) return true;
-        if (agentEmail && r.contactEmail && r.contactEmail.toLowerCase() === agentEmail.toLowerCase()) return true;
-        return false;
-    };
-}
-
 /**
  * A2 — Cross-tenant referral list. Joins inspections through
  * `agent_tenant_links` (active only) so the agent only sees inspections in
@@ -100,7 +85,7 @@ function getAgentReferralFilter(
  *   2. Carry a buyer_agent contact whose email matches the agent user's
  *      email (covers a link left pointing at an archived contact).
  *
- * Single-roundtrip; see getAgentReferralFilter for why branch 2 must stay.
+ * Single-roundtrip: the buyer_agent contact join IS the access check.
  */
 export async function listReferrals(
     rawDb: D1Database,
@@ -131,17 +116,8 @@ export async function listReferrals(
             referredById:    inspectionPeople.contactId,
             contactEmail:    contacts.email,
             inspectorName:   users.name,
-            linkContactId:   agentTenantLinks.inspectorContactId,
         })
         .from(inspections)
-        .innerJoin(
-            agentTenantLinks,
-            and(
-                eq(agentTenantLinks.tenantId, inspections.tenantId),
-                eq(agentTenantLinks.agentUserId, agentUserId),
-                eq(agentTenantLinks.status, 'active'),
-            ),
-        )
         .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
         // Owning tenant's display timezone (branding.default_timezone lives on
         // tenant_configs). Left join: tenants without a config row fall back to
@@ -171,11 +147,21 @@ export async function listReferrals(
                 eq(inspectionPeople.tenantId, inspections.tenantId),
             ),
         )
-        .leftJoin(
+        // IA-104 — THIS join is the whole access check now. The buyer_agent
+        // contact carries the agent account binding directly, so "which
+        // tenants may I see" and "am I the buyer agent here" are one
+        // condition on one row. It replaces a separate agent_tenant_links
+        // join, a post-fetch pointer comparison, and an email fallback — all
+        // three of which existed only because the binding lived elsewhere.
+        // INNER, not LEFT: an inspection whose buyer_agent is not this agent
+        // must not appear at all.
+        .innerJoin(
             contacts,
             and(
                 eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
+                eq(contacts.agentUserId, agentUserId),
+                isNull(contacts.agentRevokedAt),
             ),
         )
         // Client attribution: inspections -> contact_role_profiles (this
@@ -212,22 +198,9 @@ export async function listReferrals(
         .orderBy(desc(inspections.date))
         .all();
 
-    // Resolve agent's email once for the legacy fallback predicate.
-    const agent = await db
-        .select({ email: users.email })
-        .from(users)
-        .where(eq(users.id, agentUserId))
-        .get();
-    const agentEmail = agent?.email ?? null;
-
-    // Filter rows in JS — SQLite's join planner doesn't compose the OR
-    // predicate (link.contactId == inspection_people's buyer_agent contactId
-    // OR contact.email == agentEmail) cleanly when contacts is a left-join.
-    // Doing the filter post-fetch is fine: the inner join on links already
-    // narrows to ≤ N tenants × inspections, and N is small in practice.
-    const filtered = refRows.filter(getAgentReferralFilter(agentEmail));
-
-    return filtered.slice(0, Math.max(0, opts.limit)).map((r) => ({
+    // No post-fetch filter and no extra users lookup any more (IA-104): the
+    // join answers the association, so every row here is already this agent's.
+    return refRows.slice(0, Math.max(0, opts.limit)).map((r) => ({
         id:              r.id,
         tenantId:        r.tenantId,
         tenantName:      r.tenantName,
@@ -271,17 +244,8 @@ export async function accessToInspection(
             tenantId:      inspections.tenantId,
             referredById:  inspectionPeople.contactId,
             contactEmail:  contacts.email,
-            linkContactId: agentTenantLinks.inspectorContactId,
         })
         .from(inspections)
-        .innerJoin(
-            agentTenantLinks,
-            and(
-                eq(agentTenantLinks.tenantId, inspections.tenantId),
-                eq(agentTenantLinks.agentUserId, agentUserId),
-                eq(agentTenantLinks.status, 'active'),
-            ),
-        )
         // Buyer's-agent attribution via inspection_people — see listReferrals
         // above for why contact_role_profiles is joined before
         // inspection_people (avoids fanning out over every role).
@@ -301,26 +265,30 @@ export async function accessToInspection(
                 eq(inspectionPeople.tenantId, inspections.tenantId),
             ),
         )
-        .leftJoin(
+        // IA-104 — THIS join is the whole access check now. The buyer_agent
+        // contact carries the agent account binding directly, so "which
+        // tenants may I see" and "am I the buyer agent here" are one
+        // condition on one row. It replaces a separate agent_tenant_links
+        // join, a post-fetch pointer comparison, and an email fallback — all
+        // three of which existed only because the binding lived elsewhere.
+        // INNER, not LEFT: an inspection whose buyer_agent is not this agent
+        // must not appear at all.
+        .innerJoin(
             contacts,
             and(
                 eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
+                eq(contacts.agentUserId, agentUserId),
+                isNull(contacts.agentRevokedAt),
             ),
         )
         .where(eq(inspections.id, inspectionId))
         .all();
     if (rows.length === 0) return null;
 
-    const agent = await db
-        .select({ email: users.email })
-        .from(users)
-        .where(eq(users.id, agentUserId))
-        .get();
-    const agentEmail = agent?.email ?? null;
-
-    const match = rows.find(getAgentReferralFilter(agentEmail));
-    return match ? { tenantId: match.tenantId } : null;
+    // IA-104 — the join already restricted rows to inspections where THIS
+    // agent is the buyer_agent, so the first row is the answer.
+    return { tenantId: rows[0]!.tenantId };
 }
 
 /**
@@ -348,18 +316,9 @@ export async function listRecommendationsForAgent(
             templateSnapshot:  inspections.templateSnapshot,
             referredById:      inspectionPeople.contactId,
             contactEmail:      contacts.email,
-            linkContactId:     agentTenantLinks.inspectorContactId,
             resultsData:       inspectionResults.data,
         })
         .from(inspections)
-        .innerJoin(
-            agentTenantLinks,
-            and(
-                eq(agentTenantLinks.tenantId, inspections.tenantId),
-                eq(agentTenantLinks.agentUserId, agentUserId),
-                eq(agentTenantLinks.status, 'active'),
-            ),
-        )
         .innerJoin(tenants, eq(tenants.id, inspections.tenantId))
         // Left join: a company with no config row falls back to the policy
         // default in resolveAgentRepairAccess.
@@ -383,11 +342,21 @@ export async function listRecommendationsForAgent(
                 eq(inspectionPeople.tenantId, inspections.tenantId),
             ),
         )
-        .leftJoin(
+        // IA-104 — THIS join is the whole access check now. The buyer_agent
+        // contact carries the agent account binding directly, so "which
+        // tenants may I see" and "am I the buyer agent here" are one
+        // condition on one row. It replaces a separate agent_tenant_links
+        // join, a post-fetch pointer comparison, and an email fallback — all
+        // three of which existed only because the binding lived elsewhere.
+        // INNER, not LEFT: an inspection whose buyer_agent is not this agent
+        // must not appear at all.
+        .innerJoin(
             contacts,
             and(
                 eq(contacts.id, inspectionPeople.contactId),
                 eq(contacts.tenantId, inspections.tenantId),
+                eq(contacts.agentUserId, agentUserId),
+                isNull(contacts.agentRevokedAt),
             ),
         )
         .leftJoin(
@@ -400,13 +369,8 @@ export async function listRecommendationsForAgent(
         .where(eq(inspections.reportStatus, REPORT_STATUS.PUBLISHED))
         .all();
 
-    const agent = await db.select({ email: users.email })
-        .from(users).where(eq(users.id, agentUserId)).get();
-    const agentEmail = agent?.email ?? null;
-
-    const filtered = rows.filter(getAgentReferralFilter(agentEmail));
-
-    const flat = filtered.flatMap((r) => flattenInspectionToRecommendations({
+    // IA-104 — no post-filter; the join is the access check.
+    const flat = rows.flatMap((r) => flattenInspectionToRecommendations({
         id:               r.id,
         tenantName:       r.tenantName,
         tenantSlug:       r.tenantSlug,
@@ -432,22 +396,34 @@ export async function listInspectors(
     const db = drizzle(rawDb);
     const rows = await db
         .select({
-            tenantId:          agentTenantLinks.tenantId,
+            tenantId:          contacts.tenantId,
             tenantName:        tenants.name,
             tenantSlug:   tenants.slug,
-            contactId:         agentTenantLinks.inspectorContactId,
+            contactId:         contacts.id,
             inspectorUserId:   users.id,
             inspectorName:     users.name,
             inspectorPhotoUrl: users.photoUrl,
             inspectorSlug:     users.slug,
         })
-        .from(agentTenantLinks)
-        .innerJoin(tenants, eq(tenants.id, agentTenantLinks.tenantId))
-        .leftJoin(users, eq(users.id, agentTenantLinks.invitedByUserId))
+        // IA-104 — driven off the contact rows that ARE this agent, instead of
+        // a link table pointing at them. `contactId` is now the row's own id
+        // rather than a nullable pointer, so it can never disagree.
+        //
+        // Gated on agent_revoked_at ONLY, deliberately not archived_at:
+        // archiving retires a contact from the workspace's own lists, it does
+        // not withdraw someone's access to work they were part of. Revoking is
+        // the act that does that, and it is separate on purpose — asserted by
+        // archived-contact-referral-visibility.spec.
+        .from(contacts)
+        .innerJoin(tenants, eq(tenants.id, contacts.tenantId))
+        // The inspector who brought this agent into the workspace. Was
+        // agent_tenant_links.invited_by_user_id, which duplicated this exact
+        // fact; the owner-fallback it needed is gone with the link table.
+        .leftJoin(users, eq(users.id, contacts.createdByUserId))
         .where(
             and(
-                eq(agentTenantLinks.agentUserId, agentUserId),
-                eq(agentTenantLinks.status, 'active'),
+                eq(contacts.agentUserId, agentUserId),
+                isNull(contacts.agentRevokedAt),
             ),
         )
         .all();
@@ -487,17 +463,8 @@ export async function referralsByDay(
         .select({
             createdAt:    inspections.createdAt,
             referredById: inspectionPeople.contactId,
-            linkContactId: agentTenantLinks.inspectorContactId,
         })
         .from(inspections)
-        .innerJoin(
-            agentTenantLinks,
-            and(
-                eq(agentTenantLinks.tenantId, inspections.tenantId),
-                eq(agentTenantLinks.agentUserId, agentUserId),
-                eq(agentTenantLinks.status, 'active'),
-            ),
-        )
         // Buyer's-agent attribution via inspection_people — see listReferrals
         // above for why contact_role_profiles is joined before
         // inspection_people (avoids fanning out over every role). NOTE: if an
@@ -522,23 +489,45 @@ export async function referralsByDay(
                 eq(inspectionPeople.tenantId, inspections.tenantId),
             ),
         )
+        // IA-104 — the scoping join. This query used to lean on the
+        // agent_tenant_links INNER JOIN for tenant scope and then re-check the
+        // contact pointer in JS; both collapse into this one condition. It is
+        // NOT optional: without it the query counts every inspection in every
+        // tenant, because nothing else here mentions the agent.
+        .innerJoin(
+            contacts,
+            and(
+                eq(contacts.id, inspectionPeople.contactId),
+                eq(contacts.tenantId, inspections.tenantId),
+                eq(contacts.agentUserId, agentUserId),
+                isNull(contacts.agentRevokedAt),
+            ),
+        )
         .all();
 
     const created = new Array<number>(days).fill(0);
     for (const r of rows) {
-        if (r.referredById && r.linkContactId && r.referredById === r.linkContactId) {
-            const cMs = r.createdAt instanceof Date ? r.createdAt.getTime() : Number(r.createdAt) || 0;
-            const day = Math.floor((cMs - startMs) / 86400000);
-            if (day >= 0 && day < days) created[day]!++;
-        }
+        // The join already guarantees every row is this agent's referral.
+        const cMs = r.createdAt instanceof Date ? r.createdAt.getTime() : Number(r.createdAt) || 0;
+        const day = Math.floor((cMs - startMs) / 86400000);
+        if (day >= 0 && day < days) created[day]!++;
     }
     return { created };
 }
 
 /**
- * A2 — Inspector-side revoke of a partner link. Tenant-scoped: callers
- * must pass the tenantId they're acting from (from the JWT) so a stolen
- * linkId can't be revoked from a different tenant.
+ * Inspector-side revoke of an agent's standing account access. Tenant-scoped:
+ * callers pass the tenantId they are acting from (from the JWT) so an id
+ * lifted from elsewhere cannot be revoked from a different tenant.
+ *
+ * IA-104 — `linkId` is now the CONTACT id, since the binding lives on the
+ * contact. Stamping `agent_revoked_at` rather than clearing `agent_user_id`
+ * keeps the history of who this contact was, and keeps the revoke visible in
+ * the UI instead of silently reverting the row to "never had an account".
+ *
+ * Deliberately does NOT archive the contact: the person is still a real
+ * buyer's agent on real inspections and must stay usable there. Only the
+ * cross-inspector portal view is withdrawn.
  */
 export async function revokeLink(
     rawDb: D1Database,
@@ -547,14 +536,14 @@ export async function revokeLink(
 ): Promise<void> {
     const db = drizzle(rawDb);
     const row = await db
-        .select({ id: agentTenantLinks.id })
-        .from(agentTenantLinks)
-        .where(and(eq(agentTenantLinks.id, linkId), eq(agentTenantLinks.tenantId, tenantId)))
+        .select({ id: contacts.id })
+        .from(contacts)
+        .where(and(eq(contacts.id, linkId), eq(contacts.tenantId, tenantId)))
         .get();
     if (!row) throw Errors.NotFound('Link not found');
     await db
-        .update(agentTenantLinks)
-        .set({ status: 'revoked', revokedAt: new Date() })
-        .where(and(eq(agentTenantLinks.id, linkId), eq(agentTenantLinks.tenantId, tenantId)));
-    logger.info('agent.link.revoked', { linkId, tenantId });
+        .update(contacts)
+        .set({ agentRevokedAt: new Date() })
+        .where(and(eq(contacts.id, linkId), eq(contacts.tenantId, tenantId)));
+    logger.info('agent.link.revoked', { contactId: linkId, tenantId });
 }

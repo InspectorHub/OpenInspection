@@ -1,10 +1,11 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { drizzle } from 'drizzle-orm/d1';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import { Errors } from '../lib/errors';
 import { requireRole } from '../lib/middleware/rbac';
-import { agentTenantLinks, users } from '../lib/db/schema/tenant';
+import { users } from '../lib/db/schema/tenant';
+import { contacts } from '../lib/db/schema/contact';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 
 /**
@@ -29,7 +30,7 @@ const LinkRowSchema = z
         agentUserId: z.string().describe('TODO describe agentUserId field for the OpenInspection MCP integration'),
         agentName:   z.string().nullable().describe('TODO describe agentName field for the OpenInspection MCP integration'),
         agentEmail:  z.string().nullable().describe('TODO describe agentEmail field for the OpenInspection MCP integration'),
-        status:      z.enum(['pending', 'active', 'revoked']).describe('TODO describe status field for the OpenInspection MCP integration'),
+        status:      z.enum(['active', 'revoked']).describe('TODO describe status field for the OpenInspection MCP integration'),
         createdAt:   z.number().nullable().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
         revokedAt:   z.number().nullable().describe('TODO describe revokedAt field for the OpenInspection MCP integration'),
     })
@@ -99,30 +100,36 @@ const agentsRoutes = createApiRouter()
         const tenantId = c.get('tenantId');
         if (!tenantId) throw Errors.Unauthorized();
         const db = drizzle(c.env.DB);
+        // IA-104 — the "links" are contact rows carrying an account binding.
+        // `id` is the contact id, which is what POST /{linkId}/revoke now
+        // takes. Only bound rows are listed: an ordinary agent contact with no
+        // account is not a link, it is just a contact, and it belongs on
+        // /contacts rather than here.
         const rows = await db
             .select({
-                id:          agentTenantLinks.id,
-                agentUserId: agentTenantLinks.agentUserId,
+                id:          contacts.id,
+                agentUserId: contacts.agentUserId,
                 agentName:   users.name,
                 agentEmail:  users.email,
-                status:      agentTenantLinks.status,
-                createdAt:   agentTenantLinks.createdAt,
-                revokedAt:   agentTenantLinks.revokedAt,
+                createdAt:   contacts.agentLinkedAt,
+                revokedAt:   contacts.agentRevokedAt,
             })
-            .from(agentTenantLinks)
-            .leftJoin(users, eq(users.id, agentTenantLinks.agentUserId))
-            .where(eq(agentTenantLinks.tenantId, tenantId))
-            .orderBy(desc(agentTenantLinks.createdAt))
+            .from(contacts)
+            .leftJoin(users, eq(users.id, contacts.agentUserId))
+            .where(and(eq(contacts.tenantId, tenantId), isNotNull(contacts.agentUserId)))
+            .orderBy(desc(contacts.agentLinkedAt))
             .all();
         const links = rows.map((r) => {
             const created = r.createdAt instanceof Date ? r.createdAt.getTime() : (r.createdAt ? Number(r.createdAt) : null);
             const revoked = r.revokedAt instanceof Date ? r.revokedAt.getTime() : (r.revokedAt ? Number(r.revokedAt) : null);
             return {
                 id:          r.id,
-                agentUserId: r.agentUserId,
+                agentUserId: r.agentUserId ?? '',
                 agentName:   r.agentName ?? null,
                 agentEmail:  r.agentEmail ?? null,
-                status:      (r.status as 'pending' | 'active' | 'revoked'),
+                // Derived rather than stored: the old `status` column had three
+                // values but only ever held two, since nothing wrote 'pending'.
+                status:      (revoked ? 'revoked' : 'active') as 'active' | 'revoked',
                 createdAt:   created,
                 revokedAt:   revoked,
             };

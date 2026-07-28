@@ -47,15 +47,17 @@ async function seedFixture(testDb: BetterSQLite3Database<typeof schema>, opts: S
         { id: CONTACT_AGENT, tenantId: T1, type: 'agent', name: 'Jane Smith',
           email: 'jane@realty.com', createdAt: new Date() },
     ]);
-    await testDb.insert(schema.agentTenantLinks).values({
-        id: crypto.randomUUID(),
-        agentUserId: AGENT,
-        tenantId: T1,
-        inspectorContactId: CONTACT_AGENT,
-        status: agentLinkStatus,
-        invitedByUserId: INSPECTOR,
-        createdAt: new Date(),
-    });
+    // IA-104 — the agent binding is a column on the contact now, so seeding
+    // it is an update to the contact rather than a row in a link table.
+    // 'pending' no longer exists: nothing ever wrote it, so the states are
+    // bound (agent_user_id set) and revoked (agent_revoked_at set).
+    await testDb.update(schema.contacts)
+        .set({
+            agentUserId: AGENT,
+            agentLinkedAt: new Date(),
+            agentRevokedAt: agentLinkStatus === 'active' ? null : new Date(),
+        })
+        .where(eq(schema.contacts.id, CONTACT_AGENT));
     // Task 9c-X2 — confirmByClient's agent-notify now resolves the buyer_agent
     // contact via inspection_people, which createBooking only populates when
     // role profiles exist for the tenant (see its try/catch mirror-write).

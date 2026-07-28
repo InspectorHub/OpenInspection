@@ -11,7 +11,7 @@
  */
 import { eq } from 'drizzle-orm';
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
-import { users, agentTenantLinks, inspections } from '../lib/db/schema';
+import { users, contacts, inspections } from '../lib/db/schema';
 import { logger } from '../lib/logger';
 
 export interface AccountExport {
@@ -28,8 +28,12 @@ export interface AccountDeleteResult {
 
 export async function exportAccount(db: DrizzleD1Database, userId: string): Promise<AccountExport> {
     const identity = await db.select().from(users).where(eq(users.id, userId)).get();
-    const memberships = await db.select().from(agentTenantLinks)
-        .where(eq(agentTenantLinks.agentUserId, userId)).all();
+    // IA-104 — an agent's tenant memberships are the contact rows bound to
+    // their account. Same facts the link table held, now on the row itself.
+    // Still the right thing to export for a DSAR: it is where this person
+    // appears in other people's workspaces.
+    const memberships = await db.select().from(contacts)
+        .where(eq(contacts.agentUserId, userId)).all();
     const userInspections = await db.select().from(inspections)
         .where(eq(inspections.inspectorId, userId)).all();
     return {
