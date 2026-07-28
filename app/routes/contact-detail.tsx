@@ -132,6 +132,9 @@ export default function ContactDetailPage() {
   const { detail, access, accessFailed } = useLoaderData<typeof loader>();
   const revokeFetcher = useFetcher<typeof action>();
   const revoking = revokeFetcher.state !== "idle";
+  // Only once the round trip has settled — showing the previous result while
+  // the next one is in flight would report the wrong revoke.
+  const revokeResult = revoking ? null : revokeFetcher.data;
   const { contact, inspections, stats } = detail;
   const displayTz = useDisplayTimeZone();
   const archived = !!contact.archivedAt;
@@ -267,6 +270,27 @@ export default function ContactDetailPage() {
             </revokeFetcher.Form>
           )}
         </div>
+
+        {/* The revoked count is computed honestly server-side precisely so it
+            can be reported — "revoked 3" when one had already lapsed would
+            teach an operator to trust a number that is not measuring anything.
+            It was then being discarded here, which also made a FAILED revoke
+            indistinguishable from a successful one: in both cases the page
+            simply said nothing. */}
+        {revokeResult && (
+          <p
+            role="status"
+            className={`text-[12px] mb-3 ${revokeResult.ok ? "text-ih-fg-3" : "text-ih-bad-fg"}`}
+          >
+            {!revokeResult.ok
+              ? m.contacts_detail_access_revoke_failed()
+              : revokeResult.revoked === 0
+                ? m.contacts_detail_access_revoked_none()
+                : revokeResult.revoked === 1
+                  ? m.contacts_detail_access_revoked_one()
+                  : m.contacts_detail_access_revoked_many({ count: revokeResult.revoked })}
+          </p>
+        )}
 
         {accessFailed ? (
           <p className="text-[13px] text-ih-bad-fg">

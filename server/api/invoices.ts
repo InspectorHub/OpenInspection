@@ -21,6 +21,15 @@ import { getTenantId, getDrizzle } from '../lib/route-helpers';
 import { resolveLocale } from '../lib/locale';
 import { formatCurrency } from '../lib/format';
 
+/**
+ * `invoices.id` is an opaque TEXT id, so the route must not demand a UUID
+ * shape it never promised. The mark-paid endpoint rejected one with a 400 that
+ * the page then swallowed, leaving an operator who had just banked a cheque
+ * looking at an unchanged "SENT" pill. Same defect as the contacts id contract
+ * and as the `inspectorId` `.uuid()` in IA-87.
+ */
+const INVOICE_ID = z.string().trim().min(1);
+
 const listInvoicesRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
     tags: ["invoices"], summary: "List invoices for current tenant",
@@ -60,7 +69,7 @@ const markSentRoute = createRoute(withMcpMetadata({
     method: 'post', path: '/{id}/mark-sent',
     tags: ["invoices"], summary: 'Mark invoice as sent',
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Success' },
     },
@@ -74,7 +83,7 @@ const markPaidRoute = createRoute(withMcpMetadata({
     tags: ["invoices"], summary: 'Mark invoice as paid',
     middleware: [requireRole('owner', 'manager')],
     request: {
-        params: z.object({ id: z.string().uuid().describe('Invoice id to mark as paid.') }).describe('Path params for the mark-paid endpoint.'),
+        params: z.object({ id: INVOICE_ID.describe('Invoice id to mark as paid.') }).describe('Path params for the mark-paid endpoint.'),
         body: { content: { 'application/json': { schema: MarkInvoicePaidSchema } } },
     },
     responses: {
@@ -89,7 +98,7 @@ const deleteInvoiceRoute = createRoute(withMcpMetadata({
     method: 'delete', path: '/{id}',
     tags: ["invoices"], summary: "Delete invoice for current tenant",
     middleware: [requireRole('owner', 'manager')],
-    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: INVOICE_ID.describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Deleted' },
     },

@@ -13,7 +13,7 @@
  * above is a rendering defect, and there is no auth decision to get wrong.
  */
 import { describe, it, expect } from "vitest";
-import { render } from "@testing-library/react";
+import { render, fireEvent } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
 
 import InvoicesPage from "~/routes/invoices";
@@ -76,6 +76,55 @@ describe("/invoices — IA-97", () => {
     expect(view[0].getAttribute("href")).toBe("/inspections/insp-abc");
     // The dash is what the cell used to be; it must be gone for this row.
     expect(container.querySelector("tbody")?.textContent).not.toContain("—");
+  });
+
+  it("shows a failed mark-paid instead of swallowing it", async () => {
+    // The regression: POST mark-paid returned 400, the action discarded the
+    // reason, and nothing rendered. The picker closed, the pill stayed SENT,
+    // and an operator who had just banked a cheque had no signal at all that
+    // it went unrecorded — the worst outcome for the one action on this page
+    // that moves money in their books.
+    const Stub = createRoutesStub([
+      {
+        path: "/invoices",
+        Component: InvoicesPage,
+        loader: () => ({ invoices: [UNPAID], inspections: [] }),
+        action: () => ({ intent: "mark-paid", ok: false, error: "Invoice not found" }),
+      },
+    ]);
+    const { findByText, findAllByRole } = render(<Stub initialEntries={["/invoices"]} />);
+
+    const markPaid = (await findAllByRole("button")).find((b) => b.textContent === "Mark paid");
+    if (!markPaid) throw new Error("no Mark paid button");
+    fireEvent.click(markPaid);
+
+    const check = (await findAllByRole("button")).find((b) => b.textContent === "Check");
+    if (!check) throw new Error("no method picker");
+    fireEvent.click(check);
+
+    expect(await findByText("Invoice not found")).toBeTruthy();
+  });
+
+  it("stays quiet when mark-paid succeeds", async () => {
+    // An always-on banner would be its own defect.
+    const Stub = createRoutesStub([
+      {
+        path: "/invoices",
+        Component: InvoicesPage,
+        loader: () => ({ invoices: [UNPAID], inspections: [] }),
+        action: () => ({ intent: "mark-paid", ok: true, error: null }),
+      },
+    ]);
+    const { findAllByRole, queryByRole } = render(<Stub initialEntries={["/invoices"]} />);
+
+    const markPaid = (await findAllByRole("button")).find((b) => b.textContent === "Mark paid");
+    if (!markPaid) throw new Error("no Mark paid button");
+    fireEvent.click(markPaid);
+    const check = (await findAllByRole("button")).find((b) => b.textContent === "Check");
+    if (!check) throw new Error("no method picker");
+    fireEvent.click(check);
+
+    expect(queryByRole("alert")).toBeNull();
   });
 
   it("renders an inspection-less invoice as plain text, not a broken link", async () => {

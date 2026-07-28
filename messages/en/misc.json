@@ -179,6 +179,7 @@
   "invoices_pay_method_other": "Other",
   "invoices_action_error_amount": "Client name and a positive amount are required.",
   "invoices_action_error_create": "Failed to create the invoice.",
+  "invoices_action_error_mark_paid": "Could not record that payment. The invoice is unchanged — try again.",
   "invoices_method_label_card": "Card",
   "invoices_method_label_check": "Check",
   "invoices_method_label_cash": "Cash",

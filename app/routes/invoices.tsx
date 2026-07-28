@@ -3,7 +3,7 @@ import { useLoaderData, useFetcher, Link } from "react-router";
 import type { Route } from "./+types/invoices";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, Card, StatCard, Button, EmptyState, Table, Pill, type PillTone } from "@core/shared-ui";
+import { PageHeader, Card, StatCard, Button, EmptyState, Table, Pill, Banner, type PillTone } from "@core/shared-ui";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
@@ -70,7 +70,16 @@ export async function action({ request, context }: Route.ActionArgs) {
       "card" | "check" | "cash" | "offline" | "other";
     const api = createApi(context, { token });
     const res = await api.invoices[":id"]["mark-paid"].$post({ param: { id }, json: { method } });
-    return { intent, ok: res.ok, error: null };
+    // Recording a payment is the one action on this page that moves money in
+    // the operator's books. It used to discard the reason for a failure and
+    // render nothing at all: the method picker closed, the row stayed SENT,
+    // and an operator who had just banked a cheque was left to infer from an
+    // unchanged pill that it had not been recorded — or to miss it entirely.
+    if (!res.ok) {
+      const err = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+      return { intent, ok: false, error: err?.error?.message ?? m.invoices_action_error_mark_paid() };
+    }
+    return { intent, ok: true, error: null };
   }
 
   if (intent === "create-invoice") {
@@ -165,6 +174,15 @@ export default function InvoicesPage() {
       />
 
       <NewInvoiceModal open={newOpen} onClose={() => setNewOpen(false)} inspections={inspections} />
+
+      {/* The create path already surfaces its errors inside the modal; the
+          mark-paid path had nowhere to put one, so it silently swallowed them.
+          Scoped to mark-paid to avoid double-reporting a create failure. */}
+      {fetcher.state === "idle" && fetcher.data?.intent === "mark-paid" && fetcher.data.ok === false && (
+        <Banner tone="danger">
+          {fetcher.data.error ?? m.invoices_action_error_mark_paid()}
+        </Banner>
+      )}
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
