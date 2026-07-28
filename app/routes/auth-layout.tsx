@@ -88,7 +88,14 @@ export default function AuthLayout() {
       <MobileHeader />
       <div className="flex min-h-screen">
         <Sidebar />
-        <main className="flex-1 w-full bg-ih-bg-app">
+        {/* `min-w-0`, and NOT `w-full`. A flex child defaults to
+            min-width:auto, so it refuses to shrink below its content — and
+            `w-full` on top of `flex-1` asks for 100% of the ROW, which already
+            has the sidebar in it. The two together made this element 1080px
+            inside a 1245px viewport whose sidebar takes 200px, so every page
+            in the workspace scrolled sideways by ~35px on a 1280-wide screen.
+            `min-w-0` lets it take the space actually left over. */}
+        <main className="flex-1 min-w-0 bg-ih-bg-app">
           {/* ds-allow: page bottom gutter (60px), bespoke page-shell spacing with no token */}
           <div className="max-w-[1080px] mx-auto pt-5 pb-[60px] px-9">
             {showSkeleton ? (
