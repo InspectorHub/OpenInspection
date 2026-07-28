@@ -82,11 +82,11 @@ export class AgentService {
      *   1. Carry a `referredByAgentId` matching this agent's contact id in
      *      that tenant (canonical link, populated by inspection create), OR
      *   2. Carry a `referredByAgentId` whose contact email matches the agent
-     *      user's email (legacy contacts pre-A1 promotion).
+     *      user's email (covers a link left pointing at an archived contact).
      *
-     * The compound predicate keeps the query single-roundtrip while remaining
-     * resilient to tenants that haven't backfilled `inspectorContactId` on
-     * the link row.
+     * The compound predicate keeps the query single-roundtrip. See
+     * getAgentReferralFilter for why the second branch is load-bearing rather
+     * than legacy.
      */
     async listReferrals(
         agentUserId: string,

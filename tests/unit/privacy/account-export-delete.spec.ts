@@ -52,11 +52,11 @@ describe('exportAccount', () => {
             id: AGENT_ID, tenantId: TENANT, email: 'agent@x.com', passwordHash: 'x', role: 'agent', createdAt: new Date(),
         });
         await testDb.insert(schema.agentTenantLinks).values({
-            id: 'link-1', agentUserId: USER_ID, tenantId: TENANT_B, status: 'active', createdAt: new Date(),
+            id: 'link-1', agentUserId: USER_ID, tenantId: TENANT_B, inspectorContactId: 'c-1', status: 'active', createdAt: new Date(),
         });
         // unrelated link for another agent — must NOT appear
         await testDb.insert(schema.agentTenantLinks).values({
-            id: 'link-2', agentUserId: AGENT_ID, tenantId: TENANT, status: 'active', createdAt: new Date(),
+            id: 'link-2', agentUserId: AGENT_ID, tenantId: TENANT, inspectorContactId: 'c-2', status: 'active', createdAt: new Date(),
         });
         const result = await exportAccount(testDb as any, USER_ID);
         expect(result.memberships).toHaveLength(1);

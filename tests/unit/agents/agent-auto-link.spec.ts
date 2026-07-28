@@ -3,7 +3,6 @@ import { AgentService } from '../../../server/services/agent.service';
 import { createTestDb, setupSchema } from '../db';
 import * as schema from '../../../server/lib/db/schema';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import type { EmailService } from '../../../server/services/email.service';
 
 vi.mock('drizzle-orm/d1', () => ({ drizzle: vi.fn() }));
 import { drizzle as mockDrizzle } from 'drizzle-orm/d1';
@@ -12,7 +11,7 @@ const TENANT_A = '00000000-0000-0000-0000-00000000000a';
 const TENANT_B = '00000000-0000-0000-0000-00000000000b';
 const TENANT_C = '00000000-0000-0000-0000-00000000000c';
 
-describe('AgentService.autoLinkSameEmail — A1', () => {
+describe('AgentService.autoLinkSameEmail', () => {
     let svc: AgentService;
     let testDb: BetterSQLite3Database<typeof schema>;
 
@@ -28,9 +27,6 @@ describe('AgentService.autoLinkSameEmail — A1', () => {
         ]);
 
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);
-        const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
-            sendAgentInvite: vi.fn().mockResolvedValue(undefined),
-        };
         svc = new AgentService({} as D1Database);
     });
 
@@ -41,6 +37,43 @@ describe('AgentService.autoLinkSameEmail — A1', () => {
         });
         return id;
     }
+
+    it('links the ACTIVE contact, never an archived one with the same email', async () => {
+        // `contacts` allows one ACTIVE row per (tenant, email) but any number of
+        // archived ones, while agent_tenant_links allows one row per (agent,
+        // tenant). Without an archived filter the dead record could win the
+        // link — and the duplicate insert for the live contact would then be
+        // swallowed by the unique-index catch, leaving the agent linked to a
+        // contact no inspection references and a dashboard that is empty for
+        // no visible reason.
+        await testDb.insert(schema.contacts).values([
+            { id: 'cOld', tenantId: TENANT_A, type: 'agent', name: 'Jane', email: 'jane@realty.com', createdAt: new Date(1), archivedAt: new Date(2) },
+            { id: 'cNew', tenantId: TENANT_A, type: 'agent', name: 'Jane', email: 'jane@realty.com', createdAt: new Date(3) },
+        ]);
+        const userId = await seedAgentUser('jane@realty.com');
+
+        const created = await svc.autoLinkSameEmail(userId, 'jane@realty.com');
+        expect(created).toBe(1);
+
+        const links = await testDb.select().from(schema.agentTenantLinks).all();
+        expect(links).toHaveLength(1);
+        expect(links[0].inspectorContactId).toBe('cNew');
+    });
+
+    it('always sets inspectorContactId — the column is NOT NULL', async () => {
+        // IA-103. This is the only writer of the table now that invite-accept
+        // is gone, and it finds the link BY the contact, so a row with no
+        // contact behind it cannot be constructed.
+        await testDb.insert(schema.contacts).values([
+            { id: 'cA', tenantId: TENANT_A, type: 'agent', name: 'Jane', email: 'jane@realty.com', createdAt: new Date() },
+        ]);
+        const userId = await seedAgentUser('jane@realty.com');
+        await svc.autoLinkSameEmail(userId, 'jane@realty.com');
+
+        const links = await testDb.select().from(schema.agentTenantLinks).all();
+        expect(links).toHaveLength(1);
+        expect(links[0].inspectorContactId).toBe('cA');
+    });
 
     it('creates a link for every contacts row matching email + type=agent', async () => {
         await testDb.insert(schema.contacts).values([

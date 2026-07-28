@@ -78,16 +78,24 @@ const AGENT_CONTACT2 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaac2';
 const AGENT_USER2 = 'dddddddd-dddd-dddd-dddd-ddddddddddc2';
 const LINK2 = 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeec2';
 
+/** The contact the link points at — superseded, so no inspection names it. */
+const STALE_CONTACT2 = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaa5t2';
+
 async function seedEmailFallbackOnly(db: BetterSQLite3Database<typeof schema>) {
   await db.insert(schema.tenants).values(
     { id: T2, name: 'B', slug: 'b', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date() });
-  // Agent user's email intentionally matches the contact's email below — the
-  // ONLY thing that can associate this referral, since the link's
-  // inspectorContactId is left NULL (canonical path is unreachable).
+  // The agent user's email intentionally matches the buyer_agent contact's
+  // email — the ONLY thing that can associate this referral, because the link
+  // points at a DIFFERENT contact row than the inspection names.
   await db.insert(schema.users).values(
     { id: AGENT_USER2, tenantId: null, email: 'b@x.test', passwordHash: 'x', role: 'agent', createdAt: new Date() });
-  await db.insert(schema.contacts).values(
-    { id: AGENT_CONTACT2, tenantId: T2, type: 'agent', name: 'Agent B', email: 'b@x.test', createdAt: new Date() });
+  await db.insert(schema.contacts).values([
+    // The superseded record the link still points at (archived, so it does not
+    // collide with the live row on uq_contacts_tenant_email).
+    { id: STALE_CONTACT2, tenantId: T2, type: 'agent', name: 'Agent B', email: 'b@x.test', createdAt: new Date(1), archivedAt: new Date(2) },
+    // The live record every inspection actually names.
+    { id: AGENT_CONTACT2, tenantId: T2, type: 'agent', name: 'Agent B', email: 'b@x.test', createdAt: new Date(3) },
+  ]);
   await db.insert(schema.contactRoleProfiles).values(
     { id: BA_PROFILE2, tenantId: T2, key: 'buyer_agent', label: "Buyer's Agent", kind: 'agent', isSystem: true, sortOrder: 0, active: true, createdAt: new Date(), updatedAt: new Date() });
   await db.insert(schema.inspections).values(
@@ -95,11 +103,15 @@ async function seedEmailFallbackOnly(db: BetterSQLite3Database<typeof schema>) {
   await db.insert(schema.inspectionPeople).values(
     { id: 'p2', tenantId: T2, inspectionId: INSP2, contactId: AGENT_CONTACT2, roleProfileId: BA_PROFILE2, createdAt: new Date() });
   // Active link (so the inner join on agentTenantLinks still includes this
-  // tenant), but inspectorContactId is NULL — the canonical match path can
-  // never fire, so listReferrals can ONLY find this row via the email
-  // fallback (contacts.email === agent's email).
+  // tenant) pointing at the STALE contact. The canonical match can never fire,
+  // so listReferrals can only find this row via the email fallback.
+  //
+  // This used to seed inspectorContactId: null. That shape is now
+  // unrepresentable (IA-103 made the column NOT NULL), but the scenario it
+  // stood for is real and got MORE likely, not less: contact churn leaves the
+  // link addressing a superseded row. Same test, constructible shape.
   await db.insert(schema.agentTenantLinks).values(
-    { id: LINK2, tenantId: T2, agentUserId: AGENT_USER2, inspectorContactId: null, status: 'active', createdAt: new Date() } as never);
+    { id: LINK2, tenantId: T2, agentUserId: AGENT_USER2, inspectorContactId: STALE_CONTACT2, status: 'active', createdAt: new Date() } as never);
 }
 
 describe('archive preserves agent referral visibility via the email-fallback path', () => {

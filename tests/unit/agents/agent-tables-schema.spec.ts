@@ -29,10 +29,10 @@ describe('agent tables schema', () => {
         );
 
         const insert = sqlite.prepare(
-            `INSERT INTO agent_tenant_links (id, agent_user_id, tenant_id, status, created_at) VALUES (?,?,?,?,?)`,
+            `INSERT INTO agent_tenant_links (id, agent_user_id, tenant_id, inspector_contact_id, status, created_at) VALUES (?,?,?,?,?,?)`,
         );
-        insert.run('link1', 'agent1', 't1', 'active', Date.now());
-        expect(() => insert.run('link2', 'agent1', 't1', 'active', Date.now())).toThrow(/UNIQUE constraint/);
+        insert.run('link1', 'agent1', 't1', 'c1', 'active', Date.now());
+        expect(() => insert.run('link2', 'agent1', 't1', 'c1', 'active', Date.now())).toThrow(/UNIQUE constraint/);
     });
 
     it('agent_tenant_links enforces the tenant_id FK', () => {
@@ -52,9 +52,9 @@ describe('agent tables schema', () => {
         // FK enforcement is off by default in SQLite; enable it for this check.
         sqlite.pragma('foreign_keys = ON');
         const badInsert = sqlite.prepare(
-            `INSERT INTO agent_tenant_links (id, agent_user_id, tenant_id, status, created_at) VALUES (?,?,?,?,?)`,
+            `INSERT INTO agent_tenant_links (id, agent_user_id, tenant_id, inspector_contact_id, status, created_at) VALUES (?,?,?,?,?,?)`,
         );
-        expect(() => badInsert.run('linkX', 'agent2', 'no-such-tenant', 'active', Date.now())).toThrow(/FOREIGN KEY constraint/);
+        expect(() => badInsert.run('linkX', 'agent2', 'no-such-tenant', 'c1', 'active', Date.now())).toThrow(/FOREIGN KEY constraint/);
     });
 
     it('agent_invites is gone', () => {

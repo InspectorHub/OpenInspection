@@ -63,8 +63,17 @@ export interface AgentInspectorRow {
  * with a referral row when either:
  *   1. the inspection's buyer_agent `inspection_people` contactId equals the
  *      active link's `inspectorContactId` (canonical link), OR
- *   2. the referred contact's email matches the agent's email (legacy
- *      contacts pre-A1 promotion).
+ *   2. the referred contact's email matches the agent's email.
+ *
+ * DO NOT DELETE BRANCH 2. It was labelled "legacy pre-A1" and slated for
+ * removal once `inspectorContactId` became NOT NULL (IA-103); it is neither
+ * legacy nor dead. One link per (agent, tenant) meets one ACTIVE contact per
+ * (tenant, email) plus unlimited archived ones, so contact churn leaves the
+ * link addressing a superseded row — branch 1 then misses every inspection on
+ * the live contact and branch 2 is all that keeps the agent's own referrals
+ * visible. Pinned by archived-contact-referral-visibility.spec. The durable
+ * fix is re-pointing the link on archive (the archive-revokes-access work).
+ * Not an escalation vector: agents cannot edit their account email.
  *
  * Returns a predicate bound to the agent's email so the three call sites stay
  * byte-identical (and the where-condition / row filter stays the same SQL +
@@ -89,11 +98,9 @@ function getAgentReferralFilter(
  *      agent's contact id in that tenant (canonical link, populated by
  *      inspection create), OR
  *   2. Carry a buyer_agent contact whose email matches the agent user's
- *      email (legacy contacts pre-A1 promotion).
+ *      email (covers a link left pointing at an archived contact).
  *
- * The compound predicate keeps the query single-roundtrip while remaining
- * resilient to tenants that haven't backfilled `inspectorContactId` on
- * the link row.
+ * Single-roundtrip; see getAgentReferralFilter for why branch 2 must stay.
  */
 export async function listReferrals(
     rawDb: D1Database,

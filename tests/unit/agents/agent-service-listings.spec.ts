@@ -244,7 +244,9 @@ describe('AgentService.listInspectors — A2', () => {
             id: 'T3', name: 'NoInspector', slug: 'no', status: 'active', deploymentMode: 'shared', tier: 'free', createdAt: new Date(),
         });
         await testDb.insert(schema.agentTenantLinks).values({
-            id: 'l3', agentUserId: AGENT_USER, tenantId: 'T3', status: 'active', createdAt: new Date(),
+            // No contact fixture for T3 — this case is about a MISSING inviter, not a
+            // missing contact, so the id can be any live value.
+            id: 'l3', agentUserId: AGENT_USER, tenantId: 'T3', inspectorContactId: 'jane-c3', status: 'active', createdAt: new Date(),
         });
         const rows = await svc.listInspectors(AGENT_USER);
         const noRow = rows.find((r) => r.tenantId === 'T3');
@@ -270,7 +272,7 @@ describe('AgentService.revokeLink — A2', () => {
             id: AGENT_USER, tenantId: null, email: 'jane@realty.com', role: 'agent', name: 'Jane', createdAt: new Date(), passwordHash: 'h',
         });
         await testDb.insert(schema.agentTenantLinks).values({
-            id: 'l1', agentUserId: AGENT_USER, tenantId: T1, status: 'active', createdAt: new Date(),
+            id: 'l1', agentUserId: AGENT_USER, tenantId: T1, inspectorContactId: 'jane-c1', status: 'active', createdAt: new Date(),
         });
 
         (mockDrizzle as unknown as ReturnType<typeof vi.fn>).mockReturnValue(testDb);

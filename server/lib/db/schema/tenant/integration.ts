@@ -89,9 +89,12 @@ export const agentTenantLinks = sqliteTable('agent_tenant_links', {
     id:                  text('id').primaryKey(),
     agentUserId:         text('agent_user_id').notNull().references(() => users.id),
     tenantId:            text('tenant_id').notNull().references(() => tenants.id),
-    // Optional pointer to the contacts row this link was promoted from. NULL
-    // when the agent self-signed-up before the inspector added them as a contact.
-    inspectorContactId:  text('inspector_contact_id'),
+    // The contacts row this link was promoted from. REQUIRED (IA-103): the
+    // only writer is autoLinkSameEmail, which finds the link BY the contact,
+    // so a link with no contact behind it cannot be constructed. It used to be
+    // nullable because invite-accept could mint a link for an email the tenant
+    // held no contact for; that track is gone.
+    inspectorContactId:  text('inspector_contact_id').notNull(),
     // Schema Rules: state-machine column declares its enum (type-layer only).
     status:              text('status', { enum: ['pending', 'active', 'revoked'] }).notNull().default('active'),
     invitedByUserId:     text('invited_by_user_id'),

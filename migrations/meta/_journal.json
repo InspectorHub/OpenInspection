@@ -43,6 +43,13 @@
       "when": 1785219543259,
       "tag": "0005_silky_alex_power",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1785221660417,
+      "tag": "0006_brainy_blizzard",
+      "breakpoints": true
     }
   ]
 }

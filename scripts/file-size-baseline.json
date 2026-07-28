@@ -28,8 +28,8 @@
   "server/services/marketplace.service.ts": 587,
   "server/services/concierge.service.ts": 585,
   "server/api/auth.ts": 564,
+  "server/services/agent/referral.ts": 561,
   "app/lib/collab/results-binding.ts": 560,
-  "server/services/agent/referral.ts": 554,
   "server/api/calendar.ts": 547,
   "server/api/portal.ts": 545,
   "server/api/inspections/core.ts": 540,
@@ -61,7 +61,7 @@
   "server/services/portal-access.service.ts": 430,
   "app/hooks/useStructureEdit.ts": 424,
   "app/routes/templates.tsx": 414,
-  "server/lib/middleware/di.ts": 414,
+  "server/lib/middleware/di.ts": 406,
   "app/routes/calendar.tsx": 402,
   "server/api/secrets.ts": 401
 }
