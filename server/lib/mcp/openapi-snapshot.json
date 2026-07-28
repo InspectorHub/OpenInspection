@@ -1,23 +1,5 @@
 [
   {
-    "operationId": "acceptAgent",
-    "method": "POST",
-    "pathTemplate": "/api/agents/accept",
-    "scopes": [
-      "write"
-    ],
-    "tag": "agents",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [],
-      "body": {
-        "$ref": "#/components/schemas/AgentAcceptBody"
-      }
-    },
-    "summary": "Accept a partner-agent invite",
-    "description": "Auto-generated placeholder for acceptAgent (POST /accept, agents domain). TODO: replace with a real description sourced from the handler."
-  },
-  {
     "operationId": "activateTotp",
     "method": "POST",
     "pathTemplate": "/api/auth/2fa/verify",
@@ -6626,31 +6608,6 @@
     "description": "Auto-generated placeholder for geocodeBooking (GET /geocode, bookings domain). TODO: replace with a real description sourced from the handler."
   },
   {
-    "operationId": "getAgentInviteInfo",
-    "method": "GET",
-    "pathTemplate": "/api/agents/invite-info",
-    "scopes": [],
-    "tag": "agents",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "token",
-          "in": "query",
-          "required": true,
-          "description": "The agent-invite token from the invite email.",
-          "schema": {
-            "type": "string",
-            "description": "The agent-invite token from the invite email."
-          }
-        }
-      ],
-      "body": null
-    },
-    "summary": "Resolve a partner-agent invite token",
-    "description": "Public, no-login resolution of an agent-invite token into the inspector + tenant + email metadata the accept page renders. Returns 404 for unknown/expired/used tokens so the page can show its recovery state."
-  },
-  {
     "operationId": "getAgentProfile",
     "method": "GET",
     "pathTemplate": "/api/agent/profile",
@@ -8529,24 +8486,6 @@
     },
     "summary": "Inspector pre-signs an agreement before sending to client",
     "description": "Spec 5H D1 — optional inspector pre-sign. Allowed only while envelope is pending."
-  },
-  {
-    "operationId": "inviteAgent",
-    "method": "POST",
-    "pathTemplate": "/api/agents/invite",
-    "scopes": [
-      "write"
-    ],
-    "tag": "agents",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [],
-      "body": {
-        "$ref": "#/components/schemas/AgentInviteBody"
-      }
-    },
-    "summary": "Invite a partner agent",
-    "description": "Auto-generated placeholder for inviteAgent (POST /invite, agents domain). TODO: replace with a real description sourced from the handler."
   },
   {
     "operationId": "inviteTeam",

@@ -1,4 +1,3 @@
-import type { EmailService } from './email.service';
 import type { AgentRecommendationGroups } from './agent-recommendations';
 import {
     listReferrals,
@@ -10,85 +9,44 @@ import {
     type AgentReferralRow,
     type AgentInspectorRow,
 } from './agent/referral';
-import {
-    invite,
-    resolveInvite,
-    acceptInvite,
-    type ResolvedInvite,
-    type AcceptInviteInput,
-    type AcceptInviteResult,
-} from './agent/invite';
 import { signup, autoLinkSameEmail } from './agent/signup';
 import { updateProfile, getProfile, type AgentProfilePatch } from './agent/profile';
 import { findGlobalAgentByEmail } from './agent/account';
 
 export type { AgentReferralRow, AgentInspectorRow } from './agent/referral';
-export type { ResolvedInvite, AcceptInviteInput, AcceptInviteResult } from './agent/invite';
 export type { AgentProfilePatch } from './agent/profile';
 
 /**
- * Agent Accounts A1 — invites, accepts, signups, and the same-email auto-link
- * routine that reconciles invite-driven and self-signup paths.
+ * Agent accounts — signup, the same-email auto-link routine, referrals, and
+ * profile.
  *
  * Agents are global users (users.tenant_id IS NULL, role='agent') that connect
- * to one or more tenants via rows in `agent_tenant_links`. The mental model:
+ * to one or more tenants via rows in `agent_tenant_links`. An account is
+ * entirely OPTIONAL: an agent reads a report through a per-inspection access
+ * token that works with no login at all. The account exists only to give a
+ * frequent collaborator one place to see work across inspectors.
  *
- *   - Inspector at tenant A invites jane@realty.com
- *     -> agent_invites row (TTL 7d)
- *     -> Jane clicks /agent-invite/accept?token=… and sets a password
- *     -> users row (tenant_id NULL, role=agent) + agent_tenant_links row
+ * There is therefore ONE way in:
  *
- *   - Jane self-signs-up at /agent-signup
+ *   - Jane is added as a contact on an inspection and receives her link.
+ *     If she wants a standing account she signs up at /agent-signup, or
+ *     follows the prompt from the portal's login / register pages.
  *     -> users row (tenant_id NULL, role=agent)
  *     -> autoLinkSameEmail() finds every contacts row where email=Jane's and
  *        type='agent' and creates an active agent_tenant_links row for each.
  *
+ * A parallel invite track used to exist (`agent_invites`, a 7-day token, an
+ * accept page). It was removed: it required an inspector to invite someone who
+ * could already read everything without being invited, and it was the only
+ * path that could produce a link with no contact behind it. Its POST endpoint
+ * had no caller in the UI at all.
+ *
  * The implementation is split into domain modules under `server/services/agent/`
- * (invite / signup / referral / profile); this class stays the public facade so
+ * (signup / referral / profile); this class stays the public facade so
  * `services.agent.X(...)` call sites + tests remain unchanged.
  */
 export class AgentService {
-    constructor(
-        private db: D1Database,
-        private email: EmailService,
-        private appBaseUrl: string,
-    ) {}
-
-    /**
-     * Mint an invite token + persist the invite + send the agent-invite email.
-     * Rejects when an unaccepted, non-expired invite for the same email already
-     * exists for this tenant — duplicate prevention is per-tenant, so two
-     * different tenants can independently invite the same email.
-     */
-    async invite(
-        tenantId: string,
-        invitedByUserId: string,
-        params: { email: string; contactId?: string },
-    ): Promise<{ token: string; expiresAt: number; emailSent: boolean }> {
-        return invite(this.db, this.email, this.appBaseUrl, tenantId, invitedByUserId, params);
-    }
-
-    /**
-     * Resolve an invite token into the metadata the public accept page needs:
-     * inspector name + photo + tenant name + expiry status. Returns null when
-     * no invite row matches the token; surfaces `expired=true` for tokens past
-     * their TTL so the caller can render the friendly recovery page.
-     */
-    async resolveInvite(token: string): Promise<ResolvedInvite | null> {
-        return resolveInvite(this.db, token);
-    }
-
-    /**
-     * Accept an invite: validate token, create or reuse a global agent user,
-     * link them to the invite's tenant, run the same-email auto-link routine
-     * to fold in any other tenants that already had this email as a contact,
-     * and mark the invite consumed.
-     *
-     * Throws on expired / already-used / unknown tokens.
-     */
-    async acceptInvite(token: string, input: AcceptInviteInput): Promise<AcceptInviteResult> {
-        return acceptInvite(this.db, token, input);
-    }
+    constructor(private db: D1Database) {}
 
     /**
      * Self-serve signup: create a global agent user, run autoLinkSameEmail to
@@ -105,7 +63,7 @@ export class AgentService {
     }
 
     /**
-     * Same-email auto-link: when an agent account is created (signup or invite-accept),
+     * Same-email auto-link: when an agent account is created at signup,
      * find every `contacts` row in any tenant where `type='agent'` and `email` matches
      * the agent's email, and create an `active` agent_tenant_links row for each. Skips
      * existing links thanks to the unique (agent_user_id, tenant_id) index.

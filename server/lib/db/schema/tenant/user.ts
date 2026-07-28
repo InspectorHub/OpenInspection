@@ -134,21 +134,3 @@ export const tenantInvites = sqliteTable('tenant_invites', {
         .on(t.tenantId, t.email)
         .where(sql`status = 'pending'`),
 ]);
-
-// Agent Accounts A1 — invite tokens minted by inspectors via POST /api/agents/invite.
-// 7-day TTL. accepted_at flips to a timestamp once the recipient claims the invite;
-// expired/used tokens are kept for audit (we don't delete them).
-export const agentInvites = sqliteTable('agent_invites', {
-    token:               text('token').primaryKey(),
-    tenantId:            text('tenant_id').notNull().references(() => tenants.id),
-    inspectorContactId:  text('inspector_contact_id'),
-    email:               text('email').notNull(),
-    invitedByUserId:     text('invited_by_user_id').notNull().references(() => users.id),
-    expiresAt:           integer('expires_at', { mode: 'timestamp_ms' }).notNull(),
-    acceptedAt:          integer('accepted_at', { mode: 'timestamp_ms' }),
-    createdAt:           integer('created_at', { mode: 'timestamp_ms' }).notNull(),
-}, (t) => [
-    index('idx_agent_invites_email').on(t.email),
-    index('idx_agent_invites_tenant').on(t.tenantId),
-    index('idx_agent_invites_expiration').on(t.expiresAt),
-]);

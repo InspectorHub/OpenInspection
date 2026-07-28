@@ -31,11 +31,7 @@ describe('AgentService.autoLinkSameEmail — A1', () => {
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new AgentService(
-            {} as D1Database,
-            stubEmail as unknown as EmailService,
-            'https://acme.example.com',
-        );
+        svc = new AgentService({} as D1Database);
     });
 
     async function seedAgentUser(email: string): Promise<string> {

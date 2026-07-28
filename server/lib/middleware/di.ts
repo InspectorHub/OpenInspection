@@ -339,19 +339,11 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     }
                     break;
                 case 'agent':
-                    {
-                        // Agent Accounts A1 — agent service depends on EmailService
-                        // (through the same lazy proxy) and the public app base URL
-                        // for accept-link minting.
-                        if (!target.email) {
-                            target.email = buildEmailService();
-                        }
-                        target.agent = new AgentService(
-                            c.env.DB,
-                            target.email,
-                            c.env.APP_BASE_URL || '',
-                        );
-                    }
+                    // No EmailService or APP_BASE_URL any more: both existed
+                    // solely to mint and send agent-invite accept links, and
+                    // that track is gone (agents reach a report through a
+                    // per-inspection token that needs no account).
+                    target.agent = new AgentService(c.env.DB);
                     break;
                 case 'concierge':
                     {

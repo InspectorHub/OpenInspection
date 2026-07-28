@@ -93,11 +93,7 @@ describe('AgentService.listReferrals — A2', () => {
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new AgentService(
-            {} as D1Database,
-            stubEmail as unknown as EmailService,
-            'https://acme.example.com',
-        );
+        svc = new AgentService({} as D1Database);
     });
 
     it('returns inspections from all tenants the agent has active links with', async () => {
@@ -214,11 +210,7 @@ describe('AgentService.listInspectors — A2', () => {
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new AgentService(
-            {} as D1Database,
-            stubEmail as unknown as EmailService,
-            'https://acme.example.com',
-        );
+        svc = new AgentService({} as D1Database);
     });
 
     it('returns one row per active link with inspector contact info', async () => {
@@ -285,11 +277,7 @@ describe('AgentService.revokeLink — A2', () => {
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new AgentService(
-            {} as D1Database,
-            stubEmail as unknown as EmailService,
-            'https://acme.example.com',
-        );
+        svc = new AgentService({} as D1Database);
     });
 
     it('flips link status to revoked + sets revokedAt', async () => {
@@ -325,11 +313,7 @@ describe('AgentService.updateProfile — A2', () => {
         const stubEmail: Pick<EmailService, 'sendAgentInvite'> = {
             sendAgentInvite: vi.fn().mockResolvedValue(undefined),
         };
-        svc = new AgentService(
-            {} as D1Database,
-            stubEmail as unknown as EmailService,
-            'https://acme.example.com',
-        );
+        svc = new AgentService({} as D1Database);
     });
 
     it('persists slug + notification prefs', async () => {

@@ -63,7 +63,6 @@ export default [
   // (no inspector slug); the server auto-assigns the first available inspector.
   route("embed/:tenant", "routes/public/booking-embed-company.tsx"),
   // Standalone agent pages — no agent-layout chrome
-  route("agent-invite/:token", "routes/agent/invite-accept.tsx"),
   route("agent-signup", "routes/agent/signup.tsx"),
   // Spec 3 Task 5 — core dual-mode agent front door (password + magic-link).
   route("agent-login", "routes/agent/login.tsx"),
