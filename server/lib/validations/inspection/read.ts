@@ -132,7 +132,7 @@ export const InspectionHubSchema = z.object({
     date:              z.string().nullable().describe('Scheduled inspection date (YYYY-MM-DD)'),
     inspectorId:       z.string().nullable().describe('Assigned inspector users.id'),
     templateId:        z.string().nullable().describe('Selected template id'),
-    price:             z.number().describe('Denormalized price cache in cents (authority chain tier 3)'),
+    price:             z.number().optional().describe('Denormalized price cache in cents (authority chain tier 3). ABSENT when the caller lacks the financial capability (IA-95).'),
     paymentStatus:     z.string().describe('Payment status: unpaid | partial | paid'),
     paymentRequired:   z.boolean().describe('Whether report is payment-gated'),
     agreementRequired: z.boolean().describe('Whether report is agreement-gated'),
@@ -150,9 +150,9 @@ export const InspectionHubSchema = z.object({
     id:        z.string().describe('inspection_services row id'),
     serviceId: z.string().describe('Catalog service this line came from — lets a picker mark what is already booked'),
     name:      z.string().describe('Service name snapshot'),
-    priceCents: z.number().describe('Effective line price (priceOverride ?? priceSnapshot)'),
-    priceSnapshot: z.number().describe('Catalog price in cents when the line was added'),
-    priceOverride: z.number().nullable().describe('Per-inspection price override in cents, or null'),
+    priceCents: z.number().optional().describe('Effective line price (priceOverride ?? priceSnapshot). ABSENT without the financial capability.'),
+    priceSnapshot: z.number().optional().describe('Catalog price in cents when the line was added. ABSENT without the financial capability.'),
+    priceOverride: z.number().nullable().optional().describe('Per-inspection price override in cents, or null. ABSENT without the financial capability.'),
   })).describe('Booked service lines'),
   agreements: z.array(z.object({
     id:   z.string().describe('Agreement template id'),
@@ -171,7 +171,7 @@ export const InspectionHubSchema = z.object({
   invoice: z.object({
     id:         z.string().describe('Invoice id'),
     status:     z.string().describe('draft | sent | partial | paid'),
-    amountCents: z.number().describe('Invoice total in cents'),
+    amountCents: z.number().optional().describe('Invoice total in cents. ABSENT without the financial capability.'),
     sentAt:     z.string().nullable().describe('ISO sent timestamp'),
     paidAt:     z.string().nullable().describe('ISO paid timestamp'),
     // IA-34 — the public pay page is token-gated, so a bare `/invoice/:id` is

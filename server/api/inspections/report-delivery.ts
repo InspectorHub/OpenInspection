@@ -8,6 +8,8 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../../lib/openapi-router';
 import { requireRole } from '../../lib/middleware/rbac';
+import { capabilitiesFor } from '../../lib/middleware/require-capability';
+import { redactMoney } from '../../lib/auth/money-redaction';
 import { auditFromContext } from '../../lib/audit';
 import { getBookingHost, getBaseUrl, resolveTenantSlug } from '../../lib/url';
 import { reportUrl as buildReportUrl, buildRenderReportUrl, paymentUrl } from '../../lib/public-urls';
@@ -457,7 +459,12 @@ const reportDeliveryRoutes = createApiRouter()
             }
         }
         const hub = { ...data, invoice: data.invoice ? { ...data.invoice, payUrl } : null };
-        return c.json({ success: true, data: hub }, 200);
+        // IA-95 — an inspector may see the inspection but not its money, and
+        // `financial` is false by default for that role. The gate on
+        // `GET /api/invoices` never covered this aggregate, so the same figures
+        // came out here unguarded. Project rather than refuse: the rest of the
+        // payload is legitimately theirs.
+        return c.json({ success: true, data: redactMoney(hub, await capabilitiesFor(c)) }, 200);
     })
     .openapi(createRoute(withMcpMetadata({
         method: 'post', path: '/{id}/agent-token',

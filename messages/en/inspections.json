@@ -134,6 +134,7 @@
   "inspections_hub_agreement_empty": "No agreement requests yet.",
   "inspections_hub_agreement_send": "Send agreement",
   "inspections_hub_invoice_paid": "Payment received.",
+  "inspections_hub_invoice_hidden": "Amount hidden",
   "inspections_hub_invoice_resend": "Resend request",
   "inspections_hub_invoice_request": "Request payment",
   "inspections_hub_report_create_reinspection": "Create re-inspection",
