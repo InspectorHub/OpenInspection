@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { useLoaderData, useFetcher } from "react-router";
+import { useState } from "react";
+import { useLoaderData, useFetcher, Link } from "react-router";
 import type { Route } from "./+types/invoices";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
-import { PageHeader, Card, StatCard, Button, EmptyState, Modal, Table, Pill, type PillTone } from "@core/shared-ui";
-import { MoneyInput } from "~/components/MoneyInput";
+import { PageHeader, Card, StatCard, Button, EmptyState, Table, Pill, type PillTone } from "@core/shared-ui";
 import { formatCurrency, formatDate } from "~/lib/format";
 import { useDisplayLocale, useDisplayCurrency } from "~/hooks/useSessionContext";
 import { m } from "~/paraglide/messages";
+import { NewInvoiceModal, type InspectionOption } from "~/components/invoices/NewInvoiceModal";
 
 export function meta() {
   return [{ title: m.invoices_meta_title() }];
@@ -24,13 +24,6 @@ type InvoiceRow = {
   // Phase B — the invoice's own snapshot currency; wins over the live tenant
   // setting so a historical record never gets re-labelled after a switch.
   currency: string;
-};
-
-type InspectionOption = {
-  id: string;
-  propertyAddress: string | null;
-  clientName: string | null;
-  date: string | null;
 };
 
 export async function loader({ request, context }: Route.LoaderArgs) {
@@ -129,100 +122,6 @@ function methodLabel(method: string): string {
   return labels[method];
 }
 
-function NewInvoiceModal({
-  open,
-  onClose,
-  inspections,
-}: {
-  open: boolean;
-  onClose: () => void;
-  inspections: InspectionOption[];
-}) {
-  const fetcher = useFetcher<typeof action>();
-  const locale = useDisplayLocale();
-  const busy = fetcher.state !== "idle";
-  const [clientName, setClientName] = useState("");
-  // Money stays in integer cents; the hidden `amount` field carries dollars to
-  // the action (which multiplies by 100), so the wire contract is unchanged.
-  const [amountCents, setAmountCents] = useState<number | null>(null);
-
-  // Close on successful create; the action revalidates the list automatically.
-  // (onClose is intentionally omitted from deps — parent recreates it per render.)
-  useEffect(() => {
-    if (fetcher.state === "idle" && fetcher.data?.intent === "create-invoice" && fetcher.data.ok) {
-      onClose();
-    }
-  }, [fetcher.state, fetcher.data]);  
-
-  if (!open) return null;
-  const inputCls =
-    "w-full h-9 px-3 rounded-md border border-ih-border bg-ih-bg-card text-[13px] text-ih-fg-1 focus:border-ih-primary focus:shadow-ih-focus outline-none transition-all";
-  const labelCls = "block text-[10px] font-bold uppercase tracking-[0.2em] text-ih-fg-3 mb-1";
-
-  return (
-    <Modal open={open} onClose={onClose} title={m.invoices_new_title()} size="md">
-      <fetcher.Form method="post" className="space-y-4">
-        <input type="hidden" name="intent" value="create-invoice" />
-        <div>
-          <label htmlFor="ninv-inspection" className={labelCls}>{m.invoices_new_inspection_label()}</label>
-          <select
-            id="ninv-inspection"
-            name="inspectionId"
-            className={inputCls}
-            defaultValue=""
-            onChange={(e) => {
-              const insp = inspections.find((i) => i.id === e.target.value);
-              if (insp?.clientName && !clientName) setClientName(insp.clientName);
-            }}
-          >
-            <option value="">{m.invoices_new_no_inspection()}</option>
-            {inspections.map((i) => (
-              <option key={i.id} value={i.id}>
-                {(i.propertyAddress || i.id.slice(0, 8)) + (i.date ? ` · ${formatDate(i.date, { locale, timeZone: "UTC" })}` : "")}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="ninv-client" className={labelCls}>{m.invoices_new_client_label()}</label>
-          <input
-            id="ninv-client" name="clientName" required className={inputCls}
-            value={clientName} onChange={(e) => setClientName(e.target.value)}
-          />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="ninv-amount" className={labelCls}>{m.invoices_new_amount_label()}</label>
-            <MoneyInput cents={amountCents} onChange={setAmountCents} ariaLabel={m.invoices_new_amount_label()} className={inputCls} />
-            <input type="hidden" name="amount" value={amountCents == null ? "" : String(amountCents / 100)} />
-          </div>
-          <div>
-            <label htmlFor="ninv-due" className={labelCls}>{m.invoices_new_due_label()}</label>
-            <input id="ninv-due" name="dueDate" type="date" className={inputCls} />
-          </div>
-        </div>
-        <div>
-          <label htmlFor="ninv-notes" className={labelCls}>{m.invoices_new_notes_label()}</label>
-          <input id="ninv-notes" name="notes" className={inputCls} />
-        </div>
-        {fetcher.data?.intent === "create-invoice" && fetcher.data.error && (
-          <p className="text-[12px] text-ih-bad-fg">{fetcher.data.error}</p>
-        )}
-        <div className="flex justify-end gap-3 pt-2 border-t border-ih-border">
-          <button type="button" onClick={onClose} disabled={busy}
-            className="h-9 px-4 rounded-md border border-ih-border bg-ih-bg-card text-[13px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors disabled:opacity-60">
-            {m.common_cancel()}
-          </button>
-          <button type="submit" disabled={busy}
-            className="h-9 px-4 rounded-md bg-ih-primary text-white font-bold text-[13px] hover:bg-ih-primary-600 active:scale-[.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed">
-            {busy ? m.invoices_new_creating() : m.invoices_new_create()}
-          </button>
-        </div>
-      </fetcher.Form>
-    </Modal>
-  );
-}
-
 export default function InvoicesPage() {
   const { invoices, inspections } = useLoaderData<typeof loader>();
   const fetcher = useFetcher<typeof action>();
@@ -235,6 +134,11 @@ export default function InvoicesPage() {
   const paid = invoices.filter((i) => i.status === "paid").length;
   const unpaid = invoices.filter((i) => i.status !== "paid").length;
   const revenue = invoices.filter((i) => i.status === "paid").reduce((s, i) => s + (i.amountCents || 0), 0);
+
+  const countLabel = `${total} ${total === 1 ? m.invoices_meta_singular() : m.invoices_meta_plural()}`;
+  // Only mention unpaid when there are some — "0 unpaid" is noise on a clean
+  // ledger, and an empty list should not read as if something were pending.
+  const metaLine = unpaid > 0 ? `${countLabel} · ${unpaid} ${m.invoices_meta_unpaid()}` : countLabel;
 
   // The row currently being submitted (optimistic disable).
   const submittingId =
@@ -249,9 +153,14 @@ export default function InvoicesPage() {
 
   return (
     <div className="space-y-ih-list">
+      {/* IA-97 — title and meta used to render the same sentence twice ("2
+          Invoices" over "2 invoices"). Convention across list pages (templates,
+          team) is title = the page's name, meta = the counts; the count moves
+          down and the meta earns its line by naming the number that prompts
+          action. */}
       <PageHeader
-        title={`${total} ${total === 1 ? m.invoices_count_singular() : m.invoices_count_plural()}`}
-        meta={`${total} ${total === 1 ? m.invoices_meta_singular() : m.invoices_meta_plural()}`}
+        title={m.invoices_count_plural()}
+        meta={metaLine}
         actions={<Button variant="primary" onClick={() => setNewOpen(true)}>{m.invoices_new_button()}</Button>}
       />
 
@@ -276,7 +185,39 @@ export default function InvoicesPage() {
           getRowKey={(invoice) => invoice.id}
           empty={<EmptyState title={m.invoices_empty_title()} />}
           columns={[
-            { label: m.invoices_col_client(), cell: (invoice) => <span className="font-medium text-ih-fg-1">{invoice.clientName || "—"}</span> },
+            {
+              // IA-97 — the list was a dead end: no way from an invoice to the
+              // inspection it bills, and a PAID row had no control at all, so
+              // the page looked broken ("why is there no action?").
+              //
+              // The identity cell links, NOT the whole row via `onRowClick`:
+              // the Action column holds real buttons, and a row-wide handler
+              // would fire on every "Mark paid" click too. A <Link> is also
+              // keyboard-reachable and middle-clickable, which a `<tr onClick>`
+              // is not.
+              //
+              // It points at the hub rather than growing invoice actions here.
+              // The hub already owns them — including the tokenized pay link,
+              // which is minted per recipient (IA-34) and would cost one token
+              // issue per row to reproduce on a list.
+              label: m.invoices_col_client(),
+              cell: (invoice) => {
+                const name = invoice.clientName || "—";
+                // A standalone invoice has no inspection to open.
+                if (!invoice.inspectionId) {
+                  return <span className="font-medium text-ih-fg-1">{name}</span>;
+                }
+                return (
+                  <Link
+                    to={`/inspections/${invoice.inspectionId}`}
+                    title={m.invoices_row_view_inspection()}
+                    className="font-medium text-ih-fg-1 hover:text-ih-primary hover:underline transition-colors"
+                  >
+                    {name}
+                  </Link>
+                );
+              },
+            },
             { label: m.invoices_col_amount(), cell: (invoice) => <span className="font-mono text-ih-fg-1">{formatCurrency(invoice.amountCents, { locale, currency: invoice.currency || currency })}</span> },
             { label: m.invoices_col_due(), cell: (invoice) => <span className="text-ih-fg-3">{invoice.dueDate ? formatDate(invoice.dueDate, { locale, timeZone: "UTC" }) : "—"}</span> },
             {
@@ -299,7 +240,22 @@ export default function InvoicesPage() {
               cell: (invoice) => {
                 const isPaid = invoice.status === "paid";
                 const busy = submittingId === invoice.id;
-                if (isPaid) return <span className="text-[12px] text-ih-fg-4">—</span>;
+                // IA-97 — a paid invoice has nothing left to mark, but an
+                // Action column reading "—" looks like a missing feature
+                // rather than a settled account. Offer the one thing still
+                // worth doing: open the inspection it belongs to.
+                if (isPaid) {
+                  return invoice.inspectionId ? (
+                    <Link
+                      to={`/inspections/${invoice.inspectionId}`}
+                      className="px-3 h-7 inline-flex items-center rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-fg-2 hover:bg-ih-bg-muted transition-colors"
+                    >
+                      {m.invoices_row_view_inspection()}
+                    </Link>
+                  ) : (
+                    <span className="text-[12px] text-ih-fg-4">—</span>
+                  );
+                }
                 if (pickerFor === invoice.id) {
                   return (
                     <div className="inline-flex flex-wrap items-center justify-end gap-1.5">

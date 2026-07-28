@@ -198,6 +198,8 @@
   "invoices_count_plural": "Invoices",
   "invoices_meta_singular": "invoice",
   "invoices_meta_plural": "invoices",
+  "invoices_meta_unpaid": "unpaid",
+  "invoices_row_view_inspection": "View inspection",
   "invoices_stat_total": "TOTAL",
   "invoices_stat_unpaid": "UNPAID",
   "invoices_stat_paid": "PAID",
