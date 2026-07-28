@@ -45,7 +45,7 @@ let sendEmail: ReturnType<typeof vi.fn>;
 let sendReportReady: ReturnType<typeof vi.fn>;
 let sendInspectionReportPdf: ReturnType<typeof vi.fn>;
 
-function buildApp() {
+function buildApp(withPdf = false) {
     const app = new OpenAPIHono<HonoConfig>();
     sendEmail = vi.fn().mockResolvedValue({ delivered: true });
     sendReportReady = vi.fn().mockResolvedValue(true);
@@ -68,8 +68,14 @@ function buildApp() {
             },
             people: new PeopleService({ DB: {} as D1Database }),
             portalAccess: { issueToken: vi.fn().mockResolvedValue('tok-1') },
-            // No PDF — exercises the text path, which is the same branch point.
-            reportPdf: { getOrRender: vi.fn().mockResolvedValue(null), streamPdf: vi.fn().mockResolvedValue(null) },
+            // Default: no PDF, exercising the text path. `withPdf` flips it to
+            // the attachment path, which is where IA-110 lived.
+            reportPdf: withPdf
+                ? {
+                      getOrRender: vi.fn().mockResolvedValue({ key: 'pdf-record' }),
+                      streamPdf: vi.fn().mockResolvedValue({ arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)) }),
+                  }
+                : { getOrRender: vi.fn().mockResolvedValue(null), streamPdf: vi.fn().mockResolvedValue(null) },
             email: { sendEmail, sendReportReady, sendInspectionReportPdf },
         } as never);
         await next();
@@ -83,6 +89,7 @@ function buildApp() {
     });
     return app;
 }
+
 
 const ENV = { DB: {}, APP_BASE_URL: 'https://acme.example.com', JWT_SECRET: 'test-secret' } as never;
 const CTX = { waitUntil: () => {}, passThroughOnException: () => {} } as never;
@@ -150,6 +157,23 @@ describe('manual send-report — role email template', () => {
 
         // The default copy must NOT also go out — one report, one email.
         expect(sendReportReady).not.toHaveBeenCalled();
+    });
+
+    it('still attaches the PDF when the role has a template', async () => {
+        // IA-110 — the first version of this branch called sendEmail with no
+        // attachment, so naming a template silently downgraded that recipient
+        // to a link-only email while everyone else got the PDF — after the
+        // render cost had already been paid once for the whole batch.
+        // Choosing different WORDING must not change what is ENCLOSED.
+        await setRoleTemplate('buyer_agent', TPL_EMAIL);
+        const res = await buildApp(true).fetch(post([{ contactId: AGENT, roleKey: 'buyer_agent' }]), ENV, CTX);
+        expect(res.status).toBe(200);
+
+        expect(sendEmail).toHaveBeenCalledTimes(1);
+        const attachments = sendEmail.mock.calls[0][3];
+        expect(attachments).toHaveLength(1);
+        expect(attachments[0].filename).toMatch(/\.pdf$/);
+        expect(attachments[0].content).toBeTruthy();
     });
 
     it('leaves roles without a template on the default copy', async () => {

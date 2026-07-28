@@ -400,10 +400,19 @@ const reportDeliveryRoutes = createApiRouter()
                         company_name:     tenantSlug,
                         role_label:       roleTemplate.roleLabel,
                     };
+                    // The PDF rides along, exactly as it does on the default
+                    // path. The first version of this branch omitted it, so a
+                    // recipient whose role named a template got a link-only
+                    // email while everyone else got the attachment — after the
+                    // render cost had already been paid once for the batch.
+                    // Choosing different WORDING must not change what is
+                    // ENCLOSED.
                     await c.var.services.email.sendEmail(
                         [recipientEmail],
                         interpolate(roleTemplate.subject, vars),
                         interpolate(roleTemplate.body, vars),
+                        pdf ? [{ filename: `${address.replace(/[^a-z0-9]+/gi, '-')}-report.pdf`, content: pdf }] : undefined,
+                        { inspector: sigInspector },
                     );
                 } else if (pdf) {
                     await c.var.services.email.sendInspectionReportPdf(recipientEmail, address, linkUrl, pdf, sigInspector, sigHost);
