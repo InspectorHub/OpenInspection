@@ -87,6 +87,7 @@ export default [
   route("resources/entity-audit", "routes/resources/entity-audit.tsx"),
   route("resources/agreement-signers", "routes/resources/agreement-signers.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
+  route("resources/contact-access", "routes/resources/contact-access.tsx"),
   route("resources/template-search", "routes/resources/template-search.tsx"),
   route("resources/inspection-search", "routes/resources/inspection-search.tsx"),
   layout("routes/auth-layout.tsx", [

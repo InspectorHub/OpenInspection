@@ -9072,6 +9072,34 @@
     "description": "Returns the tenant-scoped append-only erasure accountability record (Track I-a). Newest first, capped at 50. Exposes subject_email + status + counts + parsed decisions only."
   },
   {
+    "operationId": "listContactAccess",
+    "method": "GET",
+    "pathTemplate": "/api/contacts/{id}/access",
+    "scopes": [
+      "read"
+    ],
+    "tag": "contacts",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Contact id.",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Contact id."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "List the live report links a contact still holds",
+    "description": "Every inspection this contact can still open, by way of a live (unrevoked, unexpired) access token addressed to their email. Empty for a contact with no email."
+  },
+  {
     "operationId": "listContacts",
     "method": "GET",
     "pathTemplate": "/api/contacts",
@@ -15452,6 +15480,45 @@
     },
     "summary": "Revoke a partner-agent link",
     "description": "Auto-generated placeholder for revokeAgent (POST /{linkId}/revoke, agents domain). TODO: replace with a real description sourced from the handler."
+  },
+  {
+    "operationId": "revokeContactAccess",
+    "method": "POST",
+    "pathTemplate": "/api/contacts/{id}/access/revoke",
+    "scopes": [
+      "write"
+    ],
+    "tag": "contacts",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Contact id.",
+          "schema": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Contact id."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "inspectionIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Inspections to revoke. Omit to revoke every live link this contact holds."
+          }
+        }
+      }
+    },
+    "summary": "Revoke a contact's report links",
+    "description": "Revokes the named inspections' links for this contact, or every live link when inspectionIds is omitted. Returns the number actually revoked, which can be lower than requested if some were already gone."
   },
   {
     "operationId": "revokeMcpGrant",

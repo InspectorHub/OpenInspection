@@ -225,6 +225,18 @@ export const tenantConfigs = sqliteTable('tenant_configs', {
     // Tenant transaction/display currency (ISO 4217, e.g. 'USD'). Tenant-scoped
     // only (tied to billing); no per-user override.
     currency: text('currency').notNull().default('USD'),
+    // IA-100 — when true, archiving a contact ALSO revokes every live report
+    // link that contact still holds.
+    //
+    // Default OFF, which is the surprising-looking choice, so: archiving is a
+    // list-management act ("stop offering this person in pickers"), and a
+    // buyer's agent whose deal closed should not lose the report they were
+    // legitimately given. Silently cutting access on archive would break that
+    // for every tenant that archives as routine hygiene. Tenants who treat
+    // archive as offboarding turn this on; either way the archive dialog now
+    // states the live-link count, so nobody is deciding blind.
+    // Appended at table end for D1 rebuild safety.
+    archiveRevokesAccess: integer('is_archive_revoking_access', { mode: 'boolean' }).notNull().default(false),
 });
 
 /**

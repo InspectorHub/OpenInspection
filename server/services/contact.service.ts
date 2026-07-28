@@ -7,9 +7,20 @@ import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema/inspecti
 import { Errors } from '../lib/errors';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
+import { tenantConfigs } from '../lib/db/schema';
+import { logger } from '../lib/logger';
 
 export class ContactService {
-    constructor(private db: D1Database) {}
+    /**
+     * `portalAccess` is optional so the many tests that construct this service
+     * bare keep working. When absent, archive simply does not revoke — the
+     * conservative direction: failing to revoke is visible on the next audit,
+     * whereas revoking by accident silently breaks a customer's report link.
+     */
+    constructor(
+        private db: D1Database,
+        private portalAccess?: import('./portal-access.service').PortalAccessService,
+    ) {}
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private getDrizzle() { return drizzle(this.db as any); }
@@ -196,6 +207,72 @@ export class ContactService {
         // Idempotent — re-archiving an archived row is a no-op set.
         await db.update(contacts).set({ archivedAt: new Date() })
             .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+
+        // IA-100 — archiving a contact LOOKED like it cut off their access and
+        // did not: a report link is a per-inspection token that works with no
+        // account, so it survives the contact row being retired. Whether that
+        // is right depends on what the tenant means by "archive", so it is
+        // their setting rather than our guess — see is_archive_revoking_access.
+        //
+        // Type-agnostic: clients hold these links exactly as agents do.
+        if (existing.email) {
+            const revokes = await db.select({ on: tenantConfigs.archiveRevokesAccess })
+                .from(tenantConfigs).where(eq(tenantConfigs.tenantId, tenantId)).get();
+            if (revokes?.on) {
+                const n = await this.portalAccess?.revokeAccessForRecipient(tenantId, existing.email) ?? 0;
+                if (n > 0) logger.info('contact.archive.revoked_access', { tenantId, contactId: id, revoked: n });
+            }
+        }
+    }
+
+    /**
+     * Every inspection this contact can still open (IA-100). Null when the
+     * contact does not exist in this tenant, so the route can 404 rather than
+     * report an empty list for an id that was never theirs — those two answers
+     * look identical to a caller and mean very different things.
+     *
+     * An empty array for a contact with no email is correct: a token is
+     * addressed to an email, so there is nothing to hold.
+     */
+    async listAccess(id: string, tenantId: string): Promise<Array<{
+        inspectionId: string;
+        propertyAddress: string | null;
+        role: string;
+        createdAt: number | null;
+    }> | null> {
+        const db = this.getDrizzle();
+        const row = await db.select({ email: contacts.email }).from(contacts)
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+        if (!row) return null;
+        if (!row.email || !this.portalAccess) return [];
+        return this.portalAccess.listLiveAccessByRecipient(tenantId, row.email);
+    }
+
+    /**
+     * Withdraw some or all of that access. Null on an unknown contact (see
+     * listAccess); otherwise the number of links ACTUALLY revoked, which can
+     * be lower than asked for when a link had already lapsed. Reporting the
+     * real number matters: "revoked 3" when one was already dead would teach
+     * an operator to trust a count that is not measuring anything.
+     */
+    async revokeAccess(id: string, tenantId: string, inspectionIds?: string[]): Promise<number | null> {
+        const db = this.getDrizzle();
+        const row = await db.select({ email: contacts.email }).from(contacts)
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+        if (!row) return null;
+        if (!row.email || !this.portalAccess) return 0;
+        const n = await this.portalAccess.revokeAccessForRecipient(tenantId, row.email, inspectionIds);
+        if (n > 0) logger.info('contact.access.revoked', { tenantId, contactId: id, revoked: n });
+        return n;
+    }
+
+    /**
+     * How many live report links this contact still holds (IA-100). Drives the
+     * archive dialog's warning, so an operator is never asked to archive
+     * someone without being told what that does or does not withdraw.
+     */
+    async liveAccessCount(id: string, tenantId: string): Promise<number> {
+        return (await this.listAccess(id, tenantId))?.length ?? 0;
     }
 
     /**
@@ -244,7 +321,11 @@ export class ContactService {
                     await db
                         .update(contacts)
                         .set(updates)
-                        .where(eq(contacts.id, existing.id));
+                        // tenantId as well as id: `existing` came from a
+                        // tenant-scoped read, so this is belt-and-braces, but
+                        // an id-only write is the shape the scoping gate exists
+                        // to keep out of the codebase — and it costs nothing.
+                        .where(and(eq(contacts.id, existing.id), eq(contacts.tenantId, tenantId)));
                 }
                 return { id: existing.id, created: false };
             }

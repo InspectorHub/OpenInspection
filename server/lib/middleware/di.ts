@@ -237,7 +237,18 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.availability = new AvailabilityService(c.env.DB);
                     break;
                 case 'contact':
-                    target.contact = new ContactService(c.env.DB);
+                    // IA-100 — contact archiving needs to see (and optionally
+                    // revoke) the report links a contact still holds, and that
+                    // predicate lives in PortalAccessService. Injected rather
+                    // than re-implemented so "what counts as live access" has
+                    // exactly one definition.
+                    target.contact = new ContactService(
+                        c.env.DB,
+                        new PortalAccessService(c.env.DB, {
+                            jwtSecret: c.env.JWT_SECRET,
+                            ...(c.env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: c.env.JWT_SECRET_PREVIOUS } : {}),
+                        }),
+                    );
                     break;
                 case 'invoice':
                     target.invoice = new InvoiceService(c.env.DB);

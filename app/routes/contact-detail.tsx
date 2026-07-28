@@ -1,4 +1,4 @@
-import { useLoaderData, Link, isRouteErrorResponse, useRouteError } from "react-router";
+import { useLoaderData, useFetcher, Link, isRouteErrorResponse, useRouteError } from "react-router";
 import type { Route } from "./+types/contact-detail";
 import { useDisplayTimeZone } from "~/hooks/useSessionContext";
 import { requireToken } from "~/lib/session.server";
@@ -19,10 +19,19 @@ export function meta() {
 /*  server/lib/validations/contact.schema.ts                           */
 /* ------------------------------------------------------------------ */
 
+/** One inspection this contact can still open (IA-100). */
+interface AccessRow {
+  inspectionId: string;
+  propertyAddress: string | null;
+  role: string;
+  createdAt: number | null;
+}
+
 interface ContactDetail {
   contact: {
     id: string;
-    type: "agent" | "client";
+    // IA-96 widened this to match contact_role_profiles.kind.
+    type: "agent" | "client" | "other";
     name: string;
     email: string | null;
     phone: string | null;
@@ -64,7 +73,46 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   }
   const body = await res.json();
   const detail = ((body as Record<string, unknown>).data ?? {}) as unknown as ContactDetail;
-  return { detail };
+
+  // IA-100 — what this person can still OPEN, which is a different question
+  // from what they appear on. A report link is a per-inspection token that
+  // works with no account, so it outlives archiving and was previously
+  // invisible everywhere. Fetched alongside rather than blocking the page: a
+  // failure here should cost the access panel, not the whole record.
+  let access: AccessRow[] = [];
+  try {
+    const accessRes = await api.contacts[":id"].access.$get({ param: { id } });
+    if (accessRes.ok) {
+      const ab = (await accessRes.json()) as { data?: { access?: AccessRow[] } };
+      access = ab.data?.access ?? [];
+    }
+  } catch {
+    access = [];
+  }
+
+  return { detail, access };
+}
+
+export async function action({ request, params, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
+  const fd = await request.formData();
+  const id = params.id as string;
+
+  if (fd.get("intent") === "revoke-access") {
+    // A single id revokes one row; its absence revokes everything. Same shape
+    // the API takes, so "revoke all" is not a client-side loop that can fail
+    // halfway and leave the operator believing access was cut.
+    const one = fd.get("inspectionId");
+    const res = await api.contacts[":id"].access.revoke.$post({
+      param: { id },
+      json: typeof one === "string" && one ? { inspectionIds: [one] } : {},
+    });
+    if (!res.ok) return { ok: false, revoked: 0 };
+    const b = (await res.json()) as { data?: { revoked?: number } };
+    return { ok: true, revoked: b.data?.revoked ?? 0 };
+  }
+  return { ok: false, revoked: 0 };
 }
 
 /* ------------------------------------------------------------------ */
@@ -72,7 +120,9 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function ContactDetailPage() {
-  const { detail } = useLoaderData<typeof loader>();
+  const { detail, access } = useLoaderData<typeof loader>();
+  const revokeFetcher = useFetcher<typeof action>();
+  const revoking = revokeFetcher.state !== "idle";
   const { contact, inspections, stats } = detail;
   const displayTz = useDisplayTimeZone();
   const archived = !!contact.archivedAt;
@@ -187,7 +237,66 @@ export default function ContactDetailPage() {
         </Card>
       </div>
 
-      {/* 3. Inspection history -------------------------------------- */}
+      {/* 3. Report access (IA-100) ---------------------------------- */}
+      {/* Deliberately its own block rather than a column on the history
+          list below. History answers "what were they part of"; this answers
+          "what can they still open", and the two diverge the moment anything
+          is revoked — showing them as one list would imply they never do. */}
+      <Card className="p-5">
+        <div className="flex items-start justify-between gap-4 mb-3">
+          <BlockHeading title={m.contacts_detail_access_heading()} />
+          {access.length > 0 && (
+            <revokeFetcher.Form method="post">
+              <input type="hidden" name="intent" value="revoke-access" />
+              <button
+                type="submit"
+                disabled={revoking}
+                className="px-3 h-8 rounded-md border border-ih-border bg-ih-bg-card text-[12px] font-bold text-ih-bad-fg hover:bg-ih-bg-muted transition-colors disabled:opacity-60"
+              >
+                {m.contacts_detail_access_revoke_all()}
+              </button>
+            </revokeFetcher.Form>
+          )}
+        </div>
+
+        {access.length === 0 ? (
+          <p className="text-[13px] text-ih-fg-3">{m.contacts_detail_access_none()}</p>
+        ) : (
+          <>
+            <p className="text-[12px] text-ih-fg-3 mb-3">
+              {m.contacts_detail_access_explainer()}
+            </p>
+            <div className="divide-y divide-ih-border">
+              {access.map((a) => (
+                <div key={a.inspectionId} className="flex items-center justify-between gap-4 py-2.5">
+                  <div className="min-w-0">
+                    <Link
+                      to={`/inspections/${a.inspectionId}`}
+                      className="text-[13px] font-medium text-ih-fg-1 hover:text-ih-primary hover:underline"
+                    >
+                      {a.propertyAddress || a.inspectionId.slice(0, 8)}
+                    </Link>
+                    <p className="text-[11px] text-ih-fg-4">{a.role}</p>
+                  </div>
+                  <revokeFetcher.Form method="post">
+                    <input type="hidden" name="intent" value="revoke-access" />
+                    <input type="hidden" name="inspectionId" value={a.inspectionId} />
+                    <button
+                      type="submit"
+                      disabled={revoking}
+                      className="text-[12px] font-bold text-ih-fg-3 hover:text-ih-bad-fg hover:underline disabled:opacity-60"
+                    >
+                      {m.contacts_detail_access_revoke()}
+                    </button>
+                  </revokeFetcher.Form>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
+
+      {/* 4. Inspection history -------------------------------------- */}
       <Card className="p-5">
         <BlockHeading title={m.contacts_detail_history_heading()} />
         {inspections.length === 0 ? (

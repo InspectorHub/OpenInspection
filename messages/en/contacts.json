@@ -38,6 +38,8 @@
   "contacts_agents_empty_desc": "Agents you add or import appear here. Grant report access per inspection from the People panel.",
   "contacts_archive_title": "Archive this contact?",
   "contacts_archive_confirm": "Removes them from your list. Their inspections and any report links they were sent are unaffected.",
+  "contacts_archive_access_warning": "This contact can still open {count} report(s). Archiving does not withdraw that.",
+  "contacts_archive_access_warning_revoking": "Archiving will also revoke the {count} report link(s) this contact still holds.",
   "contacts_detail_archived": "Archived",
   "contacts_detail_back": "Back to Contacts",
   "contacts_detail_info_heading": "Contact info",
@@ -92,5 +94,10 @@
   "contacts_roles_modal_email_template_label": "Email template",
   "contacts_roles_modal_sms_template_label": "SMS template",
   "contacts_roles_modal_template_none": "None",
-  "contacts_type_other": "Other"
+  "contacts_type_other": "Other",
+  "contacts_detail_access_heading": "Report access",
+  "contacts_detail_access_none": "This contact cannot open any reports.",
+  "contacts_detail_access_explainer": "These links work without an account. Revoking one takes effect immediately.",
+  "contacts_detail_access_revoke": "Revoke",
+  "contacts_detail_access_revoke_all": "Revoke all"
 }

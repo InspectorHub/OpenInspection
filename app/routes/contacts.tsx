@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLoaderData, useFetcher } from "react-router";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/contacts";
@@ -35,6 +35,25 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   } catch {
     return { contacts: [] as Contact[], filterType: "" };
   }
+}
+
+/**
+ * IA-100 — the archive dialog fetches the contact's live-link count when it
+ * opens, rather than the list loading one per row up front. A contacts page
+ * with 200 rows would otherwise pay 200 queries to answer a question asked
+ * about one of them.
+ */
+function useLiveAccess(contact: Contact | null) {
+  const fetcher = useFetcher<{ access?: unknown[]; archiveRevokesAccess?: boolean }>();
+  const id = contact?.id;
+  useEffect(() => {
+    if (id) fetcher.load(`/resources/contact-access?id=${id}`);
+    // fetcher is stable per instance; re-running on it would loop.
+  }, [id]);
+  return {
+    count: id ? (fetcher.data?.access?.length ?? 0) : 0,
+    revokesOnArchive: fetcher.data?.archiveRevokesAccess ?? false,
+  };
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -116,6 +135,10 @@ export default function ContactsPage() {
   const [typeFilter, setTypeFilter] = useState(filterType || "");
   const [pendingArchive, setPendingArchive] = useState<Contact | null>(null);
   const archiveFetcher = useFetcher<{ ok?: boolean }>();
+  // IA-100 — how many reports this person can still open, fetched only for the
+  // contact actually being archived, plus whether this tenant treats archiving
+  // as revoking.
+  const { count: pendingAccessCount, revokesOnArchive: archiveRevokesAccess } = useLiveAccess(pendingArchive);
 
   const openEdit = (c: Contact) => { setEditContact(c); setModalOpen(true); };
   const confirmArchive = () => {
@@ -186,10 +209,22 @@ export default function ContactsPage() {
       <ContactModal open={modalOpen} onClose={() => setModalOpen(false)} contact={editContact} />
       <CsvImportModal open={csvModalOpen} onClose={() => setCsvModalOpen(false)} />
 
+      {/* IA-100 — say what archiving does and does not withdraw. A report link
+          is a per-inspection token that works with no account, so archiving
+          the contact does not touch it unless the tenant opted in. Operators
+          were reading "archive" as "cut off", which it was not. */}
       <ConfirmDialog
         open={pendingArchive !== null}
         title={m.contacts_archive_title()}
-        message={m.contacts_archive_confirm()}
+        message={
+          pendingAccessCount > 0
+            ? `${m.contacts_archive_confirm()} ${
+                archiveRevokesAccess
+                  ? m.contacts_archive_access_warning_revoking({ count: pendingAccessCount })
+                  : m.contacts_archive_access_warning({ count: pendingAccessCount })
+              }`
+            : m.contacts_archive_confirm()
+        }
         confirmLabel={m.contacts_action_archive()}
         tone="default"
         busy={archiveFetcher.state !== "idle"}
