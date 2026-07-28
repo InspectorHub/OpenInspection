@@ -13,6 +13,7 @@ import { users } from '../../lib/db/schema/tenant';
 import { DUMMY_HASH } from '../../services/auth.service';
 import { findGlobalAgentByEmail } from '../../services/agent/account';
 import { requestMagicLoginByEmail } from '../../services/agent/magic-login.service';
+import { authCookieOptions, AUTH_COOKIE_NAME } from '../../lib/auth-helpers';
 import {
     AgentLoginSchema,
     AgentLoginLinkSchema,
@@ -135,13 +136,7 @@ export const agentLoginRoutes = createApiRouter()
             exp: now + 60 * 60 * 24,
         }, keyring);
 
-        setCookie(c, '__Host-inspector_token', token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'Strict',
-            path: '/',
-            maxAge: 60 * 60 * 24,
-        });
+        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
 
         // Tenant-less global agent identity — same reasoning as the
         // magic-login redeem handler: no tenant-scoped audit_logs row

@@ -30,8 +30,8 @@ import { logger } from '../lib/logger';
 import { signJwt } from '../lib/jwt-keyring';
 import { findGlobalAgentByEmail } from '../services/agent/account';
 import type { HonoConfig } from '../types/hono';
+import { authCookieOptions, AUTH_COOKIE_NAME, portalSessionCookieOptions, PORTAL_SESSION_COOKIE_NAME } from '../lib/auth-helpers';
 
-const PORTAL_SESSION_COOKIE = '__Host-portal_session';
 
 /** Resolves the path-derived tenantId, or null when the slug is unknown. */
 function resolveTenantId(c: Context<HonoConfig>): string | null {
@@ -48,7 +48,7 @@ function resolveTenantId(c: Context<HonoConfig>): string | null {
  * by design — the cookie carries only a verified email.
  */
 async function portalSession(c: Context<HonoConfig>, next: () => Promise<void>) {
-    const cookie = getCookie(c, PORTAL_SESSION_COOKIE);
+    const cookie = getCookie(c, PORTAL_SESSION_COOKIE_NAME);
     const verified = cookie ? await verifyPortalSession(c.env.JWT_SECRET, cookie) : null;
     if (!verified) {
         return c.json({ error: 'Not authenticated' }, 401);
@@ -424,13 +424,7 @@ const portalRoutes = portalRouter
                 exp: now + 60 * 60 * 24,
             }, keyring);
 
-            setCookie(c, '__Host-inspector_token', token, {
-                httpOnly: true,
-                secure: true,
-                sameSite: 'Strict',
-                path: '/',
-                maxAge: 60 * 60 * 24,
-            });
+            setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
 
             // Tenant-less global agent identity — same reasoning as the agent
             // login/magic-login redeem handlers: no tenant-scoped audit_logs
@@ -441,7 +435,7 @@ const portalRoutes = portalRouter
         }
 
         const sess = await signPortalSession(c.env.JWT_SECRET, verified.email);
-        setCookie(c, PORTAL_SESSION_COOKIE, sess, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
+        setCookie(c, PORTAL_SESSION_COOKIE_NAME, sess, portalSessionCookieOptions());
         return c.json({ data: { email: verified.email } }, 200);
     })
     .openapi(exchangeRoute, async (c) => {
@@ -469,7 +463,7 @@ const portalRoutes = portalRouter
         }
 
         const sess = await signPortalSession(c.env.JWT_SECRET, grant.recipientEmail);
-        setCookie(c, PORTAL_SESSION_COOKIE, sess, { httpOnly: true, secure: true, sameSite: 'Lax', path: '/' });
+        setCookie(c, PORTAL_SESSION_COOKIE_NAME, sess, portalSessionCookieOptions());
         return c.json({ data: { email: grant.recipientEmail } }, 200);
     })
     .openapi(logoutRoute, async (c) => {
@@ -477,7 +471,7 @@ const portalRoutes = portalRouter
         // whether a session or a resolvable slug exists, so we do NOT gate on
         // resolveTenantId here. CLAUDE.md: deleteCookie on a `__Host-` cookie MUST
         // pass { path: '/', secure: true } or it throws at runtime.
-        deleteCookie(c, PORTAL_SESSION_COOKIE, { path: '/', secure: true });
+        deleteCookie(c, PORTAL_SESSION_COOKIE_NAME, { path: '/', secure: true });
         return c.json({ data: { ok: true } }, 200);
     })
     .openapi(meRoute, async (c) => {

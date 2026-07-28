@@ -101,6 +101,17 @@ export default tseslint.config(
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
                 },
+                // Cookie-policy guard (PR 1) — setCookie must take its attributes
+                // from a factory in server/lib/auth-helpers.ts, never an inline object.
+                // CLAUDE.md mandates httpOnly + secure + sameSite + path on EVERY
+                // setCookie; five sites were hand-maintaining identical copies of the
+                // staff-session options and two more the portal's. They were correct
+                // at the time, which is exactly why nobody noticed there were seven
+                // places to update on the next policy change.
+                {
+                    selector: "CallExpression[callee.name='setCookie'] > ObjectExpression",
+                    message: 'Pass a cookie-options factory from server/lib/auth-helpers.ts (authCookieOptions / portalSessionCookieOptions), not an inline object — CLAUDE.md requires httpOnly+secure+sameSite+path on every cookie.',
+                },
                 // Admin-tier guard (IA-94 / PR 1) — "is this an owner or a manager"
                 // must go through isAdminRole() in server/lib/auth/roles.ts. It was
                 // re-derived in SEVEN places before this rule existed, including a
@@ -214,6 +225,17 @@ export default tseslint.config(
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
                 },
+                // Cookie-policy guard (PR 1) — setCookie must take its attributes
+                // from a factory in server/lib/auth-helpers.ts, never an inline object.
+                // CLAUDE.md mandates httpOnly + secure + sameSite + path on EVERY
+                // setCookie; five sites were hand-maintaining identical copies of the
+                // staff-session options and two more the portal's. They were correct
+                // at the time, which is exactly why nobody noticed there were seven
+                // places to update on the next policy change.
+                {
+                    selector: "CallExpression[callee.name='setCookie'] > ObjectExpression",
+                    message: 'Pass a cookie-options factory from server/lib/auth-helpers.ts (authCookieOptions / portalSessionCookieOptions), not an inline object — CLAUDE.md requires httpOnly+secure+sameSite+path on every cookie.',
+                },
                 // Admin-tier guard (IA-94 / PR 1) — "is this an owner or a manager"
                 // must go through isAdminRole() in server/lib/auth/roles.ts. It was
                 // re-derived in SEVEN places before this rule existed, including a
@@ -245,6 +267,17 @@ export default tseslint.config(
                 {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
+                },
+                // Cookie-policy guard (PR 1) — setCookie must take its attributes
+                // from a factory in server/lib/auth-helpers.ts, never an inline object.
+                // CLAUDE.md mandates httpOnly + secure + sameSite + path on EVERY
+                // setCookie; five sites were hand-maintaining identical copies of the
+                // staff-session options and two more the portal's. They were correct
+                // at the time, which is exactly why nobody noticed there were seven
+                // places to update on the next policy change.
+                {
+                    selector: "CallExpression[callee.name='setCookie'] > ObjectExpression",
+                    message: 'Pass a cookie-options factory from server/lib/auth-helpers.ts (authCookieOptions / portalSessionCookieOptions), not an inline object — CLAUDE.md requires httpOnly+secure+sameSite+path on every cookie.',
                 },
                 // Admin-tier guard (IA-94 / PR 1) — "is this an owner or a manager"
                 // must go through isAdminRole() in server/lib/auth/roles.ts. It was

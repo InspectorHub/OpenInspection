@@ -27,6 +27,7 @@ import { logger } from '../logger';
 import type * as schema from '../db/schema';
 import type { HonoConfig } from '../../types/hono';
 import type { UserRole } from '../../types/auth';
+import { bearerToken, AUTH_COOKIE_NAME } from '../auth-helpers';
 
 // Static asset extensions — these bypass JWT verification. We use a strict allowlist
 // rather than path.includes('.') so a dot inside a path segment (e.g. "/inspections/foo.bar")
@@ -56,10 +57,7 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
     // First-time setup is gated solely by the SETUP_CODE secret, validated in
     // POST /api/auth/setup. No KV bootstrap code is generated here.
 
-    const authHeader = c.req.header('Authorization');
-    const token = authHeader?.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : getCookie(c, '__Host-inspector_token');
+    const token = bearerToken(c) ?? getCookie(c, AUTH_COOKIE_NAME);
 
     if (!token) return next();
 

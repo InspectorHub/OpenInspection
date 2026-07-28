@@ -9,6 +9,7 @@ import { signJwt } from '../lib/jwt-keyring';
 import { agentTenantLinks, users } from '../lib/db/schema/tenant';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { getLegalLinks, buildTermsAcceptedBlob } from '../lib/legal-links';
+import { authCookieOptions, AUTH_COOKIE_NAME } from '../lib/auth-helpers';
 
 /**
  * Agent Accounts A1 — invite + accept endpoints. The (existing) /api/agent
@@ -258,13 +259,7 @@ const agentsRoutes = createApiRouter()
             exp: now + 60 * 60 * 24,
         }, keyring);
 
-        setCookie(c, '__Host-inspector_token', token, {
-            httpOnly: true,
-            secure: true,
-            sameSite: 'Strict',
-            path: '/',
-            maxAge: 60 * 60 * 24,
-        });
+        setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
 
         return c.json({
             success: true as const,
