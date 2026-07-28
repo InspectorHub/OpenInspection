@@ -249,6 +249,7 @@ export default function InspectionEditPage() {
 
  const state = useInspectionState({
  inspection: seededInspection,
+  locale: displayLocale,
  schema: loaderData.schema as unknown as InspectionSchema,
  results: loaderData.results,
  ratingLevels: loaderData.ratingLevels,

@@ -4,6 +4,7 @@ import { backfillLevelDescriptions } from "./inspection/helpers";
 import type { InspectionContext } from "./inspection/helpers";
 import type { Severity } from "~/lib/severity";
 import { rangeIds } from "~/lib/editor/batch-range";
+import { formatDate } from "~/lib/format";
 import { useInspectionProgress } from "./inspection/useInspectionProgress";
 import { useInspectionNavigation } from "./inspection/useInspectionNavigation";
 import { useInspectionSearch } from "./inspection/useInspectionSearch";
@@ -109,6 +110,12 @@ export interface UseInspectionOptions {
   inspection: Record<string, unknown>;
   schema: InspectionSchema;
   results: ResultMap;
+  /**
+   * BCP-47 display locale, from the session context the SERVER sent. Required
+   * rather than optional on purpose (IA-92): an omitted locale is exactly what
+   * falls back to a runtime default, so the type is the guard.
+   */
+  locale: string;
   ratingLevels?: RatingLevel[];
   /**
    * Phase U (Batch C1) — the active per-unit scope. `null`/undefined (default)
@@ -138,6 +145,7 @@ export interface UseInspectionOptions {
  * every memo/callback dependency array is identical to the pre-split hook.
  */
 export function useInspectionState(opts: UseInspectionOptions) {
+  const locale = opts.locale;
   const [inspection, setInspection] = useState<Inspection>(
     opts.inspection as Inspection,
   );
@@ -446,19 +454,12 @@ export function useInspectionState(opts: UseInspectionOptions) {
     const d =
       inspection.date || inspection.scheduledDate || inspection.createdAt;
     if (!d) return "";
-    try {
-      // Browser-default locale (viewer-responsive) — useInspection is a
-      // router-agnostic core hook, so it deliberately avoids the data-router-bound
-      // useDisplayLocale(); a consuming component can thread a locale if needed.
-      return new Date(d as string).toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-    } catch {
-      return String(d);
-    }
-  }, [inspection]);
+    // IA-92 — never `toLocaleDateString(undefined, …)` here: that reads the
+    // RUNTIME default, which differs between the Workers server and the
+    // visitor's browser, and the mismatch cost us hydration on every editor
+    // load outside en-US.
+    return formatDate(d as string, { locale });
+  }, [inspection, locale]);
 
   return {
     // Core data
