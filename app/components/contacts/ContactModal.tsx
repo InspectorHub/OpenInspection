@@ -77,6 +77,10 @@ export function ContactModal({
             >
               <option value="client">{m.contacts_type_client()}</option>
               <option value="agent">{m.contacts_type_agent()}</option>
+              {/* IA-96 — matches the third `kind` an inspection role can have.
+                  Without it, a contact created under a contractor role could
+                  never be corrected here: the select had nothing to hold it. */}
+              <option value="other">{m.contacts_type_other()}</option>
             </select>
           </div>
 

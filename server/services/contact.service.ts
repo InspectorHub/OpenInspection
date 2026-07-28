@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { eq, and, like, sql, isNull, inArray, isNotNull } from 'drizzle-orm';
-import { contacts } from '../lib/db/schema/contact';
+import { contacts, type ContactType } from '../lib/db/schema/contact';
 import { inspections } from '../lib/db/schema/inspection';
 import { invoices } from '../lib/db/schema/invoice';
 import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema/inspection/role-profiles';
@@ -14,7 +14,7 @@ export class ContactService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private getDrizzle() { return drizzle(this.db as any); }
 
-    async listContacts(tenantId: string, opts: { type?: 'agent' | 'client'; search?: string; limit: number; offset: number }) {
+    async listContacts(tenantId: string, opts: { type?: ContactType; search?: string; limit: number; offset: number }) {
         const db = this.getDrizzle();
         const conditions = [eq(contacts.tenantId, tenantId), isNull(contacts.archivedAt)];
         if (opts.type) conditions.push(eq(contacts.type, opts.type));
@@ -143,7 +143,7 @@ export class ContactService {
         };
     }
 
-    async createContact(tenantId: string, data: { type: 'agent' | 'client'; name: string; email?: string | null | undefined; phone?: string | null | undefined; agency?: string | null | undefined; notes?: string | null | undefined; createdByUserId?: string | null | undefined }) {
+    async createContact(tenantId: string, data: { type: ContactType; name: string; email?: string | null | undefined; phone?: string | null | undefined; agency?: string | null | undefined; notes?: string | null | undefined; createdByUserId?: string | null | undefined }) {
         const db = this.getDrizzle();
         const normalized = {
             email: data.email ?? null,
@@ -160,7 +160,7 @@ export class ContactService {
         return { ...row, createdAt: safeISODate(row.createdAt), inspectionCount: 0 };
     }
 
-    async updateContact(id: string, tenantId: string, data: Partial<{ type: 'agent' | 'client'; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }>) {
+    async updateContact(id: string, tenantId: string, data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }>) {
         const db = this.getDrizzle();
         const existing = await db.select().from(contacts).where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
         if (!existing) throw Errors.NotFound('Contact not found');

@@ -93,7 +93,12 @@ export function AddPersonModal({
     fetcher.data?.intent === "person-add" && !fetcher.data.ok ? fetcher.data.error : undefined;
 
   const roleKind = activeRoles.find((r) => r.id === roleProfileId)?.kind;
-  const newContactType = roleKind === "agent" ? "agent" : "client";
+  // IA-96 — this was `roleKind === "agent" ? "agent" : "client"`, which
+  // collapsed the role's third kind onto "client": adding someone under a
+  // contractor role filed them in the client list, where they then turned up
+  // in every client-filtered view. The two vocabularies now match, so the
+  // kind passes straight through; the fallback only covers an unresolved role.
+  const newContactType = roleKind ?? "client";
 
   const canSubmit =
     roleProfileId.length > 0 && (createMode ? newName.trim().length > 0 : selectedContact !== null);

@@ -2,7 +2,7 @@ import { z } from '@hono/zod-openapi';
 import { createApiResponseSchema } from './shared.schema';
 
 export const CreateContactSchema = z.object({
-    type: z.enum(['agent', 'client']).default('client').openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
+    type: z.enum(['agent', 'client', 'other']).default('client').openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
     name: z.string().min(1).max(100).openapi({ example: 'Jane Smith' }).describe('TODO describe name field for the OpenInspection MCP integration'),
     email: z.string().email().optional().nullable().openapi({ example: 'jane@realty.com' }).describe('TODO describe email field for the OpenInspection MCP integration'),
     phone: z.string().max(30).optional().nullable().openapi({ example: '(555) 987-6543' }).describe('TODO describe phone field for the OpenInspection MCP integration'),
@@ -15,7 +15,7 @@ export const UpdateContactSchema = CreateContactSchema.partial().openapi('Update
 export const ContactResponseSchema = z.object({
     id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
     tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    type: z.enum(['agent', 'client']).describe('TODO describe type field for the OpenInspection MCP integration'),
+    type: z.enum(['agent', 'client', 'other']).describe('TODO describe type field for the OpenInspection MCP integration'),
     name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
     email: z.string().nullable().describe('TODO describe email field for the OpenInspection MCP integration'),
     phone: z.string().nullable().describe('TODO describe phone field for the OpenInspection MCP integration'),
@@ -27,7 +27,7 @@ export const ContactResponseSchema = z.object({
 }).openapi('Contact');
 
 export const ContactListQuerySchema = z.object({
-    type: z.enum(['agent', 'client']).optional().openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
+    type: z.enum(['agent', 'client', 'other']).optional().openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
     search: z.string().max(100).optional().describe('TODO describe search field for the OpenInspection MCP integration'),
     limit: z.coerce.number().min(1).max(200).default(50).describe('TODO describe limit field for the OpenInspection MCP integration'),
     offset: z.coerce.number().min(0).default(0).describe('TODO describe offset field for the OpenInspection MCP integration'),
@@ -37,7 +37,7 @@ export const ContactListQuerySchema = z.object({
 const ContactDetailSchema = z.object({
     contact: z.object({
         id:         z.string().describe('Contact id'),
-        type:       z.enum(['agent', 'client']).describe('Contact type'),
+        type:       z.enum(['agent', 'client', 'other']).describe('Contact type'),
         name:       z.string().describe('Contact name'),
         email:      z.string().nullable().describe('Contact email'),
         phone:      z.string().nullable().describe('Contact phone'),
@@ -84,7 +84,7 @@ export const ContactImportSchema = z.object({
         email: z.string().optional().describe('CSV column header mapped to email address'),
         phone: z.string().optional().describe('CSV column header mapped to phone number'),
         agency: z.string().optional().describe('CSV column header mapped to agency name'),
-        type: z.enum(['agent', 'client']).optional().describe('Default contact type for imported rows'),
+        type: z.enum(['agent', 'client', 'other']).optional().describe('Default contact type for imported rows'),
     }).describe('Column-to-field mapping confirmed by the user'),
 }).openapi('ContactImport');
 

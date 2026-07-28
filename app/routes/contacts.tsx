@@ -5,16 +5,12 @@ import type { Route } from "./+types/contacts";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { makeAddContactSchema } from "~/lib/forms/contacts.schema";
-import { PageHeader, TabStrip, Button, Select } from "@core/shared-ui";
-import { inferMappingFromCsv, type Contact, type RoleProfile, type MessageTemplateOption } from "~/components/contacts/contacts-helpers";
+import { PageHeader, Button, Select } from "@core/shared-ui";
+import { inferMappingFromCsv, type Contact } from "~/components/contacts/contacts-helpers";
 import { ContactModal } from "~/components/contacts/ContactModal";
 import { CsvImportModal } from "~/components/contacts/CsvImportModal";
 import { ContactsTable } from "~/components/contacts/ContactsTable";
-import { AgentsTable } from "~/components/contacts/AgentsTable";
-import { RolesTable } from "~/components/contacts/RolesTable";
-import { RoleProfileModal } from "~/components/contacts/RoleProfileModal";
 import { ConfirmDialog } from "~/components/ConfirmDialog";
-import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 
 export function meta() {
@@ -27,49 +23,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const filterType = url.searchParams.get("type") || "";
   const api = createApi(context, { token });
 
-  // Resolve the session role to gate the admin-only Roles tab — mirrors the
-  // loader-side pattern in settings-connected-apps.tsx (fail-closed on error:
-  // an unresolved role never shows the admin surface).
-  let role: string | null | undefined;
   try {
-    const ctxRes = await api.sessionContext.context.$get();
-    if (ctxRes.ok) {
-      const body = (await ctxRes.json()) as { data?: { user?: { role?: string } } };
-      role = body.data?.user?.role;
-    }
-  } catch {
-    role = undefined;
-  }
-  const isAdmin = isAdminRole(role);
-
-  try {
-    const [contactsRes, rolesRes, emailTemplatesRes, smsTemplatesRes] = await Promise.all([
-      // Always fetch the full contact list, regardless of the URL `?type=`
-      // filter. Both tabs filter locally — the Contacts tab by the `typeFilter`
-      // state (seeded from `?type=`) and the Agents tab by `type === 'agent'`.
-      // Filtering server-side would starve the Agents tab on a `?type=client`
-      // deep-link (it would receive zero agents). `filterType` still seeds the
-      // dropdown below so the deep-link intent is preserved for the Contacts tab.
-      api.contacts.index.$get({ query: {} }),
-      api.roleProfiles.index.$get(),
-      api.messageTemplates.index.$get({ query: { channel: "email" } }).catch(() => null),
-      api.messageTemplates.index.$get({ query: { channel: "sms" } }).catch(() => null),
-    ]);
+    // Always fetch the FULL contact list regardless of the URL `?type=`
+    // filter: the dropdown narrows it client-side, so a server-side filter
+    // would make switching the dropdown a round trip that returns nothing for
+    // the other types. `filterType` seeds the dropdown so a deep link still
+    // lands where it promised.
+    const contactsRes = await api.contacts.index.$get({ query: {} });
     const contactsBody = contactsRes.ok ? ((await contactsRes.json()) as Record<string, unknown>) : { data: [] };
-    const rolesBody = rolesRes.ok ? ((await rolesRes.json()) as Record<string, unknown>) : { data: [] };
-    const emailTemplatesBody =
-      emailTemplatesRes && emailTemplatesRes.ok ? ((await emailTemplatesRes.json()) as { data?: MessageTemplateOption[] }) : { data: [] };
-    const smsTemplatesBody =
-      smsTemplatesRes && smsTemplatesRes.ok ? ((await smsTemplatesRes.json()) as { data?: MessageTemplateOption[] }) : { data: [] };
-    return {
-      contacts: (contactsBody.data ?? []) as Contact[],
-      roleProfiles: (rolesBody.data ?? []) as RoleProfile[],
-      messageTemplates: [...(emailTemplatesBody.data ?? []), ...(smsTemplatesBody.data ?? [])] as MessageTemplateOption[],
-      filterType,
-      isAdmin,
-    };
+    return { contacts: (contactsBody.data ?? []) as Contact[], filterType };
   } catch {
-    return { contacts: [], roleProfiles: [], messageTemplates: [], filterType: "", isAdmin };
+    return { contacts: [] as Contact[], filterType: "" };
   }
 }
 
@@ -135,65 +99,23 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res.ok, preview: (data as { data?: unknown } | null)?.data ?? {} };
   }
 
-  if (intent === "role-create") {
-    const label = String(form.get("label") ?? "").trim();
-    const kind = String(form.get("kind") ?? "") as "client" | "agent" | "other";
-    if (!label || !kind) return { ok: false };
-    const emailTemplateId = String(form.get("emailTemplateId") ?? "").trim();
-    const smsTemplateId = String(form.get("smsTemplateId") ?? "").trim();
-    const body: { label: string; kind: "client" | "agent" | "other"; emailTemplateId?: string; smsTemplateId?: string } = { label, kind };
-    if (emailTemplateId) body.emailTemplateId = emailTemplateId;
-    if (smsTemplateId) body.smsTemplateId = smsTemplateId;
-    const res = await api.roleProfiles.index.$post({ json: body });
-    return { ok: res.ok };
-  }
-
-  if (intent === "role-update") {
-    const id = form.get("id") as string;
-    const label = String(form.get("label") ?? "").trim();
-    const emailTemplateId = String(form.get("emailTemplateId") ?? "").trim();
-    const smsTemplateId = String(form.get("smsTemplateId") ?? "").trim();
-    const res = await api.roleProfiles[":id"].$put({
-      param: { id },
-      json: {
-        label,
-        emailTemplateId: emailTemplateId || null,
-        smsTemplateId: smsTemplateId || null,
-      },
-    });
-    return { ok: res.ok };
-  }
-
-  if (intent === "role-delete") {
-    const id = form.get("id") as string;
-    const res = await api.roleProfiles[":id"].$delete({ param: { id } });
-    return { ok: res.ok };
-  }
+  // The `role-*` intents moved to routes/settings-inspection-roles.tsx with
+  // the table itself (IA-96). They are gone from here rather than kept as
+  // dead branches: this route is reachable by any authenticated user, and the
+  // new home gates on `requireAdminLoader`.
 
   return { ok: false };
 }
 
 export default function ContactsPage() {
-  const { contacts, roleProfiles, messageTemplates, filterType, isAdmin } = useLoaderData<typeof loader>();
-  const TABS = [
-    { id: "contacts", label: m.contacts_label_contacts() },
-    { id: "agents", label: m.contacts_label_agents() },
-    ...(isAdmin ? [{ id: "roles", label: m.contacts_label_roles() }] : []),
-  ];
+  const { contacts, filterType } = useLoaderData<typeof loader>();
   const contactList = contacts as Contact[];
-  const roleProfileList = roleProfiles as RoleProfile[];
-  const templateList = messageTemplates as MessageTemplateOption[];
-  const [activeTab, setActiveTab] = useState("contacts");
   const [modalOpen, setModalOpen] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
-  const [roleModalOpen, setRoleModalOpen] = useState(false);
-  const [editRole, setEditRole] = useState<RoleProfile | null>(null);
   const [typeFilter, setTypeFilter] = useState(filterType || "");
   const [pendingArchive, setPendingArchive] = useState<Contact | null>(null);
   const archiveFetcher = useFetcher<{ ok?: boolean }>();
-
-  const agentContacts = contactList.filter((c) => c.type === "agent");
 
   const openEdit = (c: Contact) => { setEditContact(c); setModalOpen(true); };
   const confirmArchive = () => {
@@ -210,66 +132,59 @@ export default function ContactsPage() {
     ? contactList.filter((c) => c.type === typeFilter)
     : contactList;
 
+  // IA-96 — the page used to carry three tabs. "Agents" was the same list as
+  // "Contacts" narrowed to `type === 'agent'`, which the type dropdown beside
+  // it already did — a superset and its own subset presented as peers, with a
+  // filter whose scope nobody could guess. "Roles" was not a list of people at
+  // all; it moved to Settings → Inspection roles.
+  //
+  // What is left is one list and one filter. The count follows the filter, so
+  // the meta line says what is being shown AND out of how many — otherwise a
+  // filtered page just looks like a small address book.
+  const totalLabel = m.contacts_list_meta_count({ count: contactList.length });
+  const metaLine = typeFilter
+    ? `${m.contacts_list_meta_showing({ count: filtered.length })} · ${totalLabel}`
+    : totalLabel;
+
   return (
     <div className="space-y-ih-list">
       <PageHeader
-        title={`${filtered.length} ${filtered.length === 1 ? m.contacts_list_count_one() : m.contacts_label_contacts()}`}
-        meta={m.contacts_list_meta_count({ count: filtered.length })}
+        title={m.contacts_label_contacts()}
+        meta={metaLine}
         actions={
-          activeTab === "roles" ? undefined : (
-            <>
-              <div className="w-[130px]">
-                <Select
-                  bare
-                  aria-label={m.contacts_filter_type_aria()}
-                  value={typeFilter}
-                  onChange={(e) => setTypeFilter(e.target.value)}
-                  options={[
-                    { value: "", label: m.contacts_filter_all_types() },
-                    { value: "agent", label: m.contacts_label_agents() },
-                    { value: "client", label: m.contacts_label_clients() },
-                  ]}
-                />
-              </div>
-              <Button variant="secondary" size="sm" onClick={() => setCsvModalOpen(true)}>
-                {m.contacts_action_import_csv()}
-              </Button>
-              <Button variant="primary" onClick={() => { setEditContact(null); setModalOpen(true); }} icon={<PlusIcon />}>
-                {m.contacts_action_add()}
-              </Button>
-            </>
-          )
+          <>
+            <div className="w-[130px]">
+              <Select
+                bare
+                aria-label={m.contacts_filter_type_aria()}
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value)}
+                options={[
+                  { value: "", label: m.contacts_filter_all_types() },
+                  { value: "agent", label: m.contacts_label_agents() },
+                  { value: "client", label: m.contacts_label_clients() },
+                  // IA-96 — `contact_role_profiles.kind` has always had three
+                  // values; `contacts.type` had two, so a person added under a
+                  // contractor/other role was filed as a Client. The type now
+                  // matches the roles that produce it.
+                  { value: "other", label: m.contacts_label_other() },
+                ]}
+              />
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => setCsvModalOpen(true)}>
+              {m.contacts_action_import_csv()}
+            </Button>
+            <Button variant="primary" onClick={() => { setEditContact(null); setModalOpen(true); }} icon={<PlusIcon />}>
+              {m.contacts_action_add()}
+            </Button>
+          </>
         }
       />
 
-      <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
-
-      {activeTab === "contacts" && (
-        <ContactsTable filtered={filtered} onEdit={openEdit} onArchive={setPendingArchive} />
-      )}
-
-      {activeTab === "agents" && (
-        <AgentsTable agentContacts={agentContacts} onEdit={openEdit} onArchive={setPendingArchive} />
-      )}
-
-      {activeTab === "roles" && isAdmin && (
-        <RolesTable
-          roleProfiles={roleProfileList}
-          onEdit={(p) => { setEditRole(p); setRoleModalOpen(true); }}
-          onCreate={() => { setEditRole(null); setRoleModalOpen(true); }}
-        />
-      )}
+      <ContactsTable filtered={filtered} onEdit={openEdit} onArchive={setPendingArchive} />
 
       <ContactModal open={modalOpen} onClose={() => setModalOpen(false)} contact={editContact} />
       <CsvImportModal open={csvModalOpen} onClose={() => setCsvModalOpen(false)} />
-      {isAdmin && (
-        <RoleProfileModal
-          open={roleModalOpen}
-          onClose={() => setRoleModalOpen(false)}
-          profile={editRole}
-          templates={templateList}
-        />
-      )}
 
       <ConfirmDialog
         open={pendingArchive !== null}

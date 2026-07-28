@@ -1,5 +1,6 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ContactType } from '../lib/db/schema/contact';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
 import {
@@ -100,7 +101,7 @@ const contactRoutes = createApiRouter()
     .openapi(listContactsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const q = c.req.valid('query');
-        const opts: { type?: 'agent' | 'client'; search?: string; limit: number; offset: number } = { limit: q.limit, offset: q.offset };
+        const opts: { type?: ContactType; search?: string; limit: number; offset: number } = { limit: q.limit, offset: q.offset };
         if (q.type) opts.type = q.type;
         if (q.search) opts.search = q.search;
         const rows = await c.var.services.contact.listContacts(tenantId, opts);
@@ -133,7 +134,7 @@ const contactRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const raw = c.req.valid('json');
         // Strip undefined keys to satisfy exactOptionalPropertyTypes
-        const data: Partial<{ type: 'agent' | 'client'; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }> = {};
+        const data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }> = {};
         if (raw.type !== undefined) data.type = raw.type;
         if (raw.name !== undefined) data.name = raw.name;
         if ('email' in raw) data.email = raw.email ?? null;

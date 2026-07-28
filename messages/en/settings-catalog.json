@@ -43,6 +43,8 @@
   "settings_inspection_pinned_help": "Up to 5 tags shown as 1-click chips below the Notes field.",
   "settings_inspection_manage_tags": "Manage tag library",
   "settings_inspection_types_crumb": "Inspection types",
+  "settings_inspection_roles_heading": "Inspection roles",
+  "settings_inspection_roles_meta_title": "Inspection Roles - OpenInspection",
   "settings_inspection_types_platform_eyebrow": "Platform",
   "settings_inspection_types_platform_desc": "Standard types that ship with the platform.",
   "settings_inspection_types_counts": "{templates} templates · {inspections} inspections",

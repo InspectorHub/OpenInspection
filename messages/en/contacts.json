@@ -5,8 +5,10 @@
   "contacts_label_contacts": "Contacts",
   "contacts_label_agents": "Agents",
   "contacts_label_clients": "Clients",
+  "contacts_label_other": "Other",
   "contacts_list_count_one": "Contact",
   "contacts_list_meta_count": "{count} contacts",
+  "contacts_list_meta_showing": "Showing {count}",
   "contacts_filter_type_aria": "Filter by contact type",
   "contacts_filter_all_types": "All Types",
   "contacts_action_import_csv": "Import CSV",
@@ -89,5 +91,6 @@
   "contacts_roles_modal_kind_hint": "Set on creation and cannot be changed afterward.",
   "contacts_roles_modal_email_template_label": "Email template",
   "contacts_roles_modal_sms_template_label": "SMS template",
-  "contacts_roles_modal_template_none": "None"
+  "contacts_roles_modal_template_none": "None",
+  "contacts_type_other": "Other"
 }

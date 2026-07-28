@@ -142,6 +142,7 @@ export default [
       route("settings/event-types", "routes/settings-event-types.tsx"),
       route("settings/contractor-types", "routes/settings-contractor-types.tsx"),
       route("settings/inspection-types", "routes/settings-inspection-types.tsx"),
+      route("settings/inspection-roles", "routes/settings-inspection-roles.tsx"),
       route("settings/schedule", "routes/settings-schedule.tsx"),
       route("settings/booking", "routes/settings-booking.tsx"),
       route("settings/billing", "routes/settings-billing.tsx"),

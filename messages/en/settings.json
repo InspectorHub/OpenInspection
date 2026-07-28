@@ -28,6 +28,8 @@
   "settings_hub_event_types_desc": "Calendar event categories for scheduling.",
   "settings_hub_inspection_types_title": "Inspection Types",
   "settings_hub_inspection_types_desc": "Custom inspection categories for your company.",
+  "settings_hub_inspection_roles_title": "Inspection Roles",
+  "settings_hub_inspection_roles_desc": "The roles a contact can hold on an inspection.",
   "settings_hub_billing_title": "Billing",
   "settings_hub_billing_desc": "Subscription plan, payment method, invoices.",
   "settings_hub_integrations_title": "Integrations",

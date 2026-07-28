@@ -33,6 +33,19 @@ export function ContactsTable({
           { label: m.contacts_field_agency(), cell: (c) => <span className="text-ih-fg-3">{c.agency || "—"}</span> },
           { label: m.contacts_field_inspections(), cell: (c) => <span className="text-ih-fg-3">{c.inspectionCount ?? 0}</span> },
           {
+            // IA-96 — this column is the one thing the retired Agents tab
+            // showed that this table did not. Both counts are already
+            // computed for EVERY contact by the same query (all-role
+            // participation vs. buyer-agent referrals), so carrying it here
+            // costs nothing and removes the only reason for a second table.
+            // A dash rather than "0": for most contacts referrals are not a
+            // metric that applies, and a column of zeroes reads as data.
+            label: m.contacts_agents_col_referrals(),
+            cell: (c) => (
+              <span className="text-ih-fg-3 tabular-nums">{c.referralCount ? c.referralCount : "—"}</span>
+            ),
+          },
+          {
             label: <span className="sr-only">{m.contacts_table_col_actions()}</span>,
             align: "right",
             cell: (c) => (

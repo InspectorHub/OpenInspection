@@ -9152,7 +9152,8 @@
             "type": "string",
             "enum": [
               "agent",
-              "client"
+              "client",
+              "other"
             ],
             "example": "agent",
             "description": "TODO describe type field for the OpenInspection MCP integration"
