@@ -82,6 +82,8 @@
   "inspections_hub_people_agency_ph": "Company or agency",
   "inspections_hub_people_role_label": "Role",
   "inspections_hub_people_role_placeholder": "Select a role…",
+  "inspections_hub_people_access_notice": "Adding someone in this role lets them open this inspection from a link — no sign-up needed, and before the report is published.",
+  "inspections_hub_people_access_revoke_hint": "You can revoke it any time from their contact record; re-adding them issues a new link.",
   "inspections_hub_people_no_roles_admin": "No role profiles configured — add one in Contacts → Roles.",
   "inspections_hub_people_no_roles_non_admin": "No role profiles are configured yet. Ask an admin to set one up.",
   "inspections_hub_people_clear_contact_aria": "Clear selected contact",

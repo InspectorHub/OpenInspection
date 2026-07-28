@@ -3,6 +3,7 @@ import { useFetcher } from "react-router";
 import { Modal, Button, Input, Select } from "@core/shared-ui";
 import type { action } from "~/routes/inspection-hub";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
+import { capabilitiesForKind } from "../../../server/lib/people/capabilities";
 import { m } from "~/paraglide/messages";
 
 /** A contact returned by the "search-contacts" hub action intent. */
@@ -93,6 +94,12 @@ export function AddPersonModal({
     fetcher.data?.intent === "person-add" && !fetcher.data.ok ? fetcher.data.error : undefined;
 
   const roleKind = activeRoles.find((r) => r.id === roleProfileId)?.kind;
+  // IA-102 — whether picking this role hands the person the report. Derived
+  // from the SAME capability table the server enforces with
+  // (server/lib/people/capabilities.ts), rather than a list of role keys kept
+  // in step by hand: a tenant-custom role must not slip through the notice
+  // just because nobody thought to add its key here.
+  const grantsAccess = roleKind ? capabilitiesForKind(roleKind).receivesReport : false;
   // IA-96 — this was `roleKind === "agent" ? "agent" : "client"`, which
   // collapsed the role's third kind onto "client": adding someone under a
   // contractor role filed them in the client list, where they then turned up
@@ -268,6 +275,23 @@ export function AddPersonModal({
               : undefined
           }
         />
+
+        {/* IA-102 — adding someone here is an AUTHORIZATION act wearing the
+            clothes of a data-entry one. Every role kind has receivesReport, so
+            naming a person on this inspection is what lets them open it; add
+            the wrong same-named agent and you have handed a stranger the job,
+            with no receipt anywhere.
+
+            Wording deliberately avoids "their portal" and any hint of signing
+            up: the link is a per-inspection token that works with NO account
+            (IA-100). Saying "they will need an account" would be false, and
+            worse, it would read as a barrier that does not exist. */}
+        {grantsAccess && (
+          <p className="text-[12px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md px-3 py-2">
+            {m.inspections_hub_people_access_notice()}{" "}
+            <span className="text-ih-fg-4">{m.inspections_hub_people_access_revoke_hint()}</span>
+          </p>
+        )}
 
         {error && <p className="text-[12px] font-medium text-ih-bad-fg">{error}</p>}
       </div>
