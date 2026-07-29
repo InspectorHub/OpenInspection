@@ -6,6 +6,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { inspections, inspectionServices, contacts, inspectionPeople, contactRoleProfiles, users, reportVersions } from '../lib/db/schema';
 import { eq, and, gte, sql } from 'drizzle-orm';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+import { sumEffectivePriceCentsSql } from '../lib/effective-price.sql';
 
 const metricsRoutes = createApiRouter()
     .openapi(createRoute(withMcpMetadata({
@@ -30,7 +31,7 @@ const metricsRoutes = createApiRouter()
     // Monthly revenue + count
     const monthly = await db.select({
         month:   sql<string>`strftime('%Y-%m', ${inspections.date})`,
-        revenue: sql<number>`sum(${inspections.price})`,
+        revenue: sumEffectivePriceCentsSql,
         count:   sql<number>`count(*)`,
     })
         .from(inspections)
@@ -53,7 +54,7 @@ const metricsRoutes = createApiRouter()
         agentId:   inspectionPeople.contactId,
         agentName: contacts.name,
         count:     sql<number>`count(*)`,
-        revenue:   sql<number>`sum(${inspections.price})`,
+        revenue:   sumEffectivePriceCentsSql,
     })
         .from(inspections)
         .leftJoin(contactRoleProfiles, and(
@@ -89,7 +90,7 @@ const metricsRoutes = createApiRouter()
     const serviceBreakdown = await db.select({
         serviceName: inspectionServices.nameSnapshot,
         count:       sql<number>`count(*)`,
-        revenue:     sql<number>`sum(${inspectionServices.priceSnapshot})`,
+        revenue:     sql<number>`sum(coalesce(${inspectionServices.priceOverride}, ${inspectionServices.priceSnapshot}))`,
     })
         .from(inspectionServices)
         .where(eq(inspectionServices.tenantId, tenantId))
@@ -100,7 +101,7 @@ const metricsRoutes = createApiRouter()
     // Payment summary
     const paymentSummary = await db.select({
         status:  inspections.paymentStatus,
-        revenue: sql<number>`sum(${inspections.price})`,
+        revenue: sumEffectivePriceCentsSql,
     })
         .from(inspections)
         .where(and(eq(inspections.tenantId, tenantId), gte(inspections.date, fromStr)))
@@ -122,7 +123,7 @@ const metricsRoutes = createApiRouter()
         inspectorId:       inspectorKey,
         inspectorName:     users.name,
         count:             sql<number>`count(*)`,
-        revenue:           sql<number>`sum(${inspections.price})`,
+        revenue:           sumEffectivePriceCentsSql,
         avgTurnaroundDays: sql<number | null>`avg(julianday(${reportVersions.publishedAt} / 1000.0, 'unixepoch') - julianday(${inspections.date}))`,
     })
         .from(inspections)

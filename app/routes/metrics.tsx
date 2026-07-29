@@ -48,11 +48,17 @@ export default function MetricsPage() {
   const currency = useDisplayCurrency();
   const [period, setPeriod] = useState<string>(initialPeriod || "6m");
 
-  // Revenue/order values arrive as integer money units summed from
-  // inspections.price; `fmt` formerly rendered them as whole-dollar currency
-  // (minimumFractionDigits:0). formatDollars takes integer cents and drops the
-  // redundant `.00`, so scale by 100 to keep the rendered string identical.
-  const fmt = (n: number) => formatDollars(n * 100, { locale, currency });
+  // Every revenue figure from /api/metrics is integer CENTS, and formatDollars
+  // takes integer cents — so it is passed straight through.
+  //
+  // This used to multiply by 100, on the stated belief that the values were
+  // whole dollars. They never were: the underlying column is `price_cents`, and
+  // the money-naming rule in CLAUDE.md is that `_cents` means cents. The error
+  // was invisible for as long as it was, because the endpoint summed
+  // `inspections.price` — a cache that reads 0 on real data — so every figure on
+  // this page was $0 and 100 × 0 is still 0. Fixing the source (IA-132) is what
+  // finally made a wrong scale show up, as $83,000 for two jobs worth $830.
+  const fmt = (n: number) => formatDollars(n, { locale, currency });
 
   const changePeriod = (p: string) => {
     setPeriod(p);

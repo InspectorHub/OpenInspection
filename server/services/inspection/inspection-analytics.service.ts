@@ -1,7 +1,8 @@
 import { eq, and, sql, inArray, isNull } from 'drizzle-orm';
-import { inspections, inspectionResults, tenantConfigs, invoices, agreementRequests, users, inspectionPeople, contactRoleProfiles } from '../../lib/db/schema';
+import { inspections, inspectionResults, tenantConfigs, invoices, agreementRequests, users, inspectionPeople, contactRoleProfiles, inspectionServices } from '../../lib/db/schema';
 import { contacts } from '../../lib/db/schema/contact';
 import { parseFindingKey } from '../../lib/finding-key';
+import { getEffectivePriceCents } from '../../lib/effective-price';
 import { RECOMMENDATION_CATEGORIES } from '../../lib/recommendation-categories';
 import { INSPECTION_STATUS } from '../../lib/status/inspection-status';
 import { REPORT_STATUS, isReportPublished } from '../../lib/status/report-status';
@@ -568,6 +569,50 @@ export class InspectionAnalyticsService extends InspectionSubService {
             if (r.inspectionId) paidIdSet.add(r.inspectionId as string);
         }
 
+        // IA-131 — the dashboard used to render `inspections.price` straight from
+        // the row. That is tier 3 of the P-4 authority chain, the denormalized
+        // cache, and on seeded production-shaped data it read 0 for inspections
+        // whose invoices said $450 and $380 — so the busiest list in the app
+        // announced "$0" for jobs that had been billed. `insp.price != null`
+        // could not save it either: the cache holds 0, not NULL, so there was no
+        // "unknown" to fall back to.
+        //
+        // Two tenant-scoped reads, same shape and scale as the paid-invoice
+        // lookup directly above (the row set is already fully in memory here), so
+        // the chain can be resolved per row without an N+1.
+        const invoiceAmountByInspection = new Map<string, number>();
+        const invoiceRows = await db.select({
+            inspectionId: invoices.inspectionId,
+            amountCents:  invoices.amountCents,
+            createdAt:    invoices.createdAt,
+        })
+            .from(invoices)
+            .where(and(eq(invoices.tenantId, tenantId), isNull(invoices.voidedAt)))
+            .orderBy(invoices.createdAt);
+        for (const r of invoiceRows) {
+            // Earliest non-voided invoice wins — same tie-break as
+            // effective-price.sql.ts and contact.service.ts.
+            if (r.inspectionId && !invoiceAmountByInspection.has(r.inspectionId as string)) {
+                invoiceAmountByInspection.set(r.inspectionId as string, r.amountCents ?? 0);
+            }
+        }
+
+        const serviceLinesByInspection = new Map<string, Array<{ priceSnapshot: number; priceOverride: number | null }>>();
+        const serviceRows = await db.select({
+            inspectionId:  inspectionServices.inspectionId,
+            priceSnapshot: inspectionServices.priceSnapshot,
+            priceOverride: inspectionServices.priceOverride,
+        })
+            .from(inspectionServices)
+            .where(eq(inspectionServices.tenantId, tenantId));
+        for (const r of serviceRows) {
+            const key = r.inspectionId as string;
+            const list = serviceLinesByInspection.get(key);
+            const line = { priceSnapshot: r.priceSnapshot ?? 0, priceOverride: r.priceOverride ?? null };
+            if (list) list.push(line);
+            else serviceLinesByInspection.set(key, [line]);
+        }
+
         // Round-2 backlog #2 — Inspector name lookup so the "Inspector" column
         // (Customize Columns) can render the assigned inspector without a
         // second round-trip. Self-assigned (inspectorId NULL) renders blank.
@@ -620,6 +665,13 @@ export class InspectionAnalyticsService extends InspectionSubService {
                 const sent        = isReportPublished((r as { reportStatus?: unknown }).reportStatus);
                 return {
                     ...r,
+                    // IA-131 — overrides the row's cached `price` with the
+                    // authority chain. Placed after the spread so it wins.
+                    price: getEffectivePriceCents({
+                        invoiceAmountCents:   invoiceAmountByInspection.get(id) ?? null,
+                        serviceLines:         serviceLinesByInspection.get(id) ?? null,
+                        inspectionPriceCents: (r.price as number | null) ?? null,
+                    }),
                     defectStats: statsMap.get(id) ?? zeroCounts(),
                     ...(agentName ? { agentName } : {}),
                     ...(inspectorName ? { inspectorName } : {}),

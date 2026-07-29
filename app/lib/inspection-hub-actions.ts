@@ -48,7 +48,7 @@ export async function handlePersonAdd(
   api: Api,
   inspectionId: string,
   formData: FormData,
-): Promise<{ ok: boolean; intent: "person-add"; error: string | undefined }> {
+): Promise<{ ok: boolean; intent: "person-add"; error: string | undefined; alreadyPresent?: boolean }> {
   const roleProfileId = String(formData.get("roleProfileId") || "").trim();
   if (!roleProfileId) {
     return { ok: false, intent: "person-add", error: m.inspections_hub_error_person_add_role_required() };
@@ -88,7 +88,18 @@ export async function handlePersonAdd(
     param: { id: inspectionId },
     json: { contactId, roleProfileId },
   });
-  return toActionResult(res, "person-add", m.inspections_hub_error_person_add());
+  const result = await toActionResult(res, "person-add", m.inspections_hub_error_person_add());
+  if (!result.ok) return result;
+
+  // IA-133 — a 200 here does NOT mean a seat was created. The insert is
+  // idempotent, so re-adding someone already on the inspection succeeds and
+  // changes nothing. The modal used to close on that, which read as "done" — and
+  // its own notice had just told the operator that re-adding reissues a revoked
+  // report link. It cannot: report tokens are unique per (inspection, recipient).
+  // Surfacing `alreadyPresent` is what lets the modal say so and point at "Reset
+  // access link", which is the control that actually restores access.
+  const body = (await res.json().catch(() => null)) as { data?: { added?: boolean } } | null;
+  return { ...result, alreadyPresent: body?.data?.added === false };
 }
 
 /** `person-remove` — deletes an inspection_people row. */

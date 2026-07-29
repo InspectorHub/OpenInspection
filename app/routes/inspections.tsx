@@ -517,7 +517,10 @@ export default function InspectionsPage() {
   const exportCsv = useCallback(() => {
     const rows = filteredInspections;
     if (rows.length === 0) return;
-    const header = ["ID", "Address", "Client", "Date", "Status", "Payment", "Agent", "Price"];
+    // `price` is integer cents (the P-4 chain, resolved server-side — IA-131).
+    // The column is named for the unit rather than converted, so a spreadsheet
+    // never has to guess which one it got.
+    const header = ["ID", "Address", "Client", "Date", "Status", "Payment", "Agent", "Price (cents)"];
     const csvRows = [
       header.join(","),
       ...rows.map((i) =>

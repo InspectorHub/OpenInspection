@@ -25,6 +25,7 @@ export interface ContactSearchResult {
 export function AddPersonModal({
   open,
   onClose,
+  alreadyPresent = false,
   roleProfiles,
   isAdmin,
   fetcher,
@@ -34,6 +35,10 @@ export function AddPersonModal({
   roleProfiles: RoleProfile[];
   isAdmin: boolean;
   fetcher: ReturnType<typeof useFetcher<typeof action>>;
+  /** IA-133 — the add returned ok but created nothing: this contact already
+   *  holds this role. The modal stays OPEN and says so, because the notice
+   *  above it is what sends operators here to "refresh" a revoked link. */
+  alreadyPresent?: boolean;
 }) {
   // Dedicated fetcher for the contact typeahead — independent of `fetcher`
   // (the add mutation). A debounced search must never cancel an in-flight
@@ -290,6 +295,14 @@ export function AddPersonModal({
           <p className="text-[12px] text-ih-fg-3 bg-ih-bg-muted border border-ih-border rounded-md px-3 py-2">
             {m.inspections_hub_people_access_notice()}{" "}
             <span className="text-ih-fg-4">{m.inspections_hub_people_access_revoke_hint()}</span>
+          </p>
+        )}
+
+        {alreadyPresent && (
+          <p role="status" className="text-[12px] text-ih-fg-2 bg-ih-status-watch-bg border border-ih-border rounded-md px-3 py-2">
+            {m.inspections_hub_people_already_present({
+              name: selectedContact?.name ?? (newName.trim() || m.inspections_hub_people_this_contact()),
+            })}
           </p>
         )}
 

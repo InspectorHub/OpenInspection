@@ -126,8 +126,16 @@ export function PeopleEditor({
   const primaryFetcher = useFetcher<typeof action>();
   const expiryFetcher = useFetcher<typeof action>();
 
-  const addSucceeded =
-    addFetcher.state === "idle" && addFetcher.data?.intent === "person-add" && addFetcher.data.ok;
+  // IA-133 — `ok` alone is not "a seat was created". The add is idempotent, so
+  // re-adding someone already on the inspection returns ok with nothing changed.
+  // Closing on that reads as "done", and the modal's own notice had just told the
+  // operator that re-adding reissues a revoked report link — so they walked away
+  // believing they had restored access they had not. Stay open and say so.
+  const addResult = addFetcher.state === "idle" && addFetcher.data?.intent === "person-add"
+    ? addFetcher.data
+    : null;
+  const addAlreadyPresent = addResult?.ok === true && addResult.alreadyPresent === true;
+  const addSucceeded = addResult?.ok === true && !addAlreadyPresent;
   useEffect(() => {
     if (modalOpen && addSucceeded) setModalOpen(false);
   }, [modalOpen, addSucceeded]);
@@ -358,6 +366,7 @@ export function PeopleEditor({
         roleProfiles={roleProfiles}
         isAdmin={isAdmin}
         fetcher={addFetcher}
+        alreadyPresent={addAlreadyPresent}
       />
 
       <Modal
