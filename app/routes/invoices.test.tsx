@@ -59,13 +59,22 @@ describe("/invoices — IA-97", () => {
     expect(container.textContent).not.toContain("0 unpaid");
   });
 
-  it("links a row to the inspection it bills", async () => {
+  it("gives an UNPAID row exactly one labelled route to its inspection", async () => {
+    // IA-122 — this used to assert that the CLIENT NAME was the link, styled
+    // only on hover. Three rows offered the same destination three ways: an
+    // unpaid row had nothing but that invisible name link, a paid row had the
+    // name link AND a button with the identical href, and a standalone invoice
+    // had a bare dash. The row that needed chasing was the hardest to act on,
+    // and a person's name is the wrong label for "open the inspection" anyway.
     const { findAllByRole } = renderInvoices([UNPAID]);
     const toInspection = (await findAllByRole("link")).filter(
       (a) => a.getAttribute("href") === "/inspections/insp-xyz",
     );
-    expect(toInspection.length).toBeGreaterThan(0);
-    expect(toInspection[0].textContent).toContain("Sam Okafor");
+
+    expect(toInspection).toHaveLength(1);
+    expect(toInspection[0].textContent).toBe("View inspection");
+    // …and the name is no longer a disguised control.
+    expect(toInspection[0].textContent).not.toContain("Sam Okafor");
   });
 
   it("gives a PAID row an action instead of a bare dash", async () => {
@@ -127,13 +136,22 @@ describe("/invoices — IA-97", () => {
     expect(queryByRole("alert")).toBeNull();
   });
 
-  it("renders an inspection-less invoice as plain text, not a broken link", async () => {
-    const { findByRole, queryAllByRole, container } = renderInvoices([STANDALONE]);
+  it("still offers a standalone invoice something to do (IA-123)", async () => {
+    // This used to assert the opposite — "with nowhere to go, the dash is
+    // honest, keep it". It was not honest, it was a dead end: an invoice with
+    // no inspection could be marked paid once and then had no verb at all. Not
+    // openable, not correctable. Void was the missing one, and it already
+    // existed on the server: DELETE /api/invoices/{id} voids rather than
+    // deletes ("the row is preserved for the audit trail") and had no caller
+    // anywhere in the app, so an invoice raised in error simply stood.
+    const { findByRole, queryAllByRole, findAllByRole, container } = renderInvoices([STANDALONE]);
     await findByRole("heading", { name: "Invoices" });
 
+    // No inspection means no link — that part was always right.
     expect(queryAllByRole("link")).toHaveLength(0);
     expect(container.textContent).toContain("Ali Haddad");
-    // With nowhere to go, the dash is honest — keep it.
-    expect(container.querySelector("tbody")?.textContent).toContain("—");
+
+    const voidBtn = (await findAllByRole("button")).filter((b) => b.textContent === "Void");
+    expect(voidBtn).toHaveLength(1);
   });
 });

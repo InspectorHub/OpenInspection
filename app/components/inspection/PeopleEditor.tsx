@@ -404,8 +404,17 @@ export function PeopleEditor({
           </>
         }
       >
+        {/* IA-134 — the copy assumed the recipient is holding a WORKING link,
+            and this control is offered on rows whose access is already revoked
+            or expired. In that state the operation is not destruction at all —
+            it is the way BACK, and the only way back, since report tokens are
+            unique per (inspection, recipient) and re-adding someone reissues
+            nothing (IA-133). Describing it as "their link stops working" in the
+            one case where they have no working link is precisely backwards. */}
         <p className="text-[13px] text-ih-fg-3">
-          {m.inspections_hub_people_reset_confirm({ name: resetTarget?.name ?? "" })}
+          {(resetTarget?.access?.status ?? "not_sent") === "active"
+            ? m.inspections_hub_people_reset_confirm({ name: resetTarget?.name ?? "" })
+            : m.inspections_hub_people_reset_confirm_restore({ name: resetTarget?.name ?? "" })}
         </p>
       </Modal>
     </Card>

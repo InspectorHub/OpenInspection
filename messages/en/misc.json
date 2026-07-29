@@ -214,5 +214,9 @@
   "invoices_paid_by": "Paid by:",
   "invoices_mark_paid": "Mark paid",
   "invoices_footer_note": "“Mark paid” records an offline payment (check, cash, bank transfer) and unlocks the report. Online card payments are marked automatically when the customer pays.",
-  "settings_inspection_save_failed": "That change could not be saved and has been undone. Check your connection and try again."
+  "settings_inspection_save_failed": "That change could not be saved and has been undone. Check your connection and try again.",
+  "invoices_action_void": "Void",
+  "invoices_void_title": "Void this invoice?",
+  "invoices_void_confirm": "It stops counting toward revenue and stops holding back the report. The record is kept for your audit trail rather than deleted, and this cannot be undone here.",
+  "invoices_action_error_void": "Could not void this invoice. Nothing was changed — try again."
 }
