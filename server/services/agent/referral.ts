@@ -9,7 +9,8 @@ import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { Errors } from '../../lib/errors';
 import { logger } from '../../lib/logger';
 import { REPORT_STATUS } from '../../lib/status/report-status';
-import { resolveAgentRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
+import { resolveAgentRepairAccess, effectiveRepairAccess, type AgentRepairAccess } from '../../lib/people/agent-repair-access';
+import { capabilitiesForProfile, type RoleKind } from '../../lib/people/capabilities';
 
 // Task 9c — the CLIENT role join, aliased so it can coexist in the same query
 // as the buyer_agent join (contactRoleProfiles/inspectionPeople/contacts,
@@ -115,6 +116,8 @@ export async function listReferrals(
             paymentStatus:   inspections.paymentStatus,
             referredById:    inspectionPeople.contactId,
             contactEmail:    contacts.email,
+            roleKind:        contactRoleProfiles.kind,
+            roleOverrides:   contactRoleProfiles.capabilityOverrides,
             inspectorName:   users.name,
         })
         .from(inspections)
@@ -123,28 +126,25 @@ export async function listReferrals(
         // tenant_configs). Left join: tenants without a config row fall back to
         // 'UTC' in the row mapping below.
         .leftJoin(tenantConfigs, eq(tenantConfigs.tenantId, inspections.tenantId))
-        // Buyer's-agent attribution: inspections -> contact_role_profiles
-        // (this tenant's buyer_agent profile) -> inspection_people -> contacts.
-        // contact_role_profiles is joined FIRST (correlated on tenantId only,
-        // so it narrows to at most one row per tenant) so the inspection_people
-        // join below only ever matches buyer_agent rows — joining
-        // inspection_people first would fan out over every role (client,
-        // co_client, listing_agent, ...) on the inspection. Replaces the
-        // legacy inspections.referredByAgentId column read (see PeopleService).
-        .leftJoin(
-            contactRoleProfiles,
-            and(
-                eq(contactRoleProfiles.tenantId, inspections.tenantId),
-                eq(contactRoleProfiles.key, 'buyer_agent'),
-                eq(contactRoleProfiles.active, true),
-            ),
-        )
+        // Task 9 (two-layer role model) — visibility is the showsInAgentPortal
+        // CAPABILITY, not the buyer_agent key. Join every seat this agent's
+        // contact holds (the INNER contacts join below collapses the fan-out
+        // to MY seats only), carry the seat's role kind + overrides, and
+        // filter on the resolved capability after the fetch — SQL cannot call
+        // the pure resolver, and the rows are already scoped to one agent.
         .leftJoin(
             inspectionPeople,
             and(
-                eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
                 eq(inspectionPeople.inspectionId, inspections.id),
                 eq(inspectionPeople.tenantId, inspections.tenantId),
+            ),
+        )
+        .leftJoin(
+            contactRoleProfiles,
+            and(
+                eq(contactRoleProfiles.id, inspectionPeople.roleProfileId),
+                eq(contactRoleProfiles.tenantId, inspections.tenantId),
+                eq(contactRoleProfiles.active, true),
             ),
         )
         // IA-104 — THIS join is the whole access check now. The buyer_agent
@@ -198,15 +198,29 @@ export async function listReferrals(
         .orderBy(desc(inspections.date))
         .all();
 
-    // No post-fetch filter and no extra users lookup any more (IA-104): the
-    // join answers the association, so every row here is already this agent's.
-    return refRows.slice(0, Math.max(0, opts.limit)).map((r) => ({
+    // The contacts join answers "is this my seat" (IA-104); what remains is
+    // the capability question. A seat whose role does not grant
+    // showsInAgentPortal is invisible, and an agent holding two visible seats
+    // on one inspection still yields one row.
+    const seen = new Set<string>();
+    const visible = refRows.filter((r) => {
+        const caps = capabilitiesForProfile((r.roleKind ?? 'other') as RoleKind, r.roleOverrides);
+        if (!caps.showsInAgentPortal) return false;
+        if (seen.has(r.id)) return false;
+        seen.add(r.id);
+        return true;
+    });
+    return visible.slice(0, Math.max(0, opts.limit)).map((r) => ({
         id:              r.id,
         tenantId:        r.tenantId,
         tenantName:      r.tenantName,
         tenantSlug: r.tenantSlug,
         tenantTimezone:  r.tenantTimezone ?? 'UTC',
-        repairAccess:    resolveAgentRepairAccess(r.inspectionPrefs),
+        // The STRICTER of tenant policy and the seat's own repair-list bit.
+        repairAccess:    effectiveRepairAccess(
+            resolveAgentRepairAccess(r.inspectionPrefs),
+            capabilitiesForProfile((r.roleKind ?? 'other') as RoleKind, r.roleOverrides).canAccessRepairList,
+        ),
         propertyAddress: r.propertyAddress,
         clientName:      r.clientName ?? null,
         date:            r.date,

@@ -59,16 +59,12 @@ describe('GET /api/metrics — topAgents via inspection_people (Task 9c)', () =>
         });
     });
 
-    it('legacy referredByAgentId NULL, buyer_agent inspection_people rows present — counts + names the agent', async () => {
+    it('counts + names the referrer from referred_by_contact_id (Task 9: attribution reads the column)', async () => {
         const today = new Date().toISOString().slice(0, 10);
         await db.insert(schema.inspections).values([
-            { id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: today, status: 'confirmed', paymentStatus: 'paid', price: 10000, referredByAgentId: null, inspectorId: null, createdAt: new Date() },
-            { id: INSP_2, tenantId: TENANT, propertyAddress: '2 Oak', date: today, status: 'confirmed', paymentStatus: 'paid', price: 20000, referredByAgentId: null, inspectorId: null, createdAt: new Date() },
+            { id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: today, status: 'confirmed', paymentStatus: 'paid', price: 10000, referredByContactId: AGENT_CONTACT, inspectorId: null, createdAt: new Date() },
+            { id: INSP_2, tenantId: TENANT, propertyAddress: '2 Oak', date: today, status: 'confirmed', paymentStatus: 'paid', price: 20000, referredByContactId: AGENT_CONTACT, inspectorId: null, createdAt: new Date() },
         ]);
-        const people = new PeopleService({ DB: {} as D1Database });
-        await people.addPerson(TENANT, INSP_1, AGENT_CONTACT, roleProfileId('buyer_agent'));
-        await people.addPerson(TENANT, INSP_2, AGENT_CONTACT, roleProfileId('buyer_agent'));
-
         const res = await buildApp().request('/api/metrics?from=2024-01-01&to=2028-12-31', {}, ENV, CTX);
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { topAgents: { agentId: string | null; agentName: string; count: number; revenue: number }[] } };
@@ -79,7 +75,7 @@ describe('GET /api/metrics — topAgents via inspection_people (Task 9c)', () =>
         expect(body.data.topAgents[0].revenue).toBe(30000);
     });
 
-    it('inspection with no buyer_agent inspection_people row is excluded from topAgents', async () => {
+    it('inspection with no referrer is excluded from topAgents', async () => {
         const today = new Date().toISOString().slice(0, 10);
         await db.insert(schema.inspections).values({
             id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: today, status: 'confirmed', paymentStatus: 'paid', price: 10000, referredByAgentId: null, inspectorId: null, createdAt: new Date(),

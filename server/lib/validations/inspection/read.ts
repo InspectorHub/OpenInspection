@@ -143,6 +143,8 @@ export const InspectionHubSchema = z.object({
     closingDate:       z.string().nullable().describe('Buyer closing date (YYYY-MM-DD), null when unset'),
     referenceNumber:   z.string().nullable().describe('Operator-facing order reference, null when unset'),
     referralSource:    z.string().nullable().describe('Where the order came from, null when unset'),
+    referredByContactId: z.string().nullable().describe('Contact who referred this job (any contact, not only agents); null when unattributed.'),
+    referredByName:      z.string().nullable().describe('Display name of the referrer, resolved for the card; null when unattributed or the contact was deleted.'),
   }).describe('Core inspection fields for the hub header'),
   tenantSlug: z.string().describe('Tenant slug, for building /report/:tenantSlug/:id links'),
   people: InspectionPeopleSchema.describe('Inspector + client + agents (reuses the people-card aggregation)'),

@@ -154,6 +154,9 @@ export const UpdateInspectionSchema = z.object({
     // list ("Realtor", "Past Client", ...) plus tenant custom values both
     // round-trip without a separate enum.
     referralSource: z.string().max(100).nullable().optional().openapi({ example: 'Realtor' }).describe('TODO describe referralSource field for the OpenInspection MCP integration'),
+    // Task 8 (two-layer role model) — WHO sent us the job, distinct from the
+    // channel above. Any contact, not only agent-kind ones.
+    referredByContactId: z.string().nullable().optional().describe('Contact who referred this job. Any contact, not only agents; distinct from referral_source, which is the channel.'),
     profileOverride: z.string().nullable().optional().openapi({ example: 'meridian' }).describe('Per-inspection appearance profile override (built-in profile id); NULL inherits'),
     badgeLayoutOverride: z.enum(['strip', 'inline']).nullable().optional().openapi({ example: 'inline' }).describe('Per-inspection credential badge layout override; NULL inherits the profile'),
     reportPhotoColumns: z.number().int().min(1).max(4).nullable().optional().openapi({ example: 2 }).describe('Per-inspection report photo grid columns (1-4); NULL inherits the profile'),

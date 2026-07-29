@@ -3,7 +3,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { requireRole } from '../lib/middleware/rbac';
 import { MetricsQuerySchema, MetricsApiResponseSchema } from '../lib/validations/metrics.schema';
 import { drizzle } from 'drizzle-orm/d1';
-import { inspections, inspectionServices, contacts, inspectionPeople, contactRoleProfiles, users, reportVersions } from '../lib/db/schema';
+import { inspections, inspectionServices, contacts, users, reportVersions } from '../lib/db/schema';
 import { eq, and, gte, lte, sql } from 'drizzle-orm';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
 import { sumEffectivePriceCentsSql } from '../lib/effective-price.sql';
@@ -44,40 +44,27 @@ const metricsRoutes = createApiRouter()
     const totalInspections = monthly.reduce((s, r) => s + Number(r.count || 0), 0);
     const avgOrderValue    = totalInspections > 0 ? Math.round(totalRevenue / totalInspections) : 0;
 
-    // Top agents — single JOIN query instead of N+1. Buyer's-agent
-    // attribution via inspection_people (role buyer_agent) — contact_role_profiles
-    // is joined before inspection_people so the join stays scoped to
-    // buyer_agent only (joining inspection_people first would fan out over
-    // every role on the inspection). The old "referredByAgentId is not null"
-    // filter is now implicit: an inspection with no buyer_agent
-    // inspection_people row simply has no matching row to group on.
+    // Top referrers — attribution reads the explicit referred_by_contact_id
+    // column (Task 9, two-layer role model), not the buyer_agent seat. Any
+    // contact can be the referrer, so "agent" here means "referrer" and a
+    // past client shows up under their own name.
     const topAgents = await db.select({
-        agentId:   inspectionPeople.contactId,
+        agentId:   inspections.referredByContactId,
         agentName: contacts.name,
         count:     sql<number>`count(*)`,
         revenue:   sumEffectivePriceCentsSql,
     })
         .from(inspections)
-        .leftJoin(contactRoleProfiles, and(
-            eq(contactRoleProfiles.tenantId, inspections.tenantId),
-            eq(contactRoleProfiles.key, 'buyer_agent'),
-            eq(contactRoleProfiles.active, true),
-        ))
-        .leftJoin(inspectionPeople, and(
-            eq(inspectionPeople.roleProfileId, contactRoleProfiles.id),
-            eq(inspectionPeople.inspectionId, inspections.id),
-            eq(inspectionPeople.tenantId, inspections.tenantId),
-        ))
         .leftJoin(contacts, and(
-            eq(contacts.id, inspectionPeople.contactId),
+            eq(contacts.id, inspections.referredByContactId),
             eq(contacts.tenantId, inspections.tenantId),
         ))
         .where(and(
             eq(inspections.tenantId, tenantId),
             inWindow,
-            sql`${inspectionPeople.contactId} is not null`,
+            sql`${inspections.referredByContactId} is not null`,
         ))
-        .groupBy(inspectionPeople.contactId)
+        .groupBy(inspections.referredByContactId)
         .orderBy(sql`count(*) desc`)
         .limit(10)
         .then(rows => rows.map(r => ({

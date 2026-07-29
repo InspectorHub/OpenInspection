@@ -326,6 +326,20 @@ const coreRoutes = createApiRouter()
             }
         }
 
+        // Task 8 — a referrer must be one of THIS tenant's contacts. Reject a
+        // foreign or unknown id with a 400 rather than writing a dangling soft
+        // reference (the column has no FK by Schema Rules, so the app layer is
+        // the only guard).
+        if (typeof body.referredByContactId === 'string' && body.referredByContactId) {
+            const { contacts } = await import('../../lib/db/schema');
+            const owner = await db.select({ id: contacts.id }).from(contacts)
+                .where(and(eq(contacts.id, body.referredByContactId), eq(contacts.tenantId, tenantId)))
+                .get();
+            if (!owner) {
+                return c.json({ success: false as const, error: { code: 'INVALID_REFERRER', message: 'referredByContactId is not a contact in this tenant' } }, 400);
+            }
+        }
+
         // Tenant-ownership pre-check above guards access. The validated `body`
         // can legitimately be empty: the settings sheet forwards its whole form
         // and the BFF sanitizer drops empty-string "unchanged" fields, so a save
