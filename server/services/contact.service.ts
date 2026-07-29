@@ -1,15 +1,13 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { eq, and, like, sql, isNull, inArray } from 'drizzle-orm';
+import { eq, and, like, sql, isNull, isNotNull } from 'drizzle-orm';
 import { contacts, type ContactType } from '../lib/db/schema/contact';
-import { inspections } from '../lib/db/schema/inspection';
-import { invoices } from '../lib/db/schema/invoice';
 import { inspectionPeople, contactRoleProfiles } from '../lib/db/schema/inspection/role-profiles';
 import { Errors } from '../lib/errors';
+import { buildContactDetail } from './contact-detail';
 import { escapeLikePattern } from '../lib/db/like-escape';
 import { safeISODate } from '../lib/date';
 import { tenantConfigs } from '../lib/db/schema';
 import { logger } from '../lib/logger';
-import { getEffectivePriceCents } from '../lib/effective-price';
 
 export class ContactService {
     /**
@@ -26,9 +24,15 @@ export class ContactService {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private getDrizzle() { return drizzle(this.db as any); }
 
-    async listContacts(tenantId: string, opts: { type?: ContactType; search?: string; limit: number; offset: number }) {
+    async listContacts(tenantId: string, opts: { type?: ContactType; search?: string; archived?: 'exclude' | 'only'; limit: number; offset: number }) {
         const db = this.getDrizzle();
-        const conditions = [eq(contacts.tenantId, tenantId), isNull(contacts.archivedAt)];
+        // IA-120 — archived rows used to be unconditionally excluded here, which
+        // is what made Archive a one-way door: written by the button, readable
+        // by nothing.
+        const conditions = [
+            eq(contacts.tenantId, tenantId),
+            opts.archived === 'only' ? isNotNull(contacts.archivedAt) : isNull(contacts.archivedAt),
+        ];
         if (opts.type) conditions.push(eq(contacts.type, opts.type));
         if (opts.search) conditions.push(like(contacts.name, `%${escapeLikePattern(opts.search)}%`));
 
@@ -79,113 +83,7 @@ export class ContactService {
      * still count toward inspectionCount.
      */
     async getContactDetail(id: string, tenantId: string) {
-        const db = this.getDrizzle();
-
-        const contact = await db.select().from(contacts)
-            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
-        if (!contact) return null;
-
-        const rows = await db.select({
-            id:            inspections.id,
-            propertyAddress: inspections.propertyAddress,
-            date:          inspections.date,
-            status:        inspections.status,
-            price:         inspections.price,
-            paymentStatus: inspections.paymentStatus,
-        }).from(inspections)
-            .innerJoin(inspectionPeople, eq(inspectionPeople.inspectionId, inspections.id))
-            .where(and(
-                eq(inspections.tenantId, tenantId),
-                eq(inspectionPeople.tenantId, tenantId),
-                eq(inspectionPeople.contactId, id),
-            ))
-            .all();
-
-        // Dedup by inspection id (a row matched by both linkage paths appears
-        // once) and order date desc, newest first.
-        const seen = new Set<string>();
-        const inspectionRows = rows
-            .filter(r => (seen.has(r.id) ? false : (seen.add(r.id), true)))
-            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-
-        const inspectionIds = inspectionRows.map(r => r.id);
-
-        // One pass over the invoices on these inspections, serving two readers.
-        //
-        // Revenue counts PAID ones only. The per-row price needs EVERY live one,
-        // because an invoice is tier 1 of the P-4 authority chain whether or not
-        // it has been paid — `inspections.price` is a denormalized cache and its
-        // own schema comment says to read through getEffectivePriceCents().
-        // Reading the cache directly is how this card came to state
-        // "TOTAL REVENUE $450.00" beside that same inspection listed at "$0.00".
-        //
-        // Chunk the inArray to stay under D1's 100-bind-param ceiling.
-        let totalRevenueCents = 0;
-        const invoiceByInspection = new Map<string, number>();
-        const paidInspectionIds = new Set<string>();
-        const CHUNK = 90;
-        for (let i = 0; i < inspectionIds.length; i += CHUNK) {
-            const chunk = inspectionIds.slice(i, i + CHUNK);
-            const rows = await db.select({
-                inspectionId: invoices.inspectionId,
-                amountCents:  invoices.amountCents,
-                paidAt:       invoices.paidAt,
-            })
-                .from(invoices)
-                .where(and(
-                    eq(invoices.tenantId, tenantId),
-                    inArray(invoices.inspectionId, chunk),
-                    isNull(invoices.voidedAt),
-                ))
-                .all();
-            for (const inv of rows) {
-                if (!inv.inspectionId) continue;
-                if (inv.paidAt) {
-                    totalRevenueCents += inv.amountCents ?? 0;
-                    paidInspectionIds.add(inv.inspectionId);
-                }
-                if (!invoiceByInspection.has(inv.inspectionId)) {
-                    invoiceByInspection.set(inv.inspectionId, inv.amountCents ?? 0);
-                }
-            }
-        }
-
-        return {
-            contact: {
-                id:         contact.id,
-                type:       contact.type,
-                name:       contact.name,
-                email:      contact.email,
-                phone:      contact.phone,
-                agency:     contact.agency,
-                notes:      contact.notes,
-                createdAt:  safeISODate(contact.createdAt),
-                archivedAt: contact.archivedAt ? safeISODate(contact.archivedAt) : null,
-            },
-            inspections: inspectionRows.map(r => ({
-                id:              r.id,
-                propertyAddress: r.propertyAddress,
-                date:            r.date,
-                status:          r.status,
-                // Service lines are deliberately not loaded here, so tier 2 is
-                // skipped: the helper treats undefined as "not loaded" and falls
-                // through, which is the correct behaviour rather than a gap.
-                price:           getEffectivePriceCents({
-                    invoiceAmountCents:   invoiceByInspection.get(r.id) ?? null,
-                    inspectionPriceCents: r.price,
-                }),
-                // A paid invoice settles the question, and saying otherwise
-                // beside a corrected amount reads worse than the old all-wrong
-                // row did. Deliberately one-directional: a paid invoice can
-                // promote the row, nothing here demotes it, so `partial` —
-                // which only the inspection models, via markPartial — survives.
-                paymentStatus:   paidInspectionIds.has(r.id) ? 'paid' as const : r.paymentStatus,
-            })),
-            stats: {
-                inspectionCount:   inspectionRows.length,
-                totalRevenueCents,
-            },
-        };
+        return buildContactDetail(this.getDrizzle(), id, tenantId);
     }
 
     async createContact(tenantId: string, data: { type: ContactType; name: string; email?: string | null | undefined; phone?: string | null | undefined; agency?: string | null | undefined; notes?: string | null | undefined; createdByUserId?: string | null | undefined }) {
@@ -257,6 +155,32 @@ export class ContactService {
                 if (n > 0) logger.info('contact.archive.revoked_access', { tenantId, contactId: id, revoked: n });
             }
         }
+    }
+
+    /**
+     * Undo an archive (IA-120).
+     *
+     * Deliberately narrow: it clears `archivedAt` and nothing else. Archiving
+     * can also REVOKE report links when the tenant has that policy on, and those
+     * are not resurrected here — a revoked link is revoked, and re-granting
+     * access is the People card's job ("Reset access link"), not a side effect
+     * of un-hiding a contact row. Restoring a contact must not silently hand
+     * someone back a report.
+     *
+     * Note the asymmetry with archive(): archive DELETES the row outright when
+     * the contact is referenced by no inspection, so there is nothing to restore
+     * in that case. Restore therefore only ever applies to contacts that have
+     * history — which is exactly the set worth keeping.
+     */
+    async restoreContact(id: string, tenantId: string): Promise<{ restored: boolean }> {
+        const db = this.getDrizzle();
+        const row = await db.select({ archivedAt: contacts.archivedAt }).from(contacts)
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId))).get();
+        if (!row) throw Errors.NotFound('Contact not found');
+        if (!row.archivedAt) return { restored: false };
+        await db.update(contacts).set({ archivedAt: null })
+            .where(and(eq(contacts.id, id), eq(contacts.tenantId, tenantId)));
+        return { restored: true };
     }
 
     /**

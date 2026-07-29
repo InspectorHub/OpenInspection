@@ -114,6 +114,35 @@ const deleteContactRoute = createRoute(withMcpMetadata({
 }, { scopes: ['write'], tier: 'primary' }));
 
 /**
+ * POST /api/contacts/:id/restore — undo an archive (IA-120).
+ *
+ * Archive wrote `archivedAt` and every read path filtered it out, so the
+ * control was a one-way door behind copy that promises tidying ("Removes them
+ * from your list"). This is the way back.
+ *
+ * It does NOT restore report access. When the tenant has archive-revokes-access
+ * on, archiving killed live links; handing them back as a side effect of
+ * un-hiding a row would be a silent re-grant. Re-granting is the People card's
+ * job.
+ */
+const restoreContactRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/{id}/restore',
+    tags: ["contacts"], summary: "Restore an archived contact",
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
+    request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ restored: z.boolean().describe('False when the contact was not archived, so nothing changed.') }) }) } },
+            description: 'Restored, or already active (data.restored says which).',
+        },
+        404: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.object({ message: z.string(), code: z.string() }) }) } }, description: 'Contact not found in this tenant.' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: "restoreContact",
+    description: "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued."
+}, { scopes: ['write'], tier: 'extended' }));
+
+/**
  * GET /api/contacts/:id/access — every inspection this contact can still open
  * (IA-100).
  *
@@ -183,11 +212,18 @@ const contactRoutes = createApiRouter()
     .openapi(listContactsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const q = c.req.valid('query');
-        const opts: { type?: ContactType; search?: string; limit: number; offset: number } = { limit: q.limit, offset: q.offset };
+        const opts: { type?: ContactType; search?: string; archived?: 'exclude' | 'only'; limit: number; offset: number } =
+            { limit: q.limit, offset: q.offset, archived: q.archived };
         if (q.type) opts.type = q.type;
         if (q.search) opts.search = q.search;
         const rows = await c.var.services.contact.listContacts(tenantId, opts);
         return c.json({ success: true as const, data: rows, meta: { total: rows.length } }, 200);
+    })
+    .openapi(restoreContactRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const { restored } = await c.var.services.contact.restoreContact(id, tenantId);
+        return c.json({ success: true as const, data: { restored } }, 200);
     })
     .openapi(getContactDetailRoute, async (c) => {
         const tenantId = c.get('tenantId');

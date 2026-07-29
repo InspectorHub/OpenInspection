@@ -87,9 +87,20 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res.ok };
   }
 
-  if (intent === "role-delete") {
+  // IA-128 — the endpoint is a SOFT delete (it sets active:false and answers
+  // `{ deactivated: true }`), so the intent is named for what it does. The way
+  // back was missing entirely: the PUT schema has always accepted `active`, and
+  // nothing in the app ever sent it, which is what left a deactivated custom
+  // role stranded.
+  if (intent === "role-deactivate") {
     const id = form.get("id") as string;
     const res = await api.roleProfiles[":id"].$delete({ param: { id } });
+    return { ok: res.ok };
+  }
+
+  if (intent === "role-reactivate") {
+    const id = form.get("id") as string;
+    const res = await api.roleProfiles[":id"].$put({ param: { id }, json: { active: true } });
     return { ok: res.ok };
   }
 

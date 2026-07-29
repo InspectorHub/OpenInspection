@@ -68,6 +68,14 @@ export function RolesTable({
           {
             label: <span className="sr-only">{m.contacts_table_col_actions()}</span>,
             align: "right",
+            // IA-128 — this said "Delete" and did not delete. The endpoint is a
+            // SOFT delete (`server/api/role-profiles.ts`: "Soft-deletes … by
+            // setting active:false", responding `{ deactivated: true }`), so the
+            // row stayed put with its status flipped to Inactive and the same
+            // red "Delete" beside it. Clicking again did nothing at all, and
+            // nothing anywhere sent `active: true`, so a custom role was stuck
+            // Inactive forever — a one-way door wearing the most destructive
+            // word in the UI. The server was honest; the label was not.
             cell: (p) =>
               p.isSystem ? null : (
                 <deleteFetcher.Form
@@ -75,10 +83,13 @@ export function RolesTable({
                   className="inline"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <input type="hidden" name="intent" value="role-delete" />
+                  <input type="hidden" name="intent" value={p.active ? "role-deactivate" : "role-reactivate"} />
                   <input type="hidden" name="id" value={p.id} />
-                  <button type="submit" className="text-ih-bad-fg text-[12px] font-bold hover:underline">
-                    {m.common_delete()}
+                  <button
+                    type="submit"
+                    className={`text-[12px] font-bold hover:underline ${p.active ? "text-ih-bad-fg" : "text-ih-primary"}`}
+                  >
+                    {p.active ? m.contacts_roles_action_deactivate() : m.contacts_roles_action_reactivate()}
                   </button>
                 </deleteFetcher.Form>
               ),

@@ -7,15 +7,18 @@ import { m } from "~/paraglide/messages";
 
 const FORM_ID = "invite-seat-form";
 
-type Role = "owner" | "manager" | "inspector" | "agent";
+// Only the roles this drawer can actually offer. `owner` and `agent` were
+// carried here long after the select stopped listing them (IA-101 removed
+// agent; owner was never selectable), leaving two unreachable branches in
+// ROLE_DESC below — one of which advertised an "ownership transfer" feature
+// that does not exist anywhere in the product (IA-125).
+type Role = "manager" | "inspector";
 
 // Thunks (not eager strings) so each description resolves at render inside the
 // paraglide request scope, not once at module import.
 const ROLE_DESC: Record<Role, () => string> = {
- owner: () => m.modal_invite_role_desc_owner(),
  manager: () => m.modal_invite_role_desc_manager(),
  inspector: () => m.modal_invite_role_desc_inspector(),
- agent: () => m.modal_invite_role_desc_agent(),
 };
 
 /**

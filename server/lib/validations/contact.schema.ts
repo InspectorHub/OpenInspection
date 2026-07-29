@@ -29,6 +29,12 @@ export const ContactResponseSchema = z.object({
 export const ContactListQuerySchema = z.object({
     type: z.enum(['agent', 'client', 'other']).optional().openapi({ example: 'agent' }).describe('TODO describe type field for the OpenInspection MCP integration'),
     search: z.string().max(100).optional().describe('TODO describe search field for the OpenInspection MCP integration'),
+    // IA-120 — archive had a writer and no reader. `archivedAt` was set by the
+    // Archive button and then filtered out of every query, with no way to list,
+    // open or restore the row: a one-way door behind a control whose own copy
+    // ("Removes them from your list") promises tidying, not deletion.
+    archived: z.enum(['exclude', 'only']).default('exclude')
+        .describe('Whether to return live contacts (default) or the archived ones.'),
     limit: z.coerce.number().min(1).max(200).default(50).describe('TODO describe limit field for the OpenInspection MCP integration'),
     offset: z.coerce.number().min(0).default(0).describe('TODO describe offset field for the OpenInspection MCP integration'),
 }).openapi('ContactListQuery');

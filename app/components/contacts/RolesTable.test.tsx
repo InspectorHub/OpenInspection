@@ -69,15 +69,29 @@ describe("RolesTable", () => {
     expect(getByText("System")).toBeTruthy();
   });
 
-  it("hides the delete button on system rows but shows it on tenant-defined rows", () => {
+  it("hides the deactivate control on system rows but shows it on tenant-defined rows", () => {
     const { getByText, queryByText } = render(
       <RolesTable roleProfiles={[SYSTEM_ROLE, CLIENT_ROLE]} onEdit={vi.fn()} onCreate={vi.fn()} />,
     );
-    // Only one Delete control should be rendered (for the non-system row).
+    // Only one row-level control should be rendered (for the non-system row).
+    // IA-128 — the verb is "Deactivate", not "Delete": the endpoint is a soft
+    // delete that flips active:false and leaves the row in place.
     const deleteButtons = document.querySelectorAll('button[type="submit"]');
     expect(deleteButtons).toHaveLength(1);
-    expect(getByText("Delete")).toBeTruthy();
-    expect(queryByText("Delete")?.closest("tr")?.textContent).toContain("Buyer");
+    expect(getByText("Deactivate")).toBeTruthy();
+    expect(queryByText("Deactivate")?.closest("tr")?.textContent).toContain("Buyer");
+  });
+
+  it("offers Reactivate, not Deactivate, on an inactive row (IA-128)", () => {
+    // The missing half of the pair. Deactivating a custom role used to be
+    // terminal in the UI: the button still said "Delete", clicking it again did
+    // nothing, and nothing in the app ever sent `active: true` — even though the
+    // update schema had always accepted it.
+    const { getByText, queryByText } = render(
+      <RolesTable roleProfiles={[{ ...CLIENT_ROLE, active: false }]} onEdit={vi.fn()} onCreate={vi.fn()} />,
+    );
+    expect(getByText("Reactivate")).toBeTruthy();
+    expect(queryByText("Deactivate")).toBeNull();
   });
 
   it("calls onEdit with the row when a row is clicked", () => {

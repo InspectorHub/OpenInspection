@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData, useFetcher, useSearchParams } from "react-router";
 import { parseWithZod } from "@conform-to/zod/v4";
 import type { Route } from "./+types/contacts";
 import { requireToken } from "~/lib/session.server";
@@ -21,6 +21,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const token = await requireToken(context, request);
   const url = new URL(request.url);
   const filterType = url.searchParams.get("type") || "";
+  // IA-120 — a SERVER-side axis, unlike `?type=` below: archived rows are not
+  // in the default payload at all, so switching this genuinely needs a refetch.
+  const archivedView = url.searchParams.get("archived") === "only";
   const api = createApi(context, { token });
 
   try {
@@ -29,11 +32,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     // would make switching the dropdown a round trip that returns nothing for
     // the other types. `filterType` seeds the dropdown so a deep link still
     // lands where it promised.
-    const contactsRes = await api.contacts.index.$get({ query: {} });
+    const contactsRes = await api.contacts.index.$get({
+      query: archivedView ? { archived: "only" } : {},
+    });
     const contactsBody = contactsRes.ok ? ((await contactsRes.json()) as Record<string, unknown>) : { data: [] };
-    return { contacts: (contactsBody.data ?? []) as Contact[], filterType };
+    return { contacts: (contactsBody.data ?? []) as Contact[], filterType, archivedView };
   } catch {
-    return { contacts: [] as Contact[], filterType: "" };
+    return { contacts: [] as Contact[], filterType: "", archivedView };
   }
 }
 
@@ -89,6 +94,14 @@ export async function action({ request, context }: Route.ActionArgs) {
     return { ok: res.ok };
   }
 
+  if (intent === "restore") {
+    const id = form.get("id") as string;
+    const restore = api.contacts[":id"].restore.$post as unknown as
+      (args: { param: { id: string } }) => Promise<Response>;
+    const res = await restore({ param: { id } });
+    return { ok: res.ok };
+  }
+
   if (intent === "csv-import") {
     const csvText = form.get("csvText") as string;
     // The preview endpoint surfaces detected columns; the UI currently
@@ -127,13 +140,14 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function ContactsPage() {
-  const { contacts, filterType } = useLoaderData<typeof loader>();
+  const { contacts, filterType, archivedView } = useLoaderData<typeof loader>();
   const contactList = contacts as Contact[];
   const [modalOpen, setModalOpen] = useState(false);
   const [csvModalOpen, setCsvModalOpen] = useState(false);
   const [editContact, setEditContact] = useState<Contact | null>(null);
   const [typeFilter, setTypeFilter] = useState(filterType || "");
   const [pendingArchive, setPendingArchive] = useState<Contact | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const archiveFetcher = useFetcher<{ ok?: boolean }>();
   // IA-100 — how many reports this person can still open, fetched only for the
   // contact actually being archived, plus whether this tenant treats archiving
@@ -141,6 +155,8 @@ export default function ContactsPage() {
   const { count: pendingAccessCount, revokesOnArchive: archiveRevokesAccess } = useLiveAccess(pendingArchive);
 
   const openEdit = (c: Contact) => { setEditContact(c); setModalOpen(true); };
+  const restore = (c: Contact) =>
+    archiveFetcher.submit({ intent: "restore", id: c.id }, { method: "post" });
   const confirmArchive = () => {
     if (pendingArchive) {
       archiveFetcher.submit(
@@ -176,6 +192,28 @@ export default function ContactsPage() {
         meta={metaLine}
         actions={
           <>
+            {/* IA-120 — Active/Archived is a SERVER round trip (archived rows
+                are not in the default payload), so it drives the URL rather
+                than local state. The type dropdown beside it stays client-side;
+                two filters, two mechanisms, because they are two different
+                questions. */}
+            <div className="w-[120px]">
+              <Select
+                bare
+                aria-label={m.contacts_filter_status_aria()}
+                value={archivedView ? "only" : ""}
+                onChange={(e) => {
+                  const next = new URLSearchParams(searchParams);
+                  if (e.target.value === "only") next.set("archived", "only");
+                  else next.delete("archived");
+                  setSearchParams(next);
+                }}
+                options={[
+                  { value: "", label: m.contacts_filter_status_active() },
+                  { value: "only", label: m.contacts_filter_status_archived() },
+                ]}
+              />
+            </div>
             <div className="w-[130px]">
               <Select
                 bare
@@ -204,7 +242,13 @@ export default function ContactsPage() {
         }
       />
 
-      <ContactsTable filtered={filtered} onEdit={openEdit} onArchive={setPendingArchive} />
+      <ContactsTable
+        filtered={filtered}
+        onEdit={openEdit}
+        onArchive={setPendingArchive}
+        onRestore={restore}
+        archivedView={archivedView}
+      />
 
       <ContactModal open={modalOpen} onClose={() => setModalOpen(false)} contact={editContact} />
       <CsvImportModal open={csvModalOpen} onClose={() => setCsvModalOpen(false)} />
