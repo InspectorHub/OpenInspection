@@ -57,7 +57,18 @@ export function Table<T>({
     // columns to compress until their content wraps or clips, which is the
     // failure we are removing. `min-w-full` lets it take the width it needs
     // and hands the overflow to the wrapper.
-    <div className="overflow-x-auto">
+    //
+    // `relative` is load-bearing, not decoration. `overflow-x-auto` clips
+    // painting but does NOT establish a containing block, so an absolutely
+    // positioned descendant resolves against the initial containing block and
+    // keeps contributing to the DOCUMENT's scroll width — escaping the very
+    // container meant to hold it. Tables here label their action column with
+    // Tailwind's `sr-only`, which is `position: absolute`, so once a table grew
+    // wider than the viewport that 1px label sat off-screen and dragged a
+    // horizontal scrollbar onto the whole page. The table scrolled correctly
+    // the entire time; the page scrolled because of a screen-reader label.
+    // `relative` makes the wrapper the containing block, so it stays inside.
+    <div className="relative overflow-x-auto">
       <table
         className={`min-w-full text-left${className ? ` ${className}` : ""}`}
       >

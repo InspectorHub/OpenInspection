@@ -99,6 +99,16 @@
   --ih-fg-5: #cbd5e1;
   --ih-fg-inverse: #fff;
 
+  /* Tells the BROWSER which palette to paint its own controls with: the
+     expanded <option> list, autofill highlight, scrollbars, date pickers,
+     spinners. Those are rendered by the UA, not by us, so no amount of
+     Tailwind reaches them — without this they stay light in every theme, which
+     is why a dark-mode select looked fine closed and became dark-on-dark the
+     moment it opened. `data-color-scheme` below is our ATTRIBUTE for swapping
+     tokens; this is the CSS PROPERTY that talks to the browser. Two different
+     things that read almost identically, which is how it went unnoticed. */
+  color-scheme: light;
+
   --ih-bg-app: #f8fafc;
   --ih-bg-card: #fff;
   --ih-bg-muted: #f1f5f9;
@@ -129,6 +139,8 @@
 
 /* ── Dark mode (the 'field' scheme is dark-based and inherits these vars) ── */
 html[data-color-scheme="dark"], html[data-color-scheme="field"], .dark {
+  /* See the note in :root — this is what makes native controls dark. */
+  color-scheme: dark;
   --ih-primary: #818cf8;
   --ih-primary-600: #6366f1;
   --ih-primary-700: #4f46e5;
