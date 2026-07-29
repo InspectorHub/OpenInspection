@@ -82,7 +82,7 @@ export interface CannedCommentTabsProps {
    *  configured color renders in the editor, not just the report. */
   categoryColor?: Map<string, string>;
 
-  /** Track H (IA-5/迁移③) — whole-library hits under the same search box. */
+  /** Track H (IA-5 / migration step 3) — whole-library hits under the same search box. */
   libraryMatches: LibraryMatch[];
   /** Seeds the custom-defect form from a tapped library match. */
   onSeedFromLibrary: (match: LibraryMatch) => void;
@@ -252,7 +252,7 @@ export function CannedCommentTabs({
           })
         )}
 
-        {/* Track H (IA-5/迁移③) — whole-library hits under the same search box.
+        {/* Track H (IA-5 / migration step 3) — whole-library hits under the same search box.
             Tapping one SEEDS the custom-defect form (title from the first
             sentence, narrative = full text) so the inspector can edit before
             committing — a library comment is language, not a finished defect. */}

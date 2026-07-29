@@ -173,7 +173,7 @@ html[data-color-scheme="dark"], html[data-color-scheme="field"], .dark {
   --ih-backdrop: rgba(2, 6, 23, 0.65);
 }
 
-/* ── Field mode (Track H 迁移⑤) ──
+/* ── Field mode (Track H, migration step 5) ──
    High-contrast, large-type variant of dark for outdoor/sunlight use:
    18px base font (rem-based sizes scale up), near-black background,
    brighter foregrounds and stronger borders. Inherits everything else

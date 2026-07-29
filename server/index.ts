@@ -247,7 +247,7 @@ app.use('*', enforceTenantActive);
 app.use('*', jwtAuthMiddleware);
 
 
-// Secret UI化 — load encrypted integration secrets from DB and merge into
+// Secrets UI — load encrypted integration secrets from DB and merge into
 // c.env. Tenant comes from the JWT (authed API) or tenantRouter (standalone /
 // public slug paths) — see the ORDERING note above. Worker env vars take
 // precedence except for the tenant-owned Stripe trio.
@@ -359,7 +359,7 @@ const routes = app
   .route('/api/admin', adminBrandingRoutes)
   // Evidence download — GET /api/admin/agreement-requests/:id/pdf + certificate.pdf
   .route('/api/admin', evidenceRoutes)
-  // Secret UI化 — GET/PUT/POST /api/admin/secrets for all 14 integration keys
+  // Secrets UI — GET/PUT/POST /api/admin/secrets for all 14 integration keys
   .route('/api/admin', secretsRoutes)
   // Track L — authed SMS consent attestation + test-send + consent status.
   .route('/api/admin', smsAdminRoutes)

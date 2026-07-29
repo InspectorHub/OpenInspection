@@ -7,7 +7,7 @@ export interface CustomDefectFormProps {
   comment: string;
   category: CustomDefectCategory;
   saveToLibrary: boolean;
-  /** When set, renders the "Save to my library" checkbox (Track H B-20 回流). */
+  /** When set, renders the "Save to my library" checkbox (Track H B-20 back-flow). */
   showSaveToLibrary: boolean;
   /** IA-59 — the tenant's configured defect categories, offered alongside the
    *  three built-in seeds so field-added defects can use a custom category. */
@@ -70,7 +70,7 @@ export function CustomDefectForm({
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
         </select>
-        {/* Track H (B-20 回流) — default OFF so one-off findings don't pollute the library */}
+        {/* Track H (B-20 back-flow) — default OFF so one-off findings don't pollute the library */}
         {showSaveToLibrary && (
           <label className="flex items-center gap-1.5 text-[11px] text-ih-fg-3 cursor-pointer select-none">
             <input

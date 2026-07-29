@@ -1600,7 +1600,7 @@ export default function InspectionEditPage() {
  onOpenSnippets={openSnippets}
  onSearchLibrary={comments.searchLibrary}
  onSaveDefectToLibrary={(input) => {
- // Track H (B-20 回流): best-effort — the defect itself already landed in
+ // Track H (B-20 follow-up): best-effort — the defect itself already landed in
  // result.customComments; a failed library save only costs reuse next time.
  const text = input.comment ? `${input.title} — ${input.comment}` : input.title;
  comments.saveSnippet(
