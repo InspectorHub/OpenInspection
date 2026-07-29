@@ -4817,7 +4817,7 @@
           "description": "TODO describe oldId field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe oldId field for the OpenInspection MCP integration"
           }
         },
@@ -4828,7 +4828,7 @@
           "description": "TODO describe newId field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe newId field for the OpenInspection MCP integration"
           }
         }
@@ -8537,7 +8537,7 @@
         "properties": {
           "token": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440000",
             "description": "One-time invitation token from the team-invite email; valid until the invite expires or is consumed."
           },
@@ -9135,6 +9135,21 @@
             "type": "string",
             "maxLength": 100,
             "description": "TODO describe search field for the OpenInspection MCP integration"
+          }
+        },
+        {
+          "name": "archived",
+          "in": "query",
+          "required": false,
+          "description": "Whether to return live contacts (default) or the archived ones.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "exclude",
+              "only"
+            ],
+            "default": "exclude",
+            "description": "Whether to return live contacts (default) or the archived ones."
           }
         },
         {
@@ -15305,7 +15320,7 @@
         "properties": {
           "token": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440000",
             "description": "One-time password-reset token from the forgot-password email; valid for a short window."
           },
@@ -15354,6 +15369,34 @@
     },
     "summary": "Resolve an SMS opt-in link token to disclosure + company name",
     "description": "Resolves the opaque opt-in token to the company name + current SMS disclosure for the public double-opt-in page. Returns 404 on a bad/expired token."
+  },
+  {
+    "operationId": "restoreContact",
+    "method": "POST",
+    "pathTemplate": "/api/contacts/{id}/restore",
+    "scopes": [
+      "write"
+    ],
+    "tag": "contacts",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Contact id.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact id."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "Restore an archived contact",
+    "description": "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued."
   },
   {
     "operationId": "resubmitSmsCompliance",

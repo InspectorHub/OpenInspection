@@ -18,8 +18,8 @@ const MigrationStrategySchema = z.enum([
 ]);
 
 export const MigrationParamsSchema = z.object({
-    oldId: z.string().uuid({ message: 'oldId must be a UUID' }).describe('TODO describe oldId field for the OpenInspection MCP integration'),
-    newId: z.string().uuid({ message: 'newId must be a UUID' }).describe('TODO describe newId field for the OpenInspection MCP integration'),
+    oldId: z.string().trim().min(1, { message: 'oldId is required' }).describe('TODO describe oldId field for the OpenInspection MCP integration'),
+    newId: z.string().trim().min(1, { message: 'newId is required' }).describe('TODO describe newId field for the OpenInspection MCP integration'),
 });
 
 export const MigrationBodySchema = z.object({
