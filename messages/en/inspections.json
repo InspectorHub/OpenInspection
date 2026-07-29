@@ -82,6 +82,8 @@
   "inspections_hub_people_agency_ph": "Company or agency",
   "inspections_hub_people_role_label": "Role",
   "inspections_hub_people_role_placeholder": "Select a role…",
+  "inspections_hub_people_access_notice": "Adding someone in this role lets them open this inspection from a link — no sign-up needed, and before the report is published.",
+  "inspections_hub_people_access_revoke_hint": "You can revoke it any time from their contact record. To give a revoked link back, use “Reset access link” on their row and send the report again — re-adding them does not reissue it.",
   "inspections_hub_people_no_roles_admin": "No role profiles configured — add one in Contacts → Roles.",
   "inspections_hub_people_no_roles_non_admin": "No role profiles are configured yet. Ask an admin to set one up.",
   "inspections_hub_people_clear_contact_aria": "Clear selected contact",
@@ -134,6 +136,7 @@
   "inspections_hub_agreement_empty": "No agreement requests yet.",
   "inspections_hub_agreement_send": "Send agreement",
   "inspections_hub_invoice_paid": "Payment received.",
+  "inspections_hub_invoice_hidden": "Amount hidden",
   "inspections_hub_invoice_resend": "Resend request",
   "inspections_hub_invoice_request": "Request payment",
   "inspections_hub_report_create_reinspection": "Create re-inspection",
@@ -219,5 +222,8 @@
   "inspections_hub_people_link_expiry_lift_one": "Remove the expiry from the 1 sent link",
   "inspections_hub_people_link_expiry_noop": "Every link already matches this — nothing to change.",
   "inspections_hub_people_copy_email": "Copy",
-  "inspections_hub_people_copy_email_aria": "Copy email address {email}"
+  "inspections_hub_people_copy_email_aria": "Copy email address {email}",
+  "inspections_hub_people_already_present": "{name} already holds this role on this inspection, so nothing changed. To restore a revoked report link, close this and use “Reset access link” on their row.",
+  "inspections_hub_people_this_contact": "This contact",
+  "inspections_hub_people_reset_confirm_restore": "{name} has no working link right now. This issues a fresh one — send the report again to deliver it."
 }

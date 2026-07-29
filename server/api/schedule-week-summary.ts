@@ -16,6 +16,7 @@ import {
     WeekSummaryResponseSchema,
 } from '../lib/validations/schedule-week-summary.schema';
 import { BookingService } from '../services/booking.service';
+import { isAdminRole } from '../lib/auth/roles';
 
 const WEEK_LENGTH = 7;
 const DAY_MS = 86_400_000;
@@ -43,7 +44,7 @@ function civilDayOfWeek(date: string): number {
 }
 
 function isAdmin(role: string | undefined): boolean {
-    return role === 'owner' || role === 'manager';
+    return isAdminRole(role);
 }
 
 const allowedRoles = requireRole('owner', 'manager', 'inspector');

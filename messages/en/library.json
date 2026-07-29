@@ -202,5 +202,6 @@
   "dashboard_skeleton_loading": "Loading inspections…",
   "dashboard_toolbar_search": "Search...",
   "dashboard_toolbar_filters": "Filters",
-  "dashboard_toolbar_columns": "Columns"
+  "dashboard_toolbar_columns": "Columns",
+  "notifications_load_failed": "Notifications could not be loaded. This list may be incomplete — reload before assuming there is nothing here."
 }

@@ -46,20 +46,30 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   }
 
   if (!mcpEnabledFlag) {
-    return { mcpEnabled: false, self: [], all: null, role, isSaas };
+    return { mcpEnabled: false, self: [], all: null, role, isSaas, loadFailed: false };
   }
 
-  // Fetch own grants.
+  // IA-118 — these are OAuth/MCP grants: third-party access to this workspace's
+  // data. An empty list is the answer to "who can reach my data", so returning
+  // it because a request failed tells an operator auditing their integrations
+  // that nobody has access when the truth is unknown. Exactly the shape that
+  // told someone a contact "cannot open any reports" while they held two live
+  // links.
+  //
+  // A 404 is different and is NOT a failure: it means MCP is not enabled on
+  // this deployment, so "no grants" is genuinely correct.
   let self: McpGrant[] = [];
+  let loadFailed = false;
   try {
     const res = await api.mcpGrants.grants.$get();
     if (res.ok) {
       const body = (await res.json()) as { data?: McpGrant[] };
       self = body.data ?? [];
+    } else if (res.status !== 404) {
+      loadFailed = true;
     }
-    // 404 = MCP not enabled; treat as empty (handled by falling through)
   } catch {
-    self = [];
+    loadFailed = true;
   }
 
   // Admin-only: fetch all tenant grants.
@@ -72,13 +82,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         all = body.data ?? [];
       } else {
         all = [];
+        if (res.status !== 404) loadFailed = true;
       }
     } catch {
       all = [];
+      loadFailed = true;
     }
   }
 
-  return { mcpEnabled: true, self, all, role, isSaas };
+  return { mcpEnabled: true, self, all, role, isSaas, loadFailed };
 }
 
 // ─── Action ──────────────────────────────────────────────────────────────────
@@ -273,7 +285,14 @@ export default function SettingsConnectedApps() {
         <h3 className="text-[13px] font-semibold text-ih-fg-3 uppercase tracking-wide mb-2">
           {m.settings_apps_your_heading()}
         </h3>
-        {self.length === 0 ? (
+        {/* IA-118 — "no connected apps" answers "who can reach my data". When
+            the lookup failed we do not know that, and saying it anyway is the
+            dangerous direction on an access-audit surface. */}
+        {data.loadFailed ? (
+          <div className="py-6 px-4 bg-ih-bg-card border border-ih-border rounded-lg">
+            <p className="text-[13px] text-ih-bad-fg">{m.settings_apps_load_failed()}</p>
+          </div>
+        ) : self.length === 0 ? (
           <div className="text-center py-10 bg-ih-bg-card border border-ih-border rounded-lg">
             <p className="font-bold text-[14px] text-ih-fg-2">{m.settings_apps_none_title()}</p>
             <p className="text-[12px] text-ih-fg-4 mt-1">

@@ -32,18 +32,20 @@ export function InvoiceCard({
     onRequestPayment,
 }: {
     pill: { tone: PillTone; label: string };
-    amountCents: number;
+    /** IA-95 — undefined when the caller lacks the `financial` capability. */
+    amountCents: number | undefined;
     paid: boolean;
     sent: boolean;
     payUrl: string | null | undefined;
     hasServiceLines: boolean;
     paymentRequired: boolean;
-    basePriceCents: number;
+    /** IA-95 — undefined when money is redacted. */
+    basePriceCents: number | undefined;
     canManagePrice: boolean;
     onRequestPayment: () => void;
 }) {
     const [priceOpen, setPriceOpen] = useState(false);
-    const [cents, setCents] = useState<number | null>(basePriceCents);
+    const [cents, setCents] = useState<number | null>(basePriceCents ?? null);
     const priceFetcher = useFetcher<typeof action>();
 
     // The base price only reaches the client when nothing outranks it. Once an
@@ -59,7 +61,12 @@ export function InvoiceCard({
     return (
         <Card className="p-5">
             <BlockHeading title={m.inspections_hub_block_invoice()} pill={pill} />
-            <p className="text-[15px] font-medium text-ih-fg-1 mb-1">{formatCents(amountCents)}</p>
+            {/* IA-95 — an inspector without the financial capability sees the
+                invoice exists and its status, but not the figure. Saying so beats
+                rendering $0.00, which reads as "nothing owed". */}
+            <p className="text-[15px] font-medium text-ih-fg-1 mb-1">
+                {amountCents === undefined ? m.inspections_hub_invoice_hidden() : formatCents(amountCents)}
+            </p>
             {hasServiceLines && (
                 <p className="text-[11px] text-ih-fg-4 mb-3">{m.inspections_hub_invoice_from_services()}</p>
             )}

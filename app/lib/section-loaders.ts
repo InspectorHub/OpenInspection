@@ -188,10 +188,10 @@ export async function loadReportSection(
 }
 
 /* ------------------------------------------------------------------ */
-/* Progress section data — served via the portal-session-authed observe
- * endpoint (membership-checked), NOT the observer-link token. The portal
- * client is already authenticated by the __Host-portal_session cookie, which
- * is forwarded into the API call exactly like the overview call. */
+/* Progress section data — served via the portal-session-authed progress
+ * endpoint (membership-checked). The portal client is already authenticated by
+ * the __Host-portal_session cookie, which is forwarded into the API call
+ * exactly like the overview call. */
 /* ------------------------------------------------------------------ */
 
 export interface ProgressLoaderResult {

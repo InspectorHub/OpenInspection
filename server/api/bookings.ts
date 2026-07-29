@@ -97,7 +97,7 @@ const getAvailabilityRoute = createRoute(withMcpMetadata({
     tags: ["bookings", "public"],
     summary: "Get booking availability for current tenant",
     request: {
-        params: z.object({ inspectorId: z.string().uuid().describe('TODO describe inspectorId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         query: z.object({
             // A-17 — the tenant slug is authoritative (B-16 pattern): this public
             // endpoint is not slug-routed, so context resolution never applies.
@@ -183,7 +183,7 @@ const getTenantSlotsRoute = createRoute(withMcpMetadata({
             tenant: z.string().min(1).openapi({ example: 'acme-inspections' }).describe('Tenant slug from the booking page URL; resolved server-side to the tenant id.'),
             date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).openapi({ example: '2026-07-01' }).describe('Date to query, YYYY-MM-DD.'),
             serviceIds: z.string().optional().openapi({ example: 'svc-1,svc-2' }).describe('Comma-separated service ids; restricts the qualified-inspector set.'),
-            inspectorId: z.string().uuid().optional().describe('Restrict slots to a single inspector (client choice / deep link).'),
+            inspectorId: z.string().trim().min(1).optional().describe('Restrict slots to a single inspector (client choice / deep link).'),
         }).describe('Tenant slot query parameters'),
     },
     responses: {

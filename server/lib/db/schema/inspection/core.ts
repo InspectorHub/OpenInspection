@@ -35,7 +35,7 @@ export const inspections = sqliteTable('inspections', {
     paymentStatus:       text('payment_status', { enum: ['unpaid','partial','paid'] }).notNull().default('unpaid'),
     // Buyer's Agent — see inspection_people (referredByAgentId column DROPPED, superseded).
     // P-4 authority chain: denormalized cache only — never reconcile back from invoice
-    // or service-snapshot tiers. Use getEffectivePriceCents() (app/lib/effective-price.ts)
+    // or service-snapshot tiers. Use getEffectivePriceCents() (server/lib/effective-price.ts)
     // to read the authoritative price. Written by the inspection-create path as a
     // convenience snapshot; kept in sync when service lines change.
     price:               integer('price_cents').notNull().default(0),

@@ -42,7 +42,7 @@ export const ChangePasswordSchema = z.object({
  * Validation schema for the join-team request body.
  */
 export const JoinTeamSchema = z.object({
-    token: z.string().uuid('Invalid invitation token').openapi({
+    token: z.string().trim().min(1, 'Invalid invitation token').openapi({
         example: '550e8400-e29b-41d4-a716-446655440000',
         description: 'One-time invitation token from the team-invite email; valid until the invite expires or is consumed.',
     }),
@@ -60,7 +60,7 @@ export const JoinTeamSchema = z.object({
  * Validation schema for the reset-password request body.
  */
 export const ResetPasswordSchema = z.object({
-    token: z.string().uuid('Invalid reset token').openapi({
+    token: z.string().trim().min(1, 'Invalid reset token').openapi({
         example: '550e8400-e29b-41d4-a716-446655440000',
         description: 'One-time password-reset token from the forgot-password email; valid for a short window.',
     }),

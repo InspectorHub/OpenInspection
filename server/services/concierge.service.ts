@@ -1,11 +1,9 @@
 import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, or, isNull } from 'drizzle-orm';
 import {
     inspections,
     tenantConfigs,
-    conciergeConfirmTokens,
-    agentTenantLinks,
-    contacts,
+    conciergeConfirmTokens,    contacts,
     users,
     tenants,
     contactRoleProfiles,
@@ -132,23 +130,26 @@ export class ConciergeService {
     async createBooking(params: ConciergeBookParams): Promise<ConciergeBookResult> {
         const db = this.getDrizzle();
 
-        // 1. Verify the agent's link to this tenant is active.
+        // 1. Verify this agent is bound to a live contact in this tenant.
+        //    IA-104 — the binding is the contact, so the row we check IS the
+        //    row we then file the booking against; there is no second lookup
+        //    that could resolve to a different contact.
         const link = await db
             .select({
-                id: agentTenantLinks.id,
-                status: agentTenantLinks.status,
-                inspectorContactId: agentTenantLinks.inspectorContactId,
-                invitedByUserId: agentTenantLinks.invitedByUserId,
+                id: contacts.id,
+                inspectorContactId: contacts.id,
+                invitedByUserId: contacts.createdByUserId,
             })
-            .from(agentTenantLinks)
+            .from(contacts)
             .where(
                 and(
-                    eq(agentTenantLinks.agentUserId, params.agentUserId),
-                    eq(agentTenantLinks.tenantId, params.tenantId),
+                    eq(contacts.agentUserId, params.agentUserId),
+                    eq(contacts.tenantId, params.tenantId),
+                    isNull(contacts.agentRevokedAt),
                 ),
             )
             .get();
-        if (!link || link.status !== 'active') {
+        if (!link) {
             throw Errors.Forbidden('Agent not linked to this tenant');
         }
 

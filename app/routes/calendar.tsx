@@ -29,6 +29,7 @@ import { MonthView } from "~/components/calendar/MonthView";
 import { WeekView } from "~/components/calendar/WeekView";
 import { DayView } from "~/components/calendar/DayView";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 export function meta() {
   return [{ title: m.calendar_meta_title() }];
@@ -103,13 +104,17 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       ? { start, end, userId: currentUserId }
       : { start, end, userIds: selectedUserIds.join(",") };
     const itemsRes = await api.calendar.items.$get({ query });
-    const body = itemsRes.ok
-      ? ((await itemsRes.json()) as { data?: { items?: CalendarItem[] } })
-      : { data: { items: [] as CalendarItem[] } };
+    // IA-118 — an empty day is a statement an inspector acts on by not turning
+    // up. A non-ok response used to produce the same empty list as a genuinely
+    // free day, so "nothing scheduled" was indistinguishable from "we could not
+    // ask".
+    if (!itemsRes.ok) throw new Error(`calendar items ${itemsRes.status}`);
+    const body = (await itemsRes.json()) as { data?: { items?: CalendarItem[] } };
     const events = (body.data?.items ?? []).map(calendarItemToEvent);
-    return { events, members, currentUserId, role, scope, selectedUserIds };
+    return { events, members, currentUserId, role, scope, selectedUserIds, loadFailed: false };
   } catch {
     return {
+      loadFailed: true,
       events: [] as CalendarEvent[],
       members: [] as CalendarMember[],
       currentUserId: "",
@@ -180,7 +185,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 
 export default function CalendarPage() {
-  const { events, members, currentUserId, role, scope, selectedUserIds } = useLoaderData<typeof loader>();
+  const { events, members, currentUserId, role, scope, selectedUserIds, loadFailed } = useLoaderData<typeof loader>();
   const displayTz = useDisplayTimeZone();
   const locale = useDisplayLocale();
   const navigate = useNavigate();
@@ -299,6 +304,9 @@ export default function CalendarPage() {
 
   return (
     <div className="space-y-ih-list">
+      {/* IA-118 — an empty day is a statement an inspector acts on by not
+          turning up. Say when it is not a real answer. */}
+      {loadFailed && <LoadFailedNotice what={m.calendar_page_title()} />}
       <PageHeader
         title={m.calendar_page_title()}
         meta={

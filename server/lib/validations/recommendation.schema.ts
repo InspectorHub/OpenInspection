@@ -20,8 +20,8 @@ export const CreateRecommendationSchema = z.object({
 export const UpdateRecommendationSchema = CreateRecommendationSchema.partial().openapi('UpdateRecommendation');
 
 const RecommendationSchema = z.object({
-    id:                   z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId:             z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    id:                   z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
+    tenantId:             z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     category:             z.string().nullable().describe('TODO describe category field for the OpenInspection MCP integration'),
     name:                 z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
     severity:             SeverityEnum.describe('TODO describe severity field for the OpenInspection MCP integration'),

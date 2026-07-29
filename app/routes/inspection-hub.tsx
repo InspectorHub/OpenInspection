@@ -14,7 +14,7 @@ import {
   type HubPayload,
 } from "~/lib/hub-blocks";
 import { REPORT_STATUS, isReportPublished, humanizeStatus, statusTone } from "~/lib/status";
-import { getEffectivePriceCents } from "~/lib/effective-price";
+import { getEffectivePriceCents } from "../../server/lib/effective-price";
 import { Breadcrumb } from "~/components/Breadcrumb";
 import { PageHeader, Card, Pill, Button, Modal } from "@core/shared-ui";
 import DocumentsSection, {
@@ -85,7 +85,10 @@ interface HubData extends HubPayload {
     date: string | null;
     inspectorId: string | null;
     templateId: string | null;
-    price: number;
+    // IA-95 — absent when the caller lacks the `financial` capability (an
+    // inspector's default). Optional here so the compiler forces every render
+    // site to say what it shows instead of money.
+    price?: number;
     paymentStatus: string;
     coverPhoto: string | null;
     createdAt: string | null;
@@ -107,9 +110,11 @@ interface HubData extends HubPayload {
     id: string;
     serviceId: string;
     name: string;
-    priceCents: number;
-    priceSnapshot: number;
-    priceOverride: number | null;
+    // IA-95 — all three absent without the `financial` capability; the line
+    // itself (what was sold) is still legitimately visible.
+    priceCents?: number;
+    priceSnapshot?: number;
+    priceOverride?: number | null;
   }>;
   agreements: Array<{ id: string; name: string }>;
 }
@@ -643,14 +648,23 @@ export default function InspectionHubPage() {
     !hub.publishReadiness.ready &&
     hub.publishReadiness.blockingCount > 0;
 
+  // IA-95 — the server redacts money when the caller lacks the `financial`
+  // capability, so ABSENCE is the signal. We deliberately do NOT ship a second
+  // copy of the capability to the client to branch on: a client-side flag can
+  // disagree with what the server actually sent, whereas absence cannot — it IS
+  // what was sent. One source of truth, and it is the payload.
+  const canSeeMoney = inspection.price !== undefined;
+
   // Invoice amount the SERVER will request — same money authority chain as the
   // endpoint (invoice > Σ services > inspections.price). Drives the modal amount
-  // and the card's headline figure.
-  const invoiceAmountCents = getEffectivePriceCents({
-    invoiceAmountCents: hub.invoice?.amountCents ?? null,
-    serviceLines: services.map((s) => ({ priceSnapshot: s.priceCents })),
-    inspectionPriceCents: inspection.price,
-  });
+  // and the card's headline figure. Undefined when money is redacted.
+  const invoiceAmountCents = canSeeMoney
+    ? getEffectivePriceCents({
+        invoiceAmountCents: hub.invoice?.amountCents ?? null,
+        serviceLines: services.map((s) => ({ priceSnapshot: s.priceCents ?? 0 })),
+        inspectionPriceCents: inspection.price ?? 0,
+      })
+    : undefined;
   const invoicePaid = hub.invoice?.status === "paid";
   // "sent" and "partial" both mean the request has gone out — show resend + link.
   const invoiceSent = hub.invoice?.status === "sent" || hub.invoice?.status === "partial";
@@ -961,7 +975,7 @@ export default function InspectionHubPage() {
           hasServiceLines={services.length > 0}
           paymentRequired={inspection.paymentRequired}
           basePriceCents={inspection.price}
-          canManagePrice={isAdmin}
+          canManagePrice={isAdmin && canSeeMoney}
           onRequestPayment={() => paymentModal.setOpen(true)}
         />
 

@@ -22,8 +22,39 @@ export class PeopleService {
         return row;
     }
 
-    async addPerson(tenantId: string, inspectionId: string, contactId: string, roleProfileId: string): Promise<void> {
+    /**
+     * Assign a contact to a role on an inspection.
+     *
+     * Returns whether a row was actually created. The insert is idempotent by
+     * design — `onConflictDoNothing` against the unique
+     * (inspection, contact, role) index, which is what keeps a double-submit or
+     * a retry safe — but idempotent is not the same as "nothing to say" (IA-133).
+     *
+     * The People modal reported every 200 as success and closed, so re-adding
+     * someone already on the inspection looked exactly like adding them. That
+     * mattered because the modal's own notice told operators that re-adding
+     * reissues a revoked report link. It does not, and cannot: report tokens are
+     * unique per (inspection, recipient), so there is no second row to mint. An
+     * operator following that advice to restore a revoked agent got a success
+     * dialog and no access. Saying `added: false` is what lets the UI tell them
+     * to use "Reset access link" instead.
+     */
+    async addPerson(tenantId: string, inspectionId: string, contactId: string, roleProfileId: string): Promise<{ added: boolean }> {
         const prof = await this.profile(tenantId, roleProfileId);
+
+        // Already holds exactly this seat — the case the operator hits when they
+        // re-add someone to "refresh" their access. Checked before the primary
+        // branch below, which has its own hand-over semantics for a DIFFERENT
+        // contact taking the seat and would otherwise mask this.
+        const existing = await this.db.select({ id: inspectionPeople.id }).from(inspectionPeople)
+            .where(and(
+                eq(inspectionPeople.tenantId, tenantId),
+                eq(inspectionPeople.inspectionId, inspectionId),
+                eq(inspectionPeople.contactId, contactId),
+                eq(inspectionPeople.roleProfileId, roleProfileId),
+            )).get();
+        if (existing) return { added: false };
+
         if (prof.key === PRIMARY_CLIENT_KEY) {
             // Atomic insert-if-no-existing-client. A bare SELECT-then-INSERT leaves
             // a TOCTOU race open: two concurrent adds of DIFFERENT client contacts
@@ -54,13 +85,14 @@ export class PeopleService {
                     eq(inspectionPeople.inspectionId, inspectionId),
                     eq(contactRoleProfiles.key, PRIMARY_CLIENT_KEY),
                 )).get();
-            if (winner && winner.contactId === contactId) return;
+            if (winner && winner.contactId === contactId) return { added: true };
             await this.handOverPrimary(tenantId, inspectionId, contactId, roleProfileId);
-            return;
+            return { added: true };
         }
         await this.db.insert(inspectionPeople).values({
             id: crypto.randomUUID(), tenantId, inspectionId, contactId, roleProfileId, createdAt: new Date(),
         }).onConflictDoNothing();
+        return { added: true };
     }
 
     /**

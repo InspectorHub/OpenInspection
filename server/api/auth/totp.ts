@@ -28,7 +28,7 @@ import {
 } from '../../lib/validations/auth.schema';
 import { SuccessResponseSchema } from '../../lib/validations/shared.schema';
 import { withMcpMetadata } from '../../lib/route-metadata-standards';
-import { authCookieOptions } from '../../lib/auth-helpers';
+import { authCookieOptions, AUTH_COOKIE_NAME } from '../../lib/auth-helpers';
 
 // ─── Spec 4A — TOTP 2FA endpoints ──────────────────────────────────────────
 // All 5 endpoints below were added by Spec 4A. They are additive — no existing
@@ -279,7 +279,7 @@ const totpRoutes = createApiRouter()
             exp: now + 60 * 60 * 24,
         }, keyring);
 
-        setCookie(c, '__Host-inspector_token', sessionToken, authCookieOptions());
+        setCookie(c, AUTH_COOKIE_NAME, sessionToken, authCookieOptions());
         return c.json({ success: true, data: { redirect: '/inspections' } }, 200);
     });
 

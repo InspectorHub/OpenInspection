@@ -97,7 +97,7 @@ describe('PortalService', () => {
     it('hubOverview falls back to {completed:0,total:0} when progress build throws', async () => {
         await seedInspection(testDb, 'insp1');
         const throwingSvc = new PortalService({} as D1Database, {
-            getObserveProgress: async () => { throw new Error('no report'); },
+            getSectionProgress: async () => { throw new Error('no report'); },
         });
         const ov = await throwingSvc.hubOverview(TENANT, 'insp1');
         expect(ov?.progress).toEqual({ completed: 0, total: 0 });

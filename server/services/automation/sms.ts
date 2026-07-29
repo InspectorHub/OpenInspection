@@ -1,7 +1,7 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, and } from 'drizzle-orm';
 import type { automations, tenants} from '../../lib/db/schema';
-import { automationLogs, tenantConfigs } from '../../lib/db/schema';
+import { automationLogs, tenantConfigs, contactRoleProfiles } from '../../lib/db/schema';
 import { PRIMARY_CLIENT_KEY } from '../../lib/people/default-role-profiles';
 import { logger } from '../../lib/logger';
 import { currentPeriodKey } from '../../lib/usage/period';
@@ -40,6 +40,51 @@ export type SmsRuntime = {
  */
 export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: TBase) {
     return class extends Base {
+        /**
+         * The role KIND behind a log's `recipientRoleKey` (IA-109).
+         *
+         * FAILS CLOSED — an unresolvable key returns 'client', which is the
+         * gated answer. That is deliberate and is the opposite of what a
+         * convenience helper usually does: getting this wrong in the permissive
+         * direction texts a consumer without recorded consent, which is a TCPA
+         * violation rather than a bug report. An unknown role should cost us a
+         * skipped message, never an unconsented send.
+         *
+         * `inspector` is the one key with no role-profile row; it is explicitly
+         * implied-consent (D5) and returns 'other'.
+         */
+        private async resolveRecipientRoleKind(
+            db: DrizzleD1Database,
+            tenantId: string,
+            roleKey: string | null,
+        ): Promise<'client' | 'agent' | 'other'> {
+            if (roleKey === 'inspector') return 'other';
+            if (!roleKey) return 'client';
+            // The seeded primary-client key never needs a lookup, and skipping
+            // it keeps the hot path free of a query for the commonest case.
+            if (roleKey === PRIMARY_CLIENT_KEY) return 'client';
+            try {
+                // Uses the handle deliverSms was GIVEN, not this.getDrizzle():
+                // the method already has a db, and reaching for a second one
+                // made the lookup depend on a connection its caller never
+                // supplied.
+                const row = await db
+                    .select({ kind: contactRoleProfiles.kind })
+                    .from(contactRoleProfiles)
+                    .where(and(
+                        eq(contactRoleProfiles.tenantId, tenantId),
+                        eq(contactRoleProfiles.key, roleKey),
+                    ))
+                    .get();
+                return (row?.kind as 'client' | 'agent' | 'other' | undefined) ?? 'client';
+            } catch (err) {
+                logger.warn('[automation.sms] role-kind lookup failed; treating as client (fail closed)', {
+                    tenantId, roleKey, error: err instanceof Error ? err.message : String(err),
+                });
+                return 'client';
+            }
+        }
+
         /**
          * Track L — deliver one SMS automation log via the resolved provider. Client
          * logs are gated on a recorded 'granted' consent event (agents/inspector are
@@ -89,11 +134,43 @@ export function AutomationSms<TBase extends Constructor<AutomationBase>>(Base: T
             // recorded TCPA consent. resolveRecipients stamps recipientRoleKey
             // from the contact_role_profiles.key of each resolved person, so
             // `=== PRIMARY_CLIENT_KEY` is an exact, lookup-free client match.
-            if (log.recipientRoleKey === PRIMARY_CLIENT_KEY) {
+            // IA-109 — gate on the role's KIND, not on one role KEY.
+            //
+            // This used to read `=== PRIMARY_CLIENT_KEY`, i.e. the single key
+            // 'client'. But `co_client` is ALSO kind='client'
+            // (default-role-profiles.ts), as is any client-kind role a tenant
+            // invents, and resolveRecipients happily resolves an SMS recipient
+            // for ANY role key with a phone. A co-client was therefore texted
+            // with no consent check at all — the same consumer, the same TCPA
+            // exposure, a different string.
+            //
+            // Note the shape of the previous fix recorded just above: it moved
+            // the gate off `recipientKind === 'role'` because that missed the
+            // 'all' fan-out. This is that bug one level down — still an exact
+            // match against a single value where a CATEGORY was meant.
+            const roleKind = await this.resolveRecipientRoleKind(db, inspection.tenantId, log.recipientRoleKey);
+            if (roleKind === 'client') {
                 const { SmsConsentService } = await import('../sms-consent.service');
                 const consentSvc = new SmsConsentService(this.db);
-                const contactId = inspection.clientContactId;
-                const latest = contactId ? await consentSvc.getLatest(inspection.tenantId, contactId) : null;
+                // The contact this log is addressed to, stamped at enqueue.
+                //
+                // Legacy rows predate that column. `inspection.clientContactId`
+                // is the PRIMARY client — and note it is already derived from
+                // inspection_people, not the frozen legacy column (Task 11a) —
+                // so it is a correct fallback for exactly two cases: a log
+                // explicitly keyed to the primary client, and an older log with
+                // no role key at all, which could only ever have been the
+                // primary client.
+                //
+                // For any OTHER client-kind role it names the wrong person, and
+                // consulting it is precisely the bug: a co-client was texted on
+                // the primary client's consent. Those fail closed instead.
+                const isPrimaryClientLog =
+                    log.recipientRoleKey === PRIMARY_CLIENT_KEY || log.recipientRoleKey == null;
+                const contactId = log.recipientContactId
+                    ?? (isPrimaryClientLog ? inspection.clientContactId : null);
+                if (!contactId) return void (await skip('no sms consent'));
+                const latest = await consentSvc.getLatest(inspection.tenantId, contactId);
                 if (latest !== 'granted') return void (await skip('no sms consent'));
             }
 

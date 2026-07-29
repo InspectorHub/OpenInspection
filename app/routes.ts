@@ -31,7 +31,6 @@ export default [
     route("verify/:envelopeId", "routes/public/verify.tsx"),
     route("verify", "routes/public/verify-offline.tsx"),
     route("v/:token", "routes/public/v.$token.tsx"),
-    route("observe/inspections/:id", "routes/public/observe.tsx"),
     // Flow A — client redeems the agent-concierge magic link emailed as
     // ${APP_BASE_URL}/confirm/<token>. Shows booking details then POSTs the
     // confirm and follows the server-chosen redirect (agreement / report).
@@ -64,7 +63,6 @@ export default [
   // (no inspector slug); the server auto-assigns the first available inspector.
   route("embed/:tenant", "routes/public/booking-embed-company.tsx"),
   // Standalone agent pages — no agent-layout chrome
-  route("agent-invite/:token", "routes/agent/invite-accept.tsx"),
   route("agent-signup", "routes/agent/signup.tsx"),
   // Spec 3 Task 5 — core dual-mode agent front door (password + magic-link).
   route("agent-login", "routes/agent/login.tsx"),
@@ -89,6 +87,7 @@ export default [
   route("resources/entity-audit", "routes/resources/entity-audit.tsx"),
   route("resources/agreement-signers", "routes/resources/agreement-signers.tsx"),
   route("resources/team-members", "routes/resources/team-members.tsx"),
+  route("resources/contact-access", "routes/resources/contact-access.tsx"),
   route("resources/template-search", "routes/resources/template-search.tsx"),
   route("resources/inspection-search", "routes/resources/inspection-search.tsx"),
   layout("routes/auth-layout.tsx", [
@@ -143,6 +142,7 @@ export default [
       route("settings/event-types", "routes/settings-event-types.tsx"),
       route("settings/contractor-types", "routes/settings-contractor-types.tsx"),
       route("settings/inspection-types", "routes/settings-inspection-types.tsx"),
+      route("settings/inspection-roles", "routes/settings-inspection-roles.tsx"),
       route("settings/schedule", "routes/settings-schedule.tsx"),
       route("settings/booking", "routes/settings-booking.tsx"),
       route("settings/billing", "routes/settings-billing.tsx"),

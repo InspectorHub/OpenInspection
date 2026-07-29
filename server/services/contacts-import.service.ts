@@ -26,6 +26,7 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { eq, isNotNull, isNull, and } from 'drizzle-orm';
 import { contacts } from '../lib/db/schema';
+import type { ContactType } from '../lib/db/schema/contact';
 
 const MAX_PREVIEW_ROWS = 20;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -42,7 +43,7 @@ export interface ImportMapping {
     email?: string | undefined;
     phone?: string | undefined;
     agency?: string | undefined;
-    type?: 'agent' | 'client' | undefined;
+    type?: ContactType | undefined;
 }
 
 export interface ImportResult {

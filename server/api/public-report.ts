@@ -9,7 +9,7 @@ import { createApiRouter } from '../lib/openapi-router';
 import { withMcpMetadata } from '../lib/route-metadata-standards';
 import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import { ReportDataResponseSchema } from '../lib/validations/inspection.schema';
-import { resolvePortalAccess, resolveObserverAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
+import { resolvePortalAccess, resolveOwnerPreview, classifyPortalAccess } from '../lib/public-access';
 import { resolveClientActor } from '../lib/portal-client-actor';
 // Re-export so existing callers that import resolveOwnerPreviewToken from this
 // module (e.g. tests) continue to work without changes.
@@ -217,38 +217,6 @@ const payIntentRoute = createRoute(withMcpMetadata({
     },
     operationId: 'createPublicPayIntent',
     description: "Mints a Stripe PaymentIntent for the inspection's invoice using the tenant's own Stripe keys. Gated by the recipient's portal token (?token=) or the unified-portal session cookie — client/co_client grants only.",
-}, { scopes: [], tier: 'extended' }));
-
-// Public live-observer view (③-A.4). Gated by an OBSERVER-link token (distinct
-// from the portal token) carried in `?token=`; tenantId resolves from the
-// claimed link, never the URL. Returns read-only section progress.
-const ObserveResponseSchema = z.object({
-    address: z.string(),
-    date: z.string().nullable(),
-    inspectorName: z.string(),
-    status: z.string(),
-    sections: z.array(z.object({
-        name: z.string(),
-        completedItems: z.number(),
-        totalItems: z.number(),
-    })),
-});
-
-const observeRoute = createRoute(withMcpMetadata({
-    method: 'get',
-    path: '/observe/inspections/{id}',
-    tags: ['public'],
-    summary: 'Public live observer progress (token-gated)',
-    request: {
-        params: z.object({ id: z.string().describe('Inspection id.') }),
-        query: z.object({ token: z.string().optional().describe('Observer-link token.') }),
-    },
-    responses: {
-        200: { content: { 'application/json': { schema: createApiResponseSchema(ObserveResponseSchema) } }, description: 'Live section progress' },
-        404: { description: 'Observer link missing/expired/revoked or inspection mismatch' },
-    },
-    operationId: 'getPublicObserve',
-    description: 'Public, no-login live progress for an in-flight inspection, gated by an observer-link token. 404 when the link is invalid/expired/revoked or does not grant access to the requested inspection.',
 }, { scopes: [], tier: 'extended' }));
 
 // Public report-gate (③-A.2). The "report blocked, here's why + CTA" page,
@@ -548,14 +516,6 @@ const publicReportRoutes = createApiRouter()
             logger.error('Stripe pay-intent failed', { inspectionId: id.slice(0, 8) }, err instanceof Error ? err : undefined);
             return c.json({ success: false as const, error: { code: 'STRIPE_ERROR', message: 'Payment could not be started. Please try again.' } }, 503);
         }
-    })
-    .openapi(observeRoute, async (c) => {
-        const { id } = c.req.valid('param');
-        const { token } = c.req.valid('query');
-        const access = await resolveObserverAccess(c.var.services.observerLink, token, id);
-        if (!access) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Inspection not found' } }, 404);
-        const data = await c.var.services.inspection.getObserveProgress(id, access.tenantId);
-        return c.json({ success: true as const, data }, 200);
     })
     .openapi(reportGateRoute, async (c) => {
         const { tenant, id } = c.req.valid('param');

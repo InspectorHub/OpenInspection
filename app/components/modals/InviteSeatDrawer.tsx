@@ -7,15 +7,18 @@ import { m } from "~/paraglide/messages";
 
 const FORM_ID = "invite-seat-form";
 
-type Role = "owner" | "manager" | "inspector" | "agent";
+// Only the roles this drawer can actually offer. `owner` and `agent` were
+// carried here long after the select stopped listing them (IA-101 removed
+// agent; owner was never selectable), leaving two unreachable branches in
+// ROLE_DESC below — one of which advertised an "ownership transfer" feature
+// that does not exist anywhere in the product (IA-125).
+type Role = "manager" | "inspector";
 
 // Thunks (not eager strings) so each description resolves at render inside the
 // paraglide request scope, not once at module import.
 const ROLE_DESC: Record<Role, () => string> = {
- owner: () => m.modal_invite_role_desc_owner(),
  manager: () => m.modal_invite_role_desc_manager(),
  inspector: () => m.modal_invite_role_desc_inspector(),
- agent: () => m.modal_invite_role_desc_agent(),
 };
 
 /**
@@ -152,7 +155,12 @@ export function InviteSeatDrawer({ open, onClose, seatLimitAtOpen }: InviteSeatD
  <select className="w-full px-3 py-2 rounded-md border border-ih-border bg-ih-bg-card text-sm text-ih-fg-1" value={role} onChange={(e) => setRole(e.target.value as Role)}>
  <option value="manager">{m.modal_invite_role_manager()}</option>
  <option value="inspector">{m.modal_invite_role_inspector()}</option>
- <option value="agent">{m.modal_invite_role_agent()}</option>
+ {/* IA-101 — no agent option. An agent reaches an inspection through a
+ per-inspection access token that works with no account at all, so
+ inviting one to a SEAT was a second, contradictory way to become an
+ agent — and it put them on the seat count, which is not how the
+ industry bills. Agents are granted access from the inspection's
+ People section; the API refuses the role here too. */}
  </select>
  </label>
  <p className="text-xs text-ih-fg-3">{ROLE_DESC[role]()}</p>

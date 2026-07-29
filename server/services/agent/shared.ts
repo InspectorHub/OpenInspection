@@ -1,14 +1,7 @@
-const INVITE_TOKEN_BYTES = 24; // 24 bytes -> 48 hex chars
-export const INVITE_TTL_DAYS = 7;
-
-export function mintToken(): string {
-    const buf = new Uint8Array(INVITE_TOKEN_BYTES);
-    crypto.getRandomValues(buf);
-    let hex = '';
-    for (const b of buf) hex += b.toString(16).padStart(2, '0');
-    return hex;
-}
-
+// `mintToken` and `INVITE_TTL_DAYS` lived here to issue the 7-day agent-invite
+// tokens. That track is gone — an agent reads a report through a per-inspection
+// access token that needs no account, so an invitation gated nothing — and the
+// helpers went with it rather than sitting here waiting to be re-adopted.
 export function normalizeEmail(email: string): string {
     return email.trim().toLowerCase();
 }

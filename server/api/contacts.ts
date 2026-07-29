@@ -1,13 +1,30 @@
 import { createRoute, z } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
+import type { ContactType } from '../lib/db/schema/contact';
 import { requireRole } from '../lib/middleware/rbac';
 import { requireCapability } from '../lib/middleware/require-capability';
+import { createApiResponseSchema } from '../lib/validations/shared.schema';
 import {
     CreateContactSchema, UpdateContactSchema,
     ContactResponseSchema, ContactListQuerySchema,
     ContactDetailResponseSchema,
 } from '../lib/validations/contact.schema';
 import { withMcpMetadata } from "../lib/route-metadata-standards";
+
+/**
+ * `contacts.id` is a TEXT column holding an opaque identifier. Every writer
+ * happens to mint `crypto.randomUUID()` today, but the COLUMN does not promise
+ * that and the API must not either: pinning the param to `.uuid()` rejects a
+ * perfectly valid id at the edge, and does so with a 400 that reads like bad
+ * input rather than an unsupported id format. Same defect as the `inspectorId`
+ * `.uuid()` that rejected an entire patch against a text column (IA-87).
+ *
+ * It also has to be ONE rule. This resource previously validated `.min(1)` on
+ * GET and `.uuid()` on update/delete/access, so the same id could be readable
+ * and un-revokable — and the access panel rendered that 400 as "this contact
+ * cannot open any reports".
+ */
+const CONTACT_ID = z.string().trim().min(1);
 
 const listContactsRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/',
@@ -29,7 +46,7 @@ const getContactDetailRoute = createRoute(withMcpMetadata({
     method: 'get', path: '/{id}',
     tags: ["contacts"], summary: "Contact detail: record + inspection history + stats",
     middleware: [requireRole('owner', 'manager', 'inspector')],
-    request: { params: z.object({ id: z.string().min(1).describe('Contact identifier') }) },
+    request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: ContactDetailResponseSchema } },
@@ -65,7 +82,7 @@ const updateContactRoute = createRoute(withMcpMetadata({
     // Task 10 — manageContacts capability gates contact CREATE/UPDATE/DELETE.
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: CONTACT_ID.describe('Contact id.') }),
         body: { content: { 'application/json': { schema: UpdateContactSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
@@ -84,7 +101,7 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     tags: ["contacts"], summary: "Delete contact for current tenant",
     // Task 10 — manageContacts capability gates contact CREATE/UPDATE/DELETE.
     middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
-    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
     responses: {
         200: {
             content: { 'application/json': { schema: z.object({ success: z.boolean().describe('TODO describe success field for the OpenInspection MCP integration') }).describe('TODO describe schema field for the OpenInspection MCP integration') } },
@@ -96,15 +113,117 @@ const deleteContactRoute = createRoute(withMcpMetadata({
     description: "Auto-generated placeholder for deleteContact (DELETE /{id}, contacts domain). TODO: replace with a real description sourced from the handler."
 }, { scopes: ['write'], tier: 'primary' }));
 
+/**
+ * POST /api/contacts/:id/restore — undo an archive (IA-120).
+ *
+ * Archive wrote `archivedAt` and every read path filtered it out, so the
+ * control was a one-way door behind copy that promises tidying ("Removes them
+ * from your list"). This is the way back.
+ *
+ * It does NOT restore report access. When the tenant has archive-revokes-access
+ * on, archiving killed live links; handing them back as a side effect of
+ * un-hiding a row would be a silent re-grant. Re-granting is the People card's
+ * job.
+ */
+const restoreContactRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/{id}/restore',
+    tags: ["contacts"], summary: "Restore an archived contact",
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
+    request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ restored: z.boolean().describe('False when the contact was not archived, so nothing changed.') }) }) } },
+            description: 'Restored, or already active (data.restored says which).',
+        },
+        404: { content: { 'application/json': { schema: z.object({ success: z.literal(false), error: z.object({ message: z.string(), code: z.string() }) }) } }, description: 'Contact not found in this tenant.' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: "restoreContact",
+    description: "Clears archived_at on a tenant-owned contact. Report links revoked at archive time are NOT reissued."
+}, { scopes: ['write'], tier: 'extended' }));
+
+/**
+ * GET /api/contacts/:id/access — every inspection this contact can still open
+ * (IA-100).
+ *
+ * A report link is a per-inspection token that works with no account, so
+ * revoking it is not "delete the contact" and is not visible anywhere the
+ * contact is. This is the read side of making it visible.
+ */
+const listContactAccessRoute = createRoute(withMcpMetadata({
+    method: 'get', path: '/{id}/access',
+    tags: ["contacts"],
+    summary: "List the live report links a contact still holds",
+    description: 'Every inspection this contact can still open, by way of a live (unrevoked, unexpired) access token addressed to their email. Empty for a contact with no email.',
+    middleware: [requireRole('owner', 'manager', 'inspector')],
+    request: { params: z.object({ id: CONTACT_ID.describe('Contact id.') }) },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({
+                access: z.array(z.object({
+                    inspectionId:    z.string(),
+                    propertyAddress: z.string().nullable(),
+                    role:            z.string(),
+                    createdAt:       z.number().nullable(),
+                })),
+            })) } },
+            description: 'Live access list',
+        },
+        404: { description: 'Contact not found in this tenant' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: "listContactAccess",
+    // 'extended', not 'primary': this is an administrative surface, and the
+    // primary tier is a deliberately small budget for core workflow.
+}, { scopes: ['read'], tier: 'extended' }));
+
+/**
+ * POST /api/contacts/:id/access/revoke — withdraw some or all of it.
+ *
+ * Omitting `inspectionIds` revokes everything, which is the bulk case an
+ * operator reaches for when someone should no longer see anything at all.
+ * Gated on manageContacts like the other mutating contact routes.
+ */
+const revokeContactAccessRoute = createRoute(withMcpMetadata({
+    method: 'post', path: '/{id}/access/revoke',
+    tags: ["contacts"],
+    summary: "Revoke a contact's report links",
+    description: 'Revokes the named inspections\' links for this contact, or every live link when inspectionIds is omitted. Returns the number actually revoked, which can be lower than requested if some were already gone.',
+    middleware: [requireRole('owner', 'manager', 'inspector'), requireCapability('manageContacts')],
+    request: {
+        params: z.object({ id: CONTACT_ID.describe('Contact id.') }),
+        body: { content: { 'application/json': { schema: z.object({
+            inspectionIds: z.array(z.string()).optional()
+                .describe('Inspections to revoke. Omit to revoke every live link this contact holds.'),
+        }) } } },
+    },
+    responses: {
+        200: {
+            content: { 'application/json': { schema: createApiResponseSchema(z.object({ revoked: z.number() })) } },
+            description: 'Revoked',
+        },
+        404: { description: 'Contact not found in this tenant' },
+    },
+    security: [{ bearerAuth: [] }],
+    operationId: "revokeContactAccess",
+}, { scopes: ['write'], tier: 'extended' }));
+
 const contactRoutes = createApiRouter()
     .openapi(listContactsRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const q = c.req.valid('query');
-        const opts: { type?: 'agent' | 'client'; search?: string; limit: number; offset: number } = { limit: q.limit, offset: q.offset };
+        const opts: { type?: ContactType; search?: string; archived?: 'exclude' | 'only'; limit: number; offset: number } =
+            { limit: q.limit, offset: q.offset, archived: q.archived };
         if (q.type) opts.type = q.type;
         if (q.search) opts.search = q.search;
         const rows = await c.var.services.contact.listContacts(tenantId, opts);
         return c.json({ success: true as const, data: rows, meta: { total: rows.length } }, 200);
+    })
+    .openapi(restoreContactRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const { restored } = await c.var.services.contact.restoreContact(id, tenantId);
+        return c.json({ success: true as const, data: { restored } }, 200);
     })
     .openapi(getContactDetailRoute, async (c) => {
         const tenantId = c.get('tenantId');
@@ -133,7 +252,7 @@ const contactRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         const raw = c.req.valid('json');
         // Strip undefined keys to satisfy exactOptionalPropertyTypes
-        const data: Partial<{ type: 'agent' | 'client'; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }> = {};
+        const data: Partial<{ type: ContactType; name: string; email: string | null; phone: string | null; agency: string | null; notes: string | null }> = {};
         if (raw.type !== undefined) data.type = raw.type;
         if (raw.name !== undefined) data.name = raw.name;
         if ('email' in raw) data.email = raw.email ?? null;
@@ -153,6 +272,24 @@ const contactRoutes = createApiRouter()
         const { id } = c.req.valid('param');
         await c.var.services.contact.deleteContact(id as string, tenantId);
         return c.json({ success: true }, 200);
+    })
+    .openapi(listContactAccessRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const access = await c.var.services.contact.listAccess(id, tenantId);
+        if (access === null) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Contact not found' } }, 404);
+        return c.json({ success: true as const, data: { access } }, 200);
+    })
+    .openapi(revokeContactAccessRoute, async (c) => {
+        const tenantId = c.get('tenantId');
+        const { id } = c.req.valid('param');
+        const { inspectionIds } = c.req.valid('json');
+        const revoked = await c.var.services.contact.revokeAccess(
+            id, tenantId,
+            ...(inspectionIds ? [inspectionIds] as const : [] as const),
+        );
+        if (revoked === null) return c.json({ success: false as const, error: { code: 'NOT_FOUND', message: 'Contact not found' } }, 404);
+        return c.json({ success: true as const, data: { revoked } }, 200);
     });
 
 export type ContactsApi = typeof contactRoutes;

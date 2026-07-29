@@ -13,7 +13,7 @@ export const CommentAssistSchema = z.object({
  * Input for the automatic summary request.
  */
 export const AutoSummarySchema = z.object({
-    inspectionId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
 }).openapi('AutoSummaryRequest');
 
 /**

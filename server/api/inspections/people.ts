@@ -109,7 +109,7 @@ const addPersonRoute = createRoute(withMcpMetadata({
         body: { content: { 'application/json': { schema: AddPersonSchema } } },
     },
     responses: {
-        201: { content: { 'application/json': { schema: z.object({ success: z.literal(true) }) } }, description: 'Person added.' },
+        201: { content: { 'application/json': { schema: z.object({ success: z.literal(true), data: z.object({ added: z.boolean().describe('False when the contact already held this exact role on this inspection, so nothing changed. Idempotent, but the caller must not report it as a fresh grant — see IA-133.') }) }) } }, description: 'Person added, or already present (data.added says which).' },
         404: { content: { 'application/json': { schema: ErrorResponseSchema } }, description: 'Inspection, contact, or role profile not found (including cross-tenant ids).' },
         409: { content: { 'application/json': { schema: ErrorResponseSchema } }, description: 'The company has no co-client role to move a displaced primary client into.' },
     },
@@ -251,8 +251,8 @@ const peopleRoutes = createApiRouter()
             .where(and(eq(contactRoleProfiles.id, roleProfileId), eq(contactRoleProfiles.tenantId, tenantId))).get();
         if (!profile) throw Errors.NotFound('Role profile not found');
 
-        await c.var.services.people.addPerson(tenantId, id, contactId, roleProfileId);
-        return c.json({ success: true as const }, 201);
+        const { added } = await c.var.services.people.addPerson(tenantId, id, contactId, roleProfileId);
+        return c.json({ success: true as const, data: { added } }, 201);
     })
     .openapi(removePersonRoute, async (c) => {
         const tenantId = getTenantId(c);

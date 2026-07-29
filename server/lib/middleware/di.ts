@@ -4,7 +4,6 @@ import type { HonoConfig, AppServices } from '../../types/hono';
 import { AdminService } from '../../services/admin.service';
 import { UnitService } from '../../services/unit.service';
 import { UnitSwitchService } from '../../services/unit-switch.service';
-import { ObserverLinkService } from '../../services/observer-link.service';
 import { ReportVersionService } from '../../services/report-version.service';
 import { AIService } from '../../services/ai.service';
 import { AuthService } from '../../services/auth.service';
@@ -238,7 +237,18 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     target.availability = new AvailabilityService(c.env.DB);
                     break;
                 case 'contact':
-                    target.contact = new ContactService(c.env.DB);
+                    // IA-100 — contact archiving needs to see (and optionally
+                    // revoke) the report links a contact still holds, and that
+                    // predicate lives in PortalAccessService. Injected rather
+                    // than re-implemented so "what counts as live access" has
+                    // exactly one definition.
+                    target.contact = new ContactService(
+                        c.env.DB,
+                        new PortalAccessService(c.env.DB, {
+                            jwtSecret: c.env.JWT_SECRET,
+                            ...(c.env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: c.env.JWT_SECRET_PREVIOUS } : {}),
+                        }),
+                    );
                     break;
                 case 'invoice':
                     target.invoice = new InvoiceService(c.env.DB);
@@ -340,19 +350,11 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     }
                     break;
                 case 'agent':
-                    {
-                        // Agent Accounts A1 — agent service depends on EmailService
-                        // (through the same lazy proxy) and the public app base URL
-                        // for accept-link minting.
-                        if (!target.email) {
-                            target.email = buildEmailService();
-                        }
-                        target.agent = new AgentService(
-                            c.env.DB,
-                            target.email,
-                            c.env.APP_BASE_URL || '',
-                        );
-                    }
+                    // No EmailService or APP_BASE_URL any more: both existed
+                    // solely to mint and send agent-invite accept links, and
+                    // that track is gone (agents reach a report through a
+                    // per-inspection token that needs no account).
+                    target.agent = new AgentService(c.env.DB);
                     break;
                 case 'concierge':
                     {
@@ -384,12 +386,6 @@ export async function diMiddleware(c: Context<HonoConfig>, next: Next) {
                     break;
                 case 'unitSwitch':
                     target.unitSwitch = new UnitSwitchService(c.env.DB);
-                    break;
-                case 'observerLink':
-                    target.observerLink = new ObserverLinkService(c.env.DB, {
-                        jwtSecret: c.env.JWT_SECRET,
-                        ...(c.env.JWT_SECRET_PREVIOUS ? { jwtSecretPrevious: c.env.JWT_SECRET_PREVIOUS } : {}),
-                    });
                     break;
                 case 'reportVersion':
                     target.reportVersion = new ReportVersionService(c.env.DB, c.env.KEY_ENCRYPTION_SECRET || c.env.JWT_SECRET);

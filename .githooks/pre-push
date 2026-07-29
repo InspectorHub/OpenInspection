@@ -29,6 +29,43 @@ step() { printf '\n  →  %b\n' "$1"; }
 
 printf '%b\n' "${BOLD}── OpenInspection (Pre-push Checks) ─────────────────────────────${NC}"
 
+# The gate runs a REAL build (~1-2 min). Nothing that cannot reach the worker
+# bundle can change its size, so a push touching only .github/, docs/ or tests/
+# should not pay for one. Work out what is actually being pushed from the refs
+# git feeds this hook on stdin.
+#
+# Fail-safe in both directions: an unreadable range, a brand-new branch with no
+# merge-base, or an empty stdin all fall through to RUNNING the check. Skipping
+# is only ever chosen on positive evidence that nothing bundle-affecting moved.
+BUNDLE_PATHS='^(server|app|workers|packages|public|scripts)/|^(package\.json|package-lock\.json|vite\.config|react-router\.config|wrangler|tsconfig)'
+CHANGED=""
+FORCE_CHECK=0
+ZERO=0000000000000000000000000000000000000000
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+    [ -z "$local_sha" ] && continue
+    [ "$local_sha" = "$ZERO" ] && continue          # branch deletion — nothing to build
+    if [ "$remote_sha" = "$ZERO" ] || [ -z "$remote_sha" ]; then
+        BASE=$(git merge-base "$local_sha" origin/main 2>/dev/null)
+        [ -z "$BASE" ] && { FORCE_CHECK=1; break; }
+        RANGE="$BASE..$local_sha"
+    else
+        RANGE="$remote_sha..$local_sha"
+    fi
+    FILES=$(git diff --name-only "$RANGE" 2>/dev/null) || { FORCE_CHECK=1; break; }
+    CHANGED="$CHANGED
+$FILES"
+done
+
+if [ "$FORCE_CHECK" -eq 0 ] && [ -n "$CHANGED" ] &&    ! printf '%s
+' "$CHANGED" | grep -qE "$BUNDLE_PATHS"; then
+    step "Worker bundle size"
+    pass "Skipped — nothing bundle-affecting in this push (CI's build job remains the gate)"
+    printf '
+%b
+' "${GREEN}Pre-push checks passed.${NC}"
+    exit 0
+fi
+
 step "Worker bundle size"
 BUNDLE_OUT=$(node scripts/check-bundle-size.mjs 2>&1)
 BUNDLE_RC=$?

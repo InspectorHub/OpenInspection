@@ -20,7 +20,7 @@ import { isReportPublished } from '../lib/status/report-status';
 import { PeopleService } from './people.service';
 
 interface ObserveProgressLike {
-    getObserveProgress: (
+    getSectionProgress: (
         inspectionId: string,
         tenantId: string,
     ) => Promise<{
@@ -32,7 +32,7 @@ interface ObserveProgressLike {
     }>;
 }
 
-/** Full per-section observe progress, as returned by InspectionService.getObserveProgress. */
+/** Full per-section progress, as returned by InspectionService.getSectionProgress. */
 export interface ObserveProgress {
     address: string;
     date: string | null;
@@ -194,7 +194,7 @@ export class PortalService {
 
         let progress = { completed: 0, total: 0 };
         try {
-            const observed = await this.inspectionSvc.getObserveProgress(inspectionId, tenantId);
+            const observed = await this.inspectionSvc.getSectionProgress(inspectionId, tenantId);
             progress = observed.sections.reduce(
                 (acc, s) => ({
                     completed: acc.completed + s.completedItems,
@@ -220,15 +220,15 @@ export class PortalService {
 
     /**
      * Full per-section observe progress for one inspection, computed server-side
-     * via InspectionService.getObserveProgress (tenant + inspection scoped — no
+     * via InspectionService.getSectionProgress (tenant + inspection scoped — no
      * token needed). Backs the portal-session-authed observe endpoint so the Hub
      * Progress section reads it via the portal session rather than the separate
-     * observer-link token. Returns null on failure (mirrors hubOverview's
+     * portal session. Returns null on failure (mirrors hubOverview's
      * progress fallback), which the caller maps to a 404 / error state.
      */
     async observeProgress(tenantId: string, inspectionId: string): Promise<ObserveProgress | null> {
         try {
-            return await this.inspectionSvc.getObserveProgress(inspectionId, tenantId);
+            return await this.inspectionSvc.getSectionProgress(inspectionId, tenantId);
         } catch {
             return null;
         }

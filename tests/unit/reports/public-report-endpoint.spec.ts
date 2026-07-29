@@ -77,57 +77,6 @@ describe('GET /api/public/report/:tenant/:id — ③-A.1', () => {
     });
 });
 
-/**
- * C-10 ③-A.4 — GET /api/public/observe/inspections/:id?token=
- * Live observer view, gated by an OBSERVER-link token (distinct from the portal
- * token). tenantId comes from the claimed observer link, never the URL.
- */
-describe('GET /api/public/observe/inspections/:id — ③-A.4', () => {
-    function buildApp(
-        claim: ReturnType<typeof vi.fn>,
-        getObserveProgress = vi.fn().mockResolvedValue({
-            address: '1 Main St', date: '2026-06-01', inspectorName: 'Pat', status: 'completed', sections: [],
-        }),
-    ) {
-        const app = new OpenAPIHono<HonoConfig>();
-        app.use('*', async (c, next) => {
-            c.set('services', { observerLink: { claim }, inspection: { getObserveProgress } } as unknown as HonoConfig['Variables']['services']);
-            await next();
-        });
-        app.route('/api/public', publicReportRoutes);
-        return { app, getObserveProgress };
-    }
-
-    it('404 when no token', async () => {
-        const { app } = buildApp(vi.fn());
-        const res = await app.request('/api/public/observe/inspections/insp1');
-        expect(res.status).toBe(404);
-    });
-
-    it('404 when the observer link is not claimable', async () => {
-        const { app } = buildApp(vi.fn().mockResolvedValue({ kind: 'expired' }));
-        const res = await app.request('/api/public/observe/inspections/insp1?token=tok');
-        expect(res.status).toBe(404);
-    });
-
-    it('404 when the token claims a different inspection', async () => {
-        const { app } = buildApp(vi.fn().mockResolvedValue({ kind: 'ok', inspectionId: 'other', tenantId: 't1' }));
-        const res = await app.request('/api/public/observe/inspections/insp1?token=tok');
-        expect(res.status).toBe(404);
-    });
-
-    it('200 with progress + queries by the claimed tenantId (not the URL)', async () => {
-        const { app, getObserveProgress } = buildApp(
-            vi.fn().mockResolvedValue({ kind: 'ok', inspectionId: 'insp1', tenantId: 't1' }),
-        );
-        const res = await app.request('/api/public/observe/inspections/insp1?token=tok');
-        expect(res.status).toBe(200);
-        const body = await res.json() as { success: boolean; data: { address: string } };
-        expect(body.success).toBe(true);
-        expect(body.data.address).toBe('1 Main St');
-        expect(getObserveProgress).toHaveBeenCalledWith('insp1', 't1');
-    });
-});
 
 /**
  * C-10 ③-A.2 — GET /api/public/report-gate/:tenant/:id

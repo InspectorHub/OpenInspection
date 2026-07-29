@@ -142,6 +142,118 @@ describe('IA-18 — ContactService.getContactDetail', () => {
         expect(detail.stats.totalRevenueCents).toBe(30000); // only the paid invoice
     });
 
+    it('per-row price follows the invoice, not the stale cache (P-4 tier 1)', async () => {
+        // The bug this pins: the card read `inspections.price` — tier 3, a
+        // denormalized cache — and rendered "$0.00 / Unpaid" directly beneath
+        // its own "TOTAL REVENUE $450.00", computed from the paid invoice on
+        // that same inspection. One card, two numbers, same money.
+        await testDb.insert(schema.contacts).values({
+            id: 'client-drift', tenantId: TENANT, type: 'client', name: 'Drift',
+            email: 'drift@example.com', createdAt: new Date(),
+        });
+        await testDb.insert(schema.inspections).values([
+            // Cache says zero; a PAID invoice says 45000.
+            { id: 'insp-drift-paid', tenantId: TENANT, propertyAddress: '742 Evergreen',
+              date: '2026-06-02', status: 'completed', paymentStatus: 'unpaid', price: 0,
+              paymentRequired: false, agreementRequired: false, createdAt: new Date() },
+            // Cache says zero; an UNPAID invoice still outranks it — tier 1 is
+            // "an invoice exists", not "an invoice was paid".
+            { id: 'insp-drift-unpaid', tenantId: TENANT, propertyAddress: '1 Lifecycle',
+              date: '2026-06-01', status: 'completed', paymentStatus: 'unpaid', price: 0,
+              paymentRequired: false, agreementRequired: false, createdAt: new Date() },
+        ]);
+        await people.addPerson(TENANT, 'insp-drift-paid', 'client-drift', roleProfileId('client'));
+        await people.addPerson(TENANT, 'insp-drift-unpaid', 'client-drift', roleProfileId('client'));
+        await testDb.insert(schema.invoices).values([
+            { id: 'inv-drift-paid', tenantId: TENANT, inspectionId: 'insp-drift-paid',
+              amountCents: 45000, lineItems: [], paidAt: new Date(5000), createdAt: new Date(1000) },
+            { id: 'inv-drift-unpaid', tenantId: TENANT, inspectionId: 'insp-drift-unpaid',
+              amountCents: 38000, lineItems: [], paidAt: null, createdAt: new Date(1000) },
+        ]);
+
+        const detail = await svc.getContactDetail('client-drift', TENANT);
+        if (!detail) throw new Error('unreachable');
+
+        const byId = Object.fromEntries(detail.inspections.map(i => [i.id, i.price]));
+        expect(byId['insp-drift-paid']).toBe(45000);
+        expect(byId['insp-drift-unpaid']).toBe(38000);
+
+        // Revenue is unchanged by all this: still paid-only.
+        expect(detail.stats.totalRevenueCents).toBe(45000);
+
+        // And the status stops contradicting the amount beside it.
+        const status = Object.fromEntries(detail.inspections.map(i => [i.id, i.paymentStatus]));
+        expect(status['insp-drift-paid']).toBe('paid');
+        expect(status['insp-drift-unpaid']).toBe('unpaid');
+    });
+
+    it('never demotes a partial payment to unpaid', async () => {
+        // `partial` exists only on the inspection (markPartial writes it there),
+        // so an unpaid invoice must not overwrite it. The derivation only ever
+        // promotes to paid.
+        await testDb.insert(schema.contacts).values({
+            id: 'client-partial', tenantId: TENANT, type: 'client', name: 'Partial',
+            email: 'partial@example.com', createdAt: new Date(),
+        });
+        await testDb.insert(schema.inspections).values({
+            id: 'insp-partial', tenantId: TENANT, propertyAddress: '5 Half Rd',
+            date: '2026-06-01', status: 'completed', paymentStatus: 'partial', price: 0,
+            paymentRequired: false, agreementRequired: false, createdAt: new Date(),
+        });
+        await people.addPerson(TENANT, 'insp-partial', 'client-partial', roleProfileId('client'));
+        await testDb.insert(schema.invoices).values({
+            id: 'inv-partial', tenantId: TENANT, inspectionId: 'insp-partial', amountCents: 50000,
+            lineItems: [], paidAt: null, createdAt: new Date(1000),
+        });
+
+        const detail = await svc.getContactDetail('client-partial', TENANT);
+        if (!detail) throw new Error('unreachable');
+        expect(detail.inspections[0].paymentStatus).toBe('partial');
+        expect(detail.inspections[0].price).toBe(50000);
+    });
+
+    it('falls back to the cached price when no invoice exists', async () => {
+        // Tier 3 is still a real tier. Reaching for the invoice must not zero
+        // out an inspection that simply has not been invoiced yet.
+        await testDb.insert(schema.contacts).values({
+            id: 'client-nocache', tenantId: TENANT, type: 'client', name: 'NoInv',
+            email: 'noinv@example.com', createdAt: new Date(),
+        });
+        await testDb.insert(schema.inspections).values({
+            id: 'insp-noinv', tenantId: TENANT, propertyAddress: '9 Cache Ln',
+            date: '2026-06-01', status: 'completed', paymentStatus: 'unpaid', price: 27500,
+            paymentRequired: false, agreementRequired: false, createdAt: new Date(),
+        });
+        await people.addPerson(TENANT, 'insp-noinv', 'client-nocache', roleProfileId('client'));
+
+        const detail = await svc.getContactDetail('client-nocache', TENANT);
+        if (!detail) throw new Error('unreachable');
+        expect(detail.inspections[0].price).toBe(27500);
+    });
+
+    it('a voided invoice does not become the price', async () => {
+        // Voided means withdrawn. Letting it win tier 1 would show a number the
+        // company has explicitly retracted.
+        await testDb.insert(schema.contacts).values({
+            id: 'client-void', tenantId: TENANT, type: 'client', name: 'Void',
+            email: 'void@example.com', createdAt: new Date(),
+        });
+        await testDb.insert(schema.inspections).values({
+            id: 'insp-void', tenantId: TENANT, propertyAddress: '3 Void Way',
+            date: '2026-06-01', status: 'completed', paymentStatus: 'unpaid', price: 19900,
+            paymentRequired: false, agreementRequired: false, createdAt: new Date(),
+        });
+        await people.addPerson(TENANT, 'insp-void', 'client-void', roleProfileId('client'));
+        await testDb.insert(schema.invoices).values({
+            id: 'inv-void', tenantId: TENANT, inspectionId: 'insp-void', amountCents: 99900,
+            lineItems: [], paidAt: null, voidedAt: new Date(9000), createdAt: new Date(1000),
+        });
+
+        const detail = await svc.getContactDetail('client-void', TENANT);
+        if (!detail) throw new Error('unreachable');
+        expect(detail.inspections[0].price).toBe(19900);
+    });
+
     it('archived contact still returns detail with history', async () => {
         await testDb.insert(schema.contacts).values({
             id: 'client-arch', tenantId: TENANT, type: 'client', name: 'Archived Client',

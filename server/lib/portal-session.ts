@@ -1,14 +1,14 @@
 /**
  * Unified client portal — signed magic-link token + session cookie (stateless).
  *
- * Mirrors `observer-cookie.ts` exactly: a self-contained
+ * A self-contained
  * `base64url(JSON body) + '.' + base64url(HMAC-SHA-256 of body64)` envelope.
  * There is NO database row backing either token — they are pure signed
  * payloads, so verification is stateless and revocation relies on short
  * TTLs / re-issuing the session.
  *
  * Secret is `JWT_SECRET`, imported raw as an HMAC key (same as
- * observer-cookie.ts — NOT the m2m-auth HKDF derivation, NOT the JWT keyring).
+ * NOT the m2m-auth HKDF derivation, NOT the JWT keyring).
  *
  * A `typ` discriminator distinguishes the two token families so a magic-link
  * token can never be replayed as a session cookie (or vice versa):

@@ -4,6 +4,7 @@ import {
     getCapabilities,
     coerceOverrides,
     type Capability,
+    type CapabilitySet,
     type PermissionOverrides,
 } from '../auth/capabilities';
 import { isRole } from '../auth/roles';
@@ -35,6 +36,30 @@ const resolveOverridesFromDb: OverrideResolver = async (c) => {
 };
 
 /**
+ * The acting user's full capability set, resolved the same way the middleware
+ * resolves it (fresh overrides from the DB, role defaults, pinned guardrails).
+ *
+ * Handlers need this, not just middleware: a gate can only answer "may you call
+ * this endpoint", while an endpoint that returns a MIXTURE of permitted and
+ * restricted data has to decide field by field. `GET /inspections/:id/hub` is
+ * exactly that — an inspector may see the inspection but not its money — so it
+ * projects with `redactMoney(payload, await capabilitiesFor(c))` rather than
+ * refusing the whole request.
+ *
+ * Sharing one resolver is the point. `financial` was correct in the middleware
+ * and still leaked, because two endpoints simply never wore it; a second,
+ * hand-rolled way to compute capabilities would invite the same divergence.
+ */
+export async function capabilitiesFor(
+    c: Context,
+    resolveOverrides: OverrideResolver = resolveOverridesFromDb,
+): Promise<CapabilitySet> {
+    const role = c.get('userRole');
+    if (!isRole(role)) throw Errors.Unauthorized('No role found in context');
+    return getCapabilities(role, await resolveOverrides(c));
+}
+
+/**
  * Layer a capability check ON TOP of an existing requireRole() gate. owner/admin
  * always pass (defaults grant all four capabilities); the inspector role is the
  * only one a per-user override can restrict (publish:false) or elevate
@@ -47,12 +72,8 @@ export const requireCapability = (
     cap: Capability,
     resolveOverrides: OverrideResolver = resolveOverridesFromDb,
 ) => async (c: Context, next: Next) => {
-    const role = c.get('userRole');
-    if (!isRole(role)) throw Errors.Unauthorized('No role found in context');
-
-    const overrides = await resolveOverrides(c);
-
-    if (!getCapabilities(role, overrides)[cap]) {
+    const caps = await capabilitiesFor(c, resolveOverrides);
+    if (!caps[cap]) {
         throw Errors.Forbidden(`Requires the '${cap}' capability`);
     }
     return next();

@@ -29,7 +29,8 @@ const alignClass: Record<TableAlign, string> = {
   center: "text-center",
 };
 
-const HEADER_CLASS = "py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4";
+const HEADER_CLASS =
+  "py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-ih-fg-4";
 
 export function Table<T>({
   columns,
@@ -42,51 +43,81 @@ export function Table<T>({
   const isEmpty = rows.length === 0;
 
   return (
-    <table className={`w-full text-left${className ? ` ${className}` : ""}`}>
-      <thead>
-        <tr className="border-b border-ih-border">
-          {columns.map((col, ci) => (
-            <th
-              key={col.key ?? ci}
-              className={`${HEADER_CLASS} ${alignClass[col.align ?? "left"]}`}
-            >
-              {col.label}
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {isEmpty ? (
-          empty != null ? (
-            <tr>
-              <td colSpan={columns.length}>{empty}</td>
-            </tr>
-          ) : null
-        ) : (
-          rows.map((row, ri) => (
-            <tr
-              key={getRowKey ? getRowKey(row, ri) : ri}
-              className={`group border-b border-ih-border hover:bg-ih-bg-muted/50${
-                onRowClick ? " cursor-pointer" : ""
-              }`}
-              onClick={onRowClick ? () => onRowClick(row, ri) : undefined}
-            >
-              {columns.map((col, ci) => (
-                <td
-                  key={col.key ?? ci}
-                  className={`py-3 px-4 text-[13px] ${alignClass[col.align ?? "left"]}`}
-                >
-                  {col.cell
-                    ? col.cell(row, ri)
-                    : col.key
-                      ? ((row as Record<string, React.ReactNode>)[col.key] ?? null)
-                      : null}
-                </td>
-              ))}
-            </tr>
-          ))
-        )}
-      </tbody>
-    </table>
+    // The table scrolls INSIDE this wrapper rather than overflowing its card.
+    //
+    // Without it, a table wider than its container has two bad outcomes and no
+    // good one: the card's `overflow-hidden` (there for the rounded corners)
+    // silently CLIPS the excess, or the page itself grows a horizontal
+    // scrollbar. Contacts hit the first — its Actions column was cut off by
+    // 47px, so Edit and Archive were on screen but unreachable, with nothing
+    // to indicate anything was missing.
+    //
+    // `min-w-full` rather than `w-full` on the table: inside a scroll
+    // container `w-full` pins the table to the container width and forces
+    // columns to compress until their content wraps or clips, which is the
+    // failure we are removing. `min-w-full` lets it take the width it needs
+    // and hands the overflow to the wrapper.
+    //
+    // `relative` is load-bearing, not decoration. `overflow-x-auto` clips
+    // painting but does NOT establish a containing block, so an absolutely
+    // positioned descendant resolves against the initial containing block and
+    // keeps contributing to the DOCUMENT's scroll width — escaping the very
+    // container meant to hold it. Tables here label their action column with
+    // Tailwind's `sr-only`, which is `position: absolute`, so once a table grew
+    // wider than the viewport that 1px label sat off-screen and dragged a
+    // horizontal scrollbar onto the whole page. The table scrolled correctly
+    // the entire time; the page scrolled because of a screen-reader label.
+    // `relative` makes the wrapper the containing block, so it stays inside.
+    <div className="relative overflow-x-auto">
+      <table
+        className={`min-w-full text-left${className ? ` ${className}` : ""}`}
+      >
+        <thead>
+          <tr className="border-b border-ih-border">
+            {columns.map((col, ci) => (
+              <th
+                key={col.key ?? ci}
+                className={`${HEADER_CLASS} ${alignClass[col.align ?? "left"]}`}
+              >
+                {col.label}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {isEmpty ? (
+            empty != null ? (
+              <tr>
+                <td colSpan={columns.length}>{empty}</td>
+              </tr>
+            ) : null
+          ) : (
+            rows.map((row, ri) => (
+              <tr
+                key={getRowKey ? getRowKey(row, ri) : ri}
+                className={`group border-b border-ih-border hover:bg-ih-bg-muted/50${
+                  onRowClick ? " cursor-pointer" : ""
+                }`}
+                onClick={onRowClick ? () => onRowClick(row, ri) : undefined}
+              >
+                {columns.map((col, ci) => (
+                  <td
+                    key={col.key ?? ci}
+                    className={`py-3 px-4 text-[13px] ${alignClass[col.align ?? "left"]}`}
+                  >
+                    {col.cell
+                      ? col.cell(row, ri)
+                      : col.key
+                        ? ((row as Record<string, React.ReactNode>)[col.key] ??
+                          null)
+                        : null}
+                  </td>
+                ))}
+              </tr>
+            ))
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }

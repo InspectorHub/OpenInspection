@@ -10,6 +10,7 @@ import {
     MagicLoginRequestResponseSchema,
 } from '../../lib/validations/agent-magic-login.schema';
 import { requestMagicLogin, redeemMagicLogin } from '../../services/agent/magic-login.service';
+import { authCookieOptions, AUTH_COOKIE_NAME } from '../../lib/auth-helpers';
 
 /**
  * Agent unified link (Spec 3, Task 2) — the SEPARATE single-use magic-login
@@ -139,13 +140,7 @@ export const agentMagicLoginRedeemRoutes = createApiRouter()
                 exp: now + 60 * 60 * 24,
             }, keyring);
 
-            setCookie(c, '__Host-inspector_token', token, {
-                httpOnly: true,
-                secure: true,
-                sameSite: 'Strict',
-                path: '/',
-                maxAge: 60 * 60 * 24,
-            });
+            setCookie(c, AUTH_COOKIE_NAME, token, authCookieOptions());
 
             // Global agent identity — tenant-less by design, so this does NOT go
             // through the tenant-scoped audit_logs table (auditLogs.tenantId is a

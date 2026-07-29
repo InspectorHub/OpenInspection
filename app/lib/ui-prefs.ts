@@ -9,7 +9,7 @@
  * with every request, so server and client agree on the first render.
  */
 
-/** Track H (迁移⑤) — 'field' is a high-contrast, large-type variant of dark
+/** Track H (migration step 5) — 'field' is a high-contrast, large-type variant of dark
  *  for outdoor/sunlight use (18px base font + stronger contrast). A first-class
  *  scheme the user picks explicitly: "auto" never resolves to it. */
 export type ColorScheme = "light" | "dark" | "auto" | "field";

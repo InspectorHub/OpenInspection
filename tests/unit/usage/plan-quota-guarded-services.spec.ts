@@ -86,11 +86,10 @@ describe('ConciergeService.createBooking consumes the free-tier quota', () => {
             { id: CONTACT_AGENT, tenantId: T1, type: 'agent', name: 'Jane Smith',
               email: 'jane@realty.com', createdAt: new Date() },
         ]);
-        await testDb.insert(schema.agentTenantLinks).values({
-            id: crypto.randomUUID(), agentUserId: AGENT, tenantId: T1,
-            inspectorContactId: CONTACT_AGENT, status: 'active',
-            invitedByUserId: INSPECTOR, createdAt: new Date(),
-        });
+        // IA-104 — binding lives on the contact.
+        await testDb.update(schema.contacts)
+            .set({ agentUserId: AGENT, agentLinkedAt: new Date() })
+            .where(eq(schema.contacts.id, CONTACT_AGENT));
     });
 
     afterEach(() => sqlite.close());

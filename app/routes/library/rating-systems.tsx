@@ -9,6 +9,7 @@ import { RatingSystemEditor, type EditorSystem } from "~/components/RatingSystem
 import type { Severity } from "~/lib/severity";
 import { SEVERITY_LABEL } from "~/lib/severity";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 export function meta() {
   return [{ title: m.library_rating_meta_title() }];
@@ -23,9 +24,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     const api = createApi(context, { token });
     const res = await api.ratingSystems.index.$get();
     const body = res.ok ? ((await res.json()) as Record<string, unknown>) : { data: [] };
-    return { systems: (body.data ?? []) as System[] };
+    return { systems: (body.data ?? []) as System[], loadFailed: false };
   } catch {
-    return { systems: [] as System[] };
+    return { systems: [] as System[], loadFailed: true };
   }
 }
 
@@ -70,7 +71,7 @@ const SEVERITY_RING: Record<Severity, string> = {
 };
 
 export default function RatingSystemsPage() {
-  const { systems } = useLoaderData<typeof loader>();
+  const { systems, loadFailed } = useLoaderData<typeof loader>();
   const deleteFetcher = useFetcher();
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<EditorSystem | null>(null);
@@ -104,6 +105,9 @@ export default function RatingSystemsPage() {
 
   return (
     <div className="space-y-ih-list">
+      {/* IA-118 — an empty list here is a conclusion; say when it is not a real one. */}
+      {loadFailed && <LoadFailedNotice />}
+
       <Breadcrumb items={[{ label: m.library_layout_title(), href: "/library" }, { label: m.library_rating_heading() }]} />
       <PageHeader
         title={m.library_rating_heading()}

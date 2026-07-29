@@ -142,8 +142,8 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   } else if (section === "report") {
     report = await loadReportSection(context, request, tenant, inspectionId, ctxToken);
   } else if (section === "progress") {
-    // Portal-session-authed (membership-checked) — forward the same cookie used
-    // for the overview call rather than the observer-link token.
+    // Portal-session-authed (membership-checked) — forward the same cookie the
+    // overview call uses.
     progress = await loadProgressSection(context, tenant, inspectionId, cookieForApi);
   } else if (section === "repair") {
     repair = await loadRepairSection(context, tenant, inspectionId, ctxToken);

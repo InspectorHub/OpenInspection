@@ -1,5 +1,5 @@
 /**
- * Secret UI化 — runtime middleware to load encrypted integration secrets
+ * Secrets UI — runtime middleware to load encrypted integration secrets
  * from tenant_configs.secrets_enc and merge them into c.env.
  *
  * Precedence (A-8 secret-resolution matrix):

@@ -10,8 +10,8 @@ export const AgreementSchema = z.object({
 }).openapi('Agreement');
 
 export const AgreementListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
+    tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
     content: z.string().describe('TODO describe content field for the OpenInspection MCP integration'),
     version: z.number().describe('TODO describe version field for the OpenInspection MCP integration'),
@@ -24,18 +24,18 @@ const SignerInputSchema = z.object({
     name: z.string().min(1).max(120).openapi({ example: 'John Smith' }).describe('Full name of this signer as it appears on the agreement'),
     email: z.string().email().openapi({ example: 'client@example.com' }).describe('Email address the per-signer signing link is sent to'),
     role: z.enum(['client', 'co_client', 'agent', 'other']).optional().openapi({ example: 'client' }).describe('Relationship of this signer to the inspection (client, co_client, agent, other)'),
-    contactId: z.string().uuid().nullable().optional().describe('Optional contacts.id this signer was picked from, when available'),
+    contactId: z.string().trim().min(1).nullable().optional().describe('Optional contacts.id this signer was picked from, when available'),
 }).openapi('AgreementSignerInput');
 
 export const SendAgreementSchema = z.object({
-    agreementId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe agreementId field for the OpenInspection MCP integration'),
+    agreementId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe agreementId field for the OpenInspection MCP integration'),
     // Recipient email for a single-signer send; normalised to a one-signer envelope.
     // Omit when `signers` is provided. Gated by the refine below so exactly one
     // of the two recipient fields is always satisfiable.
     clientEmail: z.string().email().optional().openapi({ example: 'client@example.com' }).describe('Recipient email for a single-signer send; normalised to a one-signer envelope'),
     clientName: z.string().max(100).optional().openapi({ example: 'John Smith' }).describe('Display name for the single-signer recipient; ignored when signers is provided'),
     // Required: every envelope must be bound to an inspection.
-    inspectionId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection this agreement envelope is bound to; required for every send'),
+    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Inspection this agreement envelope is bound to; required for every send'),
     // Explicit multi-signer list; when absent, clientEmail is the sole signer.
     // All sends go through the envelope model (findOrCreate) regardless of which
     // recipient field is used.
@@ -50,8 +50,8 @@ export const SendAgreementSchema = z.object({
 
 export const AgreementResponseSchema = createApiResponseSchema(z.object({
     agreement: z.object({
-        id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
-        tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+        id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
+        tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
         name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
         content: z.string().describe('TODO describe content field for the OpenInspection MCP integration'),
         version: z.number().describe('TODO describe version field for the OpenInspection MCP integration'),

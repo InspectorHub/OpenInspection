@@ -72,6 +72,10 @@ async function seedInspection(over: Partial<typeof schema.inspections.$inferInse
 async function seedRuleAndLog(opts: {
   conditions?: object | null; channel?: 'email' | 'sms'; subject?: string; body?: string;
   smsBody?: string; trigger?: string; inspectionId: string;
+  /** IA-109 — the per-recipient role KEY stamped on the log. */
+  roleKey?: string;
+  /** IA-109 — the contact the log is addressed to. */
+  recipientContactId?: string | null;
 }) {
   const ruleId = crypto.randomUUID();
   await db.insert(schema.automations).values({
@@ -91,7 +95,12 @@ async function seedRuleAndLog(opts: {
   await db.insert(schema.automationLogs).values({
     id: logId, tenantId: TENANT, automationId: ruleId, inspectionId: opts.inspectionId,
     recipient: opts.channel === 'sms' ? '+15551234567' : 'jane@example.com',
-    channel: opts.channel ?? 'email', recipientRoleKey: 'client',
+    channel: opts.channel ?? 'email',
+    // `=== undefined`, not `??`: a legacy log with NO role key is its own case
+    // (it predates the column), and `??` would have collapsed it into 'client',
+    // making the legacy-fallback test pass without exercising the branch.
+    recipientRoleKey: opts.roleKey === undefined ? 'client' : opts.roleKey,
+    recipientContactId: opts.recipientContactId === undefined ? 'c1' : opts.recipientContactId,
     sendAt: new Date(Date.now() - 1000), status: 'pending',
   } as never);
   return logId;
@@ -169,6 +178,101 @@ describe('CHARACTERIZATION — automation delivery (freeze before SP-ENG refacto
     expect(r?.status).toBe('skipped');
     expect(r?.error).toMatch(/consent/);
     expect(fakeSendMessage).not.toHaveBeenCalled();
+  });
+
+  // ── IA-109 — the consent gate must key on role KIND, not one role KEY ────
+  //
+  // The gate read . But co_client is ALSO
+  // kind='client' (default-role-profiles.ts), and resolveRecipients resolves
+  // an SMS recipient for ANY role key that has a phone. A co-client was
+  // therefore texted with no consent check at all — same consumer, same TCPA
+  // exposure, different string.
+
+  it('SMS branch: CO-CLIENT without consent → skipped, not sent', async () => {
+    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    await new SmsConsentService({} as D1Database).publishDisclosure('disclosure');
+    // Addressed to a DIFFERENT contact in a co_client role — the shape the old
+    // gate let straight through.
+    const logId = await seedRuleAndLog({
+      channel: 'sms', smsBody: 'Hi', inspectionId: insp,
+      roleKey: 'co_client', recipientContactId: 'c2',
+    });
+    await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+
+    const r = await statusOf(logId);
+    expect(r?.status).toBe('skipped');
+    expect(r?.error).toMatch(/consent/);
+    expect(fakeSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('SMS branch: co-client consent is read for THEIR contact, not the primary client', async () => {
+    // The old gate looked up inspections.client_contact_id regardless of who
+    // the log was for, so the primary client's consent silently authorised a
+    // text to someone who had never granted anything.
+    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const consent = new SmsConsentService({} as D1Database);
+    await consent.publishDisclosure('disclosure');
+    await consent.record(TENANT, 'c1', 'granted', 'admin', {});  // primary ONLY
+    const logId = await seedRuleAndLog({
+      channel: 'sms', smsBody: 'Hi', inspectionId: insp,
+      roleKey: 'co_client', recipientContactId: 'c2',
+    });
+    await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+
+    expect((await statusOf(logId))?.status).toBe('skipped');
+    expect(fakeSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('SMS branch: co-client WITH their own consent → sent', async () => {
+    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const consent = new SmsConsentService({} as D1Database);
+    await consent.publishDisclosure('disclosure');
+    await consent.record(TENANT, 'c2', 'granted', 'admin', {});
+    const logId = await seedRuleAndLog({
+      channel: 'sms', smsBody: 'Hi', inspectionId: insp,
+      roleKey: 'co_client', recipientContactId: 'c2',
+    });
+    await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+
+    expect((await statusOf(logId))?.status).toBe('sent');
+    expect(fakeSendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('SMS branch: a NON-primary client-kind log with no contact id fails closed', async () => {
+    // Legacy rows predate recipient_contact_id. For the primary client the
+    // inspection's own (inspection_people-derived) contact is a correct
+    // fallback, so those keep working across the deploy. For a co-client there
+    // is nobody to look up — and the primary client's consent is emphatically
+    // not theirs — so skipping is the only safe answer.
+    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const consent = new SmsConsentService({} as D1Database);
+    await consent.publishDisclosure('disclosure');
+    await consent.record(TENANT, 'c1', 'granted', 'admin', {});   // primary ONLY
+    const logId = await seedRuleAndLog({
+      channel: 'sms', smsBody: 'Hi', inspectionId: insp,
+      roleKey: 'co_client', recipientContactId: null,
+    });
+    await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+
+    expect((await statusOf(logId))?.status).toBe('skipped');
+    expect(fakeSendMessage).not.toHaveBeenCalled();
+  });
+
+  it('SMS branch: a legacy log with NO role key still uses the primary client contact', async () => {
+    // Rows predating recipientRoleKey could only ever have been the primary
+    // client. Failing those closed would drop every already-queued send at
+    // deploy time for no safety gain.
+    const insp = await seedInspection({ clientContactId: 'c1', clientPhone: '+15551234567' });
+    const consent = new SmsConsentService({} as D1Database);
+    await consent.publishDisclosure('disclosure');
+    await consent.record(TENANT, 'c1', 'granted', 'admin', {});
+    const logId = await seedRuleAndLog({
+      channel: 'sms', smsBody: 'Hi', inspectionId: insp,
+      roleKey: null as unknown as string, recipientContactId: null,
+    });
+    await svc.flush(stubEmailFor, 'Acme', 'https://acme.example.com', smsRuntime);
+
+    expect((await statusOf(logId))?.status).toBe('sent');
   });
 
   it('SMS branch: client with granted consent → sent via provider', async () => {

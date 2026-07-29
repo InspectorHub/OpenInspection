@@ -1,0 +1,1 @@
+ALTER TABLE `tenant_configs` ADD `is_archive_revoking_access` integer DEFAULT false NOT NULL;

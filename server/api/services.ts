@@ -2,6 +2,8 @@ import { createRoute } from '@hono/zod-openapi';
 import { createApiRouter } from '../lib/openapi-router';
 import { z } from 'zod';
 import { requireRole } from '../lib/middleware/rbac';
+import { capabilitiesFor } from '../lib/middleware/require-capability';
+import { redactMoney } from '../lib/auth/money-redaction';
 import {
     CreateServiceSchema, UpdateServiceSchema, ServiceResponseSchema,
     ServiceListResponseSchema, CreateDiscountCodeSchema, UpdateDiscountCodeSchema,
@@ -23,7 +25,10 @@ export const servicesRoutes = createApiRouter()
     }, { scopes: ['read'], tier: 'primary' })), async (c) => {
         const tenantId = c.get('tenantId');
         const rows = await c.var.services.service.listServices(tenantId);
-        return c.json({ success: true, data: rows });
+        // IA-95 — the catalog carries `price`, and this route admits inspectors,
+        // whose `financial` default is false. Second of the three money surfaces
+        // the capability was not worn by.
+        return c.json({ success: true, data: redactMoney(rows, await capabilitiesFor(c)) });
     })
     // POST /api/services/discount/validate — MUST be before /:id routes
     .openapi(createRoute(withMcpMetadata({

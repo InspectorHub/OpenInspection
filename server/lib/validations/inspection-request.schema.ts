@@ -27,7 +27,7 @@ export const CreateInspectionRequestSchema = z.object({
     propertyZip:     z.string().max(20).optional().nullable().describe('TODO describe propertyZip field for the OpenInspection MCP integration'),
     scheduledAt:     z.string().min(1).openapi({ example: '2026-06-15T09:00:00Z' }).describe('TODO describe scheduledAt field for the OpenInspection MCP integration'),
     notes:           z.string().max(2000).optional().nullable().describe('TODO describe notes field for the OpenInspection MCP integration'),
-    inspectorId:     z.string().uuid().optional().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId:     z.string().trim().min(1).optional().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     subInspections:  z.array(SubInspectionInputSchema).min(1, 'At least one inspection is required').max(10).describe('TODO describe subInspections field for the OpenInspection MCP integration'),
 }).openapi('CreateInspectionRequest');
 

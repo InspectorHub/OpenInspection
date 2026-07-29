@@ -47,16 +47,16 @@ describe('exportAccount', () => {
         expect(result.exportedAt).toMatch(/\d{4}-\d{2}-\d{2}T/);
     });
 
-    it('returns agent_tenant_links memberships scoped to this user', async () => {
+    it('returns bound-contact memberships scoped to this user', async () => {
         await testDb.insert(schema.users).values({
             id: AGENT_ID, tenantId: TENANT, email: 'agent@x.com', passwordHash: 'x', role: 'agent', createdAt: new Date(),
         });
-        await testDb.insert(schema.agentTenantLinks).values({
-            id: 'link-1', agentUserId: USER_ID, tenantId: TENANT_B, status: 'active', createdAt: new Date(),
+        await testDb.insert(schema.contacts).values({
+            id: 'link-1', tenantId: TENANT_B, type: 'agent', name: 'A', email: 'a@x.test', agentUserId: USER_ID, agentLinkedAt: new Date(), createdAt: new Date(),
         });
         // unrelated link for another agent — must NOT appear
-        await testDb.insert(schema.agentTenantLinks).values({
-            id: 'link-2', agentUserId: AGENT_ID, tenantId: TENANT, status: 'active', createdAt: new Date(),
+        await testDb.insert(schema.contacts).values({
+            id: 'link-2', tenantId: TENANT, type: 'agent', name: 'B', email: 'b@x.test', agentUserId: AGENT_ID, agentLinkedAt: new Date(), createdAt: new Date(),
         });
         const result = await exportAccount(testDb as any, USER_ID);
         expect(result.memberships).toHaveLength(1);

@@ -22,6 +22,27 @@ export const InviteMemberSchema = z.object({
 }).openapi('InviteMember');
 
 /**
+ * Validation schema for editing an existing team member (IA-101).
+ *
+ * Both fields are optional so the caller can move a role without restating
+ * every capability, or flip a capability without touching the role. Sending
+ * neither is a no-op rather than an error — a form that submits unchanged is
+ * not a client mistake.
+ *
+ * `permissionOverrides` is REPLACE, not merge: the drawer always submits the
+ * full set of four, and a merge would make un-ticking a box unexpressible.
+ */
+export const UpdateMemberSchema = z.object({
+    role: z.enum(ROLES).optional().openapi({ example: 'manager' }).describe('New role for this member. Omit to leave unchanged.'),
+    permissionOverrides: z.object({
+        publish: z.boolean().optional(),
+        scheduleOthers: z.boolean().optional(),
+        financial: z.boolean().optional(),
+        manageContacts: z.boolean().optional(),
+    }).partial().nullable().optional().openapi({ example: { financial: true } }).describe('Full capability map to store as the diff against the role template. Null clears all overrides.'),
+}).openapi('UpdateMember');
+
+/**
  * Validation schema for the GDPA data erasure request.
  */
 export const DataErasureSchema = z.object({
@@ -33,7 +54,7 @@ export const DataErasureSchema = z.object({
  */
 export const AdminExportResponseSchema = createApiResponseSchema(z.object({
     exportedAt: z.string().openapi({ example: '2024-04-09T10:00:00Z' }).describe('TODO describe exportedAt field for the OpenInspection MCP integration'),
-    tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     inspections: z.array(z.record(z.string(), z.any())).describe('TODO describe inspections field for the OpenInspection MCP integration'),
     templates: z.array(z.record(z.string(), z.any())).describe('TODO describe templates field for the OpenInspection MCP integration'),
     agreements: z.array(z.record(z.string(), z.any())).describe('TODO describe agreements field for the OpenInspection MCP integration'),
@@ -41,7 +62,7 @@ export const AdminExportResponseSchema = createApiResponseSchema(z.object({
 })).openapi('AdminExportResponse');
 
 export const MemberListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
     email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
     role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
     createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
@@ -51,13 +72,13 @@ export const MemberListResponseSchema = createApiResponseSchema(z.array(z.object
 
 export const AuditLogResponseSchema = createApiResponseSchema(z.object({
     items: z.array(z.object({
-        id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+        id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
         action: z.string().describe('TODO describe action field for the OpenInspection MCP integration'),
         entityType: z.string().describe('TODO describe entityType field for the OpenInspection MCP integration'),
         metadata: z.any().nullable().describe('TODO describe metadata field for the OpenInspection MCP integration'),
         ipAddress: z.string().nullable().describe('TODO describe ipAddress field for the OpenInspection MCP integration'),
         createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
-        userId: z.string().uuid().nullable().describe('TODO describe userId field for the OpenInspection MCP integration'),
+        userId: z.string().trim().min(1).nullable().describe('TODO describe userId field for the OpenInspection MCP integration'),
     })).describe('TODO describe items field for the OpenInspection MCP integration'),
     nextCursor: z.string().nullable().describe('TODO describe nextCursor field for the OpenInspection MCP integration'),
 })).openapi('AuditLogResponse');
@@ -110,10 +131,12 @@ export const EraseDataResponseSchema = createApiResponseSchema(z.object({
 
 export const TeamMembersResponseSchema = createApiResponseSchema(z.object({
     members: z.array(z.object({
-        id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+        id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
         name: z.string().nullable().describe("The member's display name; null when never set (renders as 'Unnamed')."),
         email: z.string().describe('TODO describe email field for the OpenInspection MCP integration'),
         role: z.string().describe('TODO describe role field for the OpenInspection MCP integration'),
+        permissionOverrides: z.record(z.string(), z.boolean()).nullable().optional()
+            .describe("Capability toggles that differ from this member's role template, or null when they match it exactly."),
         createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
     })).describe('TODO describe members field for the OpenInspection MCP integration'),
     invites: z.array(z.object({

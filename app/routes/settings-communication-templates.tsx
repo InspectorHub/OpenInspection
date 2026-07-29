@@ -8,6 +8,7 @@ import { requireAdminLoader } from "~/lib/access.server";
 import { AccessDenied } from "~/components/AccessDenied";
 import { Button, Pill, TabStrip, EmptyState, Card, Modal } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
+import { LoadFailedNotice } from "~/components/LoadFailedNotice";
 
 // ─── Exported pure helper ────────────────────────────────────────────────────
 
@@ -63,7 +64,12 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     (smsRes && smsRes.ok
       ? ((await smsRes.json()) as { data?: MessageTemplate[] }).data
       : []) ?? [];
-  return { emailTemplates, smsTemplates };
+  // IA-118 — `.catch(() => null)` on each request means a failure arrives as an
+  // empty template list, and this page's empty state reads as "you have no
+  // templates", which is what an operator checks before trusting an automation
+  // to send anything.
+  const loadFailed = !emailRes?.ok || !smsRes?.ok;
+  return { emailTemplates, smsTemplates, loadFailed };
 }
 
 // ─── Action ──────────────────────────────────────────────────────────────────
@@ -189,6 +195,7 @@ export default function SettingsCommunicationTemplates() {
 
   return (
     <div className="space-y-ih-list">
+      {"loadFailed" in data && data.loadFailed && <LoadFailedNotice />}
       <SettingsCrumb
         items={[
           { label: m.settings_crumb_root(), href: "/settings" },

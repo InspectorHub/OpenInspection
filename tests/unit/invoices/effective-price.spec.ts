@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from 'vitest';
-import { getEffectivePriceCents } from '~/lib/effective-price';
+import { getEffectivePriceCents } from '../../../server/lib/effective-price';
 
 /**
  * P-4 authority chain:

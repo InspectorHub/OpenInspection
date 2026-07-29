@@ -16,7 +16,7 @@ const inspection = { id: "insp-1" };
 describe("useInspectionState — Phase U stub seeding", () => {
   it("seeds only _default + bare-itemId stubs when no unit is active (byte-identical)", () => {
     const { result } = renderHook(() =>
-      useInspectionState({ inspection, schema, results: {} }),
+      useInspectionState({ inspection, schema, results: {}, locale: "en-US" }),
     );
     expect(Object.keys(result.current.results).sort()).toEqual(["_default:s1:i1", "i1"]);
     expect(result.current.results["_default:s1:i1"]).toEqual({ rating: null, notes: "", photos: [] });
@@ -24,7 +24,7 @@ describe("useInspectionState — Phase U stub seeding", () => {
 
   it("also seeds the active unit's scope when a unit is the initial active scope", () => {
     const { result } = renderHook(() =>
-      useInspectionState({ inspection, schema, results: {}, activeUnitId: "u1" }),
+      useInspectionState({ inspection, schema, results: {}, locale: "en-US", activeUnitId: "u1" }),
     );
     expect(Object.keys(result.current.results).sort()).toEqual([
       "_default:s1:i1",

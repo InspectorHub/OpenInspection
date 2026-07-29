@@ -43,6 +43,7 @@ const sessionContextRoutes = createApiRouter()
         let tenantTimezone = 'UTC';
         let tenantLocale = 'en-US';
         let tenantCurrency = 'USD';
+        let archiveRevokesAccess = false;
         if (tenantId) {
             try {
                 const db = drizzle(c.env.DB);
@@ -60,6 +61,10 @@ const sessionContextRoutes = createApiRouter()
                     defaultTimezone: tenantConfigs.defaultTimezone,
                     defaultLocale: tenantConfigs.defaultLocale,
                     currency: tenantConfigs.currency,
+                    // IA-100 — the contacts archive dialog states whether
+                    // archiving also revokes report links, so it needs the
+                    // policy, not just the link count.
+                    archiveRevokesAccess: tenantConfigs.archiveRevokesAccess,
                 })
                     .from(tenantConfigs)
                     .where(eq(tenantConfigs.tenantId, tenantId))
@@ -67,6 +72,7 @@ const sessionContextRoutes = createApiRouter()
                 if (cfg?.defaultTimezone) tenantTimezone = cfg.defaultTimezone;
                 tenantLocale = resolveLocale(cfg?.defaultLocale);
                 if (cfg?.currency) tenantCurrency = cfg.currency;
+                archiveRevokesAccess = cfg?.archiveRevokesAccess ?? false;
             } catch (e) {
                 logger.warn('[session-context] user lookup failed', { userId: user.sub, error: (e as Error).message });
             }
@@ -184,6 +190,7 @@ const sessionContextRoutes = createApiRouter()
                     defaultTimezone: tenantTimezone,
                     defaultLocale: tenantLocale,
                     currency: tenantCurrency,
+                    archiveRevokesAccess,
                 },
                 user: {
                     name: userName,

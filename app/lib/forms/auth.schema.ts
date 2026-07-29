@@ -110,20 +110,6 @@ export function makeJoinSchema() {
 }
 
 /**
- * Partner-agent invite accept (`/agent-invite/accept`). Token + email come from
- * the invite (email is read-only), so only name + password are validated.
- * Mirrors the API's agent accept schema: name min 2, password min 12.
- */
-export function makeAgentInviteAcceptSchema() {
-  return z.object({
-    name: requiredText(m.auth_validation_full_name_required())
-      .min(2, m.auth_validation_full_name_required())
-      .max(120, m.auth_validation_name_too_long()),
-    password: requiredText(m.auth_validation_password_min12()).min(12, m.auth_validation_password_min12()),
-  });
-}
-
-/**
  * Partner-agent self-signup (`/agent-signup`). Mirrors the API's
  * `SignupBodySchema`: name min 2/max 120, email, password min 12/max 120.
  * The Turnstile token is not a validated form field — it passes through.

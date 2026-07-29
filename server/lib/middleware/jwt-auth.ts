@@ -24,10 +24,10 @@ import { verifyJwt } from '../jwt-keyring';
 import { classifyJwtPayload } from '../auth/jwt-claims';
 import { AppError, Errors } from '../errors';
 import { logger } from '../logger';
-import { OBSERVER_EXPIRED_PATH } from './observer-cookie';
 import type * as schema from '../db/schema';
 import type { HonoConfig } from '../../types/hono';
 import type { UserRole } from '../../types/auth';
+import { bearerToken, AUTH_COOKIE_NAME } from '../auth-helpers';
 
 // Static asset extensions — these bypass JWT verification. We use a strict allowlist
 // rather than path.includes('.') so a dot inside a path segment (e.g. "/inspections/foo.bar")
@@ -52,19 +52,12 @@ export const jwtAuthMiddleware: MiddlewareHandler<HonoConfig> = async (c, next) 
         path === '/api/concierge/confirm-info';
     const isPublic = path.startsWith('/api/__test__/') || path.startsWith('/api/public/') || path.startsWith('/api/integration/') || path.startsWith('/api/admin/connect') || path.startsWith('/api/admin/silo') || path.startsWith('/api/ics/') || path === '/book' || path.startsWith('/book/') || path.startsWith('/inspector/') || path.startsWith('/embed/') || path.startsWith('/photos/') || path === '/' || path === '/status' || path.startsWith('/static/') || path.startsWith('/report/') || path.startsWith('/report-view/') || path.startsWith('/invoice/') || path.startsWith('/agreements/sign/') || path.startsWith('/checkout/') || path.startsWith('/sign/') || path.startsWith('/m2m/') || path.startsWith('/verify/') || path.startsWith('/v/') || path.startsWith('/.well-known/') || STATIC_ASSET_EXT.test(path) || path === '/api/integrations/qbo/webhook' || path === '/api/integrations/stripe/webhook' || path.startsWith('/api/integrations/stripe/webhook/') || path.startsWith('/repair-request/') || path.startsWith('/repair-builder/') || path.startsWith('/api/portal/') || path.startsWith('/portal/');
 
-    // Design System 0520 subsystem D P5 — observer surfaces are gated by
-    // the dedicated observer-cookie middleware, not JWT.
-    const isObserverPublic = path.startsWith('/observe/') || path === OBSERVER_EXPIRED_PATH;
-
-    if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || isObserverPublic || path === '/setup' || path === '/login' || path === '/join') return next();
+    if (isAuthPublic || isPublic || isAgentPublic || isConciergePublic || path === '/setup' || path === '/login' || path === '/join') return next();
 
     // First-time setup is gated solely by the SETUP_CODE secret, validated in
     // POST /api/auth/setup. No KV bootstrap code is generated here.
 
-    const authHeader = c.req.header('Authorization');
-    const token = authHeader?.startsWith('Bearer ')
-        ? authHeader.slice(7)
-        : getCookie(c, '__Host-inspector_token');
+    const token = bearerToken(c) ?? getCookie(c, AUTH_COOKIE_NAME);
 
     if (!token) return next();
 

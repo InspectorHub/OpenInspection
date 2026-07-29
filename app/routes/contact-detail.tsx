@@ -7,6 +7,7 @@ import { formatInspectionDateTime } from "~/lib/format-date";
 import { formatCents } from "~/lib/hub-blocks";
 import { humanizeStatus, capitalize } from "~/lib/status";
 import { Breadcrumb } from "~/components/Breadcrumb";
+import { ReportAccessPanel, type AccessRow } from "~/components/contacts/ReportAccessPanel";
 import { PageHeader, Card, Pill, EmptyState } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
@@ -22,7 +23,8 @@ export function meta() {
 interface ContactDetail {
   contact: {
     id: string;
-    type: "agent" | "client";
+    // IA-96 widened this to match contact_role_profiles.kind.
+    type: "agent" | "client" | "other";
     name: string;
     email: string | null;
     phone: string | null;
@@ -64,7 +66,55 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   }
   const body = await res.json();
   const detail = ((body as Record<string, unknown>).data ?? {}) as unknown as ContactDetail;
-  return { detail };
+
+  // IA-100 — what this person can still OPEN, which is a different question
+  // from what they appear on. A report link is a per-inspection token that
+  // works with no account, so it outlives archiving and was previously
+  // invisible everywhere. Fetched alongside rather than blocking the page: a
+  // failure here should cost the access panel, not the whole record.
+  //
+  // A failure must NOT collapse into the empty list. "This contact cannot open
+  // any reports" is an assertion about access control, and rendering it because
+  // the request failed tells the operator the opposite of what may be true —
+  // the dangerous direction on this particular panel. Empty and unknown are
+  // different answers and the page says which one it has.
+  let access: AccessRow[] = [];
+  let accessFailed = false;
+  try {
+    const accessRes = await api.contacts[":id"].access.$get({ param: { id } });
+    if (accessRes.ok) {
+      const ab = (await accessRes.json()) as { data?: { access?: AccessRow[] } };
+      access = ab.data?.access ?? [];
+    } else {
+      accessFailed = true;
+    }
+  } catch {
+    accessFailed = true;
+  }
+
+  return { detail, access, accessFailed };
+}
+
+export async function action({ request, params, context }: Route.ActionArgs) {
+  const token = await requireToken(context, request);
+  const api = createApi(context, { token });
+  const fd = await request.formData();
+  const id = params.id as string;
+
+  if (fd.get("intent") === "revoke-access") {
+    // A single id revokes one row; its absence revokes everything. Same shape
+    // the API takes, so "revoke all" is not a client-side loop that can fail
+    // halfway and leave the operator believing access was cut.
+    const one = fd.get("inspectionId");
+    const res = await api.contacts[":id"].access.revoke.$post({
+      param: { id },
+      json: typeof one === "string" && one ? { inspectionIds: [one] } : {},
+    });
+    if (!res.ok) return { ok: false, revoked: 0 };
+    const b = (await res.json()) as { data?: { revoked?: number } };
+    return { ok: true, revoked: b.data?.revoked ?? 0 };
+  }
+  return { ok: false, revoked: 0 };
 }
 
 /* ------------------------------------------------------------------ */
@@ -72,7 +122,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 /* ------------------------------------------------------------------ */
 
 export default function ContactDetailPage() {
-  const { detail } = useLoaderData<typeof loader>();
+  const { detail, access, accessFailed } = useLoaderData<typeof loader>();
   const { contact, inspections, stats } = detail;
   const displayTz = useDisplayTimeZone();
   const archived = !!contact.archivedAt;
@@ -187,7 +237,9 @@ export default function ContactDetailPage() {
         </Card>
       </div>
 
-      {/* 3. Inspection history -------------------------------------- */}
+      <ReportAccessPanel access={access} accessFailed={accessFailed} />
+
+      {/* 4. Inspection history -------------------------------------- */}
       <Card className="p-5">
         <BlockHeading title={m.contacts_detail_history_heading()} />
         {inspections.length === 0 ? (
