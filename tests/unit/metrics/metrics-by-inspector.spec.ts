@@ -67,7 +67,7 @@ describe('GET /api/metrics — byInspector (IA-63)', () => {
             { id: 'i-b2', tenantId: TENANT, propertyAddress: '4 Oak', date: today, status: 'completed', paymentStatus: 'paid', price: 5000, inspectorId: U1, leadInspectorId: U2, createdAt: new Date() },
         ] as never);
 
-        const res = await buildApp().request('/api/metrics?from=2000-01-01&to=2100-01-01', {}, ENV, CTX);
+        const res = await buildApp().request('/api/metrics?from=2024-01-01&to=2028-12-31', {}, ENV, CTX);
         expect(res.status).toBe(200);
         const rows = ((await res.json()) as { data: { byInspector: ByInspectorRow[] } }).data.byInspector;
         expect(rows).toHaveLength(2);
@@ -95,7 +95,7 @@ describe('GET /api/metrics — byInspector (IA-63)', () => {
             snapshotJson: '{}', publishedAt: new Date('2026-07-04T00:00:00Z'), publishedBy: U1,
         } as never);
 
-        const res = await buildApp().request('/api/metrics?from=2000-01-01&to=2100-01-01', {}, ENV, CTX);
+        const res = await buildApp().request('/api/metrics?from=2024-01-01&to=2028-12-31', {}, ENV, CTX);
         const rows = ((await res.json()) as { data: { byInspector: ByInspectorRow[] } }).data.byInspector;
 
         const alice = rows.find((r) => r.inspectorId === U1)!;

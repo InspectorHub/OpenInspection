@@ -27,8 +27,11 @@ describe('resolveMetricsWindow', () => {
     });
 
     it('ignores a malformed bound rather than erroring on a hand-built request', () => {
+        // Malformed `from` falls back to the default (three months before now =
+        // 2026-04-29), which lands AFTER the supplied `to` — and the reversed
+        // pair then swaps, same as any other reversed input.
         expect(resolveMetricsWindow({ from: 'yesterday', to: '2026-03-31' }, NOW))
-            .toEqual({ from: '2026-04-29', to: '2026-03-31' } as never);
+            .toEqual({ from: '2026-03-31', to: '2026-04-29' });
     });
 
     it('rejects an impossible civil date that Date.UTC would silently roll over', () => {

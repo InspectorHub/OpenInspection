@@ -4292,6 +4292,10 @@
             },
             "maxItems": 5,
             "description": "Up to 5 previously-uploaded attachments."
+          },
+          "contactId": {
+            "type": "string",
+            "description": "Which contact's thread to post into (compose picker). Omitted: the primary client's thread. 404 when the contact is not on this inspection."
           }
         },
         "required": [
@@ -6640,33 +6644,6 @@
     "description": "Public, unauthenticated read-only probe for the portal report-landing BFF loader. Resolves the report token to a role kind and, for agent-kind tokens only, whether a global agent account exists for the recipient email. A bad/expired/mismatched token replies 200 with kind: null rather than 401 — this is a context probe, not an auth check."
   },
   {
-    "operationId": "getAutomationLog",
-    "method": "GET",
-    "pathTemplate": "/api/automations/logs/{inspectionId}",
-    "scopes": [
-      "read"
-    ],
-    "tag": "automations",
-    "tier": "extended",
-    "inputSchema": {
-      "parameters": [
-        {
-          "name": "inspectionId",
-          "in": "path",
-          "required": true,
-          "description": "TODO describe inspectionId field for the OpenInspection MCP integration",
-          "schema": {
-            "type": "string",
-            "description": "TODO describe inspectionId field for the OpenInspection MCP integration"
-          }
-        }
-      ],
-      "body": null
-    },
-    "summary": "Get automation log for current tenant",
-    "description": "Auto-generated placeholder for getAutomationLog (GET /logs/{inspectionId}, automations domain). TODO: replace with a real description sourced from the handler."
-  },
-  {
     "operationId": "getBookingAvailability",
     "method": "GET",
     "pathTemplate": "/api/public/availability/{inspectorId}",
@@ -6896,6 +6873,47 @@
     "description": "Retrieve detailed information about a single inspection."
   },
   {
+    "operationId": "getInspectionCommunication",
+    "method": "GET",
+    "pathTemplate": "/api/inspections/{id}/communication",
+    "scopes": [
+      "read"
+    ],
+    "tag": "inspections",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Inspection identifier.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Inspection identifier."
+          }
+        },
+        {
+          "name": "markRead",
+          "in": "query",
+          "required": false,
+          "description": "When set, marks every counterparty-authored message on the inspection read — the caller is DISPLAYING the merged Messages view, where all threads are visible at once. A poll refreshing a closed block must omit it.",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "1"
+            ],
+            "description": "When set, marks every counterparty-authored message on the inspection read — the caller is DISPLAYING the merged Messages view, where all threads are visible at once. A poll refreshing a closed block must omit it."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "The inspection's Communication payload: person-written messages and platform-sent notices",
+    "description": "Returns the inspection's communication in two never-interleaved arrays: messages (written by people — the client, agents, staff) and deliveries (sent by the platform — automation emails and SMS with their per-recipient outcome and raw skip/fail reason)."
+  },
+  {
     "operationId": "getInspectionCompliance",
     "method": "GET",
     "pathTemplate": "/api/inspections/{id}/compliance",
@@ -6987,7 +7005,7 @@
       "body": null
     },
     "summary": "Aggregate hub payload (people, schedule, services, agreement, invoice, report status)",
-    "description": "Returns one aggregate payload for the inspection hub page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection's agreement requests, the most recent invoice, and the publish-readiness summary."
+    "description": "Returns one aggregate payload for the inspector portal page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection's agreement requests, the most recent invoice, and the publish-readiness summary."
   },
   {
     "operationId": "getInspectionPrefs",
@@ -7222,6 +7240,34 @@
     },
     "summary": "List messages for an inspection (inspector view)",
     "description": "Returns the message thread for an inspection (oldest first) and marks all client messages read. Inspector-authenticated."
+  },
+  {
+    "operationId": "getMessageThread",
+    "method": "GET",
+    "pathTemplate": "/api/messages/threads/{contactId}",
+    "scopes": [
+      "read"
+    ],
+    "tag": "messages",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Contact whose thread to read.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact whose thread to read."
+          }
+        }
+      ],
+      "body": null
+    },
+    "summary": "One contact's full thread (marks it read)",
+    "description": "Every message with this contact — across inspections and the rows with no inspection attached — oldest first. Reading it marks the thread's counterparty messages read."
   },
   {
     "operationId": "getMyAccount",
@@ -8700,11 +8746,34 @@
     "tag": "metrics",
     "tier": "extended",
     "inputSchema": {
-      "parameters": [],
+      "parameters": [
+        {
+          "name": "from",
+          "in": "query",
+          "required": false,
+          "description": "First day of the window (inclusive), YYYY-MM-DD.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "First day of the window (inclusive), YYYY-MM-DD."
+          }
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "required": false,
+          "description": "Last day of the window (inclusive), YYYY-MM-DD.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Last day of the window (inclusive), YYYY-MM-DD."
+          }
+        }
+      ],
       "body": null
     },
-    "summary": "Section × rating bucket counts across this tenant's inspections",
-    "description": "Auto-generated placeholder for listAnalyticFindingsHeatmap (GET /findings-heatmap, metrics domain). TODO: replace with a real description sourced from the handler."
+    "summary": "Section × rating-level counts across this tenant's inspections",
+    "description": "Counts rated items by template section and rating level over an inclusive `from`..`to` window. Columns are the tenant's own rating levels minus Not Inspected / Not Present; rows are template sections ordered by volume, with unresolvable sections collected in a flagged catch-all row."
   },
   {
     "operationId": "listAnalyticGrowth",
@@ -10282,6 +10351,22 @@
     "description": "Returns the tenant message templates, optionally filtered by channel (email | sms)."
   },
   {
+    "operationId": "listMessageThreads",
+    "method": "GET",
+    "pathTemplate": "/api/messages/threads",
+    "scopes": [
+      "read"
+    ],
+    "tag": "messages",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [],
+      "body": null
+    },
+    "summary": "Company-wide message inbox: one row per contact thread",
+    "description": "Per-contact thread summaries across every inspection and the no-inspection outreach rows, newest activity first."
+  },
+  {
     "operationId": "listMetrics",
     "method": "GET",
     "pathTemplate": "/api/metrics",
@@ -10293,26 +10378,32 @@
     "inputSchema": {
       "parameters": [
         {
-          "name": "period",
+          "name": "from",
           "in": "query",
           "required": false,
-          "description": "TODO describe period field for the OpenInspection MCP integration",
+          "description": "First day of the window (inclusive), YYYY-MM-DD. Defaults to three months before `to`.",
           "schema": {
             "type": "string",
-            "enum": [
-              "3m",
-              "6m",
-              "12m"
-            ],
-            "default": "12m",
-            "description": "TODO describe period field for the OpenInspection MCP integration"
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "First day of the window (inclusive), YYYY-MM-DD. Defaults to three months before `to`."
+          }
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "required": false,
+          "description": "Last day of the window (inclusive), YYYY-MM-DD. Defaults to today.",
+          "schema": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Last day of the window (inclusive), YYYY-MM-DD. Defaults to today."
           }
         }
       ],
       "body": null
     },
     "summary": "List metrics for current tenant",
-    "description": "Auto-generated placeholder for listMetrics (GET /, metrics domain). TODO: replace with a real description sourced from the handler."
+    "description": "Revenue and volume aggregates over an inclusive `from`..`to` civil-date window: monthly series, top referring agents, per-inspector productivity, service mix, and paid/unpaid split. Omitting both bounds returns the trailing three months."
   },
   {
     "operationId": "listNotifications",
@@ -15687,6 +15778,51 @@
     },
     "summary": "Seed the Document Review checklist",
     "description": "Seeds the Document Review checklist (ASTM §8.6) from the platform catalog. Idempotent — items already present for this inspection are left untouched."
+  },
+  {
+    "operationId": "sendMessageThread",
+    "method": "POST",
+    "pathTemplate": "/api/messages/threads/{contactId}",
+    "scopes": [
+      "write"
+    ],
+    "tag": "messages",
+    "tier": "extended",
+    "inputSchema": {
+      "parameters": [
+        {
+          "name": "contactId",
+          "in": "path",
+          "required": true,
+          "description": "Contact whose thread to post into.",
+          "schema": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Contact whose thread to post into."
+          }
+        }
+      ],
+      "body": {
+        "type": "object",
+        "properties": {
+          "body": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 5000,
+            "description": "Message text."
+          },
+          "inspectionId": {
+            "type": "string",
+            "description": "Optional inspection mention — the nullable inspection_id column with a value, nothing more. No parser, no separate mention table."
+          }
+        },
+        "required": [
+          "body"
+        ]
+      }
+    },
+    "summary": "Send into a contact thread, optionally mentioning an inspection",
+    "description": "Posts an inspector-authored message to the contact thread. With inspectionId it is exactly the per-inspection send; without, it is pre-booking outreach — stored on the thread and nudged by a plain email, since no contact-facing surface shows no-inspection threads yet."
   },
   {
     "operationId": "sendTenant",

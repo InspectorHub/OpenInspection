@@ -107,7 +107,7 @@ export function presetRange(id: PresetId, today: string): MetricsRange {
 }
 
 /** The default window when the URL names none. */
-export const DEFAULT_PRESET: PresetId = "3m";
+const DEFAULT_PRESET: PresetId = "3m";
 
 /**
  * Which preset, if any, a range currently equals. Used to light up the active

@@ -22,7 +22,7 @@ import { useState } from "react";
 import { Card, Select, Table } from "@core/shared-ui";
 import { m } from "~/paraglide/messages";
 
-export interface FindingsSystem {
+interface FindingsSystem {
   systemId: string;
   systemName: string;
   columns: { key: string; label: string; color: string }[];

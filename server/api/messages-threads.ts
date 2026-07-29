@@ -144,5 +144,5 @@ export const messageThreadRoutes = createApiRouter()
         return c.json({ success: true as const, data: row }, 201);
     });;
 
-export type MessageThreadsApi = typeof messageThreadRoutes;
-export default messageThreadRoutes;
+// No default export and no standalone Api type: the router composes onto
+// /api/messages inside messages.ts, so its types flow through MessagesApi.

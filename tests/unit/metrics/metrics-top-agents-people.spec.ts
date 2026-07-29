@@ -69,7 +69,7 @@ describe('GET /api/metrics — topAgents via inspection_people (Task 9c)', () =>
         await people.addPerson(TENANT, INSP_1, AGENT_CONTACT, roleProfileId('buyer_agent'));
         await people.addPerson(TENANT, INSP_2, AGENT_CONTACT, roleProfileId('buyer_agent'));
 
-        const res = await buildApp().request('/api/metrics?from=2000-01-01&to=2100-01-01', {}, ENV, CTX);
+        const res = await buildApp().request('/api/metrics?from=2024-01-01&to=2028-12-31', {}, ENV, CTX);
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { topAgents: { agentId: string | null; agentName: string; count: number; revenue: number }[] } };
         expect(body.data.topAgents).toHaveLength(1);
@@ -84,7 +84,7 @@ describe('GET /api/metrics — topAgents via inspection_people (Task 9c)', () =>
         await db.insert(schema.inspections).values({
             id: INSP_1, tenantId: TENANT, propertyAddress: '1 Main', date: today, status: 'confirmed', paymentStatus: 'paid', price: 10000, referredByAgentId: null, inspectorId: null, createdAt: new Date(),
         });
-        const res = await buildApp().request('/api/metrics?from=2000-01-01&to=2100-01-01', {}, ENV, CTX);
+        const res = await buildApp().request('/api/metrics?from=2024-01-01&to=2028-12-31', {}, ENV, CTX);
         expect(res.status).toBe(200);
         const body = await res.json() as { data: { topAgents: unknown[] } };
         expect(body.data.topAgents).toEqual([]);

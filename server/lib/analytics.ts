@@ -87,14 +87,14 @@ export interface HeatmapLevel {
     order?:       number;
 }
 
-export interface FindingsColumn {
+interface FindingsColumn {
     /** Stable slug of the level label — the key inside every row's `counts`. */
     key:   string;
     label: string;
     color: string;
 }
 
-export interface FindingsRow {
+interface FindingsRow {
     section: string;
     counts:  Record<string, number>;
     total:   number;
@@ -109,7 +109,7 @@ export interface FindingsRow {
 }
 
 /** One rating system's self-contained matrix. */
-export interface FindingsSystemMatrix {
+interface FindingsSystemMatrix {
     systemId:   string;
     systemName: string;
     columns:    FindingsColumn[];
@@ -145,10 +145,10 @@ export interface HeatmapSystem {
     levels: HeatmapLevel[];
 }
 
-export const UNKNOWN_SECTION = 'Unknown';
+const UNKNOWN_SECTION = 'Unknown';
 
 /** Level label → the `counts` key. Lowercase, non-alphanumerics collapsed. */
-export function findingsColumnKey(label: string): string {
+function findingsColumnKey(label: string): string {
     return label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'unlabelled';
 }
 

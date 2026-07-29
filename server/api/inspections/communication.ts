@@ -120,5 +120,6 @@ const communicationRoutes = createApiRouter()
         }, 200);
     });
 
-export type CommunicationApi = typeof communicationRoutes;
+// Types flow through InspectionsApi via the router composition in
+// ../inspections.ts; no standalone Api type needed.
 export default communicationRoutes;
