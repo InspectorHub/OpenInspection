@@ -124,6 +124,28 @@ export default tseslint.config(
             // hide-on-load, use style="display:none" + x-show.
             'no-restricted-syntax': ['error',
                 {
+                    // IA-117 — an id validator must never be STRICTER than the
+                    // column it guards. Every id here is a plain TEXT column:
+                    // each writer happens to mint crypto.randomUUID() today, but
+                    // the COLUMN makes no such promise and the API must not make
+                    // it either.
+                    //
+                    // Not theoretical. `.uuid()` on contacts.id 400'd the
+                    // report-access lookup, and the page rendered that as "this
+                    // contact cannot open any reports" about someone holding two
+                    // live links. The same shape on invoices.id made Mark paid do
+                    // nothing, and earlier on inspectorId it rejected a whole
+                    // patch (IA-87). Three times, each found by a person.
+                    //
+                    // Relaxing loses nothing: a malformed id reaches the
+                    // tenant-scoped lookup and 404s, which is the honest answer.
+                    // `.trim()` matters — a bare `.min(1)` accepts "%20".
+                    // If a value really is UUID-shaped by construction rather
+                    // than convention, disable inline WITH that reason.
+                    selector: "CallExpression[callee.property.name='uuid'][callee.object.callee.property.name='string']",
+                    message: 'Do not validate an id with z.string().uuid() — these are opaque TEXT columns and the check is stricter than the column promises (IA-117/IA-87). Use z.string().trim().min(1).',
+                },
+                {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
                 },
@@ -248,6 +270,28 @@ export default tseslint.config(
             // Turn off ONLY the role-literal restriction for these files; all other rules still apply.
             'no-restricted-syntax': ['error',
                 {
+                    // IA-117 — an id validator must never be STRICTER than the
+                    // column it guards. Every id here is a plain TEXT column:
+                    // each writer happens to mint crypto.randomUUID() today, but
+                    // the COLUMN makes no such promise and the API must not make
+                    // it either.
+                    //
+                    // Not theoretical. `.uuid()` on contacts.id 400'd the
+                    // report-access lookup, and the page rendered that as "this
+                    // contact cannot open any reports" about someone holding two
+                    // live links. The same shape on invoices.id made Mark paid do
+                    // nothing, and earlier on inspectorId it rejected a whole
+                    // patch (IA-87). Three times, each found by a person.
+                    //
+                    // Relaxing loses nothing: a malformed id reaches the
+                    // tenant-scoped lookup and 404s, which is the honest answer.
+                    // `.trim()` matters — a bare `.min(1)` accepts "%20".
+                    // If a value really is UUID-shaped by construction rather
+                    // than convention, disable inline WITH that reason.
+                    selector: "CallExpression[callee.property.name='uuid'][callee.object.callee.property.name='string']",
+                    message: 'Do not validate an id with z.string().uuid() — these are opaque TEXT columns and the check is stricter than the column promises (IA-117/IA-87). Use z.string().trim().min(1).',
+                },
+                {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',
                 },
@@ -290,6 +334,28 @@ export default tseslint.config(
         files: ['app/routes/**/*.ts', 'app/routes/**/*.tsx'],
         rules: {
             'no-restricted-syntax': ['error',
+                {
+                    // IA-117 — an id validator must never be STRICTER than the
+                    // column it guards. Every id here is a plain TEXT column:
+                    // each writer happens to mint crypto.randomUUID() today, but
+                    // the COLUMN makes no such promise and the API must not make
+                    // it either.
+                    //
+                    // Not theoretical. `.uuid()` on contacts.id 400'd the
+                    // report-access lookup, and the page rendered that as "this
+                    // contact cannot open any reports" about someone holding two
+                    // live links. The same shape on invoices.id made Mark paid do
+                    // nothing, and earlier on inspectorId it rejected a whole
+                    // patch (IA-87). Three times, each found by a person.
+                    //
+                    // Relaxing loses nothing: a malformed id reaches the
+                    // tenant-scoped lookup and 404s, which is the honest answer.
+                    // `.trim()` matters — a bare `.min(1)` accepts "%20".
+                    // If a value really is UUID-shaped by construction rather
+                    // than convention, disable inline WITH that reason.
+                    selector: "CallExpression[callee.property.name='uuid'][callee.object.callee.property.name='string']",
+                    message: 'Do not validate an id with z.string().uuid() — these are opaque TEXT columns and the check is stricter than the column promises (IA-117/IA-87). Use z.string().trim().min(1).',
+                },
                 {
                     selector: "JSXAttribute[name.name='x-cloak']",
                     message: 'Avoid x-cloak on nested JSX elements — Alpine does not auto-remove it, so [x-cloak]{display:none} stays sticky. Use style="display:none" + x-show, or place x-cloak only on the outermost x-data element. See main-layout.tsx comment.',

@@ -7,7 +7,7 @@ const LineItemSchema = z.object({
 });
 
 export const CreateInvoiceSchema = z.object({
-    inspectionId: z.string().uuid().optional().nullable().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().trim().min(1).optional().nullable().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
     clientName: z.string().min(1).max(100).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     clientEmail: z.string().email().optional().nullable().describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     amountCents: z.number().int().min(0).describe('TODO describe amountCents field for the OpenInspection MCP integration'),
@@ -23,7 +23,7 @@ export const CreateInvoiceSchema = z.object({
  * link. Tenant scope comes from the JWT, never the body.
  */
 export const RequestPaymentSchema = z.object({
-    inspectionId: z.string().uuid().describe('Inspection whose invoice to send a payment request for'),
+    inspectionId: z.string().trim().min(1).describe('Inspection whose invoice to send a payment request for'),
 }).openapi('RequestPayment');
 
 export const RequestPaymentResponseSchema = z.object({
@@ -39,9 +39,9 @@ export const MarkInvoicePaidSchema = z.object({
 }).openapi('MarkInvoicePaid');
 
 export const InvoiceResponseSchema = z.object({
-    id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
-    inspectionId: z.string().uuid().nullable().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
+    tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().trim().min(1).nullable().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
     clientName: z.string().nullable().describe('TODO describe clientName field for the OpenInspection MCP integration'),
     clientEmail: z.string().nullable().describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     amountCents: z.number().describe('TODO describe amountCents field for the OpenInspection MCP integration'),

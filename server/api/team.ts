@@ -86,7 +86,7 @@ const updateTeamMemberRoute = createRoute(withMcpMetadata({
     description: 'Changes role and/or capability overrides for an active member. A role change also invalidates the member\'s sessions and MCP grants, since the role is a JWT claim. Refuses to demote the last owner, to change your own role, or to assign the agent role (agents are granted per-inspection access, not seats).',
     middleware: [requireRole('manager', 'owner')],
     request: {
-        params: z.object({ id: z.string().uuid().describe('The member\'s user id.') }),
+        params: z.object({ id: z.string().trim().min(1).describe('The member\'s user id.') }),
         body: { content: { 'application/json': { schema: UpdateMemberSchema } } },
     },
     responses: {
@@ -111,7 +111,7 @@ const removeTeamMemberRoute = createRoute(withMcpMetadata({
     summary: 'Remove a team member',
     middleware: [requireRole('manager', 'owner')],
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {
@@ -140,7 +140,7 @@ const cancelInviteRoute = createRoute(withMcpMetadata({
     description: 'Hard-deletes a pending tenant_invites row that belongs to the caller tenant. 404 when the token is unknown, already accepted, or belongs to another tenant.',
     middleware: [requireRole('manager', 'owner')],
     request: {
-        params: z.object({ token: z.string().uuid().describe('The pending invite token (tenant_invites.id).') }),
+        params: z.object({ token: z.string().trim().min(1).describe('The pending invite token (tenant_invites.id).') }),
     },
     responses: {
         200: {
@@ -165,7 +165,7 @@ const resendInviteRoute = createRoute(withMcpMetadata({
     description: 'Re-sends the invitation email for an existing pending tenant_invites row. 404 when the token is unknown, accepted, or cross-tenant.',
     middleware: [requireRole('manager', 'owner')],
     request: {
-        params: z.object({ token: z.string().uuid().describe('The pending invite token (tenant_invites.id).') }),
+        params: z.object({ token: z.string().trim().min(1).describe('The pending invite token (tenant_invites.id).') }),
     },
     responses: {
         200: {

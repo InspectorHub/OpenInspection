@@ -6,7 +6,7 @@ import { INSPECTION_STATUSES } from '../../status/inspection-status';
  * Core Inspection Schema (Output)
  */
 export const InspectionSchema = z.object({
-    id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
     propertyAddress: z.string().openapi({ example: '123 Main St, Anytown' }).describe('TODO describe propertyAddress field for the OpenInspection MCP integration'),
     clientName: z.string().nullable().openapi({ example: 'John Doe' }).describe('TODO describe clientName field for the OpenInspection MCP integration'),
     clientEmail: z.string().email().nullable().openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
@@ -32,7 +32,7 @@ export const InspectionListQuerySchema = z.object({
     cursor: z.string().optional().openapi({ example: 'eyJpZCI6IjU1MGU4NDAwLWUyOWItNDFkNC1hNzE2LTQ0NjY1NTQ0MDAwMCJ9' }).describe('TODO describe cursor field for the OpenInspection MCP integration'),
     status: z.enum(INSPECTION_STATUSES).optional().openapi({ example: 'completed' }).describe('TODO describe status field for the OpenInspection MCP integration'),
     search: z.string().optional().openapi({ example: '123 Main' }).describe('TODO describe search field for the OpenInspection MCP integration'),
-    inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-01-01' }).describe('TODO describe dateFrom field for the OpenInspection MCP integration'),
     dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').optional().openapi({ example: '2024-12-31' }).describe('TODO describe dateTo field for the OpenInspection MCP integration'),
     // One filter vocabulary across the API and the workspace: a filter is named
@@ -58,12 +58,12 @@ export const CreateInspectionSchema = z.object({
         .openapi({ example: 'john@example.com' }).describe('TODO describe clientEmail field for the OpenInspection MCP integration'),
     clientPhone: z.string().max(30).optional().nullable().openapi({ example: '(555) 123-4567' }).describe('TODO describe clientPhone field for the OpenInspection MCP integration'),
     templateId: z.string().min(1, 'Template is required').openapi({ example: '550e8400-e29b-41d4-a716-446655440002' }).describe('TODO describe templateId field for the OpenInspection MCP integration'),
-    inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440001' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     date: z.string().datetime().optional().openapi({ example: '2024-03-20T10:00:00Z' }).describe('TODO describe date field for the OpenInspection MCP integration'),
-    referredByAgentId: z.string().uuid().optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440003' }).describe('TODO describe referredByAgentId field for the OpenInspection MCP integration'),
+    referredByAgentId: z.string().trim().min(1).optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440003' }).describe('TODO describe referredByAgentId field for the OpenInspection MCP integration'),
     // R7-09: Buyer's Agent — separate from listing agent. Input-only DTO field;
     // mirrored into inspection_people (listing_agent role), not an inspections column (dropped, Task 13).
-    sellingAgentId: z.string().uuid().optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440004' }).describe('TODO describe sellingAgentId field for the OpenInspection MCP integration'),
+    sellingAgentId: z.string().trim().min(1).optional().nullable().openapi({ example: '550e8400-e29b-41d4-a716-446655440004' }).describe('TODO describe sellingAgentId field for the OpenInspection MCP integration'),
     // Spec 5D — geocoded address fields (set when client picked from Places autocomplete).
     addressPlaceId: z.string().min(1).max(200).optional().nullable().describe('TODO describe addressPlaceId field for the OpenInspection MCP integration'),
     addressStreet:  z.string().max(200).optional().nullable().describe('TODO describe addressStreet field for the OpenInspection MCP integration'),
@@ -190,9 +190,9 @@ export const InspectionCountsSchema = z.object({
  * Validation schema for bulk operations.
  */
 export const BulkInspectionSchema = z.object({
-    ids: z.array(z.string().uuid()).min(1).max(100).describe('TODO describe ids field for the OpenInspection MCP integration'),
+    ids: z.array(z.string().trim().min(1)).min(1).max(100).describe('TODO describe ids field for the OpenInspection MCP integration'),
     action: z.enum(['assignInspector', 'updateStatus']).describe('TODO describe action field for the OpenInspection MCP integration'),
-    inspectorId: z.string().uuid().optional().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).optional().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     status: z.enum(INSPECTION_STATUSES).optional().describe('TODO describe status field for the OpenInspection MCP integration'),
 }).openapi('BulkInspection');
 

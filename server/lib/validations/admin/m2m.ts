@@ -5,7 +5,7 @@ import { z } from '@hono/zod-openapi';
  * slug comes from URL param, not body.
  */
 export const TenantStatusBodySchema = z.object({
-    id: z.string().uuid().optional().describe('TODO describe id field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).optional().describe('TODO describe id field for the OpenInspection MCP integration'),
     status: z.string().min(1).describe('TODO describe status field for the OpenInspection MCP integration'),
     tier: z.string().optional().describe('TODO describe tier field for the OpenInspection MCP integration'),
     name: z.string().optional().describe('TODO describe name field for the OpenInspection MCP integration'),

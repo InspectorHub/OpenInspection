@@ -85,7 +85,7 @@ const getInspectionRoute = createRoute(withMcpMetadata({
     description: 'Retrieve detailed information about a single inspection.',
     request: {
         params: z.object({
-            id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+            id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
         }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     responses: {
@@ -118,7 +118,7 @@ const deleteInspectionRoute = createRoute(withMcpMetadata({
     description: "Permanently remove an inspection record. (DELETE /{id}, inspections domain).",
     request: {
         params: z.object({
-            id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+            id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
         }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
@@ -146,7 +146,7 @@ const updateInspectionRoute = createRoute(withMcpMetadata({
     description: "Partially update an inspection record. (PATCH /{id}, inspections domain).",
     request: {
         params: z.object({
-            id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+            id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
         }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
@@ -214,7 +214,7 @@ const cloneInspectionRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "Clone inspection for current tenant",
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {

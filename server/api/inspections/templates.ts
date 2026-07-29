@@ -200,7 +200,7 @@ const updateTemplateRoute = createRoute(withMcpMetadata({
     tags: ["inspections", "templates"],
     summary: "Update inspection template for current tenant",
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
                 'application/json': {
@@ -234,7 +234,7 @@ const deleteTemplateRoute = createRoute(withMcpMetadata({
     tags: ["inspections", "templates"],
     summary: "Delete inspection template for current tenant",
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {

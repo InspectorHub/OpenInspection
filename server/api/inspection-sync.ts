@@ -21,7 +21,7 @@ const syncRoutes = createApiRouter()
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         params: z.object({
-            id:         z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+            id:         z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
             itemId:     z.string().describe('TODO describe itemId field for the OpenInspection MCP integration'),
             photoIndex: z.coerce.number().int().nonnegative().describe('TODO describe photoIndex field for the OpenInspection MCP integration'),
         }).describe('TODO describe params field for the OpenInspection MCP integration'),
@@ -79,7 +79,7 @@ const syncRoutes = createApiRouter()
     summary: 'Record inspector signature on an inspection (authenticated)',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: InspectorSignatureSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     responses: {
@@ -135,7 +135,7 @@ const syncRoutes = createApiRouter()
     tags: ["inspections"],
     summary: 'Upgrade inspection template snapshot to current master version',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: { 200: { content: { 'application/json': { schema: z.object({ success: z.literal(true).describe('TODO describe success field for the OpenInspection MCP integration'), data: z.object({ from: z.number().describe('TODO describe from field for the OpenInspection MCP integration'), to: z.number().describe('TODO describe to field for the OpenInspection MCP integration') }).describe('TODO describe data field for the OpenInspection MCP integration') }) } }, description: 'Upgraded' } },
     operationId: "upgradeInspection",
     description: "Auto-generated placeholder for upgradeInspection (POST /{id}/template/upgrade, inspections domain). TODO: replace with a real description sourced from the handler."

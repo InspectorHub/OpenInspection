@@ -40,7 +40,7 @@ const getPropertyFactsRoute = createRoute(withMcpMetadata({
     summary: "List inspection property facts",
     description: 'Returns the Property Facts strip payload (year built, sqft, foundation, lot, beds, baths).',
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
     responses: {
@@ -64,7 +64,7 @@ export const updatePropertyFactsRoute = createRoute(withMcpMetadata({
     summary: "Patch inspection property fact",
     description: 'Patches the Property Facts strip plus the commercial subtype-preset `metadata` envelope. Omitted keys are unchanged; null clears a field.',
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: PropertyFactsWriteSchema.describe('Property Facts strip fields plus a metadata envelope for non-dedicated commercial subtype-preset fields.') } } },
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
@@ -89,7 +89,7 @@ const updatePcaNarrativeRoute = createRoute(withMcpMetadata({
     summary: "Patch inspection PCA report narrative",
     description: 'Patches the PCA report narrative blocks. Omitted keys are unchanged; empty strings fall back to seed copy on render.',
     request: {
-        params: z.object({ id: z.string().uuid().describe('Inspection id whose PCA narrative is patched') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection id whose PCA narrative is patched') }),
         body: { content: { 'application/json': { schema: PcaNarrativePatchSchema } } },
     },
     middleware: [requireRole('owner', 'manager', 'inspector')],
@@ -120,7 +120,7 @@ const autofillPropertyFactsRoute = createRoute(withMcpMetadata({
     summary: 'Auto-fill property facts from public records (Estated.io)',
     description: 'Returns mapped Property Facts payload or null + reason code. Inspector remains free to override fields manually after auto-fill.',
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: { content: { 'application/json': { schema: PropertyFactsAutofillRequestSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } } },
     },
     middleware: [requireRole('owner', 'manager')],
@@ -142,7 +142,7 @@ const getResultsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: "List inspection results for current tenant",
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         // Commercial PCA Phase U (Batch C-lazy) — OPTIONAL per-unit read-slice:
         // present ⇒ only that scope's findings (unit id, or '_default' common);
         // omitted ⇒ full map, backward compatible for every existing caller.
@@ -184,7 +184,7 @@ const updateTemplateSnapshotRoute = createRoute(withMcpMetadata({
     description: 'Replaces the templateSnapshot JSON wholesale. Validated against TemplateSchemaV2. Used by the inspection editor for inline structural edits (rating system swap, add/remove section/item).',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('Inspection ID') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }),
         body: { content: { 'application/json': { schema: PatchTemplateSnapshotBodySchema } } },
     },
     responses: {
@@ -203,7 +203,7 @@ const updateTemplateSnapshotRoute = createRoute(withMcpMetadata({
  * always preserved.
  */
 const SwitchRatingSystemSchema = z.object({
-    ratingSystemId: z.string().uuid().describe('Target rating system ID to apply to this inspection'),
+    ratingSystemId: z.string().trim().min(1).describe('Target rating system ID to apply to this inspection'),
     mode:           z.enum(['remap', 'clear']).default('remap').describe('How to handle existing ratings: remap by severity bucket or clear them'),
 });
 const SwitchRatingSystemResultSchema = z.object({
@@ -219,7 +219,7 @@ const switchRatingSystemRoute = createRoute(withMcpMetadata({
     description: 'Swaps the per-inspection ratingSystem to the target system. mode="remap" maps existing item ratings by severity bucket; mode="clear" wipes them. Notes/photos/canned comments preserved. Clears the inspection_results.ratingSystemSnapshot freeze so the new system applies end-to-end.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('Inspection ID') }),
+        params: z.object({ id: z.string().trim().min(1).describe('Inspection ID') }),
         body: { content: { 'application/json': { schema: SwitchRatingSystemSchema } } },
     },
     responses: {
@@ -239,7 +239,7 @@ const aggregateRecommendationsRoute = createRoute(withMcpMetadata({
     tags: ["inspections"],
     summary: 'Aggregate all attached recommendations + totals for repair list',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
-    request: { params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
+    request: { params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration') },
     responses: {
         200: { content: { 'application/json': { schema: AggregatedRecommendationsResponseSchema.describe('TODO describe schema field for the OpenInspection MCP integration') } }, description: 'Aggregated recommendations' },
     },

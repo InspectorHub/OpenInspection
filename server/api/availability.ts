@@ -31,7 +31,7 @@ const listAvailabilityRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         query: z.object({
-            inspectorId: z.string().uuid().optional().describe('Inspector UUID to query; defaults to the caller when omitted.'),
+            inspectorId: z.string().trim().min(1).optional().describe('Inspector UUID to query; defaults to the caller when omitted.'),
         }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
@@ -92,7 +92,7 @@ const listOverridesRoute = createRoute(withMcpMetadata({
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
         query: z.object({
-            inspectorId: z.string().uuid().optional().describe('Inspector UUID to query; defaults to the caller when omitted.'),
+            inspectorId: z.string().trim().min(1).optional().describe('Inspector UUID to query; defaults to the caller when omitted.'),
         }).describe('TODO describe query field for the OpenInspection MCP integration'),
     },
     responses: {
@@ -151,7 +151,7 @@ const deleteOverrideRoute = createRoute(withMcpMetadata({
     description: 'Removes the specified availability override entry, restoring the default recurring schedule for that date.',
     middleware: [requireRole('owner', 'manager', 'inspector')] as const,
     request: {
-        params: z.object({ id: z.string().uuid().describe('UUID of the availability override entry to delete.') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('UUID of the availability override entry to delete.') }).describe('TODO describe params field for the OpenInspection MCP integration'),
     },
     responses: {
         200: {

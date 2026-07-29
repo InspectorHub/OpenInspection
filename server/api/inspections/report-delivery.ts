@@ -40,7 +40,7 @@ const sendReportPdfRoute = createRoute(withMcpMetadata({
     summary: 'Send the inspection report to one or more role-keyed recipients',
     middleware: [requireRole('owner', 'manager', 'inspector')],
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         body: {
             content: {
                 'application/json': { schema: SendReportSchema },

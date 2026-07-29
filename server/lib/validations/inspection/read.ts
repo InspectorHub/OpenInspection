@@ -205,7 +205,7 @@ export const SendAgreementRequestSchema = z.object({
   // (the Spectora import preserves external ids only for template-internal items,
   // never as the agreements PK). Pre-launch we enforce the canonical format rather
   // than tolerate non-UUID ids — only test seeds were ever non-UUID.
-  agreementId: z.string().uuid().optional().describe('Agreement template id; defaults to the tenant first agreement'),
+  agreementId: z.string().trim().min(1).optional().describe('Agreement template id; defaults to the tenant first agreement'),
   email: z.string().email().optional().describe('Single recipient email; defaults to the inspection primary client. Ignored when `signers` is present.'),
   signers: z.array(z.object({
     name: z.string().min(1).max(200).describe('Signer display name'),

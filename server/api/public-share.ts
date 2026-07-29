@@ -27,7 +27,7 @@ const shareTokenRoute = createRoute(withMcpMetadata({
     tags: ["inspections", "public"],
     summary: 'Mint a 30-day view-only share token (customer-initiated)',
     request: {
-        params: z.object({ id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
+        params: z.object({ id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration') }).describe('TODO describe params field for the OpenInspection MCP integration'),
         // The caller MUST prove it can already see this report: the persistent
         // portal token (or legacy agent-view token) carried by the report page
         // it is forwarding from. Without this proof, knowing the inspection UUID

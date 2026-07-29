@@ -13,8 +13,8 @@ export const CreateContactSchema = z.object({
 export const UpdateContactSchema = CreateContactSchema.partial().openapi('UpdateContact');
 
 export const ContactResponseSchema = z.object({
-    id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
-    tenantId: z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
+    tenantId: z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     type: z.enum(['agent', 'client', 'other']).describe('TODO describe type field for the OpenInspection MCP integration'),
     name: z.string().describe('TODO describe name field for the OpenInspection MCP integration'),
     email: z.string().nullable().describe('TODO describe email field for the OpenInspection MCP integration'),

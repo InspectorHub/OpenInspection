@@ -325,7 +325,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -353,7 +353,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -444,7 +444,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -547,7 +547,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -624,7 +624,7 @@
           "description": "The pending invite token (tenant_invites.id).",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "The pending invite token (tenant_invites.id)."
           }
         }
@@ -716,7 +716,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -792,7 +792,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -1578,7 +1578,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -1727,7 +1727,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -4011,7 +4011,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -4041,7 +4041,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -4082,7 +4082,7 @@
           "description": "Inspection id",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection id"
           }
         }
@@ -4411,7 +4411,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -5195,7 +5195,7 @@
           "description": "UUID of the availability override entry to delete.",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "UUID of the availability override entry to delete."
           }
         }
@@ -5248,11 +5248,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Contact id.",
           "schema": {
             "type": "string",
-            "format": "uuid",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "minLength": 1,
+            "description": "Contact id."
           }
         }
       ],
@@ -5390,7 +5390,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440000",
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
@@ -5456,7 +5456,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -5506,7 +5506,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -5545,7 +5545,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -5573,7 +5573,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -5612,7 +5612,7 @@
           "description": "Inspection id",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection id"
           }
         },
@@ -5679,7 +5679,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -5790,7 +5790,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -5978,7 +5978,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -6006,7 +6006,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -6034,7 +6034,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -6096,7 +6096,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -6372,7 +6372,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -6565,7 +6565,7 @@
           "description": "Inspection id",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection id"
           }
         }
@@ -6684,7 +6684,7 @@
           "description": "TODO describe inspectorId field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe inspectorId field for the OpenInspection MCP integration"
           }
         },
@@ -6785,11 +6785,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "Contact identifier",
+          "description": "Contact id.",
           "schema": {
             "type": "string",
             "minLength": 1,
-            "description": "Contact identifier"
+            "description": "Contact id."
           }
         }
       ],
@@ -6884,7 +6884,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440000",
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
@@ -7134,7 +7134,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -7709,7 +7709,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -8237,7 +8237,7 @@
           "description": "Restrict slots to a single inspector (client choice / deep link).",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Restrict slots to a single inspector (client choice / deep link)."
           }
         }
@@ -8648,7 +8648,7 @@
           "description": "Optional agent ID to filter by. Defaults to the current user if not provided.",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Optional agent ID to filter by. Defaults to the current user if not provided."
           }
         }
@@ -8799,7 +8799,7 @@
           "description": "Inspector UUID to query; defaults to the caller when omitted.",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspector UUID to query; defaults to the caller when omitted."
           }
         }
@@ -9089,7 +9089,7 @@
           "description": "Contact id.",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Contact id."
           }
         }
@@ -9323,7 +9323,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -9448,7 +9448,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -9503,7 +9503,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -9665,7 +9665,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -9758,7 +9758,7 @@
           "description": "TODO describe inspectorId field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440001",
             "description": "TODO describe inspectorId field for the OpenInspection MCP integration"
           }
@@ -9896,7 +9896,7 @@
           "description": "Inspection id whose per-unit progress is summarized",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection id whose per-unit progress is summarized"
           }
         }
@@ -9924,7 +9924,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -9952,7 +9952,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -9980,7 +9980,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -10487,7 +10487,7 @@
           "description": "Inspector UUID to query; defaults to the caller when omitted.",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspector UUID to query; defaults to the caller when omitted."
           }
         }
@@ -11348,7 +11348,7 @@
           "description": "Invoice id to mark as paid.",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Invoice id to mark as paid."
           }
         }
@@ -11412,7 +11412,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -11456,7 +11456,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -11538,7 +11538,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "example": "550e8400-e29b-41d4-a716-446655440000",
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
@@ -11633,7 +11633,7 @@
           "description": "Inspection id whose PCA narrative is patched",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection id whose PCA narrative is patched"
           }
         }
@@ -11713,7 +11713,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -11743,7 +11743,7 @@
           "description": "Inspection ID",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection ID"
           }
         }
@@ -13881,7 +13881,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -14801,7 +14801,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -14839,11 +14839,11 @@
           "name": "id",
           "in": "path",
           "required": true,
-          "description": "TODO describe id field for the OpenInspection MCP integration",
+          "description": "Contact id.",
           "schema": {
             "type": "string",
-            "format": "uuid",
-            "description": "TODO describe id field for the OpenInspection MCP integration"
+            "minLength": 1,
+            "description": "Contact id."
           }
         }
       ],
@@ -15066,7 +15066,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -15217,7 +15217,7 @@
           "description": "The pending invite token (tenant_invites.id).",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "The pending invite token (tenant_invites.id)."
           }
         }
@@ -15418,7 +15418,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -15499,7 +15499,7 @@
           "description": "Contact id.",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Contact id."
           }
         }
@@ -15738,7 +15738,7 @@
           "description": "Inspection id that scopes the photo.",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection id that scopes the photo."
           }
         },
@@ -15939,7 +15939,7 @@
           "description": "Inspection id",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection id"
           }
         }
@@ -16227,7 +16227,7 @@
           "description": "Inspection ID",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection ID"
           }
         }
@@ -16237,7 +16237,7 @@
         "properties": {
           "ratingSystemId": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Target rating system ID to apply to this inspection"
           },
           "mode": {
@@ -16276,7 +16276,7 @@
           "description": "Inspection id whose unit-inspection mode is switched",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "Inspection id whose unit-inspection mode is switched"
           }
         }
@@ -16896,7 +16896,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         },
@@ -16994,7 +16994,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -19477,7 +19477,7 @@
           "description": "The member's user id.",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "The member's user id."
           }
         }
@@ -19507,7 +19507,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -19553,7 +19553,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -19652,7 +19652,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }
@@ -19680,7 +19680,7 @@
           "description": "TODO describe id field for the OpenInspection MCP integration",
           "schema": {
             "type": "string",
-            "format": "uuid",
+            "minLength": 1,
             "description": "TODO describe id field for the OpenInspection MCP integration"
           }
         }

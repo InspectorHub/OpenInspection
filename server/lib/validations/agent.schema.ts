@@ -6,7 +6,7 @@ import { InspectionSchema } from './inspection.schema';
  * Schema for an individual agent's reports query.
  */
 export const AgentReportsQuerySchema = z.object({
-    agentId: z.string().uuid().optional().openapi({ 
+    agentId: z.string().trim().min(1).optional().openapi({ 
         description: 'Optional agent ID to filter by. Defaults to the current user if not provided.' 
     }),
 }).openapi('AgentReportsQuery');
@@ -16,7 +16,7 @@ export const AgentReportsQuerySchema = z.object({
  */
 export const AgentReportsResponseSchema = createApiResponseSchema(
     z.object({
-        agentId: z.string().uuid().describe('TODO describe agentId field for the OpenInspection MCP integration'),
+        agentId: z.string().trim().min(1).describe('TODO describe agentId field for the OpenInspection MCP integration'),
         reports: z.array(InspectionSchema).describe('TODO describe reports field for the OpenInspection MCP integration'),
     })
 ).openapi('AgentReportsResponse');
@@ -25,7 +25,7 @@ export const AgentReportsResponseSchema = createApiResponseSchema(
  * Schema for the agent performance leaderboard.
  */
 const LeaderboardEntrySchema = z.object({
-    agentId: z.string().uuid().nullable().describe('TODO describe agentId field for the OpenInspection MCP integration'),
+    agentId: z.string().trim().min(1).nullable().describe('TODO describe agentId field for the OpenInspection MCP integration'),
     name:    z.string().nullable().optional().describe('TODO describe name field for the OpenInspection MCP integration'),
     agency:  z.string().nullable().optional().describe('TODO describe agency field for the OpenInspection MCP integration'),
     email:   z.string().nullable().optional().describe('TODO describe email field for the OpenInspection MCP integration'),
@@ -79,7 +79,7 @@ export const AgentProfileResponseSchema = createApiResponseSchema(
 // the client (default mode) or notifies the inspector for review (per-tenant
 // reviewer mode).
 export const ConciergeBookSchema = z.object({
-    tenantId:           z.string().uuid().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
+    tenantId:           z.string().trim().min(1).describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     // Naming an inspector is optional — a hold with nobody assigned is normal
     // when the agent takes whoever is free. A booking form knows the inspector's
     // user id; the tenant's own tooling knows the contact id.
@@ -98,7 +98,7 @@ export const ConciergeBookSchema = z.object({
 
 export const ConciergeBookResponseSchema = createApiResponseSchema(
     z.object({
-        inspectionId: z.string().uuid().describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+        inspectionId: z.string().trim().min(1).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
         status:       z.enum(['awaiting_inspector', 'awaiting_client']).describe('TODO describe status field for the OpenInspection MCP integration'),
     }),
 ).openapi('ConciergeBookResponse');

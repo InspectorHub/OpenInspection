@@ -26,7 +26,7 @@ export const PublicBookingSchema = z.object({
     // (per-inspector deep link / allowInspectorChoice dropdown). If supplied and
     // the inspector is unavailable or belongs to a different tenant the request
     // is rejected; the server will NOT silently reassign to a free inspector.
-    inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Optional inspector id. Omit for company-level auto-assign; supply to target a specific inspector (deep link / inspector-choice flow).'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('Optional inspector id. Omit for company-level auto-assign; supply to target a specific inspector (deep link / inspector-choice flow).'),
     turnstileToken: z.string().optional().openapi({ example: '0.xtoken...' }).describe('TODO describe turnstileToken field for the OpenInspection MCP integration'),
     // Sprint 2 S2-2 — Multi-inspection per request. Customer can pick multiple
     // services in a single visit. When omitted (legacy single-service flow),
@@ -54,7 +54,7 @@ export const PublicBookingSchema = z.object({
  * Validation schema for recurring weekly availability.
  */
 export const AvailabilitySchema = z.object({
-    inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     slots: z.array(z.object({
         dayOfWeek: z.number().min(0).max(6).openapi({ example: 1 }).describe('TODO describe dayOfWeek field for the OpenInspection MCP integration'),
         startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').openapi({ example: '09:00' }).describe('TODO describe startTime field for the OpenInspection MCP integration'),
@@ -66,7 +66,7 @@ export const AvailabilitySchema = z.object({
  * Validation schema for date-specific availability overrides.
  */
 export const OverrideSchema = z.object({
-    inspectorId: z.string().uuid().optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).optional().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (YYYY-MM-DD)').openapi({ example: '2024-04-16' }).describe('TODO describe date field for the OpenInspection MCP integration'),
     isAvailable: z.boolean().openapi({ example: false }).describe('TODO describe isAvailable field for the OpenInspection MCP integration'),
     startTime: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format (HH:mm)').optional().nullable().openapi({ example: '09:00' }).describe('TODO describe startTime field for the OpenInspection MCP integration'),
@@ -77,7 +77,7 @@ export const OverrideSchema = z.object({
  * Response Schemas
  */
 export const InspectorsResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe id field for the OpenInspection MCP integration'),
     name: z.string().openapi({ example: 'Jane Smith' }).describe('TODO describe name field for the OpenInspection MCP integration'),
 }))).openapi('InspectorsResponse');
 
@@ -90,40 +90,40 @@ export const AvailabilityResponseSchema = createApiResponseSchema(z.object({
 export const BookingResponseSchema = createApiResponseSchema(z.object({
     success: z.boolean().openapi({ example: true }).describe('TODO describe success field for the OpenInspection MCP integration'),
     // Single-service legacy callers still get the first inspection's id here.
-    inspectionId: z.string().uuid().openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
+    inspectionId: z.string().trim().min(1).openapi({ example: '550e8400-e29b-41d4-a716-446655440000' }).describe('TODO describe inspectionId field for the OpenInspection MCP integration'),
     // Sprint 2 S2-2 — request grouping is always present, even for single-service bookings.
     requestId: z.string().optional().openapi({ example: 'req-abc12345' }).describe('TODO describe requestId field for the OpenInspection MCP integration'),
-    inspectionIds: z.array(z.string().uuid()).optional().openapi({ description: 'All inspection ids in the request' }),
+    inspectionIds: z.array(z.string().trim().min(1)).optional().openapi({ description: 'All inspection ids in the request' }),
 })).openapi('BookingResponse');
 
 export const AvailabilityListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
     tenantId: z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     dayOfWeek: z.number().describe('TODO describe dayOfWeek field for the OpenInspection MCP integration'),
     startTime: z.string().describe('TODO describe startTime field for the OpenInspection MCP integration'),
     endTime: z.string().describe('TODO describe endTime field for the OpenInspection MCP integration'),
-    inspectorId: z.string().uuid().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }))).openapi('AvailabilityListResponse');
 
 export const OverrideListResponseSchema = createApiResponseSchema(z.array(z.object({
-    id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+    id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
     tenantId: z.string().describe('TODO describe tenantId field for the OpenInspection MCP integration'),
     date: z.string().describe('TODO describe date field for the OpenInspection MCP integration'),
     isAvailable: z.boolean().describe('TODO describe isAvailable field for the OpenInspection MCP integration'),
     startTime: z.string().nullable().describe('TODO describe startTime field for the OpenInspection MCP integration'),
     endTime: z.string().nullable().describe('TODO describe endTime field for the OpenInspection MCP integration'),
-    inspectorId: z.string().uuid().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+    inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     createdAt: z.string().describe('TODO describe createdAt field for the OpenInspection MCP integration'),
 }))).openapi('OverrideListResponse');
 
 export const OverrideResponseSchema = createApiResponseSchema(z.object({
     override: z.object({
-        id: z.string().uuid().describe('TODO describe id field for the OpenInspection MCP integration'),
+        id: z.string().trim().min(1).describe('TODO describe id field for the OpenInspection MCP integration'),
         date: z.string().describe('TODO describe date field for the OpenInspection MCP integration'),
         isAvailable: z.boolean().describe('TODO describe isAvailable field for the OpenInspection MCP integration'),
         startTime: z.string().nullable().describe('TODO describe startTime field for the OpenInspection MCP integration'),
         endTime: z.string().nullable().describe('TODO describe endTime field for the OpenInspection MCP integration'),
-        inspectorId: z.string().uuid().describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
+        inspectorId: z.string().trim().min(1).describe('TODO describe inspectorId field for the OpenInspection MCP integration'),
     }).describe('TODO describe override field for the OpenInspection MCP integration'),
 })).openapi('OverrideResponse');
