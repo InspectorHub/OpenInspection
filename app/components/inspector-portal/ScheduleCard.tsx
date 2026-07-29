@@ -5,7 +5,7 @@ import { BlockHeading } from "./BlockHeading";
 import { formatInspectionDateTime } from "~/lib/format-date";
 import { toLocalInputValue, fromLocalInputValue } from "~/lib/datetime-local";
 import { m } from "~/paraglide/messages";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 
 export interface TeamMember {
     id: string;

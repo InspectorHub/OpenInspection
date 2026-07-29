@@ -7,7 +7,7 @@ import type { ContactSearchResult } from "~/components/inspection/AddPersonModal
 import { m } from "~/paraglide/messages";
 
 /**
- * Map an API `Response` to the inspection-hub action's standard result shape,
+ * Map an API `Response` to the inspector-portal action's standard result shape,
  * parameterized by the intent literal. On a non-OK response it surfaces the
  * API's `error.message` (B-4: never unconditional ok:true), falling back to the
  * caller-supplied default. On success it returns `{ ok: true, intent }`.

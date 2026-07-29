@@ -2,7 +2,7 @@
  * /messages — the company-wide Messages inbox (Track D, design §3.9).
  *
  * Threads are contact-keyed, so this page is `WHERE contact_id` over the same
- * table the inspection hub's Communication card reads — the Conversations
+ * table the inspector portal's Communication card reads — the Conversations
  * shape both Spectora and ISN ship. It is also the only surface that shows
  * messages with NO inspection attached (pre-booking outreach); the
  * per-inspection view filters those out by construction.

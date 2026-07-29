@@ -16,7 +16,7 @@ import { CLIENT_PROFILE_LIST } from "~/lib/report-style/profiles-client";
  * the closing date, the reference number, the referral source, the price and
  * the two delivery gates. Those are facts about the job, not about the report,
  * and putting them here meant the only way to change a price was to open the
- * report editor and find an unlabelled gear. They live on the inspection hub
+ * report editor and find an unlabelled gear. They live on the inspector portal
  * now, on the card for the thing each one affects (IA-87).
  */
 interface SettingsForm {

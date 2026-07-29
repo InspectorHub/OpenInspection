@@ -9,13 +9,13 @@
  * inside the REPORT editor, or (for service lines) not at all after creation.
  * These handlers are the hub's write face for them.
  *
- * They live beside the People handlers in `inspection-hub-actions.ts` in
+ * They live beside the People handlers in `inspector-portal-actions.ts` in
  * spirit, in their own module in fact, because that one is already at its
  * file-size ceiling.
  */
 
 import type { Api } from "~/lib/api-client.server";
-import { toActionResult } from "~/lib/inspection-hub-actions";
+import { toActionResult } from "~/lib/inspector-portal-actions";
 import { m } from "~/paraglide/messages";
 
 /** Fields of `UpdateInspectionSchema` the hub's order cards are allowed to write. */

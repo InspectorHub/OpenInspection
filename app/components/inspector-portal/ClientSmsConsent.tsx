@@ -3,7 +3,7 @@ import { Button } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import type { PillTone } from "~/lib/hub-blocks";
 import { m } from "~/paraglide/messages";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 
 /**
  * Client SMS consent status + attestation (Track L (E)).

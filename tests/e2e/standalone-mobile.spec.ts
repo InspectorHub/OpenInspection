@@ -129,7 +129,7 @@ test.describe.serial('Standalone Mobile (iPhone 375x812)', () => {
     test.skip('M-05: Inspector messages floating button (needs RR rebind)', async () => {});
 
     // M-06 deleted in the 2026-07 tests-reorg dedup: the /reports 301 redirect is
-    // covered more strongly by inspection-hub.spec.ts (raw 301 + exact Location
+    // covered more strongly by inspector-portal.spec.ts (raw 301 + exact Location
     // + active-tab styling). A server-side redirect is viewport-independent, so
     // there is nothing mobile-specific left to assert.
 

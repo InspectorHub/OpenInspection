@@ -63,7 +63,7 @@ function navItems(): Array<{ section: HubSection; label: string }> {
   ];
 }
 
-export default function InspectionHub({
+export default function ClientPortalHub({
   overview,
   ctx,
   brand,

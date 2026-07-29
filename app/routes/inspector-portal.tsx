@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLoaderData, Link, isRouteErrorResponse, useRouteError, useFetcher, useNavigate, useRevalidator } from "react-router";
-import type { Route } from "./+types/inspection-hub";
+import type { Route } from "./+types/inspector-portal";
 import { requireToken } from "~/lib/session.server";
 import { createApi } from "~/lib/api-client.server";
 import { formatInspectionDateTime } from "~/lib/format-date";
@@ -22,16 +22,16 @@ import DocumentsSection, {
   type DocumentCategory,
   type DocumentVisibility,
 } from "~/components/DocumentsSection";
-import { BlockHeading } from "~/components/inspection-hub/BlockHeading";
-import { ClientSmsConsent } from "~/components/inspection-hub/ClientSmsConsent";
-import { LifecycleCard } from "~/components/inspection-hub/LifecycleCard";
+import { BlockHeading } from "~/components/inspector-portal/BlockHeading";
+import { ClientSmsConsent } from "~/components/inspector-portal/ClientSmsConsent";
+import { LifecycleCard } from "~/components/inspector-portal/LifecycleCard";
 import { SendAgreementModal, type SendAgreementPayload } from "~/components/agreements/SendAgreementModal";
-import { SigningRequests } from "~/components/inspection-hub/SigningRequests";
+import { SigningRequests } from "~/components/inspector-portal/SigningRequests";
 import { SignaturePad } from "~/components/SignaturePad";
-import { RequestPaymentModal } from "~/components/inspection-hub/RequestPaymentModal";
-import { PublishReportModal } from "~/components/inspection-hub/PublishReportModal";
-import { CreateReinspectionModal } from "~/components/inspection-hub/CreateReinspectionModal";
-import { PublishNotice } from "~/components/inspection-hub/PublishNotice";
+import { RequestPaymentModal } from "~/components/inspector-portal/RequestPaymentModal";
+import { PublishReportModal } from "~/components/inspector-portal/PublishReportModal";
+import { CreateReinspectionModal } from "~/components/inspector-portal/CreateReinspectionModal";
+import { PublishNotice } from "~/components/inspector-portal/PublishNotice";
 import { PeopleEditor, type PersonRow } from "~/components/inspection/PeopleEditor";
 import { SendReportModal } from "~/components/inspection/SendReportModal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
@@ -45,21 +45,21 @@ import {
   handleSearchContacts,
   handleSendAgreement,
   handleInspectorSign,
-} from "~/lib/inspection-hub-actions";
+} from "~/lib/inspector-portal-actions";
 import {
   handleSaveOrder,
   handleServiceAdd,
   handleServicePrice,
   handleServiceRemove,
 } from "~/lib/inspection-order-actions";
-import { ScheduleCard, type TeamMember } from "~/components/inspection-hub/ScheduleCard";
-import { ServicesCard, type CatalogService } from "~/components/inspection-hub/ServicesCard";
-import { OrderDetailsCard } from "~/components/inspection-hub/OrderDetailsCard";
-import { InvoiceCard } from "~/components/inspection-hub/InvoiceCard";
-import { GateToggle } from "~/components/inspection-hub/GateToggle";
-import { CommunicationSection } from "~/components/inspection-hub/CommunicationSection";
+import { ScheduleCard, type TeamMember } from "~/components/inspector-portal/ScheduleCard";
+import { ServicesCard, type CatalogService } from "~/components/inspector-portal/ServicesCard";
+import { OrderDetailsCard } from "~/components/inspector-portal/OrderDetailsCard";
+import { InvoiceCard } from "~/components/inspector-portal/InvoiceCard";
+import { GateToggle } from "~/components/inspector-portal/GateToggle";
+import { CommunicationSection } from "~/components/inspector-portal/CommunicationSection";
 import { resolveReferralSources } from "../../server/lib/referral-sources";
-import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspection-hub-helpers";
+import { versionDiffHref, type ReinspectCandidate, type ReportVersionRow } from "~/lib/inspector-portal-helpers";
 import { isAdminRole } from "~/lib/access";
 import { m } from "~/paraglide/messages";
 import { getCloudflareEnv } from "~/lib/load-context";
@@ -297,7 +297,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const api = createApi(context, { token });
 
   // IA-65 — signing requests live on the inspection now; both intents keep
-  // their bodies in inspection-hub-actions beside the People intents.
+  // their bodies in inspector-portal-actions beside the People intents.
   if (intent === "send-agreement") return handleSendAgreement(api, id, formData);
   if (intent === "inspector-sign") return handleInspectorSign(api, formData);
 
@@ -424,7 +424,7 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   }
 
   // Plan 1B Task 5 — People editor intents. Handlers live in
-  // inspection-hub-actions.ts (same extraction convention as toActionResult
+  // inspector-portal-actions.ts (same extraction convention as toActionResult
   // above) — person-add's inline-create-then-link path and search-contacts'
   // response mapping are long enough to keep this dispatcher scannable.
   if (intent === "person-add") return handlePersonAdd(api, id, formData);

@@ -1,6 +1,5 @@
 {
   "app/routes/inspection-edit.tsx": 2489,
-  "app/routes/inspection-hub.tsx": 1138,
   "server/services/inspection/inspection-core.service.ts": 1117,
   "server/services/booking.service.ts": 969,
   "server/services/inspection/inspection-report.service.ts": 920,
@@ -63,5 +62,6 @@
   "server/lib/middleware/di.ts": 417,
   "app/routes/templates.tsx": 414,
   "app/routes/calendar.tsx": 410,
-  "server/api/secrets.ts": 401
+  "server/api/secrets.ts": 401,
+  "app/routes/inspector-portal.tsx": 1138
 }

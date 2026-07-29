@@ -5,7 +5,7 @@ import { BlockHeading } from "./BlockHeading";
 import { MoneyInput } from "~/components/MoneyInput";
 import { formatCents } from "~/lib/hub-blocks";
 import { m } from "~/paraglide/messages";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 
 export interface ServiceLine {
     id: string;

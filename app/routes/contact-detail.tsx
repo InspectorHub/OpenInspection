@@ -57,7 +57,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
   const api = createApi(context, { token });
   // Task 10's contact-detail endpoint drives the whole page in one round trip.
   const res = await api.contacts[":id"].$get({ param: { id } });
-  // Mirror inspection-hub.tsx: a non-OK response goes to the ErrorBoundary with
+  // Mirror inspector-portal.tsx: a non-OK response goes to the ErrorBoundary with
   // an actionable status rather than rendering a blank page.
   if (!res.ok) {
     throw new Response("Contact not found", {
@@ -278,7 +278,7 @@ export default function ContactDetailPage() {
   );
 }
 
-/** Shared block heading: an uppercase label (mirrors inspection-hub.tsx). */
+/** Shared block heading: an uppercase label (mirrors inspector-portal.tsx). */
 function BlockHeading({ title }: { title: string }) {
   return (
     <div className="flex items-center justify-between mb-3">

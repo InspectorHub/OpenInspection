@@ -27,7 +27,7 @@ export interface ReportVersionRow {
  * Version 1 has nothing earlier to compare against, so it gets no link.
  *
  * Lives here rather than in the route it serves: it is pure, and its spec was
- * importing it out of `~/routes/inspection-hub`, which pulled the entire page
+ * importing it out of `~/routes/inspector-portal`, which pulled the entire page
  * module — loader, action, every modal — in to test two string branches.
  */
 export function versionDiffHref(inspectionId: string, versionNumber: number): string | null {

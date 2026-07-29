@@ -3,7 +3,7 @@ import { useFetcher } from "react-router";
 import { Card, Button, Modal } from "@core/shared-ui";
 import { BlockHeading } from "./BlockHeading";
 import { m } from "~/paraglide/messages";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 
 const FIELD_CLASS =
     "mt-1 w-full h-10 px-3 rounded-md border border-ih-border bg-ih-bg-card text-ih-fg-1 text-[14px] font-medium focus:border-ih-primary focus:shadow-ih-focus outline-none";

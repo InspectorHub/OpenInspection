@@ -189,7 +189,7 @@ const hubRoute = createRoute(withMcpMetadata({
         404: { description: 'Inspection not found in this tenant' },
     },
     operationId: 'getInspectionHub',
-    description: 'Returns one aggregate payload for the inspection hub page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection\'s agreement requests, the most recent invoice, and the publish-readiness summary.',
+    description: 'Returns one aggregate payload for the inspector portal page so the loader makes a single round trip: core inspection fields, the people card, booked service lines, the tenant agreement templates, this inspection\'s agreement requests, the most recent invoice, and the publish-readiness summary.',
 }, { scopes: ['read'], tier: 'extended' }));
 
 // ── Spec 5A — report PDF render pipeline (download side) ───────────────────

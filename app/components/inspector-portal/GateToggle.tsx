@@ -1,6 +1,6 @@
 import { useFetcher } from "react-router";
 import { m } from "~/paraglide/messages";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 
 /**
  * A per-inspection delivery gate: "the client can't open the report until this

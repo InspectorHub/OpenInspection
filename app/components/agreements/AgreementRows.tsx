@@ -7,7 +7,7 @@ import { m } from "~/paraglide/messages";
  * Library → Agreements table rows.
  *
  * IA-65 — the signing-request row that used to live beside this one moved to
- * the inspection workspace (`inspection-hub/SigningRequests`), where the
+ * the inspection workspace (`inspector-portal/SigningRequests`), where the
  * envelope it describes actually belongs. What remains is the template row.
  */
 export function TemplateRow({ t }: { t: { id: string; name?: string; updatedAt?: string; createdAt?: string } }) {

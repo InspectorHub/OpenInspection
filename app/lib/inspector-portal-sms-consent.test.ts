@@ -1,5 +1,5 @@
 /**
- * Track L (Task 9, Part E) — inspection-hub SMS consent status + attestation.
+ * Track L (Task 9, Part E) — inspector-portal SMS consent status + attestation.
  *
  * Same BFF-seam approach as settings-automations.spec.ts (no React render
  * harness in this repo): exercise the exported loader/action directly against a
@@ -26,7 +26,7 @@ vi.mock('~/lib/api-client.server', () => ({
     })),
 }));
 
-import { loader, action } from '~/routes/inspection-hub';
+import { loader, action } from '~/routes/inspector-portal';
 
 type LoaderArgs = Parameters<typeof loader>[0];
 type ActionArgs = Parameters<typeof action>[0];
@@ -72,7 +72,7 @@ beforeEach(() => {
     postAttest.mockReset().mockResolvedValue(jsonRes({ success: true }));
 });
 
-describe('inspection-hub loader — SMS consent (Part E)', () => {
+describe('inspector-portal loader — SMS consent (Part E)', () => {
     it('surfaces the client consent status from GET /sms/consent', async () => {
         const data = await loader(loaderArgs());
         expect(getConsent).toHaveBeenCalledWith({ query: { inspectionId: 'insp-1' } });
@@ -92,7 +92,7 @@ describe('inspection-hub loader — SMS consent (Part E)', () => {
     });
 });
 
-describe('inspection-hub action — attest-sms (Part E)', () => {
+describe('inspector-portal action — attest-sms (Part E)', () => {
     it('intent=attest-sms posts to /sms/attest with the inspection id', async () => {
         const res = await action(actionArgs({ intent: 'attest-sms' }));
         expect(postAttest).toHaveBeenCalledWith({ json: { inspectionId: 'insp-1' } });

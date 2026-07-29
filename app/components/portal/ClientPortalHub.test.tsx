@@ -1,4 +1,4 @@
-// Spec 3 — <InspectionHub> agent-mode chrome gating.
+// Spec 3 — <ClientPortalHub> agent-mode chrome gating.
 //
 // When an agent opens their report link (token-only, no client session; the
 // server forces section='report'), the hub hides the client-only tab bar and
@@ -6,12 +6,12 @@
 // (mirrors the AgentReportActions test pattern).
 import { render } from "@testing-library/react";
 import { createRoutesStub } from "react-router";
-import InspectionHub from "./InspectionHub";
+import ClientPortalHub from "./ClientPortalHub";
 
 const OVERVIEW = {
   address: "1 Test Ave",
   date: "Jul 20, 2026",
-} as unknown as Parameters<typeof InspectionHub>[0]["overview"];
+} as unknown as Parameters<typeof ClientPortalHub>[0]["overview"];
 
 const CTX = { tenant: "acme", inspectionId: "insp-1", token: "t", signerToken: null };
 
@@ -20,7 +20,7 @@ function renderHub(agentMode: boolean, onSignOut?: () => void) {
     {
       path: "/portal/acme/i/insp-1",
       Component: () => (
-        <InspectionHub
+        <ClientPortalHub
           overview={OVERVIEW}
           ctx={CTX}
           activeSection="report"
@@ -34,7 +34,7 @@ function renderHub(agentMode: boolean, onSignOut?: () => void) {
   return render(<Stub initialEntries={["/portal/acme/i/insp-1"]} />);
 }
 
-describe("InspectionHub — agent mode", () => {
+describe("ClientPortalHub — agent mode", () => {
   it("hides the client-only tab bar when agentMode is true", () => {
     const { queryByRole } = renderHub(true);
     // Client-hub tabs are rendered as <Link>s (role=link); none should exist.

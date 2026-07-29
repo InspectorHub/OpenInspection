@@ -1,7 +1,7 @@
 /**
- * Inspection Hub E2E (#111)
+ * Inspector Portal E2E (#111)
  *
- * Two browser specs that exercise the read-only inspection hub landing and
+ * Two browser specs that exercise the read-only inspector portal landing and
  * the /reports → Published-tab retirement redirect.
  *
  *   1. A dashboard row's address link opens the hub at /inspections/{id}
@@ -20,7 +20,7 @@
  * Seed: beforeAll resets a known admin password in local D1, logs in, and
  * creates one template + one inspection so spec 1 always has a row to click.
  *
- * Run: npm run test:e2e -- inspection-hub
+ * Run: npm run test:e2e -- inspector-portal
  * (playwright.config.ts boots `npm run dev` on http://localhost:8787 and
  *  reuses an already-running server outside CI.)
  */
@@ -139,7 +139,7 @@ let inspectionId = '';
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
-test.describe.serial('Inspection Hub (#111)', () => {
+test.describe.serial('Inspector Portal (#111)', () => {
   test.beforeAll(async ({ request }) => {
     // Deterministic local seed → known credentials for the form login.
     await seedAdminPassword();

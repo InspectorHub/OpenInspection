@@ -667,7 +667,7 @@ export class BookingService {
 
         // IA-18 (#111) — capture the booker as a Client contact and link it to
         // ALL inspections this booking created so their client appears in
-        // Contacts and on the inspection hub People card.
+        // Contacts and on the inspector portal People card.
         //
         // Placement: AFTER arbitration. A losing booker self-revokes and throws
         // above, so we never stamp a contact onto inspections that were just

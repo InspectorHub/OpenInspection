@@ -1,6 +1,6 @@
 import type { useFetcher } from "react-router";
 import { Modal } from "@core/shared-ui";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 import { m } from "~/paraglide/messages";
 
 /* ------------------------------------------------------------------ */

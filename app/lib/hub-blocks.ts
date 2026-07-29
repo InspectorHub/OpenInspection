@@ -4,7 +4,7 @@
  * `deriveBlockStates(hub)` collapses the aggregate hub payload into the three
  * status pills the page renders (agreement / invoice / report). It is a pure
  * function with no React or network dependency so every status branch is unit
- * testable in isolation (see tests/web/unit/inspection-hub.spec.ts).
+ * testable in isolation (see tests/unit/inspections/inspector-portal.spec.ts).
  *
  * `formatCents` is the cents → "$X.XX" formatter used by the Services block.
  * It delegates to the shared locale-aware formatter; locale/currency default to
@@ -22,7 +22,7 @@ import type { InspectionHubSchema } from '../../server/lib/validations/inspectio
 /**
  * Pill tone union — kept in sync with packages/shared-ui/src/Pill.tsx.
  * @public — consumed via an inline `import("~/lib/hub-blocks").PillTone` type
- * reference in inspection-hub.tsx, which knip cannot trace (dynamic-import blind spot).
+ * reference in inspector-portal.tsx, which knip cannot trace (dynamic-import blind spot).
  */
 export type PillTone =
     | 'sat'

@@ -27,10 +27,10 @@ import { createApi } from "~/lib/api-client.server";
 import { resolveTenantBrand } from "~/lib/tenant-brand.server";
 import { EMPTY_BRAND } from "~/lib/brand";
 import { formatInspectionDateTime } from "~/lib/format-date";
-import InspectionHub, {
+import ClientPortalHub, {
   hubSectionNavHref,
   type HubSection,
-} from "~/components/portal/InspectionHub";
+} from "~/components/portal/ClientPortalHub";
 import { signOut } from "~/components/portal/sign-out";
 import type { StatusOverview } from "~/components/portal/InspectionStatusCards";
 import type {
@@ -158,7 +158,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   }
 
   // Backfill the minimal agent overview stand-in's .address/.date (the only
-  // fields InspectionHub reads off `overview` on a non-overview section) from
+  // fields ClientPortalHub reads off `overview` on a non-overview section) from
   // the just-fetched, token-scoped report — never from the session-gated
   // overview endpoint, which agent tokens never call (see Step 2 above).
   if (isAgentToken && report) {
@@ -371,7 +371,7 @@ export default function PortalInspection() {
   );
 
   return (
-    <InspectionHub
+    <ClientPortalHub
       overview={overview}
       ctx={ctx}
       brand={brand}

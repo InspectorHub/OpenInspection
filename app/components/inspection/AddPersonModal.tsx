@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { Modal, Button, Input, Select } from "@core/shared-ui";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 import type { RoleProfile } from "~/components/contacts/contacts-helpers";
 import { capabilitiesForKind } from "../../../server/lib/people/capabilities";
 import { m } from "~/paraglide/messages";

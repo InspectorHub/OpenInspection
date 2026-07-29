@@ -108,13 +108,13 @@ export default [
     // from /inspections). Static `new` outranks the dynamic `inspections/:id`
     // hub route, so this resolves first.
     route("inspections/new", "routes/inspections.new.tsx"),
-    // Issue #111 — the inspection hub ("where does this job stand?"). Inside the
+    // Issue #111 — the inspector portal ("where does this job stand?"). Inside the
     // auth layout: it is a management page, and sitting outside it meant walking
     // from the list into the hub dropped the entire workspace nav, leaving the
     // breadcrumb as the only way back. (The EDITOR is deliberately outside — it
     // is a full-screen work surface with its own chrome.) The hub had been
     // reproducing this layout's container by hand, which is now removed.
-    route("inspections/:id", "routes/inspection-hub.tsx"),
+    route("inspections/:id", "routes/inspector-portal.tsx"),
     route("calendar", "routes/calendar.tsx"),
     route("contacts", "routes/contacts.tsx"),
     // IA-18 (#111) — contact detail (record + inspection history + stats).

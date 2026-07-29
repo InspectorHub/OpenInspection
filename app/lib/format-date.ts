@@ -9,7 +9,7 @@ import { formatDate, formatTime } from './format';
  *  'en-US'; Phase A threads the viewer's effective locale through.
  *
  *  `timeZone` is REQUIRED, and that is the point. It used to be optional, and four
- *  of fourteen call sites left it off — two of them on the inspection hub, whose
+ *  of fourteen call sites left it off — two of them on the inspector portal, whose
  *  other calls passed it. An omitted zone falls through to Intl's default, which is
  *  the viewer's browser zone, so a single page rendered one instant in two zones: an
  *  inspection booked for 09:00 read 09:00 in the schedule card and 5:00 PM in the

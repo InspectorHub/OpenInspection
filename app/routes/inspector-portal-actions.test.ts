@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { reportActions } from '~/routes/inspection-hub';
+import { reportActions } from '~/routes/inspector-portal';
 
 const publishCaps = { publish: true };
 const noCaps = { publish: false };

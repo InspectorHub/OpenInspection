@@ -1,7 +1,7 @@
 /**
  * Shared per-inspection documents area (unified client portal, section ⑦).
  *
- * Used by BOTH the inspector inspection-hub AND the client portal Hub. Pure
+ * Used by BOTH the inspector portal AND the client portal Hub. Pure
  * presentational + helpers — NO data fetching inside. All upload / delete /
  * download actions are passed in as callbacks/hrefs by the host route.
  *

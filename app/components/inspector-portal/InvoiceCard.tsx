@@ -6,7 +6,7 @@ import { GateToggle } from "./GateToggle";
 import { MoneyInput } from "~/components/MoneyInput";
 import { formatCents, type PillTone } from "~/lib/hub-blocks";
 import { m } from "~/paraglide/messages";
-import type { action } from "~/routes/inspection-hub";
+import type { action } from "~/routes/inspector-portal";
 
 /**
  * What this inspection costs and whether it has been paid.
