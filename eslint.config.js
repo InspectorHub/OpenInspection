@@ -6,6 +6,31 @@ import jsxA11y from 'eslint-plugin-jsx-a11y';
 import importX from 'eslint-plugin-import-x';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 
+/**
+ * ESLINT_FAST — the pre-commit shape: same rules, no type information.
+ *
+ * Building the type-aware program is what eslint costs here, and on a commit it
+ * buys nothing. Measured on this repo, cache cleared:
+ *
+ *     one staged server file    15.1s  →  3.7s
+ *     two staged app files      15.8s  →  3.9s
+ *
+ * It buys nothing because every rule that NEEDS type information is 'warn'
+ * (no-floating-promises and the no-unsafe-* family below), and `.lintstagedrc`
+ * passes no `--max-warnings` — so eslint exits 0 no matter what those rules
+ * find. The only error-level TypeScript rules are `no-explicit-any` and
+ * `no-unused-vars`, and neither reads types. The hook was therefore spending
+ * ~11.5s per commit building a program whose entire output was discarded.
+ *
+ * The warnings still matter — they are just meant to be READ, not raced past on
+ * the way to a commit. `npm run lint` (CI's verify job) runs with no flag set
+ * and stays the authority; nothing below changes what CI checks.
+ */
+const FAST = !!process.env.ESLINT_FAST;
+
+/** A rule that requires type information: its normal severity, or off under ESLINT_FAST. */
+const typed = (severity = 'warn') => (FAST ? 'off' : severity);
+
 // T-hooks warn-first rollout: downgrade every rule in a plugin's preset rules
 // object to 'warn' (preserving any non-severity options), rather than hand-
 // picking which of a preset's rules to enable. Used for jsx-a11y's flat
@@ -53,7 +78,8 @@ export default tseslint.config(
         files: ['**/*.ts', '**/*.tsx'],
         languageOptions: {
             parserOptions: {
-                project: ['./tsconfig.json', './tsconfig.api.json'],
+                // Omitted under ESLINT_FAST — see the FAST note at the top of this file.
+                ...(FAST ? {} : { project: ['./tsconfig.json', './tsconfig.api.json'] }),
                 tsconfigRootDir: import.meta.dirname,
             },
         },
@@ -67,24 +93,24 @@ export default tseslint.config(
             // the specific rules called out, all at 'warn' pending cleanup.
             // floating/misused-promises are the headline pre-release signal —
             // silent unawaited promises are a data-loss bug class on Workers.
-            '@typescript-eslint/no-floating-promises': 'warn',
+            '@typescript-eslint/no-floating-promises': typed(),
             // `checksVoidReturn.attributes: false` — passing an async function to
             // a JSX event-handler prop (`onClick={async () => …}`) is idiomatic
             // React (the return is ignored by design); flagging it is pure noise.
             // The pre-release triage confirmed 43/45 misused-promises hits were
             // exactly this pattern and zero were server-executed. The remaining
             // argument/return/property checks stay on to catch genuine misuse.
-            '@typescript-eslint/no-misused-promises': ['warn', { checksVoidReturn: { attributes: false } }],
-            '@typescript-eslint/await-thenable': 'warn',
-            '@typescript-eslint/require-await': 'warn',
-            '@typescript-eslint/no-base-to-string': 'warn',
-            '@typescript-eslint/restrict-template-expressions': 'warn',
-            '@typescript-eslint/no-unnecessary-condition': 'warn',
-            '@typescript-eslint/no-unsafe-assignment': 'warn',
-            '@typescript-eslint/no-unsafe-member-access': 'warn',
-            '@typescript-eslint/no-unsafe-call': 'warn',
-            '@typescript-eslint/no-unsafe-return': 'warn',
-            '@typescript-eslint/no-unsafe-argument': 'warn',
+            '@typescript-eslint/no-misused-promises': typed(['warn', { checksVoidReturn: { attributes: false } }]),
+            '@typescript-eslint/await-thenable': typed(),
+            '@typescript-eslint/require-await': typed(),
+            '@typescript-eslint/no-base-to-string': typed(),
+            '@typescript-eslint/restrict-template-expressions': typed(),
+            '@typescript-eslint/no-unnecessary-condition': typed(),
+            '@typescript-eslint/no-unsafe-assignment': typed(),
+            '@typescript-eslint/no-unsafe-member-access': typed(),
+            '@typescript-eslint/no-unsafe-call': typed(),
+            '@typescript-eslint/no-unsafe-return': typed(),
+            '@typescript-eslint/no-unsafe-argument': typed(),
             // T-hooks Tier 3 — architecture/hygiene, warn (no --fix sweep; huge diff).
             '@typescript-eslint/consistent-type-imports': 'warn',
             '@typescript-eslint/no-import-type-side-effects': 'warn',
