@@ -39,5 +39,18 @@
   "comm_notice_manual": "Manual send",
   "comm_notice_automation": "Automation",
   "comm_recipient_norole": "Recipient",
-  "comm_action_get_consent": "Get consent"
+  "comm_action_get_consent": "Get consent",
+  "messages_meta_title": "Messages - OpenInspection",
+  "messages_heading": "Messages",
+  "messages_meta": "{count} conversations",
+  "messages_empty_list": "No conversations yet. Message a client or agent from an inspection page and the thread appears here.",
+  "messages_pick_thread": "Pick a conversation on the left.",
+  "messages_unknown_contact": "Unknown contact",
+  "messages_thread_empty_title": "No messages with this contact yet",
+  "messages_thread_empty_body": "Write below to start the conversation.",
+  "messages_thread_spans": "This conversation touches:",
+  "messages_mention_label": "About",
+  "messages_mention_aria": "Attach this message to an inspection",
+  "messages_mention_none": "No inspection",
+  "nav_item_messages": "Messages"
 }

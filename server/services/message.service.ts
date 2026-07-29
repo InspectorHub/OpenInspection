@@ -75,6 +75,106 @@ export class MessageService {
         return row;
     }
 
+    /**
+     * Company-wide inbox: one row per contact thread (design §3.9 — the
+     * Conversations shape both competitors ship). `WHERE contact_id` is the
+     * whole query once threads are contact-keyed; this summarises it per
+     * contact: who, their newest message, and how many counterparty rows are
+     * unread. Ordered newest-activity first.
+     */
+    async listThreads(tenantId: string): Promise<Array<{
+        contactId: string;
+        contactName: string | null;
+        contactEmail: string | null;
+        lastBody: string;
+        lastFromRole: string;
+        lastAt: number;
+        unread: number;
+    }>> {
+        const rows = await this.db().select({
+            contactId: inspectionMessages.contactId,
+            lastAt: sql<number>`max(${inspectionMessages.createdAt})`,
+            unread: sql<number>`sum(case when ${inspectionMessages.fromRole} != 'inspector' and ${inspectionMessages.readAt} is null then 1 else 0 end)`,
+            contactName: contacts.name,
+            contactEmail: contacts.email,
+        })
+            .from(inspectionMessages)
+            .leftJoin(contacts, and(eq(contacts.id, inspectionMessages.contactId), eq(contacts.tenantId, inspectionMessages.tenantId)))
+            .where(eq(inspectionMessages.tenantId, tenantId))
+            .groupBy(inspectionMessages.contactId)
+            .orderBy(sql`max(${inspectionMessages.createdAt}) desc`);
+
+        // Second pass for each thread's newest body — a correlated subquery in
+        // the same select would be per-dialect fragile; thread counts are small
+        // (bounded by the tenant's contact list), so one IN query is fine.
+        const latest = new Map<string, { body: string; fromRole: string }>();
+        if (rows.length > 0) {
+            const all = await this.db().select({
+                contactId: inspectionMessages.contactId,
+                body: inspectionMessages.body,
+                fromRole: inspectionMessages.fromRole,
+                createdAt: inspectionMessages.createdAt,
+            })
+                .from(inspectionMessages)
+                .where(eq(inspectionMessages.tenantId, tenantId))
+                .orderBy(inspectionMessages.createdAt);
+            for (const r of all) latest.set(r.contactId, { body: r.body, fromRole: r.fromRole });
+        }
+
+        return rows.map((r) => ({
+            contactId: r.contactId,
+            contactName: r.contactName ?? null,
+            contactEmail: r.contactEmail ?? null,
+            lastBody: latest.get(r.contactId)?.body ?? '',
+            lastFromRole: latest.get(r.contactId)?.fromRole ?? 'client',
+            lastAt: typeof r.lastAt === 'object' && r.lastAt !== null ? (r.lastAt as unknown as Date).getTime() : Number(r.lastAt),
+            unread: Number(r.unread ?? 0),
+        }));
+    }
+
+    /**
+     * One contact's full thread, across every inspection AND the rows with no
+     * inspection at all (pre-booking outreach) — the per-inspection query
+     * filters those out by construction, so this is the only reader that sees
+     * them. Inspection addresses ride along so a mention renders as a link
+     * with a human label.
+     */
+    async listThreadForContact(tenantId: string, contactId: string) {
+        const rows = await this.db().select({
+            msg: inspectionMessages,
+            propertyAddress: inspections.propertyAddress,
+        })
+            .from(inspectionMessages)
+            .leftJoin(inspections, and(
+                eq(inspections.id, inspectionMessages.inspectionId),
+                eq(inspections.tenantId, inspectionMessages.tenantId),
+            ))
+            .where(and(eq(inspectionMessages.tenantId, tenantId), eq(inspectionMessages.contactId, contactId)))
+            .orderBy(inspectionMessages.createdAt);
+        return rows.map((r) => ({ ...r.msg, propertyAddress: r.propertyAddress ?? null }));
+    }
+
+    /** Mark one contact's counterparty-authored rows read (staff opened the thread). */
+    async markContactThreadReadForStaff(tenantId: string, contactId: string) {
+        await this.db().update(inspectionMessages)
+            .set({ readAt: new Date() })
+            .where(and(
+                eq(inspectionMessages.tenantId, tenantId),
+                eq(inspectionMessages.contactId, contactId),
+                ne(inspectionMessages.fromRole, 'inspector'),
+                isNull(inspectionMessages.readAt),
+            ));
+    }
+
+    /** A contact's basic identity, tenant-scoped (compose header + send). */
+    async contactById(tenantId: string, contactId: string): Promise<ThreadContact | null> {
+        const row = await this.db().select({ contactId: contacts.id, name: contacts.name, email: contacts.email })
+            .from(contacts)
+            .where(and(eq(contacts.id, contactId), eq(contacts.tenantId, tenantId)))
+            .get();
+        return row ?? null;
+    }
+
     async listForInspection(inspectionId: string, tenantId: string) {
         return this.db().select().from(inspectionMessages)
             .where(and(eq(inspectionMessages.inspectionId, inspectionId), eq(inspectionMessages.tenantId, tenantId)))

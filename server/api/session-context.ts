@@ -172,6 +172,11 @@ const sessionContextRoutes = createApiRouter()
 
         const privacyUrl = c.env.PRIVACY_URL?.trim() || null;
 
+        let unreadMessages = 0;
+        try {
+            unreadMessages = await c.var.services.message.unreadCountForTenant(tenantId);
+        } catch { /* badge degrades to 0; the layout must never fail on it */ }
+
         return c.json({
             success: true,
             data: {
@@ -209,6 +214,9 @@ const sessionContextRoutes = createApiRouter()
                 seatUsage,
                 videoProvider,
                 collabEditing,
+                // Track D — the sidebar Messages badge. One indexed count
+                // (idx_msg_unread) per layout load; refreshes on navigation.
+                unreadMessages,
             },
         });
     });

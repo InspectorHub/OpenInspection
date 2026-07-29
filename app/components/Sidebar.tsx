@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { NavLink, useRouteLoaderData } from "react-router";
-import { useSessionContext } from "~/hooks/useSessionContext";
+import { useSessionContext, useUnreadMessages } from "~/hooks/useSessionContext";
 import { writeSidebarCookie, type UiPrefs } from "~/lib/ui-prefs";
 import { IC, WORKSPACE_ITEMS } from "~/components/sidebar/nav-items";
 import { SidebarGroup } from "~/components/sidebar/SidebarGroup";
@@ -23,6 +23,7 @@ export function Sidebar() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const ctx = useSessionContext();
+  const unreadMessages = useUnreadMessages();
   const { openPalette } = useCommandPalette();
 
   const companyName = ctx?.branding?.companyName || "OpenInspection";
@@ -93,7 +94,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-1 overflow-y-auto">
-        <SidebarGroup label={m.nav_section_workspace()} items={WORKSPACE_ITEMS} collapsed={collapsed} />
+        <SidebarGroup label={m.nav_section_workspace()} items={WORKSPACE_ITEMS.map((i) => (i.to === "/messages" ? { ...i, badge: unreadMessages } : i))} collapsed={collapsed} />
         {/* ds-allow: compact sidebar nav rhythm (10/7/14px), no semantic spacing token */}
         <div className="mb-[14px]">
           <NavLink

@@ -170,4 +170,56 @@ describe('MessageService', () => {
             expect((await svc.contactOnInspection('t1', 'i1', 'contact-coclient-1'))?.contactId).toBe('contact-coclient-1');
         });
     });
+
+    /**
+     * Track D — the company inbox reads. `WHERE contact_id` is the whole
+     * query once threads are contact-keyed; these pin the summary shape, the
+     * null-inspection rows the per-inspection view filters out by
+     * construction, and thread-scoped read-marking.
+     */
+    describe('company inbox (listThreads / listThreadForContact)', () => {
+        beforeEach(async () => {
+            await testDb.insert(contacts).values([
+                { id: 'ct-a', tenantId: 't1', type: 'client', name: 'Ann', email: 'ann@x.com', phone: null, createdAt: new Date() },
+                { id: 'ct-b', tenantId: 't1', type: 'client', name: 'Bob', email: 'bob@x.com', phone: null, createdAt: new Date() },
+            ]);
+            // Explicit timestamps: createMessage stamps `new Date()`, and three
+            // calls inside one millisecond make the newest-first order a tie.
+            await testDb.insert(inspectionMessages).values([
+                { id: 'th-1', tenantId: 't1', inspectionId: 'i1', contactId: 'ct-a', fromRole: 'client', fromName: 'Ann', body: 'first', attachments: [], readAt: null, createdAt: new Date(1000) },
+                { id: 'th-2', tenantId: 't1', inspectionId: null, contactId: 'ct-a', fromRole: 'inspector', fromName: 'Sam', body: 'pre-booking note', attachments: [], readAt: null, createdAt: new Date(2000) },
+                { id: 'th-3', tenantId: 't1', inspectionId: 'i1', contactId: 'ct-b', fromRole: 'client', fromName: 'Bob', body: 'hello there', attachments: [], readAt: null, createdAt: new Date(3000) },
+            ]);
+        });
+
+        it('summarises one row per contact, newest activity first, with unread counts', async () => {
+            const threads = await svc.listThreads('t1');
+            expect(threads.map(t => t.contactId)).toEqual(['ct-b', 'ct-a']);
+            const a = threads.find(t => t.contactId === 'ct-a')!;
+            expect(a.contactName).toBe('Ann');
+            // Ann's newest message is the inspector note; her one client message is unread.
+            expect(a.lastBody).toBe('pre-booking note');
+            expect(a.unread).toBe(1);
+        });
+
+        it('the contact thread INCLUDES rows with no inspection attached', async () => {
+            const rows = await svc.listThreadForContact('t1', 'ct-a');
+            expect(rows.map(r => r.body)).toEqual(['first', 'pre-booking note']);
+            expect(rows[1].inspectionId).toBeNull();
+            // …and an attached inspection resolves its address for the mention link.
+            expect(rows[0].propertyAddress).toBe('1 Main');
+        });
+
+        it('markContactThreadReadForStaff clears one thread and leaves the other', async () => {
+            await svc.markContactThreadReadForStaff('t1', 'ct-a');
+            const threads = await svc.listThreads('t1');
+            expect(threads.find(t => t.contactId === 'ct-a')!.unread).toBe(0);
+            expect(threads.find(t => t.contactId === 'ct-b')!.unread).toBe(1);
+        });
+
+        it('unreadCountForTenant covers the no-inspection rows too', async () => {
+            await svc.createMessage({ tenantId: 't1', inspectionId: null, contactId: 'ct-b', fromRole: 'client', fromName: 'Bob', body: 'outreach reply', attachments: [] });
+            expect(await svc.unreadCountForTenant('t1')).toBe(3);
+        });
+    });
 });

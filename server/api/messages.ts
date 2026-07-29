@@ -35,6 +35,7 @@ import { buildPortalUrl } from '../lib/portal-urls';
 import { getBaseUrl, resolveTenantSlug } from '../lib/url';
 import type { HonoConfig } from '../types/hono';
 import { r2Keys } from '../lib/r2-keys';
+import { messageThreadRoutes } from './messages-threads';
 
 const AttachmentSchema = z.object({
     id: z.string().describe('Stable attachment identifier within the message.'),
@@ -276,14 +277,16 @@ export const inspectorMessageRoutes = createApiRouter()
         return streamAttachment(obj, att);
     });
 
-// ── Cross-cutting summary router (mounted at /api/messages) ───────────────────
+// Company inbox thread routes live in ./messages-threads (Track D); they
+// compose onto this same /api/messages mount below.
 
 const messageRoutes = createApiRouter()
     .openapi(unreadRoute, async (c) => {
         const tenantId = c.get('tenantId');
         const count = await c.var.services.message.unreadCountForTenant(tenantId);
         return c.json({ success: true, data: { count } }, 200);
-    });
+    })
+    .route('/', messageThreadRoutes);
 
 export type MessagesApi = typeof messageRoutes;
 export type InspectorMessagesApi = typeof inspectorMessageRoutes;

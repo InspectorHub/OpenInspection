@@ -17,6 +17,11 @@ export function SidebarNavItem({ item, collapsed }: { item: NavItem; collapsed: 
     >
       {item.icon}
       {!collapsed && <span>{item.label()}</span>}
+      {!collapsed && (item.badge ?? 0) > 0 && (
+        <span className="ml-auto inline-flex items-center h-4 min-w-4 justify-center px-1 rounded-full bg-ih-primary text-ih-primary-fg text-[10px] font-bold tabular-nums">
+          {item.badge}
+        </span>
+      )}
     </NavLink>
   );
 }

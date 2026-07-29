@@ -49,6 +49,12 @@ export interface SessionContext {
  * Access the session context from any child route of auth-layout.
  * Returns null when context is unavailable (e.g. fetch failed).
  */
+/** Unread counterparty messages across the tenant (sidebar badge). */
+export function useUnreadMessages(): number {
+  const ctx = useSessionContext();
+  return (ctx as (SessionContext & { unreadMessages?: number }) | null)?.unreadMessages ?? 0;
+}
+
 export function useSessionContext(): SessionContext | null {
   const data = useRouteLoaderData("routes/auth-layout") as
     | { context: SessionContext | null }
